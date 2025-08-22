@@ -9,8 +9,8 @@
     "lint:fe": "pnpm --filter @nommie/frontend lint",
     "format:fe": "pnpm --filter @nommie/frontend format",
 
-    "dev:be": "pnpm --filter backend dev",
-    "build:be": "pnpm --filter backend build",
+    "dev:be": "cargo run --manifest-path apps/backend/Cargo.toml",
+    "build:be": "cargo build --manifest-path apps/backend/Cargo.toml",
     "lint:be": "cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings",
     "format:be": "cargo fmt --manifest-path apps/backend/Cargo.toml --all",
 
