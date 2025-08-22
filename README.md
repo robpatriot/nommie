@@ -5,19 +5,31 @@ It is built as a **full-stack, Docker-first application** with a clean split bet
 
 ---
 
-## 🚀 Quick Start
+## �� Quick Start
 
-1. **Start the database** (Docker Compose):
+1. **Install dependencies**:
    
-       docker compose up -d postgres
+       pnpm i
 
-2. **Install dependencies**:
+2. **Start frontend development server**:
    
-       pnpm install
+       pnpm dev:fe
+   
+   Frontend will be available at [http://localhost:3000](http://localhost:3000)
 
-3. **Run frontend & backend together**:
+3. **Start backend development server**:
    
-       pnpm dev
+       pnpm dev:be
+   
+   Backend will be available at [http://127.0.0.1:3001](http://127.0.0.1:3001)
+
+4. **Run linting** (frontend ESLint + backend clippy):
+   
+       pnpm lint
+
+5. **Run formatting** (frontend Prettier + backend fmt):
+   
+       pnpm format
 
 ---
 
