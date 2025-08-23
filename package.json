@@ -15,7 +15,14 @@
     "format:be": "cargo fmt --manifest-path apps/backend/Cargo.toml --all",
 
     "lint": "pnpm lint:fe && pnpm lint:be",
-    "format": "pnpm format:fe && pnpm format:be"
+    "format": "pnpm format:fe && pnpm format:be",
+
+    "db:up": "docker compose up -d postgres",
+    "db:stop": "docker compose stop postgres",
+    "db:down": "docker compose down -v",
+    "db:logs": "docker compose logs -f postgres",
+    "db:pg_isready": "docker exec -it nommie-postgres bash -lc 'pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"'",
+    "db:psql": "docker exec -it nommie-postgres bash -lc 'psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"'"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

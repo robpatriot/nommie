@@ -44,6 +44,31 @@ It is built as a **full-stack, Docker-first application** with a clean split bet
 
 ---
 
+We run Postgres locally via Docker Compose.
+
+### 1) Setup
+cp .env.example .env
+# Edit POSTGRES_PASSWORD in .env to a secure value
+
+### 2) Start the database
+pnpm run db:up
+# Postgres runs in a container named nommie-postgres
+# Bound to 127.0.0.1:5432
+# Data is stored in the postgres_data volume
+
+### 3) Stop the database (keep data)
+pnpm run db:stop
+
+### 4) Remove database + volume (wipe data)
+pnpm run db:down
+
+### 5) Logs & connectivity
+pnpm run db:logs       # follow Postgres logs
+pnpm run db:pg_isready # health check
+pnpm run db:psql       # open psql shell inside container
+
+---
+
 ## 🗺️ Roadmap
 
 Development is milestone-driven, from setup → core game loop → AI → polish.  
