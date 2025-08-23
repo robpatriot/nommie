@@ -6,6 +6,7 @@
     "dev": "cargo run",
     "build": "cargo build",
     "fmt": "cargo fmt",
-    "clippy": "cargo clippy"
+    "clippy": "cargo clippy",
+    "test": "cargo test"
   }
 }
