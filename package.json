@@ -21,8 +21,15 @@
     "db:stop": "docker compose stop postgres",
     "db:down": "docker compose down -v",
     "db:logs": "docker compose logs -f postgres",
-    "db:pg_isready": "docker exec -it nommie-postgres bash -lc 'pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"'",
-    "db:psql": "docker exec -it nommie-postgres bash -lc 'psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"'"
+
+    "db:pg_isready": "dotenvx run -- sh -lc 'docker exec -it nommie-postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB'",
+    "db:psql": "dotenvx run -- sh -lc 'docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB'",
+
+    "db:migrate": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie cargo run --manifest-path apps/backend/migration/Cargo.toml -- up'",
+    "db:fresh": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'",
+    "db:fresh:test": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie_test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'",
+
+    "test": "dotenvx run -- sh -lc 'DATABASE_URL=$TEST_DATABASE_URL cargo test -p backend -- --nocapture'"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
