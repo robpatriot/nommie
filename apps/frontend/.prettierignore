@@ -71,3 +71,14 @@ pids
 tmp/
 temp/
 
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Minified files
+*.min.js
+*.min.css
+
+# Compiled assets
+*.map
