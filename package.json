@@ -29,7 +29,7 @@
     "db:fresh": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'",
     "db:fresh:test": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie_test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'",
 
-    "test": "dotenvx run -- sh -lc 'DATABASE_URL=$TEST_DATABASE_URL cargo test -p backend -- --nocapture'"
+    "test": "dotenvx run -- sh -lc 'DATABASE_URL=$TEST_DATABASE_URL cargo test --manifest-path apps/backend/Cargo.toml -- --nocapture'"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

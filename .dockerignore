@@ -1,0 +1,10 @@
+.git
+.gitignore
+node_modules
+apps/frontend/.next
+apps/frontend/node_modules
+apps/backend/target
+target
+docker/postgres/init.sh~*
+**/*.swp
+**/*.swo

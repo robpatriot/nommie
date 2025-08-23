@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Expected env from docker-compose:
+#   POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, APP_DB_PASSWORD
+
+: "${POSTGRES_DB:?POSTGRES_DB is required}"
+: "${POSTGRES_USER:?POSTGRES_USER is required}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+: "${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}"
+: "${NOMMIE_OWNER_PASSWORD:?NOMMIE_OWNER_PASSWORD is required}"
+
+########################################
+# 1) Roles + Databases (idempotent)
+#    Use psql variables + \gexec for safe quoting.
+########################################
+psql -v ON_ERROR_STOP=1 \
+     --dbname "$POSTGRES_DB" \
+     --username "$POSTGRES_USER" \
+     -v owner_pw="${NOMMIE_OWNER_PASSWORD}" \
+     -v app_pw="${APP_DB_PASSWORD}" <<'PSQL'
+-- Create nommie_owner if missing, then ensure password
+SELECT format('CREATE ROLE nommie_owner LOGIN PASSWORD %L', :'owner_pw')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='nommie_owner');
+\gexec
+SELECT format('ALTER ROLE nommie_owner WITH PASSWORD %L', :'owner_pw');
+\gexec
+
+-- Create nommie_app if missing, then ensure password
+SELECT format('CREATE ROLE nommie_app LOGIN PASSWORD %L', :'app_pw')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='nommie_app');
+\gexec
+SELECT format('ALTER ROLE nommie_app WITH PASSWORD %L', :'app_pw');
+\gexec
+
+-- Create application databases if missing
+SELECT 'CREATE DATABASE nommie OWNER nommie_owner'
+WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname='nommie');
+\gexec
+SELECT 'CREATE DATABASE nommie_test OWNER nommie_owner'
+WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname='nommie_test');
+\gexec
+PSQL
+
+########################################
+# 2) Configure 'nommie' DB (extensions & privileges)
+########################################
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "nommie" <<'PSQL'
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Public schema ownership & privileges
+ALTER SCHEMA public OWNER TO nommie_owner;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA public TO nommie_owner;
+GRANT USAGE ON SCHEMA public TO nommie_app;
+
+-- Default privileges for future objects created by nommie_owner
+ALTER DEFAULT PRIVILEGES FOR USER nommie_owner IN SCHEMA public
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO nommie_app;
+
+ALTER DEFAULT PRIVILEGES FOR USER nommie_owner IN SCHEMA public
+GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO nommie_app;
+
+-- (No table creation here; schema is managed by the SeaORM migrator.)
+PSQL
+
+########################################
+# 3) Configure 'nommie_test' DB (extensions & privileges)
+########################################
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "nommie_test" <<'PSQL'
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+ALTER SCHEMA public OWNER TO nommie_owner;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT USAGE, CREATE ON SCHEMA public TO nommie_owner;
+GRANT USAGE ON SCHEMA public TO nommie_app;
+
+ALTER DEFAULT PRIVILEGES FOR USER nommie_owner IN SCHEMA public
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO nommie_app;
+
+ALTER DEFAULT PRIVILEGES FOR USER nommie_owner IN SCHEMA public
+GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO nommie_app;
+PSQL
+
