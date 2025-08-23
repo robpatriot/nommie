@@ -10,6 +10,9 @@ node_modules/
 .env.production.local
 apps/frontend/.env.local
 
+# Postgres data
+postgres_data/
+
 # Next.js
 .next/
 out/
