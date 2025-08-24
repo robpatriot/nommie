@@ -13,7 +13,7 @@ pub async fn connect_from_env() -> Result<DatabaseConnection, sea_orm::DbErr> {
 }
 
 /// Run database migrations (idempotent)
-/// This should only be called from main.rs, never from tests
+/// This should only be called from migration scripts (pnpm db:migrate), never from main.rs or tests
 pub async fn run_migrations(conn: &DatabaseConnection) -> Result<(), sea_orm::DbErr> {
     use migration::{Migrator, MigratorTrait};
     

@@ -5,17 +5,12 @@ use backend::{configure_routes, bootstrap::db, middleware::request_trace::Reques
 async fn main() -> std::io::Result<()> {
     println!("🚀 Starting Nommie Backend on http://127.0.0.1:3001");
 
-    // Load environment and connect to database
+    // Load environment and connect to database (app role only, no migrations)
     let db = db::connect_from_env()
         .await
         .expect("Failed to connect to database");
-    
-    // Run migrations (idempotent)
-    db::run_migrations(&db)
-        .await
-        .expect("Failed to run database migrations");
 
-    println!("✅ Database connected and migrations applied");
+    println!("✅ Database connected (migrations handled by pnpm db:migrate)");
 
     HttpServer::new(move || {
         App::new()
