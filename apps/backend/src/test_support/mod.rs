@@ -1,4 +1,5 @@
 pub mod migrations;
+pub mod schema_guard;
 
 /// Load test env from .env.test if present (no panic if missing).
 pub fn load_test_env() {
