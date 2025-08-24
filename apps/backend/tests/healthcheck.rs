@@ -1,30 +1,22 @@
-use actix_test;
-use backend::{build_app, assert_test_db_url, load_test_env, migrate_test_db, get_test_db_url};
+use actix_web::{test, App};
+use backend::{health, test_support::get_test_db_url};
+use sea_orm::Database;
 
-#[actix_test::test]
+#[actix_web::test]
 async fn test_health_endpoint() {
-    // Load test environment
-    load_test_env();
-    
-    // Get and validate test database URL
     let db_url = get_test_db_url();
-    assert_test_db_url(&db_url);
-    
-    // Migrate test database
-    let _db = migrate_test_db(&db_url).await;
-    
-    // Build service with the configurator closure
-    let app = actix_test::init_service(build_app()).await;
-    
-    // Send GET /health request
-    let req = actix_test::TestRequest::get().uri("/health").to_request();
-    let resp = actix_test::call_service(&app, req).await;
-    
-    // Assert response
+    let _db = Database::connect(&db_url).await.expect("connect to test database");
+
+    let app = test::init_service(
+        App::new().configure(health::configure)
+    ).await;
+
+    let req = test::TestRequest::get().uri("/health").to_request();
+    let resp = test::call_service(&app, req).await;
+
     assert!(resp.status().is_success());
     assert_eq!(resp.status().as_u16(), 200);
-    
-    // Assert response body
-    let body = actix_test::read_body(resp).await;
+
+    let body = test::read_body(resp).await;
     assert_eq!(body, "ok");
 }

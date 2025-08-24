@@ -2,54 +2,63 @@
 
 This document describes the testing setup for the Nommie backend.
 
-## Requirements
+## Database Environment Policy
 
-### Environment Configuration
-- Tests require a `.env.test` file with test-specific configuration
-- The `DATABASE_URL` must end with `_test` to prevent accidental writes to production databases
-- The test environment is loaded automatically via `dotenvy::from_filename(".env.test").ok()`
+### Code Requirements
+- **Backend code reads only `DATABASE_URL`** - no references to `TEST_DATABASE_URL`
+- **Tests must run against a database whose name ends with `_test`**
+- **Tests must NEVER run migrations** - use `pnpm db:fresh:test` to prepare schema
+- **The test runner automatically derives the test database URL** by appending `_test` to the existing `DATABASE_URL`
 
 ### Database Setup
 - Tests run against a database suffixed with `_test`
-- SeaORM migrations are automatically applied for tests
-- The `migrate_test_db()` function ensures migrations only run once per test process
+- **Schema must be prepared manually using `pnpm db:fresh:test` before running tests**
+- Tests only connect to the database and build the app - no migrations are run
+- **Running migrations in tests will panic with clear instructions**
 
 ## Test Structure
 
 ### Test Support Module (`src/test_support/`)
 - `assert_test_db_url(url: &str)` - Validates database URL ends with `_test`
 - `load_test_env()` - Loads `.env.test` configuration
-- `migrate_test_db(db_url: &str)` - Connects and migrates test database
 - `get_test_db_url()` - Retrieves database URL from environment
+- **`migrate_test_db()` - Panics with instructions to use `pnpm db:fresh:test`**
 
 ### Health Endpoint (`src/health.rs`)
 - Simple `GET /health` endpoint returning `200` with body `"ok"`
-- `build_app()` function returns a closure that configures the Actix Web App
+- `configure()` function returns a closure that configures the Actix Web App
 - Avoids generic type issues with `actix_web::App`
 
 ### Integration Tests (`tests/`)
 - `healthcheck.rs` - Tests the health endpoint with full service setup
 - Uses in-process Actix Web testing with the configurator closure
-- Validates database connectivity and migration
-
-## Running Tests
-
-```bash
-# Run all backend tests
-pnpm test
-
-# Run tests with verbose output
-cargo test --verbose
-
-# Run specific test
-cargo test test_health_endpoint
-```
+- **Only connects to database - does not run migrations**
 
 ## Safety Features
 
 - **Database Guard**: Tests panic if `DATABASE_URL` doesn't end with `_test`
-- **Migration Isolation**: Migrations run only once per test process
+- **Migration Prevention**: Any attempt to run migrations in tests will panic
 - **Environment Isolation**: Test-specific environment via `.env.test`
+
+## Running Tests
+
+```bash
+# First, prepare the test database schema
+pnpm db:fresh:test
+
+# Then run all backend tests (automatically sets DATABASE_URL to *_test)
+pnpm test
+
+# Run tests with verbose output (requires DATABASE_URL to end with _test)
+cargo test --verbose
+
+# Run specific test (requires DATABASE_URL to end with _test)
+cargo test test_health_endpoint
+```
+
+**Important**: You must run `pnpm db:fresh:test` before running tests. Tests will panic if you try to run migrations.
+
+**Note**: Running `cargo test` directly (without `pnpm test`) will fail fast with a clear `_test` guard panic if `DATABASE_URL` doesn't end with `_test`.
 
 ## Example `.env.test`
 
@@ -59,6 +68,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/nommie_test
 
 ## Architecture Notes
 
-- The `build_app()` function returns a closure to avoid Actix Web generic type issues
-- Test database migrations use `OnceCell` for process-level singleton behavior
-- Integration tests use `actix_test` for in-process service testing
+- Tests only connect to the database and build the app
+- No migrations are run during tests - schema must be prepared beforehand
+- Integration tests use `actix_web::test` for in-process service testing
+- The `_test` suffix guard ensures tests never run against production databases
