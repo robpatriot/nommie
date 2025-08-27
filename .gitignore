@@ -1,3 +1,6 @@
+# Dev logs and pids dir
+.dev
+
 # Dependencies
 node_modules/
 .pnpm-store/
