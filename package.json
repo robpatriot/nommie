@@ -4,16 +4,27 @@
   "description": "Web-based multiplayer version of Nomination Whist",
   "private": true,
   "scripts": {
-    "dev:fe": "pnpm --filter @nommie/frontend dev",
-    "build:fe": "pnpm --filter @nommie/frontend build",
-    "lint:fe": "pnpm --filter @nommie/frontend lint",
-    "format:fe": "pnpm --filter @nommie/frontend format",
-    "dev:be": "cargo run --manifest-path apps/backend/Cargo.toml",
+    "up": "pnpm up:be && pnpm up:fe",
+    "up:be": "if [ -f .dev/be.pid ] && kill -0 $(cat .dev/be.pid) 2>/dev/null; then echo \"[backend] already running (pid $(cat .dev/be.pid))\" && exit 1; fi; RUST_LOG=${RUST_LOG:-info} cargo run --manifest-path apps/backend/Cargo.toml >> .dev/dev.log 2>&1 & echo $! > .dev/be.pid && echo \"[backend] started pid $(cat .dev/be.pid)\"",
+    "up:fe": "if [ -f .dev/fe.pid ] && kill -0 $(cat .dev/fe.pid) 2>/dev/null; then echo \"[frontend] already running (pid $(cat .dev/fe.pid))\" && exit 1; fi; pnpm --filter @nommie/frontend dev >> .dev/dev.log 2>&1 & echo $! > .dev/fe.pid && echo \"[frontend] started pid $(cat .dev/fe.pid)\"",
+
+    "down": "pnpm down:be && pnpm down:fe",
+    "down:be": "if [ -f .dev/be.pid ]; then kill $(cat .dev/be.pid) 2>/dev/null || true; rm -f .dev/be.pid; echo \"[backend] stopped\"; else echo \"[backend] no pidfile\"; fi",
+    "down:fe": "if [ -f .dev/fe.pid ]; then kill $(cat .dev/fe.pid) 2>/dev/null || true; rm -f .dev/fe.pid; echo \"[frontend] stopped\"; else echo \"[frontend] no pidfile\"; fi",
+
+    "status": "for s in be fe; do if [ -f .dev/$s.pid ] && kill -0 $(cat .dev/$s.pid) 2>/dev/null; then echo \"$s: running (pid $(cat .dev/$s.pid))\"; else echo \"$s: stopped\"; fi; done",
+
+    "lint": "pnpm lint:fe && pnpm lint:be",
+    "format": "pnpm format:fe && pnpm format:be",
+    "test": "dotenvx run -- sh -lc 'export DATABASE_URL=${DATABASE_URL}_test; cargo test --manifest-path apps/backend/Cargo.toml -- --nocapture'",
+
     "build:be": "cargo build --manifest-path apps/backend/Cargo.toml",
     "lint:be": "cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings",
     "format:be": "cargo fmt --manifest-path apps/backend/Cargo.toml --all",
-    "lint": "pnpm lint:fe && pnpm lint:be",
-    "format": "pnpm format:fe && pnpm format:be",
+    "build:fe": "pnpm --filter @nommie/frontend build",
+    "lint:fe": "pnpm --filter @nommie/frontend lint",
+    "format:fe": "pnpm --filter @nommie/frontend format",
+
     "db:up": "docker compose up -d postgres",
     "db:stop": "docker compose stop postgres",
     "db:down": "docker compose down -v",
@@ -22,8 +33,7 @@
     "db:psql": "dotenvx run -- sh -lc 'docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB'",
     "db:migrate": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie cargo run --manifest-path apps/backend/migration/Cargo.toml -- up'",
     "db:fresh": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'",
-    "db:fresh:test": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie_test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'",
-    "test": "dotenvx run -- sh -lc 'export DATABASE_URL=${DATABASE_URL}_test; cargo test --manifest-path apps/backend/Cargo.toml -- --nocapture'"
+    "db:fresh:test": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie_test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.49.0",
