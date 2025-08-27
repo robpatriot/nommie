@@ -1,5 +1,5 @@
 use actix_web::{App, HttpServer, web};
-use backend::{configure_routes, bootstrap::db, middleware::request_trace::RequestTrace};
+use backend::{configure_routes, bootstrap::db, middleware::{RequestTrace, StructuredLogger}};
 
 mod telemetry;
 
@@ -19,6 +19,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(RequestTrace)
+            .wrap(StructuredLogger)
             .app_data(web::Data::new(db.clone()))
             .configure(configure_routes)
     })
