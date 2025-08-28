@@ -5,13 +5,14 @@
 node_modules/
 .pnpm-store/
 
-# Environment files
+# Environment files including cursor temp file
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 apps/frontend/.env.local
+docs/env.example.txt
 
 # Postgres data
 postgres_data/
