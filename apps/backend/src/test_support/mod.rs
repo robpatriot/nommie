@@ -9,10 +9,7 @@ pub fn load_test_env() {
 /// Panic unless the DB URL ends with `_test`.
 pub fn assert_test_db_url(url: &str) {
     if !url.ends_with("_test") {
-        panic!(
-            "Tests must run against a test database ending with `_test`. Current DATABASE_URL: {}",
-            url
-        );
+        panic!("Tests must run against a test database ending with `_test`. Current DATABASE_URL: {url}");
     }
 }
 
@@ -23,8 +20,9 @@ pub fn assert_test_db_url(url: &str) {
 pub fn get_test_db_url() -> String {
     use std::env;
     load_test_env();
-    let url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| panic!("DATABASE_URL must be set for tests (pnpm test should export it)"));
+    let url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+        panic!("DATABASE_URL must be set for tests (pnpm test should export it)")
+    });
     assert_test_db_url(&url);
     url
 }
