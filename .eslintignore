@@ -1,0 +1,6 @@
+# Ignore everything by default
+*
+
+# Allow only the frontend workspace to be linted
+!apps/frontend/**
+
