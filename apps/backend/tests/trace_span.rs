@@ -53,7 +53,7 @@ async fn handler_logs_are_in_request_span_with_trace_id() {
                 "/ping",
                 web::get().to(|| async {
                     info!("inside handler");
-                    HttpResponse::Ok().finish()
+                    Ok::<HttpResponse, backend::AppError>(HttpResponse::Ok().finish())
                 }),
             ),
     )

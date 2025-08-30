@@ -1,4 +1,4 @@
-use actix_web::{error::ResponseError, http::StatusCode, HttpResponse, HttpRequest, HttpMessage};
+use actix_web::{error::ResponseError, http::StatusCode, HttpMessage, HttpRequest, HttpResponse};
 use serde::Serialize;
 use thiserror::Error;
 
@@ -34,13 +34,9 @@ pub enum AppError {
         trace_id: Option<String>,
     },
     #[error("Unauthorized")]
-    Unauthorized {
-        trace_id: Option<String>,
-    },
+    Unauthorized { trace_id: Option<String> },
     #[error("Forbidden")]
-    Forbidden {
-        trace_id: Option<String>,
-    },
+    Forbidden { trace_id: Option<String> },
     #[error("Bad request: {detail}")]
     BadRequest {
         code: &'static str,
@@ -55,6 +51,65 @@ pub enum AppError {
 }
 
 impl AppError {
+    /// Ensures that every error response has a trace_id.
+    /// If no trace_id is provided, sets it to "unknown".
+    pub fn ensure_trace_id(err: AppError) -> AppError {
+        let trace_id = err.trace_id().unwrap_or_else(|| "unknown".to_string());
+        err.with_trace_id(Some(trace_id))
+    }
+
+    /// Helper method to extract trace_id from any error variant
+    fn trace_id(&self) -> Option<String> {
+        match self {
+            AppError::Validation { trace_id, .. } => trace_id.clone(),
+            AppError::Db { trace_id, .. } => trace_id.clone(),
+            AppError::NotFound { trace_id, .. } => trace_id.clone(),
+            AppError::Unauthorized { trace_id } => trace_id.clone(),
+            AppError::Forbidden { trace_id } => trace_id.clone(),
+            AppError::BadRequest { trace_id, .. } => trace_id.clone(),
+            AppError::Internal { trace_id, .. } => trace_id.clone(),
+        }
+    }
+
+    /// Helper method to extract error code from any error variant
+    fn code(&self) -> String {
+        match self {
+            AppError::Validation { code, .. } => code.to_string(),
+            AppError::Db { .. } => "DB_ERROR".to_string(),
+            AppError::NotFound { code, .. } => code.to_string(),
+            AppError::Unauthorized { .. } => "UNAUTHORIZED".to_string(),
+            AppError::Forbidden { .. } => "FORBIDDEN".to_string(),
+            AppError::BadRequest { code, .. } => code.to_string(),
+            AppError::Internal { .. } => "INTERNAL".to_string(),
+        }
+    }
+
+    /// Helper method to extract error detail from any error variant
+    fn detail(&self) -> String {
+        match self {
+            AppError::Validation { detail, .. } => detail.clone(),
+            AppError::Db { detail, .. } => detail.clone(),
+            AppError::NotFound { detail, .. } => detail.clone(),
+            AppError::Unauthorized { .. } => "Authentication required".to_string(),
+            AppError::Forbidden { .. } => "Access denied".to_string(),
+            AppError::BadRequest { detail, .. } => detail.clone(),
+            AppError::Internal { detail, .. } => detail.clone(),
+        }
+    }
+
+    /// Get the HTTP status code for this error
+    pub fn status(&self) -> StatusCode {
+        match self {
+            AppError::Validation { status, .. } => *status,
+            AppError::Db { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::NotFound { .. } => StatusCode::NOT_FOUND,
+            AppError::Unauthorized { .. } => StatusCode::UNAUTHORIZED,
+            AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
+            AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
+            AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+
     pub fn invalid(code: &'static str, detail: String) -> Self {
         Self::Validation {
             code,
@@ -95,40 +150,40 @@ impl AppError {
     }
 
     pub fn unauthorized() -> Self {
-        Self::Unauthorized {
-            trace_id: None,
-        }
+        Self::Unauthorized { trace_id: None }
     }
 
     pub fn forbidden() -> Self {
-        Self::Forbidden {
-            trace_id: None,
-        }
+        Self::Forbidden { trace_id: None }
     }
 
     pub fn with_trace_id(self, trace_id: Option<String>) -> Self {
         match self {
-            AppError::Validation { code, detail, status, .. } => {
-                AppError::Validation { code, detail, status, trace_id }
-            }
-            AppError::Db { detail, .. } => {
-                AppError::Db { detail, trace_id }
-            }
-            AppError::NotFound { code, detail, .. } => {
-                AppError::NotFound { code, detail, trace_id }
-            }
-            AppError::Unauthorized { .. } => {
-                AppError::Unauthorized { trace_id }
-            }
-            AppError::Forbidden { .. } => {
-                AppError::Forbidden { trace_id }
-            }
-            AppError::BadRequest { code, detail, .. } => {
-                AppError::BadRequest { code, detail, trace_id }
-            }
-            AppError::Internal { detail, .. } => {
-                AppError::Internal { detail, trace_id }
-            }
+            AppError::Validation {
+                code,
+                detail,
+                status,
+                ..
+            } => AppError::Validation {
+                code,
+                detail,
+                status,
+                trace_id,
+            },
+            AppError::Db { detail, .. } => AppError::Db { detail, trace_id },
+            AppError::NotFound { code, detail, .. } => AppError::NotFound {
+                code,
+                detail,
+                trace_id,
+            },
+            AppError::Unauthorized { .. } => AppError::Unauthorized { trace_id },
+            AppError::Forbidden { .. } => AppError::Forbidden { trace_id },
+            AppError::BadRequest { code, detail, .. } => AppError::BadRequest {
+                code,
+                detail,
+                trace_id,
+            },
+            AppError::Internal { detail, .. } => AppError::Internal { detail, trace_id },
         }
     }
 
@@ -153,55 +208,21 @@ impl AppError {
 
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
-        match self {
-            AppError::Validation { status, .. } => *status,
-            AppError::Db { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-            AppError::NotFound { .. } => StatusCode::NOT_FOUND,
-            AppError::Unauthorized { .. } => StatusCode::UNAUTHORIZED,
-            AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
-            AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
-            AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
-        }
+        self.status()
     }
 
     fn error_response(&self) -> HttpResponse {
-        let status = self.status_code();
-        let code = match self {
-            AppError::Validation { code, .. } => code,
-            AppError::Db { .. } => "DB_ERROR",
-            AppError::NotFound { code, .. } => code,
-            AppError::Unauthorized { .. } => "UNAUTHORIZED",
-            AppError::Forbidden { .. } => "FORBIDDEN",
-            AppError::BadRequest { code, .. } => code,
-            AppError::Internal { .. } => "INTERNAL",
-        };
-
-        let detail = match self {
-            AppError::Validation { detail, .. } => detail.clone(),
-            AppError::Db { detail, .. } => detail.clone(),
-            AppError::NotFound { detail, .. } => detail.clone(),
-            AppError::Unauthorized { .. } => "Authentication required".to_string(),
-            AppError::Forbidden { .. } => "Access denied".to_string(),
-            AppError::BadRequest { detail, .. } => detail.clone(),
-            AppError::Internal { detail, .. } => detail.clone(),
-        };
-
-        let trace_id = match self {
-            AppError::Validation { trace_id, .. } => trace_id.clone(),
-            AppError::Db { trace_id, .. } => trace_id.clone(),
-            AppError::NotFound { trace_id, .. } => trace_id.clone(),
-            AppError::Unauthorized { trace_id } => trace_id.clone(),
-            AppError::Forbidden { trace_id } => trace_id.clone(),
-            AppError::BadRequest { trace_id, .. } => trace_id.clone(),
-            AppError::Internal { trace_id, .. } => trace_id.clone(),
-        }.unwrap_or_else(|| "unknown".to_string());
+        let status = self.status();
+        let code = self.code();
+        let detail = self.detail();
+        let trace_id = self.trace_id().unwrap_or_else(|| "unknown".to_string());
 
         let problem_details = ProblemDetails {
             type_: format!("https://nommie.app/errors/{}", code.to_uppercase()),
-            title: Self::humanize_code(code),
+            title: Self::humanize_code(&code),
             status: status.as_u16(),
             detail,
-            code: code.to_string(),
+            code,
             trace_id,
         };
 
