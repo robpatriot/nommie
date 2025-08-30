@@ -1,8 +1,6 @@
 use sea_orm_migration::prelude::*; // Only migration prelude
 use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction}; // Explicit imports
 
-use uuid::Uuid;
-
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
