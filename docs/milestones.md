@@ -39,7 +39,7 @@
 
 ---
 
-## 🅔 E — Error Shapes & Logging *(S → M)*  
+## ✅ E — Error Shapes & Logging *(S → M)*  
 - **Dependencies:** D  
 - **Details:**  
   - Problem Details shape: `{ type, title, status, detail, code, trace_id }`.  
@@ -49,21 +49,34 @@
 
 ---
 
-## 🅕 F — Database Schema (Actual Entities) *(M → L)*  
+## ✅ F — Database Schema (Actual Entities) *(M → L)*  
 - **Dependencies:** C (plumbing done), D (tests in place).  
 - **Details:**  
   - Define real schema in `init.sql`.  
   - Tables: `users`, `games`, `memberships`, `bids`, `plays`, `scores`.  
   - Add enums for state/roles where needed.  
   - Foreign keys + indexes for performance.  
-- **Acceptance:**  
+- **Acceptance:**
   - `init.sql` defines canonical schema.  
   - Tests reset and apply schema cleanly.  
   - Entities present and coherent with game lifecycle needs.
 
 ---
 
-## 🅖 G — Extractors *(M → L)*  
+## 🅖 G — User Authentication *(M → L)*  
+- **Dependencies:** F  
+- **Details:**  
+  - Use **Google OAuth** for account creation and authentication.  
+  - Use **JWTs** for frontend/backend authentication.  
+  - Add an **auth extractor** to handle JWT authentication and user session.  
+- **Acceptance:**  
+  - Users can authenticate using **Google** OAuth.  
+  - JWTs are used for frontend/backend authentication.  
+  - Extractor handles JWT validation and user session.
+
+---
+
+## 🅗 H — Extractors *(M → L)*  
 - **Dependencies:** E, F  
 - **Details:**  
   - Extractors: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`.  
@@ -72,7 +85,7 @@
 
 ---
 
-## 🅗 H — Backend Domain Modules *(L)*  
+## 🅘 I — Backend Domain Modules *(L)*  
 - **Dependencies:** G  
 - **Details:**  
   - Pure logic in `rules`, `bidding`, `tricks`, `scoring`, `state`.  
@@ -81,7 +94,7 @@
 
 ---
 
-## 🅘 I — CI Pipeline *(S)*  
+## 🅙 J — CI Pipeline *(S)*  
 - **Dependencies:** D, E, F, G, H  
 - **Details:**  
   - CI jobs: **test** + **lint** required; build optional until later.  
@@ -89,7 +102,7 @@
 
 ---
 
-## 🅙 J — Frontend App Router Seed *(M)*  
+## 🅚 K — Frontend App Router Seed *(M)*  
 - **Dependencies:** E, G  
 - **Details:**  
   - Next.js App Router + Turbopack.  
@@ -99,7 +112,7 @@
 
 ---
 
-## 🅚 K — Game Lifecycle (Happy Path) *(L → XL)*  
+## 🅛 L — Game Lifecycle (Happy Path) *(L → XL)*  
 - **Dependencies:** H, G, I, J  
 - **Details:**  
   - End-to-end game: create → join → ready → deal → bid → trump → tricks → scoring → round advance.  
@@ -108,7 +121,7 @@
 
 ---
 
-## 🅛 L — AI Orchestration *(M → L)*  
+## 🅜 M — AI Orchestration *(M → L)*  
 - **Dependencies:** K  
 - **Details:**  
   - Basic AI bidding + trick play.  
@@ -117,7 +130,7 @@
 
 ---
 
-## 🅜 M — Validation, Edge Cases & Property Tests *(M)*  
+## 🅝 N — Validation, Edge Cases & Property Tests *(M)*  
 - **Dependencies:** K  
 - **Details:**  
   - Invalid bids/plays return proper errors.  
@@ -126,7 +139,7 @@
 
 ---
 
-## 🅝 N — Documentation & Decision Log *(S)*  
+## 🅞 O — Documentation & Decision Log *(S)*  
 - **Dependencies:** K (so docs reflect reality).  
 - **Details:**  
   - README: setup, reset flow.  
@@ -136,7 +149,7 @@
 
 ---
 
-## 🅞 O — Frontend UX Pass (Round 1) *(M → L)*  
+## 🅟 P — Frontend UX Pass (Round 1) *(M → L)*  
 - **Dependencies:** K, M  
 - **Details:**  
   - Hand display, trick area, bidding UI, trump selector.  
@@ -145,7 +158,7 @@
 
 ---
 
-## 🅟 P — Observability & Stability *(S → M)*  
+## 🅠 Q — Observability & Stability *(S → M)*  
 - **Dependencies:** E, K  
 - **Details:**  
   - Logs include `user_id` + `game_id` when relevant.  
@@ -155,7 +168,7 @@
 
 ---
 
-## 🅠 Q — Open Source Observability Stack *(M → L)*  
+## 🅡 R — Open Source Observability Stack *(M → L)*  
 - **Dependencies:** P, I  
 - **Details:**  
   - Grafana + Tempo + Loki + Prometheus in Docker.  
@@ -163,16 +176,16 @@
 
 ---
 
-# 🔄 Optional Track (can be done anytime)
+### **Optional Track (can be done anytime)**:
 
-### 1. WebSockets *(M)*  
+### 1. **WebSockets** *(M)*  
 - **Dependencies:** K  
 - **Notes:** Easier once lifecycle exists, but orthogonal.
 
-### 2. Transactional Tests *(S → M)*  
+### 2. **Transactional Tests** *(S → M)*  
 - **Dependencies:** D  
 - **Notes:** Optimization, not essential.
 
-### 3. Deployment Stub *(S → M)*  
+### 3. **Deployment Stub** *(S → M)*  
 - **Dependencies:** B, P  
 - **Notes:** Minimal prod bootstrapping; flexible timing.
