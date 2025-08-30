@@ -1,115 +1,239 @@
-use sea_orm_migration::prelude::*; // Only migration prelude
-use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction}; // Explicit imports
+use sea_orm_migration::prelude::*;
+use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
+// ----- Iden enums for tables & columns -----
+#[derive(Iden)]
+enum Users {
+    Table,
+    Id,
+    Username,
+    IsAi,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
+enum UserCredentials {
+    Table,
+    Id,
+    UserId,
+    PasswordHash,
+    Email,
+    GoogleSub,
+    LastLogin,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
+enum GamePlayers {
+    Table,
+    Id,
+    GameId,
+    UserId,
+    TurnOrder,
+    IsReady,
+    CreatedAt,
+}
+
+#[derive(Iden)]
+enum AiProfiles {
+    Table,
+    Id,
+    UserId,
+    Playstyle,
+    Difficulty,
+    CreatedAt,
+    UpdatedAt,
+}
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Create Users Table
+        // users
         manager
             .create_table(
                 Table::create()
-                    .table("users") // Table name directly as string
+                    .table(Users::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new("id").uuid().not_null().primary_key())
-                    .col(ColumnDef::new("username").string().not_null())
-                    .col(ColumnDef::new("is_ai").boolean().not_null().default(false))
-                    .col(ColumnDef::new("created_at").timestamp().not_null())
-                    .col(ColumnDef::new("updated_at").timestamp().not_null())
+                    .col(ColumnDef::new(Users::Id).uuid().not_null().primary_key())
+                    .col(ColumnDef::new(Users::Username).string().null())
+                    .col(
+                        ColumnDef::new(Users::IsAi)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(ColumnDef::new(Users::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(Users::UpdatedAt).timestamp().not_null())
                     .to_owned(),
             )
             .await?;
 
-        // Create UserCredentials Table
+        // user_credentials
         manager
             .create_table(
                 Table::create()
-                    .table("user_credentials") // Table name directly as string
+                    .table(UserCredentials::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new("id").uuid().not_null().primary_key())
-                    .col(ColumnDef::new("user_id").uuid().not_null())
-                    .col(ColumnDef::new("password_hash").string().not_null())
-                    .col(ColumnDef::new("email").string().not_null().unique_key()) // Corrected method
-                    .col(ColumnDef::new("last_login").timestamp().null())
-                    .col(ColumnDef::new("created_at").timestamp().not_null())
-                    .col(ColumnDef::new("updated_at").timestamp().not_null())
+                    .col(
+                        ColumnDef::new(UserCredentials::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(UserCredentials::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserCredentials::PasswordHash)
+                            .string()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserCredentials::Email)
+                            .string()
+                            .not_null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(UserCredentials::GoogleSub)
+                            .string()
+                            .null()
+                            .unique_key(),
+                    )
+                    .col(
+                        ColumnDef::new(UserCredentials::LastLogin)
+                            .timestamp()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserCredentials::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserCredentials::UpdatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_user_credentials_user_id")
-                            .from("user_credentials", "user_id")
-                            .to("users", "id")
-                            .on_delete(ForeignKeyAction::Cascade), // Disambiguated ForeignKeyAction
+                            .from(UserCredentials::Table, UserCredentials::UserId)
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
             .await?;
 
-        // Create GamePlayers Table
+        // unique index on user_credentials.user_id
+        manager
+            .create_index(
+                Index::create()
+                    .name("ux_user_credentials_user_id")
+                    .table(UserCredentials::Table)
+                    .col(UserCredentials::UserId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        // game_players
         manager
             .create_table(
                 Table::create()
-                    .table("game_players") // Table name directly as string
+                    .table(GamePlayers::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new("id").uuid().not_null().primary_key())
-                    .col(ColumnDef::new("game_id").uuid().not_null())
-                    .col(ColumnDef::new("user_id").uuid().not_null())
-                    .col(ColumnDef::new("turn_order").integer().not_null())
-                    .col(ColumnDef::new("is_ready").boolean().default(false))
-                    .col(ColumnDef::new("created_at").timestamp().not_null())
+                    .col(
+                        ColumnDef::new(GamePlayers::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(GamePlayers::GameId).uuid().not_null())
+                    .col(ColumnDef::new(GamePlayers::UserId).uuid().not_null())
+                    .col(ColumnDef::new(GamePlayers::TurnOrder).integer().not_null())
+                    .col(
+                        ColumnDef::new(GamePlayers::IsReady)
+                            .boolean()
+                            .not_null()
+                            .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(GamePlayers::CreatedAt)
+                            .timestamp()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_game_players_user_id")
-                            .from("game_players", "user_id")
-                            .to("users", "id")
+                            .from(GamePlayers::Table, GamePlayers::UserId)
+                            .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
             .await?;
 
-        // Create AIProfiles Table
+        // ai_profiles
         manager
             .create_table(
                 Table::create()
-                    .table("ai_profiles") // Table name directly as string
+                    .table(AiProfiles::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new("id").uuid().not_null().primary_key())
-                    .col(ColumnDef::new("user_id").uuid().not_null())
-                    .col(ColumnDef::new("playstyle").string().null())
-                    .col(ColumnDef::new("difficulty").integer().null())
-                    .col(ColumnDef::new("created_at").timestamp().not_null())
-                    .col(ColumnDef::new("updated_at").timestamp().not_null())
+                    .col(
+                        ColumnDef::new(AiProfiles::Id)
+                            .uuid()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(ColumnDef::new(AiProfiles::UserId).uuid().not_null())
+                    .col(ColumnDef::new(AiProfiles::Playstyle).string().null())
+                    .col(ColumnDef::new(AiProfiles::Difficulty).integer().null())
+                    .col(ColumnDef::new(AiProfiles::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(AiProfiles::UpdatedAt).timestamp().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_ai_profiles_user_id")
-                            .from("ai_profiles", "user_id")
-                            .to("users", "id")
+                            .from(AiProfiles::Table, AiProfiles::UserId)
+                            .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
             )
             .await?;
-
-        // Additional tables would follow a similar pattern...
 
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Drop tables in reverse order (not using enums, just direct strings)
+        // drop in reverse order + drop index before table
         manager
-            .drop_table(Table::drop().table("ai_profiles").to_owned())
+            .drop_table(Table::drop().table(AiProfiles::Table).to_owned())
             .await?;
+
         manager
-            .drop_table(Table::drop().table("game_players").to_owned())
+            .drop_table(Table::drop().table(GamePlayers::Table).to_owned())
             .await?;
+
         manager
-            .drop_table(Table::drop().table("user_credentials").to_owned())
+            .drop_index(
+                Index::drop()
+                    .name("ux_user_credentials_user_id")
+                    .table(UserCredentials::Table)
+                    .to_owned(),
+            )
             .await?;
+
         manager
-            .drop_table(Table::drop().table("users").to_owned())
+            .drop_table(Table::drop().table(UserCredentials::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(Users::Table).to_owned())
             .await?;
 
         Ok(())

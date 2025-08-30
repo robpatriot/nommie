@@ -48,6 +48,11 @@ pub enum AppError {
         detail: String,
         trace_id: Option<String>,
     },
+    #[error("Configuration error: {detail}")]
+    Config {
+        detail: String,
+        trace_id: Option<String>,
+    },
 }
 
 impl AppError {
@@ -68,6 +73,7 @@ impl AppError {
             AppError::Forbidden { trace_id } => trace_id.clone(),
             AppError::BadRequest { trace_id, .. } => trace_id.clone(),
             AppError::Internal { trace_id, .. } => trace_id.clone(),
+            AppError::Config { trace_id, .. } => trace_id.clone(),
         }
     }
 
@@ -81,6 +87,7 @@ impl AppError {
             AppError::Forbidden { .. } => "FORBIDDEN".to_string(),
             AppError::BadRequest { code, .. } => code.to_string(),
             AppError::Internal { .. } => "INTERNAL".to_string(),
+            AppError::Config { .. } => "CONFIG_ERROR".to_string(),
         }
     }
 
@@ -94,6 +101,7 @@ impl AppError {
             AppError::Forbidden { .. } => "Access denied".to_string(),
             AppError::BadRequest { detail, .. } => detail.clone(),
             AppError::Internal { detail, .. } => detail.clone(),
+            AppError::Config { detail, .. } => detail.clone(),
         }
     }
 
@@ -107,6 +115,7 @@ impl AppError {
             AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
             AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -157,6 +166,13 @@ impl AppError {
         Self::Forbidden { trace_id: None }
     }
 
+    pub fn config(detail: String) -> Self {
+        Self::Config {
+            detail,
+            trace_id: None,
+        }
+    }
+
     pub fn with_trace_id(self, trace_id: Option<String>) -> Self {
         match self {
             AppError::Validation {
@@ -184,6 +200,7 @@ impl AppError {
                 trace_id,
             },
             AppError::Internal { detail, .. } => AppError::Internal { detail, trace_id },
+            AppError::Config { detail, .. } => AppError::Config { detail, trace_id },
         }
     }
 
