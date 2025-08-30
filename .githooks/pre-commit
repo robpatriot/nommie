@@ -73,10 +73,11 @@ echo "[pre-commit] Phase A OK ✅"
 
 echo "[pre-commit] Phase B: formatting staged files…"
 
-# Rustfmt — staged-only for speed
+# Rustfmt — format only the staged Rust files
 if ((${#RUST_STAGED[@]})); then
   echo "  • rustfmt (staged backend .rs files)"
   rustfmt --edition 2021 -- "${RUST_STAGED[@]}" || true
+
   # Auto-stage only formatted Rust files
   for file in "${RUST_STAGED[@]}"; do
     if git diff --quiet --cached -- "$file"; then
