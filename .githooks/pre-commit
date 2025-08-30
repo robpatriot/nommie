@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[pre-commit] Phase A: read-only checks…"
+
+# Thresholds to avoid huge argv; fallback to project-wide in FE
+ESLINT_MAX=200
+PRETTIER_MAX=400
+
+# Buckets
+ESLINT_REL=()        # apps/frontend/* code paths (app-relative)
+PRETTIER_REL_FE=()   # apps/frontend/* format targets (app-relative)
+PRETTIER_ABS_FE=()   # same as above but repo-relative for git add
+RUST_STAGED=()       # apps/backend/*.rs
+BACKEND_META=()      # Cargo.* changes that should trigger clippy
+
+# Collect staged files
+while IFS= read -r -d '' path; do
+  case "$path" in
+    apps/frontend/*)
+      rel="${path#apps/frontend/}"
+      case "$path" in
+        *.ts|*.tsx|*.js|*.jsx|*.cjs|*.mjs)
+          ESLINT_REL+=("$rel")
+          ;;
+      esac
+      case "$path" in
+        *.ts|*.tsx|*.js|*.jsx|*.cjs|*.mjs|*.json|*.md|*.mdx|*.css|*.scss|*.yml|*.yaml|*.html)
+          PRETTIER_REL_FE+=("$rel")
+          PRETTIER_ABS_FE+=("$path")
+          ;;
+      esac
+      ;;
+    apps/backend/*)
+      case "$path" in
+        *.rs) RUST_STAGED+=("$path") ;;
+        Cargo.toml|Cargo.lock|**/Cargo.toml) BACKEND_META+=("$path") ;;
+      esac
+      ;;
+  esac
+done < <(git diff --cached -z --name-only --diff-filter=ACMR)
+
+# -------------------------
+# Phase A: read-only checks
+# -------------------------
+
+# Backend clippy — only if Rust/Cargo changed
+if ((${#RUST_STAGED[@]} + ${#BACKEND_META[@]} > 0)); then
+  echo "  • be:lint (Rust/Cargo changed)"
+  pnpm be:lint
+else
+  echo "  • be:lint skipped (no Rust changes)"
+fi
+
+# Frontend ESLint — staged-only, fallback if many files
+if ((${#ESLINT_REL[@]})); then
+  if ((${#ESLINT_REL[@]} > ESLINT_MAX)); then
+    echo "  • FE eslint (fallback: many files → whole app)"
+    pnpm --filter @nommie/frontend lint -- .
+  else
+    echo "  • FE eslint (staged files)"
+    pnpm --filter @nommie/frontend lint:files -- "${ESLINT_REL[@]}"
+  fi
+else
+  echo "  • FE eslint: no staged frontend code files"
+fi
+
+echo "[pre-commit] Phase A OK ✅"
+echo "[pre-commit] Phase B: formatting staged files…"
+
+# Rustfmt — staged-only for speed
+if ((${#RUST_STAGED[@]})); then
+  echo "  • rustfmt (staged backend .rs files)"
+  rustfmt --edition 2021 -- "${RUST_STAGED[@]}" || true
+  git add -- "${RUST_STAGED[@]}" || true
+else
+  echo "  • rustfmt: no staged backend .rs files"
+fi
+
+# Prettier — staged FE files via FE script
+if ((${#PRETTIER_REL_FE[@]})); then
+  if ((${#PRETTIER_REL_FE[@]} > PRETTIER_MAX)); then
+    echo "  • FE prettier --write (fallback: whole app)"
+    pnpm --filter @nommie/frontend format -- .
+    git add apps/frontend || true
+  else
+    echo "  • FE prettier --write (staged files)"
+    pnpm --filter @nommie/frontend format:files -- "${PRETTIER_REL_FE[@]}"
+    git add -- "${PRETTIER_ABS_FE[@]}" || true
+  fi
+else
+  echo "  • FE prettier: no staged frontend files"
+fi
+
+echo "[pre-commit] OK ✅"
+
