@@ -4,16 +4,17 @@ set -euo pipefail
 # Expected env from docker-compose:
 #   POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, APP_DB_PASSWORD
 
-: "${POSTGRES_DB:?POSTGRES_DB is required}"
-: "${POSTGRES_USER:?POSTGRES_USER is required}"
-: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
-: "${APP_DB_PASSWORD:?APP_DB_PASSWORD is required}"
-: "${NOMMIE_OWNER_PASSWORD:?NOMMIE_OWNER_PASSWORD is required}"
+: "${POSTGRES_DB:?POSTGRES_DB is required and must be set in the environment}"
+: "${POSTGRES_USER:?POSTGRES_USER is required and must be set in the environment}"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required and must be set in the environment}"
+: "${APP_DB_PASSWORD:?APP_DB_PASSWORD is required and must be set in the environment}"
+: "${NOMMIE_OWNER_PASSWORD:?NOMMIE_OWNER_PASSWORD is required and must be set in the environment}"
 
 ########################################
 # 1) Roles + Databases (idempotent)
 #    Use psql variables + \gexec for safe quoting.
 ########################################
+echo "Creating databases and roles..."
 psql -v ON_ERROR_STOP=1 \
      --dbname "$POSTGRES_DB" \
      --username "$POSTGRES_USER" \
@@ -45,6 +46,7 @@ PSQL
 ########################################
 # 2) Configure 'nommie' DB (extensions & privileges)
 ########################################
+echo "Configuring 'nommie' database..."
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "nommie" <<'PSQL'
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -54,7 +56,6 @@ REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE, CREATE ON SCHEMA public TO nommie_owner;
 GRANT USAGE ON SCHEMA public TO nommie_app;
 
--- Default privileges for future objects created by nommie_owner
 ALTER DEFAULT PRIVILEGES FOR USER nommie_owner IN SCHEMA public
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO nommie_app;
 
@@ -67,6 +68,7 @@ PSQL
 ########################################
 # 3) Configure 'nommie_test' DB (extensions & privileges)
 ########################################
+echo "Configuring 'nommie_test' database..."
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "nommie_test" <<'PSQL'
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
