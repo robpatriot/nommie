@@ -66,13 +66,26 @@ else
 fi
 
 echo "[pre-commit] Phase A OK ✅"
+
+# -------------------------
+# Phase B: formatting staged files
+# -------------------------
+
 echo "[pre-commit] Phase B: formatting staged files…"
 
 # Rustfmt — staged-only for speed
 if ((${#RUST_STAGED[@]})); then
   echo "  • rustfmt (staged backend .rs files)"
   rustfmt --edition 2021 -- "${RUST_STAGED[@]}" || true
-  git add -- "${RUST_STAGED[@]}" || true
+  # Auto-stage only formatted Rust files
+  for file in "${RUST_STAGED[@]}"; do
+    if git diff --quiet --cached -- "$file"; then
+      echo "$file was not modified by rustfmt."
+    else
+      echo "$file was modified by rustfmt, adding it back to the staging area."
+      git add "$file"
+    fi
+  done
 else
   echo "  • rustfmt: no staged backend .rs files"
 fi
@@ -86,11 +99,19 @@ if ((${#PRETTIER_REL_FE[@]})); then
   else
     echo "  • FE prettier --write (staged files)"
     pnpm --filter @nommie/frontend format:files -- "${PRETTIER_REL_FE[@]}"
-    git add -- "${PRETTIER_ABS_FE[@]}" || true
+    # Auto-stage only formatted FE files
+    for file in "${PRETTIER_ABS_FE[@]}"; do
+      if git diff --quiet --cached -- "$file"; then
+        echo "$file was not modified by prettier."
+      else
+        echo "$file was modified by prettier, adding it back to the staging area."
+        git add "$file"
+      fi
+    done
   fi
 else
   echo "  • FE prettier: no staged frontend files"
 fi
 
-echo "[pre-commit] OK ✅"
+echo "[pre-commit] Phase B OK ✅"
 
