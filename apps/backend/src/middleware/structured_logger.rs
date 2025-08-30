@@ -1,6 +1,4 @@
-use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-};
+use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use futures_util::future::{ready, LocalBoxFuture, Ready};
 use std::time::Instant;
 use tracing::info;
@@ -49,20 +47,21 @@ where
 
         Box::pin(async move {
             let result = fut.await;
-            
+
             let latency = start_time.elapsed();
             let latency_ms = latency.as_millis() as u64;
-            
+
             match &result {
                 Ok(res) => {
                     let status_code = res.status().as_u16();
-                    
+
                     // Extract trace_id from response headers (set by RequestTrace middleware)
-                    let trace_id = res.headers()
+                    let trace_id = res
+                        .headers()
                         .get("x-request-id")
                         .and_then(|v| v.to_str().ok())
                         .unwrap_or("unknown");
-                    
+
                     info!(
                         method = %method,
                         path = %path,
@@ -85,7 +84,7 @@ where
                     );
                 }
             }
-            
+
             result
         })
     }

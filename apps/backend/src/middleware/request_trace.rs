@@ -43,23 +43,22 @@ where
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let trace_id = Uuid::new_v4().to_string();
-        
+
         // Insert trace_id into request extensions
         req.extensions_mut().insert(trace_id.clone());
-        
+
         let fut = self.service.call(req);
-        
+
         Box::pin(async move {
             let mut res = fut.await?;
-            
+
             // Add X-Request-Id header to response
             res.headers_mut().insert(
                 header::HeaderName::from_static("x-request-id"),
-                header::HeaderValue::from_str(&trace_id).unwrap_or_else(|_| {
-                    header::HeaderValue::from_static("invalid-uuid")
-                }),
+                header::HeaderValue::from_str(&trace_id)
+                    .unwrap_or_else(|_| header::HeaderValue::from_static("invalid-uuid")),
             );
-            
+
             Ok(res)
         })
     }
