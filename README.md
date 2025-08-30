@@ -14,6 +14,35 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 
 ---
 
+## 🔐 Authentication Setup (NextAuth v5)
+
+The frontend uses **NextAuth v5** with Google OAuth for user authentication.
+
+### ⚙️ Environment Configuration
+1. **Copy the example file:** `cp apps/frontend/.env.example apps/frontend/.env.local`
+2. **Edit `.env.local`** with your actual values:
+   - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: Get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   - `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
+   - `NEXTAUTH_URL`: Set to `http://localhost:3000` for local development
+
+### 🔑 Google OAuth Setup
+1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. Create OAuth 2.0 credentials for a web application
+3. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+4. Copy Client ID and Client Secret to your `.env.local`
+
+### 🚀 Running with Authentication
+- **Start the app:** `pnpm dev` (from root) or `pnpm dev:fe` (from `apps/frontend`)
+- **Sign in:** Click "Sign in with Google" in the header
+- **Protected routes:** `/dashboard` requires authentication
+- **Sign out:** Click "Sign out" in the header when signed in
+
+### 🛡️ Protected Routes
+- `/dashboard/:path*` - User dashboard (requires auth)
+- `/api/private/:path*` - Private API endpoints (requires auth)
+
+---
+
 ## 🏗️ Architecture
 - **Frontend:** Next.js (App Router) + Tailwind CSS, NextAuth v5 (Google login)  
 - **Backend:** Rust (Actix Web) + SeaORM 1.1.x, JWT validation  
