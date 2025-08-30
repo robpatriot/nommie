@@ -18,6 +18,9 @@ futures-util = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
+[dev-dependencies]
+tracing-test = "0.2"
+
 [[bin]]
 name = "backend"
 path = "src/main.rs"
