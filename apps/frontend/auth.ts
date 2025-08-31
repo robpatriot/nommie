@@ -2,6 +2,9 @@
 import NextAuth from 'next-auth'
 import Google from 'next-auth/providers/google'
 
+const backendBase = process.env.BACKEND_BASE_URL
+if (!backendBase) throw new Error('BACKEND_BASE_URL must be set')
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
   providers: [
@@ -14,20 +17,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // Only run this on initial sign-in
       if (account?.provider === 'google' && profile) {
         try {
-          const response = await fetch(
-            `${process.env.NEXT_PUBLIC_BACKEND_BASE_URL}/api/auth/login`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                email: profile.email,
-                name: profile.name,
-                google_sub: profile.sub,
-              }),
-            }
-          )
+          const response = await fetch(`${backendBase}/api/auth/login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: profile.email,
+              name: profile.name,
+              google_sub: profile.sub,
+            }),
+          })
 
           if (response.ok) {
             const { token: backendJwt } = await response.json()
