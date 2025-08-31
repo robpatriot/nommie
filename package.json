@@ -15,7 +15,7 @@
     "be:build": "cargo build --manifest-path apps/backend/Cargo.toml",
     "be:lint": "cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings",
     "be:format": "cargo fmt --manifest-path apps/backend/Cargo.toml --all",
-    "be:test": "dotenvx run -- sh -lc 'export DATABASE_URL=${DATABASE_URL}_test; cargo test --manifest-path apps/backend/Cargo.toml -- --nocapture'",
+    "be:test": "dotenvx run -- sh -lc '[ \"$1\" = \"--\" ] && shift; export DATABASE_URL=${DATABASE_URL}_test; cargo test --manifest-path apps/backend/Cargo.toml \"$@\" -- --nocapture' _",
 
     "fe:up": "if [ -f .dev/fe.pid ] && kill -0 $(cat .dev/fe.pid) 2>/dev/null; then exit 1; fi; pnpm --filter @nommie/frontend exec sh -lc 'exec next dev >> ../../.dev/dev.log 2>&1' & echo $! > .dev/fe.pid",
     "fe:down": "if [ -f .dev/fe.pid ]; then kill $(cat .dev/fe.pid) 2>/dev/null || true; rm -f .dev/fe.pid; fi",
