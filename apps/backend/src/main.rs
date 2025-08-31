@@ -1,7 +1,7 @@
 use actix_web::{web, App, HttpServer};
 use backend::{
     bootstrap::db,
-    middleware::{RequestTrace, StructuredLogger},
+    middleware::{cors_middleware, RequestTrace, StructuredLogger},
     routes,
 };
 
@@ -31,6 +31,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
+            .wrap(cors_middleware())
             .wrap(RequestTrace)
             .wrap(StructuredLogger)
             .app_data(web::Data::new(db.clone()))
