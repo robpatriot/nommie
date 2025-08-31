@@ -19,7 +19,7 @@ async fn test_ensure_user_inserts_then_reuses() {
     ensure_schema_ready(&db).await;
 
     // First call - should create a new user
-    let user1 = ensure_user("alice@example.com", Some("Alice"), "google-sub-123", &db)
+    let (user1, email1) = ensure_user("alice@example.com", Some("Alice"), "google-sub-123", &db)
         .await
         .expect("should create user successfully");
 
@@ -27,9 +27,10 @@ async fn test_ensure_user_inserts_then_reuses() {
     assert_eq!(user1.username, Some("Alice".to_string()));
     assert!(!user1.is_ai);
     assert!(user1.id != uuid::Uuid::nil());
+    assert_eq!(email1, "alice@example.com");
 
     // Second call with same email but different name - should return same user
-    let user2 = ensure_user(
+    let (user2, _email2) = ensure_user(
         "alice@example.com",
         Some("Alice Smith"), // Different name
         "google-sub-456",    // Different google_sub

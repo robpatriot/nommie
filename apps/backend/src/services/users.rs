@@ -12,12 +12,13 @@ use crate::{
 /// Ensures a user exists for Google OAuth, creating one if necessary.
 /// This function is idempotent - calling it multiple times with the same email
 /// will return the same user without creating duplicates.
+/// Returns a tuple of (User, email) where email is guaranteed to match the input.
 pub async fn ensure_user(
     email: &str,
     name: Option<&str>,
     google_sub: &str,
     db: &DatabaseConnection,
-) -> Result<User, AppError> {
+) -> Result<(User, String), AppError> {
     // Start a transaction to ensure data consistency
     let txn = db
         .begin()
@@ -63,7 +64,7 @@ pub async fn ensure_user(
                 .await
                 .map_err(|e| AppError::db(format!("Failed to commit transaction: {e}")))?;
 
-            Ok(user)
+            Ok((user, email.to_string()))
         }
         None => {
             // User doesn't exist, create new user and credentials
@@ -108,7 +109,7 @@ pub async fn ensure_user(
                 .await
                 .map_err(|e| AppError::db(format!("Failed to commit transaction: {e}")))?;
 
-            Ok(user)
+            Ok((user, email.to_string()))
         }
     }
 }
