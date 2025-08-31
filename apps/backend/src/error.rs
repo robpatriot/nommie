@@ -43,6 +43,8 @@ pub enum AppError {
     UnauthorizedExpiredJwt { trace_id: Option<String> },
     #[error("Forbidden")]
     Forbidden { trace_id: Option<String> },
+    #[error("Forbidden: User not found")]
+    ForbiddenUserNotFound { trace_id: Option<String> },
     #[error("Bad request: {detail}")]
     BadRequest {
         code: &'static str,
@@ -80,6 +82,7 @@ impl AppError {
             AppError::UnauthorizedInvalidJwt { trace_id } => trace_id.clone(),
             AppError::UnauthorizedExpiredJwt { trace_id } => trace_id.clone(),
             AppError::Forbidden { trace_id } => trace_id.clone(),
+            AppError::ForbiddenUserNotFound { trace_id } => trace_id.clone(),
             AppError::BadRequest { trace_id, .. } => trace_id.clone(),
             AppError::Internal { trace_id, .. } => trace_id.clone(),
             AppError::Config { trace_id, .. } => trace_id.clone(),
@@ -97,6 +100,7 @@ impl AppError {
             AppError::UnauthorizedInvalidJwt { .. } => "UNAUTHORIZED_INVALID_JWT".to_string(),
             AppError::UnauthorizedExpiredJwt { .. } => "UNAUTHORIZED_EXPIRED_JWT".to_string(),
             AppError::Forbidden { .. } => "FORBIDDEN".to_string(),
+            AppError::ForbiddenUserNotFound { .. } => "FORBIDDEN_USER_NOT_FOUND".to_string(),
             AppError::BadRequest { code, .. } => code.to_string(),
             AppError::Internal { .. } => "INTERNAL".to_string(),
             AppError::Config { .. } => "CONFIG_ERROR".to_string(),
@@ -116,6 +120,7 @@ impl AppError {
             AppError::UnauthorizedInvalidJwt { .. } => "Invalid JWT".to_string(),
             AppError::UnauthorizedExpiredJwt { .. } => "Token expired".to_string(),
             AppError::Forbidden { .. } => "Access denied".to_string(),
+            AppError::ForbiddenUserNotFound { .. } => "User not found in database".to_string(),
             AppError::BadRequest { detail, .. } => detail.clone(),
             AppError::Internal { detail, .. } => detail.clone(),
             AppError::Config { detail, .. } => detail.clone(),
@@ -133,6 +138,7 @@ impl AppError {
             AppError::UnauthorizedInvalidJwt { .. } => StatusCode::UNAUTHORIZED,
             AppError::UnauthorizedExpiredJwt { .. } => StatusCode::UNAUTHORIZED,
             AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
+            AppError::ForbiddenUserNotFound { .. } => StatusCode::FORBIDDEN,
             AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,
@@ -198,6 +204,10 @@ impl AppError {
         Self::Forbidden { trace_id: None }
     }
 
+    pub fn forbidden_user_not_found() -> Self {
+        Self::ForbiddenUserNotFound { trace_id: None }
+    }
+
     pub fn config(detail: String) -> Self {
         Self::Config {
             detail,
@@ -235,6 +245,7 @@ impl AppError {
                 AppError::UnauthorizedExpiredJwt { trace_id }
             }
             AppError::Forbidden { .. } => AppError::Forbidden { trace_id },
+            AppError::ForbiddenUserNotFound { .. } => AppError::ForbiddenUserNotFound { trace_id },
             AppError::BadRequest { code, detail, .. } => AppError::BadRequest {
                 code,
                 detail,
