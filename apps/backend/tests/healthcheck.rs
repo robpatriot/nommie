@@ -1,7 +1,7 @@
-use actix_web::{test, App};
+use actix_web::{test, web};
 use backend::{
-    routes,
-    test_support::{get_test_db_url, schema_guard::ensure_schema_ready},
+    state::{AppState, SecurityConfig},
+    test_support::{create_test_app, get_test_db_url, schema_guard::ensure_schema_ready},
 };
 use sea_orm::Database;
 
@@ -15,7 +15,12 @@ async fn test_health_endpoint() {
     // Ensure schema is ready (this will panic if not)
     ensure_schema_ready(&db).await;
 
-    let app = test::init_service(App::new().configure(routes::configure)).await;
+    // Create test security config and app state
+    let security_config =
+        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
+    let app_state = AppState::new(db, security_config);
+
+    let app = create_test_app(web::Data::new(app_state)).await;
 
     let req = test::TestRequest::get().uri("/health").to_request();
     let resp = test::call_service(&app, req).await;

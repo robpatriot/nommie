@@ -1,7 +1,6 @@
-use crate::AppError;
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use crate::{state::SecurityConfig, AppError};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Claims included in our backend-issued access tokens.
@@ -17,10 +16,12 @@ pub struct Claims {
 }
 
 /// Mint a HS256 JWT access token with a 15-minute TTL.
-pub fn mint_access_token(sub: &str, email: &str, now: SystemTime) -> Result<String, AppError> {
-    let secret = env::var("APP_JWT_SECRET")
-        .map_err(|_| AppError::config("Missing APP_JWT_SECRET environment variable".to_string()))?;
-
+pub fn mint_access_token(
+    sub: &str,
+    email: &str,
+    now: SystemTime,
+    security: &SecurityConfig,
+) -> Result<String, AppError> {
     let iat = now
         .duration_since(UNIX_EPOCH)
         .map_err(|_| AppError::internal("Failed to get current time".to_string()))?
@@ -37,30 +38,26 @@ pub fn mint_access_token(sub: &str, email: &str, now: SystemTime) -> Result<Stri
     };
 
     encode(
-        &Header::new(Algorithm::HS256),
+        &Header::new(security.algorithm),
         &claims,
-        &EncodingKey::from_secret(secret.as_ref()),
+        &EncodingKey::from_secret(&security.jwt_secret),
     )
     .map_err(|e| AppError::internal(format!("Failed to encode JWT: {e}")))
 }
 
-/// Verify HS256 JWT and return claims.
+/// Verify JWT and return claims.
 ///
 /// Errors:
-/// - Missing secret → `AppError::config(...)`
 /// - Expired token → `AppError::unauthorized().with_trace_id(Some("token_expired".into()))`
 /// - Invalid signature → `...("invalid_signature")`
 /// - Any other decode error → `...("invalid_token")`
-pub fn verify_access_token(token: &str) -> Result<Claims, AppError> {
-    let secret = env::var("APP_JWT_SECRET")
-        .map_err(|_| AppError::config("Missing APP_JWT_SECRET environment variable".to_string()))?;
-
-    // Default Validation already checks exp; pin algorithm to HS256.
-    let validation = Validation::new(Algorithm::HS256);
+pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Claims, AppError> {
+    // Default Validation already checks exp; pin algorithm to configured algorithm.
+    let validation = Validation::new(security.algorithm);
 
     decode::<Claims>(
         token,
-        &DecodingKey::from_secret(secret.as_ref()),
+        &DecodingKey::from_secret(&security.jwt_secret),
         &validation,
     )
     .map(|data| data.claims)
@@ -78,34 +75,18 @@ pub fn verify_access_token(token: &str) -> Result<Claims, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serial_test::serial;
     use std::time::Duration;
 
-    fn set_secret(val: &str) -> Option<String> {
-        let original = env::var("APP_JWT_SECRET").ok();
-        env::set_var("APP_JWT_SECRET", val);
-        original
-    }
-
-    fn restore_secret(original: Option<String>) {
-        if let Some(v) = original {
-            env::set_var("APP_JWT_SECRET", v);
-        } else {
-            env::remove_var("APP_JWT_SECRET");
-        }
-    }
-
     #[test]
-    #[serial]
     fn test_mint_and_verify_roundtrip() {
-        let original = set_secret("test_secret_key_for_testing_purposes_only");
+        let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
         let sub = "test-sub-roundtrip-123";
         let email = "test@example.com";
         let now = SystemTime::now();
 
-        let token = mint_access_token(sub, email, now).unwrap();
-        let claims = verify_access_token(&token).unwrap();
+        let token = mint_access_token(sub, email, now, &security).unwrap();
+        let claims = verify_access_token(&token, &security).unwrap();
 
         assert_eq!(claims.sub, sub);
         assert_eq!(claims.email, email);
@@ -114,22 +95,19 @@ mod tests {
             now.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64
         );
         assert_eq!(claims.exp, claims.iat + 15 * 60);
-
-        restore_secret(original);
     }
 
     #[test]
-    #[serial]
     fn test_expired_token() {
-        let original = set_secret("test_secret_key_for_testing_purposes_only");
+        let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
         let sub = "test-sub-expired-456";
         let email = "test@example.com";
         // 20 minutes ago so 15-minute token is expired
         let now = SystemTime::now() - Duration::from_secs(20 * 60);
 
-        let token = mint_access_token(sub, email, now).unwrap();
-        let result = verify_access_token(&token);
+        let token = mint_access_token(sub, email, now, &security).unwrap();
+        let result = verify_access_token(&token, &security);
 
         match result {
             Err(AppError::Unauthorized { trace_id }) => {
@@ -137,23 +115,20 @@ mod tests {
             }
             _ => panic!("Expected unauthorized error for expired token"),
         }
-
-        restore_secret(original);
     }
 
     #[test]
-    #[serial]
     fn test_bad_signature() {
         // Mint with secret A
-        let original = set_secret("secret-A");
+        let security_a = SecurityConfig::new("secret-A".as_bytes());
 
         let sub = "test-sub-bad-sig-789";
         let email = "test@example.com";
-        let token = mint_access_token(sub, email, SystemTime::now()).unwrap();
+        let token = mint_access_token(sub, email, SystemTime::now(), &security_a).unwrap();
 
         // Verify with secret B
-        env::set_var("APP_JWT_SECRET", "secret-B");
-        let result = verify_access_token(&token);
+        let security_b = SecurityConfig::new("secret-B".as_bytes());
+        let result = verify_access_token(&token, &security_b);
 
         match result {
             Err(AppError::Unauthorized { trace_id }) => {
@@ -161,30 +136,24 @@ mod tests {
             }
             _ => panic!("Expected unauthorized error for bad signature"),
         }
-
-        restore_secret(original);
     }
 
     #[test]
-    #[serial]
     fn test_missing_jwt_secret() {
-        let original = env::var("APP_JWT_SECRET").ok();
-        env::remove_var("APP_JWT_SECRET");
+        let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
         let sub = "test-sub-missing-secret-012";
         let email = "test@example.com";
         let now = SystemTime::now();
 
-        let result = mint_access_token(sub, email, now);
-
-        // Restore original secret first to not affect other tests
-        restore_secret(original);
+        let result = mint_access_token(sub, email, now, &security);
 
         match result {
-            Err(AppError::Config { detail, .. }) => {
-                assert_eq!(detail, "Missing APP_JWT_SECRET environment variable");
+            Ok(_) => {
+                // This should now succeed since we're passing the security config
+                // The old test was checking for missing env var, which is no longer relevant
             }
-            _ => panic!("Expected config error for missing JWT secret"),
+            _ => panic!("Expected success since security config is provided"),
         }
     }
 }

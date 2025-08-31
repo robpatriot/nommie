@@ -1,19 +1,13 @@
-use actix_web::{test, web, App};
+use actix_web::{test, web};
 use backend::{
-    routes,
-    test_support::{get_test_db_url, schema_guard::ensure_schema_ready},
+    state::{AppState, SecurityConfig},
+    test_support::{create_test_app, get_test_db_url, schema_guard::ensure_schema_ready},
 };
 use sea_orm::Database;
 use serde_json::json;
 
 #[actix_web::test]
 async fn test_login_endpoint_create_and_reuse_user() {
-    // Set up test environment
-    std::env::set_var(
-        "APP_JWT_SECRET",
-        "test_secret_key_for_testing_purposes_only",
-    );
-
     let db_url = get_test_db_url();
     let db = Database::connect(&db_url)
         .await
@@ -22,12 +16,12 @@ async fn test_login_endpoint_create_and_reuse_user() {
     // Ensure schema is ready (this will panic if not)
     ensure_schema_ready(&db).await;
 
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(db.clone()))
-            .configure(routes::configure),
-    )
-    .await;
+    // Create test security config and app state
+    let security_config =
+        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
+    let app_state = AppState::new(db, security_config.clone());
+
+    let app = create_test_app(web::Data::new(app_state)).await;
 
     // Test 1: First login with new email -> creates user + returns JWT
     let login_data = json!({
@@ -53,7 +47,8 @@ async fn test_login_endpoint_create_and_reuse_user() {
     assert!(!token.is_empty());
 
     // Test 2: Decode the JWT to verify correct sub and email
-    let decoded = backend::verify_access_token(token).expect("JWT should be valid");
+    let decoded =
+        backend::verify_access_token(token, &security_config).expect("JWT should be valid");
     assert_eq!(decoded.email, "test@example.com");
 
     // Store the user sub from first login
@@ -79,7 +74,8 @@ async fn test_login_endpoint_create_and_reuse_user() {
     let body2: serde_json::Value = test::read_body_json(resp2).await;
     let token2 = body2["token"].as_str().unwrap();
 
-    let decoded2 = backend::verify_access_token(token2).expect("JWT should be valid");
+    let decoded2 =
+        backend::verify_access_token(token2, &security_config).expect("JWT should be valid");
 
     // Verify that the same user sub is returned (user was reused)
     assert_eq!(decoded2.sub, first_user_sub);
@@ -88,12 +84,6 @@ async fn test_login_endpoint_create_and_reuse_user() {
 
 #[actix_web::test]
 async fn test_login_endpoint_error_handling() {
-    // Set up test environment
-    std::env::set_var(
-        "APP_JWT_SECRET",
-        "test_secret_key_for_testing_purposes_only",
-    );
-
     let db_url = get_test_db_url();
     let db = Database::connect(&db_url)
         .await
@@ -102,12 +92,12 @@ async fn test_login_endpoint_error_handling() {
     // Ensure schema is ready
     ensure_schema_ready(&db).await;
 
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(db.clone()))
-            .configure(routes::configure),
-    )
-    .await;
+    // Create test security config and app state
+    let security_config =
+        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
+    let app_state = AppState::new(db, security_config.clone());
+
+    let app = create_test_app(web::Data::new(app_state)).await;
 
     // Test missing required fields
     let login_data = json!({

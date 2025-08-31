@@ -3,6 +3,7 @@ use backend::{
     bootstrap::db,
     middleware::{cors_middleware, RequestTrace, StructuredLogger},
     routes,
+    state::{AppState, SecurityConfig},
 };
 
 mod telemetry;
@@ -29,12 +30,20 @@ async fn main() -> std::io::Result<()> {
 
     println!("✅ Database connected (migrations handled by pnpm db:migrate)");
 
+    // Create security configuration from environment
+    let jwt_secret =
+        std::env::var("APP_JWT_SECRET").expect("APP_JWT_SECRET environment variable must be set");
+    let security_config = SecurityConfig::new(jwt_secret.as_bytes());
+
+    // Create application state
+    let app_state = AppState::new(db, security_config);
+
     HttpServer::new(move || {
         App::new()
             .wrap(cors_middleware())
             .wrap(RequestTrace)
             .wrap(StructuredLogger)
-            .app_data(web::Data::new(db.clone()))
+            .app_data(web::Data::new(app_state.clone()))
             .configure(routes::configure)
     })
     .bind(("127.0.0.1", 3001))?

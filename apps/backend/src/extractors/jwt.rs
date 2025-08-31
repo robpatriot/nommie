@@ -1,9 +1,8 @@
-use actix_web::{dev::Payload, FromRequest, HttpRequest};
-use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use actix_web::{dev::Payload, web, FromRequest, HttpRequest};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
-use std::env;
 
-use crate::AppError;
+use crate::{state::AppState, AppError};
 
 /// Generic JWT claims that can be validated against any claims type
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -16,18 +15,14 @@ where
     C: for<'de> Deserialize<'de>,
 {
     /// Verify and decode a JWT token into the specified claims type
-    pub fn verify(token: &str) -> Result<Self, AppError> {
-        let secret = env::var("APP_JWT_SECRET").map_err(|_| {
-            AppError::config("Missing APP_JWT_SECRET environment variable".to_string())
-        })?;
-
-        // Configure validation to check expiration and pin algorithm to HS256.
-        let mut validation = Validation::new(Algorithm::HS256);
+    pub fn verify(token: &str, security: &crate::state::SecurityConfig) -> Result<Self, AppError> {
+        // Configure validation to check expiration and pin algorithm to configured algorithm.
+        let mut validation = Validation::new(security.algorithm);
         validation.validate_exp = true;
 
         decode::<C>(
             token,
-            &DecodingKey::from_secret(secret.as_ref()),
+            &DecodingKey::from_secret(&security.jwt_secret),
             &validation,
         )
         .map(|data| JwtClaims {
@@ -45,18 +40,18 @@ where
     }
 
     /// Verify and decode a JWT token into the specified claims type with request context
-    pub fn verify_with_request(token: &str, req: &HttpRequest) -> Result<Self, AppError> {
-        let secret = env::var("APP_JWT_SECRET").map_err(|_| {
-            AppError::config("Missing APP_JWT_SECRET environment variable".to_string())
-        })?;
-
-        // Configure validation to check expiration and pin algorithm to HS256.
-        let mut validation = Validation::new(Algorithm::HS256);
+    pub fn verify_with_request(
+        token: &str,
+        req: &HttpRequest,
+        security: &crate::state::SecurityConfig,
+    ) -> Result<Self, AppError> {
+        // Configure validation to check expiration and pin algorithm to configured algorithm.
+        let mut validation = Validation::new(security.algorithm);
         validation.validate_exp = true;
 
         decode::<C>(
             token,
-            &DecodingKey::from_secret(secret.as_ref()),
+            &DecodingKey::from_secret(&security.jwt_secret),
             &validation,
         )
         .map(|data| JwtClaims {
@@ -115,8 +110,13 @@ where
                 ));
             }
 
+            // Get the security config from the request data
+            let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
+                AppError::from_req(&req, AppError::internal("AppState not found".to_string()))
+            })?;
+
             // Verify the JWT token
-            JwtClaims::verify_with_request(token, &req)
+            JwtClaims::verify_with_request(token, &req, &app_state.security)
         })
     }
 }

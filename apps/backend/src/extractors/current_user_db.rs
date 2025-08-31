@@ -1,9 +1,9 @@
-use actix_web::{dev::Payload, FromRequest, HttpRequest};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use actix_web::{dev::Payload, web, FromRequest, HttpRequest};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 
 use super::current_user::CurrentUser;
-use crate::{entities::users, error::AppError};
+use crate::{entities::users, error::AppError, state::AppState};
 
 /// Database-backed current user record
 /// This contains the actual user data from the database
@@ -26,11 +26,11 @@ impl FromRequest for CurrentUserRecord {
             // First extract CurrentUser (claims) to enforce H1 authentication
             let current_user = CurrentUser::from_request(&req, &mut payload).await?;
 
-            // Get database connection from request extensions
-            let db = req
-                .app_data::<actix_web::web::Data<DatabaseConnection>>()
-                .ok_or_else(|| AppError::internal("Database connection not available".to_string()))?
-                .get_ref();
+            // Get database connection from AppState
+            let app_state = req
+                .app_data::<web::Data<AppState>>()
+                .ok_or_else(|| AppError::internal("AppState not available".to_string()))?;
+            let db = &*app_state.db;
 
             // Look up user by sub in database
             let user = users::Entity::find()

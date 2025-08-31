@@ -2,7 +2,9 @@ use actix_web::{web, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 
-use crate::{auth::mint_access_token, error::AppError, services::users::ensure_user};
+use crate::{
+    auth::mint_access_token, error::AppError, services::users::ensure_user, state::AppState,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
@@ -22,7 +24,7 @@ pub struct LoginResponse {
 /// Creates or reuses a user based on email and returns a JWT token
 async fn login(
     req: web::Json<LoginRequest>,
-    db: web::Data<sea_orm::DatabaseConnection>,
+    app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     // Validate required fields
     if req.email.trim().is_empty() {
@@ -39,9 +41,15 @@ async fn login(
         ));
     }
 
-    let (user, email) = ensure_user(&req.email, req.name.as_deref(), &req.google_sub, &db).await?;
+    let (user, email) = ensure_user(
+        &req.email,
+        req.name.as_deref(),
+        &req.google_sub,
+        &app_state.db,
+    )
+    .await?;
 
-    let token = mint_access_token(&user.sub, &email, SystemTime::now())?;
+    let token = mint_access_token(&user.sub, &email, SystemTime::now(), &app_state.security)?;
 
     let response = LoginResponse { token };
     Ok(HttpResponse::Ok().json(response))
