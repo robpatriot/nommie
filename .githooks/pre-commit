@@ -21,7 +21,7 @@ while IFS= read -r -d '' path; do
       rel="${path#apps/frontend/}"
       case "$path" in
 	*.d.ts) ;;  # ⛔️ skip TypeScript declaration files for ESLint
-        *.ts|*.tsx|*.js|*.jsx|*.cjs|*.mjs)
+        *.ts|*.tsx)
           ESLINT_REL+=("$rel")
           ;;
       esac
