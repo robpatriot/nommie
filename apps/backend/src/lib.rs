@@ -2,6 +2,7 @@ pub mod auth;
 pub mod bootstrap;
 pub mod entities;
 pub mod error;
+pub mod extractors;
 pub mod health;
 pub mod middleware;
 pub mod routes;
