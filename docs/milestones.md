@@ -1,4 +1,4 @@
-# 🗺️ Nommie — Ordered Milestones Roadmap (Updated, Detailed)
+# 🗺️ Nommie — Ordered Milestones Roadmap (Updated, Detailed)  
 
 ## ✅ A — Repo & Project Bootstrap  
 - Monorepo created with `apps/frontend`, `apps/backend`, `packages/`.  
@@ -56,7 +56,7 @@
   - Tables: `users`, `games`, `memberships`, `bids`, `plays`, `scores`.  
   - Add enums for state/roles where needed.  
   - Foreign keys + indexes for performance.  
-- **Acceptance:**
+- **Acceptance:**  
   - `init.sql` defines canonical schema.  
   - Tests reset and apply schema cleanly.  
   - Entities present and coherent with game lifecycle needs.
@@ -189,3 +189,8 @@
 ### 3. **Deployment Stub** *(S → M)*  
 - **Dependencies:** B, P  
 - **Notes:** Minimal prod bootstrapping; flexible timing.
+
+### 4. **Test Serialisation Review** *(S)*  
+- **Dependencies:** D  
+- **Details:** Review the need for `serial` on tests that use `APP_JWT_SECRET`.  
+- **Notes:** Explore whether we can remove unnecessary serialisation while keeping tests reliable.
