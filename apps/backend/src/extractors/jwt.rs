@@ -21,8 +21,9 @@ where
             AppError::config("Missing APP_JWT_SECRET environment variable".to_string())
         })?;
 
-        // Default Validation already checks exp; pin algorithm to HS256.
-        let validation = Validation::new(Algorithm::HS256);
+        // Configure validation to check expiration and pin algorithm to HS256.
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = true;
 
         decode::<C>(
             token,
@@ -33,9 +34,13 @@ where
             claims: data.claims,
         })
         .map_err(|e| match e.kind() {
-            jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::unauthorized(),
-            jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::unauthorized(),
-            _ => AppError::unauthorized(),
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                AppError::unauthorized_expired_jwt()
+            }
+            jsonwebtoken::errors::ErrorKind::InvalidSignature => {
+                AppError::unauthorized_invalid_jwt()
+            }
+            _ => AppError::unauthorized_invalid_jwt(),
         })
     }
 
@@ -45,8 +50,9 @@ where
             AppError::config("Missing APP_JWT_SECRET environment variable".to_string())
         })?;
 
-        // Default Validation already checks exp; pin algorithm to HS256.
-        let validation = Validation::new(Algorithm::HS256);
+        // Configure validation to check expiration and pin algorithm to HS256.
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.validate_exp = true;
 
         decode::<C>(
             token,
@@ -58,9 +64,13 @@ where
         })
         .map_err(|e| {
             let base_error = match e.kind() {
-                jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::unauthorized(),
-                jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::unauthorized(),
-                _ => AppError::unauthorized(),
+                jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                    AppError::unauthorized_expired_jwt()
+                }
+                jsonwebtoken::errors::ErrorKind::InvalidSignature => {
+                    AppError::unauthorized_invalid_jwt()
+                }
+                _ => AppError::unauthorized_invalid_jwt(),
             };
             AppError::from_req(req, base_error)
         })
@@ -82,21 +92,27 @@ where
             let auth_header = req
                 .headers()
                 .get(actix_web::http::header::AUTHORIZATION)
-                .ok_or_else(|| AppError::from_req(&req, AppError::unauthorized()))?;
+                .ok_or_else(|| AppError::from_req(&req, AppError::unauthorized_missing_bearer()))?;
 
             let auth_value = auth_header
                 .to_str()
-                .map_err(|_| AppError::from_req(&req, AppError::unauthorized()))?;
+                .map_err(|_| AppError::from_req(&req, AppError::unauthorized_missing_bearer()))?;
 
             // Parse "Bearer <token>" format
             let parts: Vec<&str> = auth_value.split_whitespace().collect();
             if parts.len() != 2 || parts[0] != "Bearer" {
-                return Err(AppError::from_req(&req, AppError::unauthorized()));
+                return Err(AppError::from_req(
+                    &req,
+                    AppError::unauthorized_missing_bearer(),
+                ));
             }
 
             let token = parts[1];
             if token.is_empty() {
-                return Err(AppError::from_req(&req, AppError::unauthorized()));
+                return Err(AppError::from_req(
+                    &req,
+                    AppError::unauthorized_missing_bearer(),
+                ));
             }
 
             // Verify the JWT token

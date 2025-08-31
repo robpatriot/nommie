@@ -35,6 +35,12 @@ pub enum AppError {
     },
     #[error("Unauthorized")]
     Unauthorized { trace_id: Option<String> },
+    #[error("UnauthorizedMissingBearer")]
+    UnauthorizedMissingBearer { trace_id: Option<String> },
+    #[error("UnauthorizedInvalidJwt")]
+    UnauthorizedInvalidJwt { trace_id: Option<String> },
+    #[error("UnauthorizedExpiredJwt")]
+    UnauthorizedExpiredJwt { trace_id: Option<String> },
     #[error("Forbidden")]
     Forbidden { trace_id: Option<String> },
     #[error("Bad request: {detail}")]
@@ -70,6 +76,9 @@ impl AppError {
             AppError::Db { trace_id, .. } => trace_id.clone(),
             AppError::NotFound { trace_id, .. } => trace_id.clone(),
             AppError::Unauthorized { trace_id } => trace_id.clone(),
+            AppError::UnauthorizedMissingBearer { trace_id } => trace_id.clone(),
+            AppError::UnauthorizedInvalidJwt { trace_id } => trace_id.clone(),
+            AppError::UnauthorizedExpiredJwt { trace_id } => trace_id.clone(),
             AppError::Forbidden { trace_id } => trace_id.clone(),
             AppError::BadRequest { trace_id, .. } => trace_id.clone(),
             AppError::Internal { trace_id, .. } => trace_id.clone(),
@@ -84,6 +93,9 @@ impl AppError {
             AppError::Db { .. } => "DB_ERROR".to_string(),
             AppError::NotFound { code, .. } => code.to_string(),
             AppError::Unauthorized { .. } => "UNAUTHORIZED".to_string(),
+            AppError::UnauthorizedMissingBearer { .. } => "UNAUTHORIZED_MISSING_BEARER".to_string(),
+            AppError::UnauthorizedInvalidJwt { .. } => "UNAUTHORIZED_INVALID_JWT".to_string(),
+            AppError::UnauthorizedExpiredJwt { .. } => "UNAUTHORIZED_EXPIRED_JWT".to_string(),
             AppError::Forbidden { .. } => "FORBIDDEN".to_string(),
             AppError::BadRequest { code, .. } => code.to_string(),
             AppError::Internal { .. } => "INTERNAL".to_string(),
@@ -98,6 +110,11 @@ impl AppError {
             AppError::Db { detail, .. } => detail.clone(),
             AppError::NotFound { detail, .. } => detail.clone(),
             AppError::Unauthorized { .. } => "Authentication required".to_string(),
+            AppError::UnauthorizedMissingBearer { .. } => {
+                "Missing or malformed Bearer token".to_string()
+            }
+            AppError::UnauthorizedInvalidJwt { .. } => "Invalid JWT".to_string(),
+            AppError::UnauthorizedExpiredJwt { .. } => "Token expired".to_string(),
             AppError::Forbidden { .. } => "Access denied".to_string(),
             AppError::BadRequest { detail, .. } => detail.clone(),
             AppError::Internal { detail, .. } => detail.clone(),
@@ -112,6 +129,9 @@ impl AppError {
             AppError::Db { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NotFound { .. } => StatusCode::NOT_FOUND,
             AppError::Unauthorized { .. } => StatusCode::UNAUTHORIZED,
+            AppError::UnauthorizedMissingBearer { .. } => StatusCode::UNAUTHORIZED,
+            AppError::UnauthorizedInvalidJwt { .. } => StatusCode::UNAUTHORIZED,
+            AppError::UnauthorizedExpiredJwt { .. } => StatusCode::UNAUTHORIZED,
             AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
             AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
@@ -162,6 +182,18 @@ impl AppError {
         Self::Unauthorized { trace_id: None }
     }
 
+    pub fn unauthorized_missing_bearer() -> Self {
+        Self::UnauthorizedMissingBearer { trace_id: None }
+    }
+
+    pub fn unauthorized_invalid_jwt() -> Self {
+        Self::UnauthorizedInvalidJwt { trace_id: None }
+    }
+
+    pub fn unauthorized_expired_jwt() -> Self {
+        Self::UnauthorizedExpiredJwt { trace_id: None }
+    }
+
     pub fn forbidden() -> Self {
         Self::Forbidden { trace_id: None }
     }
@@ -193,6 +225,15 @@ impl AppError {
                 trace_id,
             },
             AppError::Unauthorized { .. } => AppError::Unauthorized { trace_id },
+            AppError::UnauthorizedMissingBearer { .. } => {
+                AppError::UnauthorizedMissingBearer { trace_id }
+            }
+            AppError::UnauthorizedInvalidJwt { .. } => {
+                AppError::UnauthorizedInvalidJwt { trace_id }
+            }
+            AppError::UnauthorizedExpiredJwt { .. } => {
+                AppError::UnauthorizedExpiredJwt { trace_id }
+            }
             AppError::Forbidden { .. } => AppError::Forbidden { trace_id },
             AppError::BadRequest { code, detail, .. } => AppError::BadRequest {
                 code,
