@@ -5,7 +5,6 @@ use actix_web::{test, App};
 use backend::{auth::mint_access_token, middleware::RequestTrace, routes::private};
 use serde_json::Value;
 use std::time::SystemTime;
-use uuid::Uuid;
 
 #[actix_web::test]
 #[serial_test::serial]
@@ -196,7 +195,7 @@ async fn test_expired_token() {
     .await;
 
     // Create expired JWT token by using a time from the past
-    let sub = Uuid::new_v4();
+    let sub = "test-sub-expired-123";
     let email = "test@example.com";
     let past_time = SystemTime::now() - std::time::Duration::from_secs(20 * 60); // 20 minutes ago
     let expired_token = mint_access_token(sub, email, past_time).unwrap();
@@ -241,7 +240,7 @@ async fn test_happy_path() {
     .await;
 
     // Create a valid JWT token
-    let sub = Uuid::new_v4();
+    let sub = "test-sub-happy-456";
     let email = "test@example.com";
     let token = mint_access_token(sub, email, SystemTime::now()).unwrap();
 
@@ -257,7 +256,7 @@ async fn test_happy_path() {
     assert!(resp.status().is_success());
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["sub"], sub.to_string());
+    assert_eq!(body["sub"], sub);
     assert_eq!(body["email"], email);
 
     // Clean up

@@ -5,7 +5,7 @@ use crate::{error::AppError, extractors::CurrentUser};
 
 #[derive(Debug, Serialize)]
 pub struct MeResponse {
-    pub sub: uuid::Uuid,
+    pub sub: String,
     pub email: String,
 }
 

@@ -41,7 +41,7 @@ async fn login(
 
     let (user, email) = ensure_user(&req.email, req.name.as_deref(), &req.google_sub, &db).await?;
 
-    let token = mint_access_token(user.id, &email, SystemTime::now())?;
+    let token = mint_access_token(&user.sub, &email, SystemTime::now())?;
 
     let response = LoginResponse { token };
     Ok(HttpResponse::Ok().json(response))

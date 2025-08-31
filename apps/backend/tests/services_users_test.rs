@@ -26,7 +26,7 @@ async fn test_ensure_user_inserts_then_reuses() {
     // Verify user was created with expected values
     assert_eq!(user1.username, Some("Alice".to_string()));
     assert!(!user1.is_ai);
-    assert!(user1.id != uuid::Uuid::nil());
+    assert!(user1.id > 0); // ID should be a positive number
     assert_eq!(email1, "alice@example.com");
 
     // Second call with same email but different name - should return same user

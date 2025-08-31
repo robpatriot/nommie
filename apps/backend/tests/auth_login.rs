@@ -56,8 +56,8 @@ async fn test_login_endpoint_create_and_reuse_user() {
     let decoded = backend::verify_access_token(token).expect("JWT should be valid");
     assert_eq!(decoded.email, "test@example.com");
 
-    // Store the user ID from first login
-    let first_user_id = decoded.sub;
+    // Store the user sub from first login
+    let first_user_sub = decoded.sub;
 
     // Test 3: Second call with the same email -> reuses the same user
     let login_data_2 = json!({
@@ -81,8 +81,8 @@ async fn test_login_endpoint_create_and_reuse_user() {
 
     let decoded2 = backend::verify_access_token(token2).expect("JWT should be valid");
 
-    // Verify that the same user ID is returned (user was reused)
-    assert_eq!(decoded2.sub, first_user_id);
+    // Verify that the same user sub is returned (user was reused)
+    assert_eq!(decoded2.sub, first_user_sub);
     assert_eq!(decoded2.email, "test@example.com");
 }
 

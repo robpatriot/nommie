@@ -3,13 +3,12 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
-use uuid::Uuid;
 
 /// Claims included in our backend-issued access tokens.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    /// Our internal user id
-    pub sub: Uuid,
+    /// External user identifier (users.sub)
+    pub sub: String,
     pub email: String,
     /// Issued-at (seconds since epoch)
     pub iat: i64,
@@ -18,7 +17,7 @@ pub struct Claims {
 }
 
 /// Mint a HS256 JWT access token with a 15-minute TTL.
-pub fn mint_access_token(user_id: Uuid, email: &str, now: SystemTime) -> Result<String, AppError> {
+pub fn mint_access_token(sub: &str, email: &str, now: SystemTime) -> Result<String, AppError> {
     let secret = env::var("APP_JWT_SECRET")
         .map_err(|_| AppError::config("Missing APP_JWT_SECRET environment variable".to_string()))?;
 
@@ -31,7 +30,7 @@ pub fn mint_access_token(user_id: Uuid, email: &str, now: SystemTime) -> Result<
     let exp = iat + 15 * 60;
 
     let claims = Claims {
-        sub: user_id,
+        sub: sub.to_string(),
         email: email.to_string(),
         iat,
         exp,
@@ -101,14 +100,14 @@ mod tests {
     fn test_mint_and_verify_roundtrip() {
         let original = set_secret("test_secret_key_for_testing_purposes_only");
 
-        let user_id = Uuid::new_v4();
+        let sub = "test-sub-roundtrip-123";
         let email = "test@example.com";
         let now = SystemTime::now();
 
-        let token = mint_access_token(user_id, email, now).unwrap();
+        let token = mint_access_token(sub, email, now).unwrap();
         let claims = verify_access_token(&token).unwrap();
 
-        assert_eq!(claims.sub, user_id);
+        assert_eq!(claims.sub, sub);
         assert_eq!(claims.email, email);
         assert_eq!(
             claims.iat,
@@ -124,12 +123,12 @@ mod tests {
     fn test_expired_token() {
         let original = set_secret("test_secret_key_for_testing_purposes_only");
 
-        let user_id = Uuid::new_v4();
+        let sub = "test-sub-expired-456";
         let email = "test@example.com";
         // 20 minutes ago so 15-minute token is expired
         let now = SystemTime::now() - Duration::from_secs(20 * 60);
 
-        let token = mint_access_token(user_id, email, now).unwrap();
+        let token = mint_access_token(sub, email, now).unwrap();
         let result = verify_access_token(&token);
 
         match result {
@@ -148,9 +147,9 @@ mod tests {
         // Mint with secret A
         let original = set_secret("secret-A");
 
-        let user_id = Uuid::new_v4();
+        let sub = "test-sub-bad-sig-789";
         let email = "test@example.com";
-        let token = mint_access_token(user_id, email, SystemTime::now()).unwrap();
+        let token = mint_access_token(sub, email, SystemTime::now()).unwrap();
 
         // Verify with secret B
         env::set_var("APP_JWT_SECRET", "secret-B");
@@ -172,11 +171,11 @@ mod tests {
         let original = env::var("APP_JWT_SECRET").ok();
         env::remove_var("APP_JWT_SECRET");
 
-        let user_id = Uuid::new_v4();
+        let sub = "test-sub-missing-secret-012";
         let email = "test@example.com";
         let now = SystemTime::now();
 
-        let result = mint_access_token(user_id, email, now);
+        let result = mint_access_token(sub, email, now);
 
         // Restore original secret first to not affect other tests
         restore_secret(original);

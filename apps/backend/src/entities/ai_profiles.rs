@@ -3,19 +3,14 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "user_credentials")]
+#[sea_orm(table_name = "ai_profiles")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     #[sea_orm(column_name = "user_id")]
     pub user_id: i64,
-    #[sea_orm(column_name = "password_hash")]
-    pub password_hash: Option<String>,
-    pub email: String,
-    #[sea_orm(column_name = "google_sub")]
-    pub google_sub: Option<String>,
-    #[sea_orm(column_name = "last_login")]
-    pub last_login: Option<OffsetDateTime>,
+    pub playstyle: Option<String>,
+    pub difficulty: Option<i32>,
     #[sea_orm(column_name = "created_at")]
     pub created_at: OffsetDateTime,
     #[sea_orm(column_name = "updated_at")]

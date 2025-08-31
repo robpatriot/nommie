@@ -1,14 +1,13 @@
 use actix_web::{dev::Payload, FromRequest, HttpRequest};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use super::jwt::JwtClaims;
 
 /// Backend-specific JWT claims structure
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BackendClaims {
-    /// Our internal user id
-    pub sub: Uuid,
+    /// External user identifier (users.sub)
+    pub sub: String,
     pub email: String,
     /// Expiry (seconds since epoch)
     pub exp: usize,
@@ -18,7 +17,7 @@ pub struct BackendClaims {
 /// This is a thin wrapper around JwtClaims<BackendClaims>
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CurrentUser {
-    pub sub: Uuid,
+    pub sub: String,
     pub email: String,
 }
 

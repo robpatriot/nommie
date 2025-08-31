@@ -1,3 +1,4 @@
+pub mod factories;
 pub mod migrations;
 pub mod schema_guard;
 

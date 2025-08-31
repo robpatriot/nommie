@@ -1,8 +1,7 @@
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, NotSet, QueryFilter, Set,
     TransactionTrait,
 };
-use uuid::Uuid;
 
 use crate::{
     entities::{user_credentials, users, User},
@@ -68,15 +67,15 @@ pub async fn ensure_user(
         }
         None => {
             // User doesn't exist, create new user and credentials
-            let user_id = Uuid::new_v4();
             let now = get_current_time();
 
             // Derive username from name or email local-part
             let username = derive_username(name, email);
 
-            // Create new user
+            // Create new user with auto-generated ID and sub from google_sub
             let user_active = users::ActiveModel {
-                id: Set(user_id),
+                id: NotSet,                       // Let database auto-generate
+                sub: Set(google_sub.to_string()), // Use google_sub as the external identifier
                 username: Set(username),
                 is_ai: Set(false),
                 created_at: Set(now),
@@ -88,10 +87,10 @@ pub async fn ensure_user(
                 .await
                 .map_err(|e| AppError::db(format!("Failed to create user: {e}")))?;
 
-            // Create new user credentials
+            // Create new user credentials with auto-generated ID
             let credential_active = user_credentials::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                user_id: Set(user_id),
+                id: NotSet,            // Let database auto-generate
+                user_id: Set(user.id), // Use the ID from the created user
                 password_hash: Set(None),
                 email: Set(email.to_string()),
                 google_sub: Set(Some(google_sub.to_string())),

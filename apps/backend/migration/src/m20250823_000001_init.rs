@@ -9,6 +9,7 @@ pub struct Migration;
 enum Users {
     Table,
     Id,
+    Sub,
     Username,
     IsAi,
     CreatedAt,
@@ -59,7 +60,14 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(Users::Table)
                     .if_not_exists()
-                    .col(ColumnDef::new(Users::Id).uuid().not_null().primary_key())
+                    .col(
+                        ColumnDef::new(Users::Id)
+                            .big_integer()
+                            .not_null()
+                            .primary_key()
+                            .auto_increment(),
+                    )
+                    .col(ColumnDef::new(Users::Sub).string().not_null())
                     .col(ColumnDef::new(Users::Username).string().null())
                     .col(
                         ColumnDef::new(Users::IsAi)
@@ -81,6 +89,18 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // Create unique index on users.sub
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_users_sub_unique")
+                    .table(Users::Table)
+                    .col(Users::Sub)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
         // user_credentials
         manager
             .create_table(
@@ -89,11 +109,16 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(UserCredentials::Id)
-                            .uuid()
+                            .big_integer()
                             .not_null()
-                            .primary_key(),
+                            .primary_key()
+                            .auto_increment(),
                     )
-                    .col(ColumnDef::new(UserCredentials::UserId).uuid().not_null())
+                    .col(
+                        ColumnDef::new(UserCredentials::UserId)
+                            .big_integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(UserCredentials::PasswordHash)
                             .string()
@@ -157,12 +182,13 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(GamePlayers::Id)
-                            .uuid()
+                            .big_integer()
                             .not_null()
-                            .primary_key(),
+                            .primary_key()
+                            .auto_increment(),
                     )
-                    .col(ColumnDef::new(GamePlayers::GameId).uuid().not_null())
-                    .col(ColumnDef::new(GamePlayers::UserId).uuid().not_null())
+                    .col(ColumnDef::new(GamePlayers::GameId).big_integer().not_null())
+                    .col(ColumnDef::new(GamePlayers::UserId).big_integer().not_null())
                     .col(ColumnDef::new(GamePlayers::TurnOrder).integer().not_null())
                     .col(
                         ColumnDef::new(GamePlayers::IsReady)
@@ -194,11 +220,12 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(
                         ColumnDef::new(AiProfiles::Id)
-                            .uuid()
+                            .big_integer()
                             .not_null()
-                            .primary_key(),
+                            .primary_key()
+                            .auto_increment(),
                     )
-                    .col(ColumnDef::new(AiProfiles::UserId).uuid().not_null())
+                    .col(ColumnDef::new(AiProfiles::UserId).big_integer().not_null())
                     .col(ColumnDef::new(AiProfiles::Playstyle).string().null())
                     .col(ColumnDef::new(AiProfiles::Difficulty).integer().null())
                     .col(
@@ -246,6 +273,16 @@ impl MigrationTrait for Migration {
 
         manager
             .drop_table(Table::drop().table(UserCredentials::Table).to_owned())
+            .await?;
+
+        // Drop users.sub unique index before dropping users table
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("idx_users_sub_unique")
+                    .table(Users::Table)
+                    .to_owned(),
+            )
             .await?;
 
         manager

@@ -6,7 +6,8 @@ use time::OffsetDateTime;
 #[sea_orm(table_name = "users")]
 pub struct Model {
     #[sea_orm(primary_key)]
-    pub id: Uuid,
+    pub id: i64,
+    pub sub: String,
     pub username: Option<String>,
     #[sea_orm(column_name = "is_ai")]
     pub is_ai: bool,
