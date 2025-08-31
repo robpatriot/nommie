@@ -16,9 +16,7 @@ pub async fn ensure_schema_ready(db: &DatabaseConnection) {
             // Schema is ready, continue
         }
         Ok(None) | Err(_) => {
-            panic!(
-                "Schema not prepared. Run: `pnpm db:fresh:test` (Milestone D policy: tests never run migrations)."
-            );
+            panic!("Schema not prepared. Run: `pnpm db:fresh:test` (tests never run migrations).");
         }
     }
 }
