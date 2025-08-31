@@ -67,8 +67,16 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(false),
                     )
-                    .col(ColumnDef::new(Users::CreatedAt).timestamp().not_null())
-                    .col(ColumnDef::new(Users::UpdatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(Users::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Users::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
                     .to_owned(),
             )
             .await?;
@@ -105,17 +113,17 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(UserCredentials::LastLogin)
-                            .timestamp()
+                            .timestamp_with_time_zone()
                             .null(),
                     )
                     .col(
                         ColumnDef::new(UserCredentials::CreatedAt)
-                            .timestamp()
+                            .timestamp_with_time_zone()
                             .not_null(),
                     )
                     .col(
                         ColumnDef::new(UserCredentials::UpdatedAt)
-                            .timestamp()
+                            .timestamp_with_time_zone()
                             .not_null(),
                     )
                     .foreign_key(
@@ -164,7 +172,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(GamePlayers::CreatedAt)
-                            .timestamp()
+                            .timestamp_with_time_zone()
                             .not_null(),
                     )
                     .foreign_key(
@@ -193,8 +201,16 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(AiProfiles::UserId).uuid().not_null())
                     .col(ColumnDef::new(AiProfiles::Playstyle).string().null())
                     .col(ColumnDef::new(AiProfiles::Difficulty).integer().null())
-                    .col(ColumnDef::new(AiProfiles::CreatedAt).timestamp().not_null())
-                    .col(ColumnDef::new(AiProfiles::UpdatedAt).timestamp().not_null())
+                    .col(
+                        ColumnDef::new(AiProfiles::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiProfiles::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_ai_profiles_user_id")
