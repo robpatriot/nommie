@@ -1,17 +1,15 @@
 use actix_web::{dev::Payload, http::header, FromRequest, HttpRequest};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-use crate::{auth::verify_access_token, AppError};
+use crate::AppError;
 
-/// Authentication data extracted from a valid JWT token
+/// Authentication token extracted from the Authorization header
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct BackendAuth {
-    pub sub: Uuid,
-    pub email: String,
+pub struct AuthToken {
+    pub token: String,
 }
 
-impl FromRequest for BackendAuth {
+impl FromRequest for AuthToken {
     type Error = AppError;
     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self, Self::Error>>>>;
 
@@ -40,13 +38,8 @@ impl FromRequest for BackendAuth {
                 return Err(AppError::from_req(&req, AppError::unauthorized()));
             }
 
-            // Verify the JWT token
-            let claims = verify_access_token(token).map_err(|e| AppError::from_req(&req, e))?;
-
-            // Map to BackendAuth
-            Ok(BackendAuth {
-                sub: claims.sub,
-                email: claims.email,
+            Ok(AuthToken {
+                token: token.to_string(),
             })
         })
     }

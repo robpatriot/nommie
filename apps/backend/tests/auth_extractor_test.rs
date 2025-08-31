@@ -3,14 +3,14 @@ use common::assert_problem_details_structure;
 
 use actix_web::{test, web, App};
 use backend::{
-    auth::mint_access_token, extractors::BackendAuth, middleware::RequestTrace, AppError,
+    auth::mint_access_token, extractors::CurrentUser, middleware::RequestTrace, AppError,
 };
 use serde_json::Value;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-/// Test endpoint that uses the BackendAuth extractor
-async fn test_protected_endpoint(auth: BackendAuth) -> Result<web::Json<Value>, AppError> {
+/// Test endpoint that uses the CurrentUser extractor
+async fn test_protected_endpoint(auth: CurrentUser) -> Result<web::Json<Value>, AppError> {
     let response = serde_json::json!({
         "sub": auth.sub,
         "email": auth.email

@@ -1,7 +1,7 @@
 use actix_web::{web, HttpResponse, Result};
 use serde::Serialize;
 
-use crate::{error::AppError, extractors::BackendAuth};
+use crate::{error::AppError, extractors::CurrentUser};
 
 #[derive(Debug, Serialize)]
 pub struct MeResponse {
@@ -10,7 +10,7 @@ pub struct MeResponse {
 }
 
 /// Protected endpoint that returns the caller's identity
-async fn me(auth: BackendAuth) -> Result<HttpResponse, AppError> {
+async fn me(auth: CurrentUser) -> Result<HttpResponse, AppError> {
     let response = MeResponse {
         sub: auth.sub,
         email: auth.email,

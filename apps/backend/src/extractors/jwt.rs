@@ -1,0 +1,106 @@
+use actix_web::{dev::Payload, FromRequest, HttpRequest};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+use serde::{Deserialize, Serialize};
+use std::env;
+
+use crate::AppError;
+
+/// Generic JWT claims that can be validated against any claims type
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct JwtClaims<C> {
+    pub claims: C,
+}
+
+impl<C> JwtClaims<C>
+where
+    C: for<'de> Deserialize<'de>,
+{
+    /// Verify and decode a JWT token into the specified claims type
+    pub fn verify(token: &str) -> Result<Self, AppError> {
+        let secret = env::var("APP_JWT_SECRET").map_err(|_| {
+            AppError::config("Missing APP_JWT_SECRET environment variable".to_string())
+        })?;
+
+        // Default Validation already checks exp; pin algorithm to HS256.
+        let validation = Validation::new(Algorithm::HS256);
+
+        decode::<C>(
+            token,
+            &DecodingKey::from_secret(secret.as_ref()),
+            &validation,
+        )
+        .map(|data| JwtClaims {
+            claims: data.claims,
+        })
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::unauthorized(),
+            jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::unauthorized(),
+            _ => AppError::unauthorized(),
+        })
+    }
+
+    /// Verify and decode a JWT token into the specified claims type with request context
+    pub fn verify_with_request(token: &str, req: &HttpRequest) -> Result<Self, AppError> {
+        let secret = env::var("APP_JWT_SECRET").map_err(|_| {
+            AppError::config("Missing APP_JWT_SECRET environment variable".to_string())
+        })?;
+
+        // Default Validation already checks exp; pin algorithm to HS256.
+        let validation = Validation::new(Algorithm::HS256);
+
+        decode::<C>(
+            token,
+            &DecodingKey::from_secret(secret.as_ref()),
+            &validation,
+        )
+        .map(|data| JwtClaims {
+            claims: data.claims,
+        })
+        .map_err(|e| {
+            let base_error = match e.kind() {
+                jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::unauthorized(),
+                jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::unauthorized(),
+                _ => AppError::unauthorized(),
+            };
+            AppError::from_req(req, base_error)
+        })
+    }
+}
+
+impl<C> FromRequest for JwtClaims<C>
+where
+    C: for<'de> Deserialize<'de> + 'static,
+{
+    type Error = AppError;
+    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self, Self::Error>>>>;
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        let req = req.clone();
+
+        Box::pin(async move {
+            // Extract Authorization header
+            let auth_header = req
+                .headers()
+                .get(actix_web::http::header::AUTHORIZATION)
+                .ok_or_else(|| AppError::from_req(&req, AppError::unauthorized()))?;
+
+            let auth_value = auth_header
+                .to_str()
+                .map_err(|_| AppError::from_req(&req, AppError::unauthorized()))?;
+
+            // Parse "Bearer <token>" format
+            let parts: Vec<&str> = auth_value.split_whitespace().collect();
+            if parts.len() != 2 || parts[0] != "Bearer" {
+                return Err(AppError::from_req(&req, AppError::unauthorized()));
+            }
+
+            let token = parts[1];
+            if token.is_empty() {
+                return Err(AppError::from_req(&req, AppError::unauthorized()));
+            }
+
+            // Verify the JWT token
+            JwtClaims::verify_with_request(token, &req)
+        })
+    }
+}
