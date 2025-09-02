@@ -1,21 +1,12 @@
 use actix_web::test;
-use backend::{
-    state::SecurityConfig,
-    test_support::{create_test_app, create_test_state},
-};
+use backend::test_support::{create_test_app, create_test_state};
 use serde_json::json;
 
 #[actix_web::test]
 async fn login_rejects_empty_fields_returns_problem_details(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = create_test_state().with_db().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -119,14 +110,8 @@ async fn login_rejects_empty_fields_returns_problem_details(
 #[actix_web::test]
 async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn std::error::Error>>
 {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = create_test_state().with_db().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -159,14 +144,8 @@ async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn 
 #[actix_web::test]
 async fn login_missing_google_sub_returns_400_todo_validator(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = create_test_state().with_db().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -198,14 +177,8 @@ async fn login_missing_google_sub_returns_400_todo_validator(
 
 #[actix_web::test]
 async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = create_test_state().with_db().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())

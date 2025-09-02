@@ -12,14 +12,8 @@ use std::time::SystemTime;
 
 #[actix_web::test]
 async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = create_test_state().with_db().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -49,14 +43,8 @@ async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_malformed_scheme() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = create_test_state().with_db().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -89,14 +77,8 @@ async fn test_malformed_scheme() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_empty_token() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = create_test_state().with_db().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -129,14 +111,8 @@ async fn test_empty_token() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_invalid_token() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = create_test_state().with_db().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
