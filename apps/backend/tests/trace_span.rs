@@ -1,4 +1,4 @@
-//! Integration test for Step 3.3: handler logs inherit `trace_id` via a request span.
+//! Integration test for handler logs inheriting `trace_id` via a request span.
 
 use actix_web::{test, web, App, HttpResponse};
 use serde_json::Value;

@@ -135,7 +135,7 @@ async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn 
     // Should return a 400 Bad Request
     assert_eq!(resp.status().as_u16(), 400);
 
-    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented in G4.
+    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented.
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
 
     Ok(())
@@ -169,7 +169,7 @@ async fn login_missing_google_sub_returns_400_todo_validator(
     // Should return a 400 Bad Request
     assert_eq!(resp.status().as_u16(), 400);
 
-    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented in G4.
+    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented.
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
 
     Ok(())
@@ -203,7 +203,7 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
     // Should return a 400 Bad Request
     assert_eq!(resp.status().as_u16(), 400);
 
-    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented in G4.
+    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented.
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
 
     // Test wrong type for google_sub (number instead of string)
@@ -223,7 +223,7 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
     // Should return a 400 Bad Request
     assert_eq!(resp2.status().as_u16(), 400);
 
-    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented in G4.
+    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented.
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
 
     // Test wrong type for name (number instead of string)
@@ -243,7 +243,7 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
     // Should return a 400 Bad Request
     assert_eq!(resp3.status().as_u16(), 400);
 
-    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented in G4.
+    // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented.
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
 
     Ok(())
