@@ -1,4 +1,4 @@
-# Nommie — Cursor Rules (v1.2.3)
+# Nommie — Cursor Rules (v1.2.4)
 
 > Keep this file at repo root. It applies to **all** AI actions (generate, edit, refactor, move/rename). If you must deviate, leave a short code comment explaining why.
 
@@ -17,6 +17,15 @@
 - Prefer explicit, narrow interfaces and small functions over god objects.
 - Respect linters/formatters: Rustfmt + Clippy, ESLint + Prettier.
 - Tests must be **deterministic**; avoid time/RNG leaks unless seeded/injected.
+
+### String Interpolation (JS/TS & Shell) — **Important**
+- **Always interpolate variables inside the string using template literals: `${VAR}`.**
+  - ✅ `console.log(\`Database name is ${DB_NAME}\`)`
+  - ✅ `const url = \`${host}:${port}/${db}\``
+  - ❌ `console.log("Database name is", DB_NAME)`
+  - ❌ `"name: " + name`
+- Prefer a **single formatted string** over passing variables as separate parameters to logging/print APIs.
+- (Rust note): Use standard formatting macros (`format!`, `println!`, `tracing::*`) with `{}` placeholders; avoid string concatenation.
 
 ## Error Handling & Responses
 - Handlers return `Result<T, AppError>` — **never** raw `HttpResponse`.
@@ -76,28 +85,4 @@
 - Tests are isolated and reset DB state; no test-order coupling.
 
 ### Testing Commands (important)
-- **Backend tests:** `pnpm be:test` (loads env vars; uses in-process Actix harness and TestAppBuilder).
-- **Lint/format (backend):** `pnpm backend:clippy` and `pnpm backend:fmt`.
-- **Note:** `cargo check` (or `cargo test` without env) **does not** load required env vars and can diverge from runtime. Use the `pnpm` scripts above for accurate runs.
-- **DB reset (dev/test):** use the repo’s provided scripts/compose flow; destructive ops are allowed only against `_test` DBs.
-
-## AI Players & Game Rules
-- AI players are real users (rows in `users`) and follow the same rules.
-- Respect the locked Nomination Whist rules (4 players; highest bid picks trump; follow-suit; trump priority; 1 point per trick; **+10** bonus for exact bid; 26-round structure with 4 rounds at 2 cards).
-- After any human action, AI actions may progress in a loop until it’s a human’s turn again.
-
-## Frontend
-- Next.js App Router; TypeScript strict.
-- Surface API errors clearly and show the `trace_id`.
-- Share types/enums from `/packages` where possible to avoid string drift.
-
-## Tracing & Logging
-- Use `tracing` only; no `println!`.
-- Include `trace_id`, and when relevant `user_id`/`game_id`, in structured logs.
-- Attach context early in handlers so downstream logs inherit it.
-
-## Prompt & Diff Hygiene (no Git operations)
-- Keep diffs **tiny** and focused; avoid cascading refactors unless requested.
-- If a change is non-obvious, add a one-line **code comment** explaining the trade-off.
-- Do not invent missing extractors or schema; follow the “Planned” notes above.
-
+- **Backend tests:** `pnpm be:test` (loads env vars; u
