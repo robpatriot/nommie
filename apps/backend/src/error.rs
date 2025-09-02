@@ -275,6 +275,18 @@ impl AppError {
     }
 }
 
+impl From<std::env::VarError> for AppError {
+    fn from(e: std::env::VarError) -> Self {
+        AppError::internal(format!("env var error: {e}"))
+    }
+}
+
+impl From<sea_orm::DbErr> for AppError {
+    fn from(e: sea_orm::DbErr) -> Self {
+        AppError::internal(format!("db error: {e}"))
+    }
+}
+
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         self.status()
