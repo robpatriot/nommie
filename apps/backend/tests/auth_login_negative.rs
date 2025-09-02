@@ -1,27 +1,27 @@
-use actix_web::{test, web};
+use actix_web::test;
 use backend::{
-    state::{AppState, SecurityConfig},
-    test_support::{create_test_app, get_test_db_url, schema_guard::ensure_schema_ready},
+    state::SecurityConfig,
+    test_support::{create_test_app, create_test_state},
 };
-use sea_orm::Database;
 use serde_json::json;
 
 #[actix_web::test]
-async fn login_rejects_empty_fields_returns_problem_details() {
-    let db_url = get_test_db_url();
-    let db = Database::connect(&db_url)
-        .await
-        .expect("connect to test database");
-
-    // Ensure schema is ready
-    ensure_schema_ready(&db).await;
-
-    // Create test security config and app state
+async fn login_rejects_empty_fields_returns_problem_details(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let app_state = AppState::new(db, security_config);
+    let state = create_test_state()
+        .with_db()
+        .with_security(security_config)
+        .build()
+        .await?;
 
-    let app = create_test_app(web::Data::new(app_state)).await;
+    // Build app with production routes
+    let app = create_test_app(state.clone())
+        .with_prod_routes()
+        .build()
+        .await?;
 
     // Test empty email
     let login_data_empty_email = json!({
@@ -112,24 +112,27 @@ async fn login_rejects_empty_fields_returns_problem_details() {
     assert_eq!(body3["status"], 400);
     // Should fail on first validation (email)
     assert_eq!(body3["code"], "INVALID_EMAIL");
+
+    Ok(())
 }
 
 #[actix_web::test]
-async fn login_missing_email_returns_400_todo_validator() {
-    let db_url = get_test_db_url();
-    let db = Database::connect(&db_url)
-        .await
-        .expect("connect to test database");
-
-    // Ensure schema is ready
-    ensure_schema_ready(&db).await;
-
-    // Create test security config and app state
+async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn std::error::Error>>
+{
+    // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let app_state = AppState::new(db, security_config);
+    let state = create_test_state()
+        .with_db()
+        .with_security(security_config)
+        .build()
+        .await?;
 
-    let app = create_test_app(web::Data::new(app_state)).await;
+    // Build app with production routes
+    let app = create_test_app(state.clone())
+        .with_prod_routes()
+        .build()
+        .await?;
 
     // Test missing email field entirely
     let login_data_missing_email = json!({
@@ -149,24 +152,27 @@ async fn login_missing_email_returns_400_todo_validator() {
 
     // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented in G4.
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
+
+    Ok(())
 }
 
 #[actix_web::test]
-async fn login_missing_google_sub_returns_400_todo_validator() {
-    let db_url = get_test_db_url();
-    let db = Database::connect(&db_url)
-        .await
-        .expect("connect to test database");
-
-    // Ensure schema is ready
-    ensure_schema_ready(&db).await;
-
-    // Create test security config and app state
+async fn login_missing_google_sub_returns_400_todo_validator(
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let app_state = AppState::new(db, security_config);
+    let state = create_test_state()
+        .with_db()
+        .with_security(security_config)
+        .build()
+        .await?;
 
-    let app = create_test_app(web::Data::new(app_state)).await;
+    // Build app with production routes
+    let app = create_test_app(state.clone())
+        .with_prod_routes()
+        .build()
+        .await?;
 
     // Test missing google_sub field entirely
     let login_data_missing_google_sub = json!({
@@ -186,24 +192,26 @@ async fn login_missing_google_sub_returns_400_todo_validator() {
 
     // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented in G4.
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
+
+    Ok(())
 }
 
 #[actix_web::test]
-async fn login_wrong_type_returns_400_todo_validator() {
-    let db_url = get_test_db_url();
-    let db = Database::connect(&db_url)
-        .await
-        .expect("connect to test database");
-
-    // Ensure schema is ready
-    ensure_schema_ready(&db).await;
-
-    // Create test security config and app state
+async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std::error::Error>> {
+    // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let app_state = AppState::new(db, security_config);
+    let state = create_test_state()
+        .with_db()
+        .with_security(security_config)
+        .build()
+        .await?;
 
-    let app = create_test_app(web::Data::new(app_state)).await;
+    // Build app with production routes
+    let app = create_test_app(state.clone())
+        .with_prod_routes()
+        .build()
+        .await?;
 
     // Test wrong type for email (number instead of string)
     let login_data_wrong_email_type = json!({
@@ -264,4 +272,6 @@ async fn login_wrong_type_returns_400_todo_validator() {
 
     // TODO: Upgrade this assertion once `ValidatedJson<T>` is implemented in G4.
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
+
+    Ok(())
 }

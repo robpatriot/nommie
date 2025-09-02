@@ -1,32 +1,31 @@
 mod common;
 use common::assert_problem_details_structure;
 
-use actix_web::{test, web};
+use actix_web::test;
 use backend::{
     auth::mint_access_token,
-    state::{AppState, SecurityConfig},
-    test_support::{
-        create_test_app, factories::seed_user_with_sub, get_test_db_url,
-        schema_guard::ensure_schema_ready,
-    },
+    state::SecurityConfig,
+    test_support::{create_test_app, create_test_state, factories::seed_user_with_sub},
 };
-use sea_orm::Database;
 use serde_json::Value;
 use std::time::SystemTime;
 
 #[actix_web::test]
-async fn test_me_db_success() {
-    // Set up database
-    let db_url = get_test_db_url();
-    let db = Database::connect(&db_url)
-        .await
-        .expect("connect to test database");
-    ensure_schema_ready(&db).await;
-
-    // Create test security config and app state
+async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
+    // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let app_state = AppState::new(db.clone(), security_config.clone());
+    let state = create_test_state()
+        .with_db()
+        .with_security(security_config.clone())
+        .build()
+        .await?;
+
+    // Build app with production routes
+    let app = create_test_app(state.clone())
+        .with_prod_routes()
+        .build()
+        .await?;
 
     // Seed user with specific sub - use timestamp to ensure uniqueness
     let timestamp = SystemTime::now()
@@ -35,15 +34,13 @@ async fn test_me_db_success() {
         .as_millis();
     let test_sub = format!("test-sub-{timestamp}");
     let test_email = format!("test-{timestamp}@example.com");
-    let user = seed_user_with_sub(&db, &test_sub, Some(&test_email))
+    let user = seed_user_with_sub(state.db.as_ref().unwrap(), &test_sub, Some(&test_email))
         .await
         .expect("should create user successfully");
 
     // Mint JWT with the same sub
     let token = mint_access_token(&test_sub, &test_email, SystemTime::now(), &security_config)
         .expect("should mint token successfully");
-
-    let app = create_test_app(web::Data::new(app_state)).await;
 
     // Make request with valid token
     let req = test::TestRequest::get()
@@ -65,21 +62,26 @@ async fn test_me_db_success() {
     assert_eq!(response["id"], user.id);
     assert_eq!(response["sub"], test_sub);
     assert_eq!(response["email"], Value::Null); // email is None since it's not in users table
+
+    Ok(())
 }
 
 #[actix_web::test]
-async fn test_me_db_user_not_found() {
-    // Set up database
-    let db_url = get_test_db_url();
-    let db = Database::connect(&db_url)
-        .await
-        .expect("connect to test database");
-    ensure_schema_ready(&db).await;
-
-    // Create test security config and app state
+async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
+    // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let app_state = AppState::new(db.clone(), security_config.clone());
+    let state = create_test_state()
+        .with_db()
+        .with_security(security_config.clone())
+        .build()
+        .await?;
+
+    // Build app with production routes
+    let app = create_test_app(state.clone())
+        .with_prod_routes()
+        .build()
+        .await?;
 
     // Mint JWT with a sub that doesn't exist in database - use timestamp to ensure uniqueness
     let timestamp = SystemTime::now()
@@ -95,8 +97,6 @@ async fn test_me_db_user_not_found() {
         &security_config,
     )
     .expect("should mint token successfully");
-
-    let app = create_test_app(web::Data::new(app_state)).await;
 
     // Make request with valid token but non-existent user
     let req = test::TestRequest::get()
@@ -117,23 +117,26 @@ async fn test_me_db_user_not_found() {
         "User not found in database",
     )
     .await;
+
+    Ok(())
 }
 
 #[actix_web::test]
-async fn test_me_db_unauthorized() {
-    // Set up database
-    let db_url = get_test_db_url();
-    let db = Database::connect(&db_url)
-        .await
-        .expect("connect to test database");
-    ensure_schema_ready(&db).await;
-
-    // Create test security config and app state
+async fn test_me_db_unauthorized() -> Result<(), Box<dyn std::error::Error>> {
+    // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let app_state = AppState::new(db, security_config);
+    let state = create_test_state()
+        .with_db()
+        .with_security(security_config)
+        .build()
+        .await?;
 
-    let app = create_test_app(web::Data::new(app_state)).await;
+    // Build app with production routes
+    let app = create_test_app(state.clone())
+        .with_prod_routes()
+        .build()
+        .await?;
 
     // Make request without Authorization header
     let req = test::TestRequest::get()
@@ -153,4 +156,6 @@ async fn test_me_db_unauthorized() {
         "Missing or malformed Bearer token",
     )
     .await;
+
+    Ok(())
 }
