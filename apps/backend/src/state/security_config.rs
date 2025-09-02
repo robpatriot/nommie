@@ -1,11 +1,10 @@
 use jsonwebtoken::Algorithm;
-use std::sync::Arc;
 
 /// Configuration for JWT security settings
 #[derive(Debug, Clone)]
 pub struct SecurityConfig {
     /// JWT secret key for signing and verifying tokens
-    pub jwt_secret: Arc<[u8]>,
+    pub jwt_secret: Vec<u8>,
     /// JWT algorithm to use (defaults to HS256)
     pub algorithm: Algorithm,
     /// Optional JWT issuer claim
@@ -16,7 +15,7 @@ pub struct SecurityConfig {
 
 impl SecurityConfig {
     /// Create a new SecurityConfig with the given JWT secret
-    pub fn new(jwt_secret: impl Into<Arc<[u8]>>) -> Self {
+    pub fn new(jwt_secret: impl Into<Vec<u8>>) -> Self {
         Self {
             jwt_secret: jwt_secret.into(),
             algorithm: Algorithm::HS256,
