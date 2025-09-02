@@ -1,22 +1,18 @@
-use sea_orm::{ColumnTrait, Database, EntityTrait, PaginatorTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 
 use backend::{
+    bootstrap::db::{connect_db, DbProfile},
     entities::user_credentials,
     services::users::ensure_user,
-    test_support::{get_test_db_url, schema_guard::ensure_schema_ready},
 };
 
 #[tokio::test]
 #[serial]
 async fn test_ensure_user_inserts_then_reuses() {
-    let db_url = get_test_db_url();
-    let db = Database::connect(&db_url)
+    let db = connect_db(DbProfile::Test)
         .await
-        .expect("connect to test database");
-
-    // Ensure schema is ready (this will panic if not)
-    ensure_schema_ready(&db).await;
+        .expect("connect to _test database");
 
     // First call - should create a new user
     let (user1, email1) = ensure_user("alice@example.com", Some("Alice"), "google-sub-123", &db)

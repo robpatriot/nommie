@@ -1,8 +1,11 @@
 mod common;
 use common::assert_problem_details_structure;
 
-use actix_web::{test, web, App, HttpMessage, HttpRequest, HttpResponse};
-use backend::{middleware::RequestTrace, AppError};
+use actix_web::{test, web, HttpMessage, HttpRequest, HttpResponse};
+use backend::{
+    test_support::{create_test_app, create_test_state},
+    AppError,
+};
 use serde_json::Value;
 
 /// Test endpoint that returns a validation error (400)
@@ -55,10 +58,12 @@ async fn test_db_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
 /// This test consolidates all error type testing into a single, parameterized test
 #[actix_web::test]
 async fn test_all_error_responses_conform_to_problem_details() {
-    let app = test::init_service(
-        App::new()
-            .wrap(RequestTrace)
-            .route("/_test/validation", web::get().to(test_validation_error))
+    let state = create_test_state()
+        .build()
+        .await
+        .expect("create test state");
+    let web_scope = |cfg: &mut web::ServiceConfig| {
+        cfg.route("/_test/validation", web::get().to(test_validation_error))
             .route("/_test/bad_request", web::get().to(test_bad_request_error))
             .route("/_test/not_found", web::get().to(test_not_found_error))
             .route(
@@ -67,9 +72,13 @@ async fn test_all_error_responses_conform_to_problem_details() {
             )
             .route("/_test/forbidden", web::get().to(test_forbidden_error))
             .route("/_test/internal", web::get().to(test_internal_error))
-            .route("/_test/db", web::get().to(test_db_error)),
-    )
-    .await;
+            .route("/_test/db", web::get().to(test_db_error));
+    };
+    let app = create_test_app(state)
+        .with_routes(web_scope)
+        .build()
+        .await
+        .expect("create test app");
 
     // Test all error types to ensure they conform to ProblemDetails format
     let error_cases = vec![
@@ -116,12 +125,18 @@ async fn test_successful_response_with_error_handling() {
         Ok(HttpResponse::Ok().body("Success"))
     }
 
-    let app = test::init_service(
-        App::new()
-            .wrap(RequestTrace)
-            .route("/_test/success", web::get().to(success_handler)),
-    )
-    .await;
+    let state = create_test_state()
+        .build()
+        .await
+        .expect("create test state");
+    let web_scope = |cfg: &mut web::ServiceConfig| {
+        cfg.route("/_test/success", web::get().to(success_handler));
+    };
+    let app = create_test_app(state)
+        .with_routes(web_scope)
+        .build()
+        .await
+        .expect("create test app");
 
     let req = test::TestRequest::get().uri("/_test/success").to_request();
     let resp = test::call_service(&app, req).await;
@@ -153,12 +168,18 @@ async fn test_error_without_trace_id() {
         )))
     }
 
-    let app = test::init_service(
-        App::new()
-            .wrap(RequestTrace)
-            .route("/_test/no_trace", web::get().to(error_without_trace)),
-    )
-    .await;
+    let state = create_test_state()
+        .build()
+        .await
+        .expect("create test state");
+    let web_scope = |cfg: &mut web::ServiceConfig| {
+        cfg.route("/_test/no_trace", web::get().to(error_without_trace));
+    };
+    let app = create_test_app(state)
+        .with_routes(web_scope)
+        .build()
+        .await
+        .expect("create test app");
 
     let req = test::TestRequest::get().uri("/_test/no_trace").to_request();
     let resp = test::call_service(&app, req).await;
@@ -220,12 +241,18 @@ async fn test_malformed_error_response_handling() {
             .with_trace_id(Some("test-trace".to_string())))
     }
 
-    let app = test::init_service(
-        App::new()
-            .wrap(RequestTrace)
-            .route("/_test/malformed", web::get().to(malformed_error)),
-    )
-    .await;
+    let state = create_test_state()
+        .build()
+        .await
+        .expect("create test state");
+    let web_scope = |cfg: &mut web::ServiceConfig| {
+        cfg.route("/_test/malformed", web::get().to(malformed_error));
+    };
+    let app = create_test_app(state)
+        .with_routes(web_scope)
+        .build()
+        .await
+        .expect("create test app");
 
     let req = test::TestRequest::get()
         .uri("/_test/malformed")

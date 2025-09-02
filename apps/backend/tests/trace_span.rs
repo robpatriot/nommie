@@ -2,6 +2,7 @@
 
 use actix_web::{test, web, App, HttpResponse};
 use serde_json::Value;
+use serial_test::serial;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
 use tracing::{info, subscriber::set_global_default};
@@ -25,6 +26,7 @@ impl Write for BufWriter {
 }
 
 #[actix_web::test]
+#[serial]
 async fn handler_logs_are_in_request_span_with_trace_id() {
     // ---- 1) In-memory JSON logger that records span list, globally (worker threads) ----
     let buf = Arc::new(Mutex::new(Vec::new()));
