@@ -14,6 +14,15 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 
 ---
 
+## Cursor Rules
+
+This repo uses [Cursor](https://cursor.sh) for AI-assisted development.  
+Project-specific conventions are locked in **`.cursor/rules.md`** — covering schema design, error handling, extractors, testing, and more.  
+
+➡️ Always check that file before making changes; update it when project policies evolve.
+
+---
+
 ## 🔐 Authentication Setup (NextAuth v5)
 
 The frontend uses **NextAuth v5** with Google OAuth for user authentication.
