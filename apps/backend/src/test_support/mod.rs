@@ -1,6 +1,8 @@
+pub mod app_builder;
 pub mod factories;
 pub mod migrations;
 pub mod schema_guard;
+pub mod state_builder;
 
 use crate::{middleware::RequestTrace, state::AppState};
 use actix_http::Request;
@@ -45,3 +47,7 @@ pub async fn create_test_app(
     )
     .await
 }
+
+// Re-export the new builders
+pub use app_builder::create_test_app_builder;
+pub use state_builder::create_test_state;

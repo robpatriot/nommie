@@ -1,77 +1,78 @@
-//! Test service builder (two-stage test harness, stage 2).
-//! Given an AppState, build an initialized Actix **test service**.
-
+use crate::{error::AppError, middleware::RequestTrace, routes, state::AppState};
+use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::{Service, ServiceResponse};
-use actix_web::Error as ActixError;
-use actix_web::{
-    web::{self, ServiceConfig},
-    App,
-};
+use actix_web::{test, web, App, Error};
 
-use crate::error::AppError;
-use crate::state::app_state::AppState;
+/// Type alias for route configuration functions
+type RouteConfigFn = Box<dyn Fn(&mut web::ServiceConfig) + Send + Sync>;
 
-/// Function pointer for custom route configuration.
-type RoutesFn = Box<dyn FnOnce(&mut ServiceConfig) + Send>;
-
-pub fn create_test_app_builder(state: AppState) -> TestAppBuilder {
-    TestAppBuilder {
-        state,
-        router: Router::Unset,
-    }
-}
-
-enum Router {
-    Unset,
-    Prod,
-    Custom(RoutesFn),
-}
-
+/// Builder for creating test Actix service instances
 pub struct TestAppBuilder {
     state: AppState,
-    router: Router,
+    route_config: Option<RouteConfigFn>,
 }
 
 impl TestAppBuilder {
-    /// Use the application's production routes.
+    /// Create a new TestAppBuilder with the given AppState
+    pub fn new(state: AppState) -> Self {
+        Self {
+            state,
+            route_config: None,
+        }
+    }
+
+    /// Configure the app to use production routes
     pub fn with_prod_routes(mut self) -> Self {
-        self.router = Router::Prod;
+        self.route_config = Some(Box::new(routes::configure) as RouteConfigFn);
         self
     }
 
-    /// Use custom routes for a test.
-    pub fn with_routes<F>(mut self, f: F) -> Self
+    /// Configure the app with custom routes
+    pub fn with_routes<F>(mut self, config_fn: F) -> Self
     where
-        F: FnOnce(&mut ServiceConfig) + Send + 'static,
+        F: Fn(&mut web::ServiceConfig) + Send + Sync + 'static,
     {
-        self.router = Router::Custom(Box::new(f));
+        self.route_config = Some(Box::new(config_fn) as RouteConfigFn);
         self
     }
 
-    /// Build and initialize the Actix test service.
-    ///
-    /// Return type is `impl Service<...>` so callers don't have to name the opaque service type.
+    /// Build the test service
     pub async fn build(
         self,
-    ) -> Result<
-        impl Service<actix_http::Request, Response = ServiceResponse<BoxBody>, Error = ActixError>,
-        AppError,
-    > {
-        let mut app = App::new()
-            // Register a single Data<AppState>.
-            .app_data(web::Data::new(self.state.clone()));
+    ) -> Result<impl Service<Request, Response = ServiceResponse<BoxBody>, Error = Error>, AppError>
+    {
+        let state = self.state;
+        let route_config = self.route_config;
 
-        app = match self.router {
-            Router::Unset | Router::Prod => {
-                // ⬇️ Adjust this to your real prod-router function.
-                // e.g., crate::http::routes::configure, crate::routes::prod, etc.
-                app.configure(crate::routes::configure)
-            }
-            Router::Custom(f) => app.configure(f),
-        };
+        let service = test::init_service(
+            App::new()
+                .wrap(RequestTrace)
+                .app_data(web::Data::new(state))
+                .configure(move |cfg| {
+                    if let Some(config_fn) = &route_config {
+                        config_fn(cfg);
+                    }
+                }),
+        )
+        .await;
 
-        let srv = actix_web::test::init_service(app).await;
-        Ok(srv)
+        Ok(service)
     }
+}
+
+/// Create a new test app builder with the given AppState
+///
+/// # Example
+/// ```rust
+/// use backend::test_support::{create_test_app_builder, create_test_state};
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let state = create_test_state().with_db().build().await?;
+/// let app = create_test_app_builder(state.clone()).with_prod_routes().build().await?;
+/// # Ok(())
+/// # }
+/// ```
+pub fn create_test_app_builder(state: AppState) -> TestAppBuilder {
+    TestAppBuilder::new(state)
 }
