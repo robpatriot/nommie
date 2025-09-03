@@ -65,10 +65,11 @@ impl TestAppBuilder {
 ///
 /// # Example
 /// ```rust
-/// use backend::test_support::{create_test_app, create_test_state};
+/// use backend::test_support::{build_state, create_test_app};
+/// use backend::bootstrap::db::DbProfile;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let state = create_test_state().with_db().build().await?;
+/// let state = build_state().with_db(DbProfile::Test).build().await?;
 /// let app = create_test_app(state.clone()).with_prod_routes().build().await?;
 /// # Ok(())
 /// # }

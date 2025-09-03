@@ -11,16 +11,6 @@ pub enum DbProfile {
     Test,
 }
 
-/// Connect to database using DATABASE_URL from environment
-/// This function does NOT run any migrations
-pub async fn connect_from_env() -> Result<DatabaseConnection, sea_orm::DbErr> {
-    dotenvy::dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
-    Database::connect(&database_url).await
-}
-
 /// Unified database connector that supports different profiles
 /// This function does NOT run any migrations
 pub async fn connect_db(profile: DbProfile) -> Result<DatabaseConnection, AppError> {

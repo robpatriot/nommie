@@ -4,8 +4,9 @@ use common::assert_problem_details_structure;
 use actix_web::test;
 use backend::{
     auth::mint_access_token,
+    bootstrap::db::DbProfile,
     state::SecurityConfig,
-    test_support::{create_test_app, create_test_state},
+    test_support::{build_state, create_test_app},
 };
 use serde_json::Value;
 use std::time::SystemTime;
@@ -13,7 +14,7 @@ use std::time::SystemTime;
 #[actix_web::test]
 async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and default security config
-    let state = create_test_state().with_db().build().await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -44,7 +45,7 @@ async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
 #[actix_web::test]
 async fn test_malformed_scheme() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and default security config
-    let state = create_test_state().with_db().build().await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -78,7 +79,7 @@ async fn test_malformed_scheme() -> Result<(), Box<dyn std::error::Error>> {
 #[actix_web::test]
 async fn test_empty_token() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and default security config
-    let state = create_test_state().with_db().build().await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -112,7 +113,7 @@ async fn test_empty_token() -> Result<(), Box<dyn std::error::Error>> {
 #[actix_web::test]
 async fn test_invalid_token() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and default security config
-    let state = create_test_state().with_db().build().await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -142,8 +143,8 @@ async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
+    let state = build_state()
+        .with_db(DbProfile::Test)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -182,8 +183,8 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = create_test_state()
-        .with_db()
+    let state = build_state()
+        .with_db(DbProfile::Test)
         .with_security(security_config.clone())
         .build()
         .await?;

@@ -4,24 +4,24 @@ use crate::{
     state::{AppState, SecurityConfig},
 };
 
-/// Builder for creating test AppState instances
-pub struct TestStateBuilder {
+/// Builder for creating AppState instances (used in both tests and main)
+pub struct StateBuilder {
     security_config: SecurityConfig,
-    with_db: bool,
+    db_profile: Option<DbProfile>,
 }
 
-impl TestStateBuilder {
-    /// Create a new TestStateBuilder with default settings
+impl StateBuilder {
+    /// Create a new StateBuilder with default settings
     pub fn new() -> Self {
         Self {
             security_config: SecurityConfig::default(),
-            with_db: false,
+            db_profile: None,
         }
     }
 
-    /// Enable database connection using connect_db(DbProfile::Test)
-    pub fn with_db(mut self) -> Self {
-        self.with_db = true;
+    /// Enable database connection with explicit profile
+    pub fn with_db(mut self, profile: DbProfile) -> Self {
+        self.db_profile = Some(profile);
         self
     }
 
@@ -33,8 +33,8 @@ impl TestStateBuilder {
 
     /// Build the AppState
     pub async fn build(self) -> Result<AppState, AppError> {
-        if self.with_db {
-            let db = connect_db(DbProfile::Test).await?;
+        if let Some(profile) = self.db_profile {
+            let db = connect_db(profile).await?;
             Ok(AppState::new(db, self.security_config))
         } else {
             Ok(AppState::without_db(self.security_config))
@@ -42,23 +42,24 @@ impl TestStateBuilder {
     }
 }
 
-impl Default for TestStateBuilder {
+impl Default for StateBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Create a new test state builder
+/// Create a new state builder
 ///
 /// # Example
 /// ```rust
-/// use backend::test_support::create_test_state;
+/// use backend::test_support::build_state;
+/// use backend::bootstrap::db::DbProfile;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let state = create_test_state().with_db().build().await?;
+/// let state = build_state().with_db(DbProfile::Test).build().await?;
 /// # Ok(())
 /// # }
 /// ```
-pub fn create_test_state() -> TestStateBuilder {
-    TestStateBuilder::new()
+pub fn build_state() -> StateBuilder {
+    StateBuilder::new()
 }

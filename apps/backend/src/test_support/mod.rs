@@ -32,4 +32,4 @@ pub fn get_test_db_url() -> String {
 
 // Re-export the new builders
 pub use app_builder::create_test_app;
-pub use state_builder::create_test_state;
+pub use state_builder::build_state;

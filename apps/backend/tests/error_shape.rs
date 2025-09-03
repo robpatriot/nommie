@@ -3,7 +3,7 @@ use common::assert_problem_details_structure;
 
 use actix_web::{test, web, HttpMessage, HttpRequest, HttpResponse};
 use backend::{
-    test_support::{create_test_app, create_test_state},
+    test_support::{build_state, create_test_app},
     AppError,
 };
 use serde_json::Value;
@@ -58,10 +58,7 @@ async fn test_db_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
 /// This test consolidates all error type testing into a single, parameterized test
 #[actix_web::test]
 async fn test_all_error_responses_conform_to_problem_details() {
-    let state = create_test_state()
-        .build()
-        .await
-        .expect("create test state");
+    let state = build_state().build().await.expect("create test state");
     let web_scope = |cfg: &mut web::ServiceConfig| {
         cfg.route("/_test/validation", web::get().to(test_validation_error))
             .route("/_test/bad_request", web::get().to(test_bad_request_error))
@@ -125,10 +122,7 @@ async fn test_successful_response_with_error_handling() {
         Ok(HttpResponse::Ok().body("Success"))
     }
 
-    let state = create_test_state()
-        .build()
-        .await
-        .expect("create test state");
+    let state = build_state().build().await.expect("create test state");
     let web_scope = |cfg: &mut web::ServiceConfig| {
         cfg.route("/_test/success", web::get().to(success_handler));
     };
@@ -168,10 +162,7 @@ async fn test_error_without_trace_id() {
         )))
     }
 
-    let state = create_test_state()
-        .build()
-        .await
-        .expect("create test state");
+    let state = build_state().build().await.expect("create test state");
     let web_scope = |cfg: &mut web::ServiceConfig| {
         cfg.route("/_test/no_trace", web::get().to(error_without_trace));
     };
@@ -241,10 +232,7 @@ async fn test_malformed_error_response_handling() {
             .with_trace_id(Some("test-trace".to_string())))
     }
 
-    let state = create_test_state()
-        .build()
-        .await
-        .expect("create test state");
+    let state = build_state().build().await.expect("create test state");
     let web_scope = |cfg: &mut web::ServiceConfig| {
         cfg.route("/_test/malformed", web::get().to(malformed_error));
     };
