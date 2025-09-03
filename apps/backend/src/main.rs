@@ -18,16 +18,11 @@ async fn main() -> std::io::Result<()> {
 
     println!("🚀 Starting Nommie Backend on http://127.0.0.1:3001");
 
-    // Ensure required environment variables are set
-    if std::env::var("APP_JWT_SECRET").is_err() {
-        eprintln!("❌ APP_JWT_SECRET environment variable must be set");
+    let jwt = std::env::var("APP_JWT_SECRET").unwrap_or_else(|_| {
+        eprintln!("❌ APP_JWT_SECRET must be set");
         std::process::exit(1);
-    }
-
-    // Create security configuration from environment
-    let jwt_secret =
-        std::env::var("APP_JWT_SECRET").expect("APP_JWT_SECRET environment variable must be set");
-    let security_config = SecurityConfig::new(jwt_secret.as_bytes());
+    });
+    let security_config = SecurityConfig::new(jwt.as_bytes());
 
     // Create application state using unified builder
     let app_state = build_state()
