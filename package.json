@@ -27,8 +27,8 @@
     "db:down": "docker compose down -v",
     "db:stop": "docker compose stop postgres",
     "db:logs": "docker compose logs -f postgres",
-    "db:pg_isready": "dotenvx run -- sh -lc 'docker exec -it nommie-postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB'",
-    "db:psql": "dotenvx run -- sh -lc 'docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB'",
+    "db:pg_isready": "docker exec -it nommie-postgres pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
+    "db:psql": "docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
     "db:migrate": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- up",
     "db:fresh": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh",
     "db:fresh:test": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh"
