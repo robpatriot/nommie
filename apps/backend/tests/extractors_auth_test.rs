@@ -1,13 +1,14 @@
 mod common;
-use common::assert_problem_details_structure;
+use std::time::SystemTime;
 
 use actix_web::test;
-use backend::{
-    auth::mint_access_token, config::db::DbProfile, infra::state::build_state,
-    state::SecurityConfig, test_support::create_test_app,
-};
+use backend::auth::jwt::mint_access_token;
+use backend::config::db::DbProfile;
+use backend::infra::state::build_state;
+use backend::state::security_config::SecurityConfig;
+use backend::test_support::create_test_app;
+use common::assert_problem_details_structure;
 use serde_json::Value;
-use std::time::SystemTime;
 
 #[actix_web::test]
 async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {

@@ -1,8 +1,10 @@
-use actix_web::{dev::Payload, web, FromRequest, HttpRequest};
+use actix_web::dev::Payload;
+use actix_web::{web, FromRequest, HttpRequest};
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::{state::AppState, AppError};
+use crate::state::app_state::AppState;
+use crate::AppError;
 
 /// Generic JWT claims that can be validated against any claims type
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -15,7 +17,10 @@ where
     C: for<'de> Deserialize<'de>,
 {
     /// Verify and decode a JWT token into the specified claims type
-    pub fn verify(token: &str, security: &crate::state::SecurityConfig) -> Result<Self, AppError> {
+    pub fn verify(
+        token: &str,
+        security: &crate::state::security_config::SecurityConfig,
+    ) -> Result<Self, AppError> {
         // Configure validation to check expiration and pin algorithm to configured algorithm.
         let mut validation = Validation::new(security.algorithm);
         validation.validate_exp = true;
@@ -43,7 +48,7 @@ where
     pub fn verify_with_request(
         token: &str,
         req: &HttpRequest,
-        security: &crate::state::SecurityConfig,
+        security: &crate::state::security_config::SecurityConfig,
     ) -> Result<Self, AppError> {
         // Configure validation to check expiration and pin algorithm to configured algorithm.
         let mut validation = Validation::new(security.algorithm);

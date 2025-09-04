@@ -1,10 +1,12 @@
-use actix_web::{web, HttpResponse, Result};
-use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 
-use crate::{
-    auth::mint_access_token, error::AppError, services::users::ensure_user, state::AppState,
-};
+use actix_web::{web, HttpResponse, Result};
+use serde::{Deserialize, Serialize};
+
+use crate::auth::jwt::mint_access_token;
+use crate::error::AppError;
+use crate::services::users::ensure_user;
+use crate::state::app_state::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {

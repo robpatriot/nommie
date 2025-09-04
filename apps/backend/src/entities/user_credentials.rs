@@ -1,3 +1,4 @@
+use sea_orm;
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;

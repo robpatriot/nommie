@@ -1,6 +1,7 @@
-use crate::entities::User;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, NotSet, Set};
 use time::OffsetDateTime;
+
+use crate::entities::users::Model as User;
 
 /// Seed a user with a specific sub value for testing purposes.
 ///

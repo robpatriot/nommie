@@ -1,5 +1,6 @@
-use crate::error::AppError;
 use std::env;
+
+use crate::error::AppError;
 
 /// Database profile enum for different environments
 #[derive(Debug, Clone, PartialEq)]
@@ -84,8 +85,9 @@ fn must_var(name: &str) -> Result<String, AppError> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::env;
+
+    use super::{db_url, DbOwner, DbProfile};
 
     fn set_test_env() {
         env::set_var("PROD_DB", "nommie");

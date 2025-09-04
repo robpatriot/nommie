@@ -2,11 +2,10 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, NotSet, QueryFilter, Set,
     TransactionTrait,
 };
+use users::Model as User;
 
-use crate::{
-    entities::{user_credentials, users, User},
-    error::AppError,
-};
+use crate::entities::{user_credentials, users};
+use crate::error::AppError;
 
 /// Ensures a user exists for Google OAuth, creating one if necessary.
 /// This function is idempotent - calling it multiple times with the same email

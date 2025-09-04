@@ -1,7 +1,10 @@
-use crate::{state::SecurityConfig, AppError};
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::state::security_config::SecurityConfig;
+use crate::AppError;
 
 /// Claims included in our backend-issued access tokens.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -74,8 +77,11 @@ pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Cla
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::time::Duration;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    use super::{mint_access_token, verify_access_token};
+    use crate::state::security_config::SecurityConfig;
+    use crate::AppError;
 
     #[test]
     fn test_mint_and_verify_roundtrip() {

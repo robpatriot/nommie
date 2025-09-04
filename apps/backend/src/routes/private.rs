@@ -1,10 +1,9 @@
 use actix_web::{web, HttpResponse, Result};
 use serde::Serialize;
 
-use crate::{
-    error::AppError,
-    extractors::{CurrentUser, CurrentUserRecord},
-};
+use crate::error::AppError;
+use crate::extractors::current_user::CurrentUser;
+use crate::extractors::current_user_db::CurrentUserRecord;
 
 #[derive(Debug, Serialize)]
 pub struct MeResponse {

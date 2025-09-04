@@ -1,14 +1,18 @@
 //! Integration test for handler logs inheriting `trace_id` via a request span.
 
-use actix_web::{test, web, App, HttpResponse};
-use serde_json::Value;
-use serial_test::serial;
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
-use tracing::{info, subscriber::set_global_default};
-use tracing_subscriber::{fmt, layer::SubscriberExt, registry::Registry};
 
-use backend::middleware::{RequestTrace, StructuredLogger};
+use actix_web::{test, web, App, HttpResponse};
+use backend::middleware::request_trace::RequestTrace;
+use backend::middleware::structured_logger::StructuredLogger;
+use serde_json::Value;
+use serial_test::serial;
+use tracing::info;
+use tracing::subscriber::set_global_default;
+use tracing_subscriber::fmt;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::registry::Registry;
 
 /// Simple writer that appends JSON lines to a shared Vec<u8>.
 #[derive(Clone)]

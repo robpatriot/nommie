@@ -1,6 +1,6 @@
 use sea_orm::DatabaseConnection;
 
-use super::SecurityConfig;
+use super::security_config::SecurityConfig;
 
 /// Application state containing shared resources
 #[derive(Debug, Clone)]

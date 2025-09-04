@@ -1,11 +1,14 @@
+#![deny(clippy::wildcard_imports)]
+#![cfg_attr(test, allow(clippy::wildcard_imports))]
+
 use actix_web::{web, App, HttpServer};
-use backend::{
-    config::db::DbProfile,
-    infra::state::build_state,
-    middleware::{cors_middleware, RequestTrace, StructuredLogger},
-    routes,
-    state::SecurityConfig,
-};
+use backend::config::db::DbProfile;
+use backend::infra::state::build_state;
+use backend::middleware::cors::cors_middleware;
+use backend::middleware::request_trace::RequestTrace;
+use backend::middleware::structured_logger::StructuredLogger;
+use backend::routes;
+use backend::state::security_config::SecurityConfig;
 
 mod telemetry;
 

@@ -1,9 +1,12 @@
-use actix_web::{dev::Payload, web, FromRequest, HttpRequest};
+use actix_web::dev::Payload;
+use actix_web::{web, FromRequest, HttpRequest};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 
 use super::current_user::CurrentUser;
-use crate::{entities::users, error::AppError, state::AppState};
+use crate::entities::users;
+use crate::error::AppError;
+use crate::state::app_state::AppState;
 
 /// Database-backed current user record
 /// This contains the actual user data from the database

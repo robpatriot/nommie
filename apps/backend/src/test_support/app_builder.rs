@@ -1,8 +1,12 @@
-use crate::{error::AppError, middleware::RequestTrace, routes, state::AppState};
 use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{test, web, App, Error};
+
+use crate::error::AppError;
+use crate::middleware::request_trace::RequestTrace;
+use crate::routes;
+use crate::state::app_state::AppState;
 
 /// Type alias for route configuration functions
 type RouteConfigFn = Box<dyn Fn(&mut web::ServiceConfig) + Send + Sync>;
