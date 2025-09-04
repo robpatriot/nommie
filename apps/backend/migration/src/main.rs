@@ -1,4 +1,7 @@
-use ::backend::{connect_db, DbOwner, DbProfile};
+use ::backend::{
+    config::db::{DbOwner, DbProfile},
+    infra::db::connect_db,
+};
 use sea_orm_migration::prelude::*;
 use std::env;
 
