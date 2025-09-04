@@ -1,10 +1,10 @@
 use actix_web::{web, App, HttpServer};
 use backend::{
-    config::db::{DbOwner, DbProfile},
+    config::db::DbProfile,
+    infra::state::build_state,
     middleware::{cors_middleware, RequestTrace, StructuredLogger},
     routes,
     state::SecurityConfig,
-    test_support::build_state,
 };
 
 mod telemetry;
@@ -23,7 +23,7 @@ async fn main() -> std::io::Result<()> {
 
     // Create application state using unified builder
     let app_state = build_state()
-        .with_db(DbProfile::Prod, DbOwner::App)
+        .with_db(DbProfile::Prod)
         .with_security(security_config)
         .build()
         .await

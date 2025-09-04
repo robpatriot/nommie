@@ -1,15 +1,14 @@
 use crate::{
-    bootstrap::db::connect_db,
-    config::db::{DbOwner, DbProfile},
     error::AppError,
+    infra::db::connect_db,
     state::{AppState, SecurityConfig},
 };
 
 /// Builder for creating AppState instances (used in both tests and main)
 pub struct StateBuilder {
     security_config: SecurityConfig,
-    db_profile: Option<DbProfile>,
-    db_owner: Option<DbOwner>,
+    db_profile: crate::config::db::DbProfile,
+    owner: crate::config::db::DbOwner,
 }
 
 impl StateBuilder {
@@ -17,15 +16,20 @@ impl StateBuilder {
     pub fn new() -> Self {
         Self {
             security_config: SecurityConfig::default(),
-            db_profile: None,
-            db_owner: None,
+            db_profile: crate::config::db::DbProfile::Prod,
+            owner: crate::config::db::DbOwner::App,
         }
     }
 
-    /// Enable database connection with explicit profile and owner
-    pub fn with_db(mut self, profile: DbProfile, owner: DbOwner) -> Self {
-        self.db_profile = Some(profile);
-        self.db_owner = Some(owner);
+    /// Set the database profile
+    pub fn with_db(mut self, profile: crate::config::db::DbProfile) -> Self {
+        self.db_profile = profile;
+        self
+    }
+
+    /// Set the database owner
+    pub fn with_owner(mut self, owner: crate::config::db::DbOwner) -> Self {
+        self.owner = owner;
         self
     }
 
@@ -37,12 +41,8 @@ impl StateBuilder {
 
     /// Build the AppState
     pub async fn build(self) -> Result<AppState, AppError> {
-        if let (Some(profile), Some(owner)) = (self.db_profile, self.db_owner) {
-            let db = connect_db(profile, owner).await?;
-            Ok(AppState::new(db, self.security_config))
-        } else {
-            Ok(AppState::without_db(self.security_config))
-        }
+        let db = connect_db(self.db_profile, self.owner).await?;
+        Ok(AppState::new(db, self.security_config))
     }
 }
 
@@ -56,11 +56,11 @@ impl Default for StateBuilder {
 ///
 /// # Example
 /// ```rust
-/// use backend::test_support::build_state;
+/// use backend::infra::state::build_state;
 /// use backend::config::db::{DbProfile, DbOwner};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let state = build_state().with_db(DbProfile::Test, DbOwner::App).build().await?;
+/// let state = build_state().with_db(DbProfile::Test).build().await?;
 /// # Ok(())
 /// # }
 /// ```

@@ -1,18 +1,12 @@
 use actix_web::test;
-use backend::{
-    config::db::{DbOwner, DbProfile},
-    test_support::{build_state, create_test_app},
-};
+use backend::{config::db::DbProfile, infra::state::build_state, test_support::create_test_app};
 use serde_json::json;
 
 #[actix_web::test]
 async fn login_rejects_empty_fields_returns_problem_details(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and default security config
-    let state = build_state()
-        .with_db(DbProfile::Test, DbOwner::App)
-        .build()
-        .await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -117,10 +111,7 @@ async fn login_rejects_empty_fields_returns_problem_details(
 async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn std::error::Error>>
 {
     // Build state with database and default security config
-    let state = build_state()
-        .with_db(DbProfile::Test, DbOwner::App)
-        .build()
-        .await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -154,10 +145,7 @@ async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn 
 async fn login_missing_google_sub_returns_400_todo_validator(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and default security config
-    let state = build_state()
-        .with_db(DbProfile::Test, DbOwner::App)
-        .build()
-        .await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())
@@ -190,10 +178,7 @@ async fn login_missing_google_sub_returns_400_todo_validator(
 #[actix_web::test]
 async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and default security config
-    let state = build_state()
-        .with_db(DbProfile::Test, DbOwner::App)
-        .build()
-        .await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state.clone())

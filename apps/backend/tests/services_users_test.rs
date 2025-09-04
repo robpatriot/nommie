@@ -2,9 +2,9 @@ use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 
 use backend::{
-    bootstrap::db::connect_db,
     config::db::{DbOwner, DbProfile},
     entities::user_credentials,
+    infra::db::connect_db,
     services::users::ensure_user,
 };
 

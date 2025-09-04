@@ -1,5 +1,5 @@
 use actix_web::test;
-use backend::test_support::{build_state, create_test_app};
+use backend::{infra::state::build_state, test_support::create_test_app};
 
 #[actix_web::test]
 async fn test_health_endpoint() -> Result<(), Box<dyn std::error::Error>> {

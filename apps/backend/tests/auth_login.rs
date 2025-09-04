@@ -1,8 +1,7 @@
 use actix_web::test;
 use backend::{
-    config::db::{DbOwner, DbProfile},
-    state::SecurityConfig,
-    test_support::{build_state, create_test_app},
+    config::db::DbProfile, infra::state::build_state, state::SecurityConfig,
+    test_support::create_test_app,
 };
 use serde_json::json;
 
@@ -12,7 +11,7 @@ async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test, DbOwner::App)
+        .with_db(DbProfile::Test)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -90,7 +89,7 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test, DbOwner::App)
+        .with_db(DbProfile::Test)
         .with_security(security_config.clone())
         .build()
         .await?;
