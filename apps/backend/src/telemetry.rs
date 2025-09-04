@@ -1,4 +1,5 @@
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt, EnvFilter};
 
 pub fn init_tracing() {
     let env_filter = EnvFilter::try_from_default_env()

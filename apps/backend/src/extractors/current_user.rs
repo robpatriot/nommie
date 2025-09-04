@@ -1,4 +1,5 @@
-use actix_web::{dev::Payload, FromRequest, HttpRequest};
+use actix_web::dev::Payload;
+use actix_web::{FromRequest, HttpRequest};
 use serde::{Deserialize, Serialize};
 
 use super::jwt::JwtClaims;

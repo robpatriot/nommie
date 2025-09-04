@@ -1,8 +1,7 @@
-use crate::{
-    config::db::{db_url, DbOwner, DbProfile},
-    error::AppError,
-};
 use sea_orm::{Database, DatabaseConnection};
+
+use crate::config::db::{db_url, DbOwner, DbProfile};
+use crate::error::AppError;
 
 /// Unified database connector that supports different profiles and owners
 /// This function does NOT run any migrations

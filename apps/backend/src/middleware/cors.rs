@@ -1,7 +1,8 @@
 // apps/backend/src/middleware/cors.rs
+use std::env;
+
 use actix_cors::Cors;
 use actix_web::http::header;
-use std::env;
 
 pub fn cors_middleware() -> Cors {
     // Comma-separated origins, e.g.:

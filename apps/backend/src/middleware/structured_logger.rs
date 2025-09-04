@@ -1,6 +1,7 @@
+use std::time::Instant;
+
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use futures_util::future::{ready, LocalBoxFuture, Ready};
-use std::time::Instant;
 use tracing::info;
 
 pub struct StructuredLogger;
