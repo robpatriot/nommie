@@ -1,3 +1,4 @@
+use crate::config::db::DbOwner;
 use crate::{
     error::AppError,
     infra::db::connect_db,
@@ -8,7 +9,6 @@ use crate::{
 pub struct StateBuilder {
     security_config: SecurityConfig,
     db_profile: crate::config::db::DbProfile,
-    owner: crate::config::db::DbOwner,
 }
 
 impl StateBuilder {
@@ -17,19 +17,12 @@ impl StateBuilder {
         Self {
             security_config: SecurityConfig::default(),
             db_profile: crate::config::db::DbProfile::Prod,
-            owner: crate::config::db::DbOwner::App,
         }
     }
 
     /// Set the database profile
     pub fn with_db(mut self, profile: crate::config::db::DbProfile) -> Self {
         self.db_profile = profile;
-        self
-    }
-
-    /// Set the database owner
-    pub fn with_owner(mut self, owner: crate::config::db::DbOwner) -> Self {
-        self.owner = owner;
         self
     }
 
@@ -41,8 +34,8 @@ impl StateBuilder {
 
     /// Build the AppState
     pub async fn build(self) -> Result<AppState, AppError> {
-        let db = connect_db(self.db_profile, self.owner).await?;
-        Ok(AppState::new(db, self.security_config))
+        let conn = connect_db(self.db_profile, DbOwner::App).await?;
+        Ok(AppState::new(conn, self.security_config))
     }
 }
 
@@ -57,7 +50,7 @@ impl Default for StateBuilder {
 /// # Example
 /// ```rust
 /// use backend::infra::state::build_state;
-/// use backend::config::db::{DbProfile, DbOwner};
+/// use backend::config::db::DbProfile;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let state = build_state().with_db(DbProfile::Test).build().await?;
