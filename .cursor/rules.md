@@ -1,88 +1,103 @@
-# Nommie — Cursor Rules (v1.2.4)
+# Nommie — Cursor Rules (v1.3.0)
 
-> Keep this file at repo root. It applies to **all** AI actions (generate, edit, refactor, move/rename). If you must deviate, leave a short code comment explaining why.
+> Keep this file at repo root. It applies to all AI actions (generate, edit, refactor, move/rename). If you must deviate, leave a short code comment explaining why.
 
 ## Purpose
 - Apply these rules to all AI-assisted edits, refactors, and codegen.
-- Prefer clarity and **small, reviewable diffs**. Explain non-obvious changes in **code comments** adjacent to the change.
+- Prefer clarity and small, reviewable diffs. Explain non-obvious changes in code comments adjacent to the change.
 
 ## Tech Stack Hints
 - Backend: Rust, Actix Web, SeaORM, PostgreSQL.
 - Frontend: Next.js (App Router), TypeScript, Tailwind.
 - Monorepo layout: /apps/frontend, /apps/backend, /packages, /docs.
 
+## Environment & Commands Policy
+- We do not use dotenv loaders (dotenvx, dotenvy) in code or scripts.
+- Always source env in your shell before running commands: run `set -a; . ./.env; set +a` once per shell session.
+- .env.example contains component vars only (no DATABASE_URL). Code builds URLs from parts.
+- Never read DATABASE_URL directly in code. Use `config::db::db_url(profile, owner)` or `infra::db::connect_db(profile, owner)`.
+
+## Module Boundaries
+- config/ — pure settings (env parsing, small helpers). No I/O.
+  - config/db.rs → DbProfile, DbOwner, db_url(profile, owner).
+- infra/ — runtime infrastructure (does I/O, owns handles).
+  - infra/db.rs → connect_db(profile, owner) using db_url; enforces “_test” safety.
+  - infra/state.rs → StateBuilder; builds AppState (uses App role).
+- test_support/ — test-only helpers (e.g., logging init). No production wiring.
+- Domain modules contain no DB/framework code.
+
 ## Global Conventions
-- Domain logic stays **pure**: no DB access and no web framework imports in domain modules.
-- Use **enums** over strings for states/roles/phases (code + schema).
+- Domain logic stays pure: no DB access and no web framework imports in domain modules.
+- Use enums over strings for states/roles/phases (code + schema).
 - Prefer explicit, narrow interfaces and small functions over god objects.
 - Respect linters/formatters: Rustfmt + Clippy, ESLint + Prettier.
-- Tests must be **deterministic**; avoid time/RNG leaks unless seeded/injected.
+- Tests must be deterministic; avoid time/RNG leaks unless seeded/injected.
 
-### String Interpolation (JS/TS & Shell) — **Important**
-- **Always interpolate variables inside the string using template literals: `${VAR}`.**
-  - ✅ `console.log(\`Database name is ${DB_NAME}\`)`
-  - ✅ `const url = \`${host}:${port}/${db}\``
-  - ❌ `console.log("Database name is", DB_NAME)`
-  - ❌ `"name: " + name`
-- Prefer a **single formatted string** over passing variables as separate parameters to logging/print APIs.
-- (Rust note): Use standard formatting macros (`format!`, `println!`, `tracing::*`) with `{}` placeholders; avoid string concatenation.
+## String Interpolation (JS/TS & Shell) — Important
+- JS/TS: use template literals like `${value}`.
+- Shell: expand with `${VAR}` or `"$VAR"` as appropriate.
+- Prefer a single formatted string over ad-hoc concatenation where clarity matters.
 
 ## Error Handling & Responses
-- Handlers return `Result<T, AppError>` — **never** raw `HttpResponse`.
+- Handlers return `Result<T, AppError>` — never raw `HttpResponse`.
 - Problem Details shape: `{ type, title, status, detail, code, trace_id }`.
-- `code` is **SCREAMING_SNAKE_CASE** from a central registry (no ad-hoc strings).
+- `code` is SCREAMING_SNAKE_CASE from a central registry (no ad-hoc strings).
 - Ensure per-request `trace_id` flows into logs and responses.
 
 ## AppState & Configuration
-- `AppState` holds DB pool and `SecurityConfig`; inject via `web::Data<AppState>`.
-- **Do not** clone/rebuild security config ad-hoc; use shared state.
+- AppState holds DB pool and SecurityConfig; inject via `web::Data<AppState>`.
+- Do not clone/rebuild security config ad-hoc; use shared state.
+- Build DB URLs from env parts; tests must use a DB whose name ends with `_test`.
 
 ## Extractors
-- **Available now (completed):** `AuthToken`, `JwtClaims`, `CurrentUser`, `CurrentUserDb`.
-- **Planned (do NOT synthesize yet):**
-  - `ValidatedJson<T>` → body validation wrapper returning Problem Details on failure.
-  - `GameId` → autoincrement **bigint PK**, must verify existence and return 404 if missing.
-  - `GameMembership` → resolve user + membership with a **single DB hit**.
-- Authentication policy: Google OAuth for accounts; JWT for FE/BE auth; `users.sub` (JWT subject) is the stable identity (not numeric id).
+- Available now: AuthToken, JwtClaims, CurrentUser, CurrentUserDb.
+- Planned (do not synthesize until requested): ValidatedJson<T>, GameId, GameMembership.
 
-## Schema Conventions
-- **Single source of truth:** canonical schema lives in one idempotent `init.sql`.  
-  - Do not create additional migration files unless policy changes.
-- **Primary keys:** all tables use `BIGINT GENERATED BY DEFAULT AS IDENTITY` (autoincrement).  
-  - No UUIDs or composite PKs unless explicitly requested.  
-  - All cross-table references use bigint foreign keys.
-- **Enums:** represent persistent states/roles/phases; no string literals in schema.  
-- **Timestamps:** always stored in UTC.  
-- **Indexes:** add indexes for FKs and for frequently queried fields (e.g. ordering by created_at).  
-- **Test DB guard:** all destructive ops (drop/reset) are allowed only against `_test` databases.  
-  - Never run destructive ops against non-`_test` DBs.  
-- **Entities:** keep all models/entities in the initial migration until policy changes.
+## Schema & Migrations
+- Canonical schema is managed via the SeaORM migrator crate.
+- Migrations run with the Owner role via `infra::db::connect_db(profile, DbOwner::Owner)`.
+- Fresh/reset operations are allowed only against `_test` databases.
+- Primary keys: bigint identity; timestamps in UTC; add indexes for FKs/frequent queries.
+- Use enums for persistent states/roles/phases (no string literals in schema).
 
 ## Persistence Patterns (SeaORM)
 - Prefer explicit column selection over `select(*)`.
 - On updates/deletes check `rows_affected`; treat `0` as meaningful.
 - No `unwrap()`/`expect()` outside tests; use `?` and map to `AppError`.
-- Use **explicit transactions** for multi-row or multi-table flows; avoid partial writes.
+- Use explicit transactions for multi-row or multi-table flows.
 
 ## Transactions & Concurrency
-- Use `DatabaseTransaction` for atomic sequences (e.g., play card → update trick → score).
+- Use `DatabaseTransaction` for atomic sequences.
 - Keep transactions short; avoid long-lived locks.
-- For turn-taking and “only-one-writes,” use row-level locking or safe uniqueness constraints; never rely on in-memory cross-request invariants.
-
-## Domain Modules
-- `rules`, `bidding`, `tricks`, `scoring`, `state` contain no DB/framework code.
-- Orchestration/adapters sit above domain modules; no SeaORM in domain code.
-- Provide helpers so domain logic is unit-testable without a DB.
+- For “only-one-writes,” use row-level locking or safe uniqueness constraints; never rely on in-memory cross-request invariants.
 
 ## Time, Randomness & Determinism
-- **No** `SystemTime::now()` in domain code. Inject a `Clock` trait; use a fixed `TestClock` in tests.
-- RNG is passed in via interface; tests **must** seed RNG for reproducibility.
+- No `SystemTime::now()` in domain code. Inject a Clock trait; use a fixed TestClock in tests.
+- RNG must be injected and seeded in tests for reproducibility.
 
 ## Testing Policy
 - Unit tests for new code; integration tests for complex flows.
 - Provide assertion helpers for Problem Details and `trace_id`.
-- Prefer **property tests** for trick/scoring invariants where practical.
+- Prefer property tests for trick/scoring invariants where practical.
 - Tests are isolated and reset DB state; no test-order coupling.
+- Tests that touch the DB must validate they’re using a “_test” database (guard enforced by infra/db.rs).
 
-### Testing Commands (important)
-- **Backend tests:** `pnpm be:test` (loads env vars; u
+## Testing Commands (current)
+- Backend: `pnpm be:test` (cargo test with nocapture).
+- Migrations:
+  - Prod: `pnpm db:migrate`
+  - Fresh prod: `pnpm db:fresh`
+  - Fresh test: `pnpm db:fresh:test`
+- Postgres helpers:
+  - Ready check: `pnpm db:pg_isready`
+  - psql shell: `pnpm db:psql`
+
+## Imports & Layout
+- Parent modules declare children at the top (`pub mod x; mod y;`).
+- Group `use` at the top of files: standard library, external crates, then `crate::…`.
+- Keep re-exports (`pub use`) centralized in `lib.rs` or a `prelude` module; avoid scattering them in leaf modules.
+
+## Safety Rails
+- Do not introduce dotenvx/dotenvy in code or scripts.
+- Do not read DATABASE_URL directly; always compose via db_url or connect via connect_db.
+- Never run destructive operations against non-“_test” databases.
