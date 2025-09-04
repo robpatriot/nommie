@@ -1,0 +1,21 @@
+# Nextest configuration for backend tests
+# See: https://nexte.st/book/configuration
+
+[profile.default]
+# Disable fail-fast by default to run full test suite
+fail-fast = false
+
+# Enable informative status line and end-of-run summary
+status-level = "all"
+final-status-level = "none"
+
+# Output policy: show failure output immediately, suppress success by default
+failure-output = "immediate"
+success-output = "never"
+
+# Example CLI overrides (commented for reference):
+# --success-output=final     # Show success output at the end
+# --status-level=print       # Show status for each test
+# --final-status-level=print # Show final status summary
+# --hide-progress-bar        # Disable progress bar
+# --no-capture              # Don't capture output (serializes execution)

@@ -57,11 +57,40 @@ Migrations run with the **Owner** role. Choose a target DB via `MIGRATION_TARGET
 
 ## Testing
 
-Backend (current):
-- `pnpm be:test` → runs `cargo test -- --nocapture`
-- Tests that hit the DB always use `TEST_DB` (guarded by `_test` suffix).
+### Backend Testing (Nextest)
 
-Frontend:
+We use **cargo-nextest** as the primary test runner with sensible defaults.
+
+**Running tests:**
+- `pnpm be:test` - Run all tests (quiet by default)
+- `pnpm be:test:v` - Verbose with success output at the end
+- `pnpm be:test:q` - Quiet mode with final failure summary only
+- `pnpm be:test:cargo` - Fallback to standard cargo test
+
+**Targeted runs:**
+- **Substring filter:** `pnpm be:test -- login` (runs tests with "login" in name)
+- **File/module filter:** `pnpm be:test -- --test file_stem` (runs specific test file)
+- **Expression filters:** `pnpm be:test -- -E 'status(fail)'` (runs only failing tests)
+- **Preview what will run:**
+  - `cargo nextest list --manifest-path apps/backend/Cargo.toml`
+  - With filters: `cargo nextest list -E 'test(login)' --manifest-path apps/backend/Cargo.toml`
+
+**Verbosity knobs:**
+- `-q` / `-v` - Quiet/verbose output
+- `--success-output=final` - Show success output at the end
+- `--failure-output=final` - Show failure output at the end
+- `--status-level` / `--final-status-level` - Control status display
+- `--hide-progress-bar` - Disable progress bar
+- `--no-capture` - Don't capture output (serializes execution)
+
+**Opt-in logs:**
+- Add `test_support::logging::init()` inside tests that need logs
+- Enable levels with `TEST_LOG=info|debug|trace`
+- Example: `TEST_LOG=info pnpm be:test:v -- some_filter`
+
+Tests that hit the DB always use `TEST_DB` (guarded by `_test` suffix).
+
+### Frontend Testing
 - `fe:test` pending — will be added with Vitest + Testing Library.
 
 ---
