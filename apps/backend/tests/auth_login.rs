@@ -1,6 +1,6 @@
 use actix_web::test;
 use backend::{
-    bootstrap::db::DbProfile,
+    config::db::{DbOwner, DbProfile},
     state::SecurityConfig,
     test_support::{build_state, create_test_app},
 };
@@ -12,7 +12,7 @@ async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_db(DbProfile::Test, DbOwner::App)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -90,7 +90,7 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_db(DbProfile::Test, DbOwner::App)
         .with_security(security_config.clone())
         .build()
         .await?;

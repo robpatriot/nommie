@@ -15,7 +15,7 @@
     "be:build": "cargo build --manifest-path apps/backend/Cargo.toml",
     "be:lint": "cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings",
     "be:format": "cargo fmt --manifest-path apps/backend/Cargo.toml --all",
-    "be:test": "dotenvx run -- sh -lc '[ \"$1\" = \"--\" ] && shift; export DATABASE_URL=${DATABASE_URL}_test; cargo test --manifest-path apps/backend/Cargo.toml \"$@\" -- --nocapture' _",
+    "be:test": "cargo test --manifest-path apps/backend/Cargo.toml -- --nocapture",
 
     "fe:up": "if [ -f .dev/fe.pid ] && kill -0 $(cat .dev/fe.pid) 2>/dev/null; then exit 1; fi; pnpm --filter @nommie/frontend exec sh -lc 'exec next dev >> ../../.dev/dev.log 2>&1' & echo $! > .dev/fe.pid",
     "fe:down": "if [ -f .dev/fe.pid ]; then kill $(cat .dev/fe.pid) 2>/dev/null || true; rm -f .dev/fe.pid; fi",
@@ -29,12 +29,11 @@
     "db:logs": "docker compose logs -f postgres",
     "db:pg_isready": "dotenvx run -- sh -lc 'docker exec -it nommie-postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB'",
     "db:psql": "dotenvx run -- sh -lc 'docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U $POSTGRES_USER -d $POSTGRES_DB'",
-    "db:migrate": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie cargo run --manifest-path apps/backend/migration/Cargo.toml -- up'",
-    "db:fresh": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'",
-    "db:fresh:test": "dotenvx run -- sh -lc 'DATABASE_URL=postgres://nommie_owner:${NOMMIE_OWNER_PASSWORD}@localhost:${POSTGRES_PORT:-5432}/nommie_test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh'"
+    "db:migrate": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- up",
+    "db:fresh": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh",
+    "db:fresh:test": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh"
   },
   "devDependencies": {
-    "@dotenvx/dotenvx": "^1.49.0",
     "@types/node": "^20.0.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "15.5.x",

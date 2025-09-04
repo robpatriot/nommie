@@ -1,3 +1,3 @@
 pub mod db;
 
-pub use db::run_migrations;
+pub use db::connect_db;

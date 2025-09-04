@@ -2,7 +2,8 @@ use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 
 use backend::{
-    bootstrap::db::{connect_db, DbProfile},
+    bootstrap::db::connect_db,
+    config::db::{DbOwner, DbProfile},
     entities::user_credentials,
     services::users::ensure_user,
 };
@@ -10,7 +11,7 @@ use backend::{
 #[tokio::test]
 #[serial]
 async fn test_ensure_user_inserts_then_reuses() {
-    let db = connect_db(DbProfile::Test)
+    let db = connect_db(DbProfile::Test, DbOwner::App)
         .await
         .expect("connect to _test database");
 

@@ -1,5 +1,6 @@
 use crate::{
-    bootstrap::db::{connect_db, DbProfile},
+    bootstrap::db::connect_db,
+    config::db::{DbOwner, DbProfile},
     error::AppError,
     state::{AppState, SecurityConfig},
 };
@@ -8,6 +9,7 @@ use crate::{
 pub struct StateBuilder {
     security_config: SecurityConfig,
     db_profile: Option<DbProfile>,
+    db_owner: Option<DbOwner>,
 }
 
 impl StateBuilder {
@@ -16,12 +18,14 @@ impl StateBuilder {
         Self {
             security_config: SecurityConfig::default(),
             db_profile: None,
+            db_owner: None,
         }
     }
 
-    /// Enable database connection with explicit profile
-    pub fn with_db(mut self, profile: DbProfile) -> Self {
+    /// Enable database connection with explicit profile and owner
+    pub fn with_db(mut self, profile: DbProfile, owner: DbOwner) -> Self {
         self.db_profile = Some(profile);
+        self.db_owner = Some(owner);
         self
     }
 
@@ -33,8 +37,8 @@ impl StateBuilder {
 
     /// Build the AppState
     pub async fn build(self) -> Result<AppState, AppError> {
-        if let Some(profile) = self.db_profile {
-            let db = connect_db(profile).await?;
+        if let (Some(profile), Some(owner)) = (self.db_profile, self.db_owner) {
+            let db = connect_db(profile, owner).await?;
             Ok(AppState::new(db, self.security_config))
         } else {
             Ok(AppState::without_db(self.security_config))
@@ -53,10 +57,10 @@ impl Default for StateBuilder {
 /// # Example
 /// ```rust
 /// use backend::test_support::build_state;
-/// use backend::bootstrap::db::DbProfile;
+/// use backend::config::db::{DbProfile, DbOwner};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let state = build_state().with_db(DbProfile::Test).build().await?;
+/// let state = build_state().with_db(DbProfile::Test, DbOwner::App).build().await?;
 /// # Ok(())
 /// # }
 /// ```

@@ -1,6 +1,6 @@
 use actix_web::{web, App, HttpServer};
 use backend::{
-    bootstrap::db::DbProfile,
+    config::db::{DbOwner, DbProfile},
     middleware::{cors_middleware, RequestTrace, StructuredLogger},
     routes,
     state::SecurityConfig,
@@ -13,9 +13,6 @@ mod telemetry;
 async fn main() -> std::io::Result<()> {
     telemetry::init_tracing();
 
-    // Load environment variables early
-    dotenvy::dotenv().ok();
-
     println!("🚀 Starting Nommie Backend on http://127.0.0.1:3001");
 
     let jwt = std::env::var("APP_JWT_SECRET").unwrap_or_else(|_| {
@@ -26,7 +23,7 @@ async fn main() -> std::io::Result<()> {
 
     // Create application state using unified builder
     let app_state = build_state()
-        .with_db(DbProfile::Prod)
+        .with_db(DbProfile::Prod, DbOwner::App)
         .with_security(security_config)
         .build()
         .await

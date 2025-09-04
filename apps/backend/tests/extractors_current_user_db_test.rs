@@ -4,7 +4,7 @@ use common::assert_problem_details_structure;
 use actix_web::test;
 use backend::{
     auth::mint_access_token,
-    bootstrap::db::DbProfile,
+    config::db::{DbOwner, DbProfile},
     state::SecurityConfig,
     test_support::{build_state, create_test_app, factories::seed_user_with_sub},
 };
@@ -17,7 +17,7 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_db(DbProfile::Test, DbOwner::App)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -73,7 +73,7 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_db(DbProfile::Test, DbOwner::App)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -128,7 +128,7 @@ async fn test_me_db_unauthorized() -> Result<(), Box<dyn std::error::Error>> {
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_db(DbProfile::Test, DbOwner::App)
         .with_security(security_config)
         .build()
         .await?;
