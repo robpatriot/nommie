@@ -1,6 +1,6 @@
 use sea_orm::{ConnectionTrait, DatabaseConnection, Statement};
 
-/// Schema guard for tests - ensures the test database has the required schema
+/// Schema guard - ensures the database has the required schema
 /// This will panic with clear instructions if the schema is not prepared
 pub async fn ensure_schema_ready(db: &DatabaseConnection) {
     // Check for the migrations table which should exist after running migrations
@@ -16,7 +16,7 @@ pub async fn ensure_schema_ready(db: &DatabaseConnection) {
             // Schema is ready, continue
         }
         Ok(None) | Err(_) => {
-            panic!("Schema not prepared. Run: `pnpm db:fresh:test` (tests never run migrations).");
+            panic!("Schema not prepared. Run: `pnpm db:migrate` or `pnpm db:fresh` for prod, or `pnpm db:fresh:test` for test.");
         }
     }
 }

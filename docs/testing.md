@@ -22,7 +22,7 @@ This document describes the testing setup for the Nommie backend.
 - `assert_test_db_url(url: &str)` - Validates database URL ends with `_test`
 - `load_test_env()` - Loads `.env.test` configuration
 - `get_test_db_url()` - Retrieves database URL from environment
-- **`migrate_test_db()` - Panics with instructions to use `pnpm db:fresh:test`**
+- `ensure_schema_ready(db)` - Validates database schema is ready (automatically called by `build_state`)
 
 ### Health Endpoint (`src/health.rs`)
 - Simple `GET /health` endpoint returning `200` with body `"ok"`
@@ -39,6 +39,7 @@ This document describes the testing setup for the Nommie backend.
 - **Database Guard**: Tests panic if `DATABASE_URL` doesn't end with `_test`
 - **Migration Prevention**: Any attempt to run migrations in tests will panic
 - **Environment Isolation**: Test-specific environment via `.env.test`
+- **Automatic Schema Validation**: `build_state()` automatically validates schema is ready for both prod and test
 
 ## Running Tests
 
@@ -72,3 +73,4 @@ DATABASE_URL=postgresql://user:password@localhost:5432/nommie_test
 - No migrations are run during tests - schema must be prepared beforehand
 - Integration tests use `actix_web::test` for in-process service testing
 - The `_test` suffix guard ensures tests never run against production databases
+- Schema validation is automatic - both prod and test startup validate schema readiness

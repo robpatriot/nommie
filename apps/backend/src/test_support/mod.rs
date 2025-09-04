@@ -1,6 +1,5 @@
 pub mod app_builder;
 pub mod factories;
-pub mod migrations;
 pub mod schema_guard;
 
 // Re-export the new builders

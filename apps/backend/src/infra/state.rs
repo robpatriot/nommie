@@ -3,6 +3,7 @@ use crate::error::AppError;
 use crate::infra::db::connect_db;
 use crate::state::app_state::AppState;
 use crate::state::security_config::SecurityConfig;
+use crate::test_support::schema_guard::ensure_schema_ready;
 
 /// Builder for creating AppState instances (used in both tests and main)
 pub struct StateBuilder {
@@ -34,6 +35,10 @@ impl StateBuilder {
     /// Build the AppState
     pub async fn build(self) -> Result<AppState, AppError> {
         let conn = connect_db(self.db_profile, DbOwner::App).await?;
+
+        // Ensure schema is ready (validates migrations table exists)
+        ensure_schema_ready(&conn).await;
+
         Ok(AppState::new(conn, self.security_config))
     }
 }
