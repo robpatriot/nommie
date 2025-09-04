@@ -5,21 +5,64 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 
 ---
 
-## 🚀 Quick Start
-1. **Install deps:** `pnpm i`
-2. **Frontend:** `pnpm dev:fe` → [http://localhost:3000](http://localhost:3000)
-3. **Backend:** `pnpm dev:be` → [http://127.0.0.1:3001](http://127.0.0.1:3001)
-4. **Lint:** `pnpm lint`
-5. **Format:** `pnpm format`
+## Quick Start
+
+1. Prereqs: Node 18+, pnpm 8+, Rust stable, Docker.
+2. Copy env and source it **once per shell**:
+   - `cp docs/env.example.txt .env`
+   - `set -a; . ./.env; set +a`
+3. Start Postgres:
+   - `pnpm db:up`
+4. Create/refresh databases:
+   - Dev DB (owner role): `pnpm db:fresh`
+   - Test DB (owner role): `pnpm db:fresh:test`
+5. Run backend + frontend:
+   - Backend: `pnpm be:up` (logs → `.dev/dev.log`, stop with `pnpm be:down`)
+   - Frontend: `pnpm fe:up` (stop with `pnpm fe:down`)
+6. Run backend tests:
+   - `pnpm be:test` (plain `cargo test --nocapture` for now)
+
+> Tip: If a shell is new, re-source env: `set -a; . ./.env; set +a`
+
+## Environment
+
+We don't store `DATABASE_URL`. We store **parts** in `.env` and construct URLs in code.
+
+- Source env in your shell before running anything:
+  - `set -a; . ./.env; set +a`
+- Key vars (see `docs/env.example.txt`):
+  - `POSTGRES_HOST`, `POSTGRES_PORT`
+  - `PROD_DB`, `TEST_DB` (test DB **must** end with `_test`)
+  - App role: `APP_DB_USER`, `APP_DB_PASSWORD`
+  - Owner role: `NOMMIE_OWNER_USER`, `NOMMIE_OWNER_PASSWORD`
+  - `APP_JWT_SECRET`, `CORS_ALLOWED_ORIGINS`
 
 ---
 
-## Cursor Rules
+## Database & Migrations
 
-This repo uses [Cursor](https://cursor.sh) for AI-assisted development.  
-Project-specific conventions are locked in **`.cursor/rules.md`** — covering schema design, error handling, extractors, testing, and more.  
+Migrations run with the **Owner** role. Choose a target DB via `MIGRATION_TARGET`.
 
-➡️ Always check that file before making changes; update it when project policies evolve.
+- Migrate prod DB:
+  - `pnpm db:migrate`  (equivalent to `MIGRATION_TARGET=prod … -- up`)
+- Fresh prod DB:
+  - `pnpm db:fresh`
+- Fresh test DB:
+  - `pnpm db:fresh:test` (uses `MIGRATION_TARGET=test`)
+- Readiness helpers:
+  - `pnpm db:pg_isready`
+  - `pnpm db:psql`
+
+---
+
+## Testing
+
+Backend (current):
+- `pnpm be:test` → runs `cargo test -- --nocapture`
+- Tests that hit the DB always use `TEST_DB` (guarded by `_test` suffix).
+
+Frontend:
+- `fe:test` pending — will be added with Vitest + Testing Library.
 
 ---
 
@@ -59,54 +102,6 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 - **Workflow:** pnpm workspaces, Docker-first, structured logs with trace IDs  
 
 👉 See [Architecture & Tech Stack](docs/architecture.md) for details.
-
----
-
-## 🗄️ Database
-
-We run Postgres locally via Docker Compose.
-
-### ⚙️ Setup
-```bash
-cp docs/env.example.txt .env
-# Edit APP_DB_PASSWORD and POSTGRES_PASSWORD to secure values
-```
-
-### ▶️ Start / Stop / Destroy
-```bash
-pnpm db:up      # start Postgres (container: nommie-postgres)
-pnpm db:stop    # stop container, keep data
-pnpm db:down    # stop + remove container & volume (wipe data)
-```
-- Bound to `127.0.0.1:5432`  
-- Data stored in `postgres_data` volume
-
-### 🔍 Logs & Connectivity
-```bash
-pnpm db:logs       # follow logs
-pnpm db:pg_isready # check health
-pnpm db:psql       # open psql shell
-```
-
-### 🗂️ Schema (SeaORM migrator)
-```bash
-pnpm db:migrate    # apply new migrations (safe)
-pnpm db:fresh      # drop + rebuild schema in dev DB (nommie)
-pnpm db:fresh:test # drop + rebuild schema in test DB (nommie_test)
-```
-
-### 🧹 Clean-room Recipes
-**Dev DB**
-```bash
-pnpm db:down && pnpm db:up
-pnpm db:pg_isready
-pnpm db:fresh
-```
-**Test DB**
-```bash
-pnpm db:fresh:test
-pnpm test
-```
 
 ---
 
