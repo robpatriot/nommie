@@ -1,4 +1,4 @@
-# Nommie — Cursor Rules (v1.3.0)
+# Nommie — Cursor Rules (v1.3.2)
 
 > Keep this file at repo root. It applies to all AI actions (generate, edit, refactor, move/rename). If you must deviate, leave a short code comment explaining why.
 
@@ -26,6 +26,29 @@
 - test_support/ — test-only helpers (e.g., logging init). No production wiring.
 - Domain modules contain no DB/framework code.
 
+## Imports & Re-exports Policy (Rust)
+1) Module declarations first at the top: `pub mod ...; mod ...;`
+2) One imports block per file, placed after module declarations.
+3) Group imports with a blank line between groups and alphabetical sorting within each group:
+   - `use std::...`
+   - external crates (not `std`, `crate`, or `super`)
+   - `use crate::...` and `use super::...`
+4) No wildcard imports in production code. Tests may use wildcard imports (e.g., `use crate::prelude::*;`) when it improves readability.
+5) Centralize re-exports:
+   - Re-export the public surface from `apps/backend/src/lib.rs` under a single re-exports block.
+   - Provide a minimal `pub mod prelude` in `lib.rs` for tests. Production code should import explicit items from the crate root (e.g., `use crate::{DbProfile, DbOwner};`), not wildcard preludes.
+   - Avoid `pub use` in leaf modules. If a leaf module must expose items publicly, re-export them from `lib.rs` instead.
+6) Rustfmt and Clippy enforcement:
+   - rustfmt.toml at repo root should include:
+     - edition = "2021"
+     - group_imports = "StdExternalCrate"
+     - imports_granularity = "Module"
+     - reorder_imports = true
+     - reorder_modules = true
+   - Deny wildcard imports in non-test code via crate attributes at the top of lib.rs and main.rs:
+     - `#![deny(clippy::wildcard_imports)]`
+     - `#![cfg_attr(test, allow(clippy::wildcard_imports))]`
+
 ## Global Conventions
 - Domain logic stays pure: no DB access and no web framework imports in domain modules.
 - Use enums over strings for states/roles/phases (code + schema).
@@ -33,7 +56,7 @@
 - Respect linters/formatters: Rustfmt + Clippy, ESLint + Prettier.
 - Tests must be deterministic; avoid time/RNG leaks unless seeded/injected.
 
-## String Interpolation (JS/TS & Shell) — Important
+## String Interpolation (JS/TS & Shell)
 - JS/TS: use template literals like `${value}`.
 - Shell: expand with `${VAR}` or `"$VAR"` as appropriate.
 - Prefer a single formatted string over ad-hoc concatenation where clarity matters.
@@ -91,11 +114,6 @@
 - Postgres helpers:
   - Ready check: `pnpm db:pg_isready`
   - psql shell: `pnpm db:psql`
-
-## Imports & Layout
-- Parent modules declare children at the top (`pub mod x; mod y;`).
-- Group `use` at the top of files: standard library, external crates, then `crate::…`.
-- Keep re-exports (`pub use`) centralized in `lib.rs` or a `prelude` module; avoid scattering them in leaf modules.
 
 ## Safety Rails
 - Do not introduce dotenvx/dotenvy in code or scripts.
