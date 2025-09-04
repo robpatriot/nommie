@@ -1,196 +1,209 @@
-# 🗺️ Nommie — Ordered Milestones Roadmap (Updated, Detailed)  
+# 🗺️ Nommie — Ordered Milestones Roadmap (Verbose)
 
-## ✅ A — Repo & Project Bootstrap  
-- Monorepo created with `apps/frontend`, `apps/backend`, `packages/`.  
-- Root `.env` canonical; FE `.env.local` mirrors only `NEXT_PUBLIC_*`.  
-- **Root `package.json`** created with scripts:  
-  - `backend:fmt` → `cargo fmt --manifest-path apps/backend/Cargo.toml --all`  
-  - `backend:clippy` → `cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings`  
-- ESLint/Prettier (FE) configured.  
-- Pre-commit hooks active.  
-
-**Acceptance:** Hello-world FE/BE apps build locally; lint/format hooks pass.
+_Last updated: 2025-09-04_
 
 ---
 
-## ✅ B — Docker-First Dev Environment  
-- Docker Compose with Postgres (roles, DBs, grants).  
-- Host-pnpm for speed; backend runs host or container.  
-
-**Acceptance:** `pnpm dev` starts FE+BE; Postgres reachable; FE talks to BE.
-
----
-
-## ✅ C — Database Schema via Init SQL (Scaffolding Only)  
-- Single SQL init file = source of truth.  
-- Test harness applies schema to `_test` DB at startup (guarded).  
-
-**Acceptance:** Tests bootstrap schema cleanly; `_test` guard enforced.  
-*(Note: actual entities deferred to new Milestone F.)*
+## ✅ A — Repo & Project Bootstrap
+- **Dependencies:** none.
+- **Details:**
+  - Monorepo with `apps/frontend`, `apps/backend`, `packages/`.
+  - Root `.env` is canonical; FE `.env.local` mirrors only `NEXT_PUBLIC_*`.
+  - Root scripts:
+    - `backend:fmt` → `cargo fmt --manifest-path apps/backend/Cargo.toml --all`
+    - `backend:clippy` → `cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings`
+  - ESLint/Prettier configured for FE.
+  - Pre-commit hooks active.
+- **Acceptance:** Hello-world FE/BE apps build locally; lint/format hooks pass.
 
 ---
 
-## ✅ D — Testing Harness & Policies  
-- `pnpm test` runs all (unit + integration + smoke).  
-- Actix in-process integration test harness.  
-- First smoke test: create → add AI → snapshot.  
-
-**Acceptance:** Tests green locally + CI.
+## ✅ B — Docker-First Dev Environment
+- **Dependencies:** A.
+- **Details:**
+  - Docker Compose with Postgres (roles, DBs, grants).
+  - Host-pnpm for speed; backend runs host or container.
+- **Acceptance:** `pnpm dev` starts FE+BE; Postgres reachable; FE talks to BE.
 
 ---
 
-## ✅ E — Error Shapes & Logging *(S → M)*  
-- **Dependencies:** D  
-- **Details:**  
-  - Problem Details shape: `{ type, title, status, detail, code, trace_id }`.  
-  - `code` = SCREAMING_SNAKE.  
-  - Middleware adds per-request `trace_id`.  
+## ✅ C — Database Schema via Init SQL *(Scaffolding Only)*
+- **Dependencies:** B.
+- **Details:**
+  - Single `init.sql` is source of truth.
+  - Test harness applies schema to `_test` DB at startup with guard.
+- **Acceptance:** Tests bootstrap schema cleanly; `_test` guard enforced.  
+  *(Actual entities are in F.)*
+
+---
+
+## ✅ D — Testing Harness & Policies
+- **Dependencies:** C.
+- **Details:**
+  - `pnpm test` runs unit + integration + smoke.
+  - Actix in-process integration test harness.
+  - First smoke test: `create → add AI → snapshot`.
+- **Acceptance:** Tests green locally + CI.
+
+---
+
+## ✅ E — Error Shapes & Logging *(S → M)*
+- **Dependencies:** D.
+- **Details:**
+  - Problem Details error shape:
+    `{ type, title, status, detail, code, trace_id }`
+  - `code` in SCREAMING_SNAKE.
+  - Middleware injects per-request `trace_id`.
 - **Acceptance:** Consistent error responses; logs include `trace_id`.
 
 ---
 
-## ✅ F — Database Schema (Actual Entities) *(M → L)*  
-- **Dependencies:** C (plumbing done), D (tests in place).  
-- **Details:**  
-  - Define real schema in `init.sql`.  
-  - Tables: `users`, `games`, `memberships`, `bids`, `plays`, `scores`.  
-  - Add enums for state/roles where needed.  
-  - Foreign keys + indexes for performance.  
-- **Acceptance:**  
-  - `init.sql` defines canonical schema.  
-  - Tests reset and apply schema cleanly.  
-  - Entities present and coherent with game lifecycle needs.
+## ✅ F — Database Schema (Actual Entities) *(M → L)*
+- **Dependencies:** C, D.
+- **Details:**
+  - Entities in `init.sql`: `users`, `games`, `memberships`, `bids`, `plays`, `scores`.
+  - Enums for `game_state`, `membership_role`, etc.
+  - FKs + indexes; AI players represented in `users` like humans.
+- **Acceptance:** Schema applies cleanly; coherent with lifecycle needs.
 
 ---
 
-## 🅖 G — User Authentication *(M → L)*  
-- **Dependencies:** F  
-- **Details:**  
-  - Use **Google OAuth** for account creation and authentication.  
-  - Use **JWTs** for frontend/backend authentication.  
-  - Add an **auth extractor** to handle JWT authentication and user session.  
-- **Acceptance:**  
-  - Users can authenticate using **Google** OAuth.  
-  - JWTs are used for frontend/backend authentication.  
-  - Extractor handles JWT validation and user session.
+## ✅ G — User Authentication *(M → L)*
+- **Dependencies:** F.
+- **Details (Done):**
+  - Google OAuth for account creation & login.
+  - JWTs for FE/BE auth.
+  - Auth extractor validates JWT and resolves current user.
+- **Acceptance:** Users authenticate via Google; JWTs enforced; extractor loads current user.
 
 ---
 
-## 🅗 H — Extractors *(M → L)*  
-- **Dependencies:** E, F  
-- **Details:**  
-  - Extractors: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`.  
-  - Ensure single DB hit for user + membership.  
-- **Acceptance:** Handlers are thin; extractor tests pass.
+## 🟨 H — Extractors *(M → L, partially done)*
+- **Dependencies:** E, F, G.
+- **Completed:**
+  - `AuthToken`
+  - `JwtClaims`
+  - `CurrentUser`
+- **Remaining:**
+  - `GameId` — validates bigint game ID and existence.
+  - `GameMembership` — verifies membership/role in one hit where possible.
+  - `ValidatedJson<T>` — shape validation with Problem Details errors.
+- **Acceptance:** Handlers are thin; extractor tests pass; single DB hit for user+membership when possible.
 
 ---
 
-## 🅘 I — Backend Domain Modules *(L)*  
-- **Dependencies:** G  
-- **Details:**  
-  - Pure logic in `rules`, `bidding`, `tricks`, `scoring`, `state`.  
-  - No DB access in domain modules. Orchestration sits on top.  
+## 🅘 I — Backend Domain Modules *(L)*
+- **Dependencies:** G.
+- **Details:**
+  - Pure logic modules: `rules`, `bidding`, `tricks`, `scoring`, `state`.
+  - No DB access in domain modules; orchestration above them.
 - **Acceptance:** `grep` shows no SeaORM in domain modules.
 
 ---
 
-## 🅙 J — CI Pipeline *(S)*  
-- **Dependencies:** D, E, F, G, H  
-- **Details:**  
-  - CI jobs: **test** + **lint** required; build optional until later.  
-- **Acceptance:** CI green gate required for merges.
+## 🟨 J — Frontend App Router Seed *(M, partially done)*
+- **Dependencies:** E, G.
+- **Details:**
+  - Next.js App Router + Turbopack.
+  - Pages:
+    - ✅ **Login** (NextAuth v5 wrapper for Google) — working.
+    - ❌ **Lobby skeleton** — not yet implemented.
+    - ❌ **Game skeleton** — not yet implemented.
+- **Acceptance:** Can sign in, see lobby, and a placeholder game screen.
 
 ---
 
-## 🅚 K — Frontend App Router Seed *(M)*  
-- **Dependencies:** E, G  
-- **Details:**  
-  - Next.js App Router + Turbopack.  
-  - Lobby + Game pages skeleton.  
-  - NextAuth v5 beta wrapper.  
-- **Acceptance:** Can sign in, see lobby, placeholder game screen.
-
----
-
-## 🅛 L — Game Lifecycle (Happy Path) *(L → XL)*  
-- **Dependencies:** H, G, I, J  
-- **Details:**  
-  - End-to-end game: create → join → ready → deal → bid → trump → tricks → scoring → round advance.  
-  - Integration test covers minimal loop.  
+## 🅚 K — Game Lifecycle (Happy Path) *(L → XL)*
+- **Dependencies:** H, G, I, J.
+- **Details:**
+  - End-to-end: `create → join → ready → deal → bid → trump → tricks → scoring → round advance`.
+  - Integration test covers the minimal loop.
 - **Acceptance:** Happy-path game completes.
 
 ---
 
-## 🅜 M — AI Orchestration *(M → L)*  
-- **Dependencies:** K  
-- **Details:**  
-  - Basic AI bidding + trick play.  
-  - Runs per poll cycle.  
+## 🅛 L — AI Orchestration *(M → L)*
+- **Dependencies:** J.
+- **Details:**
+  - Basic AI bidding + valid trick play.
+  - Runs per poll cycle; AI auto-advances until human’s turn.
 - **Acceptance:** Full game completes with AIs filling seats.
 
 ---
 
-## 🅝 N — Validation, Edge Cases & Property Tests *(M)*  
-- **Dependencies:** K  
-- **Details:**  
-  - Invalid bids/plays return proper errors.  
-  - Property tests for trick/scoring invariants.  
-- **Acceptance:** Error paths + properties tested.
+## 🅜 M — Validation, Edge Cases & Property Tests *(M)*
+- **Dependencies:** J.
+- **Details:**
+  - Invalid bids/plays return proper Problem Details errors.
+  - Property tests for trick/scoring invariants.
+- **Acceptance:** Error paths validated; properties hold.
 
 ---
 
-## 🅞 O — Documentation & Decision Log *(S)*  
-- **Dependencies:** K (so docs reflect reality).  
-- **Details:**  
-  - README: setup, reset flow.  
-  - CONTRIBUTING: module layout, extractor policy, `_test` guard.  
-  - DECISIONS.md: locked decisions recorded.  
+## 🅝 N — Frontend UX Pass (Round 1) *(M → L)*
+- **Dependencies:** J, L.
+- **Details:**
+  - Hand display, trick area, bidding UI, trump selector.
+  - FE surfaces Problem Details errors nicely.
+- **Acceptance:** Gameplay is clear; errors understandable.
+
+---
+
+## 🟨 O — CI Pipeline *(S, partially done)*
+- **Dependencies:** D, E, F, G, H, M, N.
+- **Completed (local):**
+  - Robust **pre-commit** hook: FE ESLint/Prettier (staged-aware), BE clippy + rustfmt (staged write).
+- **Remaining (to complete CI gate):**
+  - GitHub Actions workflow that gates PRs/`main` with:
+    - FE: **ESLint**, **Prettier check**, **TypeScript typecheck**.
+    - BE: **clippy**, **rustfmt --check**.
+    - **Tests** with Postgres service; apply `init.sql` **twice**.
+    - **Caching** (pnpm + Cargo).
+- **Acceptance:** CI green gate (lint + typecheck + tests) required for merges; `init.sql` re-applies cleanly.
+
+---
+
+## 🅟 P — Documentation & Decision Log *(S)*
+- **Dependencies:** J.
+- **Details:**
+  - README: setup + reset flow.
+  - CONTRIBUTING: module layout, extractor policy, `_test` guard.
+  - DECISIONS.md: locked decisions recorded.
 - **Acceptance:** New devs onboard smoothly.
 
 ---
 
-## 🅟 P — Frontend UX Pass (Round 1) *(M → L)*  
-- **Dependencies:** K, M  
-- **Details:**  
-  - Hand display, trick area, bidding UI, trump selector.  
-  - FE surfaces Problem Details errors nicely.  
-- **Acceptance:** Gameplay clear; errors understandable.
-
----
-
-## 🅠 Q — Observability & Stability *(S → M)*  
-- **Dependencies:** E, K  
-- **Details:**  
-  - Logs include `user_id` + `game_id` when relevant.  
-  - FE shows `trace_id` on errors.  
-  - Health endpoint with DB status.  
+## 🅠 Q — Observability & Stability *(S → M)*
+- **Dependencies:** E, J.
+- **Details:**
+  - Logs include `user_id` + `game_id` where relevant.
+  - FE shows `trace_id` on errors.
+  - Health endpoint reports DB status.
 - **Acceptance:** Logs actionable; trace_id visible end-to-end.
 
 ---
 
-## 🅡 R — Open Source Observability Stack *(M → L)*  
-- **Dependencies:** P, I  
-- **Details:**  
-  - Grafana + Tempo + Loki + Prometheus in Docker.  
-- **Acceptance:** Infra captures app metrics/logs/traces.
+## 🅡 R — Open Source Observability Stack *(M → L)*
+- **Dependencies:** O, I.
+- **Details:**
+  - Grafana + Tempo + Loki + Prometheus in Docker.
+- **Acceptance:** Infra captures app metrics, logs, and traces.
 
 ---
 
-### **Optional Track (can be done anytime)**:
+# 🔄 Optional Track (anytime)
 
-### 1. **WebSockets** *(M)*  
-- **Dependencies:** K  
-- **Notes:** Easier once lifecycle exists, but orthogonal.
+### 🅂 WebSockets *(M)*
+- **Dependencies:** J.
+- **Details:** Replace polling with push (Actix WS or SSE). Ensure AI orchestration fits push model.
+- **Acceptance:** FE receives live state; polling removed.
 
-### 2. **Transactional Tests** *(S → M)*  
-- **Dependencies:** D  
-- **Notes:** Optimization, not essential.
+### 🅃 Transactional Tests *(S → M)*
+- **Dependencies:** D.
+- **Details:** Wrap integration tests in DB transactions; rollback for isolation; `_test` guard intact.
+- **Acceptance:** Tests faster; DB clean post-run.
 
-### 3. **Deployment Stub** *(S → M)*  
-- **Dependencies:** B, P  
-- **Notes:** Minimal prod bootstrapping; flexible timing.
-
-### 4. **Test Serialisation Review** *(S)*  
-- **Dependencies:** D  
-- **Details:** Review the need for `serial` on tests that use `APP_JWT_SECRET`.  
-- **Notes:** Explore whether we can remove unnecessary serialisation while keeping tests reliable.
+### 🅄 Deployment Stub *(S → M)*
+- **Dependencies:** B, P, Q.
+- **Details:** Minimal prod-like deployment (Compose or k3d). Includes FE, BE, DB, observability stubs.
+- **Acceptance:** App boots in a minimal production-style environment.
