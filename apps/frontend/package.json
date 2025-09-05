@@ -9,7 +9,10 @@
     "lint": "eslint . --max-warnings=0",
     "lint:files": "eslint --max-warnings=0",
     "format": "prettier --write .",
-    "format:files": "prettier --write"
+    "format:files": "prettier --write",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage"
   },
   "dependencies": {
     "next": "15.5.0",
