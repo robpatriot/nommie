@@ -25,6 +25,9 @@
     "fe:build": "pnpm --filter @nommie/frontend build",
     "fe:lint": "pnpm --filter @nommie/frontend lint",
     "fe:format": "pnpm --filter @nommie/frontend format",
+    "fe:test": "pnpm --filter @nommie/frontend test",
+    "fe:test:watch": "pnpm --filter @nommie/frontend test:watch",
+    "fe:test:cov": "pnpm --filter @nommie/frontend test:cov",
 
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down -v",
@@ -42,7 +45,7 @@
     "eslint-config-next": "15.5.x",
     "typescript": "^5.0.0"
   },
-  "packageManager": "pnpm@8.0.0",
+  "packageManager": "pnpm@10.15.1",
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
