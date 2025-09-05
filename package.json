@@ -22,6 +22,7 @@
     "fe:down": "if [ -f .dev/fe.pid ]; then kill $(cat .dev/fe.pid) 2>/dev/null || true; rm -f .dev/fe.pid; fi",
     "fe:build": "pnpm --filter @nommie/frontend build",
     "fe:lint": "pnpm --filter @nommie/frontend lint",
+    "fe:lint:fix": "pnpm --filter @nommie/frontend exec eslint . --fix",
     "fe:format": "pnpm --filter @nommie/frontend format",
     "fe:test": "pnpm --filter @nommie/frontend test",
     "fe:test:watch": "pnpm --filter @nommie/frontend test:watch",
@@ -37,20 +38,23 @@
     "db:fresh:test": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh"
   },
   "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@next/eslint-plugin-next": "^15.5.2",
     "@types/node": "^20.0.0",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "15.5.x",
-    "typescript": "^5.0.0"
+    "eslint": "^9.34.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^16.3.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0"
   },
   "packageManager": "pnpm@10.15.1",
   "engines": {
-    "node": ">=18.0.0",
-    "pnpm": ">=8.0.0"
+    "node": ">=20.0.0",
+    "pnpm": ">=10.15.1"
   },
   "pnpm": {
-    "overrides": {
-      "eslint": "^8.57.0"
-    },
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",
