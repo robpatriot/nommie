@@ -1,5 +1,6 @@
 use sea_orm_migration::prelude::*;
-use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction};
+use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction, Index, Table};
+use sea_orm_migration::sea_query::extension::postgres::Type as PgType;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -27,6 +28,39 @@ enum UserCredentials {
     LastLogin,
     CreatedAt,
     UpdatedAt,
+}
+
+#[derive(Iden)]
+enum Games {
+    Table,
+    Id,
+    CreatedBy,
+    Visibility,
+    State,
+    CreatedAt,
+    UpdatedAt,
+    StartedAt,
+    EndedAt,
+    Name,
+    JoinCode,
+    RulesVersion,
+    RngSeed,
+    CurrentRound,
+    HandSize,
+    DealerPos,
+    LockVersion,
+}
+
+#[derive(Iden)]
+enum GameStateEnum {
+    #[iden = "game_state"]
+    Type,
+}
+
+#[derive(Iden)]
+enum GameVisibilityEnum {
+    #[iden = "game_visibility"]
+    Type,
 }
 
 #[derive(Iden)]
@@ -174,6 +208,136 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // Create Postgres enums
+        manager
+            .create_type(
+                PgType::create()
+                    .as_enum(GameStateEnum::Type)
+                    .values([
+                        "LOBBY",
+                        "DEALING", 
+                        "BIDDING",
+                        "TRUMP_SELECTION",
+                        "TRICK_PLAY",
+                        "SCORING",
+                        "BETWEEN_ROUNDS",
+                        "COMPLETED",
+                        "ABANDONED",
+                    ])
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_type(
+                PgType::create()
+                    .as_enum(GameVisibilityEnum::Type)
+                    .values(["PUBLIC", "PRIVATE"])
+                    .to_owned(),
+            )
+            .await?;
+
+        // games table
+        manager
+            .create_table(
+                Table::create()
+                    .table(Games::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(Games::Id)
+                            .big_integer()
+                            .not_null()
+                            .primary_key()
+                            .auto_increment(),
+                    )
+                    .col(ColumnDef::new(Games::CreatedBy).big_integer().null())
+                    .col(
+                        ColumnDef::new(Games::Visibility)
+                            .custom(GameVisibilityEnum::Type)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Games::State)
+                            .custom(GameStateEnum::Type)
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Games::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(Games::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(Games::StartedAt).timestamp_with_time_zone().null())
+                    .col(ColumnDef::new(Games::EndedAt).timestamp_with_time_zone().null())
+                    .col(ColumnDef::new(Games::Name).text().null())
+                    .col(
+                        ColumnDef::new(Games::JoinCode)
+                            .string_len(10)
+                            .unique_key()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(Games::RulesVersion)
+                            .text()
+                            .not_null()
+                            .default("nommie-1.0.0"),
+                    )
+                    .col(ColumnDef::new(Games::RngSeed).big_integer().null())
+                    .col(ColumnDef::new(Games::CurrentRound).small_integer().null())
+                    .col(ColumnDef::new(Games::HandSize).small_integer().null())
+                    .col(ColumnDef::new(Games::DealerPos).small_integer().null())
+                    .col(
+                        ColumnDef::new(Games::LockVersion)
+                            .integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_games_created_by")
+                            .from(Games::Table, Games::CreatedBy)
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::SetNull),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // Create indexes for games table
+        manager
+            .create_index(
+                Index::create()
+                    .name("ix_games_created_by")
+                    .table(Games::Table)
+                    .col(Games::CreatedBy)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("ix_games_state")
+                    .table(Games::Table)
+                    .col(Games::State)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("ix_games_visibility")
+                    .table(Games::Table)
+                    .col(Games::Visibility)
+                    .to_owned(),
+            )
+            .await?;
+
         // game_players
         manager
             .create_table(
@@ -208,6 +372,38 @@ impl MigrationTrait for Migration {
                             .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_game_players_game_id")
+                            .from(GamePlayers::Table, GamePlayers::GameId)
+                            .to(Games::Table, Games::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // Create unique constraints for game_players
+        manager
+            .create_index(
+                Index::create()
+                    .name("ux_game_players_game_user")
+                    .table(GamePlayers::Table)
+                    .col(GamePlayers::GameId)
+                    .col(GamePlayers::UserId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("ux_game_players_game_turn")
+                    .table(GamePlayers::Table)
+                    .col(GamePlayers::GameId)
+                    .col(GamePlayers::TurnOrder)
+                    .unique()
                     .to_owned(),
             )
             .await?;
@@ -258,8 +454,76 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(AiProfiles::Table).to_owned())
             .await?;
 
+        // Drop game_players unique constraints and table
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ux_game_players_game_turn")
+                    .table(GamePlayers::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ux_game_players_game_user")
+                    .table(GamePlayers::Table)
+                    .to_owned(),
+            )
+            .await?;
+
         manager
             .drop_table(Table::drop().table(GamePlayers::Table).to_owned())
+            .await?;
+
+        // Drop games indexes and table
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ix_games_visibility")
+                    .table(Games::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ix_games_state")
+                    .table(Games::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ix_games_created_by")
+                    .table(Games::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(Games::Table).to_owned())
+            .await?;
+
+        // Drop enum types
+        manager
+            .drop_type(
+                PgType::drop()
+                    .name(GameVisibilityEnum::Type)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_type(
+                PgType::drop()
+                    .name(GameStateEnum::Type)
+                    .to_owned(),
+            )
             .await?;
 
         manager

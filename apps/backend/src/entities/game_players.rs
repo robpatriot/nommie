@@ -28,11 +28,23 @@ pub enum Relation {
         to = "super::users::Column::Id"
     )]
     User,
+    #[sea_orm(
+        belongs_to = "super::games::Entity",
+        from = "Column::GameId",
+        to = "super::games::Column::Id"
+    )]
+    Game,
 }
 
 impl Related<super::users::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::User.def()
+    }
+}
+
+impl Related<super::games::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Game.def()
     }
 }
 
