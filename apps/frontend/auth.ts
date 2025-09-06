@@ -5,7 +5,16 @@ import Google from 'next-auth/providers/google'
 const backendBase = process.env.BACKEND_BASE_URL
 if (!backendBase) throw new Error('BACKEND_BASE_URL must be set')
 
+// 👇 add this
+const authSecret = process.env.AUTH_SECRET ?? process.env.APP_JWT_SECRET
+if (!authSecret) {
+  throw new Error('Missing AUTH_SECRET or APP_JWT_SECRET')
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // 👇 wire it into NextAuth
+  secret: authSecret,
+
   session: { strategy: 'jwt' },
   providers: [
     Google({
@@ -14,14 +23,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, account, profile }) {
-      // Only run this on initial sign-in
       if (account?.provider === 'google' && profile) {
         try {
           const response = await fetch(`${backendBase}/api/auth/login`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               email: profile.email,
               name: profile.name,
@@ -33,14 +39,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             const { token: backendJwt } = await response.json()
             token.backendJwt = backendJwt
           } else {
-            // Fail fast on backend login failure to avoid session without backendJwt
             throw new Error(
               `Backend login failed: ${response.status} ${response.statusText}`
             )
           }
         } catch (error) {
           console.error('Failed to get backend JWT:', error)
-          // Re-throw to cancel the sign-in process
           throw error
         }
       }
@@ -55,4 +59,3 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 })
 
-// Route handlers are re-exported in apps/frontend/app/api/auth/[...nextauth]/route.ts
