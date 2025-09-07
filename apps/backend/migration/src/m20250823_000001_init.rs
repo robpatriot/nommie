@@ -254,12 +254,14 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(Games::Visibility)
                             .custom(GameVisibilityEnum::Type)
-                            .not_null(),
+                            .not_null()
+                            .default("PRIVATE"),
                     )
                     .col(
                         ColumnDef::new(Games::State)
                             .custom(GameStateEnum::Type)
-                            .not_null(),
+                            .not_null()
+                            .default("LOBBY"),
                     )
                     .col(
                         ColumnDef::new(Games::CreatedAt)
