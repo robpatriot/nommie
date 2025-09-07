@@ -1,9 +1,12 @@
 {
   "scripts": {
     "lint": "pnpm fe:lint && pnpm be:lint",
+    "lint:fix": "pnpm fe:lint:fix && pnpm be:lint",
     "format": "pnpm fe:format && pnpm be:format",
-    "up": "pnpm be:up && pnpm fe:up",
-    "down": "pnpm be:down && pnpm fe:down",
+    "build": "pnpm fe:build && pnpm be:build",
+
+    "dev": "pnpm be:dev && pnpm fe:dev",
+    "stop": "pnpm be:stop && pnpm fe:stop",
     "status": "for s in be fe; do if [ -f .dev/$s.pid ] && kill -0 $(cat .dev/$s.pid) 2>/dev/null; then echo \"$s: running (pid $(cat .dev/$s.pid))\"; else echo \"$s: stopped\"; fi; done",
 
     "test": "pnpm be:test && pnpm fe:test",
@@ -11,8 +14,8 @@
     "test:q": "pnpm be:test:q && pnpm --silent fe:test",
     "test:ci": "pnpm be:test:q && pnpm fe:test:cov",
 
-    "be:up": "if [ -f .dev/be.pid ] && kill -0 $(cat .dev/be.pid) 2>/dev/null; then exit 1; fi; RUST_LOG=${RUST_LOG:-info} cargo run --manifest-path apps/backend/Cargo.toml >> .dev/dev.log 2>&1 & echo $! > .dev/be.pid",
-    "be:down": "if [ -f .dev/be.pid ]; then kill $(cat .dev/be.pid) 2>/dev/null || true; rm -f .dev/be.pid; fi",
+    "be:dev": "if [ -f .dev/be.pid ] && kill -0 $(cat .dev/be.pid) 2>/dev/null; then exit 1; fi; RUST_LOG=${RUST_LOG:-info} cargo run --manifest-path apps/backend/Cargo.toml >> .dev/dev.log 2>&1 & echo $! > .dev/be.pid",
+    "be:stop": "if [ -f .dev/be.pid ]; then kill $(cat .dev/be.pid) 2>/dev/null || true; rm -f .dev/be.pid; fi",
     "be:build": "cargo build --manifest-path apps/backend/Cargo.toml",
     "be:lint": "cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings",
     "be:format": "cargo fmt --manifest-path apps/backend/Cargo.toml --all",
@@ -21,8 +24,8 @@
     "be:test:q": "cargo nextest run --manifest-path apps/backend/Cargo.toml --failure-output=final --hide-progress-bar --status-level=none --final-status-level=fail",
     "be:test:cargo": "cargo test --manifest-path apps/backend/Cargo.toml",
 
-    "fe:up": "if [ -f .dev/fe.pid ] && kill -0 $(cat .dev/fe.pid) 2>/dev/null; then exit 1; fi; pnpm --filter @nommie/frontend exec sh -lc 'exec next dev >> ../../.dev/dev.log 2>&1' & echo $! > .dev/fe.pid",
-    "fe:down": "if [ -f .dev/fe.pid ]; then kill $(cat .dev/fe.pid) 2>/dev/null || true; rm -f .dev/fe.pid; fi",
+    "fe:dev": "if [ -f .dev/fe.pid ] && kill -0 $(cat .dev/fe.pid) 2>/dev/null; then exit 1; fi; pnpm --filter @nommie/frontend exec sh -lc 'exec next dev >> ../../.dev/dev.log 2>&1' & echo $! > .dev/fe.pid",
+    "fe:stop": "if [ -f .dev/fe.pid ]; then kill $(cat .dev/fe.pid) 2>/dev/null || true; rm -f .dev/fe.pid; fi",
     "fe:build": "pnpm --filter @nommie/frontend build",
     "fe:lint": "pnpm --filter @nommie/frontend lint",
     "fe:lint:fix": "pnpm --filter @nommie/frontend exec eslint . --fix",
@@ -31,14 +34,18 @@
     "fe:test:watch": "pnpm --filter @nommie/frontend test:watch",
     "fe:test:cov": "pnpm --filter @nommie/frontend test:cov",
 
-    "db:up": "docker compose up -d postgres",
-    "db:down": "docker compose down -v",
-    "db:stop": "docker compose stop postgres",
-    "db:logs": "docker compose logs -f postgres",
-    "db:pg_isready": "docker exec -it nommie-postgres pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
-    "db:psql": "docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
-    "db:migrate": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- up",
-    "db:fresh": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh",
-    "db:fresh:test": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- fresh"
+    "db:svc:up": "docker compose up -d postgres",
+    "db:svc:down": "docker compose down -v",
+    "db:svc:stop": "docker compose stop postgres",
+    "db:svc:logs": "docker compose logs -f postgres",
+    "db:svc:ready": "docker exec -it nommie-postgres pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
+    "db:svc:psql": "docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
+
+    "db:mig:up": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- up",
+    "db:mig:reset": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- reset",
+
+    "db:mig:test:up": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- up",
+    "db:mig:test:reset": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- reset"
   }
 }
+
