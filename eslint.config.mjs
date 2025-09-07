@@ -81,7 +81,24 @@ export default [
   //   },
   // },
 
-  // 6) Prettier — must be last
+  // 6) Focused overrides for specific file types
+  {
+    files: ['**/*.d.ts'],
+    rules: { '@typescript-eslint/no-unused-vars': 'off' },
+  },
+  {
+    files: ['apps/frontend/next-env.d.ts'],
+    rules: { '@typescript-eslint/triple-slash-reference': 'off' },
+  },
+  {
+    files: ['apps/frontend/test/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    },
+  },
+
+  // 7) Prettier — must be last
   eslintConfigPrettier,
 ];
 

@@ -17,8 +17,9 @@ const defaultUser: MockUser = {
 }
 
 // Session state
-let mockSession: any = null
-let mockStatus: 'loading' | 'authenticated' | 'unauthenticated' = 'unauthenticated'
+let mockSession: { user: MockUser; expires: string } | null = null
+let mockStatus: 'loading' | 'authenticated' | 'unauthenticated' =
+  'unauthenticated'
 
 // Mock functions
 export const mockSignIn = vi.fn()

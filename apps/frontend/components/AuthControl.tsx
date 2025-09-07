@@ -1,14 +1,16 @@
 'use client'
 
-import React from 'react'
-
 interface AuthControlProps {
   state: 'unauthenticated' | 'authenticated' | 'loading'
   onLogin?: () => void
   onLogout?: () => void
 }
 
-export default function AuthControl({ state, onLogin, onLogout }: AuthControlProps) {
+export default function AuthControl({
+  state,
+  onLogin,
+  onLogout,
+}: AuthControlProps) {
   if (state === 'loading') {
     return (
       <div role="status" aria-label="Authentication status">
@@ -22,10 +24,7 @@ export default function AuthControl({ state, onLogin, onLogout }: AuthControlPro
   if (state === 'authenticated') {
     return (
       <div role="status" aria-label="Authentication status">
-        <button 
-          onClick={onLogout}
-          aria-label="Sign out"
-        >
+        <button onClick={onLogout} aria-label="Sign out">
           Sign Out
         </button>
       </div>
@@ -35,10 +34,7 @@ export default function AuthControl({ state, onLogin, onLogout }: AuthControlPro
   // unauthenticated state
   return (
     <div role="status" aria-label="Authentication status">
-      <button 
-        onClick={onLogin}
-        aria-label="Sign in"
-      >
+      <button onClick={onLogin} aria-label="Sign in">
         Sign In
       </button>
     </div>

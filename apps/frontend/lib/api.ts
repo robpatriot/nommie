@@ -12,13 +12,25 @@ export class BackendApiError extends Error {
   }
 }
 
+export async function api<T = unknown>(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<T> {
+  const res = await fetch(input, init)
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ${res.statusText}`)
+  }
+  const data: unknown = await res.json()
+  return data as T
+}
+
 export async function fetchWithAuth(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
   const session = await auth()
 
-  if (!(session as any)?.backendJwt) {
+  if (!session?.backendJwt) {
     throw new BackendApiError('No backend JWT available', 401, 'NO_JWT')
   }
 
@@ -32,7 +44,7 @@ export async function fetchWithAuth(
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${(session as any).backendJwt}`,
+      Authorization: `Bearer ${session.backendJwt}`,
       ...options.headers,
     },
   })
@@ -60,7 +72,7 @@ export async function fetchWithAuth(
   return response
 }
 
-export async function getMe() {
+export async function getMe<T = unknown>(): Promise<T> {
   const response = await fetchWithAuth('/api/private/me')
   return response.json()
 }

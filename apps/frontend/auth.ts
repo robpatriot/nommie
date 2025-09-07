@@ -52,10 +52,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (token.backendJwt) {
-        ;(session as any).backendJwt = token.backendJwt as string
+        session.backendJwt = String(token.backendJwt)
       }
       return session
     },
   },
 })
-
