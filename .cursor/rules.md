@@ -82,6 +82,7 @@
 - Fresh/reset operations are allowed only against `_test` databases.
 - Primary keys: bigint identity; timestamps in UTC; add indexes for FKs/frequent queries.
 - Use enums for persistent states/roles/phases (no string literals in schema).
+- **All schema changes must be applied by editing the single canonical init migration file (`m2025xxxx_init`). Do not create additional migration files.**
 
 ## Persistence Patterns (SeaORM)
 - Prefer explicit column selection over `select(*)`.
