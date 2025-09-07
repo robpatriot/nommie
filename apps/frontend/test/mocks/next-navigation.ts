@@ -22,7 +22,9 @@ export const mockUsePathname = (pathname: string) => {
   mockPathname = pathname
 }
 
-export const mockUseSearchParams = (searchParams: Record<string, string> | URLSearchParams) => {
+export const mockUseSearchParams = (
+  searchParams: Record<string, string> | URLSearchParams
+) => {
   mockSearchParams = new URLSearchParams(searchParams)
 }
 

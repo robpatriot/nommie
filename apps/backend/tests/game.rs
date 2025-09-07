@@ -1,11 +1,8 @@
+use backend::config::db::{DbOwner, DbProfile};
+use backend::entities::games::{self, GameState, GameVisibility};
+use backend::infra::db::connect_db;
 use sea_orm::{EntityTrait, Set};
 use serial_test::serial;
-
-use backend::{
-    config::db::{DbOwner, DbProfile},
-    entities::games::{self, GameState, GameVisibility},
-    infra::db::connect_db,
-};
 
 #[tokio::test]
 #[serial]

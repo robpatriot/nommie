@@ -1,7 +1,6 @@
 mod common;
 
-use actix_web::test;
-use actix_web::{web, App, Responder};
+use actix_web::{test, web, App, Responder};
 use backend::config::db::DbProfile;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::game_id::GameId;
@@ -18,9 +17,7 @@ async fn echo(game_id: GameId) -> Result<impl Responder, backend::AppError> {
     struct Out {
         game_id: i64,
     }
-    Ok(web::Json(Out {
-        game_id: game_id.0,
-    }))
+    Ok(web::Json(Out { game_id: game_id.0 }))
 }
 
 #[actix_web::test]
@@ -83,9 +80,7 @@ async fn invalid_id_non_numeric_is_400() -> Result<(), Box<dyn std::error::Error
     .await;
 
     // Make request with non-numeric game id
-    let req = test::TestRequest::get()
-        .uri("/games/abc/echo")
-        .to_request();
+    let req = test::TestRequest::get().uri("/games/abc/echo").to_request();
 
     let resp = test::call_service(&app, req).await;
 
@@ -93,13 +88,7 @@ async fn invalid_id_non_numeric_is_400() -> Result<(), Box<dyn std::error::Error
     assert_eq!(resp.status().as_u16(), 400);
 
     // Validate error structure
-    assert_problem_details_structure(
-        resp,
-        400,
-        "INVALID_GAME_ID",
-        "Invalid game id: abc",
-    )
-    .await;
+    assert_problem_details_structure(resp, 400, "INVALID_GAME_ID", "Invalid game id: abc").await;
 
     Ok(())
 }
@@ -119,9 +108,7 @@ async fn invalid_id_negative_is_400() -> Result<(), Box<dyn std::error::Error>> 
     .await;
 
     // Make request with negative game id
-    let req = test::TestRequest::get()
-        .uri("/games/-5/echo")
-        .to_request();
+    let req = test::TestRequest::get().uri("/games/-5/echo").to_request();
 
     let resp = test::call_service(&app, req).await;
 
@@ -155,9 +142,7 @@ async fn invalid_id_zero_is_400() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     // Make request with zero game id
-    let req = test::TestRequest::get()
-        .uri("/games/0/echo")
-        .to_request();
+    let req = test::TestRequest::get().uri("/games/0/echo").to_request();
 
     let resp = test::call_service(&app, req).await;
 

@@ -1,12 +1,9 @@
+use backend::config::db::{DbOwner, DbProfile};
+use backend::entities::user_credentials;
+use backend::infra::db::connect_db;
+use backend::services::users::ensure_user;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
-
-use backend::{
-    config::db::{DbOwner, DbProfile},
-    entities::user_credentials,
-    infra::db::connect_db,
-    services::users::ensure_user,
-};
 
 #[tokio::test]
 #[serial]

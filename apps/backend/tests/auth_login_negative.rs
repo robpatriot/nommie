@@ -1,5 +1,7 @@
 use actix_web::test;
-use backend::{config::db::DbProfile, infra::state::build_state, test_support::create_test_app};
+use backend::config::db::DbProfile;
+use backend::infra::state::build_state;
+use backend::test_support::create_test_app;
 use serde_json::json;
 
 #[actix_web::test]
