@@ -1,11 +1,11 @@
 // apps/backend/migration/src/main.rs
-use ::backend::{
-    config::db::{DbOwner, DbProfile},
-    infra::db::connect_db,
-};
-use sea_orm_migration::prelude::*;
-use sea_orm_migration::sea_orm::{Statement};
 use std::env;
+
+use ::backend::config::db::{DbOwner, DbProfile};
+use ::backend::infra::db::connect_db;
+use migration::Migrator;
+use sea_orm_migration::prelude::*;
+use sea_orm_migration::sea_orm::Statement;
 
 #[tokio::main]
 async fn main() {
@@ -40,16 +40,17 @@ async fn main() {
     // -----------------------------------------------------------------------
 
     // Dispatch to SeaORM's runner
-    use migration::Migrator;
     let result = match cmd.as_str() {
         "up" => Migrator::up(&db, None).await,
         "down" => Migrator::down(&db, None).await,
-        "fresh" => Migrator::fresh(&db).await,     // drop managed objs, then all up()
-        "reset" => Migrator::reset(&db).await,     // all down(), then all up()  (best w/ enums)
-        "refresh" => Migrator::refresh(&db).await, // down last, then up last
+        "fresh" => Migrator::fresh(&db).await, // drop all tables, then up()
+        "reset" => Migrator::reset(&db).await, // rollback all applied migrations
+        "refresh" => Migrator::refresh(&db).await, // rollback all, then up()
         "status" => Migrator::status(&db).await,
         other => {
-            eprintln!("Unknown command: {other}. Use: up | down | fresh | reset | refresh | status");
+            eprintln!(
+                "Unknown command: {other}. Use: up | down | fresh | reset | refresh | status"
+            );
             std::process::exit(2);
         }
     };

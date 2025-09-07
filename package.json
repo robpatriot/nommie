@@ -36,9 +36,9 @@
     "db:svc:ready": "docker exec -it nommie-postgres pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
     "db:svc:psql": "docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
     "db:mig:up": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- up",
-    "db:mig:reset": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- reset",
+    "db:mig:refresh": "MIGRATION_TARGET=prod cargo run --manifest-path apps/backend/migration/Cargo.toml -- refresh",
     "db:mig:test:up": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- up",
-    "db:mig:test:reset": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- reset"
+    "db:mig:test:refresh": "MIGRATION_TARGET=test cargo run --manifest-path apps/backend/migration/Cargo.toml -- refresh"
   },
   "devDependencies": {
     "@eslint/js": "9.34.0",
