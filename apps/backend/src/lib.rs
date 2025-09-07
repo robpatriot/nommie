@@ -21,6 +21,7 @@ pub use error::AppError;
 pub use extractors::auth_token::AuthToken;
 pub use extractors::current_user::{BackendClaims, CurrentUser};
 pub use extractors::current_user_db::CurrentUserRecord;
+pub use extractors::game_id::GameId;
 pub use extractors::jwt::JwtClaims;
 pub use infra::db::connect_db;
 pub use middleware::cors::cors_middleware;
