@@ -16,7 +16,7 @@ pub async fn ensure_schema_ready(db: &DatabaseConnection) {
             // Schema is ready, continue
         }
         Ok(None) | Err(_) => {
-            panic!("Schema not prepared. Run: `pnpm db:migrate` or `pnpm db:fresh` for prod, or `pnpm db:fresh:test` for test.");
+            panic!("Schema not prepared. Run: `pnpm db:mig:refresh for prod, or `pnpm db:mig:test:refresh` for test.");
         }
     }
 }

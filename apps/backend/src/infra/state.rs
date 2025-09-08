@@ -1,9 +1,9 @@
 use crate::config::db::DbOwner;
 use crate::error::AppError;
 use crate::infra::db::connect_db;
+use crate::infra::schema_guard::ensure_schema_ready;
 use crate::state::app_state::AppState;
 use crate::state::security_config::SecurityConfig;
-use crate::test_support::schema_guard::ensure_schema_ready;
 
 /// Builder for creating AppState instances (used in both tests and main)
 pub struct StateBuilder {
