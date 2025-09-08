@@ -1,7 +1,10 @@
-//! Opt-in test logging support
+#![cfg(test)]
+
+//! Test logging helper for debug output
 //!
-//! This module provides a simple way to enable structured logging in tests that need it.
-//! It's designed to be opt-in only - tests remain quiet by default.
+//! This module provides a simple way to enable structured logging in tests that need debug output.
+//! It's designed to be opt-in only - tests remain quiet by default. Only use this when a test
+//! needs to output debug information, and call it directly from that test.
 //!
 //! # Example Usage
 //!
