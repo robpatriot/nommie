@@ -9,7 +9,7 @@
 //! # Example Usage
 //!
 //! ```rust
-//! use backend::test_support::logging;
+//! use backend::tests::support::logging;
 //!
 //! #[tokio::test]
 //! async fn test_with_logs() {

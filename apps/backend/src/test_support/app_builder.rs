@@ -69,8 +69,9 @@ impl TestAppBuilder {
 ///
 /// # Example
 /// ```rust
-/// use backend::test_support::{build_state, create_test_app};
-/// use backend::config::db::{DbProfile, DbOwner};
+/// use backend::infra::state::build_state;
+/// use backend::test_support::create_test_app;
+/// use backend::config::db::DbProfile;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let state = build_state().with_db(DbProfile::Test).build().await?;
