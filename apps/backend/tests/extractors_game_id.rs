@@ -1,14 +1,15 @@
 mod common;
+mod support;
 
 use actix_web::{test, web, Responder};
 use backend::config::db::DbProfile;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::game_id::GameId;
 use backend::infra::state::build_state;
-use backend::test_support::create_test_app;
 use common::assert_problem_details_structure;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
+use support::create_test_app;
 use time::OffsetDateTime;
 
 /// Test-only handler that echoes back the game_id for testing

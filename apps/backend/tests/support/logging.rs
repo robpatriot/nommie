@@ -50,6 +50,7 @@ static INITIALIZED: OnceLock<()> = OnceLock::new();
 /// - Full EnvFilter strings: `backend=debug,actix_web=warn`
 ///
 /// If `TEST_LOG` is not set, defaults to `warn` level.
+#[allow(dead_code)]
 pub fn init() {
     INITIALIZED.get_or_init(|| {
         let filter = std::env::var("TEST_LOG")

@@ -2,11 +2,10 @@ use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{test, web, App, Error};
-
-use crate::error::AppError;
-use crate::middleware::request_trace::RequestTrace;
-use crate::routes;
-use crate::state::app_state::AppState;
+use backend::error::AppError;
+use backend::middleware::request_trace::RequestTrace;
+use backend::routes;
+use backend::state::app_state::AppState;
 
 /// Type alias for route configuration functions
 type RouteConfigFn = Box<dyn Fn(&mut web::ServiceConfig) + Send + Sync>;
@@ -27,12 +26,14 @@ impl TestAppBuilder {
     }
 
     /// Configure the app to use production routes
+    #[allow(dead_code)]
     pub fn with_prod_routes(mut self) -> Self {
         self.route_config = Some(Box::new(routes::configure) as RouteConfigFn);
         self
     }
 
     /// Configure the app with custom routes
+    #[allow(dead_code)]
     pub fn with_routes<F>(mut self, config_fn: F) -> Self
     where
         F: Fn(&mut web::ServiceConfig) + Send + Sync + 'static,
@@ -70,7 +71,7 @@ impl TestAppBuilder {
 /// # Example
 /// ```rust
 /// use backend::infra::state::build_state;
-/// use backend::test_support::create_test_app;
+/// use support::create_test_app;
 /// use backend::config::db::DbProfile;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {

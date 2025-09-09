@@ -1,8 +1,10 @@
+mod support;
+
 use actix_web::test;
 use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
-use backend::test_support::create_test_app;
 use serde_json::json;
+use support::create_test_app;
 use test_support::{unique_email, unique_str};
 
 #[actix_web::test]

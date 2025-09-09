@@ -1,10 +1,11 @@
 mod common;
+mod support;
 use actix_web::{test, web, HttpMessage, HttpRequest, HttpResponse};
 use backend::infra::state::build_state;
-use backend::test_support::create_test_app;
 use backend::AppError;
 use common::assert_problem_details_structure;
 use serde_json::Value;
+use support::create_test_app;
 
 /// Test endpoint that returns a validation error (400)
 async fn test_validation_error(req: HttpRequest) -> Result<HttpResponse, AppError> {

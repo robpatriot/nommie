@@ -1,7 +1,6 @@
+use backend::entities::users::Model as User;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, NotSet, Set};
 use time::OffsetDateTime;
-
-use crate::entities::users::Model as User;
 
 /// Seed a user with a specific sub value for testing purposes.
 ///
@@ -12,6 +11,7 @@ use crate::entities::users::Model as User;
 ///
 /// # Returns
 /// The created user model
+#[allow(dead_code)]
 pub async fn seed_user_with_sub(
     db: &DatabaseConnection,
     sub: &str,
@@ -19,7 +19,7 @@ pub async fn seed_user_with_sub(
 ) -> Result<User, sea_orm::DbErr> {
     let now = OffsetDateTime::now_utc();
 
-    let user = crate::entities::users::ActiveModel {
+    let user = backend::entities::users::ActiveModel {
         id: NotSet, // Let database auto-generate
         sub: Set(sub.to_string()),
         username: Set(Some("Test User".to_string())),
