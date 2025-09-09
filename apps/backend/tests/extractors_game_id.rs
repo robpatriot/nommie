@@ -1,11 +1,11 @@
 mod common;
 
-use actix_web::{test, web, App, Responder};
+use actix_web::{test, web, Responder};
 use backend::config::db::DbProfile;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::game_id::GameId;
 use backend::infra::state::build_state;
-use backend::middleware::request_trace::RequestTrace;
+use backend::test_support::create_test_app;
 use common::assert_problem_details_structure;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
@@ -41,13 +41,12 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
     let game_id = game.id;
 
     // Build test app with echo route
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .wrap(RequestTrace)
-            .route("/games/{game_id}/echo", web::get().to(echo)),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/games/{game_id}/echo", web::get().to(echo));
+        })
+        .build()
+        .await?;
 
     // Make request with existing game id
     let req = test::TestRequest::get()
@@ -71,13 +70,12 @@ async fn invalid_id_non_numeric_is_400() -> Result<(), Box<dyn std::error::Error
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build test app with echo route
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .wrap(RequestTrace)
-            .route("/games/{game_id}/echo", web::get().to(echo)),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/games/{game_id}/echo", web::get().to(echo));
+        })
+        .build()
+        .await?;
 
     // Make request with non-numeric game id
     let req = test::TestRequest::get().uri("/games/abc/echo").to_request();
@@ -99,13 +97,12 @@ async fn invalid_id_negative_is_400() -> Result<(), Box<dyn std::error::Error>> 
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build test app with echo route
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .wrap(RequestTrace)
-            .route("/games/{game_id}/echo", web::get().to(echo)),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/games/{game_id}/echo", web::get().to(echo));
+        })
+        .build()
+        .await?;
 
     // Make request with negative game id
     let req = test::TestRequest::get().uri("/games/-5/echo").to_request();
@@ -133,13 +130,12 @@ async fn invalid_id_zero_is_400() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build test app with echo route
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .wrap(RequestTrace)
-            .route("/games/{game_id}/echo", web::get().to(echo)),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/games/{game_id}/echo", web::get().to(echo));
+        })
+        .build()
+        .await?;
 
     // Make request with zero game id
     let req = test::TestRequest::get().uri("/games/0/echo").to_request();
@@ -167,13 +163,12 @@ async fn not_found_is_404() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build test app with echo route
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .wrap(RequestTrace)
-            .route("/games/{game_id}/echo", web::get().to(echo)),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/games/{game_id}/echo", web::get().to(echo));
+        })
+        .build()
+        .await?;
 
     // Make request with non-existent game id
     let req = test::TestRequest::get()
