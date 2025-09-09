@@ -10,6 +10,7 @@ use backend::test_support::create_test_app;
 use backend::test_support::factories::seed_user_with_sub;
 use common::assert_problem_details_structure;
 use serde_json::Value;
+use test_support::{unique_email, unique_str};
 
 #[actix_web::test]
 async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,13 +29,9 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Seed user with specific sub - use timestamp to ensure uniqueness
-    let timestamp = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis();
-    let test_sub = format!("test-sub-{timestamp}");
-    let test_email = format!("test-{timestamp}@example.com");
+    // Seed user with specific sub - use unique helpers to ensure uniqueness
+    let test_sub = unique_str("test-sub");
+    let test_email = unique_email("test");
     let user = seed_user_with_sub(state.db.as_ref().unwrap(), &test_sub, Some(&test_email))
         .await
         .expect("should create user successfully");
@@ -84,13 +81,9 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Mint JWT with a sub that doesn't exist in database - use timestamp to ensure uniqueness
-    let timestamp = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_millis();
-    let missing_sub = format!("missing-sub-{timestamp}");
-    let test_email = format!("missing-{timestamp}@example.com");
+    // Mint JWT with a sub that doesn't exist in database - use unique helpers to ensure uniqueness
+    let missing_sub = unique_str("missing-sub");
+    let test_email = unique_email("missing");
     let token = mint_access_token(
         &missing_sub,
         &test_email,

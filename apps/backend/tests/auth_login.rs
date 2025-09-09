@@ -4,6 +4,7 @@ use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::test_support::create_test_app;
 use serde_json::json;
+use test_support::{unique_email, unique_str};
 
 #[actix_web::test]
 async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,10 +24,12 @@ async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::
         .await?;
 
     // Test 1: First login with new email -> creates user + returns JWT
+    let test_email = unique_email("test");
+    let test_google_sub = unique_str("google");
     let login_data = json!({
-        "email": "test@example.com",
+        "email": test_email,
         "name": "Test User",
-        "google_sub": "google_123"
+        "google_sub": test_google_sub
     });
 
     let req = test::TestRequest::post()
@@ -48,16 +51,16 @@ async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::
     // Test 2: Decode the JWT to verify correct sub and email
     let decoded =
         backend::verify_access_token(token, &security_config).expect("JWT should be valid");
-    assert_eq!(decoded.email, "test@example.com");
+    assert_eq!(decoded.email, test_email);
 
     // Store the user sub from first login
     let first_user_sub = decoded.sub;
 
     // Test 3: Second call with the same email -> reuses the same user
     let login_data_2 = json!({
-        "email": "test@example.com",
+        "email": test_email,
         "name": "Updated Name", // Different name shouldn't matter
-        "google_sub": "google_456" // Different google_sub shouldn't matter
+        "google_sub": unique_str("google") // Different google_sub shouldn't matter
     });
 
     let req2 = test::TestRequest::post()
@@ -78,7 +81,7 @@ async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::
 
     // Verify that the same user sub is returned (user was reused)
     assert_eq!(decoded2.sub, first_user_sub);
-    assert_eq!(decoded2.email, "test@example.com");
+    assert_eq!(decoded2.email, test_email);
 
     Ok(())
 }
@@ -101,8 +104,9 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
         .await?;
 
     // Test missing required fields
+    let test_email = unique_email("test");
     let login_data = json!({
-        "email": "test@example.com"
+        "email": test_email
         // Missing google_sub and name is optional
     });
 
@@ -124,9 +128,10 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
         .contains("application/problem+json"));
 
     // Test with empty email
+    let test_google_sub = unique_str("google");
     let login_data_empty_email = json!({
         "email": "",
-        "google_sub": "google_123"
+        "google_sub": test_google_sub
     });
 
     let req2 = test::TestRequest::post()

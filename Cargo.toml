@@ -1,0 +1,11 @@
+[workspace]
+members = [
+    "apps/backend",
+    "apps/backend/migration",
+    "packages/test-support",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"

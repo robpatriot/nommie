@@ -79,6 +79,8 @@ pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Cla
 mod tests {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+    use test_support::{unique_email, unique_str};
+
     use super::{mint_access_token, verify_access_token};
     use crate::state::security_config::SecurityConfig;
     use crate::AppError;
@@ -87,11 +89,11 @@ mod tests {
     fn test_mint_and_verify_roundtrip() {
         let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
-        let sub = "test-sub-roundtrip-123";
-        let email = "test@example.com";
+        let sub = unique_str("test-sub-roundtrip");
+        let email = unique_email("test");
         let now = SystemTime::now();
 
-        let token = mint_access_token(sub, email, now, &security).unwrap();
+        let token = mint_access_token(&sub, &email, now, &security).unwrap();
         let claims = verify_access_token(&token, &security).unwrap();
 
         assert_eq!(claims.sub, sub);
@@ -107,12 +109,12 @@ mod tests {
     fn test_expired_token() {
         let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
-        let sub = "test-sub-expired-456";
-        let email = "test@example.com";
+        let sub = unique_str("test-sub-expired");
+        let email = unique_email("test");
         // 20 minutes ago so 15-minute token is expired
         let now = SystemTime::now() - Duration::from_secs(20 * 60);
 
-        let token = mint_access_token(sub, email, now, &security).unwrap();
+        let token = mint_access_token(&sub, &email, now, &security).unwrap();
         let result = verify_access_token(&token, &security);
 
         match result {
@@ -128,9 +130,9 @@ mod tests {
         // Mint with secret A
         let security_a = SecurityConfig::new("secret-A".as_bytes());
 
-        let sub = "test-sub-bad-sig-789";
-        let email = "test@example.com";
-        let token = mint_access_token(sub, email, SystemTime::now(), &security_a).unwrap();
+        let sub = unique_str("test-sub-bad-sig");
+        let email = unique_email("test");
+        let token = mint_access_token(&sub, &email, SystemTime::now(), &security_a).unwrap();
 
         // Verify with secret B
         let security_b = SecurityConfig::new("secret-B".as_bytes());
@@ -148,11 +150,11 @@ mod tests {
     fn test_missing_jwt_secret() {
         let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
-        let sub = "test-sub-missing-secret-012";
-        let email = "test@example.com";
+        let sub = unique_str("test-sub-missing-secret");
+        let email = unique_email("test");
         let now = SystemTime::now();
 
-        let result = mint_access_token(sub, email, now, &security);
+        let result = mint_access_token(&sub, &email, now, &security);
 
         match result {
             Ok(_) => {

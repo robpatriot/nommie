@@ -4,6 +4,7 @@ use backend::infra::db::connect_db;
 use backend::services::users::ensure_user;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
+use test_support::{unique_email, unique_str};
 
 #[tokio::test]
 #[serial]
@@ -13,7 +14,9 @@ async fn test_ensure_user_inserts_then_reuses() {
         .expect("connect to _test database");
 
     // First call - should create a new user
-    let (user1, email1) = ensure_user("alice@example.com", Some("Alice"), "google-sub-123", &db)
+    let test_email = unique_email("alice");
+    let test_google_sub = unique_str("google-sub");
+    let (user1, email1) = ensure_user(&test_email, Some("Alice"), &test_google_sub, &db)
         .await
         .expect("should create user successfully");
 
@@ -21,13 +24,14 @@ async fn test_ensure_user_inserts_then_reuses() {
     assert_eq!(user1.username, Some("Alice".to_string()));
     assert!(!user1.is_ai);
     assert!(user1.id > 0); // ID should be a positive number
-    assert_eq!(email1, "alice@example.com");
+    assert_eq!(email1, test_email);
 
     // Second call with same email but different name - should return same user
+    let different_google_sub = unique_str("google-sub");
     let (user2, _email2) = ensure_user(
-        "alice@example.com",
-        Some("Alice Smith"), // Different name
-        "google-sub-456",    // Different google_sub
+        &test_email,
+        Some("Alice Smith"),   // Different name
+        &different_google_sub, // Different google_sub
         &db,
     )
     .await
@@ -39,7 +43,7 @@ async fn test_ensure_user_inserts_then_reuses() {
 
     // Verify that only one user_credentials row exists for this email
     let credential_count = user_credentials::Entity::find()
-        .filter(user_credentials::Column::Email.eq("alice@example.com"))
+        .filter(user_credentials::Column::Email.eq(&test_email))
         .count(&db)
         .await
         .expect("should count credentials successfully");
@@ -52,7 +56,7 @@ async fn test_ensure_user_inserts_then_reuses() {
 
     // Verify that the credential row has the correct user_id
     let credential = user_credentials::Entity::find()
-        .filter(user_credentials::Column::Email.eq("alice@example.com"))
+        .filter(user_credentials::Column::Email.eq(&test_email))
         .one(&db)
         .await
         .expect("should query successfully")
@@ -65,7 +69,7 @@ async fn test_ensure_user_inserts_then_reuses() {
     assert!(credential.last_login.is_some(), "last_login should be set");
     assert_eq!(
         credential.google_sub,
-        Some("google-sub-123".to_string()),
+        Some(test_google_sub.clone()),
         "google_sub should be the first one set"
     );
 }

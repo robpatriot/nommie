@@ -9,6 +9,7 @@ use backend::state::security_config::SecurityConfig;
 use backend::test_support::create_test_app;
 use common::assert_problem_details_structure;
 use serde_json::Value;
+use test_support::{unique_email, unique_str};
 
 #[actix_web::test]
 async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
@@ -155,10 +156,10 @@ async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Create expired JWT token by using a time from the past
-    let sub = "test-sub-expired-123";
-    let email = "test@example.com";
+    let sub = unique_str("test-sub-expired");
+    let email = unique_email("test");
     let past_time = SystemTime::now() - std::time::Duration::from_secs(20 * 60); // 20 minutes ago
-    let expired_token = mint_access_token(sub, email, past_time, &security_config).unwrap();
+    let expired_token = mint_access_token(&sub, &email, past_time, &security_config).unwrap();
 
     // Test with expired token
     let req = test::TestRequest::get()
@@ -195,9 +196,9 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Create a valid JWT token
-    let sub = "test-sub-happy-456";
-    let email = "test@example.com";
-    let token = mint_access_token(sub, email, SystemTime::now(), &security_config).unwrap();
+    let sub = unique_str("test-sub-happy");
+    let email = unique_email("test");
+    let token = mint_access_token(&sub, &email, SystemTime::now(), &security_config).unwrap();
 
     // Make request with valid token
     let req = test::TestRequest::get()

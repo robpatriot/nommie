@@ -3,6 +3,7 @@ use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 use backend::test_support::create_test_app;
 use serde_json::json;
+use test_support::{unique_email, unique_str};
 
 #[actix_web::test]
 async fn login_rejects_empty_fields_returns_problem_details(
@@ -17,9 +18,10 @@ async fn login_rejects_empty_fields_returns_problem_details(
         .await?;
 
     // Test empty email
+    let test_google_sub = unique_str("google");
     let login_data_empty_email = json!({
         "email": "",
-        "google_sub": "google_123",
+        "google_sub": test_google_sub,
         "name": "Test User"
     });
 
@@ -58,8 +60,9 @@ async fn login_rejects_empty_fields_returns_problem_details(
     assert_eq!(code, "INVALID_EMAIL");
 
     // Test empty google_sub
+    let test_email = unique_email("test");
     let login_data_empty_google_sub = json!({
-        "email": "test@example.com",
+        "email": test_email,
         "google_sub": "",
         "name": "Test User"
     });
@@ -122,8 +125,9 @@ async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn 
         .await?;
 
     // Test missing email field entirely
+    let test_google_sub = unique_str("google");
     let login_data_missing_email = json!({
-        "google_sub": "google_123",
+        "google_sub": test_google_sub,
         "name": "Test User"
     });
 
@@ -156,8 +160,9 @@ async fn login_missing_google_sub_returns_400_todo_validator(
         .await?;
 
     // Test missing google_sub field entirely
+    let test_email = unique_email("test");
     let login_data_missing_google_sub = json!({
-        "email": "test@example.com",
+        "email": test_email,
         "name": "Test User"
     });
 
@@ -189,9 +194,10 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
         .await?;
 
     // Test wrong type for email (number instead of string)
+    let test_google_sub = unique_str("google");
     let login_data_wrong_email_type = json!({
         "email": 123,
-        "google_sub": "google_123",
+        "google_sub": test_google_sub,
         "name": "Test User"
     });
 
@@ -209,8 +215,9 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
 
     // Test wrong type for google_sub (number instead of string)
+    let test_email = unique_email("test");
     let login_data_wrong_google_sub_type = json!({
-        "email": "test@example.com",
+        "email": test_email,
         "google_sub": 456,
         "name": "Test User"
     });
@@ -229,9 +236,11 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
     // For now, we expect a 400 but don't assert Problem Details shape since serde fails before handler.
 
     // Test wrong type for name (number instead of string)
+    let test_email = unique_email("test");
+    let test_google_sub = unique_str("google");
     let login_data_wrong_name_type = json!({
-        "email": "test@example.com",
-        "google_sub": "google_123",
+        "email": test_email,
+        "google_sub": test_google_sub,
         "name": 789
     });
 

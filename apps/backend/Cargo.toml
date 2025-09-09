@@ -24,6 +24,7 @@ rand = "0.8"
 [dev-dependencies]
 tracing-test = "0.2"
 serial_test = "3.2.0"
+test-support = { path = "../../packages/test-support" }
 
 [[bin]]
 name = "backend"
