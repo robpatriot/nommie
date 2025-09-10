@@ -50,16 +50,16 @@ impl TestAppBuilder {
         let state = self.state;
         let route_config = self.route_config;
 
-        let service = test::init_service(
-            App::new()
-                .wrap(RequestTrace)
-                .app_data(web::Data::new(state))
-                .configure(move |cfg| {
-                    if let Some(config_fn) = &route_config {
-                        config_fn(cfg);
-                    }
-                }),
-        )
+        // Wrap AppState with web::Data at the boundary
+        let data = web::Data::new(state);
+
+        let service = test::init_service(App::new().wrap(RequestTrace).app_data(data).configure(
+            move |cfg| {
+                if let Some(config_fn) = &route_config {
+                    config_fn(cfg);
+                }
+            },
+        ))
         .await;
 
         Ok(service)
@@ -76,7 +76,7 @@ impl TestAppBuilder {
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let state = build_state().with_db(DbProfile::Test).build().await?;
-/// let app = create_test_app(state.clone()).with_prod_routes().build().await?;
+/// let app = create_test_app(state).with_prod_routes().build().await?;
 /// # Ok(())
 /// # }
 /// ```

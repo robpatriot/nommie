@@ -27,7 +27,7 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Create a test game in the database
-    let db = state.db.as_ref().unwrap();
+    let db = &state.db;
     let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),

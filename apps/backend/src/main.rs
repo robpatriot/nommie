@@ -34,12 +34,15 @@ async fn main() -> std::io::Result<()> {
 
     println!("✅ Database connected (migrations handled by pnpm db:migrate)");
 
+    // Wrap AppState with web::Data before passing to HttpServer
+    let data = web::Data::new(app_state);
+
     HttpServer::new(move || {
         App::new()
             .wrap(cors_middleware())
             .wrap(RequestTrace)
             .wrap(StructuredLogger)
-            .app_data(web::Data::new(app_state.clone()))
+            .app_data(data.clone())
             .configure(routes::configure)
     })
     .bind(("127.0.0.1", 3001))?

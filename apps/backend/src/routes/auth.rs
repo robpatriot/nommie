@@ -43,10 +43,7 @@ async fn login(
         ));
     }
 
-    let db = app_state
-        .db
-        .as_ref()
-        .ok_or_else(|| AppError::internal("Database connection not available".to_string()))?;
+    let db = &app_state.db;
 
     let (user, email) = ensure_user(&req.email, req.name.as_deref(), &req.google_sub, db).await?;
 

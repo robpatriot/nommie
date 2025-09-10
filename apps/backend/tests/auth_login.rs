@@ -20,10 +20,7 @@ async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::
         .await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test 1: First login with new email -> creates user + returns JWT
     let test_email = unique_email("test");
@@ -100,10 +97,7 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
         .await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test missing required fields
     let test_email = unique_email("test");

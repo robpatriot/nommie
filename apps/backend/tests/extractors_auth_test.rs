@@ -19,10 +19,7 @@ async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Make request without Authorization header
     let req = test::TestRequest::get().uri("/api/private/me").to_request();
@@ -50,10 +47,7 @@ async fn test_malformed_scheme() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test malformed Authorization header
     let req = test::TestRequest::get()
@@ -84,10 +78,7 @@ async fn test_empty_token() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test empty token
     let req = test::TestRequest::get()
@@ -118,10 +109,7 @@ async fn test_invalid_token() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test with invalid token
     let req = test::TestRequest::get()
@@ -151,17 +139,14 @@ async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
-
     // Create expired JWT token by using a time from the past
     let sub = unique_str("test-sub-expired");
     let email = unique_email("test");
     let past_time = SystemTime::now() - std::time::Duration::from_secs(20 * 60); // 20 minutes ago
     let expired_token = mint_access_token(&sub, &email, past_time, &security_config).unwrap();
+
+    // Build app with production routes
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test with expired token
     let req = test::TestRequest::get()
@@ -191,16 +176,13 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
-
     // Create a valid JWT token
     let sub = unique_str("test-sub-happy");
     let email = unique_email("test");
     let token = mint_access_token(&sub, &email, SystemTime::now(), &security_config).unwrap();
+
+    // Build app with production routes
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Make request with valid token
     let req = test::TestRequest::get()

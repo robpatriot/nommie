@@ -8,10 +8,7 @@ use support::create_test_app;
 async fn test_health_endpoint() -> Result<(), Box<dyn std::error::Error>> {
     // Build state, then app using the two-stage harness
     let state = build_state().build().await?;
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     let req = test::TestRequest::get().uri("/health").to_request();
     let resp = test::call_service(&app, req).await;

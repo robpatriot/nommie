@@ -14,10 +14,7 @@ async fn login_rejects_empty_fields_returns_problem_details(
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test empty email
     let test_google_sub = unique_str("google");
@@ -121,10 +118,7 @@ async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn 
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test missing email field entirely
     let test_google_sub = unique_str("google");
@@ -156,10 +150,7 @@ async fn login_missing_google_sub_returns_400_todo_validator(
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test missing google_sub field entirely
     let test_email = unique_email("test");
@@ -190,10 +181,7 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test wrong type for email (number instead of string)
     let test_google_sub = unique_str("google");

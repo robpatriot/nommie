@@ -59,12 +59,7 @@ impl FromRequest for GameId {
                     AppError::internal("AppState not available".to_string()),
                 )
             })?;
-            let db = app_state.db.as_ref().ok_or_else(|| {
-                AppError::from_req(
-                    &req,
-                    AppError::internal("Database connection not available".to_string()),
-                )
-            })?;
+            let db = &app_state.db;
 
             // Check if game exists in database
             let game = games::Entity::find_by_id(game_id)

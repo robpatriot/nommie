@@ -25,22 +25,19 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
-
     // Seed user with specific sub - use unique helpers to ensure uniqueness
     let test_sub = unique_str("test-sub");
     let test_email = unique_email("test");
-    let user = seed_user_with_sub(state.db.as_ref().unwrap(), &test_sub, Some(&test_email))
+    let user = seed_user_with_sub(&state.db, &test_sub, Some(&test_email))
         .await
         .expect("should create user successfully");
 
     // Mint JWT with the same sub
     let token = mint_access_token(&test_sub, &test_email, SystemTime::now(), &security_config)
         .expect("should mint token successfully");
+
+    // Build app with production routes
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Make request with valid token
     let req = test::TestRequest::get()
@@ -77,12 +74,6 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
-
     // Mint JWT with a sub that doesn't exist in database - use unique helpers to ensure uniqueness
     let missing_sub = unique_str("missing-sub");
     let test_email = unique_email("missing");
@@ -93,6 +84,9 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
         &security_config,
     )
     .expect("should mint token successfully");
+
+    // Build app with production routes
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Make request with valid token but non-existent user
     let req = test::TestRequest::get()
@@ -129,10 +123,7 @@ async fn test_me_db_unauthorized() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     // Build app with production routes
-    let app = create_test_app(state.clone())
-        .with_prod_routes()
-        .build()
-        .await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Make request without Authorization header
     let req = test::TestRequest::get()
