@@ -2,10 +2,13 @@
 members = [
     "apps/backend",
     "apps/backend/migration",
-    "packages/test-support",
+    "packages/backend-support",
 ]
 resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+
+[workspace.dependencies]
+sea-orm = "1.1.15"

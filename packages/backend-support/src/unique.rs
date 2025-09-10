@@ -1,6 +1,6 @@
 //! Test support utilities for generating unique test data
 //!
-//! This crate provides utilities to help generate unique test data using ULIDs
+//! This module provides utilities to help generate unique test data using ULIDs
 //! to ensure test isolation and avoid conflicts between test runs.
 
 use ulid::Ulid;
@@ -15,7 +15,7 @@ use ulid::Ulid;
 ///
 /// # Examples
 /// ```
-/// use test_support::unique_str;
+/// use backend_support::unique::unique_str;
 ///
 /// let id1 = unique_str("user");
 /// let id2 = unique_str("user");
@@ -36,7 +36,7 @@ pub fn unique_str(prefix: &str) -> String {
 ///
 /// # Examples
 /// ```
-/// use test_support::unique_email;
+/// use backend_support::unique::unique_email;
 ///
 /// let email1 = unique_email("test");
 /// let email2 = unique_email("test");

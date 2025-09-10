@@ -4,9 +4,9 @@ use actix_web::test;
 use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
+use backend_support::unique::{unique_email, unique_str};
 use serde_json::json;
 use support::create_test_app;
-use test_support::{unique_email, unique_str};
 
 #[actix_web::test]
 async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::error::Error>> {

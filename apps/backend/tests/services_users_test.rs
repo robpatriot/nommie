@@ -2,9 +2,9 @@ use backend::config::db::{DbOwner, DbProfile};
 use backend::entities::user_credentials;
 use backend::infra::db::connect_db;
 use backend::services::users::ensure_user;
+use backend_support::unique::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
-use test_support::{unique_email, unique_str};
 
 #[tokio::test]
 #[serial]

@@ -5,6 +5,8 @@ use crate::infra::schema_guard::ensure_schema_ready;
 use crate::state::app_state::AppState;
 use crate::state::security_config::SecurityConfig;
 
+///#[cfg(test)]
+///use backend_support::mock_strict::register_mock_strict_connection;
 /// Builder for creating AppState instances (used in both tests and main)
 pub struct StateBuilder {
     security_config: SecurityConfig,

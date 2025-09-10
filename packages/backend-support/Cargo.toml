@@ -1,0 +1,10 @@
+[package]
+name = "backend-support"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sea-orm = { workspace = true }
+ulid = "1.2.1"
+
+[dev-dependencies]
