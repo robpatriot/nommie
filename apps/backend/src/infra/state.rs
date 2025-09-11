@@ -1,11 +1,4 @@
-use crate::config::db::DbOwner;
-use crate::error::AppError;
-use crate::infra::db::connect_db;
-use crate::infra::schema_guard::ensure_schema_ready;
-use crate::state::app_state::AppState;
-use crate::state::security_config::SecurityConfig;
-
-#[cfg(test)]
+#[cfg(any(test, feature = "mockstrict-default"))]
 use {
     backend_support::mock_strict::register_mock_strict_connection,
     sea_orm::{DatabaseBackend, MockDatabase},
@@ -13,12 +6,19 @@ use {
     std::sync::Once,
 };
 
-#[cfg(test)]
+use crate::config::db::DbOwner;
+use crate::error::AppError;
+use crate::infra::db::connect_db;
+use crate::infra::schema_guard::ensure_schema_ready;
+use crate::state::app_state::AppState;
+use crate::state::security_config::SecurityConfig;
+
+#[cfg(any(test, feature = "mockstrict-default"))]
 static MOCKSTRICT_WARNING_ONCE: Once = Once::new();
-#[cfg(test)]
+#[cfg(any(test, feature = "mockstrict-default"))]
 static MOCKSTRICT_WARNING_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-#[cfg(test)]
+#[cfg(any(test, feature = "mockstrict-default"))]
 fn emit_mockstrict_warning_once() {
     MOCKSTRICT_WARNING_ONCE.call_once(|| {
         log::warn!(
@@ -27,6 +27,12 @@ fn emit_mockstrict_warning_once() {
         MOCKSTRICT_WARNING_COUNT.fetch_add(1, Ordering::SeqCst);
     });
 }
+
+/// Determines whether to default to MockStrict when no DB profile is set
+fn should_default_to_mockstrict() -> bool {
+    cfg!(test) || cfg!(feature = "mockstrict-default")
+}
+
 /// Builder for creating AppState instances (used in both tests and main)
 pub struct StateBuilder {
     security_config: SecurityConfig,
@@ -59,26 +65,24 @@ impl StateBuilder {
 
     /// Build the AppState
     pub async fn build(self) -> Result<AppState, AppError> {
-        #[cfg(not(test))]
-        {
-            if !self.db_profile_set {
+        let conn = if !self.db_profile_set {
+            if should_default_to_mockstrict() {
+                // Use MockStrict fallback when appropriate
+                #[cfg(any(test, feature = "mockstrict-default"))]
+                {
+                    let mock_db = MockDatabase::new(DatabaseBackend::Postgres);
+                    let conn = mock_db.into_connection();
+                    register_mock_strict_connection(&conn);
+                    emit_mockstrict_warning_once();
+                    conn
+                }
+                #[cfg(not(any(test, feature = "mockstrict-default")))]
+                {
+                    unreachable!()
+                }
+            } else {
+                // Production panic when no DB profile is set
                 panic!("AppState builder requires an explicit DB profile outside tests.");
-            }
-        }
-
-        let conn = if cfg!(test) && !self.db_profile_set {
-            // In tests, default to MockStrict if no DB profile was set
-            #[cfg(test)]
-            {
-                let mock_db = MockDatabase::new(DatabaseBackend::Postgres);
-                let conn = mock_db.into_connection();
-                register_mock_strict_connection(&conn);
-                emit_mockstrict_warning_once();
-                conn
-            }
-            #[cfg(not(test))]
-            {
-                unreachable!()
             }
         } else if cfg!(test) && self.db_profile == crate::config::db::DbProfile::Test {
             // In tests with explicit Test profile, use real test DB
@@ -125,11 +129,11 @@ mod tests {
     fn test_mockstrict_warning_emitted_once() {
         // Reset the counter for this test
         MOCKSTRICT_WARNING_COUNT.store(0, Ordering::SeqCst);
-        
+
         // Call the helper function twice
         emit_mockstrict_warning_once();
         emit_mockstrict_warning_once();
-        
+
         // Assert the counter is exactly 1 (warning emitted only once)
         assert_eq!(MOCKSTRICT_WARNING_COUNT.load(Ordering::SeqCst), 1);
     }

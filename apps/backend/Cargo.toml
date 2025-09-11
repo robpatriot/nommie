@@ -10,7 +10,7 @@ actix-http = "3"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time", "mock"] }
+sea-orm = { version = "1.1", features = ["sqlx-postgres", "runtime-tokio-rustls", "macros", "with-time"] }
 once_cell = "1.19"
 thiserror = "1.0"
 uuid = { version = "1.0", features = ["v4"] }
@@ -21,11 +21,16 @@ jsonwebtoken = "9.0"
 time = { version = "0.3", features = ["serde", "macros"] }
 rand = "0.8"
 log = "0.4"
+backend-support = { path = "../../packages/backend-support", optional = true }
+
+[features]
+mockstrict-default = ["sea-orm/mock", "dep:backend-support"]
 
 [dev-dependencies]
 tracing-test = "0.2"
 serial_test = "3.2.0"
 backend-support = { path = "../../packages/backend-support" }
+sea-orm = { version = "1.1", features = ["mock"] }
 
 [[bin]]
 name = "backend"
