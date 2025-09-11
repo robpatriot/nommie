@@ -13,6 +13,9 @@ pub mod routes;
 pub mod services;
 pub mod state;
 
+#[cfg(test)]
+pub mod test_bootstrap;
+
 // Re-exports for public API
 pub use auth::jwt::{mint_access_token, verify_access_token, Claims};
 pub use config::db::{db_url, DbOwner, DbProfile};
@@ -39,4 +42,11 @@ pub mod prelude {
     pub use super::infra::*;
     pub use super::middleware::*;
     pub use super::state::*;
+}
+
+// Auto-initialize logging for unit tests
+#[cfg(test)]
+#[ctor::ctor]
+fn init_test_logging() {
+    test_bootstrap::logging::init();
 }

@@ -1,10 +1,8 @@
-#![cfg(test)]
-
-//! Test logging helper for debug output
+//! Unified test logging initialization for integration tests
 //!
-//! This module provides a simple way to enable structured logging in tests that need debug output.
-//! It's designed to be opt-in only - tests remain quiet by default. Only use this when a test
-//! needs to output debug information, and call it directly from that test.
+//! This module provides the same logging initialization logic as the crate's
+//! test_bootstrap module, but implemented directly for integration tests since
+//! they can't access the crate's test-only modules.
 //!
 //! # Example Usage
 //!
@@ -13,54 +11,69 @@
 //!
 //! #[tokio::test]
 //! async fn test_with_logs() {
-//!     // Enable logging for this test
-//!     logging::init();
-//!     
-//!     // Your test code here - logs will be captured and shown
+//!     logging::init(); // Uses the unified initializer
 //!     tracing::info!("This will be visible when TEST_LOG=info");
 //! }
 //! ```
 //!
-//! # Example Commands
+//! # Environment Variables
+//!
+//! The unified initializer respects these in order of precedence:
+//! 1. `TEST_LOG` (preferred)
+//! 2. `RUST_LOG` (fallback)
+//! 3. `"warn"` (default, quiet)
 //!
 //! ```bash
-//! # Run with info-level logs
-//! TEST_LOG=info pnpm be:test:v -- some_filter
+//! # Use TEST_LOG (preferred)
+//! TEST_LOG=info pnpm be:test:v
 //!
-//! # Run with debug-level logs
-//! TEST_LOG=debug pnpm be:test:v -- some_filter
+//! # Fallback to RUST_LOG
+//! RUST_LOG=debug pnpm be:test:v
 //!
-//! # Run with trace-level logs
-//! TEST_LOG=trace pnpm be:test:v -- some_filter
+//! # Default (warn level)
+//! pnpm be:test
 //! ```
 
-use std::sync::OnceLock;
-
+use once_cell::sync::OnceCell;
 use tracing_subscriber::{fmt, EnvFilter};
 
-static INITIALIZED: OnceLock<()> = OnceLock::new();
+static INITIALIZED: OnceCell<()> = OnceCell::new();
 
-/// Initialize structured logging for tests.
+/// Initialize structured logging for integration tests.
 ///
 /// This function is idempotent and race-safe. It can be called multiple times
-/// without panicking. The logging level is controlled by the `TEST_LOG` environment
-/// variable, which accepts:
+/// without panicking. The logging level is controlled in this order of precedence:
 ///
-/// - Simple levels: `info`, `debug`, `trace`, `warn`, `error`
-/// - Full EnvFilter strings: `backend=debug,actix_web=warn`
+/// 1. `TEST_LOG` environment variable (preferred)
+/// 2. `RUST_LOG` environment variable (fallback)
+/// 3. `"warn"` (default, quiet)
 ///
-/// If `TEST_LOG` is not set, defaults to `warn` level.
-#[allow(dead_code)]
+/// The subscriber is configured with:
+/// - `with_test_writer()` for cargo/nextest output capture
+/// - `without_time()` for stable, clean output
+/// - `try_init().ok()` to never panic if already initialized
 pub fn init() {
     INITIALIZED.get_or_init(|| {
+        // Read log level in order: TEST_LOG -> RUST_LOG -> "warn"
         let filter = std::env::var("TEST_LOG")
+            .or_else(|_| std::env::var("RUST_LOG"))
             .map(EnvFilter::new)
             .unwrap_or_else(|_| EnvFilter::new("warn"));
 
         fmt()
             .with_env_filter(filter)
-            .with_test_writer() // Integrates with test output capture
-            .without_time() // Clean, stable output
-            .init();
+            .with_test_writer() // Critical for cargo/nextest capture
+            .without_time() // Stable output
+            .try_init()
+            .ok(); // Never panic if something else already initialized
     });
+}
+
+/// Automatically initialize logging for all integration test binaries.
+///
+/// This constructor runs once per integration test binary, ensuring logging
+/// is set up before any tests run. The OnceCell guard prevents double initialization.
+#[ctor::ctor]
+fn _auto_init_for_integration_tests() {
+    init();
 }

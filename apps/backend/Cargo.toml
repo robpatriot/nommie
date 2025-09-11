@@ -27,8 +27,9 @@ backend-support = { path = "../../packages/backend-support", optional = true }
 mockstrict-default = ["sea-orm/mock", "dep:backend-support"]
 
 [dev-dependencies]
-tracing-test = "0.2"
+ctor = "0.2"
 serial_test = "3.2.0"
+tracing-test = "0.2"
 backend-support = { path = "../../packages/backend-support" }
 sea-orm = { version = "1.1", features = ["mock"] }
 
