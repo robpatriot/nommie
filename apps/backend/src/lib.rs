@@ -12,6 +12,7 @@ pub mod middleware;
 pub mod routes;
 pub mod services;
 pub mod state;
+pub mod utils;
 
 #[cfg(test)]
 pub mod test_bootstrap;
@@ -48,5 +49,5 @@ pub mod prelude {
 #[cfg(test)]
 #[ctor::ctor]
 fn init_test_logging() {
-    test_bootstrap::logging::init();
+    backend_test_support::test_logging::init();
 }

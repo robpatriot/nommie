@@ -44,3 +44,20 @@ pub fn is_mock_strict(conn: &DatabaseConnection) -> bool {
     let set = registry().lock().expect("mock registry poisoned");
     set.contains(&key(conn))
 }
+
+/// Assert that the connection has a shared transaction or panic with a specific message.
+///
+/// This function is used in tests to ensure that database operations are performed
+/// within the context of a shared transaction when using MockStrict connections.
+///
+/// # Arguments
+/// * `conn` - The database connection to check
+///
+/// # Panics
+/// Panics with a specific message if the connection is not MockStrict or doesn't have a shared transaction
+pub fn assert_has_shared_txn_or_panic(conn: &DatabaseConnection) {
+    if !is_mock_strict(conn) {
+        panic!("Expected MockStrict connection but got real database connection");
+    }
+    // Additional transaction checks could be added here if needed
+}

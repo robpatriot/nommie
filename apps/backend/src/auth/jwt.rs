@@ -79,10 +79,9 @@ pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Cla
 mod tests {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-    use backend_support::unique::{unique_email, unique_str};
-
     use super::{mint_access_token, verify_access_token};
     use crate::state::security_config::SecurityConfig;
+    use crate::utils::unique::{unique_email, unique_str};
     use crate::AppError;
 
     #[test]

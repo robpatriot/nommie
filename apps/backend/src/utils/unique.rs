@@ -15,7 +15,7 @@ use ulid::Ulid;
 ///
 /// # Examples
 /// ```
-/// use backend_support::unique::unique_str;
+/// use crate::utils::unique::unique_str;
 ///
 /// let id1 = unique_str("user");
 /// let id2 = unique_str("user");
@@ -36,7 +36,7 @@ pub fn unique_str(prefix: &str) -> String {
 ///
 /// # Examples
 /// ```
-/// use backend_support::unique::unique_email;
+/// use crate::utils::unique::unique_email;
 ///
 /// let email1 = unique_email("test");
 /// let email2 = unique_email("test");

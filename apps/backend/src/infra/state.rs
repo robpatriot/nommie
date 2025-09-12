@@ -1,6 +1,6 @@
 #[cfg(any(test, feature = "mockstrict-default"))]
 use {
-    backend_support::mock_strict::register_mock_strict_connection,
+    backend_test_support::mock_strict::register_mock_strict_connection,
     sea_orm::{DatabaseBackend, MockDatabase},
     std::sync::atomic::{AtomicUsize, Ordering},
     std::sync::Once,

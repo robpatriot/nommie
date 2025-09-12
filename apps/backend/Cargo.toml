@@ -21,16 +21,16 @@ jsonwebtoken = "9.0"
 time = { version = "0.3", features = ["serde", "macros"] }
 rand = "0.8"
 log = "0.4"
-backend-support = { path = "../../packages/backend-support", optional = true }
+ulid = "1.2.1"
+backend-test-support = { path = "../../packages/backend-test-support", optional = true }
 
 [features]
-mockstrict-default = ["sea-orm/mock", "dep:backend-support"]
+mockstrict-default = ["sea-orm/mock", "dep:backend-test-support"]
 
 [dev-dependencies]
 ctor = "0.2"
 serial_test = "3.2.0"
 tracing-test = "0.2"
-backend-support = { path = "../../packages/backend-support" }
 sea-orm = { version = "1.1", features = ["mock"] }
 
 [[bin]]

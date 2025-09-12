@@ -8,7 +8,7 @@ use backend::auth::jwt::mint_access_token;
 use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
-use backend_support::unique::{unique_email, unique_str};
+use backend::utils::unique::{unique_email, unique_str};
 use common::assert_problem_details_structure;
 use serde_json::Value;
 use support::create_test_app;
