@@ -11,7 +11,6 @@ use time::OffsetDateTime;
 ///
 /// # Returns
 /// The created user model
-#[allow(dead_code)]
 pub async fn seed_user_with_sub(
     db: &DatabaseConnection,
     sub: &str,

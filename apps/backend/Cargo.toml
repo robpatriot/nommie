@@ -22,16 +22,13 @@ time = { version = "0.3", features = ["serde", "macros"] }
 rand = "0.8"
 log = "0.4"
 ulid = "1.2.1"
-backend-test-support = { path = "../../packages/backend-test-support", optional = true }
-
-[features]
-mockstrict-default = ["sea-orm/mock", "dep:backend-test-support"]
 
 [dev-dependencies]
 ctor = "0.2"
 serial_test = "3.2.0"
 tracing-test = "0.2"
 sea-orm = { version = "1.1", features = ["mock"] }
+backend-test-support = { path = "../../packages/backend-test-support" }
 
 [[bin]]
 name = "backend"

@@ -26,14 +26,12 @@ impl TestAppBuilder {
     }
 
     /// Configure the app to use production routes
-    #[allow(dead_code)]
     pub fn with_prod_routes(mut self) -> Self {
         self.route_config = Some(Box::new(routes::configure) as RouteConfigFn);
         self
     }
 
     /// Configure the app with custom routes
-    #[allow(dead_code)]
     pub fn with_routes<F>(mut self, config_fn: F) -> Self
     where
         F: Fn(&mut web::ServiceConfig) + Send + Sync + 'static,

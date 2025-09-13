@@ -6,6 +6,7 @@ use backend::AppError;
 use common::assert_problem_details_structure;
 use serde_json::Value;
 use support::create_test_app;
+use support::state_builder_ext::StateBuilderTestExt;
 
 /// Test endpoint that returns a validation error (400)
 async fn test_validation_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
@@ -57,7 +58,11 @@ async fn test_db_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
 /// This test consolidates all error type testing into a single, parameterized test
 #[actix_web::test]
 async fn test_all_error_responses_conform_to_problem_details() {
-    let state = build_state().build().await.expect("create test state");
+    let state = build_state()
+        .with_mock_db()
+        .build()
+        .await
+        .expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/validation", web::get().to(test_validation_error))
@@ -120,7 +125,11 @@ async fn test_successful_response_with_error_handling() {
         Ok(HttpResponse::Ok().body("Success"))
     }
 
-    let state = build_state().build().await.expect("create test state");
+    let state = build_state()
+        .with_mock_db()
+        .build()
+        .await
+        .expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/success", web::get().to(success_handler));
@@ -159,7 +168,11 @@ async fn test_error_without_trace_id() {
         )))
     }
 
-    let state = build_state().build().await.expect("create test state");
+    let state = build_state()
+        .with_mock_db()
+        .build()
+        .await
+        .expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/no_trace", web::get().to(error_without_trace));
@@ -228,7 +241,11 @@ async fn test_malformed_error_response_handling() {
             .with_trace_id(Some("test-trace".to_string())))
     }
 
-    let state = build_state().build().await.expect("create test state");
+    let state = build_state()
+        .with_mock_db()
+        .build()
+        .await
+        .expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/malformed", web::get().to(malformed_error));
