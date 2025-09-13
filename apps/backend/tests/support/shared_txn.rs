@@ -28,3 +28,14 @@ pub async fn rollback(shared: SharedTxn) -> Result<(), sea_orm::DbErr> {
     })?;
     txn.rollback().await
 }
+
+/// Commit a shared transaction.
+///
+/// Tests own commit - with_txn() must not auto-commit when SharedTxn is present.
+#[allow(dead_code)]
+pub async fn commit(shared: SharedTxn) -> Result<(), sea_orm::DbErr> {
+    let txn = Arc::try_unwrap(shared.0).map_err(|_| {
+        sea_orm::DbErr::Custom("Cannot commit: transaction is still shared".to_string())
+    })?;
+    txn.commit().await
+}

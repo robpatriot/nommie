@@ -10,7 +10,7 @@ use backend::infra::state::build_state;
 
 #[actix_web::test]
 #[should_panic(
-    expected = "MockStrict DB blocked a query because no shared test transaction was provided. Either use .with_db(DbProfile::Test) for a real test DB, or inject a shared transaction into the request extensions (see tests/support/shared_txn.rs"
+    expected = "with_txn cannot run against a MockDatabase. Use .with_db(DbProfile::Test) and a shared test transaction."
 )]
 async fn test_blocks_on_mock_strict_without_shared_txn() {
     // Build state with a real Test DB
