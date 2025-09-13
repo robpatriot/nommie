@@ -5,16 +5,17 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 import nextPlugin from '@next/eslint-plugin-next';
 import globals from 'globals';
-import eslintConfigPrettier from 'eslint-config-prettier/flat'; // 👈 disables ESLint rules that conflict with Prettier
+import eslintConfigPrettier from 'eslint-config-prettier/flat'; // disables ESLint rules that conflict with Prettier
 
 /**
  * Nommie ESLint 9 flat config (Next.js + React + TypeScript)
+ * - Lives in apps/frontend
  * - No compat layers, no .eslintrc*, no .eslintignore.
  * - Restricts linting to TS/TSX files only.
- * - `eslint-config-prettier` last to prevent ESLint/Prettier flip-flop.
+ * - Prettier config last to avoid rule conflicts.
  */
 export default [
-  // 0) Global ignores
+  // 0) Global ignores (frontend context)
   {
     ignores: [
       '**/node_modules/**',
@@ -23,7 +24,6 @@ export default [
       '**/dist/**',
       '**/build/**',
       '**/coverage/**',
-      'apps/backend/**', // Rust backend not linted by ESLint
     ],
   },
 
@@ -41,14 +41,14 @@ export default [
   },
 
   // 3) TypeScript (untyped) recommended (fast, TS/TSX only)
-  ...tseslint.configs.recommended.map(cfg => ({
+  ...tseslint.configs.recommended.map((cfg) => ({
     ...cfg,
     files: ['**/*.ts', '**/*.tsx'],
   })),
 
-  // 4) Next.js + React Hooks (frontend + packages, TS/TSX only)
+  // 4) Next.js + React Hooks (TS/TSX only)
   {
-    files: ['apps/frontend/**/*.{ts,tsx}', 'packages/**/*.{ts,tsx}'],
+    files: ['**/*.{ts,tsx}'],
     plugins: {
       '@next/next': nextPlugin,
       'react-hooks': reactHooks,
@@ -87,11 +87,11 @@ export default [
     rules: { '@typescript-eslint/no-unused-vars': 'off' },
   },
   {
-    files: ['apps/frontend/next-env.d.ts'],
+    files: ['next-env.d.ts'],
     rules: { '@typescript-eslint/triple-slash-reference': 'off' },
   },
   {
-    files: ['apps/frontend/test/**/*.{ts,tsx}'],
+    files: ['test/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
