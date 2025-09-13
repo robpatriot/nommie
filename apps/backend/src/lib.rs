@@ -22,7 +22,7 @@ pub mod test_bootstrap;
 pub use auth::jwt::{mint_access_token, verify_access_token, Claims};
 pub use config::db::{db_url, DbOwner, DbProfile};
 pub use db::txn::{with_txn, SharedTxn};
-pub use db::txn_policy::{current, set_txn_policy, TxnPolicy};
+pub use db::txn_policy::{set_txn_policy, TxnPolicy};
 pub use error::AppError;
 pub use extractors::auth_token::AuthToken;
 pub use extractors::current_user::{BackendClaims, CurrentUser};

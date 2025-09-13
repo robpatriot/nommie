@@ -1,7 +1,7 @@
-/// Tests for SharedTxn reuse behavior
-///
-/// These tests verify that SharedTxn bypasses the transaction policy
-/// and that with_txn does not perform commit/rollback operations.
+//! Tests for SharedTxn reuse behavior
+//!
+//! These tests verify that SharedTxn bypasses the transaction policy
+//! and that with_txn does not perform commit/rollback operations.
 #[path = "support/shared_txn.rs"]
 mod shared_txn;
 

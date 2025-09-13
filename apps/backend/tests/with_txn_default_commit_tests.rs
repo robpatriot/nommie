@@ -1,7 +1,7 @@
-/// Tests for default commit behavior (no test_init.rs included)
-///
-/// These tests run without the test_init.rs module, so they should use the default
-/// CommitOnOk policy and persist writes to the database.
+//! Tests for default commit behavior (no test_init.rs included)
+//!
+//! These tests run without the test_init.rs module, so they should use the default
+//! CommitOnOk policy and persist writes to the database.
 use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, TxnPolicy};

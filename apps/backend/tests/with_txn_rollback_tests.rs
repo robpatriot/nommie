@@ -1,7 +1,7 @@
-/// Tests for rollback policy behavior (includes test_init.rs)
-///
-/// This module includes the test_init.rs module, so it should use the
-/// RollbackOnOk policy and not persist writes to the database.
+//! Tests for rollback policy behavior (includes test_init.rs)
+//!
+//! This module includes the test_init.rs module, so it should use the
+//! RollbackOnOk policy and not persist writes to the database.
 #[path = "support/test_init.rs"]
 mod test_init;
 
