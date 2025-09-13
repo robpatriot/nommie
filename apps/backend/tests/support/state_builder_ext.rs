@@ -23,7 +23,7 @@ impl StateBuilderTestExt for StateBuilder {
         let mock_db = MockDatabase::new(DatabaseBackend::Postgres);
         let conn = mock_db.into_connection();
         register_mock_strict_connection(&conn);
-        self.with_existing_db(conn)
+        self.with_existing_db(conn).assume_schema_ready()
     }
 
     fn with_mock_db_with_results<F>(self, setup_fn: F) -> Self
@@ -34,6 +34,6 @@ impl StateBuilderTestExt for StateBuilder {
         setup_fn(&mut mock_db);
         let conn = mock_db.into_connection();
         register_mock_strict_connection(&conn);
-        self.with_existing_db(conn)
+        self.with_existing_db(conn).assume_schema_ready()
     }
 }
