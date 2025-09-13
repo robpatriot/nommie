@@ -21,7 +21,6 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <Suspense fallback={null}>
-          {/* @ts-expect-error Async Server Component */}
           <Header />
         </Suspense>
         {children}

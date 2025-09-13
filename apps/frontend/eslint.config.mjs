@@ -1,21 +1,15 @@
-// @ts-check
-import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
-import reactPlugin from 'eslint-plugin-react';
-import reactHooks from 'eslint-plugin-react-hooks';
-import nextPlugin from '@next/eslint-plugin-next';
-import globals from 'globals';
-import eslintConfigPrettier from 'eslint-config-prettier/flat'; // disables ESLint rules that conflict with Prettier
+// apps/frontend/eslint.config.mjs
+// Flat ESLint config for the Next.js frontend (minimal + official Next presets)
 
-/**
- * Nommie ESLint 9 flat config (Next.js + React + TypeScript)
- * - Lives in apps/frontend
- * - No compat layers, no .eslintrc*, no .eslintignore.
- * - Restricts linting to TS/TSX files only.
- * - Prettier config last to avoid rule conflicts.
- */
+import { FlatCompat } from '@eslint/eslintrc'
+import eslintConfigPrettier from 'eslint-config-prettier/flat'
+
+const compat = new FlatCompat({
+  baseDirectory: import.meta.dirname,
+})
+
 export default [
-  // 0) Global ignores (frontend context)
+  // Ignore typical build/output dirs
   {
     ignores: [
       '**/node_modules/**',
@@ -27,78 +21,39 @@ export default [
     ],
   },
 
-  // 1) Base JS recommended (TS/TSX only)
-  {
-    files: ['**/*.ts', '**/*.tsx'],
-    ...eslint.configs.recommended,
-  },
-
-  // 2) React (flat) + JSX runtime (TSX only)
-  {
-    files: ['**/*.tsx'],
-    ...reactPlugin.configs.flat.recommended,
-    ...reactPlugin.configs.flat['jsx-runtime'],
-  },
-
-  // 3) TypeScript (untyped) recommended (fast, TS/TSX only)
-  ...tseslint.configs.recommended.map((cfg) => ({
-    ...cfg,
-    files: ['**/*.ts', '**/*.tsx'],
-  })),
-
-  // 4) Next.js + React Hooks (TS/TSX only)
-  {
-    files: ['**/*.{ts,tsx}'],
-    plugins: {
-      '@next/next': nextPlugin,
-      'react-hooks': reactHooks,
+  // ✅ This is what Next.js looks for — enables Next's rules (incl. core-web-vitals) + TypeScript support
+  ...compat.config({
+    extends: ['next/core-web-vitals', 'next/typescript'],
+    settings: {
+      // Helpful in monorepos if the Next app isn't at repo root
+      next: { rootDir: '.' },
     },
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-    },
-    rules: {
-      ...nextPlugin.configs.recommended.rules,
-      ...(nextPlugin.configs['core-web-vitals']?.rules ?? {}),
-      ...reactHooks.configs.recommended.rules,
-    },
-  },
+  }),
 
-  // 5) (Optional) Typed rules — enable after base passes cleanly
-  // {
-  //   files: ['**/*.ts', '**/*.tsx'],
-  //   ...tseslint.configs.recommendedTypeChecked,
-  //   ...tseslint.configs.stylisticTypeChecked,
-  //   languageOptions: {
-  //     parserOptions: {
-  //       project: true,
-  //       tsconfigRootDir: import.meta.dirname,
-  //     },
-  //   },
-  // },
-
-  // 6) Focused overrides for specific file types
+  // Local, focused overrides
   {
     files: ['**/*.d.ts'],
-    rules: { '@typescript-eslint/no-unused-vars': 'off' },
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
   },
   {
     files: ['next-env.d.ts'],
-    rules: { '@typescript-eslint/triple-slash-reference': 'off' },
+    rules: {
+      '@typescript-eslint/triple-slash-reference': 'off',
+    },
   },
   {
     files: ['test/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
   },
 
-  // 7) Prettier — must be last
+  // Keep Prettier last to disable conflicting rules
   eslintConfigPrettier,
-];
-
+]

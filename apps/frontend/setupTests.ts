@@ -1,5 +1,5 @@
-import '@testing-library/jest-dom/vitest'
-import { vi } from 'vitest'
+//import '@testing-library/jest-dom/vitest'
+import { beforeAll, afterAll, afterEach, vi } from 'vitest'
 
 // Import mocks to register them globally
 import './test/mocks/next-auth'
