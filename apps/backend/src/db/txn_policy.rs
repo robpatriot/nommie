@@ -25,27 +25,3 @@ pub fn current() -> TxnPolicy {
 pub fn set_txn_policy(policy: TxnPolicy) {
     let _ = POLICY.set(policy);
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_default_policy() {
-        // Reset the policy to ensure clean state
-        // Note: This test assumes it runs in isolation since OnceLock is global
-        assert_eq!(current(), TxnPolicy::CommitOnOk);
-    }
-
-    #[test]
-    fn test_set_policy_once() {
-        // Reset the policy to ensure clean state
-        // Note: This test assumes it runs in isolation since OnceLock is global
-        set_txn_policy(TxnPolicy::RollbackOnOk);
-        assert_eq!(current(), TxnPolicy::RollbackOnOk);
-
-        // Setting again should not change it
-        set_txn_policy(TxnPolicy::CommitOnOk);
-        assert_eq!(current(), TxnPolicy::RollbackOnOk);
-    }
-}

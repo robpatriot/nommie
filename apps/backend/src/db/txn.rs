@@ -9,7 +9,7 @@ use crate::infra::mock_strict;
 use crate::state::app_state::AppState;
 
 /// Error message for when MockStrict DB blocks a query because no shared test transaction was provided
-pub const ERR_MOCK_STRICT_NO_SHARED_TXN: &str = "with_txn cannot run against a MockDatabase. Use .with_db(DbProfile::Test) and a shared test transaction.";
+pub const ERR_MOCK_STRICT_NO_SHARED_TXN: &str = "with_txn cannot run against a MockDatabase. Use .with_db(DbProfile::Test) or inject a shared test transaction.";
 
 /// A shared transaction wrapper that can be injected into request extensions
 #[derive(Clone)]

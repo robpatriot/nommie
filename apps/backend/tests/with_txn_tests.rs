@@ -10,7 +10,7 @@ use backend::infra::state::build_state;
 
 #[actix_web::test]
 #[should_panic(
-    expected = "with_txn cannot run against a MockDatabase. Use .with_db(DbProfile::Test) and a shared test transaction."
+    expected = "with_txn cannot run against a MockDatabase. Use .with_db(DbProfile::Test) or inject a shared test transaction."
 )]
 async fn test_blocks_on_mock_strict_without_shared_txn() {
     // Build state with a real Test DB
