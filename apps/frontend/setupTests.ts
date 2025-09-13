@@ -1,4 +1,5 @@
-//import '@testing-library/jest-dom/vitest'
+import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
 import { beforeAll, afterAll, afterEach, vi } from 'vitest'
 
 // Import mocks to register them globally
@@ -14,6 +15,7 @@ beforeAll(() => {
 })
 
 afterEach(() => {
+  cleanup()
   // Reset MSW handlers to clean slate
   server.resetHandlers()
   // Clean up Vitest mocks
