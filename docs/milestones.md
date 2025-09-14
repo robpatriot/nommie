@@ -1,6 +1,4 @@
-# 🗺️ Nommie — Ordered Milestones Roadmap (Verbose)
-
-_Last updated: 2025-09-04_
+# 🗺️ Nommie — Ordered Milestones Roadmap
 
 ---
 
@@ -207,3 +205,17 @@ _Last updated: 2025-09-04_
 - **Dependencies:** B, P, Q.
 - **Details:** Minimal prod-like deployment (Compose or k3d). Includes FE, BE, DB, observability stubs.
 - **Acceptance:** App boots in a minimal production-style environment.
+
+### 🅅 Race-safe `ensure_user` hardening *(M)*
+- **Details:** Handle unique-violation on insert by re-fetching; avoid duplicate users under concurrency.
+- **Acceptance:** Concurrent first-login attempts never produce duplicate users or credentials.
+
+### 🅆 Behavioral Improvements *(S → M)*
+- **Email normalization**: normalize/truncate emails (trim + lowercase + Unicode NFKC).  
+- **Email validation**: reject invalid addresses with `422 INVALID_EMAIL`.  
+- **Username hygiene**: enforce min length/cleaning; store NULL if no valid username.  
+- **Last-login updates**: avoid unnecessary writes if nothing changes.  
+- **Error code catalog**: centralize SCREAMING_SNAKE codes in one module.  
+- **PII-safe logging**: mask/hash email and google_sub in logs.  
+- **Time provider abstraction**: trait-based clock injection for deterministic tests.  
+- **Rate limiting**: middleware/gateway rate-limits on auth endpoint, with `429 RATE_LIMITED`.  
