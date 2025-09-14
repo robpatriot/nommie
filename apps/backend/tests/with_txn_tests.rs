@@ -30,7 +30,7 @@ async fn test_blocks_on_mock_strict_without_shared_txn() {
 
     // Execute the code path that should panic, and assert the panic payload matches our constant
     let result = AssertUnwindSafe(async {
-        let _ = with_txn(Some(&req), &state, |_txn| async { Ok(()) }).await;
+        let _ = with_txn(Some(&req), &state, |_txn| Box::pin(async { Ok(()) })).await;
     })
     .catch_unwind()
     .await;
@@ -66,8 +66,8 @@ async fn test_allows_with_shared_txn_on_mock_strict_no_auto_commit(
     shared_txn::inject(&mut req, &shared);
 
     // Call with_txn and assert it returns Ok(123)
-    let result = with_txn(Some(&req), &state, |_txn| async {
-        Ok::<_, backend::error::AppError>(123)
+    let result = with_txn(Some(&req), &state, |_txn| {
+        Box::pin(async { Ok::<_, backend::error::AppError>(123) })
     })
     .await?;
 
@@ -89,8 +89,8 @@ async fn test_allows_auto_commit_on_real_db_without_shared_txn(
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Call with_txn with None for request and assert it returns Ok("ok")
-    let result = with_txn(None, &state, |_txn| async {
-        Ok::<_, backend::error::AppError>("ok")
+    let result = with_txn(None, &state, |_txn| {
+        Box::pin(async { Ok::<_, backend::error::AppError>("ok") })
     })
     .await?;
 

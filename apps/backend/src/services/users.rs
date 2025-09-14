@@ -1,6 +1,5 @@
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, NotSet, QueryFilter, Set,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, NotSet, QueryFilter, Set,
 };
 use users::Model as User;
 
@@ -12,21 +11,15 @@ use crate::error::AppError;
 /// will return the same user without creating duplicates.
 /// Returns a tuple of (User, email) where email is guaranteed to match the input.
 pub async fn ensure_user(
-    email: &str,
-    name: Option<&str>,
-    google_sub: &str,
-    db: &DatabaseConnection,
+    email: String,
+    name: Option<String>,
+    google_sub: String,
+    conn: &(impl ConnectionTrait + Send),
 ) -> Result<(User, String), AppError> {
-    // Start a transaction to ensure data consistency
-    let txn = db
-        .begin()
-        .await
-        .map_err(|e| AppError::db(format!("Failed to begin transaction: {e}")))?;
-
     // Look up existing user credentials by email
     let existing_credential = user_credentials::Entity::find()
-        .filter(user_credentials::Column::Email.eq(email))
-        .one(&txn)
+        .filter(user_credentials::Column::Email.eq(&email))
+        .one(conn)
         .await
         .map_err(|e| AppError::db(format!("Failed to query user credentials: {e}")))?;
 
@@ -39,42 +32,39 @@ pub async fn ensure_user(
 
             // Only update google_sub if it's currently NULL
             if credential.google_sub.is_none() {
-                credential_active.google_sub = Set(Some(google_sub.to_string()));
+                credential_active.google_sub = Set(Some(google_sub.clone()));
             }
 
             credential_active.updated_at = Set(get_current_time());
 
             credential_active
-                .update(&txn)
+                .update(conn)
                 .await
                 .map_err(|e| AppError::db(format!("Failed to update user credentials: {e}")))?;
 
             // Fetch and return the linked user
             let user = users::Entity::find_by_id(user_id)
-                .one(&txn)
+                .one(conn)
                 .await
                 .map_err(|e| AppError::db(format!("Failed to fetch user: {e}")))?
                 .ok_or_else(|| {
                     AppError::internal("User not found after updating credentials".to_string())
                 })?;
 
-            txn.commit()
-                .await
-                .map_err(|e| AppError::db(format!("Failed to commit transaction: {e}")))?;
-
-            Ok((user, email.to_string()))
+            Ok((user, email))
         }
         None => {
             // User doesn't exist, create new user and credentials
             let now = get_current_time();
 
             // Derive username from name or email local-part
-            let username = derive_username(name, email);
+            let username = derive_username(name.as_deref(), &email);
 
             // Create new user with auto-generated ID and sub from google_sub
+            let sub_for_user = google_sub.clone(); // clone once; original is used for credentials below
             let user_active = users::ActiveModel {
-                id: NotSet,                       // Let database auto-generate
-                sub: Set(google_sub.to_string()), // Use google_sub as the external identifier
+                id: NotSet,             // Let database auto-generate
+                sub: Set(sub_for_user), // Use google_sub as the external identifier
                 username: Set(username),
                 is_ai: Set(false),
                 created_at: Set(now),
@@ -82,7 +72,7 @@ pub async fn ensure_user(
             };
 
             let user = user_active
-                .insert(&txn)
+                .insert(conn)
                 .await
                 .map_err(|e| AppError::db(format!("Failed to create user: {e}")))?;
 
@@ -91,23 +81,19 @@ pub async fn ensure_user(
                 id: NotSet,            // Let database auto-generate
                 user_id: Set(user.id), // Use the ID from the created user
                 password_hash: Set(None),
-                email: Set(email.to_string()),
-                google_sub: Set(Some(google_sub.to_string())),
+                email: Set(email.clone()),
+                google_sub: Set(Some(google_sub)), // original moved here
                 last_login: Set(Some(now)),
                 created_at: Set(now),
                 updated_at: Set(now),
             };
 
             credential_active
-                .insert(&txn)
+                .insert(conn)
                 .await
                 .map_err(|e| AppError::db(format!("Failed to create user credentials: {e}")))?;
 
-            txn.commit()
-                .await
-                .map_err(|e| AppError::db(format!("Failed to commit transaction: {e}")))?;
-
-            Ok((user, email.to_string()))
+            Ok((user, email))
         }
     }
 }

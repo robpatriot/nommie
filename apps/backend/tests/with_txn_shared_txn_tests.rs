@@ -23,8 +23,8 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
     shared_txn::inject(&mut req, &shared);
 
     // Write via with_txn using the shared transaction
-    let result = with_txn(Some(&req), &state, |_txn| async {
-        Ok::<_, backend::error::AppError>("success")
+    let result = with_txn(Some(&req), &state, |_txn| {
+        Box::pin(async { Ok::<_, backend::error::AppError>("success") })
     })
     .await?;
 
@@ -53,8 +53,8 @@ async fn test_shared_txn_reuse_commit_behavior() -> Result<(), Box<dyn std::erro
     shared_txn::inject(&mut req, &shared);
 
     // Write via with_txn using the shared transaction
-    let result = with_txn(Some(&req), &state, |_txn| async {
-        Ok::<_, backend::error::AppError>("success")
+    let result = with_txn(Some(&req), &state, |_txn| {
+        Box::pin(async { Ok::<_, backend::error::AppError>("success") })
     })
     .await?;
 

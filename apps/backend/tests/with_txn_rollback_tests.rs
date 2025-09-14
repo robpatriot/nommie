@@ -19,8 +19,8 @@ async fn test_rollback_policy() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Test that with_txn works with rollback policy
-    let result = with_txn(None, &state, |_txn| async {
-        Ok::<_, backend::error::AppError>("success")
+    let result = with_txn(None, &state, |_txn| {
+        Box::pin(async { Ok::<_, backend::error::AppError>("success") })
     })
     .await?;
 
@@ -39,10 +39,12 @@ async fn test_rollback_policy_on_error() -> Result<(), Box<dyn std::error::Error
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Test that with_txn handles errors correctly with rollback policy
-    let result = with_txn(None, &state, |_txn| async {
-        Err::<String, _>(backend::error::AppError::Internal {
-            detail: "test error".to_string(),
-            trace_id: None,
+    let result = with_txn(None, &state, |_txn| {
+        Box::pin(async {
+            Err::<String, _>(backend::error::AppError::Internal {
+                detail: "test error".to_string(),
+                trace_id: None,
+            })
         })
     })
     .await;

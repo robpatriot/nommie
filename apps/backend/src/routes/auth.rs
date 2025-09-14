@@ -4,6 +4,7 @@ use actix_web::{web, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::jwt::mint_access_token;
+use crate::db::txn::with_txn;
 use crate::error::AppError;
 use crate::services::users::ensure_user;
 use crate::state::app_state::AppState;
@@ -43,9 +44,17 @@ async fn login(
         ));
     }
 
-    let db = &app_state.db;
+    // Prepare owned values to move into the txn closure
+    let email = req.email.clone();
+    let name = req.name.clone();
+    let google_sub = req.google_sub.clone();
 
-    let (user, email) = ensure_user(&req.email, req.name.as_deref(), &req.google_sub, db).await?;
+    // Own the transaction boundary here and pass a borrowed txn to the service
+    let (user, email) = with_txn(None, &app_state, |txn| {
+        // Box the async block so its lifetime is tied to `txn` (no 'static)
+        Box::pin(async move { ensure_user(email, name, google_sub, txn).await })
+    })
+    .await?;
 
     let token = mint_access_token(&user.sub, &email, SystemTime::now(), &app_state.security)?;
 

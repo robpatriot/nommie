@@ -16,8 +16,8 @@ async fn test_default_commit_policy() -> Result<(), Box<dyn std::error::Error>> 
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Test that with_txn works with default commit policy
-    let result = with_txn(None, &state, |_txn| async {
-        Ok::<_, backend::error::AppError>("success")
+    let result = with_txn(None, &state, |_txn| {
+        Box::pin(async { Ok::<_, backend::error::AppError>("success") })
     })
     .await?;
 
@@ -36,10 +36,12 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Test that with_txn handles errors correctly with default commit policy
-    let result = with_txn(None, &state, |_txn| async {
-        Err::<String, _>(backend::error::AppError::Internal {
-            detail: "test error".to_string(),
-            trace_id: None,
+    let result = with_txn(None, &state, |_txn| {
+        Box::pin(async {
+            Err::<String, _>(backend::error::AppError::Internal {
+                detail: "test error".to_string(),
+                trace_id: None,
+            })
         })
     })
     .await;

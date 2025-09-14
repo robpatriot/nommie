@@ -1,3 +1,5 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use actix_web::{HttpMessage, HttpRequest};
@@ -26,14 +28,18 @@ impl SharedTxn {
 // 1) If a SharedTxn is present in req.extensions(), reuse it (no commit/rollback here).
 // 2) If MockStrict DB and no SharedTxn, panic with guidance.
 // 3) Otherwise (real DB), open transaction and apply current txn_policy on Ok; rollback on Err.
-pub async fn with_txn<R, F, Fut>(
+pub async fn with_txn<R, F>(
     req: Option<&HttpRequest>,
     state: &AppState,
     f: F,
 ) -> Result<R, AppError>
 where
-    F: FnOnce(&DatabaseTransaction) -> Fut,
-    Fut: std::future::Future<Output = Result<R, AppError>>,
+    // The closure takes a borrowed transaction and returns a boxed future
+    // whose lifetime is tied to that borrow (no 'static requirements).
+    F: for<'a> FnOnce(
+            &'a DatabaseTransaction,
+        ) -> Pin<Box<dyn Future<Output = Result<R, AppError>> + Send + 'a>>
+        + Send,
 {
     // Extract any SharedTxn out of request extensions *before* awaiting to avoid holding a RefCell borrow.
     let shared_txn: Option<SharedTxn> = if let Some(r) = req {
@@ -43,6 +49,7 @@ where
     };
 
     if let Some(shared) = shared_txn {
+        // Use the provided shared transaction; no commit/rollback here.
         return f(shared.transaction()).await;
     }
 
