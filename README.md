@@ -124,6 +124,23 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 
 ---
 
+## Auth Policy (Google OAuth)
+
+- Each `user_credentials.email` is unique and links to at most one Google account.
+- On login:
+  - If `google_sub` is NULL, we set it to the incoming Google sub.
+  - If `google_sub` is already set and equals the incoming sub, login succeeds and updates `last_login`.
+  - If `google_sub` is already set and **differs** from the incoming sub, the request fails with:
+    - **HTTP 409 CONFLICT**
+    - Problem Details `code=GOOGLE_SUB_MISMATCH`
+- We never silently overwrite `google_sub`. This prevents unintended or malicious account re-linking.
+- Logging:
+  - INFO on first creation and when setting `google_sub` from NULL.
+  - DEBUG on repeat logins.
+  - WARN on mismatch.
+
+---
+
 ## 🏗️ Architecture
 - **Frontend:** Next.js (App Router) + Tailwind CSS, NextAuth v5 (Google login)  
 - **Backend:** Rust (Actix Web) + SeaORM 1.1.x, JWT validation  
