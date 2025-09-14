@@ -9,13 +9,13 @@ use crate::error::AppError;
 /// Ensures a user exists for Google OAuth, creating one if necessary.
 /// This function is idempotent - calling it multiple times with the same email
 /// will return the same user without creating duplicates.
-/// Returns a tuple of (User, email) where email is guaranteed to match the input.
+/// Returns the User that was found or created.
 pub async fn ensure_user(
     email: String,
     name: Option<String>,
     google_sub: String,
     conn: &(impl ConnectionTrait + Send),
-) -> Result<(User, String), AppError> {
+) -> Result<User, AppError> {
     // Look up existing user credentials by email
     let existing_credential = user_credentials::Entity::find()
         .filter(user_credentials::Column::Email.eq(&email))
@@ -51,7 +51,7 @@ pub async fn ensure_user(
                     AppError::internal("User not found after updating credentials".to_string())
                 })?;
 
-            Ok((user, email))
+            Ok(user)
         }
         None => {
             // User doesn't exist, create new user and credentials
@@ -93,7 +93,7 @@ pub async fn ensure_user(
                 .await
                 .map_err(|e| AppError::db(format!("Failed to create user credentials: {e}")))?;
 
-            Ok((user, email))
+            Ok(user)
         }
     }
 }

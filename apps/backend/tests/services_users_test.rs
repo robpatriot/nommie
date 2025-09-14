@@ -16,7 +16,7 @@ async fn test_ensure_user_inserts_then_reuses() {
     // First call - should create a new user
     let test_email = unique_email("alice");
     let test_google_sub = unique_str("google-sub");
-    let (user1, email1) = ensure_user(
+    let user1 = ensure_user(
         test_email.clone(),
         Some("Alice".to_string()),
         test_google_sub.clone(),
@@ -29,11 +29,10 @@ async fn test_ensure_user_inserts_then_reuses() {
     assert_eq!(user1.username, Some("Alice".to_string()));
     assert!(!user1.is_ai);
     assert!(user1.id > 0); // ID should be a positive number
-    assert_eq!(email1, test_email);
 
     // Second call with same email but different name - should return same user
     let different_google_sub = unique_str("google-sub");
-    let (user2, _email2) = ensure_user(
+    let user2 = ensure_user(
         test_email.clone(),
         Some("Alice Smith".to_string()), // Different name
         different_google_sub.clone(),    // Different google_sub

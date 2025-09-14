@@ -50,13 +50,18 @@ async fn login(
     let google_sub = req.google_sub.clone();
 
     // Own the transaction boundary here and pass a borrowed txn to the service
-    let (user, email) = with_txn(None, &app_state, |txn| {
+    let user = with_txn(None, &app_state, |txn| {
         // Box the async block so its lifetime is tied to `txn` (no 'static)
         Box::pin(async move { ensure_user(email, name, google_sub, txn).await })
     })
     .await?;
 
-    let token = mint_access_token(&user.sub, &email, SystemTime::now(), &app_state.security)?;
+    let token = mint_access_token(
+        &user.sub,
+        &req.email,
+        SystemTime::now(),
+        &app_state.security,
+    )?;
 
     let response = LoginResponse { token };
     Ok(HttpResponse::Ok().json(response))
