@@ -29,6 +29,7 @@ serial_test = "3.2.0"
 tracing-test = "0.2"
 sea-orm = { version = "1.1", features = ["mock"] }
 backend-test-support = { path = "../../packages/backend-test-support" }
+futures-util = "0.3"
 
 [[bin]]
 name = "backend"

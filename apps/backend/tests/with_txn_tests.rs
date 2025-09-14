@@ -3,15 +3,15 @@ mod mock_strict;
 #[path = "support/shared_txn.rs"]
 mod shared_txn;
 
+use std::panic::AssertUnwindSafe;
+
 use actix_web::test;
 use backend::config::db::DbProfile;
-use backend::db::txn::with_txn;
+use backend::db::txn::{with_txn, ERR_MOCK_STRICT_NO_SHARED_TXN};
 use backend::infra::state::build_state;
+use futures_util::FutureExt; // for .catch_unwind()
 
 #[actix_web::test]
-#[should_panic(
-    expected = "with_txn cannot run against a MockDatabase. Use .with_db(DbProfile::Test) or inject a shared test transaction."
-)]
 async fn test_blocks_on_mock_strict_without_shared_txn() {
     // Build state with a real Test DB
     let state = build_state()
@@ -28,8 +28,25 @@ async fn test_blocks_on_mock_strict_without_shared_txn() {
     // Create an HttpRequest without injecting a shared txn
     let req = test::TestRequest::default().to_http_request();
 
-    // Call with_txn and assert it panics with the exact message
-    let _ = with_txn(Some(&req), &state, |_txn| async { Ok(()) }).await;
+    // Execute the code path that should panic, and assert the panic payload matches our constant
+    let result = AssertUnwindSafe(async {
+        let _ = with_txn(Some(&req), &state, |_txn| async { Ok(()) }).await;
+    })
+    .catch_unwind()
+    .await;
+
+    match result {
+        Ok(_) => panic!("expected panic, but future completed successfully"),
+        Err(payload) => {
+            // Try &str first, then String
+            let msg = payload
+                .downcast_ref::<&str>()
+                .copied()
+                .or_else(|| payload.downcast_ref::<String>().map(|s| s.as_str()))
+                .unwrap_or("<unknown panic payload>");
+            assert_eq!(msg, ERR_MOCK_STRICT_NO_SHARED_TXN);
+        }
+    }
 }
 
 #[actix_web::test]

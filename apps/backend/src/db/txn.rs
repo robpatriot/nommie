@@ -9,7 +9,7 @@ use crate::infra::mock_strict;
 use crate::state::app_state::AppState;
 
 /// Error message for when MockStrict DB blocks a query because no shared test transaction was provided
-pub const ERR_MOCK_STRICT_NO_SHARED_TXN: &str = "with_txn cannot run against a MockDatabase. Use .with_db(DbProfile::Test) or inject a shared test transaction.";
+pub const ERR_MOCK_STRICT_NO_SHARED_TXN: &str = "MockStrict DB blocked a query because no shared test transaction was provided. Either use .with_db(DbProfile::Test) for a real test DB, or inject a shared transaction into the request extensions (see tests/support/shared_txn.rs).";
 
 /// A shared transaction wrapper that can be injected into request extensions
 #[derive(Clone)]
@@ -22,11 +22,10 @@ impl SharedTxn {
     }
 }
 
-/// Execute a function within a database transaction
-///
-/// 1) If a SharedTxn is in request extensions → use it (no commit/rollback here)
-/// 2) If using MockStrict DB without a SharedTxn → panic with guidance
-/// 3) Otherwise (real DB) → begin txn, run closure, apply policy on Ok / rollback on Err
+// Precedence:
+// 1) If a SharedTxn is present in req.extensions(), reuse it (no commit/rollback here).
+// 2) If MockStrict DB and no SharedTxn, panic with guidance.
+// 3) Otherwise (real DB), open transaction and apply current txn_policy on Ok; rollback on Err.
 pub async fn with_txn<R, F, Fut>(
     req: Option<&HttpRequest>,
     state: &AppState,
