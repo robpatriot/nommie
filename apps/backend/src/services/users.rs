@@ -25,6 +25,16 @@ pub async fn ensure_user(
 
     match existing_credential {
         Some(credential) => {
+            // User exists, check for google_sub mismatch
+            if let Some(existing_google_sub) = &credential.google_sub {
+                if existing_google_sub != &google_sub {
+                    return Err(AppError::conflict(
+                        "GOOGLE_SUB_MISMATCH",
+                        "This email is already linked to a different Google account. Please use the original Google account or contact support.".to_string(),
+                    ));
+                }
+            }
+
             // User exists, update last_login and google_sub if needed
             let user_id = credential.user_id;
             let mut credential_active: user_credentials::ActiveModel = credential.clone().into();

@@ -59,7 +59,7 @@ async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::
     let login_data_2 = json!({
         "email": test_email,
         "name": "Updated Name", // Different name shouldn't matter
-        "google_sub": unique_str("google") // Different google_sub shouldn't matter
+        "google_sub": test_google_sub // Same google_sub required
     });
 
     let req2 = test::TestRequest::post()

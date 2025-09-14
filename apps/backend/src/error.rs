@@ -63,6 +63,12 @@ pub enum AppError {
         detail: String,
         trace_id: Option<String>,
     },
+    #[error("Conflict: {detail}")]
+    Conflict {
+        code: &'static str,
+        detail: String,
+        trace_id: Option<String>,
+    },
 }
 
 impl AppError {
@@ -88,6 +94,7 @@ impl AppError {
             AppError::BadRequest { trace_id, .. } => trace_id.clone(),
             AppError::Internal { trace_id, .. } => trace_id.clone(),
             AppError::Config { trace_id, .. } => trace_id.clone(),
+            AppError::Conflict { trace_id, .. } => trace_id.clone(),
         }
     }
 
@@ -106,6 +113,7 @@ impl AppError {
             AppError::BadRequest { code, .. } => code.to_string(),
             AppError::Internal { .. } => "INTERNAL".to_string(),
             AppError::Config { .. } => "CONFIG_ERROR".to_string(),
+            AppError::Conflict { code, .. } => code.to_string(),
         }
     }
 
@@ -126,6 +134,7 @@ impl AppError {
             AppError::BadRequest { detail, .. } => detail.clone(),
             AppError::Internal { detail, .. } => detail.clone(),
             AppError::Config { detail, .. } => detail.clone(),
+            AppError::Conflict { detail, .. } => detail.clone(),
         }
     }
 
@@ -144,6 +153,7 @@ impl AppError {
             AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::Conflict { .. } => StatusCode::CONFLICT,
         }
     }
 
@@ -217,6 +227,14 @@ impl AppError {
         }
     }
 
+    pub fn conflict(code: &'static str, detail: String) -> Self {
+        Self::Conflict {
+            code,
+            detail,
+            trace_id: None,
+        }
+    }
+
     pub fn with_trace_id(self, trace_id: Option<String>) -> Self {
         match self {
             AppError::Validation {
@@ -255,6 +273,11 @@ impl AppError {
             },
             AppError::Internal { detail, .. } => AppError::Internal { detail, trace_id },
             AppError::Config { detail, .. } => AppError::Config { detail, trace_id },
+            AppError::Conflict { code, detail, .. } => AppError::Conflict {
+                code,
+                detail,
+                trace_id,
+            },
         }
     }
 
