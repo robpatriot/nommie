@@ -1,10 +1,21 @@
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, NotSet, QueryFilter, Set,
 };
+use tracing::{debug, info, warn};
 use users::Model as User;
 
 use crate::entities::{user_credentials, users};
 use crate::error::AppError;
+
+/// Redacts a google_sub value for logging purposes.
+/// Shows only the first 4 characters followed by asterisks.
+fn redact_google_sub(google_sub: &str) -> String {
+    if google_sub.len() <= 4 {
+        "*".repeat(google_sub.len())
+    } else {
+        format!("{}***", &google_sub[..4])
+    }
+}
 
 /// Ensures a user exists for Google OAuth, creating one if necessary.
 /// This function is idempotent - calling it multiple times with the same email
@@ -28,6 +39,13 @@ pub async fn ensure_user(
             // User exists, check for google_sub mismatch
             if let Some(existing_google_sub) = &credential.google_sub {
                 if existing_google_sub != &google_sub {
+                    warn!(
+                        user_id = credential.user_id,
+                        email = %email,
+                        incoming_google_sub = %redact_google_sub(&google_sub),
+                        existing_google_sub = %redact_google_sub(existing_google_sub),
+                        "Google sub mismatch detected"
+                    );
                     return Err(AppError::conflict(
                         "GOOGLE_SUB_MISMATCH",
                         "This email is already linked to a different Google account. Please use the original Google account or contact support.".to_string(),
@@ -42,6 +60,12 @@ pub async fn ensure_user(
 
             // Only update google_sub if it's currently NULL
             if credential.google_sub.is_none() {
+                info!(
+                    user_id = user_id,
+                    email = %email,
+                    google_sub = %redact_google_sub(&google_sub),
+                    "Setting google_sub for existing user (was previously NULL)"
+                );
                 credential_active.google_sub = Set(Some(google_sub.clone()));
             }
 
@@ -60,6 +84,13 @@ pub async fn ensure_user(
                 .ok_or_else(|| {
                     AppError::internal("User not found after updating credentials".to_string())
                 })?;
+
+            // Log repeat login (same email + same google_sub)
+            debug!(
+                user_id = user_id,
+                email = %email,
+                "Repeat login for existing user"
+            );
 
             Ok(user)
         }
@@ -92,7 +123,7 @@ pub async fn ensure_user(
                 user_id: Set(user.id), // Use the ID from the created user
                 password_hash: Set(None),
                 email: Set(email.clone()),
-                google_sub: Set(Some(google_sub)), // original moved here
+                google_sub: Set(Some(google_sub.clone())), // clone here to keep original for logging
                 last_login: Set(Some(now)),
                 created_at: Set(now),
                 updated_at: Set(now),
@@ -102,6 +133,14 @@ pub async fn ensure_user(
                 .insert(conn)
                 .await
                 .map_err(|e| AppError::db(format!("Failed to create user credentials: {e}")))?;
+
+            // Log first user creation
+            info!(
+                user_id = user.id,
+                email = %email,
+                google_sub = %redact_google_sub(&google_sub),
+                "First user creation"
+            );
 
             Ok(user)
         }
