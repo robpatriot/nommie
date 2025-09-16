@@ -13,8 +13,6 @@ pub mod services;
 pub mod state;
 pub mod utils;
 
-#[cfg(test)]
-pub mod test_bootstrap;
 
 // Re-exports for public API
 pub use auth::jwt::{mint_access_token, verify_access_token, Claims};
