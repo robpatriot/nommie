@@ -1,0 +1,5 @@
+# Warn on all wildcard imports except in test modules and entity modules
+warn-on-all-wildcard-imports = true
+
+# Allow wildcard imports in entity files (they need many SeaORM traits)
+allowed-wildcard-imports = ["sea_orm::entity::prelude", "sea_orm_migration::prelude"]

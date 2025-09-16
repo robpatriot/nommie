@@ -1,5 +1,3 @@
-#![deny(clippy::wildcard_imports)]
-#![cfg_attr(test, allow(clippy::wildcard_imports))]
 
 use actix_web::{web, App, HttpServer};
 use backend::config::db::DbProfile;

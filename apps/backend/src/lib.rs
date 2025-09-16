@@ -1,5 +1,3 @@
-#![deny(clippy::wildcard_imports)]
-#![cfg_attr(test, allow(clippy::wildcard_imports))]
 
 pub mod auth;
 pub mod config;
@@ -37,16 +35,6 @@ pub use middleware::trace_span::TraceSpan;
 pub use state::app_state::AppState;
 pub use state::security_config::SecurityConfig;
 
-// Prelude for test convenience
-pub mod prelude {
-    pub use super::auth::jwt::*;
-    pub use super::config::db::*;
-    pub use super::error::*;
-    pub use super::extractors::*;
-    pub use super::infra::*;
-    pub use super::middleware::*;
-    pub use super::state::*;
-}
 
 // Auto-initialize logging for unit tests
 #[cfg(test)]
