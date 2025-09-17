@@ -25,7 +25,7 @@ pub async fn ensure_user(
     email: String,
     name: Option<String>,
     google_sub: String,
-    conn: &(impl ConnectionTrait + Send),
+    conn: &impl ConnectionTrait,
 ) -> Result<User, AppError> {
     // Look up existing user credentials by email
     let existing_credential = user_credentials::Entity::find()
