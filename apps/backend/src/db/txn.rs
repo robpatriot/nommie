@@ -7,11 +7,7 @@ use sea_orm::{DatabaseTransaction, TransactionTrait};
 
 use super::txn_policy;
 use crate::error::AppError;
-use crate::infra::mock_strict;
 use crate::state::app_state::AppState;
-
-/// Error message for when MockStrict DB blocks a query because no shared test transaction was provided
-pub const ERR_MOCK_STRICT_NO_SHARED_TXN: &str = "MockStrict DB blocked a query because no shared test transaction was provided. Either use .with_db(DbProfile::Test) for a real test DB, or inject a shared transaction into the request extensions (see tests/support/shared_txn.rs).";
 
 /// A shared transaction wrapper that can be injected into request extensions
 #[derive(Clone)]
@@ -51,11 +47,6 @@ where
     if let Some(shared) = shared_txn {
         // Use the provided shared transaction; no commit/rollback here.
         return f(shared.transaction()).await;
-    }
-
-    // Mock DB without SharedTxn → panic with exact guidance
-    if mock_strict::is_mock_strict(&state.db) {
-        panic!("{ERR_MOCK_STRICT_NO_SHARED_TXN}");
     }
 
     // Real DB path: own the transaction lifecycle

@@ -4,7 +4,6 @@
 //! tests to easily create mock database connections without polluting production code.
 
 use backend::infra::state::StateBuilder;
-use backend_test_support::mock_strict::register_mock_strict_connection;
 use sea_orm::{DatabaseBackend, MockDatabase};
 
 /// Test-only extension trait for StateBuilder
@@ -22,7 +21,6 @@ impl StateBuilderTestExt for StateBuilder {
     fn with_mock_db(self) -> Self {
         let mock_db = MockDatabase::new(DatabaseBackend::Postgres);
         let conn = mock_db.into_connection();
-        register_mock_strict_connection(&conn);
         self.with_existing_db(conn).assume_schema_ready()
     }
 
@@ -33,7 +31,6 @@ impl StateBuilderTestExt for StateBuilder {
         let mut mock_db = MockDatabase::new(DatabaseBackend::Postgres);
         setup_fn(&mut mock_db);
         let conn = mock_db.into_connection();
-        register_mock_strict_connection(&conn);
         self.with_existing_db(conn).assume_schema_ready()
     }
 }

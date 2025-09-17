@@ -3,7 +3,6 @@
 pub mod app_builder;
 pub mod factory;
 pub mod logging;
-pub mod mock_strict;
 pub mod shared_txn;
 pub mod state_builder_ext;
 

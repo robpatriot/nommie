@@ -31,12 +31,10 @@ async fn builds_with_mock_db() {
 
 #[tokio::test]
 async fn builds_with_existing_db_mock_skips_schema() {
-    use backend_test_support::mock_strict::register_mock_strict_connection;
     use sea_orm::{DatabaseBackend, MockDatabase};
 
     let mock_db = MockDatabase::new(DatabaseBackend::Postgres);
     let conn = mock_db.into_connection();
-    register_mock_strict_connection(&conn);
 
     let _state = build_state()
         .with_existing_db(conn)
