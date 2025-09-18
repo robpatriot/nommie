@@ -6,7 +6,7 @@ use super::security_config::SecurityConfig;
 #[derive(Debug)]
 pub struct AppState {
     /// Database connection (optional)
-    pub db: Option<DatabaseConnection>,
+    db: Option<DatabaseConnection>,
     /// Security configuration including JWT settings
     pub security: SecurityConfig,
 }
