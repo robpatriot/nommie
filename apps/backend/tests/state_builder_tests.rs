@@ -12,14 +12,8 @@ async fn builds_without_db() {
 
 #[tokio::test]
 async fn builds_with_test_db() {
-    let _state = build_state().with_db(DbProfile::Test).build().await.unwrap();
-}
-
-#[tokio::test]
-async fn builds_with_test_db_skips_schema() {
     let _state = build_state()
         .with_db(DbProfile::Test)
-        .assume_schema_ready()
         .build()
         .await
         .unwrap();

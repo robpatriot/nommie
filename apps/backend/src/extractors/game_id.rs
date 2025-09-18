@@ -3,6 +3,7 @@ use actix_web::{web, FromRequest, HttpRequest};
 use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
 
+use crate::db::require_db;
 use crate::entities::games;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -46,7 +47,7 @@ impl FromRequest for GameId {
                 .app_data::<web::Data<AppState>>()
                 .ok_or_else(|| AppError::internal("AppState not available"))?;
 
-            let db = app_state.db().ok_or_else(AppError::db_unavailable)?;
+            let db = require_db(app_state)?;
 
             // Check if game exists in database
             let game = games::Entity::find_by_id(game_id)

@@ -4,6 +4,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 
 use super::current_user::CurrentUser;
+use crate::db::require_db;
 use crate::entities::users;
 use crate::error::AppError;
 use crate::state::app_state::AppState;
@@ -33,7 +34,7 @@ impl FromRequest for CurrentUserRecord {
             let app_state = req
                 .app_data::<web::Data<AppState>>()
                 .ok_or_else(|| AppError::internal("AppState not available"))?;
-            let db = app_state.db().ok_or_else(AppError::db_unavailable)?;
+            let db = require_db(app_state)?;
 
             // Look up user by sub in database
             let user = users::Entity::find()

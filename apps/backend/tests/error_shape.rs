@@ -52,6 +52,11 @@ async fn test_db_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
     Err(AppError::db("Connection timeout"))
 }
 
+/// Test endpoint that returns a database unavailable error (500)
+async fn test_db_unavailable_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::db_unavailable())
+}
+
 /// Test that all error responses conform to ProblemDetails format
 /// This test consolidates all error type testing into a single, parameterized test
 #[actix_web::test]
@@ -72,7 +77,11 @@ async fn test_all_error_responses_conform_to_problem_details() {
                 )
                 .route("/_test/forbidden", web::get().to(test_forbidden_error))
                 .route("/_test/internal", web::get().to(test_internal_error))
-                .route("/_test/db", web::get().to(test_db_error));
+                .route("/_test/db", web::get().to(test_db_error))
+                .route(
+                    "/_test/db_unavailable",
+                    web::get().to(test_db_unavailable_error),
+                );
         })
         .build()
         .await
@@ -107,6 +116,12 @@ async fn test_all_error_responses_conform_to_problem_details() {
             "Database connection failed",
         ),
         ("/_test/db", 500, "DB_ERROR", "Connection timeout"),
+        (
+            "/_test/db_unavailable",
+            500,
+            "DB_UNAVAILABLE",
+            "Database unavailable",
+        ),
     ];
 
     for (endpoint, status, code, detail) in error_cases {
@@ -273,4 +288,45 @@ async fn test_malformed_error_response_handling() {
     assert_eq!(problem_details["status"], 500);
     assert_eq!(problem_details["code"], "INTERNAL");
     assert_eq!(problem_details["detail"], "Malformed error test");
+}
+
+/// Test endpoint that uses require_db helper and fails when DB is unavailable
+async fn test_require_db_endpoint(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    use backend::db::require_db;
+    use backend::state::app_state::AppState;
+    use backend::state::security_config::SecurityConfig;
+
+    // Create AppState without DB to simulate DB unavailable scenario
+    let security_config = SecurityConfig::default();
+    let app_state = AppState::new_without_db(security_config);
+
+    // This should fail with DB_UNAVAILABLE error
+    let _db = require_db(&app_state)?;
+
+    // This line should never be reached
+    Ok(HttpResponse::Ok().body("Success"))
+}
+
+/// Test that require_db helper properly returns DB_UNAVAILABLE error when no DB is configured
+#[actix_web::test]
+async fn test_require_db_without_database() {
+    let state = build_state()
+        .build() // Create state without DB (no with_db call)
+        .await
+        .expect("create test state without DB");
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/_test/require_db", web::get().to(test_require_db_endpoint));
+        })
+        .build()
+        .await
+        .expect("create test app");
+
+    let req = test::TestRequest::get()
+        .uri("/_test/require_db")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+
+    // Should return 500 status with DB_UNAVAILABLE error
+    assert_problem_details_structure(resp, 500, "DB_UNAVAILABLE", "Database unavailable").await;
 }
