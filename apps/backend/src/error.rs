@@ -114,28 +114,38 @@ impl AppError {
         }
     }
 
-    pub fn invalid(code: &'static str, detail: String) -> Self {
+    pub fn invalid(code: &'static str, detail: impl Into<String>) -> Self {
         Self::Validation {
             code,
-            detail,
+            detail: detail.into(),
             status: StatusCode::BAD_REQUEST,
         }
     }
 
-    pub fn internal(detail: String) -> Self {
-        Self::Internal { detail }
+    pub fn internal(detail: impl Into<String>) -> Self {
+        Self::Internal {
+            detail: detail.into(),
+        }
     }
 
-    pub fn bad_request(code: &'static str, detail: String) -> Self {
-        Self::BadRequest { code, detail }
+    pub fn bad_request(code: &'static str, detail: impl Into<String>) -> Self {
+        Self::BadRequest {
+            code,
+            detail: detail.into(),
+        }
     }
 
-    pub fn not_found(code: &'static str, detail: String) -> Self {
-        Self::NotFound { code, detail }
+    pub fn not_found(code: &'static str, detail: impl Into<String>) -> Self {
+        Self::NotFound {
+            code,
+            detail: detail.into(),
+        }
     }
 
-    pub fn db(detail: String) -> Self {
-        Self::Db { detail }
+    pub fn db(detail: impl Into<String>) -> Self {
+        Self::Db {
+            detail: detail.into(),
+        }
     }
 
     pub fn unauthorized() -> Self {
@@ -162,16 +172,23 @@ impl AppError {
         Self::ForbiddenUserNotFound
     }
 
-    pub fn config(detail: String) -> Self {
-        Self::Config { detail }
+    pub fn config(detail: impl Into<String>) -> Self {
+        Self::Config {
+            detail: detail.into(),
+        }
     }
 
-    pub fn conflict(code: &'static str, detail: String) -> Self {
-        Self::Conflict { code, detail }
+    pub fn conflict(code: &'static str, detail: impl Into<String>) -> Self {
+        Self::Conflict {
+            code,
+            detail: detail.into(),
+        }
     }
 
-    pub fn db_unavailable(detail: String) -> Self {
-        Self::DbUnavailable { detail }
+    pub fn db_unavailable(detail: impl Into<String>) -> Self {
+        Self::DbUnavailable {
+            detail: detail.into(),
+        }
     }
 
     fn humanize_code(code: &str) -> String {

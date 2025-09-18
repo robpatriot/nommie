@@ -44,12 +44,12 @@ async fn test_forbidden_error(_req: HttpRequest) -> Result<HttpResponse, AppErro
 
 /// Test endpoint that returns an internal server error (500)
 async fn test_internal_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(AppError::internal("Database connection failed".to_string()))
+    Err(AppError::internal("Database connection failed"))
 }
 
 /// Test endpoint that returns a database error (500)
 async fn test_db_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(AppError::db("Connection timeout".to_string()))
+    Err(AppError::db("Connection timeout"))
 }
 
 /// Test that all error responses conform to ProblemDetails format
@@ -219,7 +219,7 @@ async fn test_trace_ctx_outside_context() {
 async fn test_malformed_error_response_handling() {
     async fn malformed_error() -> Result<HttpResponse, AppError> {
         // This would create a malformed response if not handled properly
-        Err(AppError::internal("Malformed error test".to_string()))
+        Err(AppError::internal("Malformed error test"))
     }
 
     let state = build_state()

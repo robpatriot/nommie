@@ -22,7 +22,7 @@ impl FromRequest for GameId {
         Box::pin(async move {
             // Extract game_id from path parameters
             let game_id_str = req.match_info().get("game_id").ok_or_else(|| {
-                AppError::bad_request("INVALID_GAME_ID", "Missing game_id parameter".to_string())
+                AppError::bad_request("INVALID_GAME_ID", "Missing game_id parameter")
             })?;
 
             // Parse to i64 and validate it's positive
@@ -40,10 +40,11 @@ impl FromRequest for GameId {
             // Get database connection from AppState
             let app_state = req
                 .app_data::<web::Data<AppState>>()
-                .ok_or_else(|| AppError::internal("AppState not available".to_string()))?;
-            
-            let db = app_state.db()
-                .ok_or_else(|| AppError::db_unavailable("Database unavailable".to_string()))?;
+                .ok_or_else(|| AppError::internal("AppState not available"))?;
+
+            let db = app_state
+                .db()
+                .ok_or_else(|| AppError::db_unavailable("Database unavailable"))?;
 
             // Check if game exists in database
             let game = games::Entity::find_by_id(game_id)
