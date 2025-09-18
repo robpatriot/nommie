@@ -28,7 +28,8 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
     // Seed user with specific sub - use unique helpers to ensure uniqueness
     let test_sub = unique_str("test-sub");
     let test_email = unique_email("test");
-    let user = seed_user_with_sub(&state.db, &test_sub, Some(&test_email))
+    let db = state.db.as_ref().expect("DB required for this test");
+    let user = seed_user_with_sub(db, &test_sub, Some(&test_email))
         .await
         .expect("should create user successfully");
 

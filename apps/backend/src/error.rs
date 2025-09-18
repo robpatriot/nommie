@@ -49,6 +49,8 @@ pub enum AppError {
     Config { detail: String },
     #[error("Conflict: {detail}")]
     Conflict { code: &'static str, detail: String },
+    #[error("Database unavailable: {detail}")]
+    DbUnavailable { detail: String },
 }
 
 impl AppError {
@@ -68,6 +70,7 @@ impl AppError {
             AppError::Internal { .. } => "INTERNAL".to_string(),
             AppError::Config { .. } => "CONFIG_ERROR".to_string(),
             AppError::Conflict { code, .. } => code.to_string(),
+            AppError::DbUnavailable { .. } => "DB_UNAVAILABLE".to_string(),
         }
     }
 
@@ -87,6 +90,7 @@ impl AppError {
             AppError::Internal { detail, .. } => detail.clone(),
             AppError::Config { detail, .. } => detail.clone(),
             AppError::Conflict { detail, .. } => detail.clone(),
+            AppError::DbUnavailable { detail, .. } => detail.clone(),
         }
     }
 
@@ -106,6 +110,7 @@ impl AppError {
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Conflict { .. } => StatusCode::CONFLICT,
+            AppError::DbUnavailable { .. } => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -163,6 +168,10 @@ impl AppError {
 
     pub fn conflict(code: &'static str, detail: String) -> Self {
         Self::Conflict { code, detail }
+    }
+
+    pub fn db_unavailable(detail: String) -> Self {
+        Self::DbUnavailable { detail }
     }
 
     fn humanize_code(code: &str) -> String {

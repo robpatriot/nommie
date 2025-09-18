@@ -41,7 +41,9 @@ impl FromRequest for GameId {
             let app_state = req
                 .app_data::<web::Data<AppState>>()
                 .ok_or_else(|| AppError::internal("AppState not available".to_string()))?;
-            let db = &app_state.db;
+            
+            let db = app_state.db()
+                .ok_or_else(|| AppError::db_unavailable("Database unavailable".to_string()))?;
 
             // Check if game exists in database
             let game = games::Entity::find_by_id(game_id)

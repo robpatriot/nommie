@@ -1,12 +1,12 @@
 mod common;
 mod support;
 use actix_web::{test, web, HttpRequest, HttpResponse};
+use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 use backend::AppError;
 use common::assert_problem_details_structure;
 use serde_json::Value;
 use support::create_test_app;
-use support::state_builder_ext::StateBuilderTestExt;
 
 /// Test endpoint that returns a validation error (400)
 async fn test_validation_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
@@ -57,7 +57,7 @@ async fn test_db_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
 #[actix_web::test]
 async fn test_all_error_responses_conform_to_problem_details() {
     let state = build_state()
-        .with_mock_db()
+        .with_db(DbProfile::Test)
         .build()
         .await
         .expect("create test state");
@@ -124,7 +124,7 @@ async fn test_successful_response_with_error_handling() {
     }
 
     let state = build_state()
-        .with_mock_db()
+        .with_db(DbProfile::Test)
         .build()
         .await
         .expect("create test state");
@@ -167,7 +167,7 @@ async fn test_error_with_trace_id_from_context() {
     }
 
     let state = build_state()
-        .with_mock_db()
+        .with_db(DbProfile::Test)
         .build()
         .await
         .expect("create test state");
@@ -223,7 +223,7 @@ async fn test_malformed_error_response_handling() {
     }
 
     let state = build_state()
-        .with_mock_db()
+        .with_db(DbProfile::Test)
         .build()
         .await
         .expect("create test state");
