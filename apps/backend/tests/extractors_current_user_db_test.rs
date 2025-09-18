@@ -115,14 +115,8 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_me_db_unauthorized() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and custom security config
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_db(DbProfile::Test)
-        .with_security(security_config)
-        .build()
-        .await?;
+    // Build state with database and default security config
+    let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;
