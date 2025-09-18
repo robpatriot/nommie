@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::entities::games;
 use crate::error::AppError;
+use crate::errors::ErrorCode;
 use crate::state::app_state::AppState;
 
 /// Game ID extracted from the route path parameter
@@ -22,17 +23,20 @@ impl FromRequest for GameId {
         Box::pin(async move {
             // Extract game_id from path parameters
             let game_id_str = req.match_info().get("game_id").ok_or_else(|| {
-                AppError::bad_request("INVALID_GAME_ID", "Missing game_id parameter")
+                AppError::bad_request(ErrorCode::InvalidGameId, "Missing game_id parameter")
             })?;
 
             // Parse to i64 and validate it's positive
             let game_id = game_id_str.parse::<i64>().map_err(|_| {
-                AppError::bad_request("INVALID_GAME_ID", format!("Invalid game id: {game_id_str}"))
+                AppError::bad_request(
+                    ErrorCode::InvalidGameId,
+                    format!("Invalid game id: {game_id_str}"),
+                )
             })?;
 
             if game_id <= 0 {
                 return Err(AppError::bad_request(
-                    "INVALID_GAME_ID",
+                    ErrorCode::InvalidGameId,
                     format!("Game id must be positive, got: {game_id}"),
                 ));
             }
@@ -52,7 +56,7 @@ impl FromRequest for GameId {
 
             let _game = game.ok_or_else(|| {
                 AppError::not_found(
-                    "GAME_NOT_FOUND",
+                    ErrorCode::GameNotFound,
                     format!("Game not found with id: {game_id}"),
                 )
             })?;

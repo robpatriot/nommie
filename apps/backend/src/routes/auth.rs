@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::auth::jwt::mint_access_token;
 use crate::db::txn::with_txn;
 use crate::error::AppError;
+use crate::errors::ErrorCode;
 use crate::services::users::ensure_user;
 use crate::state::app_state::AppState;
 
@@ -32,14 +33,14 @@ async fn login(
     // Validate required fields
     if req.email.trim().is_empty() {
         return Err(AppError::bad_request(
-            "INVALID_EMAIL",
+            ErrorCode::InvalidEmail,
             "Email cannot be empty".to_string(),
         ));
     }
 
     if req.google_sub.trim().is_empty() {
         return Err(AppError::bad_request(
-            "INVALID_GOOGLE_SUB",
+            ErrorCode::InvalidGoogleSub,
             "Google sub cannot be empty".to_string(),
         ));
     }

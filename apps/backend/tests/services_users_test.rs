@@ -1,6 +1,7 @@
 use backend::config::db::{DbOwner, DbProfile};
 use backend::entities::user_credentials;
 use backend::error::AppError;
+use backend::errors::ErrorCode;
 use backend::infra::db::connect_db;
 use backend::services::users::ensure_user;
 use backend::utils::unique::{unique_email, unique_str};
@@ -155,7 +156,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
 
     match error_result {
         Err(AppError::Conflict { code, detail, .. }) => {
-            assert_eq!(code, "GOOGLE_SUB_MISMATCH");
+            assert_eq!(code, ErrorCode::GoogleSubMismatch);
             assert!(detail.contains("already linked to a different Google account"));
         }
         other => panic!("Expected Conflict error with GOOGLE_SUB_MISMATCH code, got: {other:?}"),

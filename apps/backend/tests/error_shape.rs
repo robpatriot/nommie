@@ -3,7 +3,7 @@ mod support;
 use actix_web::{test, web, HttpRequest, HttpResponse};
 use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
-use backend::AppError;
+use backend::{AppError, ErrorCode};
 use common::assert_problem_details_structure;
 use serde_json::Value;
 use support::create_test_app;
@@ -11,7 +11,7 @@ use support::create_test_app;
 /// Test endpoint that returns a validation error (400)
 async fn test_validation_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
     Err(AppError::invalid(
-        "VALIDATION_ERROR",
+        ErrorCode::ValidationError,
         "Field validation failed".to_string(),
     ))
 }
@@ -19,7 +19,7 @@ async fn test_validation_error(_req: HttpRequest) -> Result<HttpResponse, AppErr
 /// Test endpoint that returns a bad request error (400)
 async fn test_bad_request_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
     Err(AppError::bad_request(
-        "BAD_REQUEST",
+        ErrorCode::BadRequest,
         "Invalid request format".to_string(),
     ))
 }
@@ -27,7 +27,7 @@ async fn test_bad_request_error(_req: HttpRequest) -> Result<HttpResponse, AppEr
 /// Test endpoint that returns a not found error (404)
 async fn test_not_found_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
     Err(AppError::not_found(
-        "NOT_FOUND",
+        ErrorCode::NotFound,
         "Resource not found".to_string(),
     ))
 }
@@ -161,7 +161,7 @@ async fn test_error_with_trace_id_from_context() {
     async fn error_with_trace() -> Result<HttpResponse, AppError> {
         // Create error - trace_id will come from task-local context
         Err(AppError::invalid(
-            "NO_TRACE",
+            ErrorCode::NoTrace,
             "Error without trace".to_string(),
         ))
     }

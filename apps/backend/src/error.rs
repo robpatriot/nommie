@@ -4,6 +4,7 @@ use actix_web::HttpResponse;
 use serde::Serialize;
 use thiserror::Error;
 
+use crate::errors::ErrorCode;
 use crate::web::trace_ctx;
 
 #[derive(Serialize)]
@@ -21,14 +22,14 @@ pub struct ProblemDetails {
 pub enum AppError {
     #[error("Validation error: {detail}")]
     Validation {
-        code: &'static str,
+        code: ErrorCode,
         detail: String,
         status: StatusCode,
     },
     #[error("Database error: {detail}")]
     Db { detail: String },
     #[error("Not found: {detail}")]
-    NotFound { code: &'static str, detail: String },
+    NotFound { code: ErrorCode, detail: String },
     #[error("Unauthorized")]
     Unauthorized,
     #[error("UnauthorizedMissingBearer")]
@@ -42,13 +43,13 @@ pub enum AppError {
     #[error("Forbidden: User not found")]
     ForbiddenUserNotFound,
     #[error("Bad request: {detail}")]
-    BadRequest { code: &'static str, detail: String },
+    BadRequest { code: ErrorCode, detail: String },
     #[error("Internal error: {detail}")]
     Internal { detail: String },
     #[error("Configuration error: {detail}")]
     Config { detail: String },
     #[error("Conflict: {detail}")]
-    Conflict { code: &'static str, detail: String },
+    Conflict { code: ErrorCode, detail: String },
     #[error("Database unavailable")]
     DbUnavailable,
 }
@@ -57,20 +58,28 @@ impl AppError {
     /// Helper method to extract error code from any error variant
     fn code(&self) -> String {
         match self {
-            AppError::Validation { code, .. } => code.to_string(),
-            AppError::Db { .. } => "DB_ERROR".to_string(),
-            AppError::NotFound { code, .. } => code.to_string(),
-            AppError::Unauthorized => "UNAUTHORIZED".to_string(),
-            AppError::UnauthorizedMissingBearer => "UNAUTHORIZED_MISSING_BEARER".to_string(),
-            AppError::UnauthorizedInvalidJwt => "UNAUTHORIZED_INVALID_JWT".to_string(),
-            AppError::UnauthorizedExpiredJwt => "UNAUTHORIZED_EXPIRED_JWT".to_string(),
-            AppError::Forbidden => "FORBIDDEN".to_string(),
-            AppError::ForbiddenUserNotFound => "FORBIDDEN_USER_NOT_FOUND".to_string(),
-            AppError::BadRequest { code, .. } => code.to_string(),
-            AppError::Internal { .. } => "INTERNAL".to_string(),
-            AppError::Config { .. } => "CONFIG_ERROR".to_string(),
-            AppError::Conflict { code, .. } => code.to_string(),
-            AppError::DbUnavailable => "DB_UNAVAILABLE".to_string(),
+            AppError::Validation { code, .. } => code.as_str().to_string(),
+            AppError::Db { .. } => ErrorCode::DbError.as_str().to_string(),
+            AppError::NotFound { code, .. } => code.as_str().to_string(),
+            AppError::Unauthorized => ErrorCode::Unauthorized.as_str().to_string(),
+            AppError::UnauthorizedMissingBearer => {
+                ErrorCode::UnauthorizedMissingBearer.as_str().to_string()
+            }
+            AppError::UnauthorizedInvalidJwt => {
+                ErrorCode::UnauthorizedInvalidJwt.as_str().to_string()
+            }
+            AppError::UnauthorizedExpiredJwt => {
+                ErrorCode::UnauthorizedExpiredJwt.as_str().to_string()
+            }
+            AppError::Forbidden => ErrorCode::Forbidden.as_str().to_string(),
+            AppError::ForbiddenUserNotFound => {
+                ErrorCode::ForbiddenUserNotFound.as_str().to_string()
+            }
+            AppError::BadRequest { code, .. } => code.as_str().to_string(),
+            AppError::Internal { .. } => ErrorCode::Internal.as_str().to_string(),
+            AppError::Config { .. } => ErrorCode::ConfigError.as_str().to_string(),
+            AppError::Conflict { code, .. } => code.as_str().to_string(),
+            AppError::DbUnavailable => ErrorCode::DbUnavailable.as_str().to_string(),
         }
     }
 
@@ -114,7 +123,7 @@ impl AppError {
         }
     }
 
-    pub fn invalid(code: &'static str, detail: impl Into<String>) -> Self {
+    pub fn invalid(code: ErrorCode, detail: impl Into<String>) -> Self {
         Self::Validation {
             code,
             detail: detail.into(),
@@ -128,14 +137,14 @@ impl AppError {
         }
     }
 
-    pub fn bad_request(code: &'static str, detail: impl Into<String>) -> Self {
+    pub fn bad_request(code: ErrorCode, detail: impl Into<String>) -> Self {
         Self::BadRequest {
             code,
             detail: detail.into(),
         }
     }
 
-    pub fn not_found(code: &'static str, detail: impl Into<String>) -> Self {
+    pub fn not_found(code: ErrorCode, detail: impl Into<String>) -> Self {
         Self::NotFound {
             code,
             detail: detail.into(),
@@ -178,7 +187,7 @@ impl AppError {
         }
     }
 
-    pub fn conflict(code: &'static str, detail: impl Into<String>) -> Self {
+    pub fn conflict(code: ErrorCode, detail: impl Into<String>) -> Self {
         Self::Conflict {
             code,
             detail: detail.into(),
