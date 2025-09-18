@@ -49,8 +49,8 @@ pub enum AppError {
     Config { detail: String },
     #[error("Conflict: {detail}")]
     Conflict { code: &'static str, detail: String },
-    #[error("Database unavailable: {detail}")]
-    DbUnavailable { detail: String },
+    #[error("Database unavailable")]
+    DbUnavailable,
 }
 
 impl AppError {
@@ -70,7 +70,7 @@ impl AppError {
             AppError::Internal { .. } => "INTERNAL".to_string(),
             AppError::Config { .. } => "CONFIG_ERROR".to_string(),
             AppError::Conflict { code, .. } => code.to_string(),
-            AppError::DbUnavailable { .. } => "DB_UNAVAILABLE".to_string(),
+            AppError::DbUnavailable => "DB_UNAVAILABLE".to_string(),
         }
     }
 
@@ -90,7 +90,7 @@ impl AppError {
             AppError::Internal { detail, .. } => detail.clone(),
             AppError::Config { detail, .. } => detail.clone(),
             AppError::Conflict { detail, .. } => detail.clone(),
-            AppError::DbUnavailable { detail, .. } => detail.clone(),
+            AppError::DbUnavailable => "Database unavailable".to_string(),
         }
     }
 
@@ -110,7 +110,7 @@ impl AppError {
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Conflict { .. } => StatusCode::CONFLICT,
-            AppError::DbUnavailable { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            AppError::DbUnavailable => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -185,10 +185,8 @@ impl AppError {
         }
     }
 
-    pub fn db_unavailable(detail: impl Into<String>) -> Self {
-        Self::DbUnavailable {
-            detail: detail.into(),
-        }
+    pub fn db_unavailable() -> Self {
+        Self::DbUnavailable
     }
 
     fn humanize_code(code: &str) -> String {

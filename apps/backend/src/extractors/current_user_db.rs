@@ -33,9 +33,7 @@ impl FromRequest for CurrentUserRecord {
             let app_state = req
                 .app_data::<web::Data<AppState>>()
                 .ok_or_else(|| AppError::internal("AppState not available"))?;
-            let db = app_state
-                .db()
-                .ok_or_else(|| AppError::db_unavailable("Database unavailable"))?;
+            let db = app_state.db().ok_or_else(AppError::db_unavailable)?;
 
             // Look up user by sub in database
             let user = users::Entity::find()

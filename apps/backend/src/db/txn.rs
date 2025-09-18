@@ -52,7 +52,7 @@ where
     // Check if database is available
     let db = state
         .db()
-        .ok_or_else(|| crate::error::AppError::db_unavailable("Database unavailable"))?;
+        .ok_or_else(crate::error::AppError::db_unavailable)?;
 
     // Real DB path: own the transaction lifecycle
     let txn = db.begin().await?;
