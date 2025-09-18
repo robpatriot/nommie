@@ -3,6 +3,7 @@ mod support;
 use actix_web::{test, web, HttpRequest, HttpResponse};
 use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
+use backend::state::app_state::AppState;
 use backend::{AppError, ErrorCode};
 use common::assert_problem_details_structure;
 use serde_json::Value;
@@ -290,30 +291,25 @@ async fn test_malformed_error_response_handling() {
     assert_eq!(problem_details["detail"], "Malformed error test");
 }
 
-/// Test endpoint that uses require_db helper and fails when DB is unavailable
-async fn test_require_db_endpoint(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+/// Test endpoint that uses require_db helper
+async fn test_require_db_endpoint(state: web::Data<AppState>) -> Result<HttpResponse, AppError> {
     use backend::db::require_db;
-    use backend::state::app_state::AppState;
-    use backend::state::security_config::SecurityConfig;
 
-    // Create AppState without DB to simulate DB unavailable scenario
-    let security_config = SecurityConfig::default();
-    let app_state = AppState::new_without_db(security_config);
+    // This will return DB_UNAVAILABLE if no DB is configured
+    let _db = require_db(&state)?;
 
-    // This should fail with DB_UNAVAILABLE error
-    let _db = require_db(&app_state)?;
-
-    // This line should never be reached
+    // If DB exists, succeed
     Ok(HttpResponse::Ok().body("Success"))
 }
 
-/// Test that require_db helper properly returns DB_UNAVAILABLE error when no DB is configured
+/// Test that require_db helper returns DB_UNAVAILABLE error when no DB is configured
 #[actix_web::test]
 async fn test_require_db_without_database() {
     let state = build_state()
-        .build() // Create state without DB (no with_db call)
+        .build() // build with no DB
         .await
         .expect("create test state without DB");
+
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/require_db", web::get().to(test_require_db_endpoint));
@@ -327,6 +323,40 @@ async fn test_require_db_without_database() {
         .to_request();
     let resp = test::call_service(&app, req).await;
 
-    // Should return 500 status with DB_UNAVAILABLE error
+    // Should return DB_UNAVAILABLE problem details with trace id
     assert_problem_details_structure(resp, 500, "DB_UNAVAILABLE", "Database unavailable").await;
+}
+
+/// Test that require_db helper succeeds when DB is configured
+#[actix_web::test]
+async fn test_require_db_with_database() {
+    let state = build_state()
+        .with_db(DbProfile::Test) // build with Test DB
+        .build()
+        .await
+        .expect("create test state with DB");
+
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/_test/require_db", web::get().to(test_require_db_endpoint));
+        })
+        .build()
+        .await
+        .expect("create test app");
+
+    let req = test::TestRequest::get()
+        .uri("/_test/require_db")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+
+    // Should succeed with 200 OK
+    assert_eq!(resp.status().as_u16(), 200);
+
+    // Still should have X-Trace-Id header
+    let headers = resp.headers();
+    assert!(headers.get("x-trace-id").is_some());
+
+    // Body should be "Success"
+    let body = test::read_body(resp).await;
+    assert_eq!(body, "Success");
 }
