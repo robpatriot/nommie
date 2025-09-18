@@ -31,7 +31,7 @@
   - Single `init.sql` is source of truth.
   - Test harness applies schema to `_test` DB at startup with guard.
 - **Acceptance:** Tests bootstrap schema cleanly; `_test` guard enforced.  
-  *(Actual entities are in F.)*
+  *(Actual entities live in F.)*
 
 ---
 
@@ -48,10 +48,9 @@
 ## ✅ E — Error Shapes & Logging *(S → M)*
 - **Dependencies:** D.
 - **Details:**
-  - Problem Details error shape:
-    `{ type, title, status, detail, code, trace_id }`
+  - Problem Details error shape: `{ type, title, status, detail, code, trace_id }`.
   - `code` in SCREAMING_SNAKE.
-  - Middleware injects per-request `trace_id`.
+  - Per-request `trace_id` surfaced in logs.
 - **Acceptance:** Consistent error responses; logs include `trace_id`.
 
 ---
@@ -76,30 +75,60 @@
 
 ---
 
-## 🟨 H — Extractors *(M → L, partially done)*
+## 🟨 H — App Error & Trace ID via Web Boundary *(S → M, current)*
+- **Dependencies:** D, E.
+- **Details:**
+  - Remove `trace_id` from `AppError`; no manual attachment in code paths.
+  - Add middleware to issue a per-request `trace_id`, store it in request context (and a task-local or span), and set the `x-trace-id` header.
+  - `ResponseError` reads `trace_id` from context when building Problem Details.
+  - Delete `from_req`, `with_trace_id`, and `ensure_trace_id`; core/services stay Actix-free.
+  - Update tests to assert header presence and parity with the JSON `trace_id`.
+- **Acceptance:**
+  - No `trace_id` stored in `AppError`; no per-call attachment utilities remain.
+  - Problem Details and `x-trace-id` header agree for all HTTP errors.
+  - `pnpm be:lint` and `pnpm be:test` pass.
+
+---
+
+## 🟨 I — Transactional Tests *(S → M)*
+- **Dependencies:** D.
+- **Details:**
+  - Unify request-path DB access through `with_txn`; remove direct `state.db` grabs.
+  - Make `AppState.db` optional and simplify the builder; default state has no DB; only `.with_db(DbProfile)` remains.
+  - Confirm `SharedTxn` reuse semantics and policy bypass behavior in tests.
+  - Define and implement nested `with_txn` behavior; cover with focused tests.
+  - Enforce rollback-by-default policy in tests (OK and error paths).
+  - Ensure DB-touching tests leave no residue; database is clean between cases.
+- **Acceptance:**
+  - Request-path code consistently uses `with_txn`.
+  - No-DB state returns `DB_UNAVAILABLE` (500) for DB-required routes.
+  - Shared + nested txn behavior matches policy; tests prove isolation.
+  - CI green (`pnpm be:lint`, `pnpm be:test`).
+
+---
+
+## 🅙 J — Extractors *(M → L, partially done)*
 - **Dependencies:** E, F, G.
 - **Completed:**
-  - `AuthToken`
-  - `JwtClaims`
-  - `CurrentUser`
+  - `AuthToken`, `JwtClaims`, `CurrentUser`.
 - **Remaining:**
-  - `GameId` — validates bigint game ID and existence.
+  - `GameId` — validates bigint ID and existence.
   - `GameMembership` — verifies membership/role in one hit where possible.
-  - `ValidatedJson<T>` — shape validation with Problem Details errors.
-- **Acceptance:** Handlers are thin; extractor tests pass; single DB hit for user+membership when possible.
+  - `ValidatedJson<T>` — request shape validation with Problem Details.
+- **Acceptance:** Handlers are thin; extractor tests pass; single DB hit for user+membership where possible.
 
 ---
 
-## 🅘 I — Backend Domain Modules *(L)*
+## 🅚 K — Backend Domain Modules *(L)*
 - **Dependencies:** G.
 - **Details:**
-  - Pure logic modules: `rules`, `bidding`, `tricks`, `scoring`, `state`.
-  - No DB access in domain modules; orchestration above them.
-- **Acceptance:** `grep` shows no SeaORM in domain modules.
+  - Pure logic: `rules`, `bidding`, `tricks`, `scoring`, `state`.
+  - No SeaORM in domain modules; orchestration sits above.
+- **Acceptance:** `grep` shows no SeaORM in domain code.
 
 ---
 
-## 🟨 J — Frontend App Router Seed *(M, partially done)*
+## 🟨 L — Frontend App Router Seed *(M, partially done)*
 - **Dependencies:** E, G.
 - **Details:**
   - Next.js App Router + Turbopack.
@@ -111,8 +140,8 @@
 
 ---
 
-## 🅚 K — Game Lifecycle (Happy Path) *(L → XL)*
-- **Dependencies:** H, G, I, J.
+## 🅛 M — Game Lifecycle (Happy Path) *(L → XL)*
+- **Dependencies:** J, G, K, L.
 - **Details:**
   - End-to-end: `create → join → ready → deal → bid → trump → tricks → scoring → round advance`.
   - Integration test covers the minimal loop.
@@ -120,8 +149,8 @@
 
 ---
 
-## 🅛 L — AI Orchestration *(M → L)*
-- **Dependencies:** J.
+## 🅜 N — AI Orchestration *(M → L)*
+- **Dependencies:** L.
 - **Details:**
   - Basic AI bidding + valid trick play.
   - Runs per poll cycle; AI auto-advances until human’s turn.
@@ -129,17 +158,17 @@
 
 ---
 
-## 🅜 M — Validation, Edge Cases & Property Tests *(M)*
-- **Dependencies:** J.
+## 🅝 O — Validation, Edge Cases & Property Tests *(M)*
+- **Dependencies:** L.
 - **Details:**
-  - Invalid bids/plays return proper Problem Details errors.
+  - Invalid bids/plays return proper Problem Details.
   - Property tests for trick/scoring invariants.
 - **Acceptance:** Error paths validated; properties hold.
 
 ---
 
-## 🅝 N — Frontend UX Pass (Round 1) *(M → L)*
-- **Dependencies:** J, L.
+## 🅞 P — Frontend UX Pass (Round 1) *(M → L)*
+- **Dependencies:** L, N.
 - **Details:**
   - Hand display, trick area, bidding UI, trump selector.
   - FE surfaces Problem Details errors nicely.
@@ -147,22 +176,22 @@
 
 ---
 
-## 🟨 O — CI Pipeline *(S, partially done)*
-- **Dependencies:** D, E, F, G, H, M, N.
+## 🟨 Q — CI Pipeline *(S, partially done)*
+- **Dependencies:** D, E, F, G, J, O, P.
 - **Completed (local):**
-  - Robust **pre-commit** hook: FE ESLint/Prettier (staged-aware), BE clippy + rustfmt (staged write).
-- **Remaining (to complete CI gate):**
-  - GitHub Actions workflow that gates PRs/`main` with:
-    - FE: **ESLint**, **Prettier check**, **TypeScript typecheck**.
-    - BE: **clippy**, **rustfmt --check**.
-    - **Tests** with Postgres service; apply `init.sql` **twice**.
-    - **Caching** (pnpm + Cargo).
-- **Acceptance:** CI green gate (lint + typecheck + tests) required for merges; `init.sql` re-applies cleanly.
+  - Robust pre-commit: FE ESLint/Prettier (staged-aware), BE clippy + rustfmt (staged write).
+- **Remaining (for CI gate):**
+  - GitHub Actions gating PRs/`main` with:
+    - FE: ESLint, Prettier check, TS typecheck.
+    - BE: clippy, `rustfmt --check`.
+    - Tests with Postgres service; apply `init.sql` twice.
+    - Caching (pnpm + Cargo).
+- **Acceptance:** CI green gate required for merges; schema re-applies cleanly.
 
 ---
 
-## 🅟 P — Documentation & Decision Log *(S)*
-- **Dependencies:** J.
+## 🅟 R — Documentation & Decision Log *(S)*
+- **Dependencies:** L.
 - **Details:**
   - README: setup + reset flow.
   - CONTRIBUTING: module layout, extractor policy, `_test` guard.
@@ -171,18 +200,18 @@
 
 ---
 
-## 🅠 Q — Observability & Stability *(S → M)*
-- **Dependencies:** E, J.
+## 🅠 S — Observability & Stability *(S → M)*
+- **Dependencies:** E, L.
 - **Details:**
   - Logs include `user_id` + `game_id` where relevant.
   - FE shows `trace_id` on errors.
   - Health endpoint reports DB status.
-- **Acceptance:** Logs actionable; trace_id visible end-to-end.
+- **Acceptance:** Logs actionable; trace id visible end-to-end.
 
 ---
 
-## 🅡 R — Open Source Observability Stack *(M → L)*
-- **Dependencies:** O, I.
+## 🅡 T — Open Source Observability Stack *(M → L)*
+- **Dependencies:** Q, K.
 - **Details:**
   - Grafana + Tempo + Loki + Prometheus in Docker.
 - **Acceptance:** Infra captures app metrics, logs, and traces.
@@ -192,30 +221,25 @@
 # 🔄 Optional Track (anytime)
 
 ### 🅂 WebSockets *(M)*
-- **Dependencies:** J.
+- **Dependencies:** L.
 - **Details:** Replace polling with push (Actix WS or SSE). Ensure AI orchestration fits push model.
 - **Acceptance:** FE receives live state; polling removed.
 
-### 🅃 Transactional Tests *(S → M)*
-- **Dependencies:** D.
-- **Details:** Wrap integration tests in DB transactions; rollback for isolation; `_test` guard intact.
-- **Acceptance:** Tests faster; DB clean post-run.
-
 ### 🅄 Deployment Stub *(S → M)*
-- **Dependencies:** B, P, Q.
-- **Details:** Minimal prod-like deployment (Compose or k3d). Includes FE, BE, DB, observability stubs.
-- **Acceptance:** App boots in a minimal production-style environment.
+- **Dependencies:** B, R, S.
+- **Details:** Minimal prod-style deployment (Compose or k3d). Includes FE, BE, DB, observability stubs.
+- **Acceptance:** App boots in a minimal production environment.
 
 ### 🅅 Race-safe `ensure_user` hardening *(M)*
 - **Details:** Handle unique-violation on insert by re-fetching; avoid duplicate users under concurrency.
 - **Acceptance:** Concurrent first-login attempts never produce duplicate users or credentials.
 
 ### 🅆 Behavioral Improvements *(S → M)*
-- **Email normalization**: normalize/truncate emails (trim + lowercase + Unicode NFKC).  
-- **Email validation**: reject invalid addresses with `422 INVALID_EMAIL`.  
-- **Username hygiene**: enforce min length/cleaning; store NULL if no valid username.  
-- **Last-login updates**: avoid unnecessary writes if nothing changes.  
-- **Error code catalog**: centralize SCREAMING_SNAKE codes in one module.  
-- **PII-safe logging**: mask/hash email and google_sub in logs.  
-- **Time provider abstraction**: trait-based clock injection for deterministic tests.  
-- **Rate limiting**: middleware/gateway rate-limits on auth endpoint, with `429 RATE_LIMITED`.  
+- **Email normalization** (trim, lowercase, Unicode NFKC).  
+- **Email validation** (`422 INVALID_EMAIL`).  
+- **Username hygiene** (min length/cleaning; store NULL if invalid).  
+- **Last-login updates** (skip no-op writes).  
+- **Error code catalog** (centralize codes).  
+- **PII-safe logging** (mask/hash email and `google_sub`).  
+- **Time provider abstraction** (injectable clock for deterministic tests).  
+- **Rate limiting** (`429 RATE_LIMITED` on auth endpoint).
