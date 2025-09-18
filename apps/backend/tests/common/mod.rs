@@ -1,17 +1,17 @@
 use actix_web::test;
 use serde_json::Value;
 
-/// Helper function to check that the trace_id in the response body matches the X-Request-Id header
+/// Helper function to check that the trace_id in the response body matches the X-Trace-Id header
 pub fn assert_trace_id_matches(response: &Value, header_trace_id: &str) {
     let trace_id_in_body = response["trace_id"].as_str().unwrap();
     assert_eq!(
         trace_id_in_body, header_trace_id,
-        "trace_id in body should match X-Request-Id header"
+        "trace_id in body should match X-Trace-Id header"
     );
 }
 
 /// Helper function to validate that a response follows the ProblemDetails structure
-/// and that trace_id matches the X-Request-Id header
+/// and that trace_id matches the X-Trace-Id header
 pub async fn assert_problem_details_structure(
     resp: actix_web::dev::ServiceResponse<actix_web::body::BoxBody>,
     expected_status: u16,
@@ -23,15 +23,15 @@ pub async fn assert_problem_details_structure(
 
     // Extract headers before consuming the response
     let headers = resp.headers().clone();
-    let request_id_header = headers.get("x-request-id");
+    let trace_id_header = headers.get("x-trace-id");
     assert!(
-        request_id_header.is_some(),
-        "X-Request-Id header should be present"
+        trace_id_header.is_some(),
+        "X-Trace-Id header should be present"
     );
-    let request_id = request_id_header.unwrap().to_str().unwrap();
+    let trace_id = trace_id_header.unwrap().to_str().unwrap();
     assert!(
-        !request_id.is_empty(),
-        "X-Request-Id header should not be empty"
+        !trace_id.is_empty(),
+        "X-Trace-Id header should not be empty"
     );
 
     // Assert Content-Type is application/problem+json
@@ -80,7 +80,7 @@ pub async fn assert_problem_details_structure(
     assert_eq!(problem_details["status"], expected_status);
 
     // Use centralized trace_id validation
-    assert_trace_id_matches(&problem_details, request_id);
+    assert_trace_id_matches(&problem_details, trace_id);
 
     // Assert type follows the expected format
     let type_value = problem_details["type"].as_str().unwrap();

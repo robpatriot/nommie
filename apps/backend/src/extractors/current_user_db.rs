@@ -42,8 +42,7 @@ impl FromRequest for CurrentUserRecord {
                 .await
                 .map_err(|e| AppError::db(format!("Failed to query user by sub: {e}")))?;
 
-            let user =
-                user.ok_or_else(|| AppError::from_req(&req, AppError::forbidden_user_not_found()))?;
+            let user = user.ok_or(AppError::forbidden_user_not_found())?;
 
             // For now, we'll return None for email since it's not in the users table
             // In a real implementation, you might want to join with user_credentials

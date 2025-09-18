@@ -70,11 +70,11 @@ async fn handler_logs_are_in_request_span_with_trace_id() {
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
 
-    // Capture request id from header for comparison with span field.
-    let req_id = resp
+    // Capture trace id from header for comparison with span field.
+    let trace_id = resp
         .headers()
-        .get("X-Request-Id")
-        .expect("X-Request-Id header present")
+        .get("X-Trace-Id")
+        .expect("X-Trace-Id header present")
         .to_str()
         .unwrap()
         .to_string();
@@ -112,7 +112,7 @@ async fn handler_logs_are_in_request_span_with_trace_id() {
                     if s.get("name").and_then(Value::as_str) == Some("request") {
                         // Directly check trace_id in the span object
                         if let Some(tid) = s.get("trace_id").and_then(Value::as_str) {
-                            if tid == req_id {
+                            if tid == trace_id {
                                 saw_trace_match = true;
                             }
                         }

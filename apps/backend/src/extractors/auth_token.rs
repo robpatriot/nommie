@@ -23,21 +23,19 @@ impl FromRequest for AuthToken {
             let auth_header = req
                 .headers()
                 .get(header::AUTHORIZATION)
-                .ok_or_else(|| AppError::from_req(&req, AppError::unauthorized()))?;
+                .ok_or(AppError::unauthorized())?;
 
-            let auth_value = auth_header
-                .to_str()
-                .map_err(|_| AppError::from_req(&req, AppError::unauthorized()))?;
+            let auth_value = auth_header.to_str().map_err(|_| AppError::unauthorized())?;
 
             // Parse "Bearer <token>" format
             let parts: Vec<&str> = auth_value.split_whitespace().collect();
             if parts.len() != 2 || parts[0] != "Bearer" {
-                return Err(AppError::from_req(&req, AppError::unauthorized()));
+                return Err(AppError::unauthorized());
             }
 
             let token = parts[1];
             if token.is_empty() {
-                return Err(AppError::from_req(&req, AppError::unauthorized()));
+                return Err(AppError::unauthorized());
             }
 
             Ok(AuthToken {

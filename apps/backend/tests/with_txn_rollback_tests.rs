@@ -43,7 +43,6 @@ async fn test_rollback_policy_on_error() -> Result<(), Box<dyn std::error::Error
         Box::pin(async {
             Err::<String, _>(backend::error::AppError::Internal {
                 detail: "test error".to_string(),
-                trace_id: None,
             })
         })
     })

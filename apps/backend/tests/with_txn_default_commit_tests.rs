@@ -40,7 +40,6 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
         Box::pin(async {
             Err::<String, _>(backend::error::AppError::Internal {
                 detail: "test error".to_string(),
-                trace_id: None,
             })
         })
     })

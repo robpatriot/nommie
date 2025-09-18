@@ -1,4 +1,3 @@
-
 pub mod auth;
 pub mod config;
 pub mod db;
@@ -12,7 +11,7 @@ pub mod routes;
 pub mod services;
 pub mod state;
 pub mod utils;
-
+pub mod web;
 
 // Re-exports for public API
 pub use auth::jwt::{mint_access_token, verify_access_token, Claims};
@@ -32,7 +31,6 @@ pub use middleware::structured_logger::StructuredLogger;
 pub use middleware::trace_span::TraceSpan;
 pub use state::app_state::AppState;
 pub use state::security_config::SecurityConfig;
-
 
 // Auto-initialize logging for unit tests
 #[cfg(test)]

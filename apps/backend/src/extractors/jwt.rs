@@ -47,7 +47,7 @@ where
     /// Verify and decode a JWT token into the specified claims type with request context
     pub fn verify_with_request(
         token: &str,
-        req: &HttpRequest,
+        _req: &HttpRequest,
         security: &crate::state::security_config::SecurityConfig,
     ) -> Result<Self, AppError> {
         // Configure validation to check expiration and pin algorithm to configured algorithm.
@@ -62,17 +62,14 @@ where
         .map(|data| JwtClaims {
             claims: data.claims,
         })
-        .map_err(|e| {
-            let base_error = match e.kind() {
-                jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-                    AppError::unauthorized_expired_jwt()
-                }
-                jsonwebtoken::errors::ErrorKind::InvalidSignature => {
-                    AppError::unauthorized_invalid_jwt()
-                }
-                _ => AppError::unauthorized_invalid_jwt(),
-            };
-            AppError::from_req(req, base_error)
+        .map_err(|e| match e.kind() {
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                AppError::unauthorized_expired_jwt()
+            }
+            jsonwebtoken::errors::ErrorKind::InvalidSignature => {
+                AppError::unauthorized_invalid_jwt()
+            }
+            _ => AppError::unauthorized_invalid_jwt(),
         })
     }
 }
@@ -92,36 +89,30 @@ where
             let auth_header = req
                 .headers()
                 .get(actix_web::http::header::AUTHORIZATION)
-                .ok_or_else(|| AppError::from_req(&req, AppError::unauthorized_missing_bearer()))?;
+                .ok_or(AppError::unauthorized_missing_bearer())?;
 
             let auth_value = auth_header
                 .to_str()
-                .map_err(|_| AppError::from_req(&req, AppError::unauthorized_missing_bearer()))?;
+                .map_err(|_| AppError::unauthorized_missing_bearer())?;
 
             // Parse "Bearer <token>" format
             let parts: Vec<&str> = auth_value.split_whitespace().collect();
             if parts.len() != 2 || parts[0] != "Bearer" {
-                return Err(AppError::from_req(
-                    &req,
-                    AppError::unauthorized_missing_bearer(),
-                ));
+                return Err(AppError::unauthorized_missing_bearer());
             }
 
             let token = parts[1];
             if token.is_empty() {
-                return Err(AppError::from_req(
-                    &req,
-                    AppError::unauthorized_missing_bearer(),
-                ));
+                return Err(AppError::unauthorized_missing_bearer());
             }
 
             // Get the security config from the request data
-            let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
-                AppError::from_req(&req, AppError::internal("AppState not found".to_string()))
-            })?;
+            let app_state = req
+                .app_data::<web::Data<AppState>>()
+                .ok_or_else(|| AppError::internal("AppState not found".to_string()))?;
 
             // Verify the JWT token
-            JwtClaims::verify_with_request(token, &req, &app_state.security)
+            JwtClaims::verify(token, &app_state.security)
         })
     }
 }

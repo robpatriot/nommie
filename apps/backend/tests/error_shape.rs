@@ -1,6 +1,6 @@
 mod common;
 mod support;
-use actix_web::{test, web, HttpMessage, HttpRequest, HttpResponse};
+use actix_web::{test, web, HttpRequest, HttpResponse};
 use backend::infra::state::build_state;
 use backend::AppError;
 use common::assert_problem_details_structure;
@@ -9,49 +9,47 @@ use support::create_test_app;
 use support::state_builder_ext::StateBuilderTestExt;
 
 /// Test endpoint that returns a validation error (400)
-async fn test_validation_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(
-        AppError::invalid("VALIDATION_ERROR", "Field validation failed".to_string())
-            .with_trace_id(req.extensions().get::<String>().cloned()),
-    )
+async fn test_validation_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::invalid(
+        "VALIDATION_ERROR",
+        "Field validation failed".to_string(),
+    ))
 }
 
 /// Test endpoint that returns a bad request error (400)
-async fn test_bad_request_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(
-        AppError::bad_request("BAD_REQUEST", "Invalid request format".to_string())
-            .with_trace_id(req.extensions().get::<String>().cloned()),
-    )
+async fn test_bad_request_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::bad_request(
+        "BAD_REQUEST",
+        "Invalid request format".to_string(),
+    ))
 }
 
 /// Test endpoint that returns a not found error (404)
-async fn test_not_found_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(
-        AppError::not_found("NOT_FOUND", "Resource not found".to_string())
-            .with_trace_id(req.extensions().get::<String>().cloned()),
-    )
+async fn test_not_found_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::not_found(
+        "NOT_FOUND",
+        "Resource not found".to_string(),
+    ))
 }
 
 /// Test endpoint that returns an unauthorized error (401)
-async fn test_unauthorized_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(AppError::unauthorized().with_trace_id(req.extensions().get::<String>().cloned()))
+async fn test_unauthorized_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::unauthorized())
 }
 
 /// Test endpoint that returns a forbidden error (403)
-async fn test_forbidden_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(AppError::forbidden().with_trace_id(req.extensions().get::<String>().cloned()))
+async fn test_forbidden_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::forbidden())
 }
 
 /// Test endpoint that returns an internal server error (500)
-async fn test_internal_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(AppError::internal("Database connection failed".to_string())
-        .with_trace_id(req.extensions().get::<String>().cloned()))
+async fn test_internal_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::internal("Database connection failed".to_string()))
 }
 
 /// Test endpoint that returns a database error (500)
-async fn test_db_error(req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(AppError::db("Connection timeout".to_string())
-        .with_trace_id(req.extensions().get::<String>().cloned()))
+async fn test_db_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::db("Connection timeout".to_string()))
 }
 
 /// Test that all error responses conform to ProblemDetails format
@@ -144,12 +142,12 @@ async fn test_successful_response_with_error_handling() {
     // Successful response should have 200 status
     assert_eq!(resp.status().as_u16(), 200);
 
-    // Should still have X-Request-Id header
+    // Should still have X-Trace-Id header
     let headers = resp.headers();
-    let request_id_header = headers.get("x-request-id");
+    let trace_id_header = headers.get("x-trace-id");
     assert!(
-        request_id_header.is_some(),
-        "X-Request-Id header should be present on successful responses"
+        trace_id_header.is_some(),
+        "X-Trace-Id header should be present on successful responses"
     );
 
     // Body should be the success message
@@ -157,15 +155,15 @@ async fn test_successful_response_with_error_handling() {
     assert_eq!(body, "Success");
 }
 
-/// Test edge case: error with missing trace_id (should fallback to "unknown")
+/// Test edge case: error with trace_id from task-local context
 #[actix_web::test]
-async fn test_error_without_trace_id() {
-    async fn error_without_trace() -> Result<HttpResponse, AppError> {
-        // Create error without trace_id and use the centralized function
-        Err(AppError::ensure_trace_id(AppError::invalid(
+async fn test_error_with_trace_id_from_context() {
+    async fn error_with_trace() -> Result<HttpResponse, AppError> {
+        // Create error - trace_id will come from task-local context
+        Err(AppError::invalid(
             "NO_TRACE",
             "Error without trace".to_string(),
-        )))
+        ))
     }
 
     let state = build_state()
@@ -175,7 +173,7 @@ async fn test_error_without_trace_id() {
         .expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.route("/_test/no_trace", web::get().to(error_without_trace));
+            cfg.route("/_test/no_trace", web::get().to(error_with_trace));
         })
         .build()
         .await
@@ -187,49 +185,33 @@ async fn test_error_without_trace_id() {
     // Should still return 400 status
     assert_eq!(resp.status().as_u16(), 400);
 
-    // Should have X-Request-Id header from middleware
+    // Should have X-Trace-Id header from middleware
     let headers = resp.headers();
-    let request_id_header = headers.get("x-request-id");
+    let trace_id_header = headers.get("x-trace-id");
     assert!(
-        request_id_header.is_some(),
-        "X-Request-Id header should be present"
+        trace_id_header.is_some(),
+        "X-Trace-Id header should be present"
     );
 
-    // Body should have trace_id as "unknown" since it wasn't set
+    let header_trace_id = trace_id_header.unwrap().to_str().unwrap().to_string();
+
+    // Body should have trace_id matching the header
     let body = test::read_body(resp).await;
     let body_str = String::from_utf8(body.to_vec()).unwrap();
     let problem_details: Value = serde_json::from_str(&body_str).unwrap();
 
-    assert_eq!(problem_details["trace_id"], "unknown");
+    assert_eq!(problem_details["trace_id"], header_trace_id);
     assert_eq!(problem_details["code"], "NO_TRACE");
     assert_eq!(problem_details["detail"], "Error without trace");
 }
 
-/// Test that the centralized ensure_trace_id function works correctly
+/// Test that trace_ctx::trace_id() returns "unknown" outside of request context
 #[actix_web::test]
-async fn test_ensure_trace_id_function() {
-    // Test with None trace_id
-    let error = AppError::invalid("TEST", "Test error".to_string());
-    let error_with_trace = AppError::ensure_trace_id(error);
+async fn test_trace_ctx_outside_context() {
+    use backend::web::trace_ctx;
 
-    match error_with_trace {
-        AppError::Validation { trace_id, .. } => {
-            assert_eq!(trace_id, Some("unknown".to_string()));
-        }
-        _ => panic!("Expected Validation error variant"),
-    }
-
-    // Test with Some trace_id
-    let error = AppError::invalid("TEST", "Test error".to_string())
-        .with_trace_id(Some("custom-trace".to_string()));
-    let error_with_trace = AppError::ensure_trace_id(error);
-
-    match error_with_trace {
-        AppError::Validation { trace_id, .. } => {
-            assert_eq!(trace_id, Some("custom-trace".to_string()));
-        }
-        _ => panic!("Expected Validation error variant"),
-    }
+    // Outside of a request context, should return "unknown"
+    assert_eq!(trace_ctx::trace_id(), "unknown");
 }
 
 /// Test edge case: malformed error response handling
@@ -237,8 +219,7 @@ async fn test_ensure_trace_id_function() {
 async fn test_malformed_error_response_handling() {
     async fn malformed_error() -> Result<HttpResponse, AppError> {
         // This would create a malformed response if not handled properly
-        Err(AppError::internal("Malformed error test".to_string())
-            .with_trace_id(Some("test-trace".to_string())))
+        Err(AppError::internal("Malformed error test".to_string()))
     }
 
     let state = build_state()
@@ -264,10 +245,10 @@ async fn test_malformed_error_response_handling() {
 
     // Should have proper headers
     let headers = resp.headers();
-    let request_id_header = headers.get("x-request-id");
+    let trace_id_header = headers.get("x-trace-id");
     assert!(
-        request_id_header.is_some(),
-        "X-Request-Id header should be present"
+        trace_id_header.is_some(),
+        "X-Trace-Id header should be present"
     );
 
     let content_type = headers.get("content-type").unwrap().to_str().unwrap();

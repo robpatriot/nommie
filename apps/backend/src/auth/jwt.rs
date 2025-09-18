@@ -65,13 +65,9 @@ pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Cla
     )
     .map(|data| data.claims)
     .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-            AppError::unauthorized().with_trace_id(Some("token_expired".to_string()))
-        }
-        jsonwebtoken::errors::ErrorKind::InvalidSignature => {
-            AppError::unauthorized().with_trace_id(Some("invalid_signature".to_string()))
-        }
-        _ => AppError::unauthorized().with_trace_id(Some("invalid_token".to_string())),
+        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::unauthorized_expired_jwt(),
+        jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::unauthorized_invalid_jwt(),
+        _ => AppError::unauthorized_invalid_jwt(),
     })
 }
 
@@ -117,10 +113,10 @@ mod tests {
         let result = verify_access_token(&token, &security);
 
         match result {
-            Err(AppError::Unauthorized { trace_id }) => {
-                assert_eq!(trace_id, Some("token_expired".to_string()));
+            Err(AppError::UnauthorizedExpiredJwt) => {
+                // Expected error for expired token
             }
-            _ => panic!("Expected unauthorized error for expired token"),
+            _ => panic!("Expected unauthorized expired JWT error for expired token"),
         }
     }
 
@@ -138,10 +134,10 @@ mod tests {
         let result = verify_access_token(&token, &security_b);
 
         match result {
-            Err(AppError::Unauthorized { trace_id }) => {
-                assert_eq!(trace_id, Some("invalid_signature".to_string()));
+            Err(AppError::UnauthorizedInvalidJwt) => {
+                // Expected error for invalid signature
             }
-            _ => panic!("Expected unauthorized error for bad signature"),
+            _ => panic!("Expected unauthorized invalid JWT error for bad signature"),
         }
     }
 
