@@ -1,4 +1,4 @@
-# Nommie — Cursor Rules (v1.4)
+# Nommie — Cursor Rules (v1.4.1)
 
 > Repo-root file. Applies to **all Cursor edits, refactors, and codegen**.  
 
@@ -61,19 +61,87 @@
 - No-DB tests must expect `DB_UNAVAILABLE` if they touch DB paths.  
 - DB tests must use a `_test` database (guard enforced).  
 
+### Running backend tests
+- **Before any backend tests**, refresh the test DB:
+
+    pnpm db:mig:test:refresh
+
+- **Run all tests**:
+
+    pnpm be:test     # backend  
+    pnpm fe:test     # frontend  
+    pnpm test        # all
+
+### Running a subset of backend tests (cargo-nextest)
+> ⚠️ Args to `pnpm be:test` go to `cargo nextest run`.  
+> Use `--` to pass flags intended for the test binaries (e.g., `--nocapture`).
+
+**A) By integration test binary (recommended)** — use the file name **without** `.rs`:
+
+    pnpm be:test --test auth_login  
+    pnpm be:test --test users_service_tests
+
+**B) By test name substring (positional filter)** — matches test *function* names across all binaries:
+
+    pnpm be:test test_me          # runs tests whose names contain "test_me"  
+    pnpm be:test login_endpoint   # runs names containing "login_endpoint"
+
+**C) By expression filter**
+
+    pnpm be:test -- -E login  
+    pnpm be:test -- -E 'test_login_endpoint_.*'
+
+**Output control**
+
+    pnpm be:test --test auth_login -- --nocapture
+
+**Gotchas**
+- `pnpm be:test auth_login` (bare word) filters by **test name**, not by binary.  
+  If no test names contain `auth_login`, you’ll see “no tests to run.”  
+  Use `--test auth_login` to select the integration-test binary named `auth_login`.  
+- Don’t pass file paths or directories; nextest selects by **binary** (`--test`) or **name filter** (positional/`-E`).  
+
 ---
 
 ## Commands
-- Lint: `pnpm be:lint`, `pnpm fe:lint`, `pnpm lint`  
-- Test: `pnpm be:test`, `pnpm be:test:v`, `pnpm be:test:q`, `pnpm fe:test`, `pnpm test`  
-- DB services: `pnpm db:svc:up|down|stop|logs|ready|psql`  
+- Lint:  
+    pnpm be:lint  
+    pnpm fe:lint  
+    pnpm lint  
+
+- Test:  
+    pnpm be:test  
+    pnpm be:test:v  
+    pnpm be:test:q  
+    pnpm fe:test  
+    pnpm test  
+
+- DB services:  
+    pnpm db:svc:up  
+    pnpm db:svc:down  
+    pnpm db:svc:stop  
+    pnpm db:svc:logs  
+    pnpm db:svc:ready  
+    pnpm db:svc:psql  
+
 - Migrations:  
-  - Prod: `pnpm db:mig:up`, `pnpm db:mig:refresh`  
-  - Test: `pnpm db:mig:test:up`, `pnpm db:mig:test:refresh`  
+  - Prod:  
+        pnpm db:mig:up  
+        pnpm db:mig:refresh  
+  - Test:  
+        pnpm db:mig:test:up  
+        pnpm db:mig:test:refresh  
 
 ---
 
 ## Safety
+- Always source the repo-root `.env` before running backend or frontend commands:  
+
+        set -a; source .env; set +a
+
+  Do this **once per shell session** — you don’t need to repeat it before every command.  
+
+- Only `.env.example` is committed; never commit real `.env` files.  
 - No dotenv loaders (`dotenvx`, `dotenvy`) in code/scripts.  
 - Never read `DATABASE_URL` directly.  
 - Never run destructive ops against non-`_test` DBs.  
