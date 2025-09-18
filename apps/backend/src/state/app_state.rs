@@ -14,18 +14,15 @@ pub struct AppState {
 impl AppState {
     /// Create a new AppState with the given database connection and security config
     pub fn new(db: DatabaseConnection, security: SecurityConfig) -> Self {
-        Self { 
-            db: Some(db), 
-            security 
+        Self {
+            db: Some(db),
+            security,
         }
     }
 
     /// Create a new AppState with no database connection
     pub fn new_without_db(security: SecurityConfig) -> Self {
-        Self { 
-            db: None, 
-            security 
-        }
+        Self { db: None, security }
     }
 
     /// Get a reference to the database connection if available
