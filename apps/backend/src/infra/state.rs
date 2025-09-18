@@ -9,13 +9,9 @@ use crate::state::security_config::SecurityConfig;
 ///
 /// The StateBuilder supports one database connection path:
 /// - `.with_db(..)` - Connect to a real database using a profile
-///
-/// By default, schema verification is performed unless `.assume_schema_ready()` is called.
-/// If no database is configured, the AppState will be created without a database connection.
 pub struct StateBuilder {
     security_config: SecurityConfig,
     db_profile: Option<crate::config::db::DbProfile>,
-    assume_schema_ready: bool,
 }
 
 impl StateBuilder {
@@ -24,7 +20,6 @@ impl StateBuilder {
         Self {
             security_config: SecurityConfig::default(),
             db_profile: None,
-            assume_schema_ready: false,
         }
     }
 
@@ -40,20 +35,12 @@ impl StateBuilder {
         self
     }
 
-    /// Skip schema verification for the connection; advanced use.
-    pub fn assume_schema_ready(mut self) -> Self {
-        self.assume_schema_ready = true;
-        self
-    }
-
     /// Build the AppState
     pub async fn build(self) -> Result<AppState, AppError> {
         if let Some(profile) = self.db_profile {
             // Connect to real database and ensure schema is ready
             let conn = connect_db(profile, DbOwner::App).await?;
-            if !self.assume_schema_ready {
-                ensure_schema_ready(&conn).await;
-            }
+            ensure_schema_ready(&conn).await;
             Ok(AppState::new(conn, self.security_config))
         } else {
             // No DB profile provided - create AppState without database
