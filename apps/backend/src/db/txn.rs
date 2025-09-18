@@ -5,7 +5,7 @@ use std::sync::Arc;
 use actix_web::{HttpMessage, HttpRequest};
 use sea_orm::{DatabaseTransaction, TransactionTrait};
 
-use super::txn_policy;
+use super::{require_db, txn_policy};
 use crate::error::AppError;
 use crate::state::app_state::AppState;
 
@@ -49,8 +49,11 @@ where
         return f(shared.transaction()).await;
     }
 
+    // Check if database is available
+    let db = require_db(state)?;
+
     // Real DB path: own the transaction lifecycle
-    let txn = state.db.begin().await?;
+    let txn = db.begin().await?;
     let out = f(&txn).await;
 
     match out {

@@ -7,6 +7,7 @@ mod shared_txn;
 
 use actix_web::test;
 use backend::config::db::DbProfile;
+use backend::db::require_db;
 use backend::db::txn::with_txn;
 use backend::infra::state::build_state;
 
@@ -16,7 +17,8 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Open a shared transaction
-    let shared = shared_txn::open(&state.db).await;
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = shared_txn::open(db).await;
 
     // Create a mutable request and inject the shared transaction
     let mut req = test::TestRequest::default().to_http_request();
@@ -46,7 +48,8 @@ async fn test_shared_txn_reuse_commit_behavior() -> Result<(), Box<dyn std::erro
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Open a shared transaction
-    let shared = shared_txn::open(&state.db).await;
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = shared_txn::open(db).await;
 
     // Create a mutable request and inject the shared transaction
     let mut req = test::TestRequest::default().to_http_request();

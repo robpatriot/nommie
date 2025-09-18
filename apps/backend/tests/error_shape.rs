@@ -1,17 +1,18 @@
 mod common;
 mod support;
 use actix_web::{test, web, HttpRequest, HttpResponse};
+use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
-use backend::AppError;
+use backend::state::app_state::AppState;
+use backend::{AppError, ErrorCode};
 use common::assert_problem_details_structure;
 use serde_json::Value;
 use support::create_test_app;
-use support::state_builder_ext::StateBuilderTestExt;
 
 /// Test endpoint that returns a validation error (400)
 async fn test_validation_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
     Err(AppError::invalid(
-        "VALIDATION_ERROR",
+        ErrorCode::ValidationError,
         "Field validation failed".to_string(),
     ))
 }
@@ -19,7 +20,7 @@ async fn test_validation_error(_req: HttpRequest) -> Result<HttpResponse, AppErr
 /// Test endpoint that returns a bad request error (400)
 async fn test_bad_request_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
     Err(AppError::bad_request(
-        "BAD_REQUEST",
+        ErrorCode::BadRequest,
         "Invalid request format".to_string(),
     ))
 }
@@ -27,7 +28,7 @@ async fn test_bad_request_error(_req: HttpRequest) -> Result<HttpResponse, AppEr
 /// Test endpoint that returns a not found error (404)
 async fn test_not_found_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
     Err(AppError::not_found(
-        "NOT_FOUND",
+        ErrorCode::NotFound,
         "Resource not found".to_string(),
     ))
 }
@@ -44,12 +45,17 @@ async fn test_forbidden_error(_req: HttpRequest) -> Result<HttpResponse, AppErro
 
 /// Test endpoint that returns an internal server error (500)
 async fn test_internal_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(AppError::internal("Database connection failed".to_string()))
+    Err(AppError::internal("Database connection failed"))
 }
 
 /// Test endpoint that returns a database error (500)
 async fn test_db_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
-    Err(AppError::db("Connection timeout".to_string()))
+    Err(AppError::db("Connection timeout"))
+}
+
+/// Test endpoint that returns a database unavailable error (500)
+async fn test_db_unavailable_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+    Err(AppError::db_unavailable())
 }
 
 /// Test that all error responses conform to ProblemDetails format
@@ -57,7 +63,7 @@ async fn test_db_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
 #[actix_web::test]
 async fn test_all_error_responses_conform_to_problem_details() {
     let state = build_state()
-        .with_mock_db()
+        .with_db(DbProfile::Test)
         .build()
         .await
         .expect("create test state");
@@ -72,7 +78,11 @@ async fn test_all_error_responses_conform_to_problem_details() {
                 )
                 .route("/_test/forbidden", web::get().to(test_forbidden_error))
                 .route("/_test/internal", web::get().to(test_internal_error))
-                .route("/_test/db", web::get().to(test_db_error));
+                .route("/_test/db", web::get().to(test_db_error))
+                .route(
+                    "/_test/db_unavailable",
+                    web::get().to(test_db_unavailable_error),
+                );
         })
         .build()
         .await
@@ -107,6 +117,12 @@ async fn test_all_error_responses_conform_to_problem_details() {
             "Database connection failed",
         ),
         ("/_test/db", 500, "DB_ERROR", "Connection timeout"),
+        (
+            "/_test/db_unavailable",
+            500,
+            "DB_UNAVAILABLE",
+            "Database unavailable",
+        ),
     ];
 
     for (endpoint, status, code, detail) in error_cases {
@@ -124,7 +140,7 @@ async fn test_successful_response_with_error_handling() {
     }
 
     let state = build_state()
-        .with_mock_db()
+        .with_db(DbProfile::Test)
         .build()
         .await
         .expect("create test state");
@@ -161,13 +177,13 @@ async fn test_error_with_trace_id_from_context() {
     async fn error_with_trace() -> Result<HttpResponse, AppError> {
         // Create error - trace_id will come from task-local context
         Err(AppError::invalid(
-            "NO_TRACE",
+            ErrorCode::NoTrace,
             "Error without trace".to_string(),
         ))
     }
 
     let state = build_state()
-        .with_mock_db()
+        .with_db(DbProfile::Test)
         .build()
         .await
         .expect("create test state");
@@ -219,11 +235,11 @@ async fn test_trace_ctx_outside_context() {
 async fn test_malformed_error_response_handling() {
     async fn malformed_error() -> Result<HttpResponse, AppError> {
         // This would create a malformed response if not handled properly
-        Err(AppError::internal("Malformed error test".to_string()))
+        Err(AppError::internal("Malformed error test"))
     }
 
     let state = build_state()
-        .with_mock_db()
+        .with_db(DbProfile::Test)
         .build()
         .await
         .expect("create test state");
@@ -273,4 +289,74 @@ async fn test_malformed_error_response_handling() {
     assert_eq!(problem_details["status"], 500);
     assert_eq!(problem_details["code"], "INTERNAL");
     assert_eq!(problem_details["detail"], "Malformed error test");
+}
+
+/// Test endpoint that uses require_db helper
+async fn test_require_db_endpoint(state: web::Data<AppState>) -> Result<HttpResponse, AppError> {
+    use backend::db::require_db;
+
+    // This will return DB_UNAVAILABLE if no DB is configured
+    let _db = require_db(&state)?;
+
+    // If DB exists, succeed
+    Ok(HttpResponse::Ok().body("Success"))
+}
+
+/// Test that require_db helper returns DB_UNAVAILABLE error when no DB is configured
+#[actix_web::test]
+async fn test_require_db_without_database() {
+    let state = build_state()
+        .build() // build with no DB
+        .await
+        .expect("create test state without DB");
+
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/_test/require_db", web::get().to(test_require_db_endpoint));
+        })
+        .build()
+        .await
+        .expect("create test app");
+
+    let req = test::TestRequest::get()
+        .uri("/_test/require_db")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+
+    // Should return DB_UNAVAILABLE problem details with trace id
+    assert_problem_details_structure(resp, 500, "DB_UNAVAILABLE", "Database unavailable").await;
+}
+
+/// Test that require_db helper succeeds when DB is configured
+#[actix_web::test]
+async fn test_require_db_with_database() {
+    let state = build_state()
+        .with_db(DbProfile::Test) // build with Test DB
+        .build()
+        .await
+        .expect("create test state with DB");
+
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route("/_test/require_db", web::get().to(test_require_db_endpoint));
+        })
+        .build()
+        .await
+        .expect("create test app");
+
+    let req = test::TestRequest::get()
+        .uri("/_test/require_db")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+
+    // Should succeed with 200 OK
+    assert_eq!(resp.status().as_u16(), 200);
+
+    // Still should have X-Trace-Id header
+    let headers = resp.headers();
+    assert!(headers.get("x-trace-id").is_some());
+
+    // Body should be "Success"
+    let body = test::read_body(resp).await;
+    assert_eq!(body, "Success");
 }

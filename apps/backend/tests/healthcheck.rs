@@ -1,14 +1,14 @@
 mod support;
 
 use actix_web::test;
+use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 use support::create_test_app;
-use support::state_builder_ext::StateBuilderTestExt;
 
 #[actix_web::test]
 async fn test_health_endpoint() -> Result<(), Box<dyn std::error::Error>> {
     // Build state, then app using the two-stage harness
-    let state = build_state().with_mock_db().build().await?;
+    let state = build_state().with_db(DbProfile::Test).build().await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let req = test::TestRequest::get().uri("/health").to_request();

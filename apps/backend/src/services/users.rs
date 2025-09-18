@@ -6,6 +6,7 @@ use users::Model as User;
 
 use crate::entities::{user_credentials, users};
 use crate::error::AppError;
+use crate::errors::ErrorCode;
 
 /// Redacts a google_sub value for logging purposes.
 /// Shows only the first 4 characters followed by asterisks.
@@ -47,7 +48,7 @@ pub async fn ensure_user(
                         "Google sub mismatch detected"
                     );
                     return Err(AppError::conflict(
-                        "GOOGLE_SUB_MISMATCH",
+                        ErrorCode::GoogleSubMismatch,
                         "This email is already linked to a different Google account. Please use the original Google account or contact support.".to_string(),
                     ));
                 }

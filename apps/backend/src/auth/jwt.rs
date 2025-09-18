@@ -27,7 +27,7 @@ pub fn mint_access_token(
 ) -> Result<String, AppError> {
     let iat = now
         .duration_since(UNIX_EPOCH)
-        .map_err(|_| AppError::internal("Failed to get current time".to_string()))?
+        .map_err(|_| AppError::internal("Failed to get current time"))?
         .as_secs() as i64;
 
     // 15 minutes expiration

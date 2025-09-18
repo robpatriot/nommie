@@ -3,6 +3,7 @@ mod support;
 
 use actix_web::{test, web, Responder};
 use backend::config::db::DbProfile;
+use backend::db::require_db;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::game_id::GameId;
 use backend::infra::state::build_state;
@@ -27,7 +28,7 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
     // Create a test game in the database
-    let db = &state.db;
+    let db = require_db(&state).expect("DB required for this test");
     let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),

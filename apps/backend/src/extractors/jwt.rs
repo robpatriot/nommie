@@ -109,7 +109,7 @@ where
             // Get the security config from the request data
             let app_state = req
                 .app_data::<web::Data<AppState>>()
-                .ok_or_else(|| AppError::internal("AppState not found".to_string()))?;
+                .ok_or_else(|| AppError::internal("AppState not found"))?;
 
             // Verify the JWT token
             JwtClaims::verify(token, &app_state.security)
