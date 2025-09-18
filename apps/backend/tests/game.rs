@@ -1,15 +1,18 @@
-use backend::config::db::{DbOwner, DbProfile};
+use backend::config::db::DbProfile;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::infra::db::connect_db;
+use backend::infra::state::build_state;
 use sea_orm::{EntityTrait, Set};
 use serial_test::serial;
 
 #[tokio::test]
 #[serial]
 async fn insert_defaults_and_fetch() {
-    let db = connect_db(DbProfile::Test, DbOwner::App)
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
         .await
-        .expect("connect to _test database");
+        .expect("build test state with DB");
+    let db = state.db().expect("database should be available");
 
     // Insert a games row with minimal fields
     let now = time::OffsetDateTime::now_utc();
@@ -23,7 +26,7 @@ async fn insert_defaults_and_fetch() {
     };
 
     let inserted_game = games::Entity::insert(game)
-        .exec(&db)
+        .exec(db)
         .await
         .expect("should insert game successfully");
 
@@ -32,7 +35,7 @@ async fn insert_defaults_and_fetch() {
 
     // Fetch by id and assert it exists
     let fetched_game = games::Entity::find_by_id(inserted_game.last_insert_id)
-        .one(&db)
+        .one(db)
         .await
         .expect("should query successfully")
         .expect("should have game row");
@@ -47,9 +50,12 @@ async fn insert_defaults_and_fetch() {
 #[tokio::test]
 #[serial]
 async fn join_code_unique() {
-    let db = connect_db(DbProfile::Test, DbOwner::App)
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
         .await
-        .expect("connect to _test database");
+        .expect("build test state with DB");
+    let db = state.db().expect("database should be available");
 
     // Insert first game with join_code
     let now = time::OffsetDateTime::now_utc();
@@ -64,7 +70,7 @@ async fn join_code_unique() {
     };
 
     let inserted_game1 = games::Entity::insert(game1)
-        .exec(&db)
+        .exec(db)
         .await
         .expect("should insert first game successfully");
 
@@ -80,7 +86,7 @@ async fn join_code_unique() {
         ..Default::default()
     };
 
-    let result = games::Entity::insert(game2).exec(&db).await;
+    let result = games::Entity::insert(game2).exec(db).await;
 
     // Assert the second insert errors (unique violation)
     assert!(
@@ -90,7 +96,7 @@ async fn join_code_unique() {
 
     // Verify the first game still exists
     let fetched_game = games::Entity::find_by_id(inserted_game1.last_insert_id)
-        .one(&db)
+        .one(db)
         .await
         .expect("should query successfully")
         .expect("should have first game row");

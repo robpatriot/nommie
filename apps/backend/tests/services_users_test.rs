@@ -1,8 +1,8 @@
-use backend::config::db::{DbOwner, DbProfile};
+use backend::config::db::DbProfile;
 use backend::entities::user_credentials;
 use backend::error::AppError;
 use backend::errors::ErrorCode;
-use backend::infra::db::connect_db;
+use backend::infra::state::build_state;
 use backend::services::users::ensure_user;
 use backend::utils::unique::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
@@ -11,9 +11,12 @@ use serial_test::serial;
 #[tokio::test]
 #[serial]
 async fn test_ensure_user_inserts_then_reuses() {
-    let db = connect_db(DbProfile::Test, DbOwner::App)
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
         .await
-        .expect("connect to _test database");
+        .expect("build test state with DB");
+    let db = state.db().expect("database should be available");
 
     // First call - should create a new user
     let test_email = unique_email("alice");
@@ -22,7 +25,7 @@ async fn test_ensure_user_inserts_then_reuses() {
         test_email.clone(),
         Some("Alice".to_string()),
         test_google_sub.clone(),
-        &db,
+        db,
     )
     .await
     .expect("should create user successfully");
@@ -37,7 +40,7 @@ async fn test_ensure_user_inserts_then_reuses() {
         test_email.clone(),
         Some("Alice Smith".to_string()), // Different name
         test_google_sub.clone(),         // Same google_sub
-        &db,
+        db,
     )
     .await
     .expect("should return existing user");
@@ -49,7 +52,7 @@ async fn test_ensure_user_inserts_then_reuses() {
     // Verify that only one user_credentials row exists for this email
     let credential_count = user_credentials::Entity::find()
         .filter(user_credentials::Column::Email.eq(&test_email))
-        .count(&db)
+        .count(db)
         .await
         .expect("should count credentials successfully");
 
@@ -62,7 +65,7 @@ async fn test_ensure_user_inserts_then_reuses() {
     // Verify that the credential row has the correct user_id
     let credential = user_credentials::Entity::find()
         .filter(user_credentials::Column::Email.eq(&test_email))
-        .one(&db)
+        .one(db)
         .await
         .expect("should query successfully")
         .expect("should have credential row");
@@ -82,9 +85,12 @@ async fn test_ensure_user_inserts_then_reuses() {
 #[tokio::test]
 #[serial]
 async fn test_ensure_user_google_sub_mismatch_policy() {
-    let db = connect_db(DbProfile::Test, DbOwner::App)
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
         .await
-        .expect("connect to _test database");
+        .expect("build test state with DB");
+    let db = state.db().expect("database should be available");
 
     let test_email = unique_email("bob");
     let original_google_sub = unique_str("google-sub-original");
@@ -95,7 +101,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
         test_email.clone(),
         Some("Bob".to_string()),
         original_google_sub.clone(),
-        &db,
+        db,
     )
     .await
     .expect("should create user successfully");
@@ -108,7 +114,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
     // Verify credential was created with the original google_sub
     let credential = user_credentials::Entity::find()
         .filter(user_credentials::Column::Email.eq(&test_email))
-        .one(&db)
+        .one(db)
         .await
         .expect("should query successfully")
         .expect("should have credential row");
@@ -124,7 +130,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
         test_email.clone(),
         Some("Bob Smith".to_string()), // Different name
         original_google_sub.clone(),   // Same google_sub
-        &db,
+        db,
     )
     .await
     .expect("should return existing user");
@@ -136,7 +142,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
     // Verify that only one user_credentials row exists for this email
     let credential_count = user_credentials::Entity::find()
         .filter(user_credentials::Column::Email.eq(&test_email))
-        .count(&db)
+        .count(db)
         .await
         .expect("should count credentials successfully");
 
@@ -150,7 +156,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
         test_email.clone(),
         Some("Bob".to_string()),
         different_google_sub.clone(),
-        &db,
+        db,
     )
     .await;
 
@@ -165,7 +171,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
     // Verify that the original credential remains unchanged
     let credential_after_error = user_credentials::Entity::find()
         .filter(user_credentials::Column::Email.eq(&test_email))
-        .one(&db)
+        .one(db)
         .await
         .expect("should query successfully")
         .expect("should have credential row");
@@ -180,9 +186,12 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
 #[tokio::test]
 #[serial]
 async fn test_ensure_user_set_null_google_sub() {
-    let db = connect_db(DbProfile::Test, DbOwner::App)
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
         .await
-        .expect("connect to _test database");
+        .expect("build test state with DB");
+    let db = state.db().expect("database should be available");
 
     let test_email = unique_email("charlie");
     let google_sub = unique_str("google-sub");
@@ -203,7 +212,7 @@ async fn test_ensure_user_set_null_google_sub() {
     };
 
     let user = user_active
-        .insert(&db)
+        .insert(db)
         .await
         .expect("should create user successfully");
 
@@ -220,7 +229,7 @@ async fn test_ensure_user_set_null_google_sub() {
     };
 
     credential_active
-        .insert(&db)
+        .insert(db)
         .await
         .expect("should create user credentials successfully");
 
@@ -229,7 +238,7 @@ async fn test_ensure_user_set_null_google_sub() {
         test_email.clone(),
         Some("Charlie Brown".to_string()), // Different name
         google_sub.clone(),
-        &db,
+        db,
     )
     .await
     .expect("should update user successfully");
@@ -241,7 +250,7 @@ async fn test_ensure_user_set_null_google_sub() {
     // Verify that the google_sub was set
     let credential_after_update = user_credentials::Entity::find()
         .filter(user_credentials::Column::Email.eq(&test_email))
-        .one(&db)
+        .one(db)
         .await
         .expect("should query successfully")
         .expect("should have credential row");
