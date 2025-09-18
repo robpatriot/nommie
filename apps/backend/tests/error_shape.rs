@@ -62,11 +62,7 @@ async fn test_db_unavailable_error(_req: HttpRequest) -> Result<HttpResponse, Ap
 /// This test consolidates all error type testing into a single, parameterized test
 #[actix_web::test]
 async fn test_all_error_responses_conform_to_problem_details() {
-    let state = build_state()
-        .with_db(DbProfile::Test)
-        .build()
-        .await
-        .expect("create test state");
+    let state = build_state().build().await.expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/validation", web::get().to(test_validation_error))
@@ -139,11 +135,7 @@ async fn test_successful_response_with_error_handling() {
         Ok(HttpResponse::Ok().body("Success"))
     }
 
-    let state = build_state()
-        .with_db(DbProfile::Test)
-        .build()
-        .await
-        .expect("create test state");
+    let state = build_state().build().await.expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/success", web::get().to(success_handler));
@@ -182,11 +174,7 @@ async fn test_error_with_trace_id_from_context() {
         ))
     }
 
-    let state = build_state()
-        .with_db(DbProfile::Test)
-        .build()
-        .await
-        .expect("create test state");
+    let state = build_state().build().await.expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/no_trace", web::get().to(error_with_trace));
@@ -238,11 +226,7 @@ async fn test_malformed_error_response_handling() {
         Err(AppError::internal("Malformed error test"))
     }
 
-    let state = build_state()
-        .with_db(DbProfile::Test)
-        .build()
-        .await
-        .expect("create test state");
+    let state = build_state().build().await.expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/malformed", web::get().to(malformed_error));

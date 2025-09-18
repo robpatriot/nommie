@@ -1,6 +1,5 @@
 mod support;
 
-use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 
 #[tokio::test]
@@ -12,9 +11,5 @@ async fn builds_without_db() {
 
 #[tokio::test]
 async fn builds_with_test_db() {
-    let _state = build_state()
-        .with_db(DbProfile::Test)
-        .build()
-        .await
-        .unwrap();
+    let _state = build_state().build().await.unwrap();
 }
