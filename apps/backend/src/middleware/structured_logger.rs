@@ -1,10 +1,10 @@
-use std::time::Instant;
 use std::future::{ready, Ready};
+use std::time::Instant;
 
-use actix_web::{HttpMessage, Error as ActixError};
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
+use actix_web::{Error as ActixError, HttpMessage};
 use futures_util::future::LocalBoxFuture;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 pub struct StructuredLogger;
 
