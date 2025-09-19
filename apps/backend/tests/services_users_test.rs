@@ -1,10 +1,12 @@
+mod support;
+
+use actix_web::ResponseError;
 use backend::config::db::DbProfile;
 use backend::entities::user_credentials;
-use backend::error::AppError;
-use backend::errors::ErrorCode;
 use backend::infra::state::build_state;
 use backend::services::users::ensure_user;
 use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::problem_details::assert_problem_details_from_http_response;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
 
@@ -161,11 +163,17 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
     .await;
 
     match error_result {
-        Err(AppError::Conflict { code, detail, .. }) => {
-            assert_eq!(code, ErrorCode::GoogleSubMismatch);
-            assert!(detail.contains("already linked to a different Google account"));
+        Err(err) => {
+            let response = err.error_response();
+            assert_problem_details_from_http_response(
+                response,
+                "GOOGLE_SUB_MISMATCH",
+                actix_web::http::StatusCode::CONFLICT,
+                Some("already linked to a different Google account"),
+            )
+            .await;
         }
-        other => panic!("Expected Conflict error with GOOGLE_SUB_MISMATCH code, got: {other:?}"),
+        Ok(_) => panic!("Expected Conflict error with GOOGLE_SUB_MISMATCH code"),
     }
 
     // Verify that the original credential remains unchanged

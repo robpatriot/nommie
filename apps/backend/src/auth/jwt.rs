@@ -75,13 +75,17 @@ pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Cla
 mod tests {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+    use actix_web::http::StatusCode;
+    use actix_web::ResponseError;
+    // Import the shared test helper
+    use backend_test_support::problem_details::assert_problem_details_from_http_response;
+
     use super::{mint_access_token, verify_access_token};
     use crate::state::security_config::SecurityConfig;
     use crate::utils::unique::{unique_email, unique_str};
-    use crate::AppError;
 
-    #[test]
-    fn test_mint_and_verify_roundtrip() {
+    #[tokio::test]
+    async fn test_mint_and_verify_roundtrip() {
         let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
         let sub = unique_str("test-sub-roundtrip");
@@ -100,8 +104,8 @@ mod tests {
         assert_eq!(claims.exp, claims.iat + 15 * 60);
     }
 
-    #[test]
-    fn test_expired_token() {
+    #[tokio::test]
+    async fn test_expired_token() {
         let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
         let sub = unique_str("test-sub-expired");
@@ -113,15 +117,23 @@ mod tests {
         let result = verify_access_token(&token, &security);
 
         match result {
-            Err(AppError::UnauthorizedExpiredJwt) => {
-                // Expected error for expired token
+            Err(err) => {
+                // Use contract assertions via HTTP path
+                let response = err.error_response();
+                assert_problem_details_from_http_response(
+                    response,
+                    "UNAUTHORIZED_EXPIRED_JWT",
+                    StatusCode::UNAUTHORIZED,
+                    Some("Token expired"),
+                )
+                .await;
             }
-            _ => panic!("Expected unauthorized expired JWT error for expired token"),
+            Ok(_) => panic!("Expected unauthorized expired JWT error for expired token"),
         }
     }
 
-    #[test]
-    fn test_bad_signature() {
+    #[tokio::test]
+    async fn test_bad_signature() {
         // Mint with secret A
         let security_a = SecurityConfig::new("secret-A".as_bytes());
 
@@ -134,15 +146,23 @@ mod tests {
         let result = verify_access_token(&token, &security_b);
 
         match result {
-            Err(AppError::UnauthorizedInvalidJwt) => {
-                // Expected error for invalid signature
+            Err(err) => {
+                // Use contract assertions via HTTP path
+                let response = err.error_response();
+                assert_problem_details_from_http_response(
+                    response,
+                    "UNAUTHORIZED_INVALID_JWT",
+                    StatusCode::UNAUTHORIZED,
+                    Some("Invalid JWT"),
+                )
+                .await;
             }
-            _ => panic!("Expected unauthorized invalid JWT error for bad signature"),
+            Ok(_) => panic!("Expected unauthorized invalid JWT error for bad signature"),
         }
     }
 
-    #[test]
-    fn test_missing_jwt_secret() {
+    #[tokio::test]
+    async fn test_missing_jwt_secret() {
         let security = SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
 
         let sub = unique_str("test-sub-missing-secret");

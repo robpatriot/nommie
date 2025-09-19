@@ -1,13 +1,13 @@
 use actix_web::error::ResponseError;
 use actix_web::http::StatusCode;
 use actix_web::HttpResponse;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::errors::ErrorCode;
 use crate::web::trace_ctx;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ProblemDetails {
     #[serde(rename = "type")]
     pub type_: String,
@@ -198,6 +198,23 @@ impl AppError {
         Self::DbUnavailable
     }
 
+    /// Private canonical method for building ProblemDetails
+    /// This is the single source of truth for ProblemDetails construction
+    fn to_problem_details_with_trace_id(&self, trace_id: String) -> ProblemDetails {
+        let status = self.status();
+        let code = self.code();
+        let detail = self.detail();
+
+        ProblemDetails {
+            type_: format!("https://nommie.app/errors/{}", code.to_uppercase()),
+            title: Self::humanize_code(&code),
+            status: status.as_u16(),
+            detail,
+            code,
+            trace_id,
+        }
+    }
+
     fn humanize_code(code: &str) -> String {
         code.split('_')
             .map(|word| {
@@ -231,18 +248,8 @@ impl ResponseError for AppError {
 
     fn error_response(&self) -> HttpResponse {
         let status = self.status();
-        let code = self.code();
-        let detail = self.detail();
         let trace_id = trace_ctx::trace_id();
-
-        let problem_details = ProblemDetails {
-            type_: format!("https://nommie.app/errors/{}", code.to_uppercase()),
-            title: Self::humanize_code(&code),
-            status: status.as_u16(),
-            detail,
-            code,
-            trace_id: trace_id.clone(),
-        };
+        let problem_details = self.to_problem_details_with_trace_id(trace_id.clone());
 
         HttpResponse::build(status)
             .content_type("application/problem+json")
