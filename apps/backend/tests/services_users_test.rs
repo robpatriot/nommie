@@ -2,6 +2,7 @@ mod support;
 
 use actix_web::ResponseError;
 use backend::config::db::DbProfile;
+use backend::db::require_db;
 use backend::entities::user_credentials;
 use backend::infra::state::build_state;
 use backend::services::users::ensure_user;
@@ -18,7 +19,7 @@ async fn test_ensure_user_inserts_then_reuses() {
         .build()
         .await
         .expect("build test state with DB");
-    let db = state.db().expect("database should be available");
+    let db = require_db(&state).expect("database should be available");
 
     // First call - should create a new user
     let test_email = unique_email("alice");
@@ -92,7 +93,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() {
         .build()
         .await
         .expect("build test state with DB");
-    let db = state.db().expect("database should be available");
+    let db = require_db(&state).expect("database should be available");
 
     let test_email = unique_email("bob");
     let original_google_sub = unique_str("google-sub-original");
@@ -199,7 +200,7 @@ async fn test_ensure_user_set_null_google_sub() {
         .build()
         .await
         .expect("build test state with DB");
-    let db = state.db().expect("database should be available");
+    let db = require_db(&state).expect("database should be available");
 
     let test_email = unique_email("charlie");
     let google_sub = unique_str("google-sub");

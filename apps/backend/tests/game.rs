@@ -1,4 +1,5 @@
 use backend::config::db::DbProfile;
+use backend::db::require_db;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::infra::state::build_state;
 use sea_orm::{EntityTrait, Set};
@@ -12,7 +13,7 @@ async fn insert_defaults_and_fetch() {
         .build()
         .await
         .expect("build test state with DB");
-    let db = state.db().expect("database should be available");
+    let db = require_db(&state).expect("database should be available");
 
     // Insert a games row with minimal fields
     let now = time::OffsetDateTime::now_utc();
@@ -55,7 +56,7 @@ async fn join_code_unique() {
         .build()
         .await
         .expect("build test state with DB");
-    let db = state.db().expect("database should be available");
+    let db = require_db(&state).expect("database should be available");
 
     // Insert first game with join_code
     let now = time::OffsetDateTime::now_utc();
