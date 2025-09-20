@@ -243,3 +243,10 @@
 - **PII-safe logging** (mask/hash email and `google_sub`).  
 - **Time provider abstraction** (injectable clock for deterministic tests).  
 - **Rate limiting** (`429 RATE_LIMITED` on auth endpoint).
+
+### 🅇 Frontend Import Hygiene & Lazy Loading *(S → M)*  
+- **Consistent import ordering/grouping** (builtin, external, internal alias, parent/sibling, index).  
+- **Type-only imports** enforced via ESLint.  
+- **Dynamic `import()` / `next/dynamic`** for heavy libs or non-critical components.  
+- **Example migration** of one component to `next/dynamic`.  
+- **Docs** page explaining import policy and usage examples.  
