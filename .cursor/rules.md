@@ -20,6 +20,20 @@
 
 ---
 
+## Rust Imports & `use` Rules
+
+- Default: put all `use` at the **top of the module**, after docs/attrs.  
+- Allowed inside a function/test only if the symbol is used there once or it avoids polluting scope.  
+- Group order (with blank line): std::* then external crates then internal crates
+- Sort alphabetically within groups.  
+- Import traits explicitly; function-scoped if they’re one-off.  
+- Avoid aliasing unless needed to resolve collisions.  
+- Use `pub use` only in stable boundaries (`lib.rs`, `mod.rs`, prelude).  
+- Tests may use `use super::*;` and local trait imports for ergonomics. 
+- **No wildcard imports** in production. Allowed only in `#[cfg(test)]` and those allowed in the root clippy.toml.  
+
+---
+
 ## Transactions
 - Wrap all multi-row/table work in `with_txn`.  
 - `with_txn` closures return `Result<_, AppError>`.  
