@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use actix_web::{web, HttpResponse, Result};
+use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::jwt::mint_access_token;
@@ -27,6 +27,7 @@ pub struct LoginResponse {
 /// Handle Google OAuth login callback
 /// Creates or reuses a user based on email and returns a JWT token
 async fn login(
+    http_req: HttpRequest,
     req: web::Json<LoginRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
@@ -51,7 +52,7 @@ async fn login(
     let google_sub = req.google_sub.clone();
 
     // Own the transaction boundary here and pass a borrowed txn to the service
-    let user = with_txn(None, &app_state, |txn| {
+    let user = with_txn(Some(&http_req), &app_state, |txn| {
         // Box the async block so its lifetime is tied to `txn` (no 'static)
         Box::pin(async move { ensure_user(email, name, google_sub, txn).await })
     })

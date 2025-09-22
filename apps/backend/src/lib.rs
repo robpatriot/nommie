@@ -5,7 +5,6 @@ pub mod entities;
 pub mod error;
 pub mod errors;
 pub mod extractors;
-pub mod health;
 pub mod infra;
 pub mod middleware;
 pub mod routes;
