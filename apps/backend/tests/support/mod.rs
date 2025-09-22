@@ -2,7 +2,6 @@
 
 pub mod app_builder;
 pub mod factory;
-pub mod logging;
 pub mod shared_txn;
 
 // Re-export only what current tests actually import

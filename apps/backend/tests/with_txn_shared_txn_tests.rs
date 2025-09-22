@@ -2,6 +2,7 @@
 //!
 //! These tests verify that SharedTxn bypasses the transaction policy
 //! and that with_txn does not perform commit/rollback operations.
+mod common;
 #[path = "support/shared_txn.rs"]
 mod shared_txn;
 

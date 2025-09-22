@@ -1,9 +1,8 @@
-//! Tests for rollback policy behavior (includes test_init.rs)
+//! Tests for rollback policy behavior
 //!
-//! This module includes the test_init.rs module, so it should use the
-//! RollbackOnOk policy and not persist writes to the database.
-#[path = "support/test_init.rs"]
-mod test_init;
+//! This module now uses the common initialization which sets the
+//! RollbackOnOk policy and does not persist writes to the database.
+mod common;
 
 use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;

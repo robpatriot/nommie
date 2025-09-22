@@ -1,3 +1,4 @@
+mod common;
 mod support;
 
 use actix_web::test;

@@ -3,13 +3,9 @@
 //! These tests verify that the TxnPolicy OnceLock works correctly in isolation
 //! within each integration test binary.
 
-use backend::db::txn_policy::{current, set_txn_policy, TxnPolicy};
+mod common;
 
-#[test]
-fn test_default_policy_is_commit_on_ok() {
-    // Each integration test binary has its own OnceLock, so we start fresh
-    assert_eq!(current(), TxnPolicy::CommitOnOk);
-}
+use backend::db::txn_policy::{current, set_txn_policy, TxnPolicy};
 
 #[test]
 fn test_set_policy_to_rollback_on_ok() {

@@ -1,3 +1,5 @@
+mod common;
+
 use backend::config::db::DbProfile;
 use backend::db::require_db;
 use backend::entities::games::{self, GameState, GameVisibility};

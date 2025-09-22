@@ -1,9 +1,38 @@
+#![allow(dead_code)]
+
+// tests/common/mod.rs
+use actix_web::body::BoxBody;
+use actix_web::dev::ServiceResponse;
+use actix_web::http::header::{HeaderName, CONTENT_TYPE};
 use actix_web::test;
 use serde_json::Value;
 
+// Logging is auto-installed for most test binaries
+#[ctor::ctor]
+fn init_logging() {
+    backend_test_support::logging::init();
+}
+
+// Policy defaults to rollback but can be flipped per-binary via `NOMMIE_TXN_POLICY=commit`.
+#[ctor::ctor]
+fn init_txn_policy() {
+    let policy = match std::env::var("NOMMIE_TXN_POLICY")
+        .unwrap_or_default()
+        .to_lowercase()
+        .as_str()
+    {
+        "commit" => backend::db::txn_policy::TxnPolicy::CommitOnOk,
+        _ => backend::db::txn_policy::TxnPolicy::RollbackOnOk,
+    };
+
+    backend::db::txn_policy::set_txn_policy(policy);
+}
+
 /// Helper function to check that the trace_id in the response body matches the X-Trace-Id header
-pub fn assert_trace_id_matches(response: &Value, header_trace_id: &str) {
-    let trace_id_in_body = response["trace_id"].as_str().unwrap();
+pub fn assert_trace_id_matches(json: &Value, header_trace_id: &str) {
+    let trace_id_in_body = json["trace_id"]
+        .as_str()
+        .expect("trace_id field should be a string");
     assert_eq!(
         trace_id_in_body, header_trace_id,
         "trace_id in body should match X-Trace-Id header"
@@ -13,7 +42,7 @@ pub fn assert_trace_id_matches(response: &Value, header_trace_id: &str) {
 /// Helper function to validate that a response follows the ProblemDetails structure
 /// and that trace_id matches the X-Trace-Id header
 pub async fn assert_problem_details_structure(
-    resp: actix_web::dev::ServiceResponse<actix_web::body::BoxBody>,
+    resp: ServiceResponse<BoxBody>,
     expected_status: u16,
     expected_code: &str,
     expected_detail: &str,
@@ -23,56 +52,44 @@ pub async fn assert_problem_details_structure(
 
     // Extract headers before consuming the response
     let headers = resp.headers().clone();
-    let trace_id_header = headers.get("x-trace-id");
-    assert!(
-        trace_id_header.is_some(),
-        "X-Trace-Id header should be present"
-    );
-    let trace_id = trace_id_header.unwrap().to_str().unwrap();
+
+    // X-Trace-Id (header names are case-insensitive; use a typed HeaderName)
+    let trace_hdr = HeaderName::from_static("x-trace-id");
+    let trace_id = headers
+        .get(&trace_hdr)
+        .and_then(|v| v.to_str().ok())
+        .expect("X-Trace-Id header should be present and valid UTF-8");
     assert!(
         !trace_id.is_empty(),
         "X-Trace-Id header should not be empty"
     );
 
-    // Assert Content-Type is application/problem+json
-    let content_type = headers.get("content-type").unwrap().to_str().unwrap();
-    assert_eq!(content_type, "application/problem+json");
+    // Content-Type may include parameters (e.g., charset)
+    let content_type = headers
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    assert!(
+        content_type.starts_with("application/problem+json"),
+        "Content-Type must be application/problem+json (got {content_type})"
+    );
 
     // Read and parse the response body
     let body = test::read_body(resp).await;
-    let body_str = String::from_utf8(body.to_vec()).unwrap();
+    let body_str = std::str::from_utf8(&body).expect("Response body should be valid UTF-8");
 
     // Improved error handling for deserialization failures with more descriptive error message
-    let problem_details: Value = match serde_json::from_str(&body_str) {
-        Ok(details) => details,
-        Err(_) => panic!("Failed to parse error body as ProblemDetails. Raw body: {body_str}"),
-    };
+    let problem_details: Value = serde_json::from_str(body_str).unwrap_or_else(|_| {
+        panic!("Failed to parse error body as ProblemDetails. Raw body: {body_str}")
+    });
 
     // Assert all required keys are present
-    assert!(
-        problem_details.get("type").is_some(),
-        "type field should be present"
-    );
-    assert!(
-        problem_details.get("title").is_some(),
-        "title field should be present"
-    );
-    assert!(
-        problem_details.get("status").is_some(),
-        "status field should be present"
-    );
-    assert!(
-        problem_details.get("detail").is_some(),
-        "detail field should be present"
-    );
-    assert!(
-        problem_details.get("code").is_some(),
-        "code field should be present"
-    );
-    assert!(
-        problem_details.get("trace_id").is_some(),
-        "trace_id field should be present"
-    );
+    for key in ["type", "title", "status", "detail", "code", "trace_id"] {
+        assert!(
+            problem_details.get(key).is_some(),
+            "{key} field should be present"
+        );
+    }
 
     // Assert specific values
     assert_eq!(problem_details["code"], expected_code);
@@ -83,7 +100,9 @@ pub async fn assert_problem_details_structure(
     assert_trace_id_matches(&problem_details, trace_id);
 
     // Assert type follows the expected format
-    let type_value = problem_details["type"].as_str().unwrap();
+    let type_value = problem_details["type"]
+        .as_str()
+        .expect("type field should be a string");
     assert!(
         type_value.starts_with("https://nommie.app/errors/"),
         "type should follow the expected URL format"

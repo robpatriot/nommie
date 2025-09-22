@@ -1,3 +1,5 @@
+mod common;
+
 use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
 use backend::infra::state::build_state;

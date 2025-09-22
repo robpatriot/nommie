@@ -38,5 +38,5 @@ pub use state::security_config::SecurityConfig;
 #[cfg(test)]
 #[ctor::ctor]
 fn init_test_logging() {
-    backend_test_support::test_logging::init();
+    backend_test_support::logging::init();
 }

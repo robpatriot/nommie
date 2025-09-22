@@ -4,6 +4,5 @@
 //! mock database connection management, unified logging initialization, and
 //! Problem Details assertion helpers.
 
-pub mod mock_strict;
+pub mod logging;
 pub mod problem_details;
-pub mod test_logging;

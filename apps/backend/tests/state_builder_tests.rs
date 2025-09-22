@@ -1,3 +1,4 @@
+mod common;
 mod support;
 
 use backend::infra::state::build_state;

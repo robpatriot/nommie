@@ -1,11 +1,25 @@
-//! Tests for default commit behavior (no test_init.rs included)
+//! Tests for default commit policy behavior
 //!
-//! These tests run without the test_init.rs module, so they should use the default
-//! CommitOnOk policy and persist writes to the database.
+//! This test binary runs without mod common, so it uses the OnceLock default
+//! of CommitOnOk policy. It verifies that the default policy works correctly.
+
+// Initialize logging directly (no mod common)
+#[ctor::ctor]
+fn init_logging() {
+    backend_test_support::logging::init();
+}
+
 use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, TxnPolicy};
 use backend::infra::state::build_state;
+
+#[test]
+fn test_policy_is_commit_on_ok() {
+    // This test binary does not import mod common, so it should see the
+    // OnceLock default of CommitOnOk policy
+    assert_eq!(current(), TxnPolicy::CommitOnOk);
+}
 
 #[actix_web::test]
 async fn test_default_commit_policy() -> Result<(), Box<dyn std::error::Error>> {
