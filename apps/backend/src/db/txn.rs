@@ -35,6 +35,14 @@ impl SharedTxn {
         req.extensions_mut().insert(self.clone());
     }
 
+    /// Extract a SharedTxn from the request extensions.
+    ///
+    /// This is the symmetrical "get" partner to `inject`. Returns a cloned
+    /// SharedTxn if present in the request extensions, otherwise None.
+    pub fn from_req(req: &HttpRequest) -> Option<Self> {
+        req.extensions().get::<SharedTxn>().cloned()
+    }
+
     /// Commit this shared transaction.
     ///
     /// The caller owns the transaction lifecycle - with_txn() will not auto-commit when SharedTxn is present.
