@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::current_user::CurrentUser;
 use crate::db::require_db;
+use crate::db::txn::SharedTxn;
 use crate::entities::users;
 use crate::error::AppError;
 use crate::state::app_state::AppState;
@@ -34,14 +35,24 @@ impl FromRequest for CurrentUserRecord {
             let app_state = req
                 .app_data::<web::Data<AppState>>()
                 .ok_or_else(|| AppError::internal("AppState not available"))?;
-            let db = require_db(app_state)?;
 
             // Look up user by sub in database
-            let user = users::Entity::find()
-                .filter(users::Column::Sub.eq(&current_user.sub))
-                .one(db)
-                .await
-                .map_err(|e| AppError::db(format!("Failed to query user by sub: {e}")))?;
+            let user = if let Some(shared_txn) = SharedTxn::from_req(&req) {
+                // Use shared transaction if present
+                users::Entity::find()
+                    .filter(users::Column::Sub.eq(&current_user.sub))
+                    .one(shared_txn.transaction())
+                    .await
+                    .map_err(|e| AppError::db(format!("Failed to query user by sub: {e}")))?
+            } else {
+                // Fall back to pooled connection
+                let db = require_db(app_state)?;
+                users::Entity::find()
+                    .filter(users::Column::Sub.eq(&current_user.sub))
+                    .one(db)
+                    .await
+                    .map_err(|e| AppError::db(format!("Failed to query user by sub: {e}")))?
+            };
 
             let user = user.ok_or(AppError::forbidden_user_not_found())?;
 

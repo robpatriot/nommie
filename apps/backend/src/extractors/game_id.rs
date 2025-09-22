@@ -4,6 +4,7 @@ use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
 
 use crate::db::require_db;
+use crate::db::txn::SharedTxn;
 use crate::entities::games;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -47,13 +48,21 @@ impl FromRequest for GameId {
                 .app_data::<web::Data<AppState>>()
                 .ok_or_else(|| AppError::internal("AppState not available"))?;
 
-            let db = require_db(app_state)?;
-
             // Check if game exists in database
-            let game = games::Entity::find_by_id(game_id)
-                .one(db)
-                .await
-                .map_err(|e| AppError::db(format!("Failed to query game: {e}")))?;
+            let game = if let Some(shared_txn) = SharedTxn::from_req(&req) {
+                // Use shared transaction if present
+                games::Entity::find_by_id(game_id)
+                    .one(shared_txn.transaction())
+                    .await
+                    .map_err(|e| AppError::db(format!("Failed to query game: {e}")))?
+            } else {
+                // Fall back to pooled connection
+                let db = require_db(app_state)?;
+                games::Entity::find_by_id(game_id)
+                    .one(db)
+                    .await
+                    .map_err(|e| AppError::db(format!("Failed to query game: {e}")))?
+            };
 
             let _game = game.ok_or_else(|| {
                 AppError::not_found(
