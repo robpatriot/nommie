@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use actix_web::{HttpMessage, HttpRequest};
-use sea_orm::{DatabaseTransaction, TransactionTrait};
+use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
 
 use super::{require_db, txn_policy};
 use crate::error::AppError;
@@ -14,16 +14,53 @@ use crate::state::app_state::AppState;
 pub struct SharedTxn(pub Arc<DatabaseTransaction>);
 
 impl SharedTxn {
+    /// Begin a database transaction and wrap it as a SharedTxn.
+    ///
+    /// This method creates a new transaction that can be shared across multiple operations.
+    /// The caller is responsible for managing the transaction lifecycle (commit/rollback).
+    pub async fn open(conn: &DatabaseConnection) -> Result<Self, sea_orm::DbErr> {
+        let txn = conn.begin().await?;
+        Ok(SharedTxn(Arc::new(txn)))
+    }
+
     /// Get a reference to the underlying database transaction
     pub fn transaction(&self) -> &DatabaseTransaction {
         &self.0
     }
+
+    /// Inject this SharedTxn into the request extensions.
+    ///
+    /// This allows the transaction to be used by with_txn() in handlers.
+    pub fn inject(&self, req: &mut HttpRequest) {
+        req.extensions_mut().insert(self.clone());
+    }
+
+    /// Commit this shared transaction.
+    ///
+    /// The caller owns the transaction lifecycle - with_txn() will not auto-commit when SharedTxn is present.
+    pub async fn commit(self) -> Result<(), sea_orm::DbErr> {
+        let txn = Arc::try_unwrap(self.0).map_err(|_| {
+            sea_orm::DbErr::Custom("Cannot commit: transaction is still shared".to_string())
+        })?;
+        txn.commit().await
+    }
+
+    /// Rollback this shared transaction.
+    ///
+    /// The caller owns the transaction lifecycle - with_txn() will not auto-commit when SharedTxn is present.
+    pub async fn rollback(self) -> Result<(), sea_orm::DbErr> {
+        let txn = Arc::try_unwrap(self.0).map_err(|_| {
+            sea_orm::DbErr::Custom("Cannot rollback: transaction is still shared".to_string())
+        })?;
+        txn.rollback().await
+    }
 }
 
-// Precedence:
-// 1) If a SharedTxn is present in req.extensions(), reuse it (no commit/rollback here).
-// 2) If MockStrict DB and no SharedTxn, panic with guidance.
-// 3) Otherwise (real DB), open transaction and apply current txn_policy on Ok; rollback on Err.
+/// Execute a closure with a database transaction.
+///
+/// Transaction precedence:
+/// (1) If a `SharedTxn` is present in request extensions, **reuse it**; do **not** begin/commit/rollback.
+/// (2) Otherwise, begin a transaction; on `Ok` apply `txn_policy` (commit or rollback-on-ok), on `Err` rollback.
 pub async fn with_txn<R, F>(
     req: Option<&HttpRequest>,
     state: &AppState,

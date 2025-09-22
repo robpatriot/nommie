@@ -3,14 +3,13 @@
 //! These tests verify that SharedTxn bypasses the transaction policy
 //! and that with_txn does not perform commit/rollback operations.
 mod common;
-#[path = "support/shared_txn.rs"]
-mod shared_txn;
 
 use actix_web::test;
 use backend::config::db::DbProfile;
 use backend::db::require_db;
 use backend::db::txn::with_txn;
 use backend::infra::state::build_state;
+use backend::SharedTxn;
 
 #[actix_web::test]
 async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,11 +18,11 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
 
     // Open a shared transaction
     let db = require_db(&state).expect("DB required for this test");
-    let shared = shared_txn::open(db).await;
+    let shared = SharedTxn::open(db).await?;
 
     // Create a mutable request and inject the shared transaction
     let mut req = test::TestRequest::default().to_http_request();
-    shared_txn::inject(&mut req, &shared);
+    shared.inject(&mut req);
 
     // Write via with_txn using the shared transaction
     let result = with_txn(Some(&req), &state, |_txn| {
@@ -38,7 +37,7 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
     drop(req);
 
     // Roll back the shared transaction explicitly to prove tests own rollback
-    shared_txn::rollback(shared).await.unwrap();
+    shared.rollback().await.unwrap();
 
     Ok(())
 }
@@ -50,11 +49,11 @@ async fn test_shared_txn_reuse_commit_behavior() -> Result<(), Box<dyn std::erro
 
     // Open a shared transaction
     let db = require_db(&state).expect("DB required for this test");
-    let shared = shared_txn::open(db).await;
+    let shared = SharedTxn::open(db).await?;
 
     // Create a mutable request and inject the shared transaction
     let mut req = test::TestRequest::default().to_http_request();
-    shared_txn::inject(&mut req, &shared);
+    shared.inject(&mut req);
 
     // Write via with_txn using the shared transaction
     let result = with_txn(Some(&req), &state, |_txn| {
@@ -69,7 +68,7 @@ async fn test_shared_txn_reuse_commit_behavior() -> Result<(), Box<dyn std::erro
     drop(req);
 
     // Commit the shared transaction explicitly
-    shared_txn::commit(shared).await.unwrap();
+    shared.commit().await.unwrap();
 
     Ok(())
 }
