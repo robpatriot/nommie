@@ -1,5 +1,5 @@
 use backend::entities::users::Model as User;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, NotSet, Set};
+use sea_orm::{ActiveModelTrait, ConnectionTrait, NotSet, Set};
 use time::OffsetDateTime;
 
 /// Seed a user with a specific sub value for testing purposes.
@@ -12,7 +12,7 @@ use time::OffsetDateTime;
 /// # Returns
 /// The created user model
 pub async fn seed_user_with_sub(
-    db: &DatabaseConnection,
+    db: &(impl ConnectionTrait + Send),
     sub: &str,
     _email: Option<&str>,
 ) -> Result<User, sea_orm::DbErr> {
