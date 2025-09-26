@@ -6,7 +6,7 @@
 mod common;
 mod support;
 
-use actix_web::{test, web, FromRequest};
+use actix_web::{test, web, FromRequest, HttpMessage};
 use backend::auth::jwt::mint_access_token;
 use backend::config::db::DbProfile;
 use backend::db::require_db;
@@ -17,7 +17,7 @@ use backend::extractors::game_id::GameId;
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
-use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
+use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
 use support::factory::seed_user_with_sub;
 use time::OffsetDateTime;
 
@@ -29,7 +29,9 @@ fn bearer_header(sub: &str, email: &str, sec: &SecurityConfig) -> String {
 }
 
 /// Insert a minimal game, return its id
-async fn insert_test_game(db: &DatabaseConnection) -> Result<i64, Box<dyn std::error::Error>> {
+async fn insert_test_game(
+    db: &(impl ConnectionTrait + Send),
+) -> Result<i64, Box<dyn std::error::Error>> {
     let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),
@@ -55,26 +57,26 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
         .build()
         .await?;
 
-    // Seed user
+    // Open a shared txn first
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+
+    // Seed user using the shared transaction
     let test_sub = unique_str("test-sub-shared");
     let test_email = unique_email("test-shared");
-    let db = require_db(&state).expect("DB required for this test");
-    let user = seed_user_with_sub(db, &test_sub, Some(&test_email))
+    let user = seed_user_with_sub(shared.transaction(), &test_sub, Some(&test_email))
         .await
         .expect("should create user successfully");
 
-    // Open a shared txn
-    let shared = SharedTxn::open(db).await?;
-
     // Request with state + auth header; inject shared txn
-    let mut req = test::TestRequest::default()
+    let req = test::TestRequest::default()
         .insert_header((
             "Authorization",
             bearer_header(&test_sub, &test_email, &security_config),
         ))
         .app_data(web::Data::new(state))
         .to_http_request();
-    shared.inject(&mut req);
+    req.extensions_mut().insert(shared.clone());
 
     // Extract
     let mut payload = actix_web::dev::Payload::None;
@@ -87,7 +89,7 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
 
     // Roll back shared txn
     drop(req);
-    shared.rollback().await.unwrap();
+    shared.rollback().await?;
     Ok(())
 }
 
@@ -135,21 +137,21 @@ async fn test_game_id_with_shared_txn() -> Result<(), Box<dyn std::error::Error>
     // Build state with Test DB (no security needed)
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
-    // Insert game
+    // Open a shared txn first
     let db = require_db(&state).expect("DB required for this test");
-    let game_id = insert_test_game(db).await?;
-
-    // Open a shared txn
     let shared = SharedTxn::open(db).await?;
 
-    // Build request with path param BEFORE to_http_request(), inject shared txn
+    // Insert game using the shared transaction
+    let game_id = insert_test_game(shared.transaction()).await?;
+
+    // Build request with path param, inject shared txn
     let game_id_str = game_id.to_string();
     let game_id_static: &'static str = Box::leak(game_id_str.into_boxed_str());
-    let mut req = test::TestRequest::get()
+    let req = test::TestRequest::get()
         .param("game_id", game_id_static)
         .app_data(web::Data::new(state))
         .to_http_request();
-    shared.inject(&mut req);
+    req.extensions_mut().insert(shared.clone());
 
     // Extract
     let mut payload = actix_web::dev::Payload::None;
@@ -160,7 +162,7 @@ async fn test_game_id_with_shared_txn() -> Result<(), Box<dyn std::error::Error>
 
     // Cleanup
     drop(req);
-    shared.rollback().await.unwrap();
+    shared.rollback().await?;
     Ok(())
 }
 

@@ -1,9 +1,10 @@
 mod common;
 mod support;
 
-use actix_web::{test, web, Responder};
+use actix_web::{test, web, HttpMessage, Responder};
 use backend::config::db::DbProfile;
 use backend::db::require_db;
+use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::game_id::GameId;
 use backend::infra::state::build_state;
@@ -27,8 +28,11 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
-    // Create a test game in the database
+    // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+
+    // Create a test game in the database using the shared txn
     let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),
@@ -39,7 +43,7 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
         updated_at: Set(now),
         ..Default::default()
     };
-    let game = game.insert(db).await?;
+    let game = game.insert(shared.transaction()).await?;
     let game_id = game.id;
 
     // Build test app with echo route
@@ -50,10 +54,11 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Make request with existing game id
+    // Make request with existing game id and inject the shared txn
     let req = test::TestRequest::get()
         .uri(&format!("/games/{game_id}/echo"))
         .to_request();
+    req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
 
@@ -62,6 +67,10 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
 
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["game_id"], game_id);
+
+    // Cleanup — explicitly rollback the shared transaction.
+    // This will error if another clone still exists (good safety check).
+    shared.rollback().await?;
 
     Ok(())
 }
