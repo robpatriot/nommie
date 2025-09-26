@@ -50,6 +50,8 @@ pub enum ErrorCode {
     // Business Logic Conflicts
     /// Google sub mismatch for existing email
     GoogleSubMismatch,
+    /// Join code already exists
+    JoinCodeConflict,
 
     // System Errors
     /// Database error
@@ -93,6 +95,7 @@ impl ErrorCode {
 
             // Business Logic Conflicts
             Self::GoogleSubMismatch => "GOOGLE_SUB_MISMATCH",
+            Self::JoinCodeConflict => "JOIN_CODE_CONFLICT",
 
             // System Errors
             Self::DbError => "DB_ERROR",
@@ -145,6 +148,7 @@ mod tests {
         assert_eq!(ErrorCode::GameNotFound.as_str(), "GAME_NOT_FOUND");
         assert_eq!(ErrorCode::NotFound.as_str(), "NOT_FOUND");
         assert_eq!(ErrorCode::GoogleSubMismatch.as_str(), "GOOGLE_SUB_MISMATCH");
+        assert_eq!(ErrorCode::JoinCodeConflict.as_str(), "JOIN_CODE_CONFLICT");
         assert_eq!(ErrorCode::DbError.as_str(), "DB_ERROR");
         assert_eq!(ErrorCode::DbUnavailable.as_str(), "DB_UNAVAILABLE");
         assert_eq!(ErrorCode::Internal.as_str(), "INTERNAL");

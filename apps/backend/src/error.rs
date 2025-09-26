@@ -56,30 +56,22 @@ pub enum AppError {
 
 impl AppError {
     /// Helper method to extract error code from any error variant
-    pub fn code(&self) -> String {
+    pub fn code(&self) -> ErrorCode {
         match self {
-            AppError::Validation { code, .. } => code.as_str().to_string(),
-            AppError::Db { .. } => ErrorCode::DbError.as_str().to_string(),
-            AppError::NotFound { code, .. } => code.as_str().to_string(),
-            AppError::Unauthorized => ErrorCode::Unauthorized.as_str().to_string(),
-            AppError::UnauthorizedMissingBearer => {
-                ErrorCode::UnauthorizedMissingBearer.as_str().to_string()
-            }
-            AppError::UnauthorizedInvalidJwt => {
-                ErrorCode::UnauthorizedInvalidJwt.as_str().to_string()
-            }
-            AppError::UnauthorizedExpiredJwt => {
-                ErrorCode::UnauthorizedExpiredJwt.as_str().to_string()
-            }
-            AppError::Forbidden => ErrorCode::Forbidden.as_str().to_string(),
-            AppError::ForbiddenUserNotFound => {
-                ErrorCode::ForbiddenUserNotFound.as_str().to_string()
-            }
-            AppError::BadRequest { code, .. } => code.as_str().to_string(),
-            AppError::Internal { .. } => ErrorCode::Internal.as_str().to_string(),
-            AppError::Config { .. } => ErrorCode::ConfigError.as_str().to_string(),
-            AppError::Conflict { code, .. } => code.as_str().to_string(),
-            AppError::DbUnavailable => ErrorCode::DbUnavailable.as_str().to_string(),
+            AppError::Validation { code, .. } => *code,
+            AppError::Db { .. } => ErrorCode::DbError,
+            AppError::NotFound { code, .. } => *code,
+            AppError::Unauthorized => ErrorCode::Unauthorized,
+            AppError::UnauthorizedMissingBearer => ErrorCode::UnauthorizedMissingBearer,
+            AppError::UnauthorizedInvalidJwt => ErrorCode::UnauthorizedInvalidJwt,
+            AppError::UnauthorizedExpiredJwt => ErrorCode::UnauthorizedExpiredJwt,
+            AppError::Forbidden => ErrorCode::Forbidden,
+            AppError::ForbiddenUserNotFound => ErrorCode::ForbiddenUserNotFound,
+            AppError::BadRequest { code, .. } => *code,
+            AppError::Internal { .. } => ErrorCode::Internal,
+            AppError::Config { .. } => ErrorCode::ConfigError,
+            AppError::Conflict { code, .. } => *code,
+            AppError::DbUnavailable => ErrorCode::DbUnavailable,
         }
     }
 
@@ -202,15 +194,15 @@ impl AppError {
     /// This is the single source of truth for ProblemDetails construction
     fn to_problem_details_with_trace_id(&self, trace_id: String) -> ProblemDetails {
         let status = self.status();
-        let code = self.code();
+        let code = self.code().as_str();
         let detail = self.detail();
 
         ProblemDetails {
             type_: format!("https://nommie.app/errors/{}", code.to_uppercase()),
-            title: Self::humanize_code(&code),
+            title: Self::humanize_code(code),
             status: status.as_u16(),
             detail,
-            code,
+            code: code.to_string(),
             trace_id,
         }
     }
@@ -237,6 +229,19 @@ impl From<std::env::VarError> for AppError {
 
 impl From<sea_orm::DbErr> for AppError {
     fn from(e: sea_orm::DbErr) -> Self {
+        // Check for Postgres unique constraint violations (SQLSTATE 23505)
+        let error_msg = e.to_string();
+        if error_msg.contains("duplicate key value violates unique constraint")
+            || error_msg.contains("SQLSTATE(23505)")
+            || error_msg.contains("23505")
+        {
+            return AppError::Conflict {
+                code: ErrorCode::JoinCodeConflict,
+                detail: error_msg,
+            };
+        }
+
+        // Fallback to internal error for other database errors
         AppError::internal(format!("db error: {e}"))
     }
 }
