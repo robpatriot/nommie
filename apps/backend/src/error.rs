@@ -56,7 +56,7 @@ pub enum AppError {
 
 impl AppError {
     /// Helper method to extract error code from any error variant
-    fn code(&self) -> String {
+    pub fn code(&self) -> String {
         match self {
             AppError::Validation { code, .. } => code.as_str().to_string(),
             AppError::Db { .. } => ErrorCode::DbError.as_str().to_string(),
