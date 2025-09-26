@@ -7,6 +7,7 @@ use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
 use backend::entities::user_credentials;
 use backend::error::AppError;
+use backend::errors::ErrorCode;
 use backend::infra::state::build_state;
 use backend::services::users::ensure_user;
 use backend::utils::unique::{unique_email, unique_str};
@@ -184,8 +185,8 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
                 Err(err) => {
                     // HTTP status via ResponseError
                     assert_eq!(err.status_code(), StatusCode::CONFLICT);
-                    // Machine-readable code via AppError helper (returns String)
-                    assert_eq!(err.code(), "GOOGLE_SUB_MISMATCH");
+                    // Machine-readable code via AppError helper (returns ErrorCode)
+                    assert_eq!(err.code(), ErrorCode::GoogleSubMismatch);
                 }
                 Ok(_) => panic!("Expected Conflict error with GOOGLE_SUB_MISMATCH code"),
             }

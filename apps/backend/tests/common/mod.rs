@@ -108,3 +108,22 @@ pub async fn assert_problem_details_structure(
         "type should follow the expected URL format"
     );
 }
+
+/// Test-only helper to run a closure within a savepoint that gets rolled back.
+/// This allows testing database constraint violations without poisoning the outer transaction.
+pub async fn with_savepoint<F, Fut, T>(
+    outer: &(impl sea_orm::ConnectionTrait + sea_orm::TransactionTrait),
+    f: F,
+) -> Result<T, backend::error::AppError>
+where
+    F: FnOnce(sea_orm::DatabaseTransaction) -> Fut,
+    Fut: std::future::Future<Output = Result<T, backend::error::AppError>>,
+{
+    let sp = outer
+        .begin()
+        .await
+        .map_err(backend::error::AppError::from)?;
+    let out = f(sp).await;
+    // Note: The transaction will be automatically rolled back when dropped
+    out
+}
