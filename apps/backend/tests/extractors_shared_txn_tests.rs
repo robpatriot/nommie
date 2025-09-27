@@ -6,7 +6,7 @@
 mod common;
 mod support;
 
-use actix_web::{test, web, FromRequest, HttpMessage};
+use actix_web::{test, web, FromRequest};
 use backend::auth::jwt::mint_access_token;
 use backend::config::db::DbProfile;
 use backend::db::require_db;
@@ -69,14 +69,14 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
         .expect("should create user successfully");
 
     // Request with state + auth header; inject shared txn
-    let req = test::TestRequest::default()
+    let mut req = test::TestRequest::default()
         .insert_header((
             "Authorization",
             bearer_header(&test_sub, &test_email, &security_config),
         ))
         .app_data(web::Data::new(state))
         .to_http_request();
-    req.extensions_mut().insert(shared.clone());
+    shared.inject(&mut req);
 
     // Extract
     let mut payload = actix_web::dev::Payload::None;
@@ -147,11 +147,11 @@ async fn test_game_id_with_shared_txn() -> Result<(), Box<dyn std::error::Error>
     // Build request with path param, inject shared txn
     let game_id_str = game_id.to_string();
     let game_id_static: &'static str = Box::leak(game_id_str.into_boxed_str());
-    let req = test::TestRequest::get()
+    let mut req = test::TestRequest::get()
         .param("game_id", game_id_static)
         .app_data(web::Data::new(state))
         .to_http_request();
-    req.extensions_mut().insert(shared.clone());
+    shared.inject(&mut req);
 
     // Extract
     let mut payload = actix_web::dev::Payload::None;
