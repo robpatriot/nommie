@@ -1,4 +1,4 @@
-# Nommie — Cursor Rules (v1.4.1)
+# Nommie — Cursor Rules (v1.5.0)
 
 > Repo-root file. Applies to **all Cursor edits, refactors, and codegen**.  
 
@@ -24,13 +24,13 @@
 
 - Default: put all `use` at the **top of the module**, after docs/attrs.  
 - Allowed inside a function/test only if the symbol is used there once or it avoids polluting scope.  
-- Group order (with blank line): std::* then external crates then internal crates
+- Group order (with blank line): std::* then external crates then internal crates.  
 - Sort alphabetically within groups.  
 - Import traits explicitly; function-scoped if they’re one-off.  
 - Avoid aliasing unless needed to resolve collisions.  
 - Use `pub use` only in stable boundaries (`lib.rs`, `mod.rs`, prelude).  
-- Tests may use `use super::*;` and local trait imports for ergonomics. 
-- **No wildcard imports** in production. Allowed only in `#[cfg(test)]` and those allowed in the root clippy.toml.  
+- Tests may use `use super::*;` and local trait imports for ergonomics.  
+- **No wildcard imports** in production. Allowed only in `#[cfg(test)]` and those permitted in root `clippy.toml`.  
 
 ---
 
@@ -38,11 +38,14 @@
 - Wrap all multi-row/table work in `with_txn`.  
 - `with_txn` closures return `Result<_, AppError>`.  
 - Nested/shared transactions are allowed.  
+- In production, `with_txn` commits on `Ok` and rolls back on `Err`.  
+- In tests, `txn/test` forces **rollback always** — no manual DB refresh needed.  
+- Use `SharedTxn` in tests whenever handlers are called, so the whole test rolls back.  
 
 ---
 
 ## Extractors
-- Use only existing extractors: `AuthToken`, `JwtClaims`, `CurrentUser`, `CurrentUserDb`.  
+- Use only existing extractors: `AuthToken`, `JwtClaims`, `CurrentUser`, `CurrentUserDb`, `GameId`, `GameMembership`, `ValidatedJson<T>`.  
 - Don’t create new extractors unless explicitly asked.  
 - Minimize DB hits (resolve user+membership efficiently).  
 
@@ -73,13 +76,10 @@
 ## Testing
 - Tests must be deterministic (seed time/RNG).  
 - No-DB tests must expect `DB_UNAVAILABLE` if they touch DB paths.  
-- DB tests must use a `_test` database (guard enforced).  
+- DB tests must use the `_test` database (guard enforced).  
+- Test DB is automatically reset via rollback: **no manual refresh required**.  
 
 ### Running backend tests
-- **Before any backend tests**, refresh the test DB:
-
-    pnpm db:mig:test:refresh
-
 - **Run all tests**:
 
     pnpm be:test     # backend  
@@ -88,28 +88,28 @@
 
 ### Running a subset of backend tests (cargo-nextest)
 > ⚠️ Args to `pnpm be:test` go to `cargo nextest run`.  
-> Use `--` to pass flags intended for the test binaries (e.g., `--nocapture`).
+> Use `--` to pass flags intended for the test binaries (e.g., `--nocapture`).  
 
-**A) By integration test binary (recommended)** — use the file name **without** `.rs`:
+**A) By integration test binary (recommended)** — use the file name **without** `.rs`:  
 
     pnpm be:test --test auth_login  
-    pnpm be:test --test users_service_tests
+    pnpm be:test --test users_service_tests  
 
-**B) By test name substring (positional filter)** — matches test *function* names across all binaries:
+**B) By test name substring (positional filter)** — matches test *function* names across all binaries:  
 
     pnpm be:test test_me          # runs tests whose names contain "test_me"  
-    pnpm be:test login_endpoint   # runs names containing "login_endpoint"
+    pnpm be:test login_endpoint   # runs names containing "login_endpoint"  
 
-**C) By expression filter**
+**C) By expression filter**  
 
     pnpm be:test -- -E login  
-    pnpm be:test -- -E 'test_login_endpoint_.*'
+    pnpm be:test -- -E 'test_login_endpoint_.*'  
 
-**Output control**
+**Output control**  
 
-    pnpm be:test --test auth_login -- --nocapture
+    pnpm be:test --test auth_login -- --nocapture  
 
-**Gotchas**
+**Gotchas**  
 - `pnpm be:test auth_login` (bare word) filters by **test name**, not by binary.  
   If no test names contain `auth_login`, you’ll see “no tests to run.”  
   Use `--test auth_login` to select the integration-test binary named `auth_login`.  
@@ -151,7 +151,7 @@
 ## Safety
 - Always source the repo-root `.env` before running backend or frontend commands:  
 
-        set -a; source .env; set +a
+        set -a; source .env; set +a  
 
   Do this **once per shell session** — you don’t need to repeat it before every command.  
 
