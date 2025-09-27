@@ -5,8 +5,7 @@ use backend::db::txn::with_txn;
 use backend::infra::state::build_state;
 
 #[actix_web::test]
-async fn test_allows_auto_commit_on_real_db_without_shared_txn(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn test_with_txn_succeeds_without_shared_txn() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with a real Test DB
     let state = build_state().with_db(DbProfile::Test).build().await?;
 

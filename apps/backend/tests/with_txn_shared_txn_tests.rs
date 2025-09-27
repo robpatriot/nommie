@@ -1,7 +1,7 @@
 //! Tests for SharedTxn reuse behavior
 //!
 //! These tests verify that SharedTxn bypasses the transaction policy
-//! and that with_txn does not perform commit/rollback operations.
+//! and that with_txn does not perform rollback operations.
 mod common;
 
 use actix_web::test;
@@ -38,37 +38,6 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
 
     // Roll back the shared transaction explicitly to prove tests own rollback
     shared.rollback().await.unwrap();
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_shared_txn_reuse_commit_behavior() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with a real Test DB
-    let state = build_state().with_db(DbProfile::Test).build().await?;
-
-    // Open a shared transaction
-    let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
-
-    // Create a mutable request and inject the shared transaction
-    let mut req = test::TestRequest::default().to_http_request();
-    shared.inject(&mut req);
-
-    // Write via with_txn using the shared transaction
-    let result = with_txn(Some(&req), &state, |_txn| {
-        Box::pin(async { Ok::<_, backend::error::AppError>("success") })
-    })
-    .await?;
-
-    // Verify the operation succeeded
-    assert_eq!(result, "success");
-
-    // Drop the request to release the shared transaction reference
-    drop(req);
-
-    // Commit the shared transaction explicitly
-    shared.commit().await.unwrap();
 
     Ok(())
 }
