@@ -14,6 +14,7 @@ use support::create_test_app;
 
 #[actix_web::test]
 async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
+    // HANDLER_ONLY: no direct DB writes in this test; rely on handler-internal with_txn
     // Build state with database and default security config
     let state = build_state().build().await?;
 
@@ -42,6 +43,7 @@ async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_malformed_scheme() -> Result<(), Box<dyn std::error::Error>> {
+    // HANDLER_ONLY: no direct DB writes in this test; rely on handler-internal with_txn
     // Build state with database and default security config
     let state = build_state().build().await?;
 
@@ -73,6 +75,7 @@ async fn test_malformed_scheme() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_empty_token() -> Result<(), Box<dyn std::error::Error>> {
+    // HANDLER_ONLY: no direct DB writes in this test; rely on handler-internal with_txn
     // Build state with database and default security config
     let state = build_state().build().await?;
 
@@ -104,6 +107,7 @@ async fn test_empty_token() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_invalid_token() -> Result<(), Box<dyn std::error::Error>> {
+    // HANDLER_ONLY: no direct DB writes in this test; rely on handler-internal with_txn
     // Build state with database and default security config
     let state = build_state().build().await?;
 
@@ -129,6 +133,7 @@ async fn test_invalid_token() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
+    // HANDLER_ONLY: no direct DB writes in this test; rely on handler-internal with_txn
     // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
@@ -165,6 +170,7 @@ async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
+    // HANDLER_ONLY: no direct DB writes in this test; rely on handler-internal with_txn
     // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());

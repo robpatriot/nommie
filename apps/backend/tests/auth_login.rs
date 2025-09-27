@@ -11,6 +11,7 @@ use support::create_test_app;
 
 #[actix_web::test]
 async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::error::Error>> {
+    // HANDLER_ONLY: no direct DB writes in this test; rely on handler-internal with_txn
     // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
@@ -88,6 +89,7 @@ async fn test_login_endpoint_create_and_reuse_user() -> Result<(), Box<dyn std::
 
 #[actix_web::test]
 async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::Error>> {
+    // HANDLER_ONLY: no direct DB writes in this test; rely on handler-internal with_txn
     // Build state with database and default security config
     let state = build_state().with_db(DbProfile::Test).build().await?;
 
