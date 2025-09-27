@@ -62,7 +62,7 @@ async fn test_unauthorized_responses() {
         // Check WWW-Authenticate header
         let www_auth = resp.headers().get("WWW-Authenticate");
         assert!(www_auth.is_some());
-        assert_eq!(www_auth.unwrap(), "Bearer");
+        assert_eq!(www_auth.unwrap().to_str().unwrap(), "Bearer");
 
         // Check x-trace-id header
         let trace_id = resp.headers().get("x-trace-id");
@@ -70,14 +70,18 @@ async fn test_unauthorized_responses() {
 
         // Check content type
         assert_eq!(
-            resp.headers().get("content-type").unwrap(),
+            resp.headers()
+                .get("content-type")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "application/problem+json"
         );
 
         // Parse and validate JSON response
         let body: Value = test::read_body_json(resp).await;
-        assert_eq!(body["status"], 401);
-        assert_eq!(body["code"], error.code().as_str());
+        assert_eq!(body["status"].as_u64().unwrap(), 401);
+        assert_eq!(body["code"].as_str().unwrap(), error.code().as_str());
         assert!(!body["trace_id"].as_str().unwrap().is_empty());
         assert!(body["detail"].is_string());
         assert!(body["title"].is_string());
@@ -101,7 +105,7 @@ async fn test_database_unavailable_response() {
     // Check Retry-After header
     let retry_after = resp.headers().get("Retry-After");
     assert!(retry_after.is_some());
-    assert_eq!(retry_after.unwrap(), "1");
+    assert_eq!(retry_after.unwrap().to_str().unwrap(), "1");
 
     // Check x-trace-id header
     let trace_id = resp.headers().get("x-trace-id");
@@ -109,16 +113,20 @@ async fn test_database_unavailable_response() {
 
     // Check content type
     assert_eq!(
-        resp.headers().get("content-type").unwrap(),
+        resp.headers()
+            .get("content-type")
+            .unwrap()
+            .to_str()
+            .unwrap(),
         "application/problem+json"
     );
 
     // Parse and validate JSON response
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 503);
-    assert_eq!(body["code"], "DB_UNAVAILABLE");
+    assert_eq!(body["status"].as_u64().unwrap(), 503);
+    assert_eq!(body["code"].as_str().unwrap(), "DB_UNAVAILABLE");
     assert!(!body["trace_id"].as_str().unwrap().is_empty());
-    assert_eq!(body["detail"], "Database unavailable");
+    assert_eq!(body["detail"].as_str().unwrap(), "Database unavailable");
 }
 
 #[actix_web::test]
@@ -155,9 +163,9 @@ async fn test_conflict_responses() {
     assert_eq!(resp.status(), 409);
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 409);
-    assert_eq!(body["code"], "UNIQUE_VIOLATION");
-    assert_eq!(body["detail"], "Duplicate key");
+    assert_eq!(body["status"].as_u64().unwrap(), 409);
+    assert_eq!(body["code"].as_str().unwrap(), "UNIQUE_VIOLATION");
+    assert_eq!(body["detail"].as_str().unwrap(), "Duplicate key");
 
     // Test FkViolation
     let req = test::TestRequest::get().uri("/fk_violation").to_request();
@@ -166,9 +174,9 @@ async fn test_conflict_responses() {
     assert_eq!(resp.status(), 409);
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 409);
-    assert_eq!(body["code"], "FK_VIOLATION");
-    assert_eq!(body["detail"], "Foreign key constraint");
+    assert_eq!(body["status"].as_u64().unwrap(), 409);
+    assert_eq!(body["code"].as_str().unwrap(), "FK_VIOLATION");
+    assert_eq!(body["detail"].as_str().unwrap(), "Foreign key constraint");
 }
 
 #[actix_web::test]
@@ -192,9 +200,9 @@ async fn test_bad_request_response() {
     assert_eq!(resp.status(), 400);
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 400);
-    assert_eq!(body["code"], "CHECK_VIOLATION");
-    assert_eq!(body["detail"], "Check constraint failed");
+    assert_eq!(body["status"].as_u64().unwrap(), 400);
+    assert_eq!(body["code"].as_str().unwrap(), "CHECK_VIOLATION");
+    assert_eq!(body["detail"].as_str().unwrap(), "Check constraint failed");
 }
 
 #[actix_web::test]
@@ -218,9 +226,9 @@ async fn test_not_found_response() {
     assert_eq!(resp.status(), 404);
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 404);
-    assert_eq!(body["code"], "RECORD_NOT_FOUND");
-    assert_eq!(body["detail"], "Record not found");
+    assert_eq!(body["status"].as_u64().unwrap(), 404);
+    assert_eq!(body["code"].as_str().unwrap(), "RECORD_NOT_FOUND");
+    assert_eq!(body["detail"].as_str().unwrap(), "Record not found");
 }
 
 #[actix_web::test]
@@ -237,9 +245,12 @@ async fn test_config_error_response() {
     assert_eq!(resp.status(), 500);
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 500);
-    assert_eq!(body["code"], "CONFIG_ERROR");
-    assert_eq!(body["detail"], "Missing environment variable");
+    assert_eq!(body["status"].as_u64().unwrap(), 500);
+    assert_eq!(body["code"].as_str().unwrap(), "CONFIG_ERROR");
+    assert_eq!(
+        body["detail"].as_str().unwrap(),
+        "Missing environment variable"
+    );
 }
 
 #[actix_web::test]
@@ -256,9 +267,12 @@ async fn test_db_error_response() {
     assert_eq!(resp.status(), 500);
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 500);
-    assert_eq!(body["code"], "DB_ERROR");
-    assert_eq!(body["detail"], "Database connection failed");
+    assert_eq!(body["status"].as_u64().unwrap(), 500);
+    assert_eq!(body["code"].as_str().unwrap(), "DB_ERROR");
+    assert_eq!(
+        body["detail"].as_str().unwrap(),
+        "Database connection failed"
+    );
 }
 
 #[actix_web::test]
@@ -306,9 +320,13 @@ async fn test_sanitized_database_error_details() {
     );
     let app_error: AppError = db_err.into();
 
-    assert!(matches!(app_error, AppError::Conflict { .. }));
-    assert_eq!(app_error.code(), ErrorCode::UniqueViolation);
-    assert_eq!(app_error.detail(), "Unique constraint violation");
+    match app_error {
+        AppError::Conflict { code, detail } => {
+            assert_eq!(code, ErrorCode::UniqueViolation);
+            assert_eq!(detail, "Unique constraint violation");
+        }
+        _ => panic!("Expected Conflict variant"),
+    }
 
     // Test foreign key constraint violation with sanitized detail
     let db_err = DbErr::Custom(
@@ -317,17 +335,25 @@ async fn test_sanitized_database_error_details() {
     );
     let app_error: AppError = db_err.into();
 
-    assert!(matches!(app_error, AppError::Conflict { .. }));
-    assert_eq!(app_error.code(), ErrorCode::FkViolation);
-    assert_eq!(app_error.detail(), "Foreign key constraint violation");
+    match app_error {
+        AppError::Conflict { code, detail } => {
+            assert_eq!(code, ErrorCode::FkViolation);
+            assert_eq!(detail, "Foreign key constraint violation");
+        }
+        _ => panic!("Expected Conflict variant"),
+    }
 
     // Test check constraint violation with sanitized detail
     let db_err = DbErr::Custom("new row for relation \"games\" violates check constraint \"games_status_check\" SQLSTATE(23514)".to_string());
     let app_error: AppError = db_err.into();
 
-    assert!(matches!(app_error, AppError::BadRequest { .. }));
-    assert_eq!(app_error.code(), ErrorCode::CheckViolation);
-    assert_eq!(app_error.detail(), "Check constraint violation");
+    match app_error {
+        AppError::BadRequest { code, detail } => {
+            assert_eq!(code, ErrorCode::CheckViolation);
+            assert_eq!(detail, "Check constraint violation");
+        }
+        _ => panic!("Expected BadRequest variant"),
+    }
 
     // Test connection issue detection
     let db_err = DbErr::Custom("connection timeout after 30 seconds".to_string());
@@ -340,9 +366,14 @@ async fn test_sanitized_database_error_details() {
     let db_err = DbErr::Custom("some unexpected database error".to_string());
     let app_error: AppError = db_err.into();
 
-    assert!(matches!(app_error, AppError::Db { .. }));
     assert_eq!(app_error.code(), ErrorCode::DbError);
-    assert_eq!(app_error.detail(), "Database operation failed");
+
+    match app_error {
+        AppError::Db { detail } => {
+            assert_eq!(detail, "Database operation failed");
+        }
+        _ => panic!("Expected Db variant"),
+    }
 }
 
 #[actix_web::test]
@@ -384,9 +415,12 @@ async fn test_sanitized_error_http_responses() {
     assert_eq!(resp.status(), 409);
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 409);
-    assert_eq!(body["code"], "UNIQUE_VIOLATION");
-    assert_eq!(body["detail"], "Unique constraint violation");
+    assert_eq!(body["status"].as_u64().unwrap(), 409);
+    assert_eq!(body["code"].as_str().unwrap(), "UNIQUE_VIOLATION");
+    assert_eq!(
+        body["detail"].as_str().unwrap(),
+        "Unique constraint violation"
+    );
     assert!(!body["trace_id"].as_str().unwrap().is_empty());
 
     // Test FK violation response has sanitized detail
@@ -396,8 +430,11 @@ async fn test_sanitized_error_http_responses() {
     assert_eq!(resp.status(), 409);
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 409);
-    assert_eq!(body["code"], "FK_VIOLATION");
-    assert_eq!(body["detail"], "Foreign key constraint violation");
+    assert_eq!(body["status"].as_u64().unwrap(), 409);
+    assert_eq!(body["code"].as_str().unwrap(), "FK_VIOLATION");
+    assert_eq!(
+        body["detail"].as_str().unwrap(),
+        "Foreign key constraint violation"
+    );
     assert!(!body["trace_id"].as_str().unwrap().is_empty());
 }

@@ -10,6 +10,7 @@
 //! All errors follow RFC 7807 Problem Details format with proper HTTP status codes.
 
 use actix_web::error::ResponseError;
+use actix_web::http::header::{CONTENT_TYPE, RETRY_AFTER, WWW_AUTHENTICATE};
 use actix_web::http::StatusCode;
 use actix_web::HttpResponse;
 use serde::Serialize;
@@ -93,7 +94,7 @@ impl AppError {
     }
 
     /// Helper method to extract error detail from any error variant
-    pub fn detail(&self) -> String {
+    fn detail(&self) -> String {
         match self {
             AppError::Validation { detail, .. } => detail.clone(),
             AppError::Db { detail, .. } => detail.clone(),
@@ -267,6 +268,14 @@ impl From<sea_orm::DbErr> for AppError {
                 );
                 return AppError::DbUnavailable;
             }
+            sea_orm::DbErr::Conn(_) => {
+                warn!(
+                    trace_id = %trace_id,
+                    raw_error = %error_msg,
+                    "Database connection failed"
+                );
+                return AppError::DbUnavailable;
+            }
             _ => {}
         }
 
@@ -355,27 +364,17 @@ impl ResponseError for AppError {
 
         let is_service_unavailable = status == StatusCode::SERVICE_UNAVAILABLE;
 
-        match (is_unauthorized, is_service_unavailable) {
-            (true, true) => HttpResponse::build(status)
-                .content_type("application/problem+json")
-                .insert_header(("x-trace-id", trace_id))
-                .insert_header(("WWW-Authenticate", "Bearer"))
-                .insert_header(("Retry-After", "1"))
-                .json(problem_details),
-            (true, false) => HttpResponse::build(status)
-                .content_type("application/problem+json")
-                .insert_header(("x-trace-id", trace_id))
-                .insert_header(("WWW-Authenticate", "Bearer"))
-                .json(problem_details),
-            (false, true) => HttpResponse::build(status)
-                .content_type("application/problem+json")
-                .insert_header(("x-trace-id", trace_id))
-                .insert_header(("Retry-After", "1"))
-                .json(problem_details),
-            (false, false) => HttpResponse::build(status)
-                .content_type("application/problem+json")
-                .insert_header(("x-trace-id", trace_id))
-                .json(problem_details),
+        // Build step-by-step to avoid borrowing a temporary
+        let mut builder = HttpResponse::build(status);
+        builder.insert_header((CONTENT_TYPE, "application/problem+json"));
+        builder.insert_header(("x-trace-id", trace_id)); // keep custom
+        if is_unauthorized {
+            builder.insert_header((WWW_AUTHENTICATE, "Bearer"));
         }
+        if is_service_unavailable {
+            builder.insert_header((RETRY_AFTER, "1"));
+        }
+
+        builder.json(problem_details)
     }
 }
