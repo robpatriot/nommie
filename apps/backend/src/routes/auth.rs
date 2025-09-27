@@ -7,6 +7,7 @@ use crate::auth::jwt::mint_access_token;
 use crate::db::txn::with_txn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
+use crate::extractors::ValidatedJson;
 use crate::services::users::ensure_user;
 use crate::state::app_state::AppState;
 
@@ -28,7 +29,7 @@ pub struct LoginResponse {
 /// Creates or reuses a user based on email and returns a JWT token
 async fn login(
     http_req: HttpRequest,
-    req: web::Json<LoginRequest>,
+    req: ValidatedJson<LoginRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     // Validate required fields
