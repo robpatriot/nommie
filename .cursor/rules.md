@@ -1,4 +1,4 @@
-# Nommie — Cursor Rules (v1.5.0)
+# Nommie — Cursor Rules (v1.5.1)
 
 > Repo-root file. Applies to **all Cursor edits, refactors, and codegen**.  
 
@@ -45,9 +45,16 @@
 ---
 
 ## Extractors
-- Use only existing extractors: `AuthToken`, `JwtClaims`, `CurrentUser`, `CurrentUserDb`, `GameId`, `GameMembership`, `ValidatedJson<T>`.  
+- Use only existing extractors:  
+  - `AuthToken`  
+  - `JwtClaims`  
+  - `CurrentUser`  
+  - `CurrentUserDb`  
+  - `GameId`  
+  - `ValidatedJson<T>`  
 - Don’t create new extractors unless explicitly asked.  
 - Minimize DB hits (resolve user+membership efficiently).  
+- `ValidatedJson<T>` must convert all JSON parse/validation failures into proper `AppError` Problem Details responses — never panic or leak serde errors.  
 
 ---
 
