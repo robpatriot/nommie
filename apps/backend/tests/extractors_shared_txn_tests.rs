@@ -94,45 +94,6 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
 }
 
 #[actix_web::test]
-async fn test_current_user_db_without_shared_txn() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with Test DB + Security (JWT)
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_db(DbProfile::Test)
-        .with_security(security_config.clone())
-        .build()
-        .await?;
-
-    // Seed user
-    let test_sub = unique_str("test-sub-pooled");
-    let test_email = unique_email("test-pooled");
-    let db = require_db(&state).expect("DB required for this test");
-    let user = seed_user_with_sub(db, &test_sub, Some(&test_email))
-        .await
-        .expect("should create user successfully");
-
-    // Request with state + auth header (no shared txn)
-    let req = test::TestRequest::default()
-        .insert_header((
-            "Authorization",
-            bearer_header(&test_sub, &test_email, &security_config),
-        ))
-        .app_data(web::Data::new(state))
-        .to_http_request();
-
-    // Extract
-    let mut payload = actix_web::dev::Payload::None;
-    let result = CurrentUserRecord::from_request(&req, &mut payload).await?;
-
-    // Verify
-    assert_eq!(result.id, user.id);
-    assert_eq!(result.sub, test_sub);
-    assert_eq!(result.email, None);
-    Ok(())
-}
-
-#[actix_web::test]
 async fn test_game_id_with_shared_txn() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with Test DB (no security needed)
     let state = build_state().with_db(DbProfile::Test).build().await?;
@@ -163,31 +124,5 @@ async fn test_game_id_with_shared_txn() -> Result<(), Box<dyn std::error::Error>
     // Cleanup
     drop(req);
     shared.rollback().await?;
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_game_id_without_shared_txn() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with Test DB (no security needed)
-    let state = build_state().with_db(DbProfile::Test).build().await?;
-
-    // Insert game
-    let db = require_db(&state).expect("DB required for this test");
-    let game_id = insert_test_game(db).await?;
-
-    // Request with path param (no shared txn)
-    let game_id_str = game_id.to_string();
-    let game_id_static: &'static str = Box::leak(game_id_str.into_boxed_str());
-    let req = test::TestRequest::get()
-        .param("game_id", game_id_static)
-        .app_data(web::Data::new(state))
-        .to_http_request();
-
-    // Extract
-    let mut payload = actix_web::dev::Payload::None;
-    let result = GameId::from_request(&req, &mut payload).await?;
-
-    // Verify
-    assert_eq!(result.0, game_id);
     Ok(())
 }

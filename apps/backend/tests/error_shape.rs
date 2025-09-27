@@ -58,6 +58,7 @@ async fn test_db_unavailable_error(_req: HttpRequest) -> Result<HttpResponse, Ap
     Err(AppError::db_unavailable())
 }
 
+// handler-only: validates error shape; no DB
 /// Test that all error responses conform to ProblemDetails format
 /// This test consolidates all error type testing into a single, parameterized test
 #[actix_web::test]
@@ -128,6 +129,7 @@ async fn test_all_error_responses_conform_to_problem_details() {
     }
 }
 
+// handler-only: validates error shape; no DB
 /// Test that successful responses don't interfere with error handling
 #[actix_web::test]
 async fn test_successful_response_with_error_handling() {
@@ -163,6 +165,7 @@ async fn test_successful_response_with_error_handling() {
     assert_eq!(body, "Success");
 }
 
+// handler-only: validates error shape; no DB
 /// Test edge case: error with trace_id from task-local context
 #[actix_web::test]
 async fn test_error_with_trace_id_from_context() {
@@ -209,6 +212,7 @@ async fn test_error_with_trace_id_from_context() {
     assert_eq!(problem_details["detail"], "Error without trace");
 }
 
+// handler-only: validates error shape; no DB
 /// Test that trace_ctx::trace_id() returns "unknown" outside of request context
 #[actix_web::test]
 async fn test_trace_ctx_outside_context() {
@@ -218,6 +222,7 @@ async fn test_trace_ctx_outside_context() {
     assert_eq!(trace_ctx::trace_id(), "unknown");
 }
 
+// handler-only: validates error shape; no DB
 /// Test edge case: malformed error response handling
 #[actix_web::test]
 async fn test_malformed_error_response_handling() {
@@ -286,6 +291,28 @@ async fn test_require_db_endpoint(state: web::Data<AppState>) -> Result<HttpResp
     Ok(HttpResponse::Ok().body("Success"))
 }
 
+// require_db: negative (no DB configured)
+/// Test that require_db helper returns DB_UNAVAILABLE error when no DB is configured
+#[actix_web::test]
+async fn test_require_db_direct_without_database() {
+    use backend::db::require_db;
+
+    let state = build_state()
+        .build() // build with no DB
+        .await
+        .expect("create test state without DB");
+
+    let res = require_db(&state);
+    assert!(
+        res.is_err(),
+        "require_db should fail when no DB is configured"
+    );
+
+    let err = res.unwrap_err();
+    assert_eq!(err.code(), ErrorCode::DbUnavailable);
+}
+
+// require_db: negative (no DB configured)
 /// Test that require_db helper returns DB_UNAVAILABLE error when no DB is configured
 #[actix_web::test]
 async fn test_require_db_without_database() {
@@ -311,6 +338,7 @@ async fn test_require_db_without_database() {
     assert_problem_details_structure(resp, 500, "DB_UNAVAILABLE", "Database unavailable").await;
 }
 
+// require_db: positive (DB configured)
 /// Test that require_db helper succeeds when DB is configured
 #[actix_web::test]
 async fn test_require_db_with_database() {
