@@ -3,10 +3,11 @@ use std::time::SystemTime;
 
 mod support;
 
-use actix_web::test;
+use actix_web::{test, HttpMessage};
 use backend::auth::jwt::mint_access_token;
 use backend::config::db::DbProfile;
 use backend::db::require_db;
+use backend::db::txn::SharedTxn;
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
@@ -26,11 +27,14 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
+    // Open SharedTxn for this test
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+
     // Seed user with specific sub - use unique helpers to ensure uniqueness
     let test_sub = unique_str("test-sub");
     let test_email = unique_email("test");
-    let db = require_db(&state).expect("DB required for this test");
-    let user = seed_user_with_sub(db, &test_sub, Some(&test_email))
+    let user = seed_user_with_sub(shared.transaction(), &test_sub, Some(&test_email))
         .await
         .expect("should create user successfully");
 
@@ -47,6 +51,9 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
 
+    // Inject SharedTxn via extensions
+    req.extensions_mut().insert(shared.clone());
+
     let resp = test::call_service(&app, req).await;
 
     // Assert 200
@@ -61,6 +68,9 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(response["id"], user.id);
     assert_eq!(response["sub"], test_sub);
     assert_eq!(response["email"], Value::Null); // email is None since it's not in users table
+
+    // Rollback the transaction
+    shared.rollback().await?;
 
     Ok(())
 }
