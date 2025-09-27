@@ -107,12 +107,12 @@ async fn join_code_unique() -> Result<(), AppError> {
             })
             .await;
 
-            // Assert the second insert errors with JoinCodeConflict
+            // Assert the second insert errors with UniqueViolation
             match result {
                 Err(err) => {
-                    assert_eq!(err.code(), ErrorCode::JoinCodeConflict);
+                    assert_eq!(err.code(), ErrorCode::UniqueViolation);
                 }
-                Ok(_) => panic!("Expected Conflict error with JOIN_CODE_CONFLICT code"),
+                Ok(_) => panic!("Expected Conflict error with UNIQUE_VIOLATION code"),
             }
 
             // Verify the first game still exists

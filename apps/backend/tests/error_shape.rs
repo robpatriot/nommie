@@ -116,7 +116,7 @@ async fn test_all_error_responses_conform_to_problem_details() {
         ("/_test/db", 500, "DB_ERROR", "Connection timeout"),
         (
             "/_test/db_unavailable",
-            500,
+            503,
             "DB_UNAVAILABLE",
             "Database unavailable",
         ),
@@ -335,7 +335,7 @@ async fn test_require_db_without_database() {
     let resp = test::call_service(&app, req).await;
 
     // Should return DB_UNAVAILABLE problem details with trace id
-    assert_problem_details_structure(resp, 500, "DB_UNAVAILABLE", "Database unavailable").await;
+    assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "Database unavailable").await;
 }
 
 // require_db: positive (DB configured)

@@ -38,7 +38,7 @@ mod tests {
             assert_problem_details_from_http_response(
                 response,
                 "DB_UNAVAILABLE",
-                StatusCode::INTERNAL_SERVER_ERROR,
+                StatusCode::SERVICE_UNAVAILABLE,
                 Some("Database unavailable"),
             )
             .await;
@@ -61,7 +61,7 @@ mod tests {
             assert_problem_details_from_http_response(
                 response,
                 "DB_UNAVAILABLE",
-                StatusCode::INTERNAL_SERVER_ERROR,
+                StatusCode::SERVICE_UNAVAILABLE,
                 Some("Database unavailable"),
             )
             .await;

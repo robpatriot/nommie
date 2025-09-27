@@ -58,6 +58,19 @@ pub enum ErrorCode {
     DbError,
     /// Database unavailable
     DbUnavailable,
+    /// Database pool exhausted
+    DbPoolExhausted,
+
+    // Database Constraint Violations
+    /// Unique constraint violation (SQLSTATE 23505; generic 409)
+    UniqueViolation,
+    /// Foreign key constraint violation (SQLSTATE 23503; generic 409)
+    FkViolation,
+    /// Check constraint violation (SQLSTATE 23514; generic 400)
+    CheckViolation,
+    /// Record not found (generic 404 for DB-driven not-found)
+    RecordNotFound,
+
     /// Internal server error
     Internal,
     /// Configuration error
@@ -100,6 +113,14 @@ impl ErrorCode {
             // System Errors
             Self::DbError => "DB_ERROR",
             Self::DbUnavailable => "DB_UNAVAILABLE",
+            Self::DbPoolExhausted => "DB_POOL_EXHAUSTED",
+
+            // Database Constraint Violations
+            Self::UniqueViolation => "UNIQUE_VIOLATION",
+            Self::FkViolation => "FK_VIOLATION",
+            Self::CheckViolation => "CHECK_VIOLATION",
+            Self::RecordNotFound => "RECORD_NOT_FOUND",
+
             Self::Internal => "INTERNAL",
             Self::ConfigError => "CONFIG_ERROR",
 
@@ -151,6 +172,11 @@ mod tests {
         assert_eq!(ErrorCode::JoinCodeConflict.as_str(), "JOIN_CODE_CONFLICT");
         assert_eq!(ErrorCode::DbError.as_str(), "DB_ERROR");
         assert_eq!(ErrorCode::DbUnavailable.as_str(), "DB_UNAVAILABLE");
+        assert_eq!(ErrorCode::DbPoolExhausted.as_str(), "DB_POOL_EXHAUSTED");
+        assert_eq!(ErrorCode::UniqueViolation.as_str(), "UNIQUE_VIOLATION");
+        assert_eq!(ErrorCode::FkViolation.as_str(), "FK_VIOLATION");
+        assert_eq!(ErrorCode::CheckViolation.as_str(), "CHECK_VIOLATION");
+        assert_eq!(ErrorCode::RecordNotFound.as_str(), "RECORD_NOT_FOUND");
         assert_eq!(ErrorCode::Internal.as_str(), "INTERNAL");
         assert_eq!(ErrorCode::ConfigError.as_str(), "CONFIG_ERROR");
         assert_eq!(ErrorCode::NoTrace.as_str(), "NO_TRACE");
@@ -160,5 +186,16 @@ mod tests {
     fn test_display_trait() {
         assert_eq!(format!("{}", ErrorCode::Unauthorized), "UNAUTHORIZED");
         assert_eq!(format!("{}", ErrorCode::InvalidGameId), "INVALID_GAME_ID");
+        assert_eq!(
+            format!("{}", ErrorCode::UniqueViolation),
+            "UNIQUE_VIOLATION"
+        );
+        assert_eq!(format!("{}", ErrorCode::FkViolation), "FK_VIOLATION");
+        assert_eq!(format!("{}", ErrorCode::CheckViolation), "CHECK_VIOLATION");
+        assert_eq!(format!("{}", ErrorCode::RecordNotFound), "RECORD_NOT_FOUND");
+        assert_eq!(
+            format!("{}", ErrorCode::DbPoolExhausted),
+            "DB_POOL_EXHAUSTED"
+        );
     }
 }
