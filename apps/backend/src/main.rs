@@ -1,4 +1,3 @@
-
 use actix_web::{web, App, HttpServer};
 use backend::config::db::DbProfile;
 use backend::infra::state::build_state;

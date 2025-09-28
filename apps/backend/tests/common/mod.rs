@@ -74,6 +74,53 @@ pub async fn assert_problem_details_structure(
         "Content-Type must be application/problem+json (got {content_type})"
     );
 
+    // Header-specific assertions based on status code
+    match expected_status {
+        401 => {
+            // 401 responses should have WWW-Authenticate: Bearer and no Retry-After
+            let www_auth = headers.get("WWW-Authenticate");
+            assert!(
+                www_auth.is_some(),
+                "401 responses should have WWW-Authenticate header"
+            );
+            assert_eq!(www_auth.unwrap().to_str().unwrap(), "Bearer");
+            assert!(
+                headers.get("Retry-After").is_none(),
+                "401 responses should not have Retry-After header"
+            );
+        }
+        503 => {
+            // 503 responses should have Retry-After and no WWW-Authenticate
+            let retry_after = headers.get("Retry-After");
+            assert!(
+                retry_after.is_some(),
+                "503 responses should have Retry-After header"
+            );
+            assert!(
+                !retry_after.unwrap().to_str().unwrap().is_empty(),
+                "Retry-After should not be empty"
+            );
+            assert!(
+                headers.get("WWW-Authenticate").is_none(),
+                "503 responses should not have WWW-Authenticate header"
+            );
+        }
+        400 | 404 | 409 => {
+            // 400/404/409 responses should have neither WWW-Authenticate nor Retry-After
+            assert!(
+                headers.get("WWW-Authenticate").is_none(),
+                "{expected_status} responses should not have WWW-Authenticate header"
+            );
+            assert!(
+                headers.get("Retry-After").is_none(),
+                "{expected_status} responses should not have Retry-After header"
+            );
+        }
+        _ => {
+            // For other status codes, we don't enforce specific header requirements
+        }
+    }
+
     // Read and parse the response body
     let body = test::read_body(resp).await;
     let body_str = std::str::from_utf8(&body).expect("Response body should be valid UTF-8");

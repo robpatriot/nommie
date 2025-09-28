@@ -115,10 +115,11 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
 
     // Verify it returns Problem Details format
     let content_type = resp.headers().get("content-type").unwrap();
-    assert!(content_type
-        .to_str()
-        .unwrap()
-        .contains("application/problem+json"));
+    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
+
+    // Negative header checks for 400 responses
+    assert!(resp.headers().get("www-authenticate").is_none());
+    assert!(resp.headers().get("retry-after").is_none());
 
     // Test with empty email
     let test_google_sub = unique_str("google");
@@ -138,10 +139,11 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
     assert!(resp2.status().is_client_error());
 
     let content_type2 = resp2.headers().get("content-type").unwrap();
-    assert!(content_type2
-        .to_str()
-        .unwrap()
-        .contains("application/problem+json"));
+    assert_eq!(content_type2.to_str().unwrap(), "application/problem+json");
+
+    // Negative header checks for 400 responses
+    assert!(resp2.headers().get("www-authenticate").is_none());
+    assert!(resp2.headers().get("retry-after").is_none());
 
     Ok(())
 }

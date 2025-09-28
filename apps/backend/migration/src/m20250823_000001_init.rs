@@ -1,6 +1,6 @@
 use sea_orm_migration::prelude::*;
-use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction, Index, Table};
 use sea_orm_migration::sea_query::extension::postgres::Type as PgType;
+use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction, Index, Table};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -215,7 +215,7 @@ impl MigrationTrait for Migration {
                     .as_enum(GameStateEnum::Type)
                     .values([
                         "LOBBY",
-                        "DEALING", 
+                        "DEALING",
                         "BIDDING",
                         "TRUMP_SELECTION",
                         "TRICK_PLAY",
@@ -273,8 +273,16 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(Games::StartedAt).timestamp_with_time_zone().null())
-                    .col(ColumnDef::new(Games::EndedAt).timestamp_with_time_zone().null())
+                    .col(
+                        ColumnDef::new(Games::StartedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(Games::EndedAt)
+                            .timestamp_with_time_zone()
+                            .null(),
+                    )
                     .col(ColumnDef::new(Games::Name).text().null())
                     .col(
                         ColumnDef::new(Games::JoinCode)
@@ -513,19 +521,11 @@ impl MigrationTrait for Migration {
 
         // Drop enum types
         manager
-            .drop_type(
-                PgType::drop()
-                    .name(GameVisibilityEnum::Type)
-                    .to_owned(),
-            )
+            .drop_type(PgType::drop().name(GameVisibilityEnum::Type).to_owned())
             .await?;
 
         manager
-            .drop_type(
-                PgType::drop()
-                    .name(GameStateEnum::Type)
-                    .to_owned(),
-            )
+            .drop_type(PgType::drop().name(GameStateEnum::Type).to_owned())
             .await?;
 
         manager

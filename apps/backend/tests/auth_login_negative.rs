@@ -37,10 +37,11 @@ async fn login_rejects_empty_fields_returns_problem_details(
 
     // Verify it returns Problem Details format
     let content_type = resp.headers().get("content-type").unwrap();
-    assert!(content_type
-        .to_str()
-        .unwrap()
-        .contains("application/problem+json"));
+    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
+
+    // Negative header checks for 400 responses
+    assert!(resp.headers().get("www-authenticate").is_none());
+    assert!(resp.headers().get("retry-after").is_none());
 
     // Verify Problem Details structure
     let body: serde_json::Value = test::read_body_json(resp).await;
@@ -78,10 +79,11 @@ async fn login_rejects_empty_fields_returns_problem_details(
     assert_eq!(resp2.status().as_u16(), 400);
 
     let content_type2 = resp2.headers().get("content-type").unwrap();
-    assert!(content_type2
-        .to_str()
-        .unwrap()
-        .contains("application/problem+json"));
+    assert_eq!(content_type2.to_str().unwrap(), "application/problem+json");
+
+    // Negative header checks for 400 responses
+    assert!(resp2.headers().get("www-authenticate").is_none());
+    assert!(resp2.headers().get("retry-after").is_none());
 
     let body2: serde_json::Value = test::read_body_json(resp2).await;
     assert_eq!(body2["status"], 400);
@@ -103,6 +105,14 @@ async fn login_rejects_empty_fields_returns_problem_details(
 
     // Should return a 400 Bad Request
     assert_eq!(resp3.status().as_u16(), 400);
+
+    // Assert headers
+    let content_type3 = resp3.headers().get("content-type").unwrap();
+    assert_eq!(content_type3.to_str().unwrap(), "application/problem+json");
+
+    // Negative header checks for 400 responses
+    assert!(resp3.headers().get("www-authenticate").is_none());
+    assert!(resp3.headers().get("retry-after").is_none());
 
     let body3: serde_json::Value = test::read_body_json(resp3).await;
     assert_eq!(body3["status"], 400);

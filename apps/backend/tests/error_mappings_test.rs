@@ -3,6 +3,8 @@
 //! This module tests the precise mapping of database errors to AppError variants
 //! and ensures HTTP responses follow RFC 7807 Problem Details format.
 
+mod common;
+
 use actix_web::{test, web, App, HttpResponse, Result};
 use backend::error::AppError;
 use backend::errors::ErrorCode;
@@ -59,33 +61,17 @@ async fn test_unauthorized_responses() {
 
         assert_eq!(resp.status(), 401);
 
-        // Check WWW-Authenticate header
-        let www_auth = resp.headers().get("WWW-Authenticate");
-        assert!(www_auth.is_some());
-        assert_eq!(www_auth.unwrap().to_str().unwrap(), "Bearer");
-
-        // Check x-trace-id header
-        let trace_id = resp.headers().get("x-trace-id");
-        assert!(trace_id.is_some());
-
-        // Check content type
-        assert_eq!(
-            resp.headers()
-                .get("content-type")
-                .unwrap()
-                .to_str()
-                .unwrap(),
-            "application/problem+json"
-        );
-
-        // Parse and validate JSON response
-        let body: Value = test::read_body_json(resp).await;
-        assert_eq!(body["status"].as_u64().unwrap(), 401);
-        assert_eq!(body["code"].as_str().unwrap(), error.code().as_str());
-        assert!(!body["trace_id"].as_str().unwrap().is_empty());
-        assert!(body["detail"].is_string());
-        assert!(body["title"].is_string());
-        assert!(body["type"].is_string());
+        // Use the common helper for comprehensive validation
+        use common::assert_problem_details_structure;
+        // For Unauthorized variants, we need to use the specific detail messages
+        let expected_detail = match error {
+            AppError::Unauthorized => "Authentication required",
+            AppError::UnauthorizedMissingBearer => "Missing or malformed Bearer token",
+            AppError::UnauthorizedInvalidJwt => "Invalid JWT",
+            AppError::UnauthorizedExpiredJwt => "Token expired",
+            _ => "Authentication required", // fallback
+        };
+        assert_problem_details_structure(resp, 401, error.code().as_str(), expected_detail).await;
     }
 }
 
@@ -102,31 +88,9 @@ async fn test_database_unavailable_response() {
 
     assert_eq!(resp.status(), 503);
 
-    // Check Retry-After header
-    let retry_after = resp.headers().get("Retry-After");
-    assert!(retry_after.is_some());
-    assert_eq!(retry_after.unwrap().to_str().unwrap(), "1");
-
-    // Check x-trace-id header
-    let trace_id = resp.headers().get("x-trace-id");
-    assert!(trace_id.is_some());
-
-    // Check content type
-    assert_eq!(
-        resp.headers()
-            .get("content-type")
-            .unwrap()
-            .to_str()
-            .unwrap(),
-        "application/problem+json"
-    );
-
-    // Parse and validate JSON response
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 503);
-    assert_eq!(body["code"].as_str().unwrap(), "DB_UNAVAILABLE");
-    assert!(!body["trace_id"].as_str().unwrap().is_empty());
-    assert_eq!(body["detail"].as_str().unwrap(), "Database unavailable");
+    // Use the common helper for comprehensive validation
+    use common::assert_problem_details_structure;
+    assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "Database unavailable").await;
 }
 
 #[actix_web::test]
@@ -162,10 +126,9 @@ async fn test_conflict_responses() {
 
     assert_eq!(resp.status(), 409);
 
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 409);
-    assert_eq!(body["code"].as_str().unwrap(), "UNIQUE_VIOLATION");
-    assert_eq!(body["detail"].as_str().unwrap(), "Duplicate key");
+    // Use the common helper for comprehensive validation
+    use common::assert_problem_details_structure;
+    assert_problem_details_structure(resp, 409, "UNIQUE_VIOLATION", "Duplicate key").await;
 
     // Test FkViolation
     let req = test::TestRequest::get().uri("/fk_violation").to_request();
@@ -173,10 +136,8 @@ async fn test_conflict_responses() {
 
     assert_eq!(resp.status(), 409);
 
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 409);
-    assert_eq!(body["code"].as_str().unwrap(), "FK_VIOLATION");
-    assert_eq!(body["detail"].as_str().unwrap(), "Foreign key constraint");
+    // Use the common helper for comprehensive validation
+    assert_problem_details_structure(resp, 409, "FK_VIOLATION", "Foreign key constraint").await;
 }
 
 #[actix_web::test]
@@ -199,10 +160,9 @@ async fn test_bad_request_response() {
 
     assert_eq!(resp.status(), 400);
 
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 400);
-    assert_eq!(body["code"].as_str().unwrap(), "CHECK_VIOLATION");
-    assert_eq!(body["detail"].as_str().unwrap(), "Check constraint failed");
+    // Use the common helper for comprehensive validation
+    use common::assert_problem_details_structure;
+    assert_problem_details_structure(resp, 400, "CHECK_VIOLATION", "Check constraint failed").await;
 }
 
 #[actix_web::test]
@@ -225,10 +185,9 @@ async fn test_not_found_response() {
 
     assert_eq!(resp.status(), 404);
 
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 404);
-    assert_eq!(body["code"].as_str().unwrap(), "RECORD_NOT_FOUND");
-    assert_eq!(body["detail"].as_str().unwrap(), "Record not found");
+    // Use the common helper for comprehensive validation
+    use common::assert_problem_details_structure;
+    assert_problem_details_structure(resp, 404, "RECORD_NOT_FOUND", "Record not found").await;
 }
 
 #[actix_web::test]

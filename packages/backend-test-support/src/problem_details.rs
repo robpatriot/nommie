@@ -20,7 +20,7 @@ struct ProblemDetailsLike {
 }
 
 /// Assert that an HTTP response conforms to the stable error contract
-/// 
+///
 /// This helper operates on HttpResponse and validates:
 /// - HTTP status matches expected
 /// - x-trace-id header exists and matches body trace_id
@@ -33,11 +33,11 @@ pub async fn assert_problem_details_from_http_response(
 ) {
     let status = resp.status();
     let headers = resp.headers().clone();
-    
+
     // Convert HttpResponse to bytes for parsing
     let body_bytes = resp.into_body();
     let body = actix_web::body::to_bytes(body_bytes).await.unwrap();
-    
+
     assert_problem_details_from_parts(
         status,
         &headers,
@@ -45,11 +45,12 @@ pub async fn assert_problem_details_from_http_response(
         expected_code,
         expected_status,
         expected_detail_contains,
-    ).await;
+    )
+    .await;
 }
 
 /// Assert that response parts conform to the stable error contract
-/// 
+///
 /// This helper operates on raw response parts and validates:
 /// - HTTP status matches expected
 /// - x-trace-id header exists and matches body trace_id
@@ -64,20 +65,20 @@ pub async fn assert_problem_details_from_parts(
 ) {
     // Assert HTTP status matches expected
     assert_eq!(status, expected_status);
-    
+
     // Parse the response body as ProblemDetails
-    let body_str = String::from_utf8(body_bytes.to_vec())
-        .expect("Response body should be valid UTF-8");
-    let problem: ProblemDetailsLike = serde_json::from_str(&body_str)
-        .expect("Response body should be valid ProblemDetails JSON");
-    
+    let body_str =
+        String::from_utf8(body_bytes.to_vec()).expect("Response body should be valid UTF-8");
+    let problem: ProblemDetailsLike =
+        serde_json::from_str(&body_str).expect("Response body should be valid ProblemDetails JSON");
+
     // Assert trace_id parity: body trace_id should equal x-trace-id header
     let trace_id_header = headers
         .get("x-trace-id")
         .expect("x-trace-id header should be present")
         .to_str()
         .expect("x-trace-id header should be valid UTF-8");
-    
+
     assert_eq!(
         problem.trace_id, trace_id_header,
         "trace_id in body should match x-trace-id header"
@@ -99,7 +100,7 @@ pub async fn assert_problem_details_from_parts(
 }
 
 /// Assert that a ServiceResponse conforms to the stable error contract
-/// 
+///
 /// This helper operates on ServiceResponse<BoxBody> and validates:
 /// - HTTP status matches expected
 /// - x-trace-id header exists and matches body trace_id
@@ -113,7 +114,7 @@ pub async fn assert_problem_details_from_service_response(
     let status = resp.status();
     let headers = resp.headers().clone();
     let body = actix_web::test::read_body(resp).await;
-    
+
     assert_problem_details_from_parts(
         status,
         &headers,
@@ -121,5 +122,6 @@ pub async fn assert_problem_details_from_service_response(
         expected_code,
         expected_status,
         expected_detail_contains,
-    ).await;
+    )
+    .await;
 }

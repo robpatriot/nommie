@@ -259,6 +259,10 @@ async fn test_malformed_error_response_handling() {
     let content_type = headers.get("content-type").unwrap().to_str().unwrap();
     assert_eq!(content_type, "application/problem+json");
 
+    // Negative header checks for 500 responses
+    assert!(headers.get("WWW-Authenticate").is_none());
+    assert!(headers.get("Retry-After").is_none());
+
     // Body should be valid JSON with all required fields
     let body = test::read_body(resp).await;
     let body_str = String::from_utf8(body.to_vec()).unwrap();
@@ -266,7 +270,7 @@ async fn test_malformed_error_response_handling() {
     // This should not panic and should parse correctly
     let problem_details: Value = serde_json::from_str(&body_str).unwrap();
 
-    // Verify all required fields are present
+    // Verify all required fields are present and have correct types
     assert!(problem_details.get("type").is_some());
     assert!(problem_details.get("title").is_some());
     assert!(problem_details.get("status").is_some());
@@ -274,10 +278,23 @@ async fn test_malformed_error_response_handling() {
     assert!(problem_details.get("code").is_some());
     assert!(problem_details.get("trace_id").is_some());
 
-    // Verify specific values
-    assert_eq!(problem_details["status"], 500);
-    assert_eq!(problem_details["code"], "INTERNAL");
-    assert_eq!(problem_details["detail"], "Malformed error test");
+    // Verify specific values using .as_*() accessors
+    assert_eq!(problem_details["status"].as_u64().unwrap(), 500);
+    assert_eq!(problem_details["code"].as_str().unwrap(), "INTERNAL");
+    assert_eq!(
+        problem_details["detail"].as_str().unwrap(),
+        "Malformed error test"
+    );
+
+    // Verify trace_id is present and non-empty
+    let trace_id = problem_details["trace_id"].as_str().unwrap();
+    assert!(!trace_id.is_empty(), "trace_id should not be empty");
+
+    // Verify type and title are non-empty strings
+    let type_val = problem_details["type"].as_str().unwrap();
+    assert!(!type_val.is_empty(), "type should not be empty");
+    let title = problem_details["title"].as_str().unwrap();
+    assert!(!title.is_empty(), "title should not be empty");
 }
 
 /// Test endpoint that uses require_db helper
