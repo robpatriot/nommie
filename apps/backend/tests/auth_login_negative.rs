@@ -5,6 +5,7 @@ use actix_web::test;
 use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 use backend::utils::unique::{unique_email, unique_str};
+use common::assert_problem_details_structure;
 use serde_json::json;
 use support::create_test_app;
 
@@ -32,33 +33,8 @@ async fn login_rejects_empty_fields_returns_problem_details(
 
     let resp = test::call_service(&app, req).await;
 
-    // Should return a 400 Bad Request for empty email
-    assert_eq!(resp.status().as_u16(), 400);
-
-    // Verify it returns Problem Details format
-    let content_type = resp.headers().get("content-type").unwrap();
-    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks for 400 responses
-    assert!(resp.headers().get("www-authenticate").is_none());
-    assert!(resp.headers().get("retry-after").is_none());
-
-    // Verify Problem Details structure
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    assert!(body.get("type").is_some());
-    assert!(body.get("title").is_some());
-    assert_eq!(body["status"], 400);
-    assert!(body.get("detail").is_some());
-    assert!(body.get("code").is_some());
-    assert!(body.get("trace_id").is_some());
-
-    // Verify code is SCREAMING_SNAKE
-    let code = body["code"].as_str().unwrap();
-    assert!(
-        code.chars().all(|c| c.is_uppercase() || c == '_'),
-        "Code should be SCREAMING_SNAKE_CASE"
-    );
-    assert_eq!(code, "INVALID_EMAIL");
+    // Validate error structure using centralized helper
+    assert_problem_details_structure(resp, 400, "INVALID_EMAIL", "Email cannot be empty").await;
 
     // Test empty google_sub
     let test_email = unique_email("test");
@@ -75,19 +51,14 @@ async fn login_rejects_empty_fields_returns_problem_details(
 
     let resp2 = test::call_service(&app, req2).await;
 
-    // Should return a 400 Bad Request for empty google_sub
-    assert_eq!(resp2.status().as_u16(), 400);
-
-    let content_type2 = resp2.headers().get("content-type").unwrap();
-    assert_eq!(content_type2.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks for 400 responses
-    assert!(resp2.headers().get("www-authenticate").is_none());
-    assert!(resp2.headers().get("retry-after").is_none());
-
-    let body2: serde_json::Value = test::read_body_json(resp2).await;
-    assert_eq!(body2["status"], 400);
-    assert_eq!(body2["code"], "INVALID_GOOGLE_SUB");
+    // Validate error structure using centralized helper
+    assert_problem_details_structure(
+        resp2,
+        400,
+        "INVALID_GOOGLE_SUB",
+        "Google sub cannot be empty",
+    )
+    .await;
 
     // Test both empty
     let login_data_both_empty = json!({
@@ -103,21 +74,9 @@ async fn login_rejects_empty_fields_returns_problem_details(
 
     let resp3 = test::call_service(&app, req3).await;
 
-    // Should return a 400 Bad Request
-    assert_eq!(resp3.status().as_u16(), 400);
-
-    // Assert headers
-    let content_type3 = resp3.headers().get("content-type").unwrap();
-    assert_eq!(content_type3.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks for 400 responses
-    assert!(resp3.headers().get("www-authenticate").is_none());
-    assert!(resp3.headers().get("retry-after").is_none());
-
-    let body3: serde_json::Value = test::read_body_json(resp3).await;
-    assert_eq!(body3["status"], 400);
+    // Validate error structure using centralized helper
     // Should fail on first validation (email)
-    assert_eq!(body3["code"], "INVALID_EMAIL");
+    assert_problem_details_structure(resp3, 400, "INVALID_EMAIL", "Email cannot be empty").await;
 
     Ok(())
 }
@@ -145,38 +104,9 @@ async fn login_missing_email_returns_400_todo_validator() -> Result<(), Box<dyn 
 
     let resp = test::call_service(&app, req).await;
 
-    // Should return a 400 Bad Request
-    assert_eq!(resp.status().as_u16(), 400);
-
-    // Assert headers
-    let content_type = resp.headers().get("content-type").unwrap();
-    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks
-    assert!(resp.headers().get("www-authenticate").is_none());
-    assert!(resp.headers().get("retry-after").is_none());
-
-    // Assert RFC7807 body structure
-    let body: serde_json::Value = test::read_body_json(resp).await;
-
-    assert_eq!(body["status"], 400);
-    assert!(body.get("type").is_some());
-    assert!(body.get("title").is_some());
-    assert!(body.get("detail").is_some());
-    assert!(body.get("code").is_some());
-    assert!(body.get("trace_id").is_some());
-
-    // Verify the error code is the expected validation error code
+    // Validate error structure using centralized helper
     // Missing email field results in empty string default, which fails business validation
-    assert_eq!(body["code"], "INVALID_EMAIL");
-
-    // Verify detail contains information about empty email
-    let detail = body["detail"].as_str().unwrap();
-    assert!(detail.contains("Email cannot be empty"));
-
-    // Verify trace_id is present and non-empty
-    let trace_id = body["trace_id"].as_str().unwrap();
-    assert!(!trace_id.is_empty());
+    assert_problem_details_structure(resp, 400, "INVALID_EMAIL", "Email cannot be empty").await;
 
     Ok(())
 }
@@ -204,38 +134,15 @@ async fn login_missing_google_sub_returns_400_todo_validator(
 
     let resp = test::call_service(&app, req).await;
 
-    // Should return a 400 Bad Request
-    assert_eq!(resp.status().as_u16(), 400);
-
-    // Assert headers
-    let content_type = resp.headers().get("content-type").unwrap();
-    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks
-    assert!(resp.headers().get("www-authenticate").is_none());
-    assert!(resp.headers().get("retry-after").is_none());
-
-    // Assert RFC7807 body structure
-    let body: serde_json::Value = test::read_body_json(resp).await;
-
-    assert_eq!(body["status"], 400);
-    assert!(body.get("type").is_some());
-    assert!(body.get("title").is_some());
-    assert!(body.get("detail").is_some());
-    assert!(body.get("code").is_some());
-    assert!(body.get("trace_id").is_some());
-
-    // Verify the error code is the expected validation error code
+    // Validate error structure using centralized helper
     // Missing google_sub field results in empty string default, which fails business validation
-    assert_eq!(body["code"], "INVALID_GOOGLE_SUB");
-
-    // Verify detail contains information about empty google_sub
-    let detail = body["detail"].as_str().unwrap();
-    assert!(detail.contains("Google sub cannot be empty"));
-
-    // Verify trace_id is present and non-empty
-    let trace_id = body["trace_id"].as_str().unwrap();
-    assert!(!trace_id.is_empty());
+    assert_problem_details_structure(
+        resp,
+        400,
+        "INVALID_GOOGLE_SUB",
+        "Google sub cannot be empty",
+    )
+    .await;
 
     Ok(())
 }
@@ -263,37 +170,14 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
 
     let resp = test::call_service(&app, req).await;
 
-    // Should return a 400 Bad Request
-    assert_eq!(resp.status().as_u16(), 400);
-
-    // Assert headers
-    let content_type = resp.headers().get("content-type").unwrap();
-    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks
-    assert!(resp.headers().get("www-authenticate").is_none());
-    assert!(resp.headers().get("retry-after").is_none());
-
-    // Assert RFC7807 body structure
-    let body: serde_json::Value = test::read_body_json(resp).await;
-
-    assert_eq!(body["status"], 400);
-    assert!(body.get("type").is_some());
-    assert!(body.get("title").is_some());
-    assert!(body.get("detail").is_some());
-    assert!(body.get("code").is_some());
-    assert!(body.get("trace_id").is_some());
-
-    // Verify the error code is the expected validation error code
-    assert_eq!(body["code"], "BAD_REQUEST");
-
-    // Verify detail contains stable substrings about JSON parsing
-    let detail = body["detail"].as_str().unwrap();
-    assert!(detail.contains("Invalid JSON"));
-
-    // Verify trace_id is present and non-empty
-    let trace_id = body["trace_id"].as_str().unwrap();
-    assert!(!trace_id.is_empty());
+    // Validate error structure using centralized helper
+    assert_problem_details_structure(
+        resp,
+        400,
+        "BAD_REQUEST",
+        "Invalid JSON: wrong types for one or more fields",
+    )
+    .await;
 
     // Test wrong type for google_sub (number instead of string)
     let test_email = unique_email("test");
@@ -310,37 +194,14 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
 
     let resp2 = test::call_service(&app, req2).await;
 
-    // Should return a 400 Bad Request
-    assert_eq!(resp2.status().as_u16(), 400);
-
-    // Assert headers
-    let content_type = resp2.headers().get("content-type").unwrap();
-    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks
-    assert!(resp2.headers().get("www-authenticate").is_none());
-    assert!(resp2.headers().get("retry-after").is_none());
-
-    // Assert RFC7807 body structure
-    let body: serde_json::Value = test::read_body_json(resp2).await;
-
-    assert_eq!(body["status"], 400);
-    assert!(body.get("type").is_some());
-    assert!(body.get("title").is_some());
-    assert!(body.get("detail").is_some());
-    assert!(body.get("code").is_some());
-    assert!(body.get("trace_id").is_some());
-
-    // Verify the error code is the expected validation error code
-    assert_eq!(body["code"], "BAD_REQUEST");
-
-    // Verify detail contains stable substrings about JSON parsing
-    let detail = body["detail"].as_str().unwrap();
-    assert!(detail.contains("Invalid JSON"));
-
-    // Verify trace_id is present and non-empty
-    let trace_id = body["trace_id"].as_str().unwrap();
-    assert!(!trace_id.is_empty());
+    // Validate error structure using centralized helper
+    assert_problem_details_structure(
+        resp2,
+        400,
+        "BAD_REQUEST",
+        "Invalid JSON: wrong types for one or more fields",
+    )
+    .await;
 
     // Test wrong type for name (number instead of string)
     let test_email = unique_email("test");
@@ -358,37 +219,14 @@ async fn login_wrong_type_returns_400_todo_validator() -> Result<(), Box<dyn std
 
     let resp3 = test::call_service(&app, req3).await;
 
-    // Should return a 400 Bad Request
-    assert_eq!(resp3.status().as_u16(), 400);
-
-    // Assert headers
-    let content_type = resp3.headers().get("content-type").unwrap();
-    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks
-    assert!(resp3.headers().get("www-authenticate").is_none());
-    assert!(resp3.headers().get("retry-after").is_none());
-
-    // Assert RFC7807 body structure
-    let body: serde_json::Value = test::read_body_json(resp3).await;
-
-    assert_eq!(body["status"], 400);
-    assert!(body.get("type").is_some());
-    assert!(body.get("title").is_some());
-    assert!(body.get("detail").is_some());
-    assert!(body.get("code").is_some());
-    assert!(body.get("trace_id").is_some());
-
-    // Verify the error code is the expected validation error code
-    assert_eq!(body["code"], "BAD_REQUEST");
-
-    // Verify detail contains stable substrings about JSON parsing
-    let detail = body["detail"].as_str().unwrap();
-    assert!(detail.contains("Invalid JSON"));
-
-    // Verify trace_id is present and non-empty
-    let trace_id = body["trace_id"].as_str().unwrap();
-    assert!(!trace_id.is_empty());
+    // Validate error structure using centralized helper
+    assert_problem_details_structure(
+        resp3,
+        400,
+        "BAD_REQUEST",
+        "Invalid JSON: wrong types for one or more fields",
+    )
+    .await;
 
     Ok(())
 }

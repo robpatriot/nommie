@@ -6,6 +6,7 @@ use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
+use common::assert_problem_details_structure;
 use serde_json::json;
 use support::create_test_app;
 
@@ -110,16 +111,14 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
 
     let resp = test::call_service(&app, req).await;
 
-    // Should return a 400 Bad Request due to missing google_sub
-    assert!(resp.status().is_client_error());
-
-    // Verify it returns Problem Details format
-    let content_type = resp.headers().get("content-type").unwrap();
-    assert_eq!(content_type.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks for 400 responses
-    assert!(resp.headers().get("www-authenticate").is_none());
-    assert!(resp.headers().get("retry-after").is_none());
+    // Validate error structure using centralized helper
+    assert_problem_details_structure(
+        resp,
+        400,
+        "INVALID_GOOGLE_SUB",
+        "Google sub cannot be empty",
+    )
+    .await;
 
     // Test with empty email
     let test_google_sub = unique_str("google");
@@ -135,15 +134,8 @@ async fn test_login_endpoint_error_handling() -> Result<(), Box<dyn std::error::
 
     let resp2 = test::call_service(&app, req2).await;
 
-    // Should return a 400 Bad Request for empty email
-    assert!(resp2.status().is_client_error());
-
-    let content_type2 = resp2.headers().get("content-type").unwrap();
-    assert_eq!(content_type2.to_str().unwrap(), "application/problem+json");
-
-    // Negative header checks for 400 responses
-    assert!(resp2.headers().get("www-authenticate").is_none());
-    assert!(resp2.headers().get("retry-after").is_none());
+    // Validate error structure using centralized helper
+    assert_problem_details_structure(resp2, 400, "INVALID_EMAIL", "Email cannot be empty").await;
 
     Ok(())
 }

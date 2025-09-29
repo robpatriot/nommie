@@ -8,7 +8,6 @@ mod common;
 use actix_web::{test, web, App, HttpResponse, Result};
 use backend::error::AppError;
 use backend::errors::ErrorCode;
-use serde_json::Value;
 
 /// Test handler that returns a specific AppError for testing
 async fn test_handler(error: AppError) -> Result<HttpResponse, AppError> {
@@ -203,13 +202,10 @@ async fn test_config_error_response() {
 
     assert_eq!(resp.status(), 500);
 
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 500);
-    assert_eq!(body["code"].as_str().unwrap(), "CONFIG_ERROR");
-    assert_eq!(
-        body["detail"].as_str().unwrap(),
-        "Missing environment variable"
-    );
+    // Use the common helper for comprehensive validation
+    use common::assert_problem_details_structure;
+    assert_problem_details_structure(resp, 500, "CONFIG_ERROR", "Missing environment variable")
+        .await;
 }
 
 #[actix_web::test]
@@ -225,13 +221,9 @@ async fn test_db_error_response() {
 
     assert_eq!(resp.status(), 500);
 
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 500);
-    assert_eq!(body["code"].as_str().unwrap(), "DB_ERROR");
-    assert_eq!(
-        body["detail"].as_str().unwrap(),
-        "Database connection failed"
-    );
+    // Use the common helper for comprehensive validation
+    use common::assert_problem_details_structure;
+    assert_problem_details_structure(resp, 500, "DB_ERROR", "Database connection failed").await;
 }
 
 #[actix_web::test]
@@ -373,14 +365,10 @@ async fn test_sanitized_error_http_responses() {
 
     assert_eq!(resp.status(), 409);
 
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 409);
-    assert_eq!(body["code"].as_str().unwrap(), "UNIQUE_VIOLATION");
-    assert_eq!(
-        body["detail"].as_str().unwrap(),
-        "Unique constraint violation"
-    );
-    assert!(!body["trace_id"].as_str().unwrap().is_empty());
+    // Use the common helper for comprehensive validation
+    use common::assert_problem_details_structure;
+    assert_problem_details_structure(resp, 409, "UNIQUE_VIOLATION", "Unique constraint violation")
+        .await;
 
     // Test FK violation response has sanitized detail
     let req = test::TestRequest::get().uri("/fk_violation").to_request();
@@ -388,12 +376,12 @@ async fn test_sanitized_error_http_responses() {
 
     assert_eq!(resp.status(), 409);
 
-    let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"].as_u64().unwrap(), 409);
-    assert_eq!(body["code"].as_str().unwrap(), "FK_VIOLATION");
-    assert_eq!(
-        body["detail"].as_str().unwrap(),
-        "Foreign key constraint violation"
-    );
-    assert!(!body["trace_id"].as_str().unwrap().is_empty());
+    // Use the common helper for comprehensive validation
+    assert_problem_details_structure(
+        resp,
+        409,
+        "FK_VIOLATION",
+        "Foreign key constraint violation",
+    )
+    .await;
 }
