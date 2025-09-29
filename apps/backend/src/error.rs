@@ -57,8 +57,8 @@ pub enum AppError {
     UnauthorizedInvalidJwt,
     #[error("UnauthorizedExpiredJwt")]
     UnauthorizedExpiredJwt,
-    #[error("Forbidden")]
-    Forbidden,
+    #[error("Forbidden: {detail}")]
+    Forbidden { code: ErrorCode, detail: String },
     #[error("Forbidden: User not found")]
     ForbiddenUserNotFound,
     #[error("Bad request: {detail}")]
@@ -84,7 +84,7 @@ impl AppError {
             AppError::UnauthorizedMissingBearer => ErrorCode::UnauthorizedMissingBearer,
             AppError::UnauthorizedInvalidJwt => ErrorCode::UnauthorizedInvalidJwt,
             AppError::UnauthorizedExpiredJwt => ErrorCode::UnauthorizedExpiredJwt,
-            AppError::Forbidden => ErrorCode::Forbidden,
+            AppError::Forbidden { code, .. } => *code,
             AppError::ForbiddenUserNotFound => ErrorCode::ForbiddenUserNotFound,
             AppError::BadRequest { code, .. } => *code,
             AppError::Internal { .. } => ErrorCode::Internal,
@@ -104,7 +104,7 @@ impl AppError {
             AppError::UnauthorizedMissingBearer => "Missing or malformed Bearer token".to_string(),
             AppError::UnauthorizedInvalidJwt => "Invalid JWT".to_string(),
             AppError::UnauthorizedExpiredJwt => "Token expired".to_string(),
-            AppError::Forbidden => "Access denied".to_string(),
+            AppError::Forbidden { detail, .. } => detail.clone(),
             AppError::ForbiddenUserNotFound => "User not found in database".to_string(),
             AppError::BadRequest { detail, .. } => detail.clone(),
             AppError::Internal { detail, .. } => detail.clone(),
@@ -124,7 +124,7 @@ impl AppError {
             AppError::UnauthorizedMissingBearer => StatusCode::UNAUTHORIZED,
             AppError::UnauthorizedInvalidJwt => StatusCode::UNAUTHORIZED,
             AppError::UnauthorizedExpiredJwt => StatusCode::UNAUTHORIZED,
-            AppError::Forbidden => StatusCode::FORBIDDEN,
+            AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
             AppError::ForbiddenUserNotFound => StatusCode::FORBIDDEN,
             AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
@@ -185,7 +185,17 @@ impl AppError {
     }
 
     pub fn forbidden() -> Self {
-        Self::Forbidden
+        Self::Forbidden {
+            code: ErrorCode::Forbidden,
+            detail: "Access denied".to_string(),
+        }
+    }
+
+    pub fn forbidden_with_code(code: ErrorCode, detail: impl Into<String>) -> Self {
+        Self::Forbidden {
+            code,
+            detail: detail.into(),
+        }
     }
 
     pub fn forbidden_user_not_found() -> Self {

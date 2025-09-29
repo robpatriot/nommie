@@ -28,6 +28,10 @@ pub enum ErrorCode {
     Forbidden,
     /// User not found in database
     ForbiddenUserNotFound,
+    /// User is not a member of the game
+    NotAMember,
+    /// User has insufficient role for this operation
+    InsufficientRole,
 
     // Request Validation
     /// Invalid game ID provided
@@ -94,6 +98,8 @@ impl ErrorCode {
             Self::UnauthorizedExpiredJwt => "UNAUTHORIZED_EXPIRED_JWT",
             Self::Forbidden => "FORBIDDEN",
             Self::ForbiddenUserNotFound => "FORBIDDEN_USER_NOT_FOUND",
+            Self::NotAMember => "NOT_A_MEMBER",
+            Self::InsufficientRole => "INSUFFICIENT_ROLE",
 
             // Request Validation
             Self::InvalidGameId => "INVALID_GAME_ID",
@@ -161,6 +167,8 @@ mod tests {
             ErrorCode::ForbiddenUserNotFound.as_str(),
             "FORBIDDEN_USER_NOT_FOUND"
         );
+        assert_eq!(ErrorCode::NotAMember.as_str(), "NOT_A_MEMBER");
+        assert_eq!(ErrorCode::InsufficientRole.as_str(), "INSUFFICIENT_ROLE");
         assert_eq!(ErrorCode::InvalidGameId.as_str(), "INVALID_GAME_ID");
         assert_eq!(ErrorCode::InvalidEmail.as_str(), "INVALID_EMAIL");
         assert_eq!(ErrorCode::InvalidGoogleSub.as_str(), "INVALID_GOOGLE_SUB");
