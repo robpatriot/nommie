@@ -18,6 +18,7 @@ use thiserror::Error;
 use tracing::warn;
 
 use crate::errors::ErrorCode;
+use crate::logging::pii::Redacted;
 use crate::web::trace_ctx;
 
 /// Helper function to detect SQLSTATE codes in error messages
@@ -263,7 +264,7 @@ impl From<sea_orm::DbErr> for AppError {
             sea_orm::DbErr::ConnectionAcquire(_) => {
                 warn!(
                     trace_id = %trace_id,
-                    raw_error = %error_msg,
+                    raw_error = %Redacted(&error_msg),
                     "Database connection acquire failed"
                 );
                 return AppError::DbUnavailable;
@@ -271,7 +272,7 @@ impl From<sea_orm::DbErr> for AppError {
             sea_orm::DbErr::Conn(_) => {
                 warn!(
                     trace_id = %trace_id,
-                    raw_error = %error_msg,
+                    raw_error = %Redacted(&error_msg),
                     "Database connection failed"
                 );
                 return AppError::DbUnavailable;
@@ -285,7 +286,7 @@ impl From<sea_orm::DbErr> for AppError {
         {
             warn!(
                 trace_id = %trace_id,
-                raw_error = %error_msg,
+                raw_error = %Redacted(&error_msg),
                 "Unique constraint violation detected"
             );
             return AppError::Conflict {
@@ -297,7 +298,7 @@ impl From<sea_orm::DbErr> for AppError {
         if mentions_sqlstate(&error_msg, "23503") {
             warn!(
                 trace_id = %trace_id,
-                raw_error = %error_msg,
+                raw_error = %Redacted(&error_msg),
                 "Foreign key constraint violation detected"
             );
             return AppError::Conflict {
@@ -309,7 +310,7 @@ impl From<sea_orm::DbErr> for AppError {
         if mentions_sqlstate(&error_msg, "23514") {
             warn!(
                 trace_id = %trace_id,
-                raw_error = %error_msg,
+                raw_error = %Redacted(&error_msg),
                 "Check constraint violation detected"
             );
             return AppError::BadRequest {
@@ -326,7 +327,7 @@ impl From<sea_orm::DbErr> for AppError {
         {
             warn!(
                 trace_id = %trace_id,
-                raw_error = %error_msg,
+                raw_error = %Redacted(&error_msg),
                 "Database connection issue detected"
             );
             return AppError::DbUnavailable;
@@ -335,7 +336,7 @@ impl From<sea_orm::DbErr> for AppError {
         // Fallback: generic database error
         warn!(
             trace_id = %trace_id,
-            raw_error = %error_msg,
+            raw_error = %Redacted(&error_msg),
             "Unhandled database error"
         );
         AppError::Db {

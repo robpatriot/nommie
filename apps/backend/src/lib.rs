@@ -6,6 +6,7 @@ pub mod error;
 pub mod errors;
 pub mod extractors;
 pub mod infra;
+pub mod logging;
 pub mod middleware;
 pub mod routes;
 pub mod services;

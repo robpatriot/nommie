@@ -7,6 +7,7 @@ use users::Model as User;
 use crate::entities::{user_credentials, users};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
+use crate::logging::pii::Redacted;
 
 /// Redacts a google_sub value for logging purposes.
 /// Shows only the first 4 characters followed by asterisks.
@@ -42,7 +43,7 @@ pub async fn ensure_user(
                 if existing_google_sub != &google_sub {
                     warn!(
                         user_id = credential.user_id,
-                        email = %email,
+                        email = %Redacted(&email),
                         incoming_google_sub = %redact_google_sub(&google_sub),
                         existing_google_sub = %redact_google_sub(existing_google_sub),
                         "Google sub mismatch detected"
@@ -63,7 +64,7 @@ pub async fn ensure_user(
             if credential.google_sub.is_none() {
                 info!(
                     user_id = user_id,
-                    email = %email,
+                    email = %Redacted(&email),
                     google_sub = %redact_google_sub(&google_sub),
                     "Setting google_sub for existing user (was previously NULL)"
                 );
@@ -89,7 +90,7 @@ pub async fn ensure_user(
             // Log repeat login (same email + same google_sub)
             debug!(
                 user_id = user_id,
-                email = %email,
+                email = %Redacted(&email),
                 "Repeat login for existing user"
             );
 
@@ -138,7 +139,7 @@ pub async fn ensure_user(
             // Log first user creation
             info!(
                 user_id = user.id,
-                email = %email,
+                email = %Redacted(&email),
                 google_sub = %redact_google_sub(&google_sub),
                 "First user creation"
             );

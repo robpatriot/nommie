@@ -10,6 +10,7 @@ use tracing::{debug, warn};
 
 use crate::error::AppError;
 use crate::errors::ErrorCode;
+use crate::logging::pii::Redacted;
 use crate::web::trace_ctx;
 
 /// Validated JSON extractor that provides standardized error handling for JSON parse/validation failures
@@ -86,7 +87,7 @@ where
 
                 debug!(
                     trace_id = %trace_id,
-                    error = %e,
+                    error = %Redacted(&e.to_string()),
                     content_type = %content_type,
                     body_size = body.len(),
                     "JSON parsing failed"
