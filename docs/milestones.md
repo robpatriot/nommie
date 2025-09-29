@@ -75,47 +75,44 @@
 
 ---
 
-## 🟨 H — App Error & Trace ID via Web Boundary *(S → M, current)*
+## ✅ H — App Error & Trace ID via Web Boundary *(S → M)*
 - **Dependencies:** D, E.
-- **Details:**
-  - Remove `trace_id` from `AppError`; no manual attachment in code paths.
-  - Add middleware to issue a per-request `trace_id`, store it in request context (and a task-local or span), and set the `x-trace-id` header.
+- **Details (Done):**
+  - Removed `trace_id` from `AppError`.
+  - Middleware issues per-request `trace_id`, stored in request context and set in `x-trace-id` header.
   - `ResponseError` reads `trace_id` from context when building Problem Details.
-  - Delete `from_req`, `with_trace_id`, and `ensure_trace_id`; core/services stay Actix-free.
-  - Update tests to assert header presence and parity with the JSON `trace_id`.
-- **Acceptance:**
-  - No `trace_id` stored in `AppError`; no per-call attachment utilities remain.
-  - Problem Details and `x-trace-id` header agree for all HTTP errors.
+  - Removed `from_req`, `with_trace_id`, `ensure_trace_id`.
+  - Updated tests assert header presence and parity with JSON `trace_id`.
+- **Acceptance:** 
+  - No `trace_id` in `AppError` or manual attachments.
+  - Problem Details and `x-trace-id` header agree for all errors.
   - `pnpm be:lint` and `pnpm be:test` pass.
 
 ---
 
-## 🟨 I — Transactional Tests *(S → M)*
+## ✅ I — Transactional Tests *(S → M)*
 - **Dependencies:** D.
-- **Details:**
-  - Unify request-path DB access through `with_txn`; remove direct `state.db` grabs.
-  - Make `AppState.db` optional and simplify the builder; default state has no DB; only `.with_db(DbProfile)` remains.
-  - Confirm `SharedTxn` reuse semantics and policy bypass behavior in tests.
-  - Define and implement nested `with_txn` behavior; cover with focused tests.
-  - Enforce rollback-by-default policy in tests (OK and error paths).
-  - Ensure DB-touching tests leave no residue; database is clean between cases.
-- **Acceptance:**
+- **Details (Done):**
+  - Unified request-path DB access through `with_txn`; removed direct `state.db` grabs.
+  - Simplified `AppState.db` builder.
+  - Defined + tested nested `with_txn` behavior.
+  - Enforced rollback-by-default policy in tests.
+- **Acceptance:** 
   - Request-path code consistently uses `with_txn`.
-  - No-DB state returns `DB_UNAVAILABLE` (500) for DB-required routes.
-  - Shared + nested txn behavior matches policy; tests prove isolation.
-  - CI green (`pnpm be:lint`, `pnpm be:test`).
+  - No-DB state returns `DB_UNAVAILABLE`.
+  - Shared + nested txn behavior proven in tests.
+  - CI green.
 
 ---
 
-## 🅙 J — Extractors *(M → L, partially done)*
+## ✅ J — Extractors *(M → L)*
 - **Dependencies:** E, F, G.
-- **Completed:**
-  - `AuthToken`, `JwtClaims`, `CurrentUser`.
-- **Remaining:**
-  - `GameId` — validates bigint ID and existence.
-  - `GameMembership` — verifies membership/role in one hit where possible.
-  - `ValidatedJson<T>` — request shape validation with Problem Details.
-- **Acceptance:** Handlers are thin; extractor tests pass; single DB hit for user+membership where possible.
+- **Details (Done):**
+  - Completed: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`.
+- **Acceptance:** 
+  - Handlers are thin.
+  - Extractor tests pass.
+  - Single DB hit for user+membership where possible.
 
 ---
 
