@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod config;
 pub mod db;
+pub mod domain;
 pub mod entities;
 pub mod error;
 pub mod errors;
@@ -13,7 +14,6 @@ pub mod services;
 pub mod state;
 pub mod utils;
 pub mod web;
-pub mod domain;
 
 // Re-exports for public API
 pub use auth::jwt::{mint_access_token, verify_access_token, Claims};

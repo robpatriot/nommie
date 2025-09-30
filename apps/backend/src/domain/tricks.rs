@@ -1,12 +1,14 @@
 use crate::domain::cards::{hand_has_suit, Card};
-use crate::domain::rules::PLAYERS;
 use crate::domain::errors::DomainError;
+use crate::domain::rules::PLAYERS;
 use crate::domain::state::{advance_turn, GameState, Phase, PlayerId, RoundState};
 
 /// Compute legal cards the player may play, independent of turn enforcement.
 pub fn legal_moves(state: &GameState, who: PlayerId) -> Vec<Card> {
     // If not in Trick phase, the set is empty.
-    let Phase::Trick { .. } = state.phase else { return Vec::new(); };
+    let Phase::Trick { .. } = state.phase else {
+        return Vec::new();
+    };
     let hand = &state.hands[who as usize];
     if hand.is_empty() {
         return Vec::new();
@@ -26,7 +28,9 @@ pub fn legal_moves(state: &GameState, who: PlayerId) -> Vec<Card> {
 /// Play a card into the current trick, enforcing turn, suit-following, and phase.
 pub fn play_card(state: &mut GameState, who: PlayerId, card: Card) -> Result<(), DomainError> {
     // Phase check
-    let Phase::Trick { .. } = state.phase else { return Err(DomainError::PhaseMismatch); };
+    let Phase::Trick { .. } = state.phase else {
+        return Err(DomainError::PhaseMismatch);
+    };
     // Turn check
     if state.turn != who {
         return Err(DomainError::OutOfTurn);
@@ -66,7 +70,9 @@ pub fn play_card(state: &mut GameState, who: PlayerId, card: Card) -> Result<(),
             if state.trick_no > state.hand_size {
                 state.phase = Phase::Scoring;
             } else {
-                state.phase = Phase::Trick { trick_no: state.trick_no };
+                state.phase = Phase::Trick {
+                    trick_no: state.trick_no,
+                };
             }
         }
         Ok(())

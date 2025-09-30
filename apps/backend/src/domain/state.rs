@@ -93,5 +93,3 @@ pub fn next_player(p: PlayerId) -> PlayerId {
 pub fn advance_turn(state: &mut GameState) {
     state.turn = next_player(state.turn);
 }
-
-

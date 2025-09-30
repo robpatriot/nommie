@@ -1,18 +1,16 @@
 //! Domain layer: pure game logic types and helpers.
 
-pub mod cards;
-pub mod rules;
-pub mod errors;
-pub mod state;
 pub mod bidding;
-pub mod tricks;
+pub mod cards;
+pub mod errors;
+pub mod rules;
 pub mod scoring;
+pub mod state;
+pub mod tricks;
 
 // Re-exports for ergonomics
-pub use cards::{Suit, Rank, Card, card_beats, hand_has_suit};
-pub use rules::{PLAYERS, hand_size_for_round, valid_bid_range};
-pub use errors::DomainError;
-pub use state::{PlayerId, Phase, GameState, RoundState};
 pub use bidding::set_trump;
-
-
+pub use cards::{card_beats, hand_has_suit, Card, Rank, Suit};
+pub use errors::DomainError;
+pub use rules::{hand_size_for_round, valid_bid_range, PLAYERS};
+pub use state::{GameState, Phase, PlayerId, RoundState};

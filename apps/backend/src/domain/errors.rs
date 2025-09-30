@@ -27,5 +27,3 @@ impl Display for DomainError {
 }
 
 impl Error for DomainError {}
-
-

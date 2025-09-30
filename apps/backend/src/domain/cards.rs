@@ -161,9 +161,7 @@ pub fn card_beats(a: Card, b: Card, lead: Suit, trump: Suit) -> bool {
 pub fn parse_cards(tokens: &[&str]) -> Vec<Card> {
     tokens
         .iter()
-        .map(|s| {
-            serde_json::from_str::<Card>(&format!("\"{s}\"")).expect("valid card token")
-        })
+        .map(|s| serde_json::from_str::<Card>(&format!("\"{s}\"")).expect("valid card token"))
         .collect()
 }
 
@@ -198,15 +196,30 @@ mod tests {
 
     #[test]
     fn test_card_beats_logic() {
-        use Suit::*;
         use Rank::*;
+        use Suit::*;
         let lead = Hearts;
         let trump = Spades;
-        let ah = Card { suit: Hearts, rank: Ace };
-        let kh = Card { suit: Hearts, rank: King };
-        let ts = Card { suit: Spades, rank: Ten };
-        let th = Card { suit: Hearts, rank: Ten };
-        let td = Card { suit: Diamonds, rank: Ten };
+        let ah = Card {
+            suit: Hearts,
+            rank: Ace,
+        };
+        let kh = Card {
+            suit: Hearts,
+            rank: King,
+        };
+        let ts = Card {
+            suit: Spades,
+            rank: Ten,
+        };
+        let th = Card {
+            suit: Hearts,
+            rank: Ten,
+        };
+        let td = Card {
+            suit: Diamonds,
+            rank: Ten,
+        };
 
         assert!(card_beats(ah, kh, lead, trump));
         assert!(!card_beats(th, ah, lead, trump));
@@ -218,12 +231,16 @@ mod tests {
     #[test]
     fn test_hand_has_suit() {
         let hand = vec![
-            Card { suit: Suit::Clubs, rank: Rank::Two },
-            Card { suit: Suit::Diamonds, rank: Rank::Ace },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Two,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ace,
+            },
         ];
         assert!(hand_has_suit(&hand, Suit::Clubs));
         assert!(!hand_has_suit(&hand, Suit::Hearts));
     }
 }
-
-

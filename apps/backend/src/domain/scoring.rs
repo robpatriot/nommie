@@ -17,5 +17,3 @@ pub fn apply_round_scoring(state: &mut GameState) {
     }
     state.phase = Phase::Complete;
 }
-
-

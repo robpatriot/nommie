@@ -1,13 +1,15 @@
 use crate::domain::errors::DomainError;
 use crate::domain::rules::valid_bid_range;
-use crate::domain::state::{advance_turn, GameState, Phase, PlayerId};
 use crate::domain::rules::PLAYERS;
+use crate::domain::state::{advance_turn, GameState, Phase, PlayerId};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Bid(pub u8);
 
 impl Bid {
-    pub fn value(self) -> u8 { self.0 }
+    pub fn value(self) -> u8 {
+        self.0
+    }
 }
 
 /// Compute legal bids for a player. If phase is not Bidding, returns empty.
@@ -16,9 +18,7 @@ pub fn legal_bids(state: &GameState, _who: PlayerId) -> Vec<Bid> {
     if state.phase != Phase::Bidding {
         return Vec::new();
     }
-    valid_bid_range(state.hand_size)
-        .map(Bid)
-        .collect()
+    valid_bid_range(state.hand_size).map(Bid).collect()
 }
 
 /// Place a bid for `who`. Requires Bidding phase and being in turn.
@@ -70,7 +70,11 @@ pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), D
 }
 
 /// Set trump suit; only the winning bidder can call in TrumpSelect phase.
-pub fn set_trump(state: &mut GameState, who: PlayerId, suit: crate::domain::cards::Suit) -> Result<(), DomainError> {
+pub fn set_trump(
+    state: &mut GameState,
+    who: PlayerId,
+    suit: crate::domain::cards::Suit,
+) -> Result<(), DomainError> {
     if state.phase != Phase::TrumpSelect {
         return Err(DomainError::PhaseMismatch);
     }
@@ -82,11 +86,11 @@ pub fn set_trump(state: &mut GameState, who: PlayerId, suit: crate::domain::card
             state.trick_no = 1;
             state.round.trick_plays.clear();
             state.round.trick_lead = None;
-            state.phase = Phase::Trick { trick_no: state.trick_no };
+            state.phase = Phase::Trick {
+                trick_no: state.trick_no,
+            };
             Ok(())
         }
         _ => Err(DomainError::OutOfTurn),
     }
 }
-
-
