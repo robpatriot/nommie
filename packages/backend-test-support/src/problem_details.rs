@@ -15,10 +15,8 @@
 //! - `status` in body equals HTTP status
 //! - Optional substring requirement in `detail`
 
-use actix_web::http::{
-    header::{HeaderMap, HeaderName, CONTENT_TYPE, RETRY_AFTER, WWW_AUTHENTICATE},
-    StatusCode,
-};
+use actix_web::http::header::{HeaderMap, HeaderName, CONTENT_TYPE, RETRY_AFTER, WWW_AUTHENTICATE};
+use actix_web::http::StatusCode;
 use serde::{Deserialize, Serialize};
 
 /// Local ProblemDetails struct that matches the backend's structure

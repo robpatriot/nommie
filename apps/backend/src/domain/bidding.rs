@@ -1,6 +1,5 @@
 use crate::domain::errors::DomainError;
-use crate::domain::rules::valid_bid_range;
-use crate::domain::rules::PLAYERS;
+use crate::domain::rules::{valid_bid_range, PLAYERS};
 use crate::domain::state::{advance_turn, GameState, Phase, PlayerId};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
