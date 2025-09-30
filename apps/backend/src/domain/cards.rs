@@ -76,7 +76,7 @@ impl Serialize for Card {
             Suit::Hearts => 'H',
             Suit::Spades => 'S',
         };
-        let s = format!("{}{}", rank_char, suit_char);
+        let s = format!("{rank_char}{suit_char}");
         serializer.serialize_str(&s)
     }
 }
@@ -158,6 +158,16 @@ pub fn card_beats(a: Card, b: Card, lead: Suit, trump: Suit) -> bool {
 }
 
 #[cfg(test)]
+pub fn parse_cards(tokens: &[&str]) -> Vec<Card> {
+    tokens
+        .iter()
+        .map(|s| {
+            serde_json::from_str::<Card>(&format!("\"{s}\"")).expect("valid card token")
+        })
+        .collect()
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -172,7 +182,7 @@ mod tests {
         for (rank, suit, token) in cases {
             let c = Card { suit, rank };
             let s = serde_json::to_string(&c).unwrap();
-            assert_eq!(s, format!("\"{}\"", token));
+            assert_eq!(s, format!("\"{token}\""));
             let decoded: Card = serde_json::from_str(&s).unwrap();
             assert_eq!(decoded, c);
         }
@@ -181,7 +191,7 @@ mod tests {
     #[test]
     fn rejects_invalid_tokens() {
         for tok in ["1H", "11S", "Ah", "ZZ", "", "10H"] {
-            let res: Result<Card, _> = serde_json::from_str(&format!("\"{}\"", tok));
+            let res: Result<Card, _> = serde_json::from_str(&format!("\"{tok}\""));
             assert!(res.is_err());
         }
     }

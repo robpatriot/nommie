@@ -92,6 +92,13 @@
 
 ---
 
+## Use of pnpm
+
+ - All pnpm commands are built to be run from the project root
+ - This includes all executions of db commands and tests
+
+---
+
 ## Testing
 - Tests must be deterministic (seed time/RNG).  
 - No-DB tests must expect `DB_UNAVAILABLE` if they touch DB paths.  

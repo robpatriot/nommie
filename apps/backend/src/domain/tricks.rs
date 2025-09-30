@@ -1,17 +1,106 @@
-use crate::domain::cards::Card;
-use crate::domain::state::{GameState, PlayerId, RoundState};
+use crate::domain::cards::{hand_has_suit, Card};
+use crate::domain::rules::PLAYERS;
 use crate::domain::errors::DomainError;
+use crate::domain::state::{advance_turn, GameState, Phase, PlayerId, RoundState};
 
-pub fn legal_moves(_state: &GameState, _who: PlayerId) -> Vec<Card> {
-    Vec::new()
+/// Compute legal cards the player may play, independent of turn enforcement.
+pub fn legal_moves(state: &GameState, who: PlayerId) -> Vec<Card> {
+    // If not in Trick phase, the set is empty.
+    let Phase::Trick { .. } = state.phase else { return Vec::new(); };
+    let hand = &state.hands[who as usize];
+    if hand.is_empty() {
+        return Vec::new();
+    }
+    if let Some(lead) = state.round.trick_lead {
+        if hand_has_suit(hand, lead) {
+            let mut v: Vec<Card> = hand.iter().copied().filter(|c| c.suit == lead).collect();
+            v.sort();
+            return v;
+        }
+    }
+    let mut any = hand.clone();
+    any.sort();
+    any
 }
 
-pub fn play_card(_state: &mut GameState, _who: PlayerId, _card: Card) -> Result<(), DomainError> {
-    Err(DomainError::CardNotInHand)
+/// Play a card into the current trick, enforcing turn, suit-following, and phase.
+pub fn play_card(state: &mut GameState, who: PlayerId, card: Card) -> Result<(), DomainError> {
+    // Phase check
+    let Phase::Trick { .. } = state.phase else { return Err(DomainError::PhaseMismatch); };
+    // Turn check
+    if state.turn != who {
+        return Err(DomainError::OutOfTurn);
+    }
+    // Card in hand (immutable check first to avoid borrow conflicts)
+    let pos_opt = state.hands[who as usize].iter().position(|&c| c == card);
+    if let Some(pos) = pos_opt {
+        // Suit following check using an immutable borrow only
+        let legal = legal_moves(state, who);
+        if !legal.contains(&card) {
+            return Err(DomainError::MustFollowSuit);
+        }
+        // On first play, set lead
+        if state.round.trick_plays.is_empty() {
+            state.round.trick_lead = Some(card.suit);
+            state.leader = who; // remember who led this trick
+        }
+        // Move card to plays (now take mutable borrow)
+        let removed = {
+            let hand_mut = &mut state.hands[who as usize];
+            hand_mut.remove(pos)
+        };
+        state.round.trick_plays.push((who, removed));
+        // Advance turn
+        advance_turn(state);
+        // If 4 plays, resolve
+        if state.round.trick_plays.len() == 4 {
+            if let Some(winner) = resolve_current_trick(&state.round) {
+                state.round.tricks_won[winner as usize] += 1;
+                state.leader = winner;
+                state.turn = winner;
+            }
+            // Prepare next trick
+            state.round.trick_plays.clear();
+            state.round.trick_lead = None;
+            state.trick_no += 1;
+            if state.trick_no > state.hand_size {
+                state.phase = Phase::Scoring;
+            } else {
+                state.phase = Phase::Trick { trick_no: state.trick_no };
+            }
+        }
+        Ok(())
+    } else {
+        Err(DomainError::CardNotInHand)
+    }
 }
 
-pub fn resolve_current_trick(_state: &RoundState) -> Option<PlayerId> {
-    None
+/// Resolve the current trick winner if complete.
+pub fn resolve_current_trick(state: &RoundState) -> Option<PlayerId> {
+    if state.trick_plays.len() < 4 {
+        return None;
+    }
+    let lead = state.trick_lead?;
+    let trump = state.trump;
+    // Determine best play index per rules
+    let mut best_idx = 0usize;
+    for i in 1..PLAYERS {
+        let (_, card_i) = state.trick_plays[i];
+        let (_, card_best) = state.trick_plays[best_idx];
+        let better = match trump {
+            Some(tr) => crate::domain::card_beats(card_i, card_best, lead, tr),
+            None => {
+                // No trump chosen? Then only lead suit counts
+                if card_i.suit == card_best.suit {
+                    card_i.rank > card_best.rank
+                } else {
+                    card_i.suit == lead && card_best.suit != lead
+                }
+            }
+        };
+        if better {
+            best_idx = i;
+        }
+    }
+    Some(state.trick_plays[best_idx].0)
 }
-
-
