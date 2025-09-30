@@ -8,8 +8,8 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 ## Quick Start
 
 1. Prereqs: Node 18+, pnpm 8+, Rust stable, Docker.
-2. Copy env and source it **once per shell**:
-   - `cp docs/env.example.txt .env`
+2. Copy env file and source it **once per shell**:
+   - `cp .env.example .env`
    - `set -a; . ./.env; set +a`
 3. Start Postgres:
    - `pnpm db:up`
@@ -28,14 +28,33 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 
 We don't store `DATABASE_URL`. We store **parts** in `.env` and construct URLs in code.
 
-- Source env in your shell before running anything:
-  - `set -a; . ./.env; set +a`
-- Key vars (see `docs/env.example.txt`):
-  - `POSTGRES_HOST`, `POSTGRES_PORT`
-  - `PROD_DB`, `TEST_DB` (test DB **must** end with `_test`)
-  - App role: `APP_DB_USER`, `APP_DB_PASSWORD`
-  - Owner role: `NOMMIE_OWNER_USER`, `NOMMIE_OWNER_PASSWORD`
-  - `APP_JWT_SECRET`, `CORS_ALLOWED_ORIGINS`
+**Important:** Environment variables must be sourced in each new shell session:
+```bash
+set -a; . ./.env; set +a
+```
+The project does not use `dotenvx` or `dotenvy` - all environment loading is done via shell sourcing.
+
+### Key Environment Variables
+
+**Database Configuration:**
+- `POSTGRES_HOST`, `POSTGRES_PORT` - Database connection (defaults: localhost, 5432)
+- `PROD_DB`, `TEST_DB` - Database names (test DB **must** end with `_test`)
+- `APP_DB_USER`, `APP_DB_PASSWORD` - App role credentials
+- `NOMMIE_OWNER_USER`, `NOMMIE_OWNER_PASSWORD` - Owner role credentials
+
+**Backend Configuration:**
+- `APP_JWT_SECRET` - JWT signing secret (required)
+- `CORS_ALLOWED_ORIGINS` - Comma-separated allowed origins (defaults to localhost:3000, 127.0.0.1:3000)
+
+**Frontend Configuration:**
+- `BACKEND_BASE_URL` - Backend API URL (e.g., `http://localhost:3001`)
+- `APP_JWT_SECRET` - NextAuth secret (shared with backend JWT secret from root .env)
+- See Authentication Setup section for Google OAuth configuration
+
+### Environment File Setup
+1. **Root environment:** Copy `.env.example` to `.env` and update values
+2. **Frontend environment:** See Authentication Setup section below for detailed frontend configuration
+3. **Shared secrets:** The frontend automatically uses `APP_JWT_SECRET` from the root `.env` file
 
 ---
 
@@ -100,17 +119,17 @@ Tests that hit the DB always use `TEST_DB` (guarded by `_test` suffix).
 The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 
 ### ⚙️ Environment Configuration
-1. **Copy the example file:** `cp apps/frontend/.env.example apps/frontend/.env.local`
-2. **Edit `.env.local`** with your actual values:
-   - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: Get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - `NEXTAUTH_SECRET`: Generate with `openssl rand -base64 32`
-   - `NEXTAUTH_URL`: Set to `http://localhost:3000` for local development
+1. **Copy frontend env file:** `cp apps/frontend/.env.local.example apps/frontend/.env.local`
+2. **Update required variables:**
+   - `AUTH_GOOGLE_ID` & `AUTH_GOOGLE_SECRET`: Get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+   - `BACKEND_BASE_URL`: Set to `http://localhost:3001` for local development
+   - `APP_JWT_SECRET`: Already configured in root `.env` (shared with backend)
 
 ### 🔑 Google OAuth Setup
 1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Create OAuth 2.0 credentials for a web application
 3. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
-4. Copy Client ID and Client Secret to your `.env.local`
+4. Copy Client ID and Client Secret to your `apps/frontend/.env.local` as `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`
 
 ### 🚀 Running with Authentication
 - **Start the app:** `pnpm dev` (from root) or `pnpm dev:fe` (from `apps/frontend`)
