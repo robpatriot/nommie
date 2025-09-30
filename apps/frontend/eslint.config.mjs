@@ -8,7 +8,7 @@ const compat = new FlatCompat({
   baseDirectory: import.meta.dirname,
 })
 
-export default [
+const config = [
   // Ignore typical build/output dirs
   {
     ignores: [
@@ -56,4 +56,6 @@ export default [
 
   // Keep Prettier last to disable conflicting rules
   eslintConfigPrettier,
-]
+];
+
+export default config;
