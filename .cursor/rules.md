@@ -1,4 +1,4 @@
-# Nommie — Cursor Rules (v1.5.1)
+# Nommie — Cursor Rules (v1.5.3)
 
 > Repo-root file. Applies to **all Cursor edits, refactors, and codegen**.  
 
@@ -21,7 +21,6 @@
 ---
 
 ## Rust Imports & `use` Rules
-
 - Default: put all `use` at the **top of the module**, after docs/attrs.  
 - Allowed inside a function/test only if the symbol is used there once or it avoids polluting scope.  
 - Group order (with blank line): std::* then external crates then internal crates.  
@@ -37,10 +36,11 @@
 ## Transactions
 - Wrap all multi-row/table work in `with_txn`.  
 - `with_txn` closures return `Result<_, AppError>`.  
-- Nested/shared transactions are allowed.  
+- **Nested transactions are not supported**. The only exception is calling a handler inside `SharedTxn`, which internally uses `with_txn`.  
 - In production, `with_txn` commits on `Ok` and rolls back on `Err`.  
-- In tests, `txn/test` forces **rollback always** — no manual DB refresh needed.  
-- Use `SharedTxn` in tests whenever handlers are called, so the whole test rolls back.  
+- In tests, `with_txn` always rolls back.  
+- **Service functions** that touch the DB must accept `&(impl sea_orm::ConnectionTrait + Send + Sync)`.  
+- Do **not** call `begin/commit/rollback` directly; `with_txn` is the only transaction boundary.  
 
 ---
 
@@ -53,14 +53,26 @@
   - `GameId`  
   - `ValidatedJson<T>`  
 - Don’t create new extractors unless explicitly asked.  
-- Minimize DB hits (resolve user+membership efficiently).  
+- Ordering guideline in handlers: AuthToken → JwtClaims → CurrentUser / CurrentUserDb → GameId → ValidatedJson<T>.  
 - `ValidatedJson<T>` must convert all JSON parse/validation failures into proper `AppError` Problem Details responses — never panic or leak serde errors.  
+- Minimize DB hits (resolve user+membership efficiently).  
 
 ---
 
 ## Error Handling
 - Errors follow Problem Details: `{ type, title, status, detail, code, trace_id }`.  
-- `code` must come from the central registry (no ad-hoc strings).  
+- All errors must be created through the **central AppError helpers**.  
+- `code` must come from the **central registry** (no ad-hoc strings).  
+- Never leak raw serde/SQL/OAuth errors to clients; map them to safe `detail`.  
+- Every error path must include the `trace_id`.  
+
+---
+
+## Logging & Tracing
+- Structured logs only; every request log must include `trace_id`.  
+- Mask or hash PII (emails, google_sub).  
+- Don’t log full JWTs or auth headers.  
+- Time comes from a **time provider abstraction** so tests remain deterministic.  
 
 ---
 
@@ -85,6 +97,14 @@
 - No-DB tests must expect `DB_UNAVAILABLE` if they touch DB paths.  
 - DB tests must use the `_test` database (guard enforced).  
 - Test DB is automatically reset via rollback: **no manual refresh required**.  
+
+### Transaction use in tests
+- If a test only calls handlers and each call is independent, **do not use `SharedTxn`** — each handler’s `with_txn` will roll back.  
+- **Use `SharedTxn` only when a test needs continuity within one test**, e.g.:  
+  - Direct DB setup (fixtures) plus handler calls that must see that setup.  
+  - Chained handler calls in the same test, where later calls must see earlier writes.  
+- For control tests that must verify committed persistence outside rollback, use the **pooled DB** directly for setup (not `with_txn`).  
+- Never rely on state across tests; all tests must be independent.  
 
 ### Running backend tests
 - **Run all tests**:
@@ -166,3 +186,5 @@
 - No dotenv loaders (`dotenvx`, `dotenvy`) in code/scripts.  
 - Never read `DATABASE_URL` directly.  
 - Never run destructive ops against non-`_test` DBs.  
+
+---
