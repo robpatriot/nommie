@@ -33,7 +33,9 @@ async fn insert_defaults_and_fetch() -> Result<(), AppError> {
                 ..Default::default()
             };
 
-            let inserted_game = games::Entity::insert(game).exec(txn).await?;
+            let inserted_game = games::Entity::insert(game).exec(txn).await.map_err(|e| {
+                backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+            })?;
 
             // Assert id > 0
             assert!(inserted_game.last_insert_id > 0);
@@ -41,7 +43,10 @@ async fn insert_defaults_and_fetch() -> Result<(), AppError> {
             // Fetch by id and assert it exists
             let fetched_game = games::Entity::find_by_id(inserted_game.last_insert_id)
                 .one(txn)
-                .await?
+                .await
+                .map_err(|e| {
+                    backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                })?
                 .expect("should have game row");
 
             // Assert state round-trips correctly
@@ -103,22 +108,26 @@ async fn join_code_unique() -> Result<(), AppError> {
                 games::Entity::insert(game2)
                     .exec(&sp)
                     .await
-                    .map_err(AppError::from) // Route through error mapping
+                    .map_err(|e| AppError::from(backend::infra::db_errors::map_db_err(e)))
+                // Route through error mapping
             })
             .await;
 
-            // Assert the second insert errors with UniqueViolation
+            // Assert the second insert errors with JoinCodeConflict
             match result {
                 Err(err) => {
-                    assert_eq!(err.code(), ErrorCode::UniqueViolation);
+                    assert_eq!(err.code(), ErrorCode::JoinCodeConflict);
                 }
-                Ok(_) => panic!("Expected Conflict error with UNIQUE_VIOLATION code"),
+                Ok(_) => panic!("Expected Conflict error with JOIN_CODE_CONFLICT code"),
             }
 
             // Verify the first game still exists
             let fetched_game = games::Entity::find_by_id(inserted_game1.last_insert_id)
                 .one(txn)
-                .await?
+                .await
+                .map_err(|e| {
+                    backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                })?
                 .expect("should have first game row");
 
             assert_eq!(fetched_game.join_code, Some("ABC123".to_string()));

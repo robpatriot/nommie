@@ -2,6 +2,7 @@ use sea_orm::{Database, DatabaseConnection};
 
 use crate::config::db::{db_url, DbOwner, DbProfile};
 use crate::error::AppError;
+use crate::infra::db_errors::map_db_err;
 
 /// Unified database connector that supports different profiles and owners
 /// This function does NOT run any migrations
@@ -13,7 +14,9 @@ pub async fn connect_db(
     let database_url = db_url(profile, owner)?;
 
     // Connect to database
-    let conn = Database::connect(&database_url).await?;
+    let conn = Database::connect(&database_url)
+        .await
+        .map_err(|e| AppError::from(map_db_err(e)))?;
     Ok(conn)
 }
 

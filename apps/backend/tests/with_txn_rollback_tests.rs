@@ -41,6 +41,7 @@ async fn test_rollback_policy_on_error() -> Result<(), Box<dyn std::error::Error
     let result = with_txn(None, &state, |_txn| {
         Box::pin(async {
             Err::<String, _>(backend::error::AppError::Internal {
+                code: backend::errors::ErrorCode::InternalError,
                 detail: "test error".to_string(),
             })
         })

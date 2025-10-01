@@ -109,7 +109,7 @@ async fn test_all_error_responses_conform_to_problem_details() {
         (
             "/_test/internal",
             500,
-            "INTERNAL",
+            "INTERNAL_ERROR",
             "Database connection failed",
         ),
         ("/_test/db", 500, "DB_ERROR", "Connection timeout"),
@@ -226,7 +226,7 @@ async fn test_malformed_error_response_handling() {
     let resp = test::call_service(&app, req).await;
 
     // Validate error structure using centralized helper
-    assert_problem_details_structure(resp, 500, "INTERNAL", "Malformed error test").await;
+    assert_problem_details_structure(resp, 500, "INTERNAL_ERROR", "Malformed error test").await;
 }
 
 /// Test endpoint that uses require_db helper

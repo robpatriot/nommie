@@ -15,16 +15,13 @@ use actix_web::http::StatusCode;
 use actix_web::HttpResponse;
 use serde::Serialize;
 use thiserror::Error;
-use tracing::warn;
+use tracing::{error, warn};
 
 use crate::errors::ErrorCode;
-use crate::logging::pii::Redacted;
+// use crate::logging::pii::Redacted; // not used in this module
 use crate::web::trace_ctx;
 
-/// Helper function to detect SQLSTATE codes in error messages
-fn mentions_sqlstate(msg: &str, code: &str) -> bool {
-    msg.contains(code) || msg.contains(&format!("SQLSTATE({code})"))
-}
+// (legacy helper removed; DB error mapping lives in infra::db_errors)
 
 #[derive(Serialize)]
 pub struct ProblemDetails {
@@ -64,13 +61,15 @@ pub enum AppError {
     #[error("Bad request: {detail}")]
     BadRequest { code: ErrorCode, detail: String },
     #[error("Internal error: {detail}")]
-    Internal { detail: String },
+    Internal { code: ErrorCode, detail: String },
     #[error("Configuration error: {detail}")]
     Config { detail: String },
     #[error("Conflict: {detail}")]
     Conflict { code: ErrorCode, detail: String },
     #[error("Database unavailable")]
     DbUnavailable,
+    #[error("Timeout: {detail}")]
+    Timeout { code: ErrorCode, detail: String },
 }
 
 impl AppError {
@@ -87,10 +86,11 @@ impl AppError {
             AppError::Forbidden { code, .. } => *code,
             AppError::ForbiddenUserNotFound => ErrorCode::ForbiddenUserNotFound,
             AppError::BadRequest { code, .. } => *code,
-            AppError::Internal { .. } => ErrorCode::Internal,
+            AppError::Internal { code, .. } => *code,
             AppError::Config { .. } => ErrorCode::ConfigError,
             AppError::Conflict { code, .. } => *code,
             AppError::DbUnavailable => ErrorCode::DbUnavailable,
+            AppError::Timeout { code, .. } => *code,
         }
     }
 
@@ -111,6 +111,7 @@ impl AppError {
             AppError::Config { detail, .. } => detail.clone(),
             AppError::Conflict { detail, .. } => detail.clone(),
             AppError::DbUnavailable => "Database unavailable".to_string(),
+            AppError::Timeout { detail, .. } => detail.clone(),
         }
     }
 
@@ -131,6 +132,7 @@ impl AppError {
             AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Conflict { .. } => StatusCode::CONFLICT,
             AppError::DbUnavailable => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::Timeout { .. } => StatusCode::GATEWAY_TIMEOUT,
         }
     }
 
@@ -144,6 +146,7 @@ impl AppError {
 
     pub fn internal(detail: impl Into<String>) -> Self {
         Self::Internal {
+            code: ErrorCode::InternalError,
             detail: detail.into(),
         }
     }
@@ -219,6 +222,13 @@ impl AppError {
         Self::DbUnavailable
     }
 
+    pub fn timeout(code: ErrorCode, detail: impl Into<String>) -> Self {
+        Self::Timeout {
+            code,
+            detail: detail.into(),
+        }
+    }
+
     /// Private canonical method for building ProblemDetails
     /// This is the single source of truth for ProblemDetails construction
     fn to_problem_details_with_trace_id(&self, trace_id: String) -> ProblemDetails {
@@ -260,97 +270,58 @@ impl From<std::env::VarError> for AppError {
 
 impl From<sea_orm::DbErr> for AppError {
     fn from(e: sea_orm::DbErr) -> Self {
-        let error_msg = e.to_string();
-        let trace_id = trace_ctx::trace_id();
+        // Delegate to infra adapter, then into AppError via DomainError mapping
+        let de = crate::infra::db_errors::map_db_err(e);
+        AppError::from(de)
+    }
+}
 
-        // Handle structured SeaORM error types first
-        match &e {
-            sea_orm::DbErr::RecordNotFound(_) => {
-                return AppError::NotFound {
-                    code: ErrorCode::RecordNotFound,
-                    detail: error_msg,
+impl From<crate::errors::DomainError> for AppError {
+    fn from(err: crate::errors::DomainError) -> Self {
+        use crate::errors::domain::{ConflictKind, InfraErrorKind, NotFoundKind};
+        use crate::errors::ErrorCode;
+
+        // Error mapping rationale:
+        // - Infra(DataCorruption) → DATA_CORRUPTION for data integrity issues
+        // - Infra(Other) → INTERNAL_ERROR for generic infrastructure failures
+        // - Both map to HTTP 500 but with distinct error codes for better debugging
+
+        match err {
+            crate::errors::DomainError::Validation(detail) => AppError::Validation {
+                code: ErrorCode::ValidationError,
+                detail,
+                status: StatusCode::UNPROCESSABLE_ENTITY,
+            },
+            crate::errors::DomainError::Conflict(kind, detail) => {
+                let code = match kind {
+                    ConflictKind::SeatTaken => ErrorCode::SeatTaken,
+                    ConflictKind::UniqueEmail => ErrorCode::UniqueEmail,
+                    ConflictKind::OptimisticLock => ErrorCode::OptimisticLock,
+                    ConflictKind::JoinCodeConflict => ErrorCode::JoinCodeConflict,
+                    ConflictKind::Other(_) => ErrorCode::Conflict, // generic conflict fallback
                 };
+                AppError::Conflict { code, detail }
             }
-            sea_orm::DbErr::ConnectionAcquire(_) => {
-                warn!(
-                    trace_id = %trace_id,
-                    raw_error = %Redacted(&error_msg),
-                    "Database connection acquire failed"
-                );
-                return AppError::DbUnavailable;
+            crate::errors::DomainError::NotFound(kind, detail) => {
+                let code = match kind {
+                    NotFoundKind::User => ErrorCode::UserNotFound,
+                    NotFoundKind::Game => ErrorCode::GameNotFound,
+                    NotFoundKind::Other(_) => ErrorCode::NotFound,
+                };
+                AppError::NotFound { code, detail }
             }
-            sea_orm::DbErr::Conn(_) => {
-                warn!(
-                    trace_id = %trace_id,
-                    raw_error = %Redacted(&error_msg),
-                    "Database connection failed"
-                );
-                return AppError::DbUnavailable;
-            }
-            _ => {}
-        }
-
-        // Check for SQLSTATE codes using helper function
-        if mentions_sqlstate(&error_msg, "23505")
-            || error_msg.contains("duplicate key value violates unique constraint")
-        {
-            warn!(
-                trace_id = %trace_id,
-                raw_error = %Redacted(&error_msg),
-                "Unique constraint violation detected"
-            );
-            return AppError::Conflict {
-                code: ErrorCode::UniqueViolation,
-                detail: "Unique constraint violation".to_string(),
-            };
-        }
-
-        if mentions_sqlstate(&error_msg, "23503") {
-            warn!(
-                trace_id = %trace_id,
-                raw_error = %Redacted(&error_msg),
-                "Foreign key constraint violation detected"
-            );
-            return AppError::Conflict {
-                code: ErrorCode::FkViolation,
-                detail: "Foreign key constraint violation".to_string(),
-            };
-        }
-
-        if mentions_sqlstate(&error_msg, "23514") {
-            warn!(
-                trace_id = %trace_id,
-                raw_error = %Redacted(&error_msg),
-                "Check constraint violation detected"
-            );
-            return AppError::BadRequest {
-                code: ErrorCode::CheckViolation,
-                detail: "Check constraint violation".to_string(),
-            };
-        }
-
-        // Check for connection/pool issues via string matching as fallback
-        if error_msg.contains("connection")
-            || error_msg.contains("timeout")
-            || error_msg.contains("pool")
-            || error_msg.contains("unavailable")
-        {
-            warn!(
-                trace_id = %trace_id,
-                raw_error = %Redacted(&error_msg),
-                "Database connection issue detected"
-            );
-            return AppError::DbUnavailable;
-        }
-
-        // Fallback: generic database error
-        warn!(
-            trace_id = %trace_id,
-            raw_error = %Redacted(&error_msg),
-            "Unhandled database error"
-        );
-        AppError::Db {
-            detail: "Database operation failed".to_string(),
+            crate::errors::DomainError::Infra(kind, detail) => match kind {
+                InfraErrorKind::Timeout => AppError::timeout(ErrorCode::DbTimeout, detail),
+                InfraErrorKind::DbUnavailable => AppError::DbUnavailable,
+                InfraErrorKind::DataCorruption => AppError::Internal {
+                    code: ErrorCode::DataCorruption,
+                    detail,
+                },
+                InfraErrorKind::Other(_) => AppError::Internal {
+                    code: ErrorCode::InternalError,
+                    detail,
+                },
+            },
         }
     }
 }
@@ -364,6 +335,43 @@ impl ResponseError for AppError {
         let status = self.status();
         let trace_id = trace_ctx::trace_id();
         let problem_details = self.to_problem_details_with_trace_id(trace_id.clone());
+
+        // Log with appropriate level: domain=warn, infra=error
+        match self {
+            // Domain-level conditions
+            AppError::Validation { .. }
+            | AppError::Conflict { .. }
+            | AppError::NotFound { .. }
+            | AppError::Forbidden { .. }
+            | AppError::ForbiddenUserNotFound
+            | AppError::BadRequest { .. }
+            | AppError::Unauthorized
+            | AppError::UnauthorizedMissingBearer
+            | AppError::UnauthorizedInvalidJwt
+            | AppError::UnauthorizedExpiredJwt => {
+                warn!(
+                    trace_id = %trace_id,
+                    code = %self.code(),
+                    status = %status.as_u16(),
+                    detail = %problem_details.detail,
+                    "domain error"
+                );
+            }
+            // Infra/system-level
+            AppError::Db { .. }
+            | AppError::DbUnavailable
+            | AppError::Timeout { .. }
+            | AppError::Internal { .. }
+            | AppError::Config { .. } => {
+                error!(
+                    trace_id = %trace_id,
+                    code = %self.code(),
+                    status = %status.as_u16(),
+                    detail = %problem_details.detail,
+                    "infrastructure error"
+                );
+            }
+        }
 
         let is_unauthorized = matches!(
             self,

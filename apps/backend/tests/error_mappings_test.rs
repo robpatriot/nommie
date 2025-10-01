@@ -244,36 +244,36 @@ async fn test_sea_orm_error_mapping() {
 
     // Test RecordNotFound mapping
     let db_err = DbErr::RecordNotFound("Record not found".to_string());
-    let app_error: AppError = db_err.into();
+    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
 
     assert!(matches!(app_error, AppError::NotFound { .. }));
-    assert_eq!(app_error.code(), ErrorCode::RecordNotFound);
+    assert_eq!(app_error.code(), ErrorCode::NotFound);
 
     // Test ConnectionAcquire mapping (using a mock error since we can't easily construct ConnAcquireErr)
     // We'll test this via string matching in the main implementation
 
-    // Test generic DbErr mapping
+    // Test generic DbErr mapping -> Internal
     let db_err = DbErr::Custom("Some other error".to_string());
-    let app_error: AppError = db_err.into();
+    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
 
-    assert!(matches!(app_error, AppError::Db { .. }));
-    assert_eq!(app_error.code(), ErrorCode::DbError);
+    assert!(matches!(app_error, AppError::Internal { .. }));
+    assert_eq!(app_error.code(), ErrorCode::InternalError);
 }
 
 #[actix_web::test]
 async fn test_sanitized_database_error_details() {
     use sea_orm::DbErr;
 
-    // Test unique constraint violation with sanitized detail
+    // Test unique constraint violation with sanitized detail (via adapter)
     let db_err = DbErr::Custom(
         "duplicate key value violates unique constraint \"users_email_key\" SQLSTATE(23505)"
             .to_string(),
     );
-    let app_error: AppError = db_err.into();
+    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
 
     match app_error {
         AppError::Conflict { code, detail } => {
-            assert_eq!(code, ErrorCode::UniqueViolation);
+            assert_eq!(code, ErrorCode::UniqueEmail);
             assert_eq!(detail, "Unique constraint violation");
         }
         _ => panic!("Expected Conflict variant"),
@@ -284,46 +284,44 @@ async fn test_sanitized_database_error_details() {
         "insert or update on table \"games\" violates foreign key constraint SQLSTATE(23503)"
             .to_string(),
     );
-    let app_error: AppError = db_err.into();
+    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
 
     match app_error {
-        AppError::Conflict { code, detail } => {
-            assert_eq!(code, ErrorCode::FkViolation);
-            assert_eq!(detail, "Foreign key constraint violation");
+        AppError::Validation { code, status, .. } => {
+            assert_eq!(code, ErrorCode::ValidationError);
+            assert_eq!(status.as_u16(), 422);
         }
-        _ => panic!("Expected Conflict variant"),
+        _ => panic!("Expected Validation variant"),
     }
 
     // Test check constraint violation with sanitized detail
     let db_err = DbErr::Custom("new row for relation \"games\" violates check constraint \"games_status_check\" SQLSTATE(23514)".to_string());
-    let app_error: AppError = db_err.into();
+    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
 
     match app_error {
-        AppError::BadRequest { code, detail } => {
-            assert_eq!(code, ErrorCode::CheckViolation);
-            assert_eq!(detail, "Check constraint violation");
+        AppError::Validation { code, status, .. } => {
+            assert_eq!(code, ErrorCode::ValidationError);
+            assert_eq!(status.as_u16(), 422);
         }
-        _ => panic!("Expected BadRequest variant"),
+        _ => panic!("Expected Validation variant"),
     }
 
     // Test connection issue detection
     let db_err = DbErr::Custom("connection timeout after 30 seconds".to_string());
-    let app_error: AppError = db_err.into();
+    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
 
-    assert!(matches!(app_error, AppError::DbUnavailable));
-    assert_eq!(app_error.code(), ErrorCode::DbUnavailable);
+    assert_eq!(app_error.code(), ErrorCode::DbTimeout);
 
     // Test generic database error with sanitized detail
     let db_err = DbErr::Custom("some unexpected database error".to_string());
-    let app_error: AppError = db_err.into();
+    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
 
-    assert_eq!(app_error.code(), ErrorCode::DbError);
-
+    // Maps to generic internal/infra error
     match app_error {
-        AppError::Db { detail } => {
+        AppError::Internal { detail, .. } => {
             assert_eq!(detail, "Database operation failed");
         }
-        _ => panic!("Expected Db variant"),
+        _ => panic!("Expected Internal variant"),
     }
 }
 
@@ -340,7 +338,7 @@ async fn test_sanitized_error_http_responses() {
                         "duplicate key value violates unique constraint SQLSTATE(23505)"
                             .to_string(),
                     );
-                    let app_error: AppError = db_err.into();
+                    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
                     test_handler(app_error)
                 }),
             )
@@ -350,7 +348,7 @@ async fn test_sanitized_error_http_responses() {
                     let db_err = DbErr::Custom(
                         "foreign key constraint violation SQLSTATE(23503)".to_string(),
                     );
-                    let app_error: AppError = db_err.into();
+                    let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
                     test_handler(app_error)
                 }),
             ),
@@ -367,20 +365,19 @@ async fn test_sanitized_error_http_responses() {
 
     // Use the common helper for comprehensive validation
     use common::assert_problem_details_structure;
-    assert_problem_details_structure(resp, 409, "UNIQUE_VIOLATION", "Unique constraint violation")
-        .await;
+    assert_problem_details_structure(resp, 409, "CONFLICT", "Unique constraint violation").await;
 
     // Test FK violation response has sanitized detail
     let req = test::TestRequest::get().uri("/fk_violation").to_request();
     let resp = test::call_service(&app, req).await;
 
-    assert_eq!(resp.status(), 409);
+    assert_eq!(resp.status(), 422);
 
     // Use the common helper for comprehensive validation
     assert_problem_details_structure(
         resp,
-        409,
-        "FK_VIOLATION",
+        422,
+        "VALIDATION_ERROR",
         "Foreign key constraint violation",
     )
     .await;

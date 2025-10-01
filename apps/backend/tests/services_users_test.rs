@@ -70,7 +70,10 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
             let credential = user_credentials::Entity::find()
                 .filter(user_credentials::Column::Email.eq(&test_email))
                 .one(txn)
-                .await?
+                .await
+                .map_err(|e| {
+                    backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                })?
                 .expect("should have credential row");
 
             assert_eq!(
@@ -125,7 +128,10 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
             let credential = user_credentials::Entity::find()
                 .filter(user_credentials::Column::Email.eq(&test_email))
                 .one(txn)
-                .await?
+                .await
+                .map_err(|e| {
+                    backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                })?
                 .expect("should have credential row");
 
             assert_eq!(
@@ -228,7 +234,9 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
                 updated_at: Set(now),
             };
 
-            let user = user_active.insert(txn).await?;
+            let user = user_active.insert(txn).await.map_err(|e| {
+                backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+            })?;
 
             // Create credential with NULL google_sub
             let credential_active = user_credentials::ActiveModel {
@@ -242,7 +250,9 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
                 updated_at: Set(now),
             };
 
-            credential_active.insert(txn).await?;
+            credential_active.insert(txn).await.map_err(|e| {
+                backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+            })?;
 
             // Scenario 4: Repeat login (email exists, google_sub NULL) → sets google_sub to incoming, succeeds
             let updated_user = ensure_user(

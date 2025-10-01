@@ -53,6 +53,7 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
     let result = with_txn(None, &state, |_txn| {
         Box::pin(async {
             Err::<String, _>(backend::error::AppError::Internal {
+                code: backend::errors::ErrorCode::InternalError,
                 detail: "test error".to_string(),
             })
         })

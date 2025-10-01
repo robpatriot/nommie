@@ -48,6 +48,8 @@ pub enum ErrorCode {
     // Resource Not Found
     /// Game not found
     GameNotFound,
+    /// User not found
+    UserNotFound,
     /// General not found error
     NotFound,
 
@@ -56,6 +58,14 @@ pub enum ErrorCode {
     GoogleSubMismatch,
     /// Join code already exists
     JoinCodeConflict,
+    /// Seat already taken
+    SeatTaken,
+    /// Unique email constraint
+    UniqueEmail,
+    /// Optimistic lock conflict
+    OptimisticLock,
+    /// Generic conflict (fallback for unmatched conflicts)
+    Conflict,
 
     // System Errors
     /// Database error
@@ -64,6 +74,8 @@ pub enum ErrorCode {
     DbUnavailable,
     /// Database pool exhausted
     DbPoolExhausted,
+    /// Database timeout (gateway timeout)
+    DbTimeout,
 
     // Database Constraint Violations
     /// Unique constraint violation (SQLSTATE 23505; generic 409)
@@ -77,8 +89,12 @@ pub enum ErrorCode {
 
     /// Internal server error
     Internal,
+    /// Internal server error (explicit problem code)
+    InternalError,
     /// Configuration error
     ConfigError,
+    /// Data corruption detected
+    DataCorruption,
 
     // Test-only codes
     /// Test error without trace
@@ -110,16 +126,22 @@ impl ErrorCode {
 
             // Resource Not Found
             Self::GameNotFound => "GAME_NOT_FOUND",
+            Self::UserNotFound => "USER_NOT_FOUND",
             Self::NotFound => "NOT_FOUND",
 
             // Business Logic Conflicts
             Self::GoogleSubMismatch => "GOOGLE_SUB_MISMATCH",
             Self::JoinCodeConflict => "JOIN_CODE_CONFLICT",
+            Self::SeatTaken => "SEAT_TAKEN",
+            Self::UniqueEmail => "UNIQUE_EMAIL",
+            Self::OptimisticLock => "OPTIMISTIC_LOCK",
+            Self::Conflict => "CONFLICT",
 
             // System Errors
             Self::DbError => "DB_ERROR",
             Self::DbUnavailable => "DB_UNAVAILABLE",
             Self::DbPoolExhausted => "DB_POOL_EXHAUSTED",
+            Self::DbTimeout => "DB_TIMEOUT",
 
             // Database Constraint Violations
             Self::UniqueViolation => "UNIQUE_VIOLATION",
@@ -128,7 +150,9 @@ impl ErrorCode {
             Self::RecordNotFound => "RECORD_NOT_FOUND",
 
             Self::Internal => "INTERNAL",
+            Self::InternalError => "INTERNAL_ERROR",
             Self::ConfigError => "CONFIG_ERROR",
+            Self::DataCorruption => "DATA_CORRUPTION",
 
             // Test-only codes
             Self::NoTrace => "NO_TRACE",

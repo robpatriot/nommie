@@ -169,7 +169,7 @@ where
     let sp = outer
         .begin()
         .await
-        .map_err(backend::error::AppError::from)?;
+        .map_err(|e| backend::error::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
     let out = f(sp).await;
     // Note: The transaction will be automatically rolled back when dropped
     out

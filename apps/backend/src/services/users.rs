@@ -7,6 +7,7 @@ use users::Model as User;
 use crate::entities::{user_credentials, users};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
+use crate::infra::db_errors::map_db_err;
 use crate::logging::pii::Redacted;
 
 /// Redacts a google_sub value for logging purposes.
@@ -34,7 +35,7 @@ pub async fn ensure_user(
         .filter(user_credentials::Column::Email.eq(&email))
         .one(conn)
         .await
-        .map_err(|e| AppError::db(format!("Failed to query user credentials: {e}")))?;
+        .map_err(|e| AppError::from(map_db_err(e)))?;
 
     match existing_credential {
         Some(credential) => {
@@ -76,16 +77,14 @@ pub async fn ensure_user(
             credential_active
                 .update(conn)
                 .await
-                .map_err(|e| AppError::db(format!("Failed to update user credentials: {e}")))?;
+                .map_err(|e| AppError::from(map_db_err(e)))?;
 
             // Fetch and return the linked user
             let user = users::Entity::find_by_id(user_id)
                 .one(conn)
                 .await
-                .map_err(|e| AppError::db(format!("Failed to fetch user: {e}")))?
-                .ok_or_else(|| {
-                    AppError::internal("User not found after updating credentials".to_string())
-                })?;
+                .map_err(|e| AppError::from(map_db_err(e)))?
+                .ok_or_else(|| AppError::not_found(ErrorCode::UserNotFound, "User not found"))?;
 
             // Log repeat login (same email + same google_sub)
             debug!(
@@ -117,7 +116,7 @@ pub async fn ensure_user(
             let user = user_active
                 .insert(conn)
                 .await
-                .map_err(|e| AppError::db(format!("Failed to create user: {e}")))?;
+                .map_err(|e| AppError::from(map_db_err(e)))?;
 
             // Create new user credentials with auto-generated ID
             let credential_active = user_credentials::ActiveModel {
@@ -134,7 +133,7 @@ pub async fn ensure_user(
             credential_active
                 .insert(conn)
                 .await
-                .map_err(|e| AppError::db(format!("Failed to create user credentials: {e}")))?;
+                .map_err(|e| AppError::from(map_db_err(e)))?;
 
             // Log first user creation
             info!(
