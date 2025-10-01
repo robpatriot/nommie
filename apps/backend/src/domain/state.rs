@@ -1,4 +1,4 @@
-use crate::domain::cards::{Card, Suit};
+use crate::domain::cards::{Card, Suit, Trump};
 use crate::domain::rules::PLAYERS;
 
 pub type PlayerId = u8; // 0..=3
@@ -27,8 +27,8 @@ pub struct RoundState {
     pub trick_lead: Option<Suit>,
     /// Tricks won per player for this round.
     pub tricks_won: [u8; PLAYERS],
-    /// Trump suit for this round (set by winning bidder).
-    pub trump: Option<Suit>,
+    /// Trump for this round (set by winning bidder).
+    pub trump: Option<Trump>,
     /// Bids per player.
     pub bids: [Option<u8>; PLAYERS],
     /// Player who won the bidding (once determined).

@@ -68,18 +68,18 @@ pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), D
     Ok(())
 }
 
-/// Set trump suit; only the winning bidder can call in TrumpSelect phase.
+/// Set trump; only the winning bidder can call in TrumpSelect phase.
 pub fn set_trump(
     state: &mut GameState,
     who: PlayerId,
-    suit: crate::domain::cards::Suit,
+    trump: crate::domain::cards::Trump,
 ) -> Result<(), DomainError> {
     if state.phase != Phase::TrumpSelect {
         return Err(DomainError::PhaseMismatch);
     }
     match state.round.winning_bidder {
         Some(bidder) if bidder == who => {
-            state.round.trump = Some(suit);
+            state.round.trump = Some(trump);
             state.leader = bidder;
             state.turn = bidder;
             state.trick_no = 1;

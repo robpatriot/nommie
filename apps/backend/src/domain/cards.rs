@@ -2,12 +2,48 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::domain::errors::DomainError;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Suit {
     Clubs,
     Diamonds,
     Hearts,
     Spades,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum Trump {
+    Clubs,
+    Diamonds,
+    Hearts,
+    Spades,
+    NoTrump,
+}
+
+impl From<Suit> for Trump {
+    fn from(suit: Suit) -> Self {
+        match suit {
+            Suit::Clubs => Trump::Clubs,
+            Suit::Diamonds => Trump::Diamonds,
+            Suit::Hearts => Trump::Hearts,
+            Suit::Spades => Trump::Spades,
+        }
+    }
+}
+
+impl TryFrom<Trump> for Suit {
+    type Error = DomainError;
+
+    fn try_from(trump: Trump) -> Result<Self, Self::Error> {
+        match trump {
+            Trump::Clubs => Ok(Suit::Clubs),
+            Trump::Diamonds => Ok(Suit::Diamonds),
+            Trump::Hearts => Ok(Suit::Hearts),
+            Trump::Spades => Ok(Suit::Spades),
+            Trump::NoTrump => Err(DomainError::InvalidTrumpConversion),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -242,5 +278,35 @@ mod tests {
         ];
         assert!(hand_has_suit(&hand, Suit::Clubs));
         assert!(!hand_has_suit(&hand, Suit::Hearts));
+    }
+
+    #[test]
+    fn suit_serde() {
+        // Test SCREAMING_SNAKE_CASE serialization for Suit
+        assert_eq!(serde_json::to_string(&Suit::Clubs).unwrap(), "\"CLUBS\"");
+        assert_eq!(
+            serde_json::to_string(&Suit::Diamonds).unwrap(),
+            "\"DIAMONDS\""
+        );
+        assert_eq!(serde_json::to_string(&Suit::Hearts).unwrap(), "\"HEARTS\"");
+        assert_eq!(serde_json::to_string(&Suit::Spades).unwrap(), "\"SPADES\"");
+
+        // Test deserialization
+        assert_eq!(
+            serde_json::from_str::<Suit>("\"CLUBS\"").unwrap(),
+            Suit::Clubs
+        );
+        assert_eq!(
+            serde_json::from_str::<Suit>("\"DIAMONDS\"").unwrap(),
+            Suit::Diamonds
+        );
+        assert_eq!(
+            serde_json::from_str::<Suit>("\"HEARTS\"").unwrap(),
+            Suit::Hearts
+        );
+        assert_eq!(
+            serde_json::from_str::<Suit>("\"SPADES\"").unwrap(),
+            Suit::Spades
+        );
     }
 }

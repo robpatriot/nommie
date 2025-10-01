@@ -1,9 +1,8 @@
 #![cfg(test)]
 
 use super::*;
-
-use crate::domain::cards::{Card, Rank, Suit, parse_cards};
-use crate::domain::bidding::{Bid, place_bid};
+use crate::domain::bidding::{place_bid, Bid};
+use crate::domain::cards::{parse_cards, Card, Rank, Suit, Trump};
 use crate::domain::scoring::apply_round_scoring;
 use crate::domain::tricks::{legal_moves, play_card, resolve_current_trick};
 
@@ -49,13 +48,13 @@ fn trump_selection_only_by_winner() {
     }
     assert_eq!(state.round.winning_bidder, Some(1));
     // wrong player
-    assert!(crate::domain::set_trump(&mut state, 0, Suit::Hearts).is_err());
+    assert!(crate::domain::set_trump(&mut state, 0, Trump::Hearts).is_err());
     // correct player
-    assert!(crate::domain::set_trump(&mut state, 1, Suit::Spades).is_ok());
+    assert!(crate::domain::set_trump(&mut state, 1, Trump::Spades).is_ok());
     assert_eq!(state.phase, Phase::Trick { trick_no: 1 });
     assert_eq!(state.leader, 1);
     assert_eq!(state.turn, 1);
-    assert_eq!(state.round.trump, Some(Suit::Spades));
+    assert_eq!(state.round.trump, Some(Trump::Spades));
     assert!(state.round.trick_plays.is_empty());
     assert!(state.round.trick_lead.is_none());
 }
@@ -71,12 +70,20 @@ fn legal_moves_follow_lead() {
     for p in 0..4 {
         assert!(place_bid(&mut state, p, Bid(0)).is_ok());
     }
-    crate::domain::set_trump(&mut state, 0, Suit::Hearts).unwrap();
+    crate::domain::set_trump(&mut state, 0, Trump::Hearts).unwrap();
     // First to play can play any
     let lm0 = legal_moves(&state, 0);
     assert_eq!(lm0.len(), 3);
     // Play AS -> lead Spades
-    play_card(&mut state, 0, Card { suit: Suit::Spades, rank: Rank::Ace }).unwrap();
+    play_card(
+        &mut state,
+        0,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
     // Player 1 must follow spades if possible
     let lm1 = legal_moves(&state, 1);
     assert!(lm1.iter().all(|c| c.suit == Suit::Spades) && !lm1.is_empty());
@@ -89,17 +96,73 @@ fn play_card_errors_and_trick_resolution() {
     let h2 = parse_cards(&["QS", "5D", "6C"]);
     let h3 = parse_cards(&["9S", "7H", "8C"]);
     let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
-    for p in 0..4 { place_bid(&mut state, p, Bid(0)).unwrap(); }
-    crate::domain::set_trump(&mut state, 0, Suit::Hearts).unwrap();
+    for p in 0..4 {
+        place_bid(&mut state, p, Bid(0)).unwrap();
+    }
+    crate::domain::set_trump(&mut state, 0, Trump::Hearts).unwrap();
     // Out of turn
-    assert_eq!(play_card(&mut state, 1, Card { suit: Suit::Spades, rank: Rank::Ten }).unwrap_err(), DomainError::OutOfTurn);
+    assert_eq!(
+        play_card(
+            &mut state,
+            1,
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ten
+            }
+        )
+        .unwrap_err(),
+        DomainError::OutOfTurn
+    );
     // Not in hand
-    assert_eq!(play_card(&mut state, 0, Card { suit: Suit::Diamonds, rank: Rank::Ace }).unwrap_err(), DomainError::CardNotInHand);
+    assert_eq!(
+        play_card(
+            &mut state,
+            0,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ace
+            }
+        )
+        .unwrap_err(),
+        DomainError::CardNotInHand
+    );
     // Play trick fully
-    play_card(&mut state, 0, Card { suit: Suit::Spades, rank: Rank::Ace }).unwrap();
-    play_card(&mut state, 1, Card { suit: Suit::Spades, rank: Rank::Ten }).unwrap();
-    play_card(&mut state, 2, Card { suit: Suit::Spades, rank: Rank::Queen }).unwrap();
-    play_card(&mut state, 3, Card { suit: Suit::Spades, rank: Rank::Nine }).unwrap();
+    play_card(
+        &mut state,
+        0,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        1,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Ten,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        2,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Queen,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        3,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Nine,
+        },
+    )
+    .unwrap();
     // Highest trump is none in trick; lead spades so Ace wins -> player 0 leads next
     assert_eq!(state.leader, 0);
     assert_eq!(state.turn, 0);
@@ -110,26 +173,74 @@ fn play_card_errors_and_trick_resolution() {
 fn resolve_trick_multiple_cases() {
     // Create a RoundState with a full trick
     let mut r = RoundState::new();
-    r.trump = Some(Suit::Hearts);
+    r.trump = Some(Trump::Hearts);
     r.trick_lead = Some(Suit::Clubs);
     r.trick_plays = vec![
-        (0, Card { suit: Suit::Clubs, rank: Rank::Ten }),
-        (1, Card { suit: Suit::Spades, rank: Rank::Ace }),
-        (2, Card { suit: Suit::Hearts, rank: Rank::Two }),
-        (3, Card { suit: Suit::Hearts, rank: Rank::King }),
+        (
+            0,
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Ten,
+            },
+        ),
+        (
+            1,
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ace,
+            },
+        ),
+        (
+            2,
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two,
+            },
+        ),
+        (
+            3,
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::King,
+            },
+        ),
     ];
     // With trump hearts, player 3 wins (KH > 2H)
     assert_eq!(resolve_current_trick(&r), Some(3));
 
     // No trump played: highest of lead
     let mut r2 = RoundState::new();
-    r2.trump = Some(Suit::Spades);
+    r2.trump = Some(Trump::Spades);
     r2.trick_lead = Some(Suit::Diamonds);
     r2.trick_plays = vec![
-        (0, Card { suit: Suit::Diamonds, rank: Rank::Nine }),
-        (1, Card { suit: Suit::Clubs, rank: Rank::Ace }),
-        (2, Card { suit: Suit::Diamonds, rank: Rank::Queen }),
-        (3, Card { suit: Suit::Hearts, rank: Rank::Two }),
+        (
+            0,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Nine,
+            },
+        ),
+        (
+            1,
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Ace,
+            },
+        ),
+        (
+            2,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Queen,
+            },
+        ),
+        (
+            3,
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two,
+            },
+        ),
     ];
     assert_eq!(resolve_current_trick(&r2), Some(2));
 }
@@ -161,27 +272,271 @@ fn happy_path_round_small() {
     place_bid(&mut state, 2, Bid(2)).unwrap();
     place_bid(&mut state, 3, Bid(1)).unwrap();
     assert_eq!(state.round.winning_bidder, Some(1));
-    crate::domain::set_trump(&mut state, 1, Suit::Hearts).unwrap();
+    crate::domain::set_trump(&mut state, 1, Trump::Hearts).unwrap();
     // Trick 1: lead 1
-    play_card(&mut state, 1, Card { suit: Suit::Spades, rank: Rank::Ten }).unwrap();
-    play_card(&mut state, 2, Card { suit: Suit::Spades, rank: Rank::Queen }).unwrap();
-    play_card(&mut state, 3, Card { suit: Suit::Spades, rank: Rank::Nine }).unwrap();
-    play_card(&mut state, 0, Card { suit: Suit::Spades, rank: Rank::Ace }).unwrap();
+    play_card(
+        &mut state,
+        1,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Ten,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        2,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Queen,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        3,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Nine,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        0,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
     assert_eq!(state.leader, 0);
     // Trick 2: lead 0
-    play_card(&mut state, 0, Card { suit: Suit::Hearts, rank: Rank::King }).unwrap();
-    play_card(&mut state, 1, Card { suit: Suit::Hearts, rank: Rank::Three }).unwrap();
-    play_card(&mut state, 2, Card { suit: Suit::Diamonds, rank: Rank::Five }).unwrap();
-    play_card(&mut state, 3, Card { suit: Suit::Hearts, rank: Rank::Seven }).unwrap();
+    play_card(
+        &mut state,
+        0,
+        Card {
+            suit: Suit::Hearts,
+            rank: Rank::King,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        1,
+        Card {
+            suit: Suit::Hearts,
+            rank: Rank::Three,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        2,
+        Card {
+            suit: Suit::Diamonds,
+            rank: Rank::Five,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        3,
+        Card {
+            suit: Suit::Hearts,
+            rank: Rank::Seven,
+        },
+    )
+    .unwrap();
     assert_eq!(state.leader, 0);
     // Trick 3: lead 0
-    play_card(&mut state, 0, Card { suit: Suit::Clubs, rank: Rank::Two }).unwrap();
-    play_card(&mut state, 1, Card { suit: Suit::Clubs, rank: Rank::Four }).unwrap();
-    play_card(&mut state, 2, Card { suit: Suit::Clubs, rank: Rank::Six }).unwrap();
-    play_card(&mut state, 3, Card { suit: Suit::Clubs, rank: Rank::Eight }).unwrap();
+    play_card(
+        &mut state,
+        0,
+        Card {
+            suit: Suit::Clubs,
+            rank: Rank::Two,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        1,
+        Card {
+            suit: Suit::Clubs,
+            rank: Rank::Four,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        2,
+        Card {
+            suit: Suit::Clubs,
+            rank: Rank::Six,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        3,
+        Card {
+            suit: Suit::Clubs,
+            rank: Rank::Eight,
+        },
+    )
+    .unwrap();
     assert_eq!(state.phase, Phase::Scoring);
     apply_round_scoring(&mut state);
     assert_eq!(state.scores_total, [3 + 10, 1, 0, 0]);
 }
 
+#[test]
+fn trump_conversions() {
+    // From<Suit> for Trump
+    assert_eq!(Trump::from(Suit::Clubs), Trump::Clubs);
+    assert_eq!(Trump::from(Suit::Diamonds), Trump::Diamonds);
+    assert_eq!(Trump::from(Suit::Hearts), Trump::Hearts);
+    assert_eq!(Trump::from(Suit::Spades), Trump::Spades);
 
+    // TryFrom<Trump> for Suit - success cases
+    use std::convert::TryInto;
+    assert_eq!(Trump::Clubs.try_into(), Ok(Suit::Clubs));
+    assert_eq!(Trump::Diamonds.try_into(), Ok(Suit::Diamonds));
+    assert_eq!(Trump::Hearts.try_into(), Ok(Suit::Hearts));
+    assert_eq!(Trump::Spades.try_into(), Ok(Suit::Spades));
+
+    // TryFrom<Trump> for Suit - NoTrump fails
+    let result: Result<Suit, _> = Trump::NoTrump.try_into();
+    assert_eq!(result, Err(DomainError::InvalidTrumpConversion));
+}
+
+#[test]
+fn trump_serde() {
+    // Test SCREAMING_SNAKE_CASE serialization
+    assert_eq!(serde_json::to_string(&Trump::Clubs).unwrap(), "\"CLUBS\"");
+    assert_eq!(
+        serde_json::to_string(&Trump::Diamonds).unwrap(),
+        "\"DIAMONDS\""
+    );
+    assert_eq!(serde_json::to_string(&Trump::Hearts).unwrap(), "\"HEARTS\"");
+    assert_eq!(serde_json::to_string(&Trump::Spades).unwrap(), "\"SPADES\"");
+    assert_eq!(
+        serde_json::to_string(&Trump::NoTrump).unwrap(),
+        "\"NO_TRUMP\""
+    );
+
+    // Test deserialization
+    assert_eq!(
+        serde_json::from_str::<Trump>("\"CLUBS\"").unwrap(),
+        Trump::Clubs
+    );
+    assert_eq!(
+        serde_json::from_str::<Trump>("\"DIAMONDS\"").unwrap(),
+        Trump::Diamonds
+    );
+    assert_eq!(
+        serde_json::from_str::<Trump>("\"HEARTS\"").unwrap(),
+        Trump::Hearts
+    );
+    assert_eq!(
+        serde_json::from_str::<Trump>("\"SPADES\"").unwrap(),
+        Trump::Spades
+    );
+    assert_eq!(
+        serde_json::from_str::<Trump>("\"NO_TRUMP\"").unwrap(),
+        Trump::NoTrump
+    );
+}
+
+#[test]
+fn trump_selection_allows_no_trump() {
+    let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+    let mut state = make_state_with_hands(hands, 3, 0);
+    for (p, b) in [(0, 0), (1, 2), (2, 2), (3, 1)] {
+        assert!(place_bid(&mut state, p, Bid(b)).is_ok());
+    }
+    assert_eq!(state.round.winning_bidder, Some(1));
+
+    // Winning bidder can select NoTrump
+    assert!(crate::domain::set_trump(&mut state, 1, Trump::NoTrump).is_ok());
+    assert_eq!(state.phase, Phase::Trick { trick_no: 1 });
+    assert_eq!(state.round.trump, Some(Trump::NoTrump));
+}
+
+#[test]
+fn trick_resolution_no_trump() {
+    // With NoTrump, only the lead suit matters
+    let mut r = RoundState::new();
+    r.trump = Some(Trump::NoTrump);
+    r.trick_lead = Some(Suit::Diamonds);
+    r.trick_plays = vec![
+        (
+            0,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Nine,
+            },
+        ),
+        (
+            1,
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ace,
+            },
+        ), // Highest card, but wrong suit
+        (
+            2,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Queen,
+            },
+        ),
+        (
+            3,
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace,
+            },
+        ), // Another high card, wrong suit
+    ];
+    // Player 2 wins with QD (highest of lead suit)
+    assert_eq!(resolve_current_trick(&r), Some(2));
+
+    // Another case: all follow lead suit
+    let mut r2 = RoundState::new();
+    r2.trump = Some(Trump::NoTrump);
+    r2.trick_lead = Some(Suit::Clubs);
+    r2.trick_plays = vec![
+        (
+            0,
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Two,
+            },
+        ),
+        (
+            1,
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Ten,
+            },
+        ),
+        (
+            2,
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::King,
+            },
+        ),
+        (
+            3,
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Ace,
+            },
+        ),
+    ];
+    // Player 3 wins with AC (highest of lead suit)
+    assert_eq!(resolve_current_trick(&r2), Some(3));
+}

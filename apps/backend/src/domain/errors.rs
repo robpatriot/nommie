@@ -9,6 +9,7 @@ pub enum DomainError {
     OutOfTurn,
     PhaseMismatch,
     ParseCard(String),
+    InvalidTrumpConversion,
     Other(String),
 }
 
@@ -21,6 +22,7 @@ impl Display for DomainError {
             DomainError::OutOfTurn => write!(f, "out of turn"),
             DomainError::PhaseMismatch => write!(f, "phase mismatch"),
             DomainError::ParseCard(s) => write!(f, "parse card: {s}"),
+            DomainError::InvalidTrumpConversion => write!(f, "cannot convert NoTrump to Suit"),
             DomainError::Other(s) => write!(f, "domain error: {s}"),
         }
     }

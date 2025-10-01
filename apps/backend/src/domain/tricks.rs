@@ -94,9 +94,31 @@ pub fn resolve_current_trick(state: &RoundState) -> Option<PlayerId> {
         let (_, card_i) = state.trick_plays[i];
         let (_, card_best) = state.trick_plays[best_idx];
         let better = match trump {
-            Some(tr) => crate::domain::card_beats(card_i, card_best, lead, tr),
+            Some(crate::domain::cards::Trump::NoTrump) => {
+                // NoTrump: only lead suit counts, no trump suit
+                if card_i.suit == card_best.suit {
+                    card_i.rank > card_best.rank
+                } else {
+                    card_i.suit == lead && card_best.suit != lead
+                }
+            }
+            Some(tr) => {
+                // Trump is a suit: convert and use card_beats
+                if let Ok(trump_suit) =
+                    std::convert::TryInto::<crate::domain::cards::Suit>::try_into(tr)
+                {
+                    crate::domain::card_beats(card_i, card_best, lead, trump_suit)
+                } else {
+                    // Shouldn't happen, but fallback to lead-suit-only
+                    if card_i.suit == card_best.suit {
+                        card_i.rank > card_best.rank
+                    } else {
+                        card_i.suit == lead && card_best.suit != lead
+                    }
+                }
+            }
             None => {
-                // No trump chosen? Then only lead suit counts
+                // No trump chosen yet: only lead suit counts
                 if card_i.suit == card_best.suit {
                     card_i.rank > card_best.rank
                 } else {
