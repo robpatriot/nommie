@@ -30,7 +30,7 @@
 - **Details:**
   - Single `init.sql` is source of truth.
   - Test harness applies schema to `_test` DB at startup with guard.
-- **Acceptance:** Tests bootstrap schema cleanly; `_test` guard enforced.  
+- **Acceptance:** Tests bootstrap schema cleanly; `_test` guard enforced.
   *(Actual entities live in F.)*
 
 ---
@@ -83,7 +83,7 @@
   - `ResponseError` reads `trace_id` from context when building Problem Details.
   - Removed `from_req`, `with_trace_id`, `ensure_trace_id`.
   - Updated tests assert header presence and parity with JSON `trace_id`.
-- **Acceptance:** 
+- **Acceptance:**
   - No `trace_id` in `AppError` or manual attachments.
   - Problem Details and `x-trace-id` header agree for all errors.
   - `pnpm be:lint` and `pnpm be:test` pass.
@@ -97,7 +97,7 @@
   - Simplified `AppState.db` builder.
   - Defined + tested nested `with_txn` behavior.
   - Enforced rollback-by-default policy in tests.
-- **Acceptance:** 
+- **Acceptance:**
   - Request-path code consistently uses `with_txn`.
   - No-DB state returns `DB_UNAVAILABLE`.
   - Shared + nested txn behavior proven in tests.
@@ -109,7 +109,7 @@
 - **Dependencies:** E, F, G.
 - **Details (Done):**
   - Completed: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`.
-- **Acceptance:** 
+- **Acceptance:**
   - Handlers are thin.
   - Extractor tests pass.
   - Single DB hit for user+membership where possible.
@@ -232,18 +232,34 @@
 - **Acceptance:** Concurrent first-login attempts never produce duplicate users or credentials.
 
 ### 🅆 Behavioral Improvements *(S → M)*
-- **Email normalization** (trim, lowercase, Unicode NFKC).  
-- **Email validation** (`422 INVALID_EMAIL`).  
-- **Username hygiene** (min length/cleaning; store NULL if invalid).  
-- **Last-login updates** (skip no-op writes).  
-- **Error code catalog** (centralize codes).  
-- **PII-safe logging** (mask/hash email and `google_sub`).  
-- **Time provider abstraction** (injectable clock for deterministic tests).  
+- **Email normalization** (trim, lowercase, Unicode NFKC).
+- **Email validation** (`422 INVALID_EMAIL`).
+- **Username hygiene** (min length/cleaning; store NULL if invalid).
+- **Last-login updates** (skip no-op writes).
+- **Error code catalog** (centralize codes).
+- **PII-safe logging** (mask/hash email and `google_sub`).
+- **Time provider abstraction** (injectable clock for deterministic tests).
 - **Rate limiting** (`429 RATE_LIMITED` on auth endpoint).
 
-### 🅇 Frontend Import Hygiene & Lazy Loading *(S → M)*  
-- **Consistent import ordering/grouping** (builtin, external, internal alias, parent/sibling, index).  
-- **Type-only imports** enforced via ESLint.  
-- **Dynamic `import()` / `next/dynamic`** for heavy libs or non-critical components.  
-- **Example migration** of one component to `next/dynamic`.  
-- **Docs** page explaining import policy and usage examples.  
+### 🅇 Frontend Import Hygiene & Lazy Loading *(S → M)*
+- **Consistent import ordering/grouping** (builtin, external, internal alias, parent/sibling, index).
+- **Type-only imports** enforced via ESLint.
+- **Dynamic `import()` / `next/dynamic`** for heavy libs or non-critical components.
+- **Example migration** of one component to `next/dynamic`.
+- **Docs** page explaining import policy and usage examples.
+
+### 🅨 Extended Property Tests *(S → M)*
+- **Dealing integrity:** generate full 52-card deck deals, assert uniqueness and correct per-seat hand sizes.
+- **Round/trick progression invariants:** leader rotation, trick counts, and phase bounds hold across generated rounds.
+- **Scoring correctness:** bids and trick counts yield scores with exact-bid +10 bonus applied correctly.
+- **Bidding legality:** all bids within allowed range, highest bid wins, ties resolve to first in turn order.
+- **Snapshot round-trip:** `serde_json` serialize/deserialize yields equal snapshots (stability check).
+- **Optional generators** for edge cases (0 bids, NO_TRUMP rounds, final round completion).
+
+### 🅩 Golden Snapshot Fixtures *(S)*
+- **Canonical JSON files** for each major phase: Init, Bidding, TrumpSelect (with NO_TRUMP), Trick, Scoring, Complete.
+- **Stability tests** assert `to_json(snapshot)` matches checked-in fixture.
+- **Review diffs** in PRs surface any intentional schema changes.
+- **Shared reference** for frontend contract and unit tests.
+- **Pretty-printed format** for readability and documentation by example.
+- **Docs link** pointing frontend contributors to the fixtures for parsing and UI snapshot tests.
