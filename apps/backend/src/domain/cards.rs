@@ -48,7 +48,7 @@ impl TryFrom<Trump> for Suit {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum Rank {
     Two,
     Three,
@@ -65,7 +65,7 @@ pub enum Rank {
     Ace,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct Card {
     pub suit: Suit,
     pub rank: Rank,

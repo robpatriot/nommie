@@ -32,6 +32,7 @@ tracing-test = "0.2"
 sea-orm = { version = "1.1" }
 backend-test-support = { path = "../../packages/backend-test-support" }
 futures-util = "0.3"
+proptest = "1.5"
 
 [[bin]]
 name = "backend"

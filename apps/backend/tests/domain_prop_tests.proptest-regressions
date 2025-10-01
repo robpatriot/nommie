@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 6cd6c45b5a2c8923f35fb96f425fc279b53d4a19d945b3c890bcd3d17eb30e36 # shrinks to (card_a, card_b) = (Card { suit: Spades, rank: Two }, Card { suit: Clubs, rank: Two }), lead = Diamonds, trump = Diamonds

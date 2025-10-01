@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod app_builder;
+pub mod domain_gens;
 pub mod factory;
 
 // Re-export only what current tests actually import
