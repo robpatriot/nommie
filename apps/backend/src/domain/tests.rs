@@ -254,7 +254,7 @@ fn scoring_bonus_only_on_exact_bid() {
     state.round.bids = [Some(2), Some(0), Some(1), Some(0)];
     state.phase = Phase::Scoring;
     apply_round_scoring(&mut state);
-    assert_eq!(state.scores_total, [12, 1, 0, 0]);
+    assert_eq!(state.scores_total, [12, 1, 0, 10]);
     assert_eq!(state.phase, Phase::Complete);
 }
 
@@ -388,7 +388,11 @@ fn happy_path_round_small() {
     .unwrap();
     assert_eq!(state.phase, Phase::Scoring);
     apply_round_scoring(&mut state);
-    assert_eq!(state.scores_total, [3 + 10, 1, 0, 0]);
+    // Player 0 bid 1, won 2 tricks: 2 points (no bonus)
+    // Player 1 bid 2, won 0 tricks: 0 points (no bonus)
+    // Player 2 bid 2, won 0 tricks: 0 points
+    // Player 3 bid 1, won 1 trick: 1 point (exact bid = 10 point bonus)
+    assert_eq!(state.scores_total, [2, 0, 0, 11]);
 }
 
 #[test]

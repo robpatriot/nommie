@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::domain::errors::DomainError;
@@ -86,6 +88,44 @@ impl PartialOrd for Card {
     }
 }
 
+impl FromStr for Card {
+    type Err = DomainError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 2 {
+            return Err(DomainError::ParseCard(s.to_string()));
+        }
+        let mut chars = s.chars();
+        let rank_ch = chars.next().unwrap();
+        let suit_ch = chars.next().unwrap();
+        // Validate via explicit match sets below; allow digit ranks (2-9)
+        let rank = match rank_ch {
+            '2' => Rank::Two,
+            '3' => Rank::Three,
+            '4' => Rank::Four,
+            '5' => Rank::Five,
+            '6' => Rank::Six,
+            '7' => Rank::Seven,
+            '8' => Rank::Eight,
+            '9' => Rank::Nine,
+            'T' => Rank::Ten,
+            'J' => Rank::Jack,
+            'Q' => Rank::Queen,
+            'K' => Rank::King,
+            'A' => Rank::Ace,
+            _ => return Err(DomainError::ParseCard(s.to_string())),
+        };
+        let suit = match suit_ch {
+            'C' => Suit::Clubs,
+            'D' => Suit::Diamonds,
+            'H' => Suit::Hearts,
+            'S' => Suit::Spades,
+            _ => return Err(DomainError::ParseCard(s.to_string())),
+        };
+        Ok(Card { suit, rank })
+    }
+}
+
 impl Serialize for Card {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -123,81 +163,88 @@ impl<'de> Deserialize<'de> for Card {
         D: Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        parse_card_str(&s).map_err(|e| serde::de::Error::custom(e.to_string()))
+        s.parse::<Card>()
+            .map_err(|e| serde::de::Error::custom(e.to_string()))
     }
-}
-
-fn parse_card_str(s: &str) -> Result<Card, DomainError> {
-    if s.len() != 2 {
-        return Err(DomainError::ParseCard(s.to_string()));
-    }
-    let mut chars = s.chars();
-    let rank_ch = chars.next().unwrap();
-    let suit_ch = chars.next().unwrap();
-    // Validate via explicit match sets below; allow digit ranks (2-9)
-    let rank = match rank_ch {
-        '2' => Rank::Two,
-        '3' => Rank::Three,
-        '4' => Rank::Four,
-        '5' => Rank::Five,
-        '6' => Rank::Six,
-        '7' => Rank::Seven,
-        '8' => Rank::Eight,
-        '9' => Rank::Nine,
-        'T' => Rank::Ten,
-        'J' => Rank::Jack,
-        'Q' => Rank::Queen,
-        'K' => Rank::King,
-        'A' => Rank::Ace,
-        _ => return Err(DomainError::ParseCard(s.to_string())),
-    };
-    let suit = match suit_ch {
-        'C' => Suit::Clubs,
-        'D' => Suit::Diamonds,
-        'H' => Suit::Hearts,
-        'S' => Suit::Spades,
-        _ => return Err(DomainError::ParseCard(s.to_string())),
-    };
-    Ok(Card { suit, rank })
 }
 
 pub fn hand_has_suit(hand: &[Card], suit: Suit) -> bool {
     hand.iter().any(|c| c.suit == suit)
 }
 
-pub fn card_beats(a: Card, b: Card, lead: Suit, trump: Suit) -> bool {
-    let a_trump = a.suit == trump;
-    let b_trump = b.suit == trump;
-    if a_trump && !b_trump {
-        return true;
+pub fn card_beats(a: Card, b: Card, lead: Suit, trump: Trump) -> bool {
+    match trump {
+        Trump::NoTrump => {
+            // No trump: only lead-suit cards can beat others
+            let a_follows = a.suit == lead;
+            let b_follows = b.suit == lead;
+            if a_follows && !b_follows {
+                return true;
+            }
+            if b_follows && !a_follows {
+                return false;
+            }
+            if a_follows && b_follows {
+                return a.rank > b.rank;
+            }
+            false
+        }
+        Trump::Clubs | Trump::Diamonds | Trump::Hearts | Trump::Spades => {
+            let trump_suit = match trump {
+                Trump::Clubs => Suit::Clubs,
+                Trump::Diamonds => Suit::Diamonds,
+                Trump::Hearts => Suit::Hearts,
+                Trump::Spades => Suit::Spades,
+                Trump::NoTrump => unreachable!(), // This arm is already handled above
+            };
+            let a_trump = a.suit == trump_suit;
+            let b_trump = b.suit == trump_suit;
+            if a_trump && !b_trump {
+                return true;
+            }
+            if b_trump && !a_trump {
+                return false;
+            }
+            // Same trump status
+            if a_trump && b_trump {
+                return a.rank > b.rank;
+            }
+            // No trump: compare only if following lead
+            let a_follows = a.suit == lead;
+            let b_follows = b.suit == lead;
+            if a_follows && !b_follows {
+                return true;
+            }
+            if b_follows && !a_follows {
+                return false;
+            }
+            if a_follows && b_follows {
+                return a.rank > b.rank;
+            }
+            false
+        }
     }
-    if b_trump && !a_trump {
-        return false;
-    }
-    // Same trump status
-    if a_trump && b_trump {
-        return a.rank > b.rank;
-    }
-    // No trump: compare only if following lead
-    let a_follows = a.suit == lead;
-    let b_follows = b.suit == lead;
-    if a_follows && !b_follows {
-        return true;
-    }
-    if b_follows && !a_follows {
-        return false;
-    }
-    if a_follows && b_follows {
-        return a.rank > b.rank;
-    }
-    false
 }
 
-#[cfg(test)]
+/// Non-panicking helper to parse card tokens (e.g., "AS", "2C") into Card instances.
+/// Returns Result<Vec<Card>, DomainError> if any token is invalid.
+pub fn try_parse_cards<I, S>(tokens: I) -> Result<Vec<Card>, DomainError>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    tokens
+        .into_iter()
+        .map(|s| s.as_ref().parse::<Card>())
+        .collect()
+}
+
+/// Helper to parse card tokens (e.g., "AS", "2C") into Card instances.
+/// Panics if a token is invalid; intended for test/fixture use only.
 pub fn parse_cards(tokens: &[&str]) -> Vec<Card> {
     tokens
         .iter()
-        .map(|s| serde_json::from_str::<Card>(&format!("\"{s}\"")).expect("valid card token"))
+        .map(|s| s.parse::<Card>().expect("valid card token"))
         .collect()
 }
 
@@ -231,11 +278,86 @@ mod tests {
     }
 
     #[test]
+    fn test_from_str_parsing() {
+        // Test successful parsing
+        assert_eq!(
+            "AS".parse::<Card>().unwrap(),
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ace
+            }
+        );
+        assert_eq!(
+            "TD".parse::<Card>().unwrap(),
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ten
+            }
+        );
+        assert_eq!(
+            "9C".parse::<Card>().unwrap(),
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Nine
+            }
+        );
+        assert_eq!(
+            "2H".parse::<Card>().unwrap(),
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two
+            }
+        );
+
+        // Test parsing failures
+        assert!("1H".parse::<Card>().is_err()); // invalid rank
+        assert!("11S".parse::<Card>().is_err()); // too long
+        assert!("Ah".parse::<Card>().is_err()); // lowercase suit
+        assert!("ZZ".parse::<Card>().is_err()); // invalid rank and suit
+        assert!("".parse::<Card>().is_err()); // empty string
+        assert!("10H".parse::<Card>().is_err()); // too long
+    }
+
+    #[test]
+    fn test_try_parse_cards() {
+        // Test successful parsing
+        let result = try_parse_cards(["AS", "TD", "9C"]);
+        assert!(result.is_ok());
+        let cards = result.unwrap();
+        assert_eq!(cards.len(), 3);
+        assert_eq!(
+            cards[0],
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ace
+            }
+        );
+        assert_eq!(
+            cards[1],
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ten
+            }
+        );
+        assert_eq!(
+            cards[2],
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Nine
+            }
+        );
+
+        // Test parsing failure
+        let result = try_parse_cards(["AS", "1H", "9C"]);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_card_beats_logic() {
         use Rank::*;
         use Suit::*;
         let lead = Hearts;
-        let trump = Spades;
+        let trump = Trump::Spades;
         let ah = Card {
             suit: Hearts,
             rank: Ace,
@@ -262,6 +384,41 @@ mod tests {
         assert!(card_beats(ts, ah, lead, trump));
         assert!(card_beats(ts, td, lead, trump));
         assert!(card_beats(ah, td, lead, trump));
+    }
+
+    #[test]
+    fn test_card_beats_no_trump() {
+        use Rank::*;
+        use Suit::*;
+        let lead = Hearts;
+        let trump = Trump::NoTrump;
+        let ah = Card {
+            suit: Hearts,
+            rank: Ace,
+        };
+        let kh = Card {
+            suit: Hearts,
+            rank: King,
+        };
+        let ts = Card {
+            suit: Spades,
+            rank: Ten,
+        };
+        let th = Card {
+            suit: Hearts,
+            rank: Ten,
+        };
+        let td = Card {
+            suit: Diamonds,
+            rank: Ten,
+        };
+
+        // In no trump, only lead suit cards can beat others
+        assert!(card_beats(ah, kh, lead, trump)); // both hearts, ace beats king
+        assert!(!card_beats(th, ah, lead, trump)); // both hearts, ten doesn't beat ace
+        assert!(!card_beats(ts, ah, lead, trump)); // spades can't beat hearts (lead suit)
+        assert!(!card_beats(ts, td, lead, trump)); // neither is lead suit
+        assert!(card_beats(ah, td, lead, trump)); // hearts beats diamonds (lead vs non-lead)
     }
 
     #[test]

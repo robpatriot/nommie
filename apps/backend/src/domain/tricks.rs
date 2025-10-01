@@ -1,4 +1,4 @@
-use crate::domain::cards::{hand_has_suit, Card};
+use crate::domain::cards::{card_beats, hand_has_suit, Card, Trump};
 use crate::domain::errors::DomainError;
 use crate::domain::rules::PLAYERS;
 use crate::domain::state::{advance_turn, GameState, Phase, PlayerId, RoundState};
@@ -93,39 +93,11 @@ pub fn resolve_current_trick(state: &RoundState) -> Option<PlayerId> {
     for i in 1..PLAYERS {
         let (_, card_i) = state.trick_plays[i];
         let (_, card_best) = state.trick_plays[best_idx];
-        let better = match trump {
-            Some(crate::domain::cards::Trump::NoTrump) => {
-                // NoTrump: only lead suit counts, no trump suit
-                if card_i.suit == card_best.suit {
-                    card_i.rank > card_best.rank
-                } else {
-                    card_i.suit == lead && card_best.suit != lead
-                }
-            }
-            Some(tr) => {
-                // Trump is a suit: convert and use card_beats
-                if let Ok(trump_suit) =
-                    std::convert::TryInto::<crate::domain::cards::Suit>::try_into(tr)
-                {
-                    crate::domain::card_beats(card_i, card_best, lead, trump_suit)
-                } else {
-                    // Shouldn't happen, but fallback to lead-suit-only
-                    if card_i.suit == card_best.suit {
-                        card_i.rank > card_best.rank
-                    } else {
-                        card_i.suit == lead && card_best.suit != lead
-                    }
-                }
-            }
-            None => {
-                // No trump chosen yet: only lead suit counts
-                if card_i.suit == card_best.suit {
-                    card_i.rank > card_best.rank
-                } else {
-                    card_i.suit == lead && card_best.suit != lead
-                }
-            }
+        let trump_for_comparison = match trump {
+            Some(tr) => tr,
+            None => Trump::NoTrump, // No trump chosen yet: treat as NoTrump
         };
+        let better = card_beats(card_i, card_best, lead, trump_for_comparison);
         if better {
             best_idx = i;
         }

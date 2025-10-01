@@ -2,10 +2,13 @@ use crate::domain::cards::{Card, Suit, Trump};
 use crate::domain::rules::PLAYERS;
 
 pub type PlayerId = u8; // 0..=3
+pub type Seat = u8; // 0..=3, positional alias for PlayerId
 
 /// Overall game progression phases.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Phase {
+    /// Game created but not yet started.
+    Init,
     /// Players place bids in fixed turn order.
     Bidding,
     /// Winning bidder selects trump suit.
@@ -16,6 +19,8 @@ pub enum Phase {
     Scoring,
     /// Round complete.
     Complete,
+    /// All rounds complete.
+    GameOver,
 }
 
 /// Per-round state that is relevant during bidding, trump, and trick play.
