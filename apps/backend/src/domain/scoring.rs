@@ -6,6 +6,20 @@ pub fn apply_round_scoring(state: &mut GameState) {
     if state.phase != Phase::Scoring {
         return;
     }
+
+    // Debug assertions for core invariants
+    let tricks_sum: u8 = state.round.tricks_won.iter().sum();
+    debug_assert_eq!(
+        tricks_sum, state.hand_size,
+        "Sum of tricks won ({}) must equal hand size ({})",
+        tricks_sum, state.hand_size
+    );
+
+    debug_assert!(
+        state.round.bids.iter().all(|bid| bid.is_some()),
+        "All players must have placed bids before scoring"
+    );
+
     for pid in 0..PLAYERS {
         let tricks = state.round.tricks_won[pid] as i16;
         let bid_opt = state.round.bids[pid];

@@ -248,9 +248,9 @@ fn resolve_trick_multiple_cases() {
 #[test]
 fn scoring_bonus_only_on_exact_bid() {
     let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
-    let mut state = make_state_with_hands(hands, 2, 0);
-    // Fake some tallies
-    state.round.tricks_won = [2, 1, 0, 0];
+    let mut state = make_state_with_hands(hands, 3, 0);
+    // Fake some tallies - sum must equal hand_size
+    state.round.tricks_won = [2, 1, 0, 0]; // Sum = 3, matches hand_size = 3
     state.round.bids = [Some(2), Some(0), Some(1), Some(0)];
     state.phase = Phase::Scoring;
     apply_round_scoring(&mut state);
@@ -543,4 +543,246 @@ fn trick_resolution_no_trump() {
     ];
     // Player 3 wins with AC (highest of lead suit)
     assert_eq!(resolve_current_trick(&r2), Some(3));
+}
+
+#[test]
+fn resolve_trick_trump_arrives_late_and_wins() {
+    // "Trump arrives late and wins": lead=Diamonds, trump=Spades; plays:
+    // 9♦, K♦, 2♠, A♦ → player who played 2♠ wins
+    let mut r = RoundState::new();
+    r.trump = Some(Trump::Spades);
+    r.trick_lead = Some(Suit::Diamonds);
+    r.trick_plays = vec![
+        (
+            0,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Nine,
+            },
+        ),
+        (
+            1,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::King,
+            },
+        ),
+        (
+            2,
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Two,
+            },
+        ),
+        (
+            3,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ace,
+            },
+        ),
+    ];
+
+    // Verify trick_lead invariant
+    assert_eq!(r.trick_plays[0].1.suit, r.trick_lead.unwrap());
+
+    // Player 2 wins with 2♠ (trump beats lead)
+    assert_eq!(resolve_current_trick(&r), Some(2));
+}
+
+#[test]
+fn resolve_trick_multiple_trumps_highest_trump_wins() {
+    // "Multiple trumps: highest trump wins": lead=Hearts, trump=Spades; plays
+    // include Q♠, 3♠, A♠ → A♠ wins
+    let mut r = RoundState::new();
+    r.trump = Some(Trump::Spades);
+    r.trick_lead = Some(Suit::Hearts);
+    r.trick_plays = vec![
+        (
+            0,
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two,
+            },
+        ),
+        (
+            1,
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Queen,
+            },
+        ),
+        (
+            2,
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Three,
+            },
+        ),
+        (
+            3,
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ace,
+            },
+        ),
+    ];
+
+    // Verify trick_lead invariant
+    assert_eq!(r.trick_plays[0].1.suit, r.trick_lead.unwrap());
+
+    // Player 3 wins with A♠ (highest trump)
+    assert_eq!(resolve_current_trick(&r), Some(3));
+}
+
+#[test]
+fn resolve_trick_notrump_only_lead_matters() {
+    // "NoTrump: only lead matters even if off-suit ranks are higher": lead=Clubs,
+    // trump=NO_TRUMP; only one clubs card vs three off-suits; the lone clubs card wins
+    let mut r = RoundState::new();
+    r.trump = Some(Trump::NoTrump);
+    r.trick_lead = Some(Suit::Clubs);
+    r.trick_plays = vec![
+        (
+            0,
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Two,
+            },
+        ),
+        (
+            1,
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ace,
+            },
+        ),
+        (
+            2,
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::King,
+            },
+        ),
+        (
+            3,
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Queen,
+            },
+        ),
+    ];
+
+    // Verify trick_lead invariant
+    assert_eq!(r.trick_plays[0].1.suit, r.trick_lead.unwrap());
+
+    // Player 0 wins with 2♣ (only clubs card, lead suit)
+    assert_eq!(resolve_current_trick(&r), Some(0));
+}
+
+#[test]
+fn scoring_exact_bid_bonus_applied_once() {
+    // "Exact-bid bonus applied once": bids [3,2,4,1], tricks [3,2,7,1] → totals [13,12,7,11]
+    let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+    let mut state = make_state_with_hands(hands, 13, 0);
+    state.round.bids = [Some(3), Some(2), Some(4), Some(1)];
+    state.round.tricks_won = [3, 2, 7, 1];
+    state.phase = Phase::Scoring;
+
+    // Verify sum-of-tricks invariant before scoring
+    let tricks_sum: u8 = state.round.tricks_won.iter().sum();
+    assert_eq!(tricks_sum, state.hand_size);
+
+    apply_round_scoring(&mut state);
+
+    // Expected: [3+10, 2+10, 7+0, 1+10] = [13, 12, 7, 11]
+    assert_eq!(state.scores_total, [13, 12, 7, 11]);
+    assert_eq!(state.phase, Phase::Complete);
+}
+
+#[test]
+fn scoring_notrump_does_not_affect_scoring_math() {
+    // "NoTrump does not affect scoring math": bids [0,5,8,0], tricks [0,5,8,0] → totals [10,15,18,10]
+    let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+    let mut state = make_state_with_hands(hands, 13, 0);
+    state.round.bids = [Some(0), Some(5), Some(8), Some(0)];
+    state.round.tricks_won = [0, 5, 8, 0];
+    state.round.trump = Some(Trump::NoTrump); // NoTrump setting
+    state.phase = Phase::Scoring;
+
+    // Verify sum-of-tricks invariant before scoring
+    let tricks_sum: u8 = state.round.tricks_won.iter().sum();
+    assert_eq!(tricks_sum, state.hand_size);
+
+    apply_round_scoring(&mut state);
+
+    // Expected: [0+10, 5+10, 8+10, 0+10] = [10, 15, 18, 10]
+    assert_eq!(state.scores_total, [10, 15, 18, 10]);
+    assert_eq!(state.phase, Phase::Complete);
+}
+
+#[test]
+fn scoring_idempotence_scoring_applies_once_only() {
+    // "Idempotence: scoring applies once only": call apply_round_scoring twice;
+    // the second call (after phase is Complete) must leave totals unchanged
+    let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+    let mut state = make_state_with_hands(hands, 5, 0);
+    state.round.bids = [Some(2), Some(1), Some(2), Some(0)];
+    state.round.tricks_won = [2, 1, 2, 0];
+    state.phase = Phase::Scoring;
+
+    // Verify sum-of-tricks invariant before scoring
+    let tricks_sum: u8 = state.round.tricks_won.iter().sum();
+    assert_eq!(tricks_sum, state.hand_size);
+
+    // First scoring call
+    apply_round_scoring(&mut state);
+    let scores_after_first = state.scores_total;
+    assert_eq!(state.phase, Phase::Complete);
+
+    // Second scoring call should be no-op
+    apply_round_scoring(&mut state);
+    assert_eq!(state.scores_total, scores_after_first);
+    assert_eq!(state.phase, Phase::Complete);
+}
+
+#[test]
+fn scoring_sum_of_tricks_invariant_violation() {
+    // Construct a state with hand_size = N and intentionally make
+    // tricks_won sum != N. Assert on the sum inside the test **before**
+    // invoking scoring. This documents the invariant; in debug builds the
+    // production debug_assert! should also catch it.
+    let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+    let mut state = make_state_with_hands(hands, 5, 0);
+    state.round.bids = [Some(2), Some(1), Some(2), Some(0)];
+    state.round.tricks_won = [3, 1, 2, 0]; // Sum = 6, but hand_size = 5
+    state.phase = Phase::Scoring;
+
+    // Verify sum-of-tricks invariant violation before scoring
+    let tricks_sum: u8 = state.round.tricks_won.iter().sum();
+    assert_ne!(
+        tricks_sum, state.hand_size,
+        "Test intentionally violates sum-of-tricks invariant"
+    );
+
+    // In debug builds, this will panic due to debug_assert!
+    // In release builds, scoring proceeds with incorrect totals
+    #[cfg(not(debug_assertions))]
+    {
+        apply_round_scoring(&mut state);
+        // Expected: [3+10, 1+10, 2+10, 0+10] = [13, 11, 12, 10] (incorrect due to invariant violation)
+        assert_eq!(state.scores_total, [13, 11, 12, 10]);
+    }
+
+    #[cfg(debug_assertions)]
+    {
+        // In debug builds, this should panic
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            apply_round_scoring(&mut state);
+        }));
+        assert!(
+            result.is_err(),
+            "debug_assert! should have triggered in debug build"
+        );
+    }
 }

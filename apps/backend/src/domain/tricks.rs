@@ -87,6 +87,14 @@ pub fn resolve_current_trick(state: &RoundState) -> Option<PlayerId> {
         return None;
     }
     let lead = state.trick_lead?;
+
+    // Debug assertion for trick_lead invariant
+    debug_assert_eq!(
+        state.trick_plays[0].1.suit, lead,
+        "First card's suit ({:?}) must match trick_lead ({:?})",
+        state.trick_plays[0].1.suit, lead
+    );
+
     let trump = state.trump;
     // Determine best play index per rules
     let mut best_idx = 0usize;

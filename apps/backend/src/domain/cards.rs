@@ -422,6 +422,82 @@ mod tests {
     }
 
     #[test]
+    fn test_card_beats_trump_beats_lead() {
+        // "Trump beats lead": lead=Hearts, trump=Spades; (2♠) must beat (A♥)
+        let two_spades = Card {
+            suit: Suit::Spades,
+            rank: Rank::Two,
+        };
+        let ace_hearts = Card {
+            suit: Suit::Hearts,
+            rank: Rank::Ace,
+        };
+        assert!(card_beats(
+            two_spades,
+            ace_hearts,
+            Suit::Hearts,
+            Trump::Spades
+        ));
+    }
+
+    #[test]
+    fn test_card_beats_notrump_lead_wins_over_offsuit() {
+        // "NoTrump: lead wins over off-suit": lead=Hearts, trump=NO_TRUMP; (A♠) must NOT beat (2♥)
+        let ace_spades = Card {
+            suit: Suit::Spades,
+            rank: Rank::Ace,
+        };
+        let two_hearts = Card {
+            suit: Suit::Hearts,
+            rank: Rank::Two,
+        };
+        assert!(!card_beats(
+            ace_spades,
+            two_hearts,
+            Suit::Hearts,
+            Trump::NoTrump
+        ));
+    }
+
+    #[test]
+    fn test_card_beats_within_lead_rank_decides() {
+        // "Within lead, rank decides": lead=Diamonds, trump=Hearts; (Q♦) beats (J♦)
+        let queen_diamonds = Card {
+            suit: Suit::Diamonds,
+            rank: Rank::Queen,
+        };
+        let jack_diamonds = Card {
+            suit: Suit::Diamonds,
+            rank: Rank::Jack,
+        };
+        assert!(card_beats(
+            queen_diamonds,
+            jack_diamonds,
+            Suit::Diamonds,
+            Trump::Hearts
+        ));
+    }
+
+    #[test]
+    fn test_card_beats_within_trump_rank_decides() {
+        // "Within trump, rank decides": lead=Clubs, trump=Spades; (A♠) beats (Q♠)
+        let ace_spades = Card {
+            suit: Suit::Spades,
+            rank: Rank::Ace,
+        };
+        let queen_spades = Card {
+            suit: Suit::Spades,
+            rank: Rank::Queen,
+        };
+        assert!(card_beats(
+            ace_spades,
+            queen_spades,
+            Suit::Clubs,
+            Trump::Spades
+        ));
+    }
+
+    #[test]
     fn test_hand_has_suit() {
         let hand = vec![
             Card {
