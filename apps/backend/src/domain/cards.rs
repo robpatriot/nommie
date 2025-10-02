@@ -96,8 +96,8 @@ impl FromStr for Card {
             return Err(DomainError::ParseCard(s.to_string()));
         }
         let mut chars = s.chars();
-        let rank_ch = chars.next().unwrap();
-        let suit_ch = chars.next().unwrap();
+        let rank_ch = chars.next().ok_or_else(|| DomainError::ParseCard(s.to_string()))?;
+        let suit_ch = chars.next().ok_or_else(|| DomainError::ParseCard(s.to_string()))?;
         // Validate via explicit match sets below; allow digit ranks (2-9)
         let rank = match rank_ch {
             '2' => Rank::Two,
@@ -244,7 +244,12 @@ where
 pub fn parse_cards(tokens: &[&str]) -> Vec<Card> {
     tokens
         .iter()
-        .map(|s| s.parse::<Card>().expect("valid card token"))
+        .map(|s| {
+            // SAFETY: This function is only used with hardcoded valid card tokens
+            // in production code (e.g., in services/games.rs for demo data)
+            #[allow(clippy::expect_used)]
+            s.parse::<Card>().expect("valid card token")
+        })
         .collect()
 }
 

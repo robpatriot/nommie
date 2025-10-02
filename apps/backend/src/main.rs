@@ -15,19 +15,28 @@ async fn main() -> std::io::Result<()> {
 
     println!("🚀 Starting Nommie Backend on http://127.0.0.1:3001");
 
-    let jwt = std::env::var("APP_JWT_SECRET").unwrap_or_else(|_| {
-        eprintln!("❌ APP_JWT_SECRET must be set");
-        std::process::exit(1);
-    });
+    let jwt = match std::env::var("APP_JWT_SECRET") {
+        Ok(jwt) => jwt,
+        Err(_) => {
+            eprintln!("❌ APP_JWT_SECRET must be set");
+            std::process::exit(1);
+        }
+    };
     let security_config = SecurityConfig::new(jwt.as_bytes());
 
     // Create application state using unified builder
-    let app_state = build_state()
+    let app_state = match build_state()
         .with_db(DbProfile::Prod)
         .with_security(security_config)
         .build()
         .await
-        .expect("Failed to build application state");
+    {
+        Ok(state) => state,
+        Err(e) => {
+            eprintln!("❌ Failed to build application state: {e}");
+            std::process::exit(1);
+        }
+    };
 
     println!("✅ Database connected (migrations handled by pnpm db:migrate)");
 

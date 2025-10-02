@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used, clippy::panic, clippy::todo, clippy::unimplemented))]
+
 pub mod auth;
 pub mod config;
 pub mod db;

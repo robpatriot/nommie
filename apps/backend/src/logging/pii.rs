@@ -4,14 +4,23 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 // Compiled regex patterns for PII redaction
-static EMAIL_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{1,}\b").unwrap());
+static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    // SAFETY: This regex pattern is known to be valid and compile successfully
+    #[allow(clippy::unwrap_used)]
+    Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{1,}\b").unwrap()
+});
 
-static BASE64_TOKEN_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\b[A-Za-z0-9+/]{16,}={0,2}\b").unwrap());
+static BASE64_TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    // SAFETY: This regex pattern is known to be valid and compile successfully
+    #[allow(clippy::unwrap_used)]
+    Regex::new(r"\b[A-Za-z0-9+/]{16,}={0,2}\b").unwrap()
+});
 
-static HEX_TOKEN_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\b[A-Fa-f0-9]{16,}\b").unwrap());
+static HEX_TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    // SAFETY: This regex pattern is known to be valid and compile successfully
+    #[allow(clippy::unwrap_used)]
+    Regex::new(r"\b[A-Fa-f0-9]{16,}\b").unwrap()
+});
 
 /// Redacts sensitive information from a string.
 ///

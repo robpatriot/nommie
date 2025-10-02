@@ -47,7 +47,9 @@ pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), D
         let mut winner: Option<PlayerId> = None;
         for i in 0..PLAYERS as u8 {
             let pid = ((start as u16 + i as u16) % PLAYERS as u16) as u8;
-            let b = state.round.bids[pid as usize].unwrap();
+            let b = state.round.bids[pid as usize].ok_or_else(|| {
+                DomainError::Other("Bid should be present after checking all bids are set".to_string())
+            })?;
             match best_bid {
                 None => {
                     best_bid = Some(b);
