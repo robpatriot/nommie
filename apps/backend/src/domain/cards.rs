@@ -239,19 +239,6 @@ where
         .collect()
 }
 
-/// Helper to parse card tokens (e.g., "AS", "2C") into Card instances.
-/// Panics if a token is invalid; intended for test/fixture use only.
-pub fn parse_cards(tokens: &[&str]) -> Vec<Card> {
-    tokens
-        .iter()
-        .map(|s| {
-            // SAFETY: This function is only used with hardcoded valid card tokens
-            // in production code (e.g., in services/games.rs for demo data)
-            #[allow(clippy::expect_used)]
-            s.parse::<Card>().expect("valid card token")
-        })
-        .collect()
-}
 
 #[cfg(test)]
 mod tests {

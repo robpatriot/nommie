@@ -3,6 +3,7 @@
 pub mod bidding;
 pub mod cards;
 pub mod errors;
+pub mod fixtures;
 pub mod rules;
 pub mod scoring;
 pub mod snapshot;

@@ -2,7 +2,7 @@
 
 use sea_orm::ConnectionTrait;
 
-use crate::domain::cards::parse_cards;
+use crate::domain::fixtures::CardFixtures;
 use crate::domain::state::{GameState, Phase, RoundState};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -27,10 +27,10 @@ pub async fn load_game_state(
 
     // Build a minimal bidding-phase state for demonstration
     let hands = [
-        parse_cards(&["AC", "2C", "3C", "4C", "5C"]),
-        parse_cards(&["AD", "2D", "3D", "4D", "5D"]),
-        parse_cards(&["AH", "2H", "3H", "4H", "5H"]),
-        parse_cards(&["AS", "2S", "3S", "4S", "5S"]),
+        CardFixtures::parse_hardcoded(&["AC", "2C", "3C", "4C", "5C"]),
+        CardFixtures::parse_hardcoded(&["AD", "2D", "3D", "4D", "5D"]),
+        CardFixtures::parse_hardcoded(&["AH", "2H", "3H", "4H", "5H"]),
+        CardFixtures::parse_hardcoded(&["AS", "2S", "3S", "4S", "5S"]),
     ];
 
     Ok(GameState {

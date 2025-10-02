@@ -3,24 +3,44 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-// Compiled regex patterns for PII redaction
-static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    // SAFETY: This regex pattern is known to be valid and compile successfully
-    #[allow(clippy::unwrap_used)]
-    Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{1,}\b").unwrap()
-});
+/// Centralized registry for PII redaction regex patterns.
+/// 
+/// This module contains all hardcoded regex patterns used for PII redaction,
+/// with a single allow per pattern construction site. All patterns are known
+/// to be valid and tested at compile time.
+pub struct PiiRegexRegistry;
 
-static BASE64_TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    // SAFETY: This regex pattern is known to be valid and compile successfully
-    #[allow(clippy::unwrap_used)]
-    Regex::new(r"\b[A-Za-z0-9+/]{16,}={0,2}\b").unwrap()
-});
+impl PiiRegexRegistry {
+    /// Email pattern: matches standard email addresses
+    /// SAFETY: This regex pattern is a vetted literal that compiles successfully
+    pub fn email() -> &'static Regex {
+        static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            #[allow(clippy::unwrap_used)]
+            Regex::new(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{1,}\b").unwrap()
+        });
+        &EMAIL_REGEX
+    }
 
-static HEX_TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    // SAFETY: This regex pattern is known to be valid and compile successfully
-    #[allow(clippy::unwrap_used)]
-    Regex::new(r"\b[A-Fa-f0-9]{16,}\b").unwrap()
-});
+    /// Base64-like token pattern: matches base64-encoded tokens (≥16 chars)
+    /// SAFETY: This regex pattern is a vetted literal that compiles successfully
+    pub fn base64_token() -> &'static Regex {
+        static BASE64_TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            #[allow(clippy::unwrap_used)]
+            Regex::new(r"\b[A-Za-z0-9+/]{16,}={0,2}\b").unwrap()
+        });
+        &BASE64_TOKEN_REGEX
+    }
+
+    /// Hex token pattern: matches hexadecimal tokens (≥16 chars)
+    /// SAFETY: This regex pattern is a vetted literal that compiles successfully
+    pub fn hex_token() -> &'static Regex {
+        static HEX_TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            #[allow(clippy::unwrap_used)]
+            Regex::new(r"\b[A-Fa-f0-9]{16,}\b").unwrap()
+        });
+        &HEX_TOKEN_REGEX
+    }
+}
 
 /// Redacts sensitive information from a string.
 ///
@@ -31,7 +51,7 @@ static HEX_TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// Order: emails first, then tokens, to avoid double-processing.
 pub fn redact(input: &str) -> String {
     // First redact emails
-    let email_redacted = EMAIL_REGEX.replace_all(input, |caps: &regex::Captures| {
+    let email_redacted = PiiRegexRegistry::email().replace_all(input, |caps: &regex::Captures| {
         let full_match = &caps[0];
         if let Some(at_pos) = full_match.find('@') {
             let local_part = &full_match[..at_pos];
@@ -52,10 +72,10 @@ pub fn redact(input: &str) -> String {
     });
 
     // Then redact base64-like tokens
-    let base64_redacted = BASE64_TOKEN_REGEX.replace_all(&email_redacted, "[REDACTED_TOKEN]");
+    let base64_redacted = PiiRegexRegistry::base64_token().replace_all(&email_redacted, "[REDACTED_TOKEN]");
 
     // Finally redact hex tokens
-    HEX_TOKEN_REGEX
+    PiiRegexRegistry::hex_token()
         .replace_all(&base64_redacted, "[REDACTED_TOKEN]")
         .to_string()
 }

@@ -1,7 +1,8 @@
 //! Snapshot API tests covering all game phases.
 
 use backend::domain::bidding::{place_bid, set_trump, Bid};
-use backend::domain::cards::{parse_cards, Card, Rank, Suit, Trump};
+use backend::domain::cards::{Card, Rank, Suit, Trump};
+use backend::domain::fixtures::CardFixtures;
 use backend::domain::rules::PLAYERS;
 use backend::domain::snapshot::{snapshot, PhaseSnapshot};
 use backend::domain::state::{GameState, Phase, RoundState};
@@ -67,16 +68,16 @@ fn init_snapshot_smoke() {
 fn bidding_snapshot_legals() {
     // Round 1: dealer=0, turn_start=1 (left-of-dealer), hand_size=13
     let hands = [
-        parse_cards(&[
+        CardFixtures::parse_hardcoded(&[
             "AC", "2C", "3C", "4C", "5C", "6C", "7C", "8C", "9C", "TC", "JC", "QC", "KC",
         ]),
-        parse_cards(&[
+        CardFixtures::parse_hardcoded(&[
             "AD", "2D", "3D", "4D", "5D", "6D", "7D", "8D", "9D", "TD", "JD", "QD", "KD",
         ]),
-        parse_cards(&[
+        CardFixtures::parse_hardcoded(&[
             "AH", "2H", "3H", "4H", "5H", "6H", "7H", "8H", "9H", "TH", "JH", "QH", "KH",
         ]),
-        parse_cards(&[
+        CardFixtures::parse_hardcoded(&[
             "AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "TS", "JS", "QS", "KS",
         ]),
     ];
@@ -99,10 +100,10 @@ fn bidding_snapshot_legals() {
 fn trump_select_snapshot() {
     // Start round and complete bidding
     let hands = [
-        parse_cards(&["AC", "2C", "3C"]),
-        parse_cards(&["AD", "2D", "3D"]),
-        parse_cards(&["AH", "2H", "3H"]),
-        parse_cards(&["AS", "2S", "3S"]),
+        CardFixtures::parse_hardcoded(&["AC", "2C", "3C"]),
+        CardFixtures::parse_hardcoded(&["AD", "2D", "3D"]),
+        CardFixtures::parse_hardcoded(&["AH", "2H", "3H"]),
+        CardFixtures::parse_hardcoded(&["AS", "2S", "3S"]),
     ];
     let mut state = start_round(1, hands);
 
@@ -135,10 +136,10 @@ fn trump_select_snapshot() {
 fn trick_snapshot_legals() {
     // Start round, complete bidding, select trump, play some cards
     let hands = [
-        parse_cards(&["AC", "2C", "3C"]),
-        parse_cards(&["AD", "2D", "3D"]),
-        parse_cards(&["AH", "2H", "3H"]),
-        parse_cards(&["AS", "2S", "3S"]),
+        CardFixtures::parse_hardcoded(&["AC", "2C", "3C"]),
+        CardFixtures::parse_hardcoded(&["AD", "2D", "3D"]),
+        CardFixtures::parse_hardcoded(&["AH", "2H", "3H"]),
+        CardFixtures::parse_hardcoded(&["AS", "2S", "3S"]),
     ];
     let mut state = start_round(1, hands);
 
@@ -218,10 +219,10 @@ fn trick_snapshot_legals() {
 fn scoring_snapshot() {
     // Complete a full round with 2 cards per player
     let hands = [
-        parse_cards(&["AC", "2C"]),
-        parse_cards(&["AD", "2D"]),
-        parse_cards(&["AH", "2H"]),
-        parse_cards(&["AS", "2S"]),
+        CardFixtures::parse_hardcoded(&["AC", "2C"]),
+        CardFixtures::parse_hardcoded(&["AD", "2D"]),
+        CardFixtures::parse_hardcoded(&["AH", "2H"]),
+        CardFixtures::parse_hardcoded(&["AS", "2S"]),
     ];
     let mut state = start_round(1, hands);
 
@@ -334,10 +335,10 @@ fn scoring_snapshot() {
 fn complete_and_gameover_snapshots() {
     // Create a state in Complete phase
     let hands = [
-        parse_cards(&["AC"]),
-        parse_cards(&["AD"]),
-        parse_cards(&["AH"]),
-        parse_cards(&["AS"]),
+        CardFixtures::parse_hardcoded(&["AC"]),
+        CardFixtures::parse_hardcoded(&["AD"]),
+        CardFixtures::parse_hardcoded(&["AH"]),
+        CardFixtures::parse_hardcoded(&["AS"]),
     ];
     let mut state = start_round(1, hands);
 

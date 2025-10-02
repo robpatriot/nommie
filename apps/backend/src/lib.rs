@@ -36,7 +36,6 @@ pub use middleware::structured_logger::StructuredLogger;
 pub use middleware::trace_span::TraceSpan;
 pub use state::app_state::AppState;
 pub use state::security_config::SecurityConfig;
-
 // Auto-initialize logging for unit tests
 #[cfg(test)]
 #[ctor::ctor]
