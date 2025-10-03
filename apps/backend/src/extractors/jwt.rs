@@ -4,7 +4,7 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 use crate::state::app_state::AppState;
-use crate::AppError;
+use crate::error::AppError;
 
 /// Generic JWT claims that can be validated against any claims type
 #[derive(Debug, Serialize, Deserialize, Clone)]

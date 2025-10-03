@@ -1,6 +1,6 @@
 //! SeaORM -> DomainError translation helpers.
 //!
-//! Adapters should convert `sea_orm::DbErr` into `crate::errors::DomainError`
+//! Adapters should convert `sea_orm::DbErr` into `crate::errors::domain::DomainError`
 //! here, and higher layers can then map `DomainError` to `AppError` via `From`.
 
 use tracing::{error, warn};

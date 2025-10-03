@@ -10,6 +10,8 @@ pub enum DomainError {
     PhaseMismatch,
     ParseCard(String),
     InvalidTrumpConversion,
+    InvalidSeat,
+    PlayerNotFound,
     Other(String),
 }
 
@@ -23,6 +25,8 @@ impl Display for DomainError {
             DomainError::PhaseMismatch => write!(f, "phase mismatch"),
             DomainError::ParseCard(s) => write!(f, "parse card: {s}"),
             DomainError::InvalidTrumpConversion => write!(f, "cannot convert NoTrump to Suit"),
+            DomainError::InvalidSeat => write!(f, "invalid seat"),
+            DomainError::PlayerNotFound => write!(f, "player not found"),
             DomainError::Other(s) => write!(f, "domain error: {s}"),
         }
     }

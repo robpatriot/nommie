@@ -276,8 +276,8 @@ impl From<sea_orm::DbErr> for AppError {
     }
 }
 
-impl From<crate::errors::DomainError> for AppError {
-    fn from(err: crate::errors::DomainError) -> Self {
+impl From<crate::errors::domain::DomainError> for AppError {
+    fn from(err: crate::errors::domain::DomainError) -> Self {
         use crate::errors::domain::{ConflictKind, InfraErrorKind, NotFoundKind};
         use crate::errors::ErrorCode;
 
@@ -287,12 +287,12 @@ impl From<crate::errors::DomainError> for AppError {
         // - Both map to HTTP 500 but with distinct error codes for better debugging
 
         match err {
-            crate::errors::DomainError::Validation(detail) => AppError::Validation {
+            crate::errors::domain::DomainError::Validation(detail) => AppError::Validation {
                 code: ErrorCode::ValidationError,
                 detail,
                 status: StatusCode::UNPROCESSABLE_ENTITY,
             },
-            crate::errors::DomainError::Conflict(kind, detail) => {
+            crate::errors::domain::DomainError::Conflict(kind, detail) => {
                 let code = match kind {
                     ConflictKind::SeatTaken => ErrorCode::SeatTaken,
                     ConflictKind::UniqueEmail => ErrorCode::UniqueEmail,
@@ -302,15 +302,16 @@ impl From<crate::errors::DomainError> for AppError {
                 };
                 AppError::Conflict { code, detail }
             }
-            crate::errors::DomainError::NotFound(kind, detail) => {
+            crate::errors::domain::DomainError::NotFound(kind, detail) => {
                 let code = match kind {
                     NotFoundKind::User => ErrorCode::UserNotFound,
                     NotFoundKind::Game => ErrorCode::GameNotFound,
+                    NotFoundKind::Other(ref s) if s == "Player" => ErrorCode::PlayerNotFound,
                     NotFoundKind::Other(_) => ErrorCode::NotFound,
                 };
                 AppError::NotFound { code, detail }
             }
-            crate::errors::DomainError::Infra(kind, detail) => match kind {
+            crate::errors::domain::DomainError::Infra(kind, detail) => match kind {
                 InfraErrorKind::Timeout => AppError::timeout(ErrorCode::DbTimeout, detail),
                 InfraErrorKind::DbUnavailable => AppError::DbUnavailable,
                 InfraErrorKind::DataCorruption => AppError::Internal {

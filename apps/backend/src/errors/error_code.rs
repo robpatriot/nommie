@@ -40,6 +40,8 @@ pub enum ErrorCode {
     InvalidEmail,
     /// Invalid Google sub provided
     InvalidGoogleSub,
+    /// Invalid seat number
+    InvalidSeat,
     /// General validation error
     ValidationError,
     /// General bad request error
@@ -50,6 +52,8 @@ pub enum ErrorCode {
     GameNotFound,
     /// User not found
     UserNotFound,
+    /// Player not found
+    PlayerNotFound,
     /// General not found error
     NotFound,
 
@@ -121,12 +125,14 @@ impl ErrorCode {
             Self::InvalidGameId => "INVALID_GAME_ID",
             Self::InvalidEmail => "INVALID_EMAIL",
             Self::InvalidGoogleSub => "INVALID_GOOGLE_SUB",
+            Self::InvalidSeat => "INVALID_SEAT",
             Self::ValidationError => "VALIDATION_ERROR",
             Self::BadRequest => "BAD_REQUEST",
 
             // Resource Not Found
             Self::GameNotFound => "GAME_NOT_FOUND",
             Self::UserNotFound => "USER_NOT_FOUND",
+            Self::PlayerNotFound => "PLAYER_NOT_FOUND",
             Self::NotFound => "NOT_FOUND",
 
             // Business Logic Conflicts
@@ -196,9 +202,11 @@ mod tests {
         assert_eq!(ErrorCode::InvalidGameId.as_str(), "INVALID_GAME_ID");
         assert_eq!(ErrorCode::InvalidEmail.as_str(), "INVALID_EMAIL");
         assert_eq!(ErrorCode::InvalidGoogleSub.as_str(), "INVALID_GOOGLE_SUB");
+        assert_eq!(ErrorCode::InvalidSeat.as_str(), "INVALID_SEAT");
         assert_eq!(ErrorCode::ValidationError.as_str(), "VALIDATION_ERROR");
         assert_eq!(ErrorCode::BadRequest.as_str(), "BAD_REQUEST");
         assert_eq!(ErrorCode::GameNotFound.as_str(), "GAME_NOT_FOUND");
+        assert_eq!(ErrorCode::PlayerNotFound.as_str(), "PLAYER_NOT_FOUND");
         assert_eq!(ErrorCode::NotFound.as_str(), "NOT_FOUND");
         assert_eq!(ErrorCode::GoogleSubMismatch.as_str(), "GOOGLE_SUB_MISMATCH");
         assert_eq!(ErrorCode::JoinCodeConflict.as_str(), "JOIN_CODE_CONFLICT");

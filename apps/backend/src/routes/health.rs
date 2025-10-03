@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse};
 
-use crate::AppError;
+use crate::error::AppError;
 
 async fn root() -> Result<HttpResponse, AppError> {
     Ok(HttpResponse::Ok().body("Hello from Nommie Backend! 🃏"))

@@ -3,7 +3,7 @@ use actix_web::http::header;
 use actix_web::{FromRequest, HttpRequest};
 use serde::{Deserialize, Serialize};
 
-use crate::AppError;
+use crate::error::AppError;
 
 /// Authentication token extracted from the Authorization header
 #[derive(Debug, Serialize, Deserialize, Clone)]

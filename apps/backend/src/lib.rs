@@ -1,5 +1,6 @@
 #![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used, clippy::panic, clippy::todo, clippy::unimplemented))]
 
+pub mod adapters;
 pub mod auth;
 pub mod config;
 pub mod db;
@@ -11,6 +12,7 @@ pub mod extractors;
 pub mod infra;
 pub mod logging;
 pub mod middleware;
+pub mod repos;
 pub mod routes;
 pub mod services;
 pub mod state;
