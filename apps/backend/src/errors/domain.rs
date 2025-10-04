@@ -23,6 +23,8 @@ pub enum InfraErrorKind {
 pub enum NotFoundKind {
     User,
     Game,
+    Player,
+    Membership,
     Other(String),
 }
 

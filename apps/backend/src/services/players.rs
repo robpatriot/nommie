@@ -1,22 +1,20 @@
 //! Player domain service.
 
+use crate::db::DbConn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::repos::players::PlayerRepo;
 
 /// Player domain service.
-pub struct PlayerService<R: PlayerRepo> {
-    repo: R,
-}
+pub struct PlayerService;
 
-impl<R: PlayerRepo> PlayerService<R> {
-    pub fn new(repo: R) -> Self {
-        Self { repo }
-    }
+impl PlayerService {
+    pub fn new() -> Self { Self }
 
     /// Get the display name of a player in a game by seat.
     /// 
     /// # Arguments
+    /// * `conn` - Database connection
     /// * `game_id` - The game identifier
     /// * `seat` - The seat number (0-3)
     /// 
@@ -25,6 +23,8 @@ impl<R: PlayerRepo> PlayerService<R> {
     /// * `Err(AppError)` - If seat is invalid, player not found, or DB error
     pub async fn get_display_name_by_seat(
         &self,
+        repo: &dyn PlayerRepo,
+        conn: &dyn DbConn,
         game_id: i64,
         seat: u8,
     ) -> Result<String, AppError> {
@@ -38,7 +38,11 @@ impl<R: PlayerRepo> PlayerService<R> {
         }
 
         // Call repository and map DomainError to AppError
-        let display_name = self.repo.get_display_name_by_seat(game_id, seat).await?;
+        let display_name = repo.get_display_name_by_seat(conn, game_id, seat).await?;
         Ok(display_name)
     }
+}
+
+impl Default for PlayerService {
+    fn default() -> Self { Self::new() }
 }

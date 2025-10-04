@@ -2,11 +2,9 @@
 
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 
-use crate::adapters::players_sea::PlayerRepoSea;
 use crate::db::txn::with_txn;
 use crate::error::AppError;
 use crate::extractors::game_id::GameId;
-use crate::services::games::load_game_state;
 use crate::services::players::PlayerService;
 use crate::state::app_state::AppState;
 
@@ -25,8 +23,10 @@ async fn get_snapshot(
     // Load game state and produce snapshot within a transaction
     let snapshot = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            // Load the game state (currently a stub; will load from DB once persistence is implemented)
-            let state = load_game_state(id, txn).await?;
+            // Create game service with repository
+            // For now, we'll use a placeholder since games repo isn't fully implemented yet
+            // TODO: Implement proper game repository wiring
+            let state = crate::services::games::load_game_state(id, txn).await?;
 
             // Produce the snapshot via the domain function
             let snap = crate::domain::snapshot::snapshot(&state);
@@ -50,13 +50,11 @@ async fn get_player_display_name(
     let (game_id, seat) = path.into_inner();
 
     // Get display name within a transaction
+    let players_repo = app_state.players_repo.clone();
     let display_name = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            // Create SeaORM adapter with the transaction
-            let repo = PlayerRepoSea::new(txn);
-            let service = PlayerService::new(repo);
-            
-            service.get_display_name_by_seat(game_id, seat).await
+            let service = PlayerService::new();
+            service.get_display_name_by_seat(players_repo.as_ref(), txn, game_id, seat).await
         })
     })
     .await?;

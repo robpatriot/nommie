@@ -1,39 +1,56 @@
 //! SeaORM adapter for player repository.
 
 use async_trait::async_trait;
-use sea_orm::{ConnectionTrait, EntityTrait, QueryFilter, ColumnTrait};
+use sea_orm::{EntityTrait, QueryFilter, ColumnTrait};
 
-use crate::errors::domain::DomainError;
+use crate::db::{DbConn, as_database_connection, as_database_transaction};
+use crate::errors::domain::{DomainError, InfraErrorKind, NotFoundKind};
 use crate::entities::{game_players, users};
 use crate::repos::players::PlayerRepo;
 
 /// SeaORM implementation of PlayerRepo.
-pub struct PlayerRepoSea<'a, C: ConnectionTrait + Send + Sync> {
-    conn: &'a C,
-}
+#[derive(Debug, Default)]
+pub struct PlayerRepoSea;
 
-impl<'a, C: ConnectionTrait + Send + Sync> PlayerRepoSea<'a, C> {
-    pub fn new(conn: &'a C) -> Self {
-        Self { conn }
+impl PlayerRepoSea {
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
-impl<'a, C: ConnectionTrait + Send + Sync> PlayerRepo for PlayerRepoSea<'a, C> {
+impl PlayerRepo for PlayerRepoSea {
     async fn get_display_name_by_seat(
         &self,
+        conn: &dyn DbConn,
         game_id: i64,
         seat: u8,
     ) -> Result<String, DomainError> {
         // Find game_players record by game_id and turn_order (which maps to seat)
-        let game_player = game_players::Entity::find()
-            .filter(game_players::Column::GameId.eq(game_id))
-            .filter(game_players::Column::TurnOrder.eq(seat as i32))
-            .find_also_related(users::Entity)
-            .one(self.conn)
-            .await
+        let game_player = {
+            if let Some(txn) = as_database_transaction(conn) {
+                game_players::Entity::find()
+                    .filter(game_players::Column::GameId.eq(game_id))
+                    .filter(game_players::Column::TurnOrder.eq(seat as i32))
+                    .find_also_related(users::Entity)
+                    .one(txn)
+                    .await
+            } else if let Some(db) = as_database_connection(conn) {
+                game_players::Entity::find()
+                    .filter(game_players::Column::GameId.eq(game_id))
+                    .filter(game_players::Column::TurnOrder.eq(seat as i32))
+                    .find_also_related(users::Entity)
+                    .one(db)
+                    .await
+            } else {
+                return Err(DomainError::infra(
+                    InfraErrorKind::Other("Connection type".to_string()),
+                    "Unsupported DbConn type for SeaORM".to_string(),
+                ));
+            }
+        }
             .map_err(|e| DomainError::infra(
-                crate::errors::domain::InfraErrorKind::Other("Database error".to_string()),
+                InfraErrorKind::Other("Database error".to_string()),
                 format!("Database error: {}", e)
             ))?;
 
@@ -47,14 +64,14 @@ impl<'a, C: ConnectionTrait + Send + Sync> PlayerRepo for PlayerRepoSea<'a, C> {
             Some((_game_player, None)) => {
                 // Game player exists but user is missing (data corruption)
                 Err(DomainError::infra(
-                    crate::errors::domain::InfraErrorKind::DataCorruption,
+                    InfraErrorKind::DataCorruption,
                     "User not found for game player"
                 ))
             }
             None => {
                 // No game player found for this seat
                 Err(DomainError::not_found(
-                    crate::errors::domain::NotFoundKind::Other("Player".to_string()),
+                    NotFoundKind::Player,
                     "Player not found at seat"
                 ))
             }

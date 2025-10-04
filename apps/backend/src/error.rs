@@ -306,6 +306,8 @@ impl From<crate::errors::domain::DomainError> for AppError {
                 let code = match kind {
                     NotFoundKind::User => ErrorCode::UserNotFound,
                     NotFoundKind::Game => ErrorCode::GameNotFound,
+                    NotFoundKind::Player => ErrorCode::PlayerNotFound,
+                    NotFoundKind::Membership => ErrorCode::NotAMember,
                     NotFoundKind::Other(ref s) if s == "Player" => ErrorCode::PlayerNotFound,
                     NotFoundKind::Other(_) => ErrorCode::NotFound,
                 };

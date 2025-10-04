@@ -28,8 +28,8 @@ async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
             create_test_game_player(txn, game_id, user_id, 0).await?;
 
             // Test the adapter
-            let repo = PlayerRepoSea::new(txn);
-            let result = repo.get_display_name_by_seat(game_id, 0).await?;
+            let repo = PlayerRepoSea::new();
+            let result = repo.get_display_name_by_seat(txn, game_id, 0).await?;
 
             assert_eq!(result, "AliceUser");
 
@@ -58,8 +58,8 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
             create_test_game_player(txn, game_id, user_id, 1).await?;
 
             // Test the adapter
-            let repo = PlayerRepoSea::new(txn);
-            let result = repo.get_display_name_by_seat(game_id, 1).await?;
+            let repo = PlayerRepoSea::new();
+            let result = repo.get_display_name_by_seat(txn, game_id, 1).await?;
 
             assert_eq!(result, "bob");
 
@@ -86,8 +86,8 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
             let game_id = create_test_game(txn).await?;
 
             // Test the adapter
-            let repo = PlayerRepoSea::new(txn);
-            let result = repo.get_display_name_by_seat(game_id, 0).await;
+            let repo = PlayerRepoSea::new();
+            let result = repo.get_display_name_by_seat(txn, game_id, 0).await;
 
             match result {
                 Err(DomainError::NotFound(_, _)) => {
@@ -129,8 +129,8 @@ async fn test_get_display_name_by_seat_missing_user() -> Result<(), AppError> {
             users::Entity::delete_by_id(user_id).exec(txn).await?;
 
             // Test the adapter
-            let repo = PlayerRepoSea::new(txn);
-            let result = repo.get_display_name_by_seat(game_id, 0).await;
+            let repo = PlayerRepoSea::new();
+            let result = repo.get_display_name_by_seat(txn, game_id, 0).await;
 
             match result {
                 Err(DomainError::Infra(_, msg)) => {

@@ -8,7 +8,7 @@ use crate::db::txn::with_txn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::extractors::ValidatedJson;
-use crate::services::users::ensure_user;
+use crate::services::users::UserService;
 use crate::state::app_state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -55,7 +55,11 @@ async fn login(
     // Own the transaction boundary here and pass a borrowed txn to the service
     let user = with_txn(Some(&http_req), &app_state, |txn| {
         // Box the async block so its lifetime is tied to `txn` (no 'static)
-        Box::pin(async move { ensure_user(email, name, google_sub, txn).await })
+        let users_repo = app_state.users_repo.clone();
+        Box::pin(async move {
+            let service = UserService::new();
+            service.ensure_user(users_repo.as_ref(), txn, &email, name.as_deref(), &google_sub).await
+        })
     })
     .await?;
 

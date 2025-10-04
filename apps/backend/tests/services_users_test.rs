@@ -9,7 +9,7 @@ use backend::entities::user_credentials;
 use backend::error::AppError;
 use backend::errors::ErrorCode;
 use backend::infra::state::build_state;
-use backend::services::users::ensure_user;
+use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serial_test::serial;
@@ -23,16 +23,19 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
         .await
         .expect("build test state with DB");
 
+    let users_repo = state.users_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // First call - should create a new user
             let test_email = unique_email("alice");
             let test_google_sub = unique_str("google-sub");
-            let user1 = ensure_user(
-                test_email.clone(),
-                Some("Alice".to_string()),
-                test_google_sub.clone(),
+            let service = UserService::new();
+            let user1 = service.ensure_user(
+                users_repo.as_ref(),
                 txn,
+                &test_email,
+                Some("Alice"),
+                &test_google_sub,
             )
             .await?;
 
@@ -42,11 +45,12 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
             assert!(user1.id > 0); // ID should be a positive number
 
             // Second call with same email but different name - should return same user
-            let user2 = ensure_user(
-                test_email.clone(),
-                Some("Alice Smith".to_string()), // Different name
-                test_google_sub.clone(),         // Same google_sub
+            let user2 = service.ensure_user(
+                users_repo.as_ref(),
                 txn,
+                &test_email,
+                Some("Alice Smith"), // Different name
+                &test_google_sub,    // Same google_sub
             )
             .await?;
 
@@ -104,18 +108,21 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
         .await
         .expect("build test state with DB");
 
+    let users_repo = state.users_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let test_email = unique_email("bob");
             let original_google_sub = unique_str("google-sub-original");
             let different_google_sub = unique_str("google-sub-different");
+            let service = UserService::new();
 
             // Scenario 1: First login (no user/credential) → creates user + credentials, sets google_sub
-            let user1 = ensure_user(
-                test_email.clone(),
-                Some("Bob".to_string()),
-                original_google_sub.clone(),
+            let user1 = service.ensure_user(
+                users_repo.as_ref(),
                 txn,
+                &test_email,
+                Some("Bob"),
+                &original_google_sub,
             )
             .await?;
 
@@ -141,11 +148,12 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
             );
 
             // Scenario 2: Repeat login (same email, same google_sub) → updates last_login, succeeds
-            let user2 = ensure_user(
-                test_email.clone(),
-                Some("Bob Smith".to_string()), // Different name
-                original_google_sub.clone(),   // Same google_sub
+            let user2 = service.ensure_user(
+                users_repo.as_ref(),
                 txn,
+                &test_email,
+                Some("Bob Smith"), // Different name
+                &original_google_sub, // Same google_sub
             )
             .await?;
 
@@ -165,11 +173,12 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
             );
 
             // Scenario 3: Repeat login (same email, credential has different google_sub) → expect 409 with GOOGLE_SUB_MISMATCH
-            let error_result = ensure_user(
-                test_email.clone(),
-                Some("Bob".to_string()),
-                different_google_sub.clone(),
+            let error_result = service.ensure_user(
+                users_repo.as_ref(),
                 txn,
+                &test_email,
+                Some("Bob"),
+                &different_google_sub,
             )
             .await;
 
@@ -214,10 +223,12 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
         .await
         .expect("build test state with DB");
 
+    let users_repo = state.users_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let test_email = unique_email("charlie");
             let google_sub = unique_str("google-sub");
+            let service = UserService::new();
 
             // Create a user with NULL google_sub by directly inserting into the database
             // This simulates a legacy user who doesn't have a google_sub set yet
@@ -255,11 +266,12 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
             })?;
 
             // Scenario 4: Repeat login (email exists, google_sub NULL) → sets google_sub to incoming, succeeds
-            let updated_user = ensure_user(
-                test_email.clone(),
-                Some("Charlie Brown".to_string()), // Different name
-                google_sub.clone(),
+            let updated_user = service.ensure_user(
+                users_repo.as_ref(),
                 txn,
+                &test_email,
+                Some("Charlie Brown"), // Different name
+                &google_sub,
             )
             .await?;
 

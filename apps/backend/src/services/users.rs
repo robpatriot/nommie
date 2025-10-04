@@ -1,14 +1,10 @@
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, NotSet, QueryFilter, Set,
-};
 use tracing::{debug, info, warn};
-use users::Model as User;
 
-use crate::entities::{user_credentials, users};
+use crate::db::DbConn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
-use crate::infra::db_errors::map_db_err;
 use crate::logging::pii::Redacted;
+use crate::repos::users::{User, UserRepo};
 
 /// Redacts a google_sub value for logging purposes.
 /// Shows only the first 4 characters followed by asterisks.
@@ -20,133 +16,119 @@ fn redact_google_sub(google_sub: &str) -> String {
     }
 }
 
-/// Ensures a user exists for Google OAuth, creating one if necessary.
-/// This function is idempotent - calling it multiple times with the same email
-/// will return the same user without creating duplicates.
-/// Returns the User that was found or created.
-pub async fn ensure_user(
-    email: String,
-    name: Option<String>,
-    google_sub: String,
-    conn: &impl ConnectionTrait,
-) -> Result<User, AppError> {
-    // Look up existing user credentials by email
-    let existing_credential = user_credentials::Entity::find()
-        .filter(user_credentials::Column::Email.eq(&email))
-        .one(conn)
-        .await
-        .map_err(|e| AppError::from(map_db_err(e)))?;
+/// User domain service.
+pub struct UserService;
 
-    match existing_credential {
-        Some(credential) => {
-            // User exists, check for google_sub mismatch
-            if let Some(existing_google_sub) = &credential.google_sub {
-                if existing_google_sub != &google_sub {
-                    warn!(
-                        user_id = credential.user_id,
-                        email = %Redacted(&email),
-                        incoming_google_sub = %redact_google_sub(&google_sub),
-                        existing_google_sub = %redact_google_sub(existing_google_sub),
-                        "Google sub mismatch detected"
-                    );
-                    return Err(AppError::conflict(
-                        ErrorCode::GoogleSubMismatch,
-                        "This email is already linked to a different Google account. Please use the original Google account or contact support.".to_string(),
-                    ));
+impl UserService {
+    pub fn new() -> Self { Self }
+
+    /// Ensures a user exists for Google OAuth, creating one if necessary.
+    /// This function is idempotent - calling it multiple times with the same email
+    /// will return the same user without creating duplicates.
+    /// Returns the User that was found or created.
+    pub async fn ensure_user(
+        &self,
+        repo: &dyn UserRepo,
+        conn: &dyn DbConn,
+        email: &str,
+        name: Option<&str>,
+        google_sub: &str,
+    ) -> Result<User, AppError> {
+        // Look up existing user credentials by email
+        let existing_credential = repo.find_credentials_by_email(conn, email).await?;
+
+        match existing_credential {
+            Some(credential) => {
+                // User exists, check for google_sub mismatch
+                if let Some(existing_google_sub) = &credential.google_sub {
+                    if existing_google_sub != google_sub {
+                        warn!(
+                            user_id = credential.user_id,
+                            email = %Redacted(email),
+                            incoming_google_sub = %redact_google_sub(google_sub),
+                            existing_google_sub = %redact_google_sub(existing_google_sub),
+                            "Google sub mismatch detected"
+                        );
+                        return Err(AppError::conflict(
+                            ErrorCode::GoogleSubMismatch,
+                            "This email is already linked to a different Google account. Please use the original Google account or contact support.".to_string(),
+                        ));
+                    }
                 }
-            }
 
-            // User exists, update last_login and google_sub if needed
-            let user_id = credential.user_id;
-            let mut credential_active: user_credentials::ActiveModel = credential.clone().into();
-            credential_active.last_login = Set(Some(get_current_time()));
+                // User exists, update last_login and google_sub if needed
+                let user_id = credential.user_id;
+                let mut updated_credential = credential.clone();
+                updated_credential.last_login = Some(get_current_time());
 
-            // Only update google_sub if it's currently NULL
-            if credential.google_sub.is_none() {
-                info!(
+                // Only update google_sub if it's currently NULL
+                if updated_credential.google_sub.is_none() {
+                    info!(
+                        user_id = user_id,
+                        email = %Redacted(email),
+                        google_sub = %redact_google_sub(google_sub),
+                        "Setting google_sub for existing user (was previously NULL)"
+                    );
+                    updated_credential.google_sub = Some(google_sub.to_string());
+                }
+
+                updated_credential.updated_at = get_current_time();
+
+                repo.update_credentials(conn, updated_credential).await?;
+
+                // Fetch and return the linked user
+                let user = repo.find_user_by_id(conn, user_id).await?
+                    .ok_or_else(|| AppError::not_found(ErrorCode::UserNotFound, "User not found"))?;
+
+                // Log repeat login (same email + same google_sub)
+                debug!(
                     user_id = user_id,
-                    email = %Redacted(&email),
-                    google_sub = %redact_google_sub(&google_sub),
-                    "Setting google_sub for existing user (was previously NULL)"
+                    email = %Redacted(email),
+                    "Repeat login for existing user"
                 );
-                credential_active.google_sub = Set(Some(google_sub.clone()));
+
+                Ok(user)
             }
+            None => {
+                // User doesn't exist, create new user and credentials
 
-            credential_active.updated_at = Set(get_current_time());
+                // Derive username from name or email local-part
+                let username = derive_username(name, email);
 
-            credential_active
-                .update(conn)
-                .await
-                .map_err(|e| AppError::from(map_db_err(e)))?;
+                // Create new user with auto-generated ID and sub from google_sub
+                let user = repo.create_user(
+                    conn,
+                    google_sub,
+                    username.as_deref().unwrap_or("user"),
+                    false,
+                ).await?;
 
-            // Fetch and return the linked user
-            let user = users::Entity::find_by_id(user_id)
-                .one(conn)
-                .await
-                .map_err(|e| AppError::from(map_db_err(e)))?
-                .ok_or_else(|| AppError::not_found(ErrorCode::UserNotFound, "User not found"))?;
+                // Create new user credentials with auto-generated ID
+                repo.create_credentials(
+                    conn,
+                    user.id,
+                    email,
+                    Some(google_sub),
+                ).await?;
 
-            // Log repeat login (same email + same google_sub)
-            debug!(
-                user_id = user_id,
-                email = %Redacted(&email),
-                "Repeat login for existing user"
-            );
+                // Log first user creation
+                info!(
+                    user_id = user.id,
+                    email = %Redacted(email),
+                    google_sub = %redact_google_sub(google_sub),
+                    "First user creation"
+                );
 
-            Ok(user)
-        }
-        None => {
-            // User doesn't exist, create new user and credentials
-            let now = get_current_time();
-
-            // Derive username from name or email local-part
-            let username = derive_username(name.as_deref(), &email);
-
-            // Create new user with auto-generated ID and sub from google_sub
-            let sub_for_user = google_sub.clone(); // clone once; original is used for credentials below
-            let user_active = users::ActiveModel {
-                id: NotSet,             // Let database auto-generate
-                sub: Set(sub_for_user), // Use google_sub as the external identifier
-                username: Set(username),
-                is_ai: Set(false),
-                created_at: Set(now),
-                updated_at: Set(now),
-            };
-
-            let user = user_active
-                .insert(conn)
-                .await
-                .map_err(|e| AppError::from(map_db_err(e)))?;
-
-            // Create new user credentials with auto-generated ID
-            let credential_active = user_credentials::ActiveModel {
-                id: NotSet,            // Let database auto-generate
-                user_id: Set(user.id), // Use the ID from the created user
-                password_hash: Set(None),
-                email: Set(email.clone()),
-                google_sub: Set(Some(google_sub.clone())), // clone here to keep original for logging
-                last_login: Set(Some(now)),
-                created_at: Set(now),
-                updated_at: Set(now),
-            };
-
-            credential_active
-                .insert(conn)
-                .await
-                .map_err(|e| AppError::from(map_db_err(e)))?;
-
-            // Log first user creation
-            info!(
-                user_id = user.id,
-                email = %Redacted(&email),
-                google_sub = %redact_google_sub(&google_sub),
-                "First user creation"
-            );
-
-            Ok(user)
+                Ok(user)
+            }
         }
     }
 }
+
+impl Default for UserService {
+    fn default() -> Self { Self::new() }
+}
+
 
 /// Gets the current UTC time as an OffsetDateTime
 fn get_current_time() -> time::OffsetDateTime {

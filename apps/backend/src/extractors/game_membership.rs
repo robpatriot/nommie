@@ -8,9 +8,8 @@ use crate::db::require_db;
 use crate::db::txn::SharedTxn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
-use crate::services::memberships::{
-    find_membership, GameMembership as ServiceGameMembership, GameRole,
-};
+use crate::services::memberships::MembershipService;
+use crate::repos::memberships::{GameMembership as ServiceGameMembership, GameRole};
 use crate::state::app_state::AppState;
 
 /// Game membership extractor that verifies a user's membership in a game
@@ -103,12 +102,13 @@ impl FromRequest for GameMembership {
                 )
             })?;
 
-            // Find membership using shared transaction if available, otherwise pooled connection
+            // Resolve repo from AppState and call service with correct conn
+            let service = MembershipService::new();
             let membership = if let Some(shared_txn) = SharedTxn::from_req(&req) {
-                find_membership(game_id.0, user.id, shared_txn.transaction()).await?
+                service.find_membership(app_state.memberships_repo.as_ref(), shared_txn.transaction(), game_id.0, user.id).await?
             } else {
                 let db = require_db(app_state)?;
-                find_membership(game_id.0, user.id, db).await?
+                service.find_membership(app_state.memberships_repo.as_ref(), db, game_id.0, user.id).await?
             };
 
             let membership = membership.ok_or_else(|| {

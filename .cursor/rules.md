@@ -1,197 +1,78 @@
-# Nommie — Cursor Rules (v1.5.3)
+# Nommie — Cursor Rules (v1.6)
 
 > Repo-root file. Applies to **all Cursor edits, refactors, and codegen**.  
 
 ---
 
 ## General
-- Follow these rules exactly. If a requested change would break them, **stop and ask for a new prompt**.  
-- Don’t add rationale in code; just implement the rules.  
+- Follow these rules exactly. If a request would break them, **stop and ask**.  
+- Don’t add rationale or comments; just implement.  
 
 ---
 
 ## Backend Code
 - Handlers return `Result<T, AppError>` — never `HttpResponse`.  
-- **All DB access** must go via `require_db(&state)` or `with_txn(&state, …)`.  
-  Do not call lower-level connection helpers directly.  
+- **All DB access** via `require_db(&state)` or `with_txn(&state, …)`.  
+- Service/repo functions take `&dyn DbConn` (dyn trait, not generics).  
+- Only adapters may `use sea_orm::*`.  
 - Domain modules: no DB or Actix imports.  
 - Use enums (not strings) for states/roles/phases.  
 - No `unwrap()` or `expect()` outside tests.  
 
 ---
 
-## Rust Imports & `use` Rules
-- Default: put all `use` at the **top of the module**, after docs/attrs.  
-- Allowed inside a function/test only if the symbol is used there once or it avoids polluting scope.  
-- Group order (with blank line): std::* then external crates then internal crates.  
-- Sort alphabetically within groups.  
-- Import traits explicitly; function-scoped if they’re one-off.  
-- Avoid aliasing unless needed to resolve collisions.  
-- Use `pub use` only in stable boundaries (`lib.rs`, `mod.rs`, prelude).  
-- Tests may use `use super::*;` and local trait imports for ergonomics.  
-- **No wildcard imports** in production. Allowed only in `#[cfg(test)]` and those permitted in root `clippy.toml`.  
-
----
-
 ## Transactions
-- Wrap all multi-row/table work in `with_txn`.  
+- Wrap multi-row/table work in `with_txn`.  
 - `with_txn` closures return `Result<_, AppError>`.  
-- **Nested transactions are not supported**. The only exception is calling a handler inside `SharedTxn`, which internally uses `with_txn`.  
-- In production, `with_txn` commits on `Ok` and rolls back on `Err`.  
-- In tests, `with_txn` always rolls back.  
-- **Service functions** that touch the DB must accept `&(impl sea_orm::ConnectionTrait + Send + Sync)`.  
-- Do **not** call `begin/commit/rollback` directly; `with_txn` is the only transaction boundary.  
+- Nested txns not supported (except via `SharedTxn` in tests).  
+- Prod: commit on Ok, rollback on Err.  
+- Tests: always rollback.  
+- Don’t call `begin/commit/rollback` directly.  
 
 ---
 
 ## Extractors
-- Use only existing extractors:  
-  - `AuthToken`  
-  - `JwtClaims`  
-  - `CurrentUser`  
-  - `CurrentUserDb`  
-  - `GameId`  
-  - `ValidatedJson<T>`  
-- Don’t create new extractors unless explicitly asked.  
-- Ordering guideline in handlers: AuthToken → JwtClaims → CurrentUser / CurrentUserDb → GameId → ValidatedJson<T>.  
-- `ValidatedJson<T>` must convert all JSON parse/validation failures into proper `AppError` Problem Details responses — never panic or leak serde errors.  
-- Minimize DB hits (resolve user+membership efficiently).  
+- Use only these: `AuthToken`, `JwtClaims`, `CurrentUser`, `CurrentUserDb`, `GameId`, `ValidatedJson<T>`.  
+- `ValidatedJson<T>` must map errors to `AppError` Problem Details.  
 
 ---
 
 ## Error Handling
 - Errors follow Problem Details: `{ type, title, status, detail, code, trace_id }`.  
-- All errors must be created through the **central AppError helpers**.  
-- `code` must come from the **central registry** (no ad-hoc strings).  
-- Never leak raw serde/SQL/OAuth errors to clients; map them to safe `detail`.  
-- Every error path must include the `trace_id`.  
+- Create all errors via central `AppError` helpers.  
+- `code` comes from registry (no ad-hoc strings).  
+- Never leak raw serde/SQL/OAuth errors.  
 
 ---
 
-## Logging & Tracing
-- Structured logs only; every request log must include `trace_id`.  
-- Mask or hash PII (emails, google_sub).  
-- Don’t log full JWTs or auth headers.  
-- Time comes from a **time provider abstraction** so tests remain deterministic.  
+## Logging
+- Logs must include `trace_id`.  
+- No PII (mask or hash emails / google_sub).  
 
 ---
 
 ## AppState
-- `AppState.db` is private. Access only via `state.db()` or `require_db(&state)`.  
-- Don’t rebuild configs ad-hoc.  
+- `AppState.db` is private. Use `state.db()` / `require_db(&state)`.  
 
 ---
 
 ## Schema & Migrations
-- **Schema is managed exclusively by the SeaORM migrator crate** at `apps/backend/migration`.  
-- There is **one init migration**: `apps/backend/migration/src/m20250823_000001_init.rs`.  
-  - Do **not** add more migration files.  
-  - When schema changes, update this single init migration to reflect the full current schema.  
-- Do **not** create SQL files for schema.  
-- Do **not** add DDL to `docker/postgres/init.sh` (that script only sets roles, extensions, and privileges).  
+- Schema is one init migration in `apps/backend/migration`.  
+- Don’t add extra migration files, SQL, or DDL elsewhere.  
 
 ---
 
-## Use of pnpm
-
- - All pnpm commands are built to be run from the project root
- - This includes all executions of db commands and tests
+## Env & pnpm
+- Always source `.env` once per shell session before pnpm commands:  
+  set -a; source .env; set +a
+- Never commit real `.env`.  
+- Don’t read `DATABASE_URL` directly in code.  
 
 ---
 
 ## Testing
 - Tests must be deterministic (seed time/RNG).  
-- No-DB tests must expect `DB_UNAVAILABLE` if they touch DB paths.  
-- DB tests must use the `_test` database (guard enforced).  
-- Test DB is automatically reset via rollback: **no manual refresh required**.  
-
-### Transaction use in tests
-- If a test only calls handlers and each call is independent, **do not use `SharedTxn`** — each handler’s `with_txn` will roll back.  
-- **Use `SharedTxn` only when a test needs continuity within one test**, e.g.:  
-  - Direct DB setup (fixtures) plus handler calls that must see that setup.  
-  - Chained handler calls in the same test, where later calls must see earlier writes.  
-- For control tests that must verify committed persistence outside rollback, use the **pooled DB** directly for setup (not `with_txn`).  
-- Never rely on state across tests; all tests must be independent.  
-
-### Running backend tests
-- **Run all tests**:
-
-    pnpm be:test     # backend  
-    pnpm fe:test     # frontend  
-    pnpm test        # all
-
-### Running a subset of backend tests (cargo-nextest)
-> ⚠️ Args to `pnpm be:test` go to `cargo nextest run`.  
-> Use `--` to pass flags intended for the test binaries (e.g., `--nocapture`).  
-
-**A) By integration test binary (recommended)** — use the file name **without** `.rs`:  
-
-    pnpm be:test --test auth_login  
-    pnpm be:test --test users_service_tests  
-
-**B) By test name substring (positional filter)** — matches test *function* names across all binaries:  
-
-    pnpm be:test test_me          # runs tests whose names contain "test_me"  
-    pnpm be:test login_endpoint   # runs names containing "login_endpoint"  
-
-**C) By expression filter**  
-
-    pnpm be:test -- -E login  
-    pnpm be:test -- -E 'test_login_endpoint_.*'  
-
-**Output control**  
-
-    pnpm be:test --test auth_login -- --nocapture  
-
-**Gotchas**  
-- `pnpm be:test auth_login` (bare word) filters by **test name**, not by binary.  
-  If no test names contain `auth_login`, you’ll see “no tests to run.”  
-  Use `--test auth_login` to select the integration-test binary named `auth_login`.  
-- Don’t pass file paths or directories; nextest selects by **binary** (`--test`) or **name filter** (positional/`-E`).  
-
----
-
-## Commands
-- Lint:  
-    pnpm be:lint  
-    pnpm fe:lint  
-    pnpm lint  
-
-- Test:  
-    pnpm be:test  
-    pnpm be:test:v  
-    pnpm be:test:q  
-    pnpm fe:test  
-    pnpm test  
-
-- DB services:  
-    pnpm db:svc:up  
-    pnpm db:svc:down  
-    pnpm db:svc:stop  
-    pnpm db:svc:logs  
-    pnpm db:svc:ready  
-    pnpm db:svc:psql  
-
-- Migrations:  
-  - Prod:  
-        pnpm db:mig:up  
-        pnpm db:mig:refresh  
-  - Test:  
-        pnpm db:mig:test:up  
-        pnpm db:mig:test:refresh  
-
----
-
-## Safety
-- Always source the repo-root `.env` before running backend or frontend commands:  
-
-        set -a; source .env; set +a  
-
-  Do this **once per shell session** — you don’t need to repeat it before every command.  
-
-- Only `.env.example` is committed; never commit real `.env` files.  
-- No dotenv loaders (`dotenvx`, `dotenvy`) in code/scripts.  
-- Never read `DATABASE_URL` directly.  
-- Never run destructive ops against non-`_test` DBs.  
-
----
+- DB tests use `_test` DB (rollback enforced).  
+- Use `SharedTxn` only when a test needs continuity.  
+- Control tests that need committed data must use pooled DB setup.  
+- Run backend tests with `pnpm be:test`.  

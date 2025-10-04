@@ -36,7 +36,7 @@ async fn echo_membership(
     Ok(web::Json(Out {
         user_id: current_user.sub,
         game_id: game_id.0,
-        membership_id: membership.membership_id,
+        membership_id: membership.id,
         turn_order: membership.turn_order,
         is_ready: membership.is_ready,
         role: format!("{:?}", membership.role),
