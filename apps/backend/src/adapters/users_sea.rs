@@ -3,9 +3,9 @@
 use async_trait::async_trait;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, NotSet, QueryFilter, Set};
 
-use crate::db::{DbConn, as_database_connection, as_database_transaction};
+use crate::db::{as_database_connection, as_database_transaction, DbConn};
 use crate::entities::{user_credentials, users};
-use crate::errors::domain::{DomainError, InfraErrorKind, ConflictKind};
+use crate::errors::domain::{ConflictKind, DomainError, InfraErrorKind};
 use crate::repos::users::{User, UserCredentials, UserRepo};
 
 /// SeaORM implementation of UserRepo.
@@ -43,10 +43,12 @@ impl UserRepo for UserRepoSea {
                 ));
             }
         }
-            .map_err(|e| DomainError::infra(
+        .map_err(|e| {
+            DomainError::infra(
                 InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to query user credentials: {}", e)
-            ))?;
+                format!("Failed to query user credentials: {e}"),
+            )
+        })?;
 
         Ok(credential.map(|c| UserCredentials {
             id: c.id,
@@ -87,20 +89,20 @@ impl UserRepo for UserRepoSea {
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
         }
-            .map_err(|e| {
-                // Map unique constraint violations to specific errors
-                if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
-                    DomainError::conflict(
-                        ConflictKind::UniqueEmail,
-                        format!("User with this sub already exists: {}", e)
-                    )
-                } else {
-                    DomainError::infra(
-                        InfraErrorKind::Other("Database error".to_string()),
-                        format!("Failed to create user: {}", e)
-                    )
-                }
-            })?;
+        .map_err(|e| {
+            // Map unique constraint violations to specific errors
+            if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
+                DomainError::conflict(
+                    ConflictKind::UniqueEmail,
+                    format!("User with this sub already exists: {e}"),
+                )
+            } else {
+                DomainError::infra(
+                    InfraErrorKind::Other("Database error".to_string()),
+                    format!("Failed to create user: {e}"),
+                )
+            }
+        })?;
 
         Ok(User {
             id: user.id,
@@ -141,20 +143,20 @@ impl UserRepo for UserRepoSea {
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
         }
-            .map_err(|e| {
-                // Map unique constraint violations to specific errors
-                if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
-                    DomainError::conflict(
-                        ConflictKind::UniqueEmail,
-                        format!("Email already exists: {}", e)
-                    )
-                } else {
-                    DomainError::infra(
-                        InfraErrorKind::Other("Database error".to_string()),
-                        format!("Failed to create user credentials: {}", e)
-                    )
-                }
-            })?;
+        .map_err(|e| {
+            // Map unique constraint violations to specific errors
+            if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
+                DomainError::conflict(
+                    ConflictKind::UniqueEmail,
+                    format!("Email already exists: {e}"),
+                )
+            } else {
+                DomainError::infra(
+                    InfraErrorKind::Other("Database error".to_string()),
+                    format!("Failed to create user credentials: {e}"),
+                )
+            }
+        })?;
 
         Ok(UserCredentials {
             id: credential.id,
@@ -186,20 +188,20 @@ impl UserRepo for UserRepoSea {
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
         }
-            .map_err(|e| {
-                // Map unique constraint violations to specific errors
-                if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
-                    DomainError::conflict(
-                        ConflictKind::UniqueEmail,
-                        format!("Email already exists: {}", e)
-                    )
-                } else {
-                    DomainError::infra(
-                        InfraErrorKind::Other("Database error".to_string()),
-                        format!("Failed to update user credentials: {}", e)
-                    )
-                }
-            })?;
+        .map_err(|e| {
+            // Map unique constraint violations to specific errors
+            if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
+                DomainError::conflict(
+                    ConflictKind::UniqueEmail,
+                    format!("Email already exists: {e}"),
+                )
+            } else {
+                DomainError::infra(
+                    InfraErrorKind::Other("Database error".to_string()),
+                    format!("Failed to update user credentials: {e}"),
+                )
+            }
+        })?;
 
         Ok(UserCredentials {
             id: credential.id,
@@ -213,16 +215,16 @@ impl UserRepo for UserRepoSea {
         })
     }
 
-    async fn find_user_by_id(&self, conn: &dyn DbConn, user_id: i64) -> Result<Option<User>, DomainError> {
+    async fn find_user_by_id(
+        &self,
+        conn: &dyn DbConn,
+        user_id: i64,
+    ) -> Result<Option<User>, DomainError> {
         let user = {
             if let Some(txn) = as_database_transaction(conn) {
-                users::Entity::find_by_id(user_id)
-                    .one(txn)
-                    .await
+                users::Entity::find_by_id(user_id).one(txn).await
             } else if let Some(db) = as_database_connection(conn) {
-                users::Entity::find_by_id(user_id)
-                    .one(db)
-                    .await
+                users::Entity::find_by_id(user_id).one(db).await
             } else {
                 return Err(DomainError::infra(
                     InfraErrorKind::Other("Connection type".to_string()),
@@ -230,10 +232,12 @@ impl UserRepo for UserRepoSea {
                 ));
             }
         }
-            .map_err(|e| DomainError::infra(
+        .map_err(|e| {
+            DomainError::infra(
                 InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to query user: {}", e)
-            ))?;
+                format!("Failed to query user: {e}"),
+            )
+        })?;
 
         Ok(user.map(|u| User {
             id: u.id,

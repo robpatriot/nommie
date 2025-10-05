@@ -3,9 +3,9 @@ mod support;
 
 use backend::adapters::players_sea::PlayerRepoSea;
 use backend::db::txn::with_txn;
-use backend::errors::domain::DomainError;
-use backend::entities::{games, game_players, users};
+use backend::entities::{game_players, games, users};
 use backend::error::AppError;
+use backend::errors::domain::DomainError;
 use backend::infra::state::build_state;
 use backend::repos::players::PlayerRepo;
 use sea_orm::{ActiveModelTrait, Set};
@@ -104,7 +104,6 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
     Ok(())
 }
 
-
 #[tokio::test]
 #[serial]
 async fn test_get_display_name_by_seat_missing_user() -> Result<(), AppError> {
@@ -118,12 +117,12 @@ async fn test_get_display_name_by_seat_missing_user() -> Result<(), AppError> {
         Box::pin(async move {
             // Create test data with missing user (data corruption scenario)
             let game_id = create_test_game(txn).await?;
-            
+
             // Create a user first, then create game_player, then delete the user
             // This simulates data corruption where the user was deleted but game_player remains
             let user_id = create_test_user(txn, "orphan", Some("OrphanUser")).await?;
             create_test_game_player(txn, game_id, user_id, 0).await?;
-            
+
             // Delete the user to create the orphaned game_player
             use sea_orm::EntityTrait;
             users::Entity::delete_by_id(user_id).exec(txn).await?;
@@ -140,10 +139,10 @@ async fn test_get_display_name_by_seat_missing_user() -> Result<(), AppError> {
                     assert!(msg.contains("Player not found at seat"));
                 }
                 Ok(display_name) => {
-                    panic!("Expected error but got success: {}", display_name);
+                    panic!("Expected error but got success: {display_name}");
                 }
                 Err(e) => {
-                    panic!("Unexpected error type: {:?}", e);
+                    panic!("Unexpected error type: {e:?}");
                 }
             }
 
@@ -160,7 +159,7 @@ async fn test_get_display_name_by_seat_missing_user() -> Result<(), AppError> {
 async fn create_test_game(txn: &impl sea_orm::ConnectionTrait) -> Result<i64, AppError> {
     // Create a user first to use as created_by
     let user_id = create_test_user(txn, "creator", Some("Creator")).await?;
-    
+
     let game = games::ActiveModel {
         id: sea_orm::NotSet,
         created_by: Set(Some(user_id)),
@@ -179,7 +178,7 @@ async fn create_test_game(txn: &impl sea_orm::ConnectionTrait) -> Result<i64, Ap
         dealer_pos: Set(Some(0)),
         lock_version: Set(1),
     };
-    
+
     let inserted = game.insert(txn).await?;
     Ok(inserted.id)
 }
@@ -197,7 +196,7 @@ async fn create_test_user(
         created_at: Set(time::OffsetDateTime::now_utc()),
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
-    
+
     let inserted = user.insert(txn).await?;
     Ok(inserted.id)
 }
@@ -216,7 +215,7 @@ async fn create_test_game_player(
         is_ready: Set(false),
         created_at: Set(time::OffsetDateTime::now_utc()),
     };
-    
+
     game_player.insert(txn).await?;
     Ok(())
 }

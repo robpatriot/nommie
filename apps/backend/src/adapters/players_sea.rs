@@ -1,11 +1,11 @@
 //! SeaORM adapter for player repository.
 
 use async_trait::async_trait;
-use sea_orm::{EntityTrait, QueryFilter, ColumnTrait};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::db::{DbConn, as_database_connection, as_database_transaction};
-use crate::errors::domain::{DomainError, InfraErrorKind, NotFoundKind};
+use crate::db::{as_database_connection, as_database_transaction, DbConn};
 use crate::entities::{game_players, users};
+use crate::errors::domain::{DomainError, InfraErrorKind, NotFoundKind};
 use crate::repos::players::PlayerRepo;
 
 /// SeaORM implementation of PlayerRepo.
@@ -49,30 +49,31 @@ impl PlayerRepo for PlayerRepoSea {
                 ));
             }
         }
-            .map_err(|e| DomainError::infra(
+        .map_err(|e| {
+            DomainError::infra(
                 InfraErrorKind::Other("Database error".to_string()),
-                format!("Database error: {}", e)
-            ))?;
+                format!("Database error: {e}"),
+            )
+        })?;
 
         match game_player {
             Some((_game_player, Some(user))) => {
                 // Use username if available, otherwise fall back to sub
-                let display_name = user.username
-                    .unwrap_or_else(|| user.sub.clone());
+                let display_name = user.username.unwrap_or_else(|| user.sub.clone());
                 Ok(display_name)
             }
             Some((_game_player, None)) => {
                 // Game player exists but user is missing (data corruption)
                 Err(DomainError::infra(
                     InfraErrorKind::DataCorruption,
-                    "User not found for game player"
+                    "User not found for game player",
                 ))
             }
             None => {
                 // No game player found for this seat
                 Err(DomainError::not_found(
                     NotFoundKind::Player,
-                    "Player not found at seat"
+                    "Player not found at seat",
                 ))
             }
         }

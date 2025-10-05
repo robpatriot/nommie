@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, NotSet, QueryFilter, Set};
 
-use crate::db::{DbConn, as_database_connection, as_database_transaction};
+use crate::db::{as_database_connection, as_database_transaction, DbConn};
 use crate::entities::game_players;
 use crate::errors::domain::{DomainError, InfraErrorKind};
 use crate::repos::memberships::{GameMembership, GameRole, MembershipRepo};
@@ -46,10 +46,12 @@ impl MembershipRepo for MembershipRepoSea {
                 ));
             }
         }
-            .map_err(|e| DomainError::infra(
+        .map_err(|e| {
+            DomainError::infra(
                 InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to query game membership: {}", e)
-            ))?;
+                format!("Failed to query game membership: {e}"),
+            )
+        })?;
 
         Ok(membership.map(|m| GameMembership {
             id: m.id,
@@ -90,10 +92,12 @@ impl MembershipRepo for MembershipRepoSea {
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
         }
-            .map_err(|e| DomainError::infra(
+        .map_err(|e| {
+            DomainError::infra(
                 InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to create game membership: {}", e)
-            ))?;
+                format!("Failed to create game membership: {e}"),
+            )
+        })?;
 
         Ok(GameMembership {
             id: membership.id,
@@ -123,10 +127,12 @@ impl MembershipRepo for MembershipRepoSea {
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
         }
-            .map_err(|e| DomainError::infra(
+        .map_err(|e| {
+            DomainError::infra(
                 InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to update game membership: {}", e)
-            ))?;
+                format!("Failed to update game membership: {e}"),
+            )
+        })?;
 
         Ok(GameMembership {
             id: membership.id,

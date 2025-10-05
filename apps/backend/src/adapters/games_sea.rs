@@ -3,9 +3,9 @@
 use async_trait::async_trait;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, NotSet, QueryFilter, Set};
 
-use crate::db::{DbConn, as_database_connection, as_database_transaction};
+use crate::db::{as_database_connection, as_database_transaction, DbConn};
 use crate::entities::games;
-use crate::errors::domain::{DomainError, InfraErrorKind, ConflictKind};
+use crate::errors::domain::{ConflictKind, DomainError, InfraErrorKind};
 use crate::repos::games::{Game, GameRepo};
 
 /// SeaORM implementation of GameRepo.
@@ -20,7 +20,11 @@ impl GameRepoSea {
 
 #[async_trait]
 impl GameRepo for GameRepoSea {
-    async fn find_by_id(&self, conn: &dyn DbConn, game_id: i64) -> Result<Option<Game>, DomainError> {
+    async fn find_by_id(
+        &self,
+        conn: &dyn DbConn,
+        game_id: i64,
+    ) -> Result<Option<Game>, DomainError> {
         let game = {
             if let Some(txn) = as_database_transaction(conn) {
                 games::Entity::find()
@@ -39,10 +43,12 @@ impl GameRepo for GameRepoSea {
                 ));
             }
         }
-            .map_err(|e| DomainError::infra(
+        .map_err(|e| {
+            DomainError::infra(
                 InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to query game: {}", e)
-            ))?;
+                format!("Failed to query game: {e}"),
+            )
+        })?;
 
         Ok(game.map(|g| Game {
             id: g.id,
@@ -52,7 +58,11 @@ impl GameRepo for GameRepoSea {
         }))
     }
 
-    async fn find_by_join_code(&self, conn: &dyn DbConn, join_code: &str) -> Result<Option<Game>, DomainError> {
+    async fn find_by_join_code(
+        &self,
+        conn: &dyn DbConn,
+        join_code: &str,
+    ) -> Result<Option<Game>, DomainError> {
         let game = {
             if let Some(txn) = as_database_transaction(conn) {
                 games::Entity::find()
@@ -71,10 +81,12 @@ impl GameRepo for GameRepoSea {
                 ));
             }
         }
-            .map_err(|e| DomainError::infra(
+        .map_err(|e| {
+            DomainError::infra(
                 InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to query game by join code: {}", e)
-            ))?;
+                format!("Failed to query game by join code: {e}"),
+            )
+        })?;
 
         Ok(game.map(|g| Game {
             id: g.id,
@@ -115,20 +127,20 @@ impl GameRepo for GameRepoSea {
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
         }
-            .map_err(|e| {
-                // Map unique constraint violations to specific errors
-                if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
-                    DomainError::conflict(
-                        ConflictKind::JoinCodeConflict,
-                        format!("Join code already exists: {}", e)
-                    )
-                } else {
-                    DomainError::infra(
-                        InfraErrorKind::Other("Database error".to_string()),
-                        format!("Failed to create game: {}", e)
-                    )
-                }
-            })?;
+        .map_err(|e| {
+            // Map unique constraint violations to specific errors
+            if e.to_string().contains("unique") || e.to_string().contains("duplicate") {
+                DomainError::conflict(
+                    ConflictKind::JoinCodeConflict,
+                    format!("Join code already exists: {e}"),
+                )
+            } else {
+                DomainError::infra(
+                    InfraErrorKind::Other("Database error".to_string()),
+                    format!("Failed to create game: {e}"),
+                )
+            }
+        })?;
 
         Ok(Game {
             id: game.id,

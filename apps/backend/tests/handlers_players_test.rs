@@ -2,10 +2,8 @@ mod common;
 mod support;
 
 use actix_web::http::StatusCode;
-use actix_web::test;
-use actix_web::web;
-use actix_web::{App, HttpMessage};
-use backend::entities::{games, game_players, users};
+use actix_web::{test, web, App, HttpMessage};
+use backend::entities::{game_players, games, users};
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::routes::games::configure_routes;
@@ -28,7 +26,8 @@ async fn test_get_player_display_name_success() -> Result<(), AppError> {
     // Create test data using the shared transaction
     let game_id = create_test_game(shared.transaction()).await?;
     let user_id = create_test_user(shared.transaction(), "alice", Some("AliceUser")).await?;
-    let _game_player_id = create_test_game_player(shared.transaction(), game_id, user_id, 0).await?;
+    let _game_player_id =
+        create_test_game_player(shared.transaction(), game_id, user_id, 0).await?;
 
     // Create test app
     let app = test::init_service(
@@ -40,9 +39,9 @@ async fn test_get_player_display_name_success() -> Result<(), AppError> {
 
     // Test the endpoint
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/players/0/display_name", game_id))
+        .uri(&format!("/api/games/{game_id}/players/0/display_name"))
         .to_request();
-    
+
     // Inject the shared transaction into the request
     req.extensions_mut().insert(shared.clone());
 
@@ -82,9 +81,9 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
 
     // Test the endpoint
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/players/0/display_name", game_id))
+        .uri(&format!("/api/games/{game_id}/players/0/display_name"))
         .to_request();
-    
+
     // Inject the shared transaction into the request
     req.extensions_mut().insert(shared.clone());
 
@@ -95,7 +94,10 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body["status"], 404);
     assert_eq!(body["code"], "PLAYER_NOT_FOUND");
-    assert!(body["detail"].as_str().unwrap().contains("Player not found at seat"));
+    assert!(body["detail"]
+        .as_str()
+        .unwrap()
+        .contains("Player not found at seat"));
 
     Ok(())
 }
@@ -116,7 +118,8 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
     // Create test data
     let game_id = create_test_game(shared.transaction()).await?;
     let user_id = create_test_user(shared.transaction(), "alice", Some("AliceUser")).await?;
-    let _game_player_id = create_test_game_player(shared.transaction(), game_id, user_id, 0).await?;
+    let _game_player_id =
+        create_test_game_player(shared.transaction(), game_id, user_id, 0).await?;
 
     // Create test app
     let app = test::init_service(
@@ -128,9 +131,9 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
 
     // Test the endpoint with invalid seat
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/players/5/display_name", game_id))
+        .uri(&format!("/api/games/{game_id}/players/5/display_name"))
         .to_request();
-    
+
     // Inject the shared transaction into the request
     req.extensions_mut().insert(shared.clone());
 
@@ -141,7 +144,10 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body["status"], 422);
     assert_eq!(body["code"], "INVALID_SEAT");
-    assert!(body["detail"].as_str().unwrap().contains("Seat must be between 0 and 3"));
+    assert!(body["detail"]
+        .as_str()
+        .unwrap()
+        .contains("Seat must be between 0 and 3"));
 
     Ok(())
 }
@@ -162,7 +168,8 @@ async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> 
     // Create test data with no username (should fall back to sub)
     let game_id = create_test_game(shared.transaction()).await?;
     let user_id = create_test_user(shared.transaction(), "bob", None).await?;
-    let _game_player_id = create_test_game_player(shared.transaction(), game_id, user_id, 1).await?;
+    let _game_player_id =
+        create_test_game_player(shared.transaction(), game_id, user_id, 1).await?;
 
     // Create test app
     let app = test::init_service(
@@ -174,9 +181,9 @@ async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> 
 
     // Test the endpoint
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/players/1/display_name", game_id))
+        .uri(&format!("/api/games/{game_id}/players/1/display_name"))
         .to_request();
-    
+
     // Inject the shared transaction into the request
     req.extensions_mut().insert(shared.clone());
 
@@ -195,7 +202,7 @@ async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> 
 async fn create_test_game(txn: &impl sea_orm::ConnectionTrait) -> Result<i64, AppError> {
     // Create a user first to use as created_by
     let user_id = create_test_user(txn, "creator", Some("Creator")).await?;
-    
+
     let game = games::ActiveModel {
         id: sea_orm::NotSet,
         created_by: Set(Some(user_id)),
@@ -214,7 +221,7 @@ async fn create_test_game(txn: &impl sea_orm::ConnectionTrait) -> Result<i64, Ap
         dealer_pos: Set(Some(0)),
         lock_version: Set(1),
     };
-    
+
     let inserted = game.insert(txn).await?;
     Ok(inserted.id)
 }
@@ -232,7 +239,7 @@ async fn create_test_user(
         created_at: Set(time::OffsetDateTime::now_utc()),
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
-    
+
     let inserted = user.insert(txn).await?;
     Ok(inserted.id)
 }
@@ -251,7 +258,7 @@ async fn create_test_game_player(
         is_ready: Set(false),
         created_at: Set(time::OffsetDateTime::now_utc()),
     };
-    
+
     let result = game_player.insert(txn).await?;
     println!("Test: Inserted game_player with id={}", result.id);
     Ok(result.id)
