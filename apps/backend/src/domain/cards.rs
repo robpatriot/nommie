@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::domain::errors::DomainError;
+use crate::errors::domain::DomainError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -43,7 +43,7 @@ impl TryFrom<Trump> for Suit {
             Trump::Diamonds => Ok(Suit::Diamonds),
             Trump::Hearts => Ok(Suit::Hearts),
             Trump::Spades => Ok(Suit::Spades),
-            Trump::NoTrump => Err(DomainError::InvalidTrumpConversion),
+            Trump::NoTrump => Err(DomainError::validation("Cannot convert NoTrump to Suit")),
         }
     }
 }
@@ -93,11 +93,15 @@ impl FromStr for Card {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() != 2 {
-            return Err(DomainError::ParseCard(s.to_string()));
+            return Err(DomainError::validation(format!("Parse card: {s}")));
         }
         let mut chars = s.chars();
-        let rank_ch = chars.next().ok_or_else(|| DomainError::ParseCard(s.to_string()))?;
-        let suit_ch = chars.next().ok_or_else(|| DomainError::ParseCard(s.to_string()))?;
+        let rank_ch = chars
+            .next()
+            .ok_or_else(|| DomainError::validation(format!("Parse card: {s}")))?;
+        let suit_ch = chars
+            .next()
+            .ok_or_else(|| DomainError::validation(format!("Parse card: {s}")))?;
         // Validate via explicit match sets below; allow digit ranks (2-9)
         let rank = match rank_ch {
             '2' => Rank::Two,
@@ -113,14 +117,14 @@ impl FromStr for Card {
             'Q' => Rank::Queen,
             'K' => Rank::King,
             'A' => Rank::Ace,
-            _ => return Err(DomainError::ParseCard(s.to_string())),
+            _ => return Err(DomainError::validation(format!("Parse card: {s}"))),
         };
         let suit = match suit_ch {
             'C' => Suit::Clubs,
             'D' => Suit::Diamonds,
             'H' => Suit::Hearts,
             'S' => Suit::Spades,
-            _ => return Err(DomainError::ParseCard(s.to_string())),
+            _ => return Err(DomainError::validation(format!("Parse card: {s}"))),
         };
         Ok(Card { suit, rank })
     }
@@ -238,7 +242,6 @@ where
         .map(|s| s.as_ref().parse::<Card>())
         .collect()
 }
-
 
 #[cfg(test)]
 mod tests {

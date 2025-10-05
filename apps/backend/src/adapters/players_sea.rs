@@ -6,6 +6,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use crate::db::{as_database_connection, as_database_transaction, DbConn};
 use crate::entities::{game_players, users};
 use crate::errors::domain::{DomainError, InfraErrorKind, NotFoundKind};
+use crate::infra::db_errors;
 use crate::repos::players::PlayerRepo;
 
 /// SeaORM implementation of PlayerRepo.
@@ -49,12 +50,7 @@ impl PlayerRepo for PlayerRepoSea {
                 ));
             }
         }
-        .map_err(|e| {
-            DomainError::infra(
-                InfraErrorKind::Other("Database error".to_string()),
-                format!("Database error: {e}"),
-            )
-        })?;
+        .map_err(db_errors::map_db_err)?;
 
         match game_player {
             Some((_game_player, Some(user))) => {

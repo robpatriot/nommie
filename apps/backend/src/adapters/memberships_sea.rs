@@ -6,6 +6,7 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, NotSet, QueryFilter, S
 use crate::db::{as_database_connection, as_database_transaction, DbConn};
 use crate::entities::game_players;
 use crate::errors::domain::{DomainError, InfraErrorKind};
+use crate::infra::db_errors;
 use crate::repos::memberships::{GameMembership, GameRole, MembershipRepo};
 
 /// SeaORM implementation of MembershipRepo.
@@ -46,12 +47,7 @@ impl MembershipRepo for MembershipRepoSea {
                 ));
             }
         }
-        .map_err(|e| {
-            DomainError::infra(
-                InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to query game membership: {e}"),
-            )
-        })?;
+        .map_err(db_errors::map_db_err)?;
 
         Ok(membership.map(|m| GameMembership {
             id: m.id,
@@ -92,12 +88,7 @@ impl MembershipRepo for MembershipRepoSea {
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
         }
-        .map_err(|e| {
-            DomainError::infra(
-                InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to create game membership: {e}"),
-            )
-        })?;
+        .map_err(db_errors::map_db_err)?;
 
         Ok(GameMembership {
             id: membership.id,
@@ -127,12 +118,7 @@ impl MembershipRepo for MembershipRepoSea {
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
         }
-        .map_err(|e| {
-            DomainError::infra(
-                InfraErrorKind::Other("Database error".to_string()),
-                format!("Failed to update game membership: {e}"),
-            )
-        })?;
+        .map_err(db_errors::map_db_err)?;
 
         Ok(GameMembership {
             id: membership.id,

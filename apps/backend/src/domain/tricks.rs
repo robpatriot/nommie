@@ -1,7 +1,7 @@
 use crate::domain::cards::{card_beats, hand_has_suit, Card, Trump};
-use crate::domain::errors::DomainError;
 use crate::domain::rules::PLAYERS;
 use crate::domain::state::{advance_turn, GameState, Phase, PlayerId, RoundState};
+use crate::errors::domain::DomainError;
 
 /// Compute legal cards the player may play, independent of turn enforcement.
 pub fn legal_moves(state: &GameState, who: PlayerId) -> Vec<Card> {
@@ -29,11 +29,11 @@ pub fn legal_moves(state: &GameState, who: PlayerId) -> Vec<Card> {
 pub fn play_card(state: &mut GameState, who: PlayerId, card: Card) -> Result<(), DomainError> {
     // Phase check
     let Phase::Trick { .. } = state.phase else {
-        return Err(DomainError::PhaseMismatch);
+        return Err(DomainError::validation("Phase mismatch"));
     };
     // Turn check
     if state.turn != who {
-        return Err(DomainError::OutOfTurn);
+        return Err(DomainError::validation("Out of turn"));
     }
     // Card in hand (immutable check first to avoid borrow conflicts)
     let pos_opt = state.hands[who as usize].iter().position(|&c| c == card);
@@ -41,7 +41,7 @@ pub fn play_card(state: &mut GameState, who: PlayerId, card: Card) -> Result<(),
         // Suit following check using an immutable borrow only
         let legal = legal_moves(state, who);
         if !legal.contains(&card) {
-            return Err(DomainError::MustFollowSuit);
+            return Err(DomainError::validation("Must follow suit"));
         }
         // On first play, set lead
         if state.round.trick_plays.is_empty() {
@@ -77,7 +77,7 @@ pub fn play_card(state: &mut GameState, who: PlayerId, card: Card) -> Result<(),
         }
         Ok(())
     } else {
-        Err(DomainError::CardNotInHand)
+        Err(DomainError::validation("Card not in hand"))
     }
 }
 
