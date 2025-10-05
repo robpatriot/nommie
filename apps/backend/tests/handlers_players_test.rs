@@ -88,16 +88,15 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
     req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 
-    // Parse response body
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 404);
-    assert_eq!(body["code"], "PLAYER_NOT_FOUND");
-    assert!(body["detail"]
-        .as_str()
-        .unwrap()
-        .contains("Player not found at seat"));
+    // Validate error structure using centralized helper (includes trace_id validation)
+    common::assert_problem_details_structure(
+        resp,
+        404,
+        "PLAYER_NOT_FOUND",
+        "Player not found at seat",
+    )
+    .await;
 
     Ok(())
 }
@@ -138,16 +137,15 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
     req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
 
-    // Parse response body
-    let body: serde_json::Value = test::read_body_json(resp).await;
-    assert_eq!(body["status"], 422);
-    assert_eq!(body["code"], "INVALID_SEAT");
-    assert!(body["detail"]
-        .as_str()
-        .unwrap()
-        .contains("Seat must be between 0 and 3"));
+    // Validate error structure using centralized helper (includes trace_id validation)
+    common::assert_problem_details_structure(
+        resp,
+        422,
+        "INVALID_SEAT",
+        "Seat must be between 0 and 3",
+    )
+    .await;
 
     Ok(())
 }
