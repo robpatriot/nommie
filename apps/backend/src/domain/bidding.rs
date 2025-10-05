@@ -1,6 +1,6 @@
 use crate::domain::rules::{valid_bid_range, PLAYERS};
 use crate::domain::state::{advance_turn, GameState, Phase, PlayerId};
-use crate::errors::domain::DomainError;
+use crate::errors::domain::{DomainError, ValidationKind};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Bid(pub u8);
@@ -23,18 +23,30 @@ pub fn legal_bids(state: &GameState, _who: PlayerId) -> Vec<Bid> {
 /// Place a bid for `who`. Requires Bidding phase and being in turn.
 pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), DomainError> {
     if state.phase != Phase::Bidding {
-        return Err(DomainError::validation("Phase mismatch"));
+        return Err(DomainError::validation(
+            ValidationKind::PhaseMismatch,
+            "Phase mismatch",
+        ));
     }
     if state.turn != who {
-        return Err(DomainError::validation("Out of turn"));
+        return Err(DomainError::validation(
+            ValidationKind::OutOfTurn,
+            "Out of turn",
+        ));
     }
     let range = valid_bid_range(state.hand_size);
     if !range.contains(&bid.0) {
-        return Err(DomainError::validation("Invalid bid"));
+        return Err(DomainError::validation(
+            ValidationKind::InvalidBid,
+            "Invalid bid",
+        ));
     }
     let idx = who as usize;
     if state.round.bids[idx].is_some() {
-        return Err(DomainError::validation("Invalid bid"));
+        return Err(DomainError::validation(
+            ValidationKind::InvalidBid,
+            "Invalid bid",
+        ));
     }
     state.round.bids[idx] = Some(bid.0);
     // Advance turn regardless; if all bids are set, determine winner and advance phase
@@ -48,7 +60,9 @@ pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), D
         for i in 0..PLAYERS as u8 {
             let pid = ((start as u16 + i as u16) % PLAYERS as u16) as u8;
             let b = state.round.bids[pid as usize].ok_or_else(|| {
-                DomainError::validation("Bid should be present after checking all bids are set")
+                DomainError::validation_other(
+                    "Bid should be present after checking all bids are set",
+                )
             })?;
             match best_bid {
                 None => {
@@ -77,7 +91,10 @@ pub fn set_trump(
     trump: crate::domain::cards::Trump,
 ) -> Result<(), DomainError> {
     if state.phase != Phase::TrumpSelect {
-        return Err(DomainError::validation("Phase mismatch"));
+        return Err(DomainError::validation(
+            ValidationKind::PhaseMismatch,
+            "Phase mismatch",
+        ));
     }
     match state.round.winning_bidder {
         Some(bidder) if bidder == who => {
@@ -92,6 +109,9 @@ pub fn set_trump(
             };
             Ok(())
         }
-        _ => Err(DomainError::validation("Out of turn")),
+        _ => Err(DomainError::validation(
+            ValidationKind::OutOfTurn,
+            "Out of turn",
+        )),
     }
 }

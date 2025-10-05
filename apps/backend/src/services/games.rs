@@ -3,29 +3,27 @@
 use crate::db::DbConn;
 use crate::domain::fixtures::CardFixtures;
 use crate::domain::state::{GameState, Phase, RoundState};
-use crate::error::AppError;
-use crate::errors::ErrorCode;
+use crate::errors::domain::{DomainError, ValidationKind};
 
 /// Game domain service.
 pub struct GameService;
 
 impl GameService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// Load or construct a GameState for the given game_id.
     ///
     /// Currently returns a stub state since full game state persistence is not yet implemented.
     /// This will be replaced with actual DB loading once state serialization is added.
-    pub async fn load_game_state(
-        &self,
-        game_id: i64,
-        ) -> Result<GameState, AppError> {
+    pub async fn load_game_state(&self, game_id: i64) -> Result<GameState, DomainError> {
         // For now, return a deterministic stub state for testing
         // TODO: Load actual game state from database once persistence is implemented
 
         if game_id <= 0 {
-            return Err(AppError::bad_request(
-                ErrorCode::InvalidGameId,
+            return Err(DomainError::validation(
+                ValidationKind::InvalidGameId,
                 "Game ID must be positive",
             ));
         }
@@ -54,18 +52,17 @@ impl GameService {
 }
 
 impl Default for GameService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Legacy function for backward compatibility
 /// TODO: Remove once all callers are updated to use GameService
-pub async fn load_game_state(
-    game_id: i64,
-    _conn: &dyn DbConn,
-) -> Result<GameState, AppError> {
+pub async fn load_game_state(game_id: i64, _conn: &dyn DbConn) -> Result<GameState, DomainError> {
     if game_id <= 0 {
-        return Err(AppError::bad_request(
-            ErrorCode::InvalidGameId,
+        return Err(DomainError::validation(
+            ValidationKind::InvalidGameId,
             "Game ID must be positive",
         ));
     }

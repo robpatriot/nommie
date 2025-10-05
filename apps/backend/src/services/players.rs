@@ -1,40 +1,40 @@
 //! Player domain service.
 
 use crate::db::DbConn;
-use crate::error::AppError;
-use crate::errors::ErrorCode;
+use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::players::PlayerRepo;
 
 /// Player domain service.
 pub struct PlayerService;
 
 impl PlayerService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// Get the display name of a player in a game by seat.
-    /// 
+    ///
     /// # Arguments
     /// * `conn` - Database connection
     /// * `game_id` - The game identifier
     /// * `seat` - The seat number (0-3)
-    /// 
+    ///
     /// # Returns
     /// * `Ok(String)` - The player's display name
-    /// * `Err(AppError)` - If seat is invalid, player not found, or DB error
+    /// * `Err(DomainError)` - If seat is invalid, player not found, or DB error
     pub async fn get_display_name_by_seat(
         &self,
         repo: &dyn PlayerRepo,
         conn: &dyn DbConn,
         game_id: i64,
         seat: u8,
-    ) -> Result<String, AppError> {
+    ) -> Result<String, DomainError> {
         // Validate seat range
         if seat > 3 {
-            return Err(AppError::Validation {
-                code: ErrorCode::InvalidSeat,
-                detail: "Seat must be between 0 and 3".to_string(),
-                status: actix_web::http::StatusCode::UNPROCESSABLE_ENTITY,
-            });
+            return Err(DomainError::validation(
+                ValidationKind::InvalidSeat,
+                "Seat must be between 0 and 3",
+            ));
         }
 
         // Call repository and map DomainError to AppError
@@ -44,5 +44,7 @@ impl PlayerService {
 }
 
 impl Default for PlayerService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }

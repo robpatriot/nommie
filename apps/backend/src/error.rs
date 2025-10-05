@@ -287,17 +287,58 @@ impl From<crate::errors::domain::DomainError> for AppError {
         // - Both map to HTTP 500 but with distinct error codes for better debugging
 
         match err {
-            crate::errors::domain::DomainError::Validation(detail) => AppError::Validation {
-                code: ErrorCode::ValidationError,
-                detail,
-                status: StatusCode::UNPROCESSABLE_ENTITY,
-            },
+            crate::errors::domain::DomainError::Validation(kind, detail) => {
+                match kind {
+                    crate::errors::domain::ValidationKind::InvalidGameId => AppError::BadRequest {
+                        code: ErrorCode::InvalidGameId,
+                        detail,
+                    },
+                    _ => {
+                        let error_code = match kind {
+                            crate::errors::domain::ValidationKind::InvalidBid => {
+                                ErrorCode::InvalidBid
+                            }
+                            crate::errors::domain::ValidationKind::MustFollowSuit => {
+                                ErrorCode::MustFollowSuit
+                            }
+                            crate::errors::domain::ValidationKind::CardNotInHand => {
+                                ErrorCode::CardNotInHand
+                            }
+                            crate::errors::domain::ValidationKind::OutOfTurn => {
+                                ErrorCode::OutOfTurn
+                            }
+                            crate::errors::domain::ValidationKind::PhaseMismatch => {
+                                ErrorCode::PhaseMismatch
+                            }
+                            crate::errors::domain::ValidationKind::ParseCard => {
+                                ErrorCode::ParseCard
+                            }
+                            crate::errors::domain::ValidationKind::InvalidTrumpConversion => {
+                                ErrorCode::InvalidTrumpConversion
+                            }
+                            crate::errors::domain::ValidationKind::InvalidSeat => {
+                                ErrorCode::InvalidSeat
+                            }
+                            crate::errors::domain::ValidationKind::Other(_) => {
+                                ErrorCode::ValidationError
+                            }
+                            _ => ErrorCode::ValidationError, // catch-all for any new variants
+                        };
+                        AppError::Validation {
+                            code: error_code,
+                            detail,
+                            status: StatusCode::UNPROCESSABLE_ENTITY,
+                        }
+                    }
+                }
+            }
             crate::errors::domain::DomainError::Conflict(kind, detail) => {
                 let code = match kind {
                     ConflictKind::SeatTaken => ErrorCode::SeatTaken,
                     ConflictKind::UniqueEmail => ErrorCode::UniqueEmail,
                     ConflictKind::OptimisticLock => ErrorCode::OptimisticLock,
                     ConflictKind::JoinCodeConflict => ErrorCode::JoinCodeConflict,
+                    ConflictKind::GoogleSubMismatch => ErrorCode::GoogleSubMismatch,
                     ConflictKind::Other(_) => ErrorCode::Conflict, // generic conflict fallback
                 };
                 AppError::Conflict { code, detail }

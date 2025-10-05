@@ -54,7 +54,9 @@ async fn get_player_display_name(
     let display_name = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = PlayerService::new();
-            service.get_display_name_by_seat(players_repo.as_ref(), txn, game_id, seat).await
+            Ok(service
+                .get_display_name_by_seat(players_repo.as_ref(), txn, game_id, seat)
+                .await?)
         })
     })
     .await?;
@@ -70,5 +72,8 @@ struct PlayerDisplayNameResponse {
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/api/games/{game_id}/snapshot").route(web::get().to(get_snapshot)));
-    cfg.service(web::resource("/api/games/{game_id}/players/{seat}/display_name").route(web::get().to(get_player_display_name)));
+    cfg.service(
+        web::resource("/api/games/{game_id}/players/{seat}/display_name")
+            .route(web::get().to(get_player_display_name)),
+    );
 }

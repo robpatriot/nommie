@@ -55,12 +55,12 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
 
     if mentions_sqlstate(&error_msg, "23503") {
         warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Foreign key constraint violation");
-        return DomainError::validation("Foreign key constraint violation");
+        return DomainError::validation_other("Foreign key constraint violation");
     }
 
     if mentions_sqlstate(&error_msg, "23514") {
         warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Check constraint violation");
-        return DomainError::validation("Check constraint violation");
+        return DomainError::validation_other("Check constraint violation");
     }
 
     if error_msg.contains("timeout")

@@ -1,12 +1,17 @@
 mod common;
 
 use actix_web::{test, web, App, HttpResponse};
-use backend::errors::domain::{ConflictKind, DomainError, InfraErrorKind, NotFoundKind};
+use backend::errors::domain::{
+    ConflictKind, DomainError, InfraErrorKind, NotFoundKind, ValidationKind,
+};
 use backend::{AppError, ErrorCode};
 
 #[actix_web::test]
 async fn unit_maps_validation_to_422() {
-    let de = DomainError::validation("bad field");
+    let de = DomainError::validation(
+        ValidationKind::Other("VALIDATION_ERROR".into()),
+        "bad field",
+    );
     let app: AppError = de.into();
     assert_eq!(app.code(), ErrorCode::ValidationError);
     assert_eq!(app.status().as_u16(), 422);
@@ -73,7 +78,7 @@ async fn integration_problem_details_from_domain_errors() {
         Err(DomainError::not_found(NotFoundKind::Game, "game missing").into())
     }
     async fn validation_handler() -> Result<HttpResponse, AppError> {
-        Err(DomainError::validation("bad").into())
+        Err(DomainError::validation(ValidationKind::Other("VALIDATION_ERROR".into()), "bad").into())
     }
     async fn timeout_handler() -> Result<HttpResponse, AppError> {
         Err(DomainError::infra(InfraErrorKind::Timeout, "operation timed out").into())
@@ -146,11 +151,14 @@ async fn integration_problem_details_from_domain_errors() {
 async fn unit_domain_purity_check() {
     // This test verifies that domain modules can be used without HTTP/SeaORM imports
     // by creating DomainError instances and converting them to AppError
-    use backend::errors::domain::{ConflictKind, DomainError, InfraErrorKind, NotFoundKind};
+    use backend::errors::domain::{
+        ConflictKind, DomainError, InfraErrorKind, NotFoundKind, ValidationKind,
+    };
     use backend::AppError;
 
     // Test that we can create domain errors without HTTP imports
-    let validation = DomainError::validation("test");
+    let validation =
+        DomainError::validation(ValidationKind::Other("VALIDATION_ERROR".into()), "test");
     let conflict = DomainError::conflict(ConflictKind::SeatTaken, "test");
     let not_found = DomainError::not_found(NotFoundKind::User, "test");
     let infra = DomainError::infra(InfraErrorKind::Timeout, "test");
@@ -165,8 +173,11 @@ async fn unit_domain_purity_check() {
 #[actix_web::test]
 async fn unit_constructor_helpers() {
     // Test validation constructor
-    let validation = DomainError::validation("invalid input");
-    assert!(matches!(validation, DomainError::Validation(_)));
+    let validation = DomainError::validation(
+        ValidationKind::Other("VALIDATION_ERROR".into()),
+        "invalid input",
+    );
+    assert!(matches!(validation, DomainError::Validation(_, _)));
 
     // Test conflict constructor
     let conflict = DomainError::conflict(ConflictKind::SeatTaken, "seat taken");

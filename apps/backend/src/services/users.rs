@@ -1,8 +1,7 @@
 use tracing::{debug, info, warn};
 
 use crate::db::DbConn;
-use crate::error::AppError;
-use crate::errors::ErrorCode;
+use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind};
 use crate::logging::pii::Redacted;
 use crate::repos::users::{User, UserRepo};
 
@@ -20,7 +19,9 @@ fn redact_google_sub(google_sub: &str) -> String {
 pub struct UserService;
 
 impl UserService {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     /// Ensures a user exists for Google OAuth, creating one if necessary.
     /// This function is idempotent - calling it multiple times with the same email
@@ -33,7 +34,7 @@ impl UserService {
         email: &str,
         name: Option<&str>,
         google_sub: &str,
-    ) -> Result<User, AppError> {
+    ) -> Result<User, DomainError> {
         // Look up existing user credentials by email
         let existing_credential = repo.find_credentials_by_email(conn, email).await?;
 
@@ -49,9 +50,9 @@ impl UserService {
                             existing_google_sub = %redact_google_sub(existing_google_sub),
                             "Google sub mismatch detected"
                         );
-                        return Err(AppError::conflict(
-                            ErrorCode::GoogleSubMismatch,
-                            "This email is already linked to a different Google account. Please use the original Google account or contact support.".to_string(),
+                        return Err(DomainError::conflict(
+                            ConflictKind::GoogleSubMismatch,
+                            "This email is already linked to a different Google account. Please use the original Google account or contact support.",
                         ));
                     }
                 }
@@ -77,8 +78,10 @@ impl UserService {
                 repo.update_credentials(conn, updated_credential).await?;
 
                 // Fetch and return the linked user
-                let user = repo.find_user_by_id(conn, user_id).await?
-                    .ok_or_else(|| AppError::not_found(ErrorCode::UserNotFound, "User not found"))?;
+                let user = repo
+                    .find_user_by_id(conn, user_id)
+                    .await?
+                    .ok_or_else(|| DomainError::not_found(NotFoundKind::User, "User not found"))?;
 
                 // Log repeat login (same email + same google_sub)
                 debug!(
@@ -96,20 +99,18 @@ impl UserService {
                 let username = derive_username(name, email);
 
                 // Create new user with auto-generated ID and sub from google_sub
-                let user = repo.create_user(
-                    conn,
-                    google_sub,
-                    username.as_deref().unwrap_or("user"),
-                    false,
-                ).await?;
+                let user = repo
+                    .create_user(
+                        conn,
+                        google_sub,
+                        username.as_deref().unwrap_or("user"),
+                        false,
+                    )
+                    .await?;
 
                 // Create new user credentials with auto-generated ID
-                repo.create_credentials(
-                    conn,
-                    user.id,
-                    email,
-                    Some(google_sub),
-                ).await?;
+                repo.create_credentials(conn, user.id, email, Some(google_sub))
+                    .await?;
 
                 // Log first user creation
                 info!(
@@ -126,9 +127,10 @@ impl UserService {
 }
 
 impl Default for UserService {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
-
 
 /// Gets the current UTC time as an OffsetDateTime
 fn get_current_time() -> time::OffsetDateTime {

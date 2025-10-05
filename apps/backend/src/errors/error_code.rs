@@ -42,6 +42,20 @@ pub enum ErrorCode {
     InvalidGoogleSub,
     /// Invalid seat number
     InvalidSeat,
+    /// Invalid bid provided
+    InvalidBid,
+    /// Must follow suit
+    MustFollowSuit,
+    /// Card not in hand
+    CardNotInHand,
+    /// Out of turn
+    OutOfTurn,
+    /// Phase mismatch
+    PhaseMismatch,
+    /// Parse card error
+    ParseCard,
+    /// Invalid trump conversion
+    InvalidTrumpConversion,
     /// General validation error
     ValidationError,
     /// General bad request error
@@ -126,6 +140,13 @@ impl ErrorCode {
             Self::InvalidEmail => "INVALID_EMAIL",
             Self::InvalidGoogleSub => "INVALID_GOOGLE_SUB",
             Self::InvalidSeat => "INVALID_SEAT",
+            Self::InvalidBid => "INVALID_BID",
+            Self::MustFollowSuit => "MUST_FOLLOW_SUIT",
+            Self::CardNotInHand => "CARD_NOT_IN_HAND",
+            Self::OutOfTurn => "OUT_OF_TURN",
+            Self::PhaseMismatch => "PHASE_MISMATCH",
+            Self::ParseCard => "PARSE_CARD",
+            Self::InvalidTrumpConversion => "INVALID_TRUMP_CONVERSION",
             Self::ValidationError => "VALIDATION_ERROR",
             Self::BadRequest => "BAD_REQUEST",
 
@@ -203,6 +224,16 @@ mod tests {
         assert_eq!(ErrorCode::InvalidEmail.as_str(), "INVALID_EMAIL");
         assert_eq!(ErrorCode::InvalidGoogleSub.as_str(), "INVALID_GOOGLE_SUB");
         assert_eq!(ErrorCode::InvalidSeat.as_str(), "INVALID_SEAT");
+        assert_eq!(ErrorCode::InvalidBid.as_str(), "INVALID_BID");
+        assert_eq!(ErrorCode::MustFollowSuit.as_str(), "MUST_FOLLOW_SUIT");
+        assert_eq!(ErrorCode::CardNotInHand.as_str(), "CARD_NOT_IN_HAND");
+        assert_eq!(ErrorCode::OutOfTurn.as_str(), "OUT_OF_TURN");
+        assert_eq!(ErrorCode::PhaseMismatch.as_str(), "PHASE_MISMATCH");
+        assert_eq!(ErrorCode::ParseCard.as_str(), "PARSE_CARD");
+        assert_eq!(
+            ErrorCode::InvalidTrumpConversion.as_str(),
+            "INVALID_TRUMP_CONVERSION"
+        );
         assert_eq!(ErrorCode::ValidationError.as_str(), "VALIDATION_ERROR");
         assert_eq!(ErrorCode::BadRequest.as_str(), "BAD_REQUEST");
         assert_eq!(ErrorCode::GameNotFound.as_str(), "GAME_NOT_FOUND");

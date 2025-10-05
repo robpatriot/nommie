@@ -58,7 +58,15 @@ async fn login(
         let users_repo = app_state.users_repo.clone();
         Box::pin(async move {
             let service = UserService::new();
-            service.ensure_user(users_repo.as_ref(), txn, &email, name.as_deref(), &google_sub).await
+            Ok(service
+                .ensure_user(
+                    users_repo.as_ref(),
+                    txn,
+                    &email,
+                    name.as_deref(),
+                    &google_sub,
+                )
+                .await?)
         })
     })
     .await?;

@@ -28,6 +28,22 @@ pub enum NotFoundKind {
     Other(String),
 }
 
+/// Domain-level validation kinds (pure domain semantics)
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ValidationKind {
+    InvalidBid,
+    MustFollowSuit,
+    CardNotInHand,
+    OutOfTurn,
+    PhaseMismatch,
+    ParseCard, // detail string will carry context
+    InvalidTrumpConversion,
+    InvalidSeat,
+    InvalidGameId,
+    Other(String),
+}
+
 /// Domain-level conflict kinds (extend as needed)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -36,6 +52,7 @@ pub enum ConflictKind {
     UniqueEmail,
     OptimisticLock,
     JoinCodeConflict,
+    GoogleSubMismatch,
     Other(String),
 }
 
@@ -43,7 +60,7 @@ pub enum ConflictKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum DomainError {
     /// Input/user validation or business rule violation
-    Validation(String),
+    Validation(ValidationKind, String),
     /// Semantic conflict
     Conflict(ConflictKind, String),
     /// Missing resource in domain terms
@@ -55,7 +72,7 @@ pub enum DomainError {
 impl Display for DomainError {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            DomainError::Validation(d) => write!(f, "validation error: {d}"),
+            DomainError::Validation(kind, detail) => write!(f, "validation {kind:?}: {detail}"),
             DomainError::Conflict(kind, d) => write!(f, "conflict {kind:?}: {d}"),
             DomainError::NotFound(kind, d) => write!(f, "not found {kind:?}: {d}"),
             DomainError::Infra(kind, d) => write!(f, "infra {kind:?}: {d}"),
@@ -66,8 +83,15 @@ impl Display for DomainError {
 impl Error for DomainError {}
 
 impl DomainError {
-    pub fn validation(detail: impl Into<String>) -> Self {
-        Self::Validation(detail.into())
+    pub fn validation(kind: ValidationKind, detail: impl Into<String>) -> Self {
+        Self::Validation(kind, detail.into())
+    }
+    /// Convenience for pure domain code that doesn't care about the specific kind.
+    pub fn validation_other(detail: impl Into<String>) -> Self {
+        Self::Validation(
+            ValidationKind::Other("VALIDATION_ERROR".into()),
+            detail.into(),
+        )
     }
     pub fn conflict(kind: ConflictKind, detail: impl Into<String>) -> Self {
         Self::Conflict(kind, detail.into())

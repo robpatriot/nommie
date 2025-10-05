@@ -6,7 +6,7 @@ use crate::domain::cards::{Card, Rank, Suit, Trump};
 use crate::domain::fixtures::CardFixtures;
 use crate::domain::scoring::apply_round_scoring;
 use crate::domain::tricks::{legal_moves, play_card, resolve_current_trick};
-use crate::errors::domain::DomainError;
+use crate::errors::domain::{DomainError, ValidationKind};
 
 fn make_state_with_hands(hands: [Vec<Card>; 4], hand_size: u8, turn_start: PlayerId) -> GameState {
     GameState {
@@ -113,7 +113,7 @@ fn play_card_errors_and_trick_resolution() {
             }
         )
         .unwrap_err(),
-        DomainError::validation("Out of turn")
+        DomainError::validation(ValidationKind::OutOfTurn, "Out of turn")
     );
     // Not in hand
     assert_eq!(
@@ -126,7 +126,7 @@ fn play_card_errors_and_trick_resolution() {
             }
         )
         .unwrap_err(),
-        DomainError::validation("Card not in hand")
+        DomainError::validation(ValidationKind::CardNotInHand, "Card not in hand")
     );
     // Play trick fully
     play_card(
@@ -416,7 +416,10 @@ fn trump_conversions() {
     let result: Result<Suit, _> = Trump::NoTrump.try_into();
     assert_eq!(
         result,
-        Err(DomainError::validation("Cannot convert NoTrump to Suit"))
+        Err(DomainError::validation(
+            ValidationKind::InvalidTrumpConversion,
+            "Cannot convert NoTrump to Suit"
+        ))
     );
 }
 
