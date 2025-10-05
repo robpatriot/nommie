@@ -7,7 +7,6 @@ use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
 
 use super::{require_db, txn_policy};
 use crate::error::AppError;
-use crate::infra::db_errors::map_db_err;
 use crate::state::app_state::AppState;
 
 /// A shared transaction wrapper that can be injected into request extensions
@@ -99,10 +98,7 @@ where
     let db = require_db(state)?;
 
     // Real DB path: own the transaction lifecycle
-    let txn = db
-        .begin()
-        .await
-        .map_err(|e| AppError::from(map_db_err(e)))?;
+    let txn = db.begin().await?;
     let out = f(&txn).await;
 
     match out {
@@ -110,15 +106,11 @@ where
             // Apply transaction policy on success
             match txn_policy::current() {
                 txn_policy::TxnPolicy::CommitOnOk => {
-                    txn.commit()
-                        .await
-                        .map_err(|e| AppError::from(map_db_err(e)))?;
+                    txn.commit().await?;
                     Ok(val)
                 }
                 txn_policy::TxnPolicy::RollbackOnOk => {
-                    txn.rollback()
-                        .await
-                        .map_err(|e| AppError::from(map_db_err(e)))?;
+                    txn.rollback().await?;
                     Ok(val)
                 }
             }

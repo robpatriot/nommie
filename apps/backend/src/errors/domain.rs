@@ -103,3 +103,9 @@ impl DomainError {
         Self::Infra(kind, detail.into())
     }
 }
+
+impl From<sea_orm::DbErr> for DomainError {
+    fn from(e: sea_orm::DbErr) -> Self {
+        crate::infra::db_errors::map_db_err(e)
+    }
+}

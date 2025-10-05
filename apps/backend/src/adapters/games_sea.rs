@@ -6,7 +6,6 @@ use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, NotSet, QueryFilter, S
 use crate::db::{as_database_connection, as_database_transaction, DbConn};
 use crate::entities::games;
 use crate::errors::domain::{DomainError, InfraErrorKind};
-use crate::infra::db_errors;
 use crate::repos::games::{Game, GameRepo};
 
 /// SeaORM implementation of GameRepo.
@@ -43,8 +42,7 @@ impl GameRepo for GameRepoSea {
                     "Unsupported DbConn type for SeaORM".to_string(),
                 ));
             }
-        }
-        .map_err(db_errors::map_db_err)?;
+        }?;
 
         Ok(game.map(|g| Game {
             id: g.id,
@@ -76,8 +74,7 @@ impl GameRepo for GameRepoSea {
                     "Unsupported DbConn type for SeaORM".to_string(),
                 ));
             }
-        }
-        .map_err(db_errors::map_db_err)?;
+        }?;
 
         Ok(game.map(|g| Game {
             id: g.id,
@@ -117,8 +114,7 @@ impl GameRepo for GameRepoSea {
                 InfraErrorKind::Other("Connection type".to_string()),
                 "Unsupported DbConn type for SeaORM".to_string(),
             ));
-        }
-        .map_err(db_errors::map_db_err)?;
+        }?;
 
         Ok(Game {
             id: game.id,

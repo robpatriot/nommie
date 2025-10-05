@@ -53,15 +53,11 @@ impl FromRequest for GameId {
                 // Use shared transaction if present
                 games::Entity::find_by_id(game_id)
                     .one(shared_txn.transaction())
-                    .await
-                    .map_err(|e| AppError::db(format!("Failed to query game: {e}")))?
+                    .await?
             } else {
                 // Fall back to pooled connection
                 let db = require_db(app_state)?;
-                games::Entity::find_by_id(game_id)
-                    .one(db)
-                    .await
-                    .map_err(|e| AppError::db(format!("Failed to query game: {e}")))?
+                games::Entity::find_by_id(game_id).one(db).await?
             };
 
             let _game = game.ok_or_else(|| {

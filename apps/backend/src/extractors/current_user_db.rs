@@ -42,16 +42,14 @@ impl FromRequest for CurrentUserRecord {
                 users::Entity::find()
                     .filter(users::Column::Sub.eq(&current_user.sub))
                     .one(shared_txn.transaction())
-                    .await
-                    .map_err(|e| AppError::db(format!("Failed to query user by sub: {e}")))?
+                    .await?
             } else {
                 // Fall back to pooled connection
                 let db = require_db(app_state)?;
                 users::Entity::find()
                     .filter(users::Column::Sub.eq(&current_user.sub))
                     .one(db)
-                    .await
-                    .map_err(|e| AppError::db(format!("Failed to query user by sub: {e}")))?
+                    .await?
             };
 
             let user = user.ok_or(AppError::forbidden_user_not_found())?;
