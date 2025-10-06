@@ -1,265 +1,249 @@
-# 🗺️ Nommie — Ordered Milestones Roadmap
+# 🗺️ Nommie — Milestone & Enhancement Roadmap
+
+This document outlines Nommie’s development path:  
+core milestones first, then optional and enhancement tracks that can be implemented at any time.
 
 ---
 
-## ✅ A — Repo & Project Bootstrap
-- **Dependencies:** none.
-- **Details:**
-  - Monorepo with `apps/frontend`, `apps/backend`, `packages/`.
-  - Root `.env` is canonical; FE `.env.local` mirrors only `NEXT_PUBLIC_*`.
-  - Root scripts:
-    - `backend:fmt` → `cargo fmt --manifest-path apps/backend/Cargo.toml --all`
-    - `backend:clippy` → `cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings`
-  - ESLint/Prettier configured for FE.
-  - Pre-commit hooks active.
-- **Acceptance:** Hello-world FE/BE apps build locally; lint/format hooks pass.
+## Core Milestones
+
+### ✅ **1. Repository & Project Bootstrap**
+**Dependencies:** none  
+**Details:**
+- Monorepo with `apps/frontend`, `apps/backend`, and `packages/`.
+- Root `.env` is canonical; frontend `.env.local` mirrors only `NEXT_PUBLIC_*`.
+- ESLint/Prettier configured for the frontend.
+- Pre-commit hooks active.
+- Scripts:
+  - `backend:fmt` → `cargo fmt --manifest-path apps/backend/Cargo.toml --all`
+  - `backend:clippy` → `cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings`
+**Acceptance:** Hello-world frontend and backend build locally; lint and format hooks pass.
 
 ---
 
-## ✅ B — Docker-First Dev Environment
-- **Dependencies:** A.
-- **Details:**
-  - Docker Compose with Postgres (roles, DBs, grants).
-  - Host-pnpm for speed; backend runs host or container.
-- **Acceptance:** `pnpm dev` starts FE+BE; Postgres reachable; FE talks to BE.
+### ✅ **2. Docker-First Development Environment**
+**Dependencies:** 1  
+**Details:**
+- Docker Compose with Postgres (roles, DBs, grants).
+- Host-pnpm for speed; backend runs on host or in container.
+**Acceptance:** `pnpm dev` starts frontend and backend; Postgres reachable; frontend communicates with backend.
 
 ---
 
-## ✅ C — Database Schema via Init SQL *(Scaffolding Only)*
-- **Dependencies:** B.
-- **Details:**
-  - Single `init.sql` is source of truth.
-  - Test harness applies schema to `_test` DB at startup with guard.
-- **Acceptance:** Tests bootstrap schema cleanly; `_test` guard enforced.
-  *(Actual entities live in F.)*
+### ✅ **3. Database Schema via Init SQL (Scaffolding Only)**
+**Dependencies:** 2  
+**Details:**
+- Single `init.sql` is source of truth.
+- Test harness applies schema to `_test` database at startup with guard.
+**Acceptance:** Tests bootstrap schema cleanly; `_test` guard enforced.  
+*(Actual entities defined in milestone 6.)*
 
 ---
 
-## ✅ D — Testing Harness & Policies
-- **Dependencies:** C.
-- **Details:**
-  - `pnpm test` runs unit + integration + smoke.
-  - Actix in-process integration test harness.
-  - First smoke test: `create → add AI → snapshot`.
-- **Acceptance:** Tests green locally + CI.
+### ✅ **4. Testing Harness & Policies**
+**Dependencies:** 3  
+**Details:**
+- `pnpm test` runs unit, integration, and smoke tests.
+- Actix in-process integration harness.
+- First smoke test: `create → add AI → snapshot`.
+**Acceptance:** Tests pass locally and in CI.
 
 ---
 
-## ✅ E — Error Shapes & Logging *(S → M)*
-- **Dependencies:** D.
-- **Details:**
-  - Problem Details error shape: `{ type, title, status, detail, code, trace_id }`.
-  - `code` in SCREAMING_SNAKE.
-  - Per-request `trace_id` surfaced in logs.
-- **Acceptance:** Consistent error responses; logs include `trace_id`.
+### ✅ **5. Error Shapes & Logging**
+**Dependencies:** 4  
+**Details:**
+- Problem Details error format: `{ type, title, status, detail, code, trace_id }`.
+- `code` uses SCREAMING_SNAKE convention.
+- Middleware assigns a `trace_id` per request.
+**Acceptance:** Consistent error responses; logs include `trace_id`.
 
 ---
 
-## ✅ F — Database Schema (Actual Entities) *(M → L)*
-- **Dependencies:** C, D.
-- **Details:**
-  - Entities in `init.sql`: `users`, `games`, `memberships`, `bids`, `plays`, `scores`.
-  - Enums for `game_state`, `membership_role`, etc.
-  - FKs + indexes; AI players represented in `users` like humans.
-- **Acceptance:** Schema applies cleanly; coherent with lifecycle needs.
+### ✅ **6. Database Schema (Actual Entities)**
+**Dependencies:** 3, 4  
+**Details:**
+- Entities defined in `init.sql`: `users`, `games`, `memberships`, `bids`, `plays`, `scores`.
+- Enums for game and membership states.
+- Foreign keys and indexes added.
+- AI players represented in `users` table like humans.
+**Acceptance:** Schema applies cleanly and aligns with game lifecycle.
 
 ---
 
-## ✅ G — User Authentication *(M → L)*
-- **Dependencies:** F.
-- **Details (Done):**
-  - Google OAuth for account creation & login.
-  - JWTs for FE/BE auth.
-  - Auth extractor validates JWT and resolves current user.
-- **Acceptance:** Users authenticate via Google; JWTs enforced; extractor loads current user.
+### ✅ **7. User Authentication**
+**Dependencies:** 6  
+**Details:**
+- Google OAuth for login and account creation.
+- JWTs for frontend/backend authentication.
+- Authentication extractor validates JWT and resolves current user.
+**Acceptance:** Users authenticate via Google; JWT validation works end-to-end.
 
 ---
 
-## ✅ H — App Error & Trace ID via Web Boundary *(S → M)*
-- **Dependencies:** D, E.
-- **Details (Done):**
-  - Removed `trace_id` from `AppError`.
-  - Middleware issues per-request `trace_id`, stored in request context and set in `x-trace-id` header.
-  - `ResponseError` reads `trace_id` from context when building Problem Details.
-  - Removed `from_req`, `with_trace_id`, `ensure_trace_id`.
-  - Updated tests assert header presence and parity with JSON `trace_id`.
-- **Acceptance:**
-  - No `trace_id` in `AppError` or manual attachments.
-  - Problem Details and `x-trace-id` header agree for all errors.
-  - `pnpm be:lint` and `pnpm be:test` pass.
+### ✅ **8. Transactional Tests & DB Access Pattern**
+**Dependencies:** 4  
+**Details:**
+- Unified request-path DB access through `with_txn`.
+- Rollback-by-default test policy.
+- Nested `with_txn` behavior defined and tested.
+**Acceptance:** All handlers use `with_txn`; no direct `state.db` usage; lint and tests clean.
 
 ---
 
-## ✅ I — Transactional Tests *(S → M)*
-- **Dependencies:** D.
-- **Details (Done):**
-  - Unified request-path DB access through `with_txn`; removed direct `state.db` grabs.
-  - Simplified `AppState.db` builder.
-  - Defined + tested nested `with_txn` behavior.
-  - Enforced rollback-by-default policy in tests.
-- **Acceptance:**
-  - Request-path code consistently uses `with_txn`.
-  - No-DB state returns `DB_UNAVAILABLE`.
-  - Shared + nested txn behavior proven in tests.
-  - CI green.
+### ✅ **9. Extractors**
+**Dependencies:** 5, 6, 7  
+**Details:**
+- Implemented: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, and `ValidatedJson<T>`.
+**Acceptance:** Handlers are thin; extractor tests pass; single DB hit for user and membership.
 
 ---
 
-## ✅ J — Extractors *(M → L)*
-- **Dependencies:** E, F, G.
-- **Details (Done):**
-  - Completed: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`.
-- **Acceptance:**
-  - Handlers are thin.
-  - Extractor tests pass.
-  - Single DB hit for user+membership where possible.
+### 🕓 **10. Backend Domain Modules**
+**Dependencies:** 7  
+**Details:**
+- Pure logic modules: `rules`, `bidding`, `tricks`, `scoring`, `state`.
+- No SeaORM in domain modules.
+**Acceptance:** `grep` shows no ORM usage in domain code.
 
 ---
 
-## 🅚 K — Backend Domain Modules *(L)*
-- **Dependencies:** G.
-- **Details:**
-  - Pure logic: `rules`, `bidding`, `tricks`, `scoring`, `state`.
-  - No SeaORM in domain modules; orchestration sits above.
-- **Acceptance:** `grep` shows no SeaORM in domain code.
+### 🟨 **11. Frontend App Router Seed**
+**Dependencies:** 5, 7  
+**Details:**
+- Next.js App Router + Turbopack.
+- Login page working.
+- Lobby and Game skeleton pages pending.
+**Acceptance:** Users can sign in and access placeholder lobby/game views.
 
 ---
 
-## 🟨 L — Frontend App Router Seed *(M, partially done)*
-- **Dependencies:** E, G.
-- **Details:**
-  - Next.js App Router + Turbopack.
-  - Pages:
-    - ✅ **Login** (NextAuth v5 wrapper for Google) — working.
-    - ❌ **Lobby skeleton** — not yet implemented.
-    - ❌ **Game skeleton** — not yet implemented.
-- **Acceptance:** Can sign in, see lobby, and a placeholder game screen.
+### 🕓 **12. Game Lifecycle (Happy Path)**
+**Dependencies:** 9, 7, 10, 11  
+**Details:**
+- Complete flow: `create → join → ready → deal → bid → trump → tricks → scoring → next round`.
+- Integration test covers minimal end-to-end loop.
+**Acceptance:** A full happy-path game completes successfully.
 
 ---
 
-## 🅛 M — Game Lifecycle (Happy Path) *(L → XL)*
-- **Dependencies:** J, G, K, L.
-- **Details:**
-  - End-to-end: `create → join → ready → deal → bid → trump → tricks → scoring → round advance`.
-  - Integration test covers the minimal loop.
-- **Acceptance:** Happy-path game completes.
+### 🕓 **13. AI Orchestration**
+**Dependencies:** 11  
+**Details:**
+- AI performs bidding and legal plays.
+- Game advances automatically until human input is required.
+**Acceptance:** Full AI-only games complete successfully.
 
 ---
 
-## 🅜 N — AI Orchestration *(M → L)*
-- **Dependencies:** L.
-- **Details:**
-  - Basic AI bidding + valid trick play.
-  - Runs per poll cycle; AI auto-advances until human’s turn.
-- **Acceptance:** Full game completes with AIs filling seats.
+### 🕓 **14. Validation, Edge Cases, and Property Tests**
+**Dependencies:** 11  
+**Details:**
+- Invalid bids/plays return proper Problem Details.
+- Property tests confirm trick/scoring invariants.
+**Acceptance:** Error cases handled consistently; all properties hold.
 
 ---
 
-## 🅝 O — Validation, Edge Cases & Property Tests *(M)*
-- **Dependencies:** L.
-- **Details:**
-  - Invalid bids/plays return proper Problem Details.
-  - Property tests for trick/scoring invariants.
-- **Acceptance:** Error paths validated; properties hold.
+### 🕓 **15. Frontend UX Pass (Round 1)**
+**Dependencies:** 11, 13  
+**Details:**
+- Hand display, trick area, bidding UI, trump selector.
+- Frontend shows Problem Details errors clearly.
+**Acceptance:** Gameplay readable and intuitive.
 
 ---
 
-## 🅞 P — Frontend UX Pass (Round 1) *(M → L)*
-- **Dependencies:** L, N.
-- **Details:**
-  - Hand display, trick area, bidding UI, trump selector.
-  - FE surfaces Problem Details errors nicely.
-- **Acceptance:** Gameplay is clear; errors understandable.
+### 🟨 **16. CI Pipeline**
+**Dependencies:** 4, 5, 6, 7, 9, 14, 15  
+**Details:**
+- Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.
+- Planned CI: GitHub Actions gates merges with lint, tests, and schema checks.
+**Acceptance:** CI green gate required for merges; schema re-applies cleanly.
 
 ---
 
-## 🟨 Q — CI Pipeline *(S, partially done)*
-- **Dependencies:** D, E, F, G, J, O, P.
-- **Completed (local):**
-  - Robust pre-commit: FE ESLint/Prettier (staged-aware), BE clippy + rustfmt (staged write).
-- **Remaining (for CI gate):**
-  - GitHub Actions gating PRs/`main` with:
-    - FE: ESLint, Prettier check, TS typecheck.
-    - BE: clippy, `rustfmt --check`.
-    - Tests with Postgres service; apply `init.sql` twice.
-    - Caching (pnpm + Cargo).
-- **Acceptance:** CI green gate required for merges; schema re-applies cleanly.
+### 🕓 **17. Documentation & Decision Log**
+**Dependencies:** 11  
+**Details:**
+- README: setup and reset flow.
+- CONTRIBUTING: module layout, extractor policy, `_test` guard.
+- DECISIONS.md: locked technical decisions.
+**Acceptance:** New developers can onboard independently.
 
 ---
 
-## 🅟 R — Documentation & Decision Log *(S)*
-- **Dependencies:** L.
-- **Details:**
-  - README: setup + reset flow.
-  - CONTRIBUTING: module layout, extractor policy, `_test` guard.
-  - DECISIONS.md: locked decisions recorded.
-- **Acceptance:** New devs onboard smoothly.
+### 🕓 **18. Observability & Stability**
+**Dependencies:** 5, 11  
+**Details:**
+- Logs include `user_id` and `game_id` when relevant.
+- Frontend displays `trace_id` on error surfaces.
+- `/health` endpoint checks DB connectivity.
+**Acceptance:** Logs actionable; trace ID visible end-to-end.
 
 ---
 
-## 🅠 S — Observability & Stability *(S → M)*
-- **Dependencies:** E, L.
-- **Details:**
-  - Logs include `user_id` + `game_id` where relevant.
-  - FE shows `trace_id` on errors.
-  - Health endpoint reports DB status.
-- **Acceptance:** Logs actionable; trace id visible end-to-end.
+### 🕓 **19. Open Source Observability Stack**
+**Dependencies:** 16, 10  
+**Details:**
+- Grafana, Tempo, Loki, and Prometheus in Docker Compose.
+**Acceptance:** Metrics, logs, and traces integrated and viewable.
 
 ---
 
-## 🅡 T — Open Source Observability Stack *(M → L)*
-- **Dependencies:** Q, K.
-- **Details:**
-  - Grafana + Tempo + Loki + Prometheus in Docker.
-- **Acceptance:** Infra captures app metrics, logs, and traces.
+## Optional & Enhancement Track
+
+Independent improvements that enhance robustness, performance, and developer experience.
 
 ---
 
-# 🔄 Optional Track (anytime)
+### **1. Architecture & Reliability**
+- **WebSockets / Server Push:** Replace polling with WebSockets or SSE. Backend emits live game-state updates.  
+  *Acceptance:* Real-time updates replace polling.
+- **Deployment Stub:** Minimal production-style environment including FE, BE, DB, and observability stubs.  
+  *Acceptance:* Application runs in minimal production configuration.
+- **Race-Safe `ensure_user`:** Handle concurrent insertions safely by re-fetching on unique violations.  
+  *Acceptance:* No duplicate users under concurrency.
 
-### 🅂 WebSockets *(M)*
-- **Dependencies:** L.
-- **Details:** Replace polling with push (Actix WS or SSE). Ensure AI orchestration fits push model.
-- **Acceptance:** FE receives live state; polling removed.
+---
 
-### 🅄 Deployment Stub *(S → M)*
-- **Dependencies:** B, R, S.
-- **Details:** Minimal prod-style deployment (Compose or k3d). Includes FE, BE, DB, observability stubs.
-- **Acceptance:** App boots in a minimal production environment.
+### **2. Behavioral & Infrastructure Improvements**
+- **Data & Auth Hygiene:** Email normalization (trim, lowercase, Unicode NFKC), validation, username cleaning, skip redundant writes.  
+- **PII-Safe Logging:** Mask or hash sensitive identifiers in logs.  
+- **Error Code Catalog:** Centralize all SCREAMING_SNAKE error codes.  
+- **Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.  
+- **Determinism Tools:** Introduce injectable clock, seeded RNG, and mock time for reproducible tests.
 
-### 🅅 Race-safe `ensure_user` hardening *(M)*
-- **Details:** Handle unique-violation on insert by re-fetching; avoid duplicate users under concurrency.
-- **Acceptance:** Concurrent first-login attempts never produce duplicate users or credentials.
+---
 
-### 🅆 Behavioral Improvements *(S → M)*
-- **Email normalization** (trim, lowercase, Unicode NFKC).
-- **Email validation** (`422 INVALID_EMAIL`).
-- **Username hygiene** (min length/cleaning; store NULL if invalid).
-- **Last-login updates** (skip no-op writes).
-- **Error code catalog** (centralize codes).
-- **PII-safe logging** (mask/hash email and `google_sub`).
-- **Time provider abstraction** (injectable clock for deterministic tests).
-- **Rate limiting** (`429 RATE_LIMITED` on auth endpoint).
+### **3. Extractors, Testing, and Validation**
+- **Extractor Unification:** Ensure all routes use `ValidatedJson<T>`, `AuthToken`, `CurrentUser`, `GameId`, and `GameMembership`.  
+  *Acceptance:* Input validation consistent across all handlers.
+- **Extended Property Tests:** Verify correctness for dealing, progression, scoring, bidding, and serialization invariants.  
+  *Acceptance:* Invariants hold across generated games.  
+- **Golden Snapshot Fixtures:** Canonical JSON snapshots for all game phases, shared between frontend and backend.  
+  *Acceptance:* Schema or logic changes surface as test diffs.  
+- **Deterministic AI Simulation:** Replay identical seeded games for regression testing.  
+  *Acceptance:* Identical seeds yield identical results.
 
-### 🅇 Frontend Import Hygiene & Lazy Loading *(S → M)*
-- **Consistent import ordering/grouping** (builtin, external, internal alias, parent/sibling, index).
-- **Type-only imports** enforced via ESLint.
-- **Dynamic `import()` / `next/dynamic`** for heavy libs or non-critical components.
-- **Example migration** of one component to `next/dynamic`.
-- **Docs** page explaining import policy and usage examples.
+---
 
-### 🅨 Extended Property Tests *(S → M)*
-- **Dealing integrity:** generate full 52-card deck deals, assert uniqueness and correct per-seat hand sizes.
-- **Round/trick progression invariants:** leader rotation, trick counts, and phase bounds hold across generated rounds.
-- **Scoring correctness:** bids and trick counts yield scores with exact-bid +10 bonus applied correctly.
-- **Bidding legality:** all bids within allowed range, highest bid wins, ties resolve to first in turn order.
-- **Snapshot round-trip:** `serde_json` serialize/deserialize yields equal snapshots (stability check).
-- **Optional generators** for edge cases (0 bids, NO_TRUMP rounds, final round completion).
+### **4. Developer Experience & Frontend Quality**
+- **Import Hygiene & Lazy Loading:** Standardized import order, type-only imports, and dynamic loading for heavy libraries.  
+  *Acceptance:* Consistent imports and improved build performance.  
+- **Documentation Enhancements:** Add `DECISIONS.md`, `CONTRIBUTING.md`, and `_test` guard docs.  
+  *Acceptance:* Onboarding and contribution processes are self-contained.  
+- **Frontend Polish:** Continue refining UI clarity and responsiveness beyond Round 1.
 
-### 🅩 Golden Snapshot Fixtures *(S)*
-- **Canonical JSON files** for each major phase: Init, Bidding, TrumpSelect (with NO_TRUMP), Trick, Scoring, Complete.
-- **Stability tests** assert `to_json(snapshot)` matches checked-in fixture.
-- **Review diffs** in PRs surface any intentional schema changes.
-- **Shared reference** for frontend contract and unit tests.
-- **Pretty-printed format** for readability and documentation by example.
-- **Docs link** pointing frontend contributors to the fixtures for parsing and UI snapshot tests.
+---
+
+### **5. Observability & Health**
+- **Health Endpoint:** Add `/health` route reporting DB connectivity and version info.  
+  *Acceptance:* Endpoint returns up/down status with trace context.  
+- **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus for full observability.  
+  *Acceptance:* Metrics, logs, and traces visible in dashboards.  
+- **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id`.
+
+---
+
+*End of Roadmap.*
