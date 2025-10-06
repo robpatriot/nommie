@@ -1,8 +1,9 @@
-//! Game repository trait for domain layer.
+//! Game repository functions for domain layer (generic over ConnectionTrait).
 
-use async_trait::async_trait;
+use sea_orm::ConnectionTrait;
 
-use crate::db::DbConn;
+use crate::adapters::games_sea as games_adapter;
+use crate::entities::games;
 use crate::errors::domain::DomainError;
 
 /// Game domain model
@@ -14,18 +15,41 @@ pub struct Game {
     pub updated_at: time::OffsetDateTime,
 }
 
-/// Repository trait for game operations.
-/// 
-/// This trait is domain-facing and contains no SeaORM imports.
-/// Adapters implement this trait using SeaORM entities.
-#[async_trait]
-pub trait GameRepo: Send + Sync {
-    /// Find game by ID
-    async fn find_by_id(&self, conn: &dyn DbConn, game_id: i64) -> Result<Option<Game>, DomainError>;
+// Free functions (generic) mirroring the previous trait methods
 
-    /// Find game by join code
-    async fn find_by_join_code(&self, conn: &dyn DbConn, join_code: &str) -> Result<Option<Game>, DomainError>;
+pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Option<Game>, DomainError> {
+    let game = games_adapter::find_by_id(conn, game_id).await?;
+    Ok(game.map(Game::from))
+}
 
-    /// Create a new game
-    async fn create_game(&self, conn: &dyn DbConn, join_code: &str) -> Result<Game, DomainError>;
+pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    join_code: &str,
+) -> Result<Option<Game>, DomainError> {
+    let game = games_adapter::find_by_join_code(conn, join_code).await?;
+    Ok(game.map(Game::from))
+}
+
+pub async fn create_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    join_code: &str,
+) -> Result<Game, DomainError> {
+    let game = games_adapter::create_game(conn, join_code).await?;
+    Ok(Game::from(game))
+}
+
+// Conversions between SeaORM models and domain models
+
+impl From<games::Model> for Game {
+    fn from(model: games::Model) -> Self {
+        Self {
+            id: model.id,
+            join_code: model.join_code.unwrap_or_default(),
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
 }

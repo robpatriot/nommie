@@ -1,8 +1,9 @@
 //! Player domain service.
 
-use crate::db::DbConn;
+use sea_orm::ConnectionTrait;
+
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::players::PlayerRepo;
+use crate::repos::players;
 
 /// Player domain service.
 pub struct PlayerService;
@@ -22,10 +23,9 @@ impl PlayerService {
     /// # Returns
     /// * `Ok(String)` - The player's display name
     /// * `Err(DomainError)` - If seat is invalid, player not found, or DB error
-    pub async fn get_display_name_by_seat(
+    pub async fn get_display_name_by_seat<C: ConnectionTrait + Send + Sync>(
         &self,
-        repo: &dyn PlayerRepo,
-        conn: &dyn DbConn,
+        conn: &C,
         game_id: i64,
         seat: u8,
     ) -> Result<String, DomainError> {
@@ -38,7 +38,7 @@ impl PlayerService {
         }
 
         // Call repository and map DomainError to AppError
-        let display_name = repo.get_display_name_by_seat(conn, game_id, seat).await?;
+        let display_name = players::get_display_name_by_seat(conn, game_id, seat).await?;
         Ok(display_name)
     }
 }

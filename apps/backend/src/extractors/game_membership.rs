@@ -104,18 +104,11 @@ impl FromRequest for GameMembership {
             let service = MembershipService::new();
             let membership = if let Some(shared_txn) = SharedTxn::from_req(&req) {
                 service
-                    .find_membership(
-                        app_state.memberships_repo.as_ref(),
-                        shared_txn.transaction(),
-                        game_id.0,
-                        user.id,
-                    )
+                    .find_membership(shared_txn.transaction(), game_id.0, user.id)
                     .await?
             } else {
                 let db = require_db(app_state)?;
-                service
-                    .find_membership(app_state.memberships_repo.as_ref(), db, game_id.0, user.id)
-                    .await?
+                service.find_membership(db, game_id.0, user.id).await?
             };
 
             let membership = membership.ok_or_else(|| {

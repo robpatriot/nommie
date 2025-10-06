@@ -1,8 +1,9 @@
-//! Membership repository trait for domain layer.
+//! Membership repository functions for domain layer (generic over ConnectionTrait).
 
-use async_trait::async_trait;
+use sea_orm::{ConnectionTrait, Set};
 
-use crate::db::DbConn;
+use crate::adapters::memberships_sea as memberships_adapter;
+use crate::entities::game_players;
 use crate::errors::domain::DomainError;
 
 /// Game membership domain model
@@ -37,35 +38,78 @@ impl GameRole {
     }
 }
 
-/// Repository trait for membership operations.
-/// 
-/// This trait is domain-facing and contains no SeaORM imports.
-/// Adapters implement this trait using SeaORM entities.
-#[async_trait]
-pub trait MembershipRepo: Send + Sync {
-    /// Find a user's membership in a specific game
-    async fn find_membership(
-        &self,
-        conn: &dyn DbConn,
-        game_id: i64,
-        user_id: i64,
-    ) -> Result<Option<GameMembership>, DomainError>;
+// Free functions (generic) mirroring the previous trait methods
 
-    /// Create a new membership
-    async fn create_membership(
-        &self,
-        conn: &dyn DbConn,
-        game_id: i64,
-        user_id: i64,
-        turn_order: i32,
-        is_ready: bool,
-        role: GameRole,
-    ) -> Result<GameMembership, DomainError>;
+pub async fn find_membership<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+    user_id: i64,
+) -> Result<Option<GameMembership>, DomainError> {
+    let membership = memberships_adapter::find_membership(conn, game_id, user_id).await?;
+    Ok(membership.map(GameMembership::from))
+}
 
-    /// Update membership
-    async fn update_membership(
-        &self,
-        conn: &dyn DbConn,
-        membership: GameMembership,
-    ) -> Result<GameMembership, DomainError>;
+pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+    user_id: i64,
+    turn_order: i32,
+    is_ready: bool,
+    role: GameRole,
+) -> Result<GameMembership, DomainError> {
+    let membership =
+        memberships_adapter::create_membership(conn, game_id, user_id, turn_order, is_ready)
+            .await?;
+    Ok(GameMembership {
+        id: membership.id,
+        game_id: membership.game_id,
+        user_id: membership.user_id,
+        turn_order: membership.turn_order,
+        is_ready: membership.is_ready,
+        role,
+    })
+}
+
+pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    membership: GameMembership,
+) -> Result<GameMembership, DomainError> {
+    let active: game_players::ActiveModel = membership.into();
+    let membership = memberships_adapter::update_membership(conn, active).await?;
+    Ok(GameMembership {
+        id: membership.id,
+        game_id: membership.game_id,
+        user_id: membership.user_id,
+        turn_order: membership.turn_order,
+        is_ready: membership.is_ready,
+        role: GameRole::Player, // For now, all members are players
+    })
+}
+
+// Conversions between SeaORM models and domain models
+
+impl From<game_players::Model> for GameMembership {
+    fn from(model: game_players::Model) -> Self {
+        Self {
+            id: model.id,
+            game_id: model.game_id,
+            user_id: model.user_id,
+            turn_order: model.turn_order,
+            is_ready: model.is_ready,
+            role: GameRole::Player, // For now, all members are players
+        }
+    }
+}
+
+impl From<GameMembership> for game_players::ActiveModel {
+    fn from(domain: GameMembership) -> Self {
+        Self {
+            id: Set(domain.id),
+            game_id: Set(domain.game_id),
+            user_id: Set(domain.user_id),
+            turn_order: Set(domain.turn_order),
+            is_ready: Set(domain.is_ready),
+            created_at: Set(time::OffsetDateTime::now_utc()),
+        }
+    }
 }

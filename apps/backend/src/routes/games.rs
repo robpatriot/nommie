@@ -50,13 +50,10 @@ async fn get_player_display_name(
     let (game_id, seat) = path.into_inner();
 
     // Get display name within a transaction
-    let players_repo = app_state.players_repo.clone();
     let display_name = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = PlayerService::new();
-            Ok(service
-                .get_display_name_by_seat(players_repo.as_ref(), txn, game_id, seat)
-                .await?)
+            Ok(service.get_display_name_by_seat(txn, game_id, seat).await?)
         })
     })
     .await?;

@@ -20,7 +20,6 @@ async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
         .await
         .expect("build test state with DB");
 
-    let players_repo = state.players_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create test data
@@ -30,9 +29,7 @@ async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
 
             // Test the service
             let service = PlayerService::new();
-            let result = service
-                .get_display_name_by_seat(players_repo.as_ref(), txn, game_id, 0)
-                .await?;
+            let result = service.get_display_name_by_seat(txn, game_id, 0).await?;
 
             assert_eq!(result, "Alice");
             Ok::<_, AppError>(())
@@ -52,14 +49,11 @@ async fn test_get_display_name_by_seat_invalid_seat() -> Result<(), AppError> {
         .await
         .expect("build test state with DB");
 
-    let players_repo = state.players_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Test the service with invalid seat (no DB data needed for validation)
             let service = PlayerService::new();
-            let result = service
-                .get_display_name_by_seat(players_repo.as_ref(), txn, 1, 5)
-                .await;
+            let result = service.get_display_name_by_seat(txn, 1, 5).await;
 
             match result {
                 Err(domain_err) => {
@@ -91,7 +85,6 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
         .await
         .expect("build test state with DB");
 
-    let players_repo = state.players_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create test game but no players
@@ -99,9 +92,7 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
 
             // Test the service
             let service = PlayerService::new();
-            let result = service
-                .get_display_name_by_seat(players_repo.as_ref(), txn, game_id, 0)
-                .await;
+            let result = service.get_display_name_by_seat(txn, game_id, 0).await;
 
             match result {
                 Err(domain_err) => {
@@ -135,7 +126,6 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
         .await
         .expect("build test state with DB");
 
-    let players_repo = state.players_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create test data with no username (should fall back to sub)
@@ -145,9 +135,7 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
 
             // Test the service
             let service = PlayerService::new();
-            let result = service
-                .get_display_name_by_seat(players_repo.as_ref(), txn, game_id, 1)
-                .await?;
+            let result = service.get_display_name_by_seat(txn, game_id, 1).await?;
 
             assert_eq!(result, "bob");
             Ok::<_, AppError>(())
@@ -167,7 +155,6 @@ async fn test_get_display_name_by_seat_multiple_seats() -> Result<(), AppError> 
         .await
         .expect("build test state with DB");
 
-    let players_repo = state.players_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create test data with multiple players
@@ -183,19 +170,13 @@ async fn test_get_display_name_by_seat_multiple_seats() -> Result<(), AppError> 
             // Test the service for different seats
             let service = PlayerService::new();
 
-            let result0 = service
-                .get_display_name_by_seat(players_repo.as_ref(), txn, game_id, 0)
-                .await?;
+            let result0 = service.get_display_name_by_seat(txn, game_id, 0).await?;
             assert_eq!(result0, "Alice");
 
-            let result1 = service
-                .get_display_name_by_seat(players_repo.as_ref(), txn, game_id, 1)
-                .await?;
+            let result1 = service.get_display_name_by_seat(txn, game_id, 1).await?;
             assert_eq!(result1, "Bob");
 
-            let result2 = service
-                .get_display_name_by_seat(players_repo.as_ref(), txn, game_id, 2)
-                .await?;
+            let result2 = service.get_display_name_by_seat(txn, game_id, 2).await?;
             assert_eq!(result2, "Charlie");
 
             Ok::<_, AppError>(())
