@@ -1,9 +1,9 @@
+use sea_orm::ConnectionTrait;
 use tracing::{debug, info, warn};
 
-use crate::db::DbConn;
 use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind};
 use crate::logging::pii::Redacted;
-use crate::repos::users::{User, UserRepo};
+use crate::repos::users::{self as users_repo, User};
 
 /// Redacts a google_sub value for logging purposes.
 /// Shows only the first 4 characters followed by asterisks.
@@ -27,16 +27,15 @@ impl UserService {
     /// This function is idempotent - calling it multiple times with the same email
     /// will return the same user without creating duplicates.
     /// Returns the User that was found or created.
-    pub async fn ensure_user(
+    pub async fn ensure_user<C: ConnectionTrait + Send + Sync>(
         &self,
-        repo: &dyn UserRepo,
-        conn: &dyn DbConn,
+        conn: &C,
         email: &str,
         name: Option<&str>,
         google_sub: &str,
     ) -> Result<User, DomainError> {
         // Look up existing user credentials by email
-        let existing_credential = repo.find_credentials_by_email(conn, email).await?;
+        let existing_credential = users_repo::find_credentials_by_email(conn, email).await?;
 
         match existing_credential {
             Some(credential) => {
@@ -75,11 +74,10 @@ impl UserService {
 
                 updated_credential.updated_at = get_current_time();
 
-                repo.update_credentials(conn, updated_credential).await?;
+                users_repo::update_credentials(conn, updated_credential).await?;
 
                 // Fetch and return the linked user
-                let user = repo
-                    .find_user_by_id(conn, user_id)
+                let user = users_repo::find_user_by_id(conn, user_id)
                     .await?
                     .ok_or_else(|| DomainError::not_found(NotFoundKind::User, "User not found"))?;
 
@@ -99,18 +97,16 @@ impl UserService {
                 let username = derive_username(name, email);
 
                 // Create new user with auto-generated ID and sub from google_sub
-                let user = repo
-                    .create_user(
-                        conn,
-                        google_sub,
-                        username.as_deref().unwrap_or("user"),
-                        false,
-                    )
-                    .await?;
+                let user = users_repo::create_user(
+                    conn,
+                    google_sub,
+                    username.as_deref().unwrap_or("user"),
+                    false,
+                )
+                .await?;
 
                 // Create new user credentials with auto-generated ID
-                repo.create_credentials(conn, user.id, email, Some(google_sub))
-                    .await?;
+                users_repo::create_credentials(conn, user.id, email, Some(google_sub)).await?;
 
                 // Log first user creation
                 info!(

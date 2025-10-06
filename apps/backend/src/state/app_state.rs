@@ -6,11 +6,9 @@ use super::security_config::SecurityConfig;
 use crate::adapters::games_sea::GameRepoSea;
 use crate::adapters::memberships_sea::MembershipRepoSea;
 use crate::adapters::players_sea::PlayerRepoSea;
-use crate::adapters::users_sea::UserRepoSea;
 use crate::repos::games::GameRepo;
 use crate::repos::memberships::MembershipRepo;
 use crate::repos::players::PlayerRepo;
-use crate::repos::users::UserRepo;
 
 /// Application state containing shared resources
 pub struct AppState {
@@ -19,7 +17,6 @@ pub struct AppState {
     /// Security configuration including JWT settings
     pub security: SecurityConfig,
     /// Repository instances (trait objects)
-    pub users_repo: Arc<dyn UserRepo>,
     pub games_repo: Arc<dyn GameRepo>,
     pub memberships_repo: Arc<dyn MembershipRepo>,
     pub players_repo: Arc<dyn PlayerRepo>,
@@ -30,7 +27,7 @@ impl AppState {
         Self {
             db,
             security,
-            users_repo: Arc::new(UserRepoSea::new()) as Arc<dyn UserRepo>,
+
             games_repo: Arc::new(GameRepoSea::new()) as Arc<dyn GameRepo>,
             memberships_repo: Arc::new(MembershipRepoSea::new()) as Arc<dyn MembershipRepo>,
             players_repo: Arc::new(PlayerRepoSea::new()) as Arc<dyn PlayerRepo>,

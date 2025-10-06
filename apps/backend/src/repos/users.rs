@@ -1,8 +1,9 @@
-//! User repository trait for domain layer.
+//! User repository functions for domain layer (generic over ConnectionTrait).
 
-use async_trait::async_trait;
+use sea_orm::{ConnectionTrait, Set};
 
-use crate::db::DbConn;
+use crate::adapters::users_sea as users_adapter;
+use crate::entities::{user_credentials, users};
 use crate::errors::domain::DomainError;
 
 /// User domain model
@@ -29,44 +30,94 @@ pub struct UserCredentials {
     pub updated_at: time::OffsetDateTime,
 }
 
-/// Repository trait for user operations.
-/// 
-/// This trait is domain-facing and contains no SeaORM imports.
-/// Adapters implement this trait using SeaORM entities.
-#[async_trait]
-pub trait UserRepo: Send + Sync {
-    /// Find user credentials by email
-    async fn find_credentials_by_email(
-        &self,
-        conn: &dyn DbConn,
-        email: &str,
-    ) -> Result<Option<UserCredentials>, DomainError>;
+// Free functions (generic) mirroring the previous trait methods
 
-    /// Create a new user
-    async fn create_user(
-        &self,
-        conn: &dyn DbConn,
-        sub: &str,
-        username: &str,
-        is_ai: bool,
-    ) -> Result<User, DomainError>;
+pub async fn find_credentials_by_email<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    email: &str,
+) -> Result<Option<UserCredentials>, DomainError> {
+    let credential = users_adapter::find_credentials_by_email(conn, email).await?;
+    Ok(credential.map(UserCredentials::from))
+}
 
-    /// Create user credentials
-    async fn create_credentials(
-        &self,
-        conn: &dyn DbConn,
-        user_id: i64,
-        email: &str,
-        google_sub: Option<&str>,
-    ) -> Result<UserCredentials, DomainError>;
+pub async fn create_user<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    sub: &str,
+    username: &str,
+    is_ai: bool,
+) -> Result<User, DomainError> {
+    let user = users_adapter::create_user(conn, sub, username, is_ai).await?;
+    Ok(User::from(user))
+}
 
-    /// Update user credentials
-    async fn update_credentials(
-        &self,
-        conn: &dyn DbConn,
-        credentials: UserCredentials,
-    ) -> Result<UserCredentials, DomainError>;
+pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    user_id: i64,
+    email: &str,
+    google_sub: Option<&str>,
+) -> Result<UserCredentials, DomainError> {
+    let credential = users_adapter::create_credentials(conn, user_id, email, google_sub).await?;
+    Ok(UserCredentials::from(credential))
+}
 
-    /// Find user by ID
-    async fn find_user_by_id(&self, conn: &dyn DbConn, user_id: i64) -> Result<Option<User>, DomainError>;
+pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    credentials: UserCredentials,
+) -> Result<UserCredentials, DomainError> {
+    let active: user_credentials::ActiveModel = credentials.into();
+    let credential = users_adapter::update_credentials(conn, active).await?;
+    Ok(UserCredentials::from(credential))
+}
+
+pub async fn find_user_by_id<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    user_id: i64,
+) -> Result<Option<User>, DomainError> {
+    let user = users_adapter::find_user_by_id(conn, user_id).await?;
+    Ok(user.map(User::from))
+}
+
+// Conversions between SeaORM models and domain models
+
+impl From<users::Model> for User {
+    fn from(model: users::Model) -> Self {
+        Self {
+            id: model.id,
+            sub: model.sub,
+            username: model.username,
+            is_ai: model.is_ai,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+impl From<user_credentials::Model> for UserCredentials {
+    fn from(model: user_credentials::Model) -> Self {
+        Self {
+            id: model.id,
+            user_id: model.user_id,
+            password_hash: model.password_hash,
+            email: model.email,
+            google_sub: model.google_sub,
+            last_login: model.last_login,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+impl From<UserCredentials> for user_credentials::ActiveModel {
+    fn from(domain: UserCredentials) -> Self {
+        Self {
+            id: Set(domain.id),
+            user_id: Set(domain.user_id),
+            password_hash: Set(domain.password_hash),
+            email: Set(domain.email),
+            google_sub: Set(domain.google_sub),
+            last_login: Set(domain.last_login),
+            created_at: Set(domain.created_at),
+            updated_at: Set(domain.updated_at),
+        }
+    }
 }

@@ -23,7 +23,6 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
         .await
         .expect("build test state with DB");
 
-    let users_repo = state.users_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // First call - should create a new user
@@ -31,13 +30,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
             let test_google_sub = unique_str("google-sub");
             let service = UserService::new();
             let user1 = service
-                .ensure_user(
-                    users_repo.as_ref(),
-                    txn,
-                    &test_email,
-                    Some("Alice"),
-                    &test_google_sub,
-                )
+                .ensure_user(txn, &test_email, Some("Alice"), &test_google_sub)
                 .await?;
 
             // Verify user was created with expected values
@@ -48,7 +41,6 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
             // Second call with same email but different name - should return same user
             let user2 = service
                 .ensure_user(
-                    users_repo.as_ref(),
                     txn,
                     &test_email,
                     Some("Alice Smith"), // Different name
@@ -110,7 +102,6 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
         .await
         .expect("build test state with DB");
 
-    let users_repo = state.users_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let test_email = unique_email("bob");
@@ -120,13 +111,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 
             // Scenario 1: First login (no user/credential) → creates user + credentials, sets google_sub
             let user1 = service
-                .ensure_user(
-                    users_repo.as_ref(),
-                    txn,
-                    &test_email,
-                    Some("Bob"),
-                    &original_google_sub,
-                )
+                .ensure_user(txn, &test_email, Some("Bob"), &original_google_sub)
                 .await?;
 
             // Verify user was created with expected values
@@ -153,7 +138,6 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
             // Scenario 2: Repeat login (same email, same google_sub) → updates last_login, succeeds
             let user2 = service
                 .ensure_user(
-                    users_repo.as_ref(),
                     txn,
                     &test_email,
                     Some("Bob Smith"),    // Different name
@@ -178,13 +162,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 
             // Scenario 3: Repeat login (same email, credential has different google_sub) → expect 409 with GOOGLE_SUB_MISMATCH
             let error_result = service
-                .ensure_user(
-                    users_repo.as_ref(),
-                    txn,
-                    &test_email,
-                    Some("Bob"),
-                    &different_google_sub,
-                )
+                .ensure_user(txn, &test_email, Some("Bob"), &different_google_sub)
                 .await;
 
             // Verify that the original credential remains unchanged
@@ -229,7 +207,6 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
         .await
         .expect("build test state with DB");
 
-    let users_repo = state.users_repo.clone();
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let test_email = unique_email("charlie");
@@ -274,7 +251,6 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
             // Scenario 4: Repeat login (email exists, google_sub NULL) → sets google_sub to incoming, succeeds
             let updated_user = service
                 .ensure_user(
-                    users_repo.as_ref(),
                     txn,
                     &test_email,
                     Some("Charlie Brown"), // Different name

@@ -55,17 +55,10 @@ async fn login(
     // Own the transaction boundary here and pass a borrowed txn to the service
     let user = with_txn(Some(&http_req), &app_state, |txn| {
         // Box the async block so its lifetime is tied to `txn` (no 'static)
-        let users_repo = app_state.users_repo.clone();
         Box::pin(async move {
             let service = UserService::new();
             Ok(service
-                .ensure_user(
-                    users_repo.as_ref(),
-                    txn,
-                    &email,
-                    name.as_deref(),
-                    &google_sub,
-                )
+                .ensure_user(txn, &email, name.as_deref(), &google_sub)
                 .await?)
         })
     })
