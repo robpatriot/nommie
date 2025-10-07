@@ -91,7 +91,7 @@ echo "[pre-commit] Phase B: formatting staged files…"
 # Rustfmt — format only the staged Rust files
 if ((${#RUST_STAGED[@]})); then
   echo "  • rustfmt (staged backend .rs files)"
-  rustfmt --edition 2021 -- "${RUST_STAGED[@]}" || true
+  rustup run nightly rustfmt --edition 2021 -- "${RUST_STAGED[@]}" || true
 
   # Auto-stage only formatted Rust files
   for file in "${RUST_STAGED[@]}"; do

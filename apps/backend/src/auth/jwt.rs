@@ -3,8 +3,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::state::security_config::SecurityConfig;
 use crate::error::AppError;
+use crate::state::security_config::SecurityConfig;
 
 /// Claims included in our backend-issued access tokens.
 #[derive(Debug, Serialize, Deserialize, Clone)]

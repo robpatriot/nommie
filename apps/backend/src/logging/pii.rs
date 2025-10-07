@@ -4,7 +4,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 /// Centralized registry for PII redaction regex patterns.
-/// 
+///
 /// This module contains all hardcoded regex patterns used for PII redaction,
 /// with a single allow per pattern construction site. All patterns are known
 /// to be valid and tested at compile time.
@@ -72,7 +72,8 @@ pub fn redact(input: &str) -> String {
     });
 
     // Then redact base64-like tokens
-    let base64_redacted = PiiRegexRegistry::base64_token().replace_all(&email_redacted, "[REDACTED_TOKEN]");
+    let base64_redacted =
+        PiiRegexRegistry::base64_token().replace_all(&email_redacted, "[REDACTED_TOKEN]");
 
     // Finally redact hex tokens
     PiiRegexRegistry::hex_token()

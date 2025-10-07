@@ -1,4 +1,13 @@
-#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used, clippy::panic, clippy::todo, clippy::unimplemented))]
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
 
 pub mod adapters;
 pub mod auth;
