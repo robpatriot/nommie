@@ -60,7 +60,7 @@ impl FromRequest for GameId {
                 games::Entity::find_by_id(game_id).one(db).await?
             };
 
-            let _game = game.ok_or_else(|| {
+            game.ok_or_else(|| {
                 AppError::not_found(
                     ErrorCode::GameNotFound,
                     format!("Game not found with id: {game_id}"),

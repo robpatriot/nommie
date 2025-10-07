@@ -166,8 +166,7 @@ async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> 
     // Create test data with no username (should fall back to sub)
     let game_id = create_test_game(shared.transaction()).await?;
     let user_id = create_test_user(shared.transaction(), "bob", None).await?;
-    let _game_player_id =
-        create_test_game_player(shared.transaction(), game_id, user_id, 1).await?;
+    create_test_game_player(shared.transaction(), game_id, user_id, 1).await?;
 
     // Create test app
     let app = test::init_service(
