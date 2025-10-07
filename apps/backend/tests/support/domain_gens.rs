@@ -1,6 +1,5 @@
-//! Proptest generators for domain types.
-//!
-//! These generators ensure unique cards and valid game states for property-based testing.
+// Proptest generators for domain types.
+// These generators ensure unique cards and valid game states for property-based testing.
 
 use std::collections::HashSet;
 

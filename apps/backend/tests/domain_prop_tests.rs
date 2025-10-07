@@ -1,33 +1,20 @@
-//! Property-based tests for domain layer card-play legality and trick-winner rules.
-//!
-//! Developer notes:
-//! - Increase cases locally with: PROPTEST_CASES=800 pnpm be:test
-//! - Generators ensure unique cards; use prop_assume! to skip invalid setups.
-//! - Oracle comparator is independent of main logic to catch regressions.
-//!
-//! All tests are pure (no DB, no HTTP) and deterministic.
+include!("common/proptest_prelude.rs");
+// Property-based tests for domain layer card-play legality and trick-winner rules.
+//
+// Developer notes:
+// - Increase cases locally with: PROPTEST_CASES=800 pnpm be:test
+// - Generators ensure unique cards; use prop_assume! to skip invalid setups.
+// - Oracle comparator is independent of main logic to catch regressions.
+//
+// All tests are pure (no DB, no HTTP) and deterministic.
 
 mod support;
 
 use std::collections::HashSet;
-use std::env;
 
 use backend::domain::{card_beats, hand_has_suit, Card, PlayerId, Rank, RoundState, Suit, Trump};
 use proptest::prelude::*;
 use support::domain_gens;
-
-/// Helper to get proptest config from environment
-fn proptest_config() -> ProptestConfig {
-    let cases = env::var("PROPTEST_CASES")
-        .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(32); // Low default for fast CI
-
-    ProptestConfig {
-        cases,
-        ..ProptestConfig::default()
-    }
-}
 
 /// Independent oracle for trick winner to cross-check domain logic.
 /// Returns the index (0-3) of the winning play.
@@ -117,8 +104,7 @@ fn legal_moves_helper(hand: &[Card], lead: Option<Suit>) -> Vec<Card> {
 }
 
 proptest! {
-    #![proptest_config(proptest_config())]
-
+    #![proptest_config(proptest_prelude_config())]
     /// Property: Follow-suit legality
     /// If a hand contains cards of the lead suit, every legal play must be of that suit.
     /// If not, the set of legal plays must be the entire hand.
