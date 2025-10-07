@@ -1,23 +1,10 @@
 pub mod txn;
 pub mod txn_policy;
 
-use std::any::Any;
-use sea_orm::{ConnectionTrait, DatabaseConnection, DatabaseTransaction};
+use sea_orm::DatabaseConnection;
 
 use crate::error::AppError;
 use crate::state::app_state::AppState;
-
-/// Database connection abstraction that wraps SeaORM's ConnectionTrait.
-/// 
-/// This trait provides a clean boundary between the domain layer and SeaORM.
-/// Services and repositories use this trait instead of directly importing SeaORM.
-pub trait DbConn: ConnectionTrait + Send + Sync + Any {}
-
-// Implement DbConn for SeaORM types
-impl DbConn for DatabaseConnection {}
-impl DbConn for DatabaseTransaction {}
-
-// DbConn is defined in this module; consumers should `use crate::db::DbConn;`
 
 /// Centralized helper to access the database connection from AppState.
 ///
@@ -26,18 +13,6 @@ impl DbConn for DatabaseTransaction {}
 /// or an AppError::db_unavailable() if the database is not configured.
 pub fn require_db(state: &AppState) -> Result<&DatabaseConnection, AppError> {
     state.db().ok_or_else(AppError::db_unavailable)
-}
-
-/// Downcast a `&dyn DbConn` to a `&DatabaseConnection` if possible
-pub fn as_database_connection(conn: &dyn DbConn) -> Option<&DatabaseConnection> {
-    let any = conn as &dyn Any;
-    any.downcast_ref::<DatabaseConnection>()
-}
-
-/// Downcast a `&dyn DbConn` to a `&DatabaseTransaction` if possible
-pub fn as_database_transaction(conn: &dyn DbConn) -> Option<&DatabaseTransaction> {
-    let any = conn as &dyn Any;
-    any.downcast_ref::<DatabaseTransaction>()
 }
 
 #[cfg(test)]

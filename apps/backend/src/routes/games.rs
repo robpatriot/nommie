@@ -21,12 +21,11 @@ async fn get_snapshot(
     let id = game_id.0;
 
     // Load game state and produce snapshot within a transaction
-    let snapshot = with_txn(Some(&http_req), &app_state, |txn| {
+    let snapshot = with_txn(Some(&http_req), &app_state, |_txn| {
         Box::pin(async move {
-            // Create game service with repository
-            // For now, we'll use a placeholder since games repo isn't fully implemented yet
-            // TODO: Implement proper game repository wiring
-            let state = crate::services::games::load_game_state(id, txn).await?;
+            // Create game service and load game state
+            let game_service = crate::services::games::GameService::new();
+            let state = game_service.load_game_state(id).await?;
 
             // Produce the snapshot via the domain function
             let snap = crate::domain::snapshot::snapshot(&state);
