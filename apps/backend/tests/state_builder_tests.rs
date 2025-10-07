@@ -18,9 +18,22 @@ async fn builds_with_test_db() -> Result<(), AppError> {
     let state = build_state().with_db(DbProfile::Test).build().await?;
     assert!(state.db().is_some());
 
-    // Test DB connectivity with a no-op transaction
-    with_txn(None, &state, |_txn| {
-        Box::pin(async { Ok::<_, AppError>(()) })
+    // Test DB connectivity with an actual database operation
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            // Perform a simple query to verify the database connection works
+            use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+
+            let stmt = Statement::from_string(
+                DatabaseBackend::Postgres,
+                "SELECT 1 as test_value".to_owned(),
+            );
+
+            let result = txn.execute(stmt).await?;
+            assert_eq!(result.rows_affected(), 1);
+
+            Ok::<_, AppError>(())
+        })
     })
     .await?;
 
