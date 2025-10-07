@@ -755,11 +755,10 @@ fn scoring_idempotence_scoring_applies_once_only() {
 }
 
 #[test]
-fn scoring_sum_of_tricks_invariant_violation() {
+fn scoring_sum_of_tricks_invariant_violation_release_variant() {
     // Construct a state with hand_size = N and intentionally make
     // tricks_won sum != N. Assert on the sum inside the test **before**
-    // invoking scoring. This documents the invariant; in debug builds the
-    // production debug_assert! should also catch it.
+    // invoking scoring. This documents the invariant.
     let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
     let mut state = make_state_with_hands(hands, 5, 0);
     state.round.bids = [Some(2), Some(1), Some(2), Some(0)];
@@ -773,24 +772,29 @@ fn scoring_sum_of_tricks_invariant_violation() {
         "Test intentionally violates sum-of-tricks invariant"
     );
 
-    // In debug builds, this will panic due to debug_assert!
-    // In release builds, scoring proceeds with incorrect totals
+    // In non-debug (release) builds, scoring should not panic and produce deterministic totals
     #[cfg(not(debug_assertions))]
     {
         apply_round_scoring(&mut state);
-        // Expected: [3+10, 1+10, 2+10, 0+10] = [13, 11, 12, 10] (incorrect due to invariant violation)
         assert_eq!(state.scores_total, [13, 11, 12, 10]);
     }
+}
 
-    #[cfg(debug_assertions)]
-    {
-        // In debug builds, this should panic
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            apply_round_scoring(&mut state);
-        }));
-        assert!(
-            result.is_err(),
-            "debug_assert! should have triggered in debug build"
-        );
-    }
+#[cfg(debug_assertions)]
+#[test]
+#[should_panic(expected = "Sum of tricks")]
+fn scoring_sum_of_tricks_invariant_violation_debug_variant() {
+    // Construct the same invalid state as the release variant
+    let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
+    let mut state = make_state_with_hands(hands, 5, 0);
+    state.round.bids = [Some(2), Some(1), Some(2), Some(0)];
+    state.round.tricks_won = [3, 1, 2, 0]; // Sum = 6, but hand_size = 5
+    state.phase = Phase::Scoring;
+
+    // Sanity-check the invariant is indeed violated
+    let tricks_sum: u8 = state.round.tricks_won.iter().sum();
+    assert_ne!(tricks_sum, state.hand_size);
+
+    // In debug builds, this should panic due to the internal debug assertion
+    apply_round_scoring(&mut state);
 }
