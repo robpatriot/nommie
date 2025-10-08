@@ -5,6 +5,7 @@
 ## General
 - Follow these rules exactly. If a request would break them, stop and ask.
 - No commentary in edits — implement directly.
+- Never run any git commands other than diff
 
 ## Persistence Design
 - Repos and services are **stateless** and **generic** over `C: ConnectionTrait`.
