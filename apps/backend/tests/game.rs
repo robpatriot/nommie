@@ -7,12 +7,10 @@ use backend::error::AppError;
 use backend::errors::ErrorCode;
 use backend::infra::state::build_state;
 use sea_orm::{EntityTrait, Set};
-use serial_test::serial;
 
 use crate::common::with_savepoint;
 
 #[tokio::test]
-#[serial]
 async fn insert_defaults_and_fetch() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -64,7 +62,6 @@ async fn insert_defaults_and_fetch() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn join_code_unique() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)

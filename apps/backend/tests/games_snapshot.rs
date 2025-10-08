@@ -13,10 +13,8 @@ use backend::infra::state::build_state;
 use backend::routes;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
-use serial_test::serial;
 
 #[tokio::test]
-#[serial]
 async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -99,7 +97,6 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -139,7 +136,6 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -180,7 +176,6 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_snapshot_phase_structure() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)

@@ -8,10 +8,8 @@ use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::routes::games::configure_routes;
 use sea_orm::{ActiveModelTrait, Set};
-use serial_test::serial;
 
 #[tokio::test]
-#[serial]
 async fn test_get_player_display_name_success() -> Result<(), AppError> {
     let state = build_state()
         .with_db(backend::config::db::DbProfile::Test)
@@ -55,7 +53,6 @@ async fn test_get_player_display_name_success() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
     let state = build_state()
         .with_db(backend::config::db::DbProfile::Test)
@@ -101,7 +98,6 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
     let state = build_state()
         .with_db(backend::config::db::DbProfile::Test)
@@ -149,7 +145,6 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> {
     let state = build_state()
         .with_db(backend::config::db::DbProfile::Test)

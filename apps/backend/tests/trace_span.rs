@@ -29,6 +29,8 @@ impl Write for BufWriter {
     }
 }
 
+// This test MUST remain #[serial] because it sets a global tracing subscriber
+// which would conflict if multiple tests run in parallel
 #[actix_web::test]
 #[serial]
 async fn handler_logs_are_in_request_span_with_trace_id() {

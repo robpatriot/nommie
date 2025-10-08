@@ -12,10 +12,8 @@ use backend::infra::state::build_state;
 use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
-use serial_test::serial;
 
 #[tokio::test]
-#[serial]
 async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -94,7 +92,6 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -199,7 +196,6 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)

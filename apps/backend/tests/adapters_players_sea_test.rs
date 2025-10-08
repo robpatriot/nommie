@@ -8,10 +8,8 @@ use backend::errors::domain::DomainError;
 use backend::infra::state::build_state;
 use backend::repos::players;
 use sea_orm::{ActiveModelTrait, Set};
-use serial_test::serial;
 
 #[tokio::test]
-#[serial]
 async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
     let state = build_state()
         .with_db(backend::config::db::DbProfile::Test)
@@ -40,7 +38,6 @@ async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-#[serial]
 async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError> {
     let state = build_state()
         .with_db(backend::config::db::DbProfile::Test)
@@ -69,7 +66,6 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
 }
 
 #[tokio::test]
-#[serial]
 async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError> {
     let state = build_state()
         .with_db(backend::config::db::DbProfile::Test)
@@ -101,7 +97,6 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
 }
 
 #[tokio::test]
-#[serial]
 async fn test_get_display_name_by_seat_missing_user() -> Result<(), AppError> {
     let state = build_state()
         .with_db(backend::config::db::DbProfile::Test)
