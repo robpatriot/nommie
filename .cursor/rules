@@ -4,56 +4,60 @@
 
 ## General
 - Follow these rules exactly. If a request would break them, stop and ask.
-- Don’t add rationale or commentary in edits; implement directly.
+- No commentary in edits — implement directly.
+
+## Persistence Design
+- Repos and services are **stateless** and **generic** over `C: ConnectionTrait`.
+- They take `&C`, so the same code works with a `DatabaseConnection` or a `DatabaseTransaction`.
+- Only SeaORM adapters depend on SeaORM; services depend only on repo traits.
 
 ## Backend Code
 - Handlers return `Result<T, AppError>` — never `HttpResponse`.
 - All DB access via `require_db(&state)` or `with_txn(&state, …)`.
-- Service/repo functions take `&dyn DbConn` (dyn trait, not generics).
-- Only adapters may `use sea_orm::*`.
+- Only **SeaORM adapters** may `use sea_orm::*`.
 - Domain modules: no DB or Actix imports.
-- Use enums (not strings) for states/roles/phases.
+- Use enums (not strings) for states, roles, and phases.
 - No `unwrap()` or `expect()` outside tests.
-- Remove unused imports entirely (do not comment them out).
+- Remove unused imports entirely (don’t comment them out).
 
 ## Transactions
-- Wrap multi-row/table work in `with_txn`.
+- All DB work runs through `with_txn` or `require_db`.
 - `with_txn` closures return `Result<_, AppError>`.
-- Nested transactions not supported (except via `SharedTxn` in tests).
-- Production: commit on Ok, rollback on Err.
+- Nested transactions only via `SharedTxn` in tests.
+- Production: commit on `Ok`, rollback on `Err`.
 - Tests: always rollback.
-- Don’t call `begin/commit/rollback` directly.
+- Never call `begin`, `commit`, or `rollback` directly.
 
 ## Extractors
-- Allowed extractors: `AuthToken`, `JwtClaims`, `CurrentUser`, `CurrentUserDb`, `GameId`, `ValidatedJson<T>`.
-- `ValidatedJson<T>` must map errors to `AppError` Problem Details.
+- Allowed: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`.
+- `ValidatedJson<T>` maps validation errors to `AppError` Problem Details.
 
 ## Error Handling
 - Errors follow Problem Details: `{ type, title, status, detail, code, trace_id }`.
 - Create all errors via central `AppError` helpers.
-- `code` comes from registry (no ad-hoc strings).
+- `code` comes from the registry (no ad-hoc strings).
 - Never leak raw serde/SQL/OAuth errors.
 
 ## Logging
 - Logs must include `trace_id`.
-- No PII (mask or hash emails / google_sub).
+- Mask or hash PII (emails, google_sub).
 
 ## AppState
-- `AppState.db` is private. Use `state.db()` / `require_db(&state)`.
+- `AppState.db` is private — access via `state.db()` / `require_db(&state)`.
 
 ## Schema & Migrations
-- Schema is one init migration in `apps/backend/migration`.
-- Don’t add extra migration files, SQL, or DDL elsewhere.
+- Schema lives in a single init migration under `apps/backend/migration`.
+- Don’t add separate migration files, SQL, or DDL elsewhere.
 
 ## Env & pnpm
-- Important: Always source `.env` once per shell session before **any** pnpm commands (e.g be:test)
-  `set -a; source .env; set +a`
+- Source `.env` once per shell session before any pnpm commands:
+  set -a; source .env; set +a
 - Never commit real `.env`.
 - Don’t read `DATABASE_URL` directly in code.
 
 ## Testing
 - Tests must be deterministic (seed time/RNG).
 - DB tests use `_test` DB (rollback enforced).
-- Use `SharedTxn` only when a test needs continuity.
-- Control tests that need committed data must use pooled DB setup.
+- Use `SharedTxn` when tests need continuity.
+- Control tests needing committed data must use pooled DB setup.
 - Run backend tests with `pnpm be:test`.
