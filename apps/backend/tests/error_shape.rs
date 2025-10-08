@@ -1,6 +1,6 @@
 mod common;
 mod support;
-use actix_web::{test, web, HttpRequest, HttpResponse};
+use actix_web::{test, web, HttpResponse};
 use backend::config::db::DbProfile;
 use backend::infra::state::build_state;
 use backend::state::app_state::AppState;
@@ -9,7 +9,7 @@ use common::assert_problem_details_structure;
 use support::create_test_app;
 
 /// Test endpoint that returns a validation error (400)
-async fn test_validation_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+async fn test_validation_error() -> Result<HttpResponse, AppError> {
     Err(AppError::invalid(
         ErrorCode::ValidationError,
         "Field validation failed".to_string(),
@@ -17,7 +17,7 @@ async fn test_validation_error(_req: HttpRequest) -> Result<HttpResponse, AppErr
 }
 
 /// Test endpoint that returns a bad request error (400)
-async fn test_bad_request_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+async fn test_bad_request_error() -> Result<HttpResponse, AppError> {
     Err(AppError::bad_request(
         ErrorCode::BadRequest,
         "Invalid request format".to_string(),
@@ -25,7 +25,7 @@ async fn test_bad_request_error(_req: HttpRequest) -> Result<HttpResponse, AppEr
 }
 
 /// Test endpoint that returns a not found error (404)
-async fn test_not_found_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+async fn test_not_found_error() -> Result<HttpResponse, AppError> {
     Err(AppError::not_found(
         ErrorCode::NotFound,
         "Resource not found".to_string(),
@@ -33,27 +33,27 @@ async fn test_not_found_error(_req: HttpRequest) -> Result<HttpResponse, AppErro
 }
 
 /// Test endpoint that returns an unauthorized error (401)
-async fn test_unauthorized_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+async fn test_unauthorized_error() -> Result<HttpResponse, AppError> {
     Err(AppError::unauthorized())
 }
 
 /// Test endpoint that returns a forbidden error (403)
-async fn test_forbidden_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+async fn test_forbidden_error() -> Result<HttpResponse, AppError> {
     Err(AppError::forbidden())
 }
 
 /// Test endpoint that returns an internal server error (500)
-async fn test_internal_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+async fn test_internal_error() -> Result<HttpResponse, AppError> {
     Err(AppError::internal("Database connection failed"))
 }
 
 /// Test endpoint that returns a database error (500)
-async fn test_db_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+async fn test_db_error() -> Result<HttpResponse, AppError> {
     Err(AppError::db("Connection timeout"))
 }
 
 /// Test endpoint that returns a database unavailable error (500)
-async fn test_db_unavailable_error(_req: HttpRequest) -> Result<HttpResponse, AppError> {
+async fn test_db_unavailable_error() -> Result<HttpResponse, AppError> {
     Err(AppError::db_unavailable())
 }
 
