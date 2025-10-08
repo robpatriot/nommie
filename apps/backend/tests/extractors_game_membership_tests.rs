@@ -189,7 +189,7 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
         created_at: Set(now),
         updated_at: Set(now),
     };
-    let _user = user.insert(shared.transaction()).await?;
+    user.insert(shared.transaction()).await?;
 
     // Create a test game
     let game = games::ActiveModel {
