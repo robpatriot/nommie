@@ -223,11 +223,6 @@ async fn integration_adapter_unique_violation_maps_to_conflict() {
     )
     .await;
     assert_eq!(resp.status(), 409);
-    common::assert_problem_details_structure(
-        resp,
-        409,
-        "UNIQUE_EMAIL",
-        "Unique constraint violation",
-    )
-    .await;
+    common::assert_problem_details_structure(resp, 409, "UNIQUE_EMAIL", "Email already registered")
+        .await;
 }

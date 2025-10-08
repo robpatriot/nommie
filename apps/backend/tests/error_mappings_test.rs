@@ -274,7 +274,7 @@ async fn test_sanitized_database_error_details() {
     match app_error {
         AppError::Conflict { code, detail } => {
             assert_eq!(code, ErrorCode::UniqueEmail);
-            assert_eq!(detail, "Unique constraint violation");
+            assert_eq!(detail, "Email already registered");
         }
         _ => panic!("Expected Conflict variant"),
     }

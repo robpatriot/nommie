@@ -36,9 +36,17 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
         || error_msg.contains("duplicate key value violates unique constraint")
     {
         warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Unique constraint violation");
-        // Specific mapping for users.email
-        if error_msg.contains("users_email_key") {
-            return DomainError::conflict(ConflictKind::UniqueEmail, "Unique constraint violation");
+        // Specific mapping for user_credentials.email
+        if error_msg.contains("user_credentials_email_key") || error_msg.contains("users_email_key")
+        {
+            return DomainError::conflict(ConflictKind::UniqueEmail, "Email already registered");
+        }
+        // Specific mapping for user_credentials.google_sub
+        if error_msg.contains("user_credentials_google_sub_key") {
+            return DomainError::conflict(
+                ConflictKind::Other("UniqueGoogleSub".into()),
+                "Google account already linked to another user",
+            );
         }
         // Specific mapping for games.join_code
         if error_msg.contains("games_join_code_key") {
