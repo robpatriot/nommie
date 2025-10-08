@@ -15,14 +15,6 @@ task_local! {
     static TRACE_ID: RefCell<Option<String>>;
 }
 
-/// Set the trace_id for the current task.
-/// This should only be called from middleware at the web boundary.
-pub fn set_trace_id(trace_id: String) {
-    // This is a no-op since we use with_trace_id for scoping
-    // The actual setting happens in the with_trace_id function
-    let _ = trace_id;
-}
-
 /// Get the trace_id for the current task.
 /// Returns "unknown" if no trace_id is set (e.g., outside of a request context).
 pub fn trace_id() -> String {
