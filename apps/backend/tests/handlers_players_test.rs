@@ -240,13 +240,15 @@ async fn create_test_game_player(
     user_id: i64,
     turn_order: i32,
 ) -> Result<i64, AppError> {
+    let now = time::OffsetDateTime::now_utc();
     let game_player = game_players::ActiveModel {
         id: sea_orm::NotSet,
         game_id: Set(game_id),
         user_id: Set(user_id),
         turn_order: Set(turn_order),
         is_ready: Set(false),
-        created_at: Set(time::OffsetDateTime::now_utc()),
+        created_at: Set(now),
+        updated_at: Set(now),
     };
 
     let result = game_player.insert(txn).await?;

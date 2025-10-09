@@ -72,6 +72,7 @@ enum GamePlayers {
     TurnOrder,
     IsReady,
     CreatedAt,
+    UpdatedAt,
 }
 
 #[derive(Iden)]
@@ -372,6 +373,11 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(GamePlayers::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(GamePlayers::UpdatedAt)
                             .timestamp_with_time_zone()
                             .not_null(),
                     )

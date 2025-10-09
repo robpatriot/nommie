@@ -17,6 +17,8 @@ pub struct Model {
     pub is_ready: bool,
     #[sea_orm(column_name = "created_at")]
     pub created_at: OffsetDateTime,
+    #[sea_orm(column_name = "updated_at")]
+    pub updated_at: OffsetDateTime,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

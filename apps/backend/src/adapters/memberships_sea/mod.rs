@@ -36,6 +36,7 @@ pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
         turn_order: Set(dto.turn_order),
         is_ready: Set(dto.is_ready),
         created_at: Set(now),
+        updated_at: Set(now),
     };
 
     membership_active.insert(conn).await
@@ -45,7 +46,6 @@ pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     dto: MembershipUpdate,
 ) -> Result<game_players::Model, sea_orm::DbErr> {
-    // Note: game_players table doesn't have updated_at field
     let membership = game_players::ActiveModel {
         id: Set(dto.id),
         game_id: Set(dto.game_id),
@@ -53,6 +53,7 @@ pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
         turn_order: Set(dto.turn_order),
         is_ready: Set(dto.is_ready),
         created_at: NotSet,
+        updated_at: Set(time::OffsetDateTime::now_utc()),
     };
     membership.update(conn).await
 }
@@ -61,21 +62,14 @@ pub async fn set_membership_ready<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     dto: MembershipSetReady,
 ) -> Result<game_players::Model, sea_orm::DbErr> {
-    use sea_orm::EntityTrait;
-
-    // Fetch the existing membership to preserve other fields
-    let existing = game_players::Entity::find_by_id(dto.id)
-        .one(conn)
-        .await?
-        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Membership not found".to_string()))?;
-
     let membership = game_players::ActiveModel {
         id: Set(dto.id),
-        game_id: Set(existing.game_id),
-        user_id: Set(existing.user_id),
-        turn_order: Set(existing.turn_order),
+        game_id: NotSet,
+        user_id: NotSet,
+        turn_order: NotSet,
         is_ready: Set(dto.is_ready),
         created_at: NotSet,
+        updated_at: Set(time::OffsetDateTime::now_utc()),
     };
     membership.update(conn).await
 }

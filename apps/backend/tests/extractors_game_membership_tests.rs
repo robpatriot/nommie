@@ -145,6 +145,7 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
         turn_order: Set(1),
         is_ready: Set(false),
         created_at: Set(now),
+        updated_at: Set(now),
     };
     let membership = membership.insert(shared.transaction()).await?;
 
@@ -410,6 +411,7 @@ async fn test_membership_composition_with_current_user_and_game_id(
         turn_order: Set(2),
         is_ready: Set(true),
         created_at: Set(now),
+        updated_at: Set(now),
     };
     let membership = membership.insert(shared.transaction()).await?;
 
@@ -565,6 +567,7 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
         turn_order: Set(1),
         is_ready: Set(false),
         created_at: Set(now),
+        updated_at: Set(now),
     };
     membership.insert(shared.transaction()).await?;
 
@@ -658,6 +661,7 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
         turn_order: Set(1),
         is_ready: Set(false),
         created_at: Set(now),
+        updated_at: Set(now),
     };
     membership.insert(shared.transaction()).await?;
 
