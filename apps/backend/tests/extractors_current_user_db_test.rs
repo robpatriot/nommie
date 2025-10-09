@@ -1,10 +1,7 @@
 mod common;
-use std::time::SystemTime;
-
 mod support;
 
 use actix_web::{test, HttpMessage};
-use backend::auth::jwt::mint_access_token;
 use backend::config::db::DbProfile;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
@@ -14,6 +11,7 @@ use backend::utils::unique::{unique_email, unique_str};
 use common::assert_problem_details_structure;
 use serde_json::Value;
 use support::app_builder::create_test_app;
+use support::auth::mint_test_token;
 use support::factory::seed_user_with_sub;
 
 #[actix_web::test]
@@ -39,8 +37,7 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
         .expect("should create user successfully");
 
     // Mint JWT with the same sub
-    let token = mint_access_token(&test_sub, &test_email, SystemTime::now(), &security_config)
-        .expect("should mint token successfully");
+    let token = mint_test_token(&test_sub, &test_email, &security_config);
 
     // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;
@@ -89,13 +86,7 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
     // Mint JWT with a sub that doesn't exist in database - use unique helpers to ensure uniqueness
     let missing_sub = unique_str("missing-sub");
     let test_email = unique_email("missing");
-    let token = mint_access_token(
-        &missing_sub,
-        &test_email,
-        SystemTime::now(),
-        &security_config,
-    )
-    .expect("should mint token successfully");
+    let token = mint_test_token(&missing_sub, &test_email, &security_config);
 
     // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;

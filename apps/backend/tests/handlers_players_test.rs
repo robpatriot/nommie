@@ -3,11 +3,11 @@ mod support;
 
 use actix_web::http::StatusCode;
 use actix_web::{test, web, App, HttpMessage};
-use backend::entities::{game_players, games, users};
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::routes::games::configure_routes;
-use sea_orm::{ActiveModelTrait, Set};
+use support::db_memberships::create_test_game_player;
+use support::factory::{create_test_game, create_test_user};
 
 #[tokio::test]
 async fn test_get_player_display_name_success() -> Result<(), AppError> {
@@ -185,73 +185,4 @@ async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> 
     assert_eq!(body["display_name"], "bob");
 
     Ok(())
-}
-
-// Helper functions for test data creation
-
-async fn create_test_game(txn: &impl sea_orm::ConnectionTrait) -> Result<i64, AppError> {
-    // Create a user first to use as created_by
-    let user_id = create_test_user(txn, "creator", Some("Creator")).await?;
-
-    let game = games::ActiveModel {
-        id: sea_orm::NotSet,
-        created_by: Set(Some(user_id)),
-        visibility: Set(games::GameVisibility::Public),
-        state: Set(games::GameState::Lobby),
-        created_at: Set(time::OffsetDateTime::now_utc()),
-        updated_at: Set(time::OffsetDateTime::now_utc()),
-        started_at: Set(None),
-        ended_at: Set(None),
-        name: Set(Some("Test Game".to_string())),
-        join_code: Set(Some("ABC123".to_string())),
-        rules_version: Set("1.0".to_string()),
-        rng_seed: Set(Some(12345)),
-        current_round: Set(Some(1)),
-        hand_size: Set(Some(13)),
-        dealer_pos: Set(Some(0)),
-        lock_version: Set(1),
-    };
-
-    let inserted = game.insert(txn).await?;
-    Ok(inserted.id)
-}
-
-async fn create_test_user(
-    txn: &impl sea_orm::ConnectionTrait,
-    sub: &str,
-    username: Option<&str>,
-) -> Result<i64, AppError> {
-    let user = users::ActiveModel {
-        id: sea_orm::NotSet,
-        sub: Set(sub.to_string()),
-        username: Set(username.map(|s| s.to_string())),
-        is_ai: Set(false),
-        created_at: Set(time::OffsetDateTime::now_utc()),
-        updated_at: Set(time::OffsetDateTime::now_utc()),
-    };
-
-    let inserted = user.insert(txn).await?;
-    Ok(inserted.id)
-}
-
-async fn create_test_game_player(
-    txn: &impl sea_orm::ConnectionTrait,
-    game_id: i64,
-    user_id: i64,
-    turn_order: i32,
-) -> Result<i64, AppError> {
-    let now = time::OffsetDateTime::now_utc();
-    let game_player = game_players::ActiveModel {
-        id: sea_orm::NotSet,
-        game_id: Set(game_id),
-        user_id: Set(user_id),
-        turn_order: Set(turn_order),
-        is_ready: Set(false),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
-
-    let result = game_player.insert(txn).await?;
-    println!("Test: Inserted game_player with id={}", result.id);
-    Ok(result.id)
 }

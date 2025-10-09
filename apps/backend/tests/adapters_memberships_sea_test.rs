@@ -1,11 +1,11 @@
 mod common;
+mod support;
 
 use backend::adapters::memberships_sea::{MembershipCreate, MembershipSetReady};
 use backend::db::txn::with_txn;
-use backend::entities::{games, users};
 use backend::error::AppError;
 use backend::infra::state::build_state;
-use sea_orm::{ActiveModelTrait, Set};
+use support::factory::{create_test_game_with_options, create_test_user_with_randomization};
 
 #[tokio::test]
 async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
@@ -18,8 +18,10 @@ async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create test data
-            let game_id = create_test_game(txn).await?;
-            let user_id = create_test_user(txn, "test_user", Some("TestUser")).await?;
+            let game_id = create_test_game_with_options(txn, None, Some(true)).await?;
+            let user_id =
+                create_test_user_with_randomization(txn, "test_user", Some("TestUser"), true)
+                    .await?;
 
             // Create membership via adapter
             let dto = MembershipCreate::new(game_id, user_id, 0, false);
@@ -62,8 +64,10 @@ async fn test_set_ready_updates_only_updated_at() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create test data
-            let game_id = create_test_game(txn).await?;
-            let user_id = create_test_user(txn, "test_user", Some("TestUser")).await?;
+            let game_id = create_test_game_with_options(txn, None, Some(true)).await?;
+            let user_id =
+                create_test_user_with_randomization(txn, "test_user", Some("TestUser"), true)
+                    .await?;
 
             // Create membership
             let dto = MembershipCreate::new(game_id, user_id, 0, false);
@@ -104,51 +108,4 @@ async fn test_set_ready_updates_only_updated_at() -> Result<(), AppError> {
     .await?;
 
     Ok(())
-}
-
-// Helper functions for test data creation
-
-async fn create_test_game(txn: &impl sea_orm::ConnectionTrait) -> Result<i64, AppError> {
-    // Create a user first to use as created_by
-    let user_id = create_test_user(txn, "creator", Some("Creator")).await?;
-
-    let game = games::ActiveModel {
-        id: sea_orm::NotSet,
-        created_by: Set(Some(user_id)),
-        visibility: Set(games::GameVisibility::Public),
-        state: Set(games::GameState::Lobby),
-        created_at: Set(time::OffsetDateTime::now_utc()),
-        updated_at: Set(time::OffsetDateTime::now_utc()),
-        started_at: Set(None),
-        ended_at: Set(None),
-        name: Set(Some("Test Game".to_string())),
-        join_code: Set(Some(format!("C{}", rand::random::<u32>() % 1000000))),
-        rules_version: Set("1.0".to_string()),
-        rng_seed: Set(Some(12345)),
-        current_round: Set(Some(1)),
-        hand_size: Set(Some(13)),
-        dealer_pos: Set(Some(0)),
-        lock_version: Set(1),
-    };
-
-    let inserted = game.insert(txn).await?;
-    Ok(inserted.id)
-}
-
-async fn create_test_user(
-    txn: &impl sea_orm::ConnectionTrait,
-    sub: &str,
-    username: Option<&str>,
-) -> Result<i64, AppError> {
-    let user = users::ActiveModel {
-        id: sea_orm::NotSet,
-        sub: Set(format!("{}_{}", sub, rand::random::<u32>())),
-        username: Set(username.map(|s| s.to_string())),
-        is_ai: Set(false),
-        created_at: Set(time::OffsetDateTime::now_utc()),
-        updated_at: Set(time::OffsetDateTime::now_utc()),
-    };
-
-    let inserted = user.insert(txn).await?;
-    Ok(inserted.id)
 }

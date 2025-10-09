@@ -7,7 +7,6 @@ mod common;
 mod support;
 
 use actix_web::{test, web, FromRequest};
-use backend::auth::jwt::mint_access_token;
 use backend::config::db::DbProfile;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
@@ -18,15 +17,9 @@ use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
+use support::auth::bearer_header;
 use support::factory::seed_user_with_sub;
 use time::OffsetDateTime;
-
-/// Mint a bearer Authorization header value for {sub, email}
-fn bearer_header(sub: &str, email: &str, sec: &SecurityConfig) -> String {
-    let now = std::time::SystemTime::now();
-    let token = mint_access_token(sub, email, now, sec).expect("should mint token");
-    format!("Bearer {token}")
-}
 
 /// Insert a minimal game, return its id
 async fn insert_test_game(

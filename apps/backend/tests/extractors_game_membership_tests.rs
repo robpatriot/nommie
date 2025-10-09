@@ -2,7 +2,6 @@ mod common;
 mod support;
 
 use actix_web::{test, web, HttpMessage, Responder};
-use backend::auth::jwt::mint_access_token;
 use backend::config::db::DbProfile;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
@@ -17,6 +16,7 @@ use common::assert_problem_details_structure;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
 use support::app_builder::create_test_app;
+use support::auth::mint_test_token;
 use time::OffsetDateTime;
 
 /// Test-only handler that echoes back the membership for testing
@@ -150,13 +150,7 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     let membership = membership.insert(shared.transaction()).await?;
 
     // Create a valid JWT token
-    let token = mint_access_token(
-        &user_sub,
-        &user_email,
-        std::time::SystemTime::now(),
-        &security_config,
-    )
-    .unwrap();
+    let token = mint_test_token(&user_sub, &user_email, &security_config);
 
     // Build test app with echo route
     let app = create_test_app(state)
@@ -237,13 +231,7 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
     let game = game.insert(shared.transaction()).await?;
 
     // Create a valid JWT token
-    let token = mint_access_token(
-        &user_sub,
-        &user_email,
-        std::time::SystemTime::now(),
-        &security_config,
-    )
-    .unwrap();
+    let token = mint_test_token(&user_sub, &user_email, &security_config);
 
     // Build test app with echo route
     let app = create_test_app(state)
@@ -314,13 +302,7 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
     // Create a JWT token with invalid user sub (non-numeric)
     let user_sub = "invalid-user-id";
     let user_email = unique_email("test");
-    let token = mint_access_token(
-        user_sub,
-        &user_email,
-        std::time::SystemTime::now(),
-        &security_config,
-    )
-    .unwrap();
+    let token = mint_test_token(user_sub, &user_email, &security_config);
 
     // Build test app with echo route
     let app = create_test_app(state)
@@ -416,13 +398,7 @@ async fn test_membership_composition_with_current_user_and_game_id(
     let membership = membership.insert(shared.transaction()).await?;
 
     // Create a valid JWT token
-    let token = mint_access_token(
-        &user_sub,
-        &user_email,
-        std::time::SystemTime::now(),
-        &security_config,
-    )
-    .unwrap();
+    let token = mint_test_token(&user_sub, &user_email, &security_config);
 
     // Build test app with echo route
     let app = create_test_app(state)
@@ -477,13 +453,7 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
     // Create a JWT token
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
-    let token = mint_access_token(
-        &user_sub,
-        &user_email,
-        std::time::SystemTime::now(),
-        &security_config,
-    )
-    .unwrap();
+    let token = mint_test_token(&user_sub, &user_email, &security_config);
 
     // Build test app with echo route
     let app = create_test_app(state)
@@ -572,13 +542,7 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     membership.insert(shared.transaction()).await?;
 
     // Create a valid JWT token
-    let token = mint_access_token(
-        &user_sub,
-        &user_email,
-        std::time::SystemTime::now(),
-        &security_config,
-    )
-    .unwrap();
+    let token = mint_test_token(&user_sub, &user_email, &security_config);
 
     // Build test app with player-only route
     let app = create_test_app(state)
@@ -666,13 +630,7 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     membership.insert(shared.transaction()).await?;
 
     // Create a valid JWT token
-    let token = mint_access_token(
-        &user_sub,
-        &user_email,
-        std::time::SystemTime::now(),
-        &security_config,
-    )
-    .unwrap();
+    let token = mint_test_token(&user_sub, &user_email, &security_config);
 
     // Build test app with spectator-allowed route
     let app = create_test_app(state)
