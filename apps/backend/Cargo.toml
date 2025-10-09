@@ -25,6 +25,7 @@ log = "0.4"
 ulid = "1.2.1"
 bytes = "1.0"
 regex = "1"
+unicode-normalization = "0.1"
 
 [dev-dependencies]
 ctor = "0.2"

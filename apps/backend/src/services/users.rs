@@ -1,7 +1,8 @@
 use sea_orm::ConnectionTrait;
 use tracing::{debug, info, warn};
+use unicode_normalization::UnicodeNormalization;
 
-use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind};
+use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind, ValidationKind};
 use crate::logging::pii::Redacted;
 use crate::repos::users::{self as users_repo, User};
 
@@ -13,6 +14,81 @@ fn redact_google_sub(google_sub: &str) -> String {
     } else {
         format!("{}***", &google_sub[..4])
     }
+}
+
+/// Normalizes an email address for consistent storage and comparison.
+///
+/// Normalization includes:
+/// - Trimming leading/trailing whitespace
+/// - Converting to lowercase
+/// - Applying Unicode NFKC normalization to handle visually equivalent but distinct codepoints
+///
+/// This ensures that logically identical emails (e.g., `EMAIL@Example.COM` and `email@example.com`,
+/// or Unicode variants like `café@example.com` and `cafe\u{0301}@example.com`) normalize to the same value.
+fn normalize_email(email: &str) -> String {
+    email.trim().nfkc().collect::<String>().to_lowercase()
+}
+
+/// Validates that an email address has a reasonable format.
+///
+/// This is a lightweight validation that checks for:
+/// - Exactly one '@' symbol
+/// - Non-empty local part (before '@')
+/// - Non-empty domain part (after '@')
+/// - No leading or trailing '@' symbols
+///
+/// This validation is intentionally simple and permissive, as full RFC-compliant
+/// email validation is complex. The goal is to catch obvious mistakes, not enforce
+/// strict RFC 5322 compliance.
+fn validate_email(email: &str) -> Result<(), DomainError> {
+    // Find the position of '@'
+    let at_pos = match email.find('@') {
+        Some(pos) => pos,
+        None => {
+            return Err(DomainError::validation(
+                ValidationKind::InvalidEmail,
+                "Email must contain an '@' symbol",
+            ))
+        }
+    };
+
+    // Check for exactly one '@' symbol (look for another '@' after the first)
+    if email[at_pos + 1..].contains('@') {
+        return Err(DomainError::validation(
+            ValidationKind::InvalidEmail,
+            "Email must contain exactly one '@' symbol",
+        ));
+    }
+
+    // Check that local part (before '@') is non-empty
+    if at_pos == 0 {
+        return Err(DomainError::validation(
+            ValidationKind::InvalidEmail,
+            "Email local part (before '@') cannot be empty",
+        ));
+    }
+
+    // Check that domain part (after '@') is non-empty
+    if at_pos == email.len() - 1 {
+        return Err(DomainError::validation(
+            ValidationKind::InvalidEmail,
+            "Email domain part (after '@') cannot be empty",
+        ));
+    }
+
+    Ok(())
+}
+
+/// Normalizes and validates an email address.
+///
+/// This function performs both normalization (trimming, lowercasing, NFKC) and
+/// lightweight validation to ensure the email is in a reasonable format.
+///
+/// Returns the normalized email string if valid, or an error if validation fails.
+fn sanitize_email(email: &str) -> Result<String, DomainError> {
+    let normalized = normalize_email(email);
+    validate_email(&normalized)?;
+    Ok(normalized)
 }
 
 /// User domain service.
@@ -34,8 +110,11 @@ impl UserService {
         name: Option<&str>,
         google_sub: &str,
     ) -> Result<User, DomainError> {
+        // Sanitize email: normalize (trim, lowercase, NFKC) and validate format
+        let clean_email = sanitize_email(email)?;
+
         // Look up existing user credentials by email
-        let existing_credential = users_repo::find_credentials_by_email(conn, email).await?;
+        let existing_credential = users_repo::find_credentials_by_email(conn, &clean_email).await?;
 
         match existing_credential {
             Some(credential) => {
@@ -94,7 +173,7 @@ impl UserService {
                 // User doesn't exist, create new user and credentials
 
                 // Derive username from name or email local-part
-                let username = derive_username(name, email);
+                let username = derive_username(name, &clean_email);
 
                 // Create new user with auto-generated ID and sub from google_sub
                 let user = users_repo::create_user(
@@ -106,7 +185,8 @@ impl UserService {
                 .await?;
 
                 // Create new user credentials with auto-generated ID
-                users_repo::create_credentials(conn, user.id, email, Some(google_sub)).await?;
+                users_repo::create_credentials(conn, user.id, &clean_email, Some(google_sub))
+                    .await?;
 
                 // Log first user creation
                 info!(

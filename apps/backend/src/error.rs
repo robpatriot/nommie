@@ -319,6 +319,9 @@ impl From<crate::errors::domain::DomainError> for AppError {
                             crate::errors::domain::ValidationKind::InvalidSeat => {
                                 ErrorCode::InvalidSeat
                             }
+                            crate::errors::domain::ValidationKind::InvalidEmail => {
+                                ErrorCode::InvalidEmail
+                            }
                             crate::errors::domain::ValidationKind::Other(_) => {
                                 ErrorCode::ValidationError
                             }

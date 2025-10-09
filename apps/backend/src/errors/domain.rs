@@ -41,6 +41,7 @@ pub enum ValidationKind {
     InvalidTrumpConversion,
     InvalidSeat,
     InvalidGameId,
+    InvalidEmail,
     Other(String),
 }
 

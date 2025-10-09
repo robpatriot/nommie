@@ -51,8 +51,10 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
             assert_eq!(user2.username, Some("Alice".to_string())); // Username should not change
 
             // Verify that only one user_credentials row exists for this email
+            // Note: email is normalized (lowercased) before storage
+            let normalized_email = test_email.to_lowercase();
             let credential_count = user_credentials::Entity::find()
-                .filter(user_credentials::Column::Email.eq(&test_email))
+                .filter(user_credentials::Column::Email.eq(&normalized_email))
                 .count(txn)
                 .await?;
 
@@ -64,7 +66,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
 
             // Verify that the credential row has the correct user_id
             let credential = user_credentials::Entity::find()
-                .filter(user_credentials::Column::Email.eq(&test_email))
+                .filter(user_credentials::Column::Email.eq(&normalized_email))
                 .one(txn)
                 .await
                 .map_err(|e| {
@@ -117,8 +119,10 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
             assert!(user1.id > 0);
 
             // Verify credential was created with the original google_sub
+            // Note: email is normalized (lowercased) before storage
+            let normalized_email = test_email.to_lowercase();
             let credential = user_credentials::Entity::find()
-                .filter(user_credentials::Column::Email.eq(&test_email))
+                .filter(user_credentials::Column::Email.eq(&normalized_email))
                 .one(txn)
                 .await
                 .map_err(|e| {
@@ -148,7 +152,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 
             // Verify that only one user_credentials row exists for this email
             let credential_count = user_credentials::Entity::find()
-                .filter(user_credentials::Column::Email.eq(&test_email))
+                .filter(user_credentials::Column::Email.eq(&normalized_email))
                 .count(txn)
                 .await?;
 
@@ -164,7 +168,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 
             // Verify that the original credential remains unchanged
             let credential_after_error = user_credentials::Entity::find()
-                .filter(user_credentials::Column::Email.eq(&test_email))
+                .filter(user_credentials::Column::Email.eq(&normalized_email))
                 .one(txn)
                 .await?
                 .expect("should have credential row");
@@ -214,10 +218,14 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
             use backend::entities::users;
             use sea_orm::{ActiveModelTrait, NotSet, Set};
 
+            // Use a unique sub for this test to avoid constraint violations
+            let user_sub = unique_str("user-sub");
+            let normalized_email = test_email.to_lowercase();
+
             let now = time::OffsetDateTime::now_utc();
             let user_active = users::ActiveModel {
                 id: NotSet,
-                sub: Set(google_sub.clone()),
+                sub: Set(user_sub.clone()),
                 username: Set(Some("Charlie".to_string())),
                 is_ai: Set(false),
                 created_at: Set(now),
@@ -229,11 +237,12 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
             })?;
 
             // Create credential with NULL google_sub
+            // Note: store normalized email to match service behavior
             let credential_active = user_credentials::ActiveModel {
                 id: NotSet,
                 user_id: Set(user.id),
                 password_hash: Set(None),
-                email: Set(test_email.clone()),
+                email: Set(normalized_email.clone()),
                 google_sub: Set(None), // NULL google_sub
                 last_login: Set(Some(now)),
                 created_at: Set(now),
@@ -260,7 +269,7 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
 
             // Verify that the google_sub was set
             let credential_after_update = user_credentials::Entity::find()
-                .filter(user_credentials::Column::Email.eq(&test_email))
+                .filter(user_credentials::Column::Email.eq(&normalized_email))
                 .one(txn)
                 .await?
                 .expect("should have credential row");
@@ -270,6 +279,282 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
                 Some(google_sub.clone()),
                 "google_sub should be set to incoming value"
             );
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("build test state with DB");
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService::new();
+            let google_sub = unique_str("google-sub");
+
+            // Create user with uppercase email and surrounding whitespace
+            let user1 = service
+                .ensure_user(txn, "  ALICE@EXAMPLE.COM  ", Some("Alice"), &google_sub)
+                .await?;
+
+            // Verify user was created
+            assert_eq!(user1.username, Some("Alice".to_string()));
+
+            // Try to log in with lowercase email (should find the same user)
+            let user2 = service
+                .ensure_user(txn, "alice@example.com", Some("Alice"), &google_sub)
+                .await?;
+
+            // Should be the same user
+            assert_eq!(user1.id, user2.id);
+
+            // Try with mixed case
+            let user3 = service
+                .ensure_user(txn, "Alice@Example.Com", Some("Alice"), &google_sub)
+                .await?;
+
+            // Should still be the same user
+            assert_eq!(user1.id, user3.id);
+
+            // Verify that only one credential row exists
+            let credential_count = user_credentials::Entity::find()
+                .filter(user_credentials::Column::Email.eq("alice@example.com"))
+                .count(txn)
+                .await?;
+
+            assert_eq!(
+                credential_count, 1,
+                "Should have exactly one credential row"
+            );
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("build test state with DB");
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService::new();
+            let google_sub = unique_str("google-sub");
+
+            // Create user with composed Unicode (é as single character U+00E9)
+            let email_composed = "café@example.com";
+            let user1 = service
+                .ensure_user(txn, email_composed, Some("User"), &google_sub)
+                .await?;
+
+            // Try to log in with decomposed Unicode (é as e + combining acute accent U+0065 U+0301)
+            // This should normalize to the same value via NFKC
+            let email_decomposed = "cafe\u{0301}@example.com";
+            let user2 = service
+                .ensure_user(txn, email_decomposed, Some("User"), &google_sub)
+                .await?;
+
+            // Should be the same user (NFKC normalization ensures this)
+            assert_eq!(
+                user1.id, user2.id,
+                "Unicode variants should normalize to the same user"
+            );
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_email_validation_missing_at_symbol() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("build test state with DB");
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService::new();
+            let google_sub = unique_str("google-sub");
+
+            // Try to create user with email missing @ symbol
+            let result = service
+                .ensure_user(txn, "invalidemail.com", Some("User"), &google_sub)
+                .await;
+
+            // Should fail with InvalidEmail error
+            match result {
+                Err(domain_err) => {
+                    let err: AppError = domain_err.into();
+                    assert_eq!(err.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+                    assert_eq!(err.code(), ErrorCode::InvalidEmail);
+                }
+                Ok(_) => panic!("Expected InvalidEmail error"),
+            }
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_email_validation_multiple_at_symbols() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("build test state with DB");
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService::new();
+            let google_sub = unique_str("google-sub");
+
+            // Try to create user with email having multiple @ symbols
+            let result = service
+                .ensure_user(txn, "user@@example.com", Some("User"), &google_sub)
+                .await;
+
+            // Should fail with InvalidEmail error
+            match result {
+                Err(domain_err) => {
+                    let err: AppError = domain_err.into();
+                    assert_eq!(err.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+                    assert_eq!(err.code(), ErrorCode::InvalidEmail);
+                }
+                Ok(_) => panic!("Expected InvalidEmail error"),
+            }
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_email_validation_empty_local_part() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("build test state with DB");
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService::new();
+            let google_sub = unique_str("google-sub");
+
+            // Try to create user with email having empty local part
+            let result = service
+                .ensure_user(txn, "@example.com", Some("User"), &google_sub)
+                .await;
+
+            // Should fail with InvalidEmail error
+            match result {
+                Err(domain_err) => {
+                    let err: AppError = domain_err.into();
+                    assert_eq!(err.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+                    assert_eq!(err.code(), ErrorCode::InvalidEmail);
+                }
+                Ok(_) => panic!("Expected InvalidEmail error"),
+            }
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_email_validation_empty_domain() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("build test state with DB");
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService::new();
+            let google_sub = unique_str("google-sub");
+
+            // Try to create user with email having empty domain part
+            let result = service
+                .ensure_user(txn, "user@", Some("User"), &google_sub)
+                .await;
+
+            // Should fail with InvalidEmail error
+            match result {
+                Err(domain_err) => {
+                    let err: AppError = domain_err.into();
+                    assert_eq!(err.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+                    assert_eq!(err.code(), ErrorCode::InvalidEmail);
+                }
+                Ok(_) => panic!("Expected InvalidEmail error"),
+            }
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_email_validation_whitespace_only() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("build test state with DB");
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService::new();
+            let google_sub = unique_str("google-sub");
+
+            // Try to create user with email that becomes empty after trimming
+            let result = service
+                .ensure_user(txn, "   ", Some("User"), &google_sub)
+                .await;
+
+            // Should fail with InvalidEmail error
+            match result {
+                Err(domain_err) => {
+                    let err: AppError = domain_err.into();
+                    assert_eq!(err.status_code(), StatusCode::UNPROCESSABLE_ENTITY);
+                    assert_eq!(err.code(), ErrorCode::InvalidEmail);
+                }
+                Ok(_) => panic!("Expected InvalidEmail error"),
+            }
 
             Ok::<_, AppError>(())
         })
