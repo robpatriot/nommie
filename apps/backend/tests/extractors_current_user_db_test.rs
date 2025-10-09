@@ -13,7 +13,7 @@ use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
 use common::assert_problem_details_structure;
 use serde_json::Value;
-use support::create_test_app;
+use support::app_builder::create_test_app;
 use support::factory::seed_user_with_sub;
 
 #[actix_web::test]

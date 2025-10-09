@@ -8,7 +8,7 @@ use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
 use common::assert_problem_details_structure;
 use serde_json::json;
-use support::create_test_app;
+use support::app_builder::create_test_app;
 
 #[actix_web::test]
 async fn test_malformed_json_returns_400_with_rfc7807() -> Result<(), Box<dyn std::error::Error>> {

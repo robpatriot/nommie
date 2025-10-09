@@ -15,7 +15,7 @@ use backend::utils::unique::{unique_email, unique_str};
 use common::assert_problem_details_structure;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
-use support::create_test_app;
+use support::app_builder::create_test_app;
 use time::OffsetDateTime;
 
 /// Test-only handler that echoes back the membership for testing

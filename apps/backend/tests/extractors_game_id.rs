@@ -11,7 +11,7 @@ use backend::infra::state::build_state;
 use common::assert_problem_details_structure;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
-use support::create_test_app;
+use support::app_builder::create_test_app;
 use time::OffsetDateTime;
 
 /// Test-only handler that echoes back the game_id for testing

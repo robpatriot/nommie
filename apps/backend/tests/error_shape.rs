@@ -6,7 +6,7 @@ use backend::infra::state::build_state;
 use backend::state::app_state::AppState;
 use backend::{AppError, ErrorCode};
 use common::assert_problem_details_structure;
-use support::create_test_app;
+use support::app_builder::create_test_app;
 
 /// Test endpoint that returns a validation error (400)
 async fn test_validation_error() -> Result<HttpResponse, AppError> {

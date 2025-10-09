@@ -69,7 +69,7 @@ impl TestAppBuilder {
 /// # Example
 /// ```rust
 /// use backend::infra::state::build_state;
-/// use support::create_test_app;
+/// use support::app_builder::create_test_app;
 /// use backend::config::db::DbProfile;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {

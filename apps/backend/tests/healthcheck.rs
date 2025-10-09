@@ -3,7 +3,7 @@ mod support;
 
 use actix_web::test;
 use backend::infra::state::build_state;
-use support::create_test_app;
+use support::app_builder::create_test_app;
 
 #[actix_web::test]
 async fn test_health_endpoint() -> Result<(), Box<dyn std::error::Error>> {
