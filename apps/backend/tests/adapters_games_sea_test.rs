@@ -69,12 +69,9 @@ async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
     unique_marker: &str,
 ) -> Result<GameProbe, AppError> {
     // 1. Create game (use unique_marker for both join_code and name for easy cleanup)
-    let dto = GameCreate::new(
-        unique_marker,
-        None,
-        Some(GameVisibility::Private),
-        Some(unique_marker),
-    );
+    let dto = GameCreate::new(unique_marker)
+        .with_visibility(GameVisibility::Private)
+        .with_name(unique_marker);
     let created = games_sea::create_game(conn, dto)
         .await
         .map_err(|e| AppError::db(format!("create_game failed: {e}")))?;
@@ -308,13 +305,13 @@ async fn test_games_error_behavior_consistent() -> Result<(), AppError> {
     let db = require_db(&state)?;
 
     // Create first game (commits)
-    let dto1 = GameCreate::new(&pooled_marker, None, None, Some("First"));
+    let dto1 = GameCreate::new(&pooled_marker).with_name("First");
     games_sea::create_game(db, dto1)
         .await
         .map_err(|e| AppError::db(format!("create failed: {e}")))?;
 
     // Try to create second game with same join_code (should fail)
-    let dto2 = GameCreate::new(&pooled_marker, None, None, Some("Second"));
+    let dto2 = GameCreate::new(&pooled_marker).with_name("Second");
     let pooled_result = games_sea::create_game(db, dto2).await;
 
     // Should have failed due to unique constraint
@@ -337,11 +334,11 @@ async fn test_games_error_behavior_consistent() -> Result<(), AppError> {
     let txn_result = with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create first game
-            let dto1 = GameCreate::new("DUPE002", None, None, Some("First"));
+            let dto1 = GameCreate::new("DUPE002").with_name("First");
             games_sea::create_game(txn, dto1).await?;
 
             // Try to create second game with same join_code
-            let dto2 = GameCreate::new("DUPE002", None, None, Some("Second"));
+            let dto2 = GameCreate::new("DUPE002").with_name("Second");
             let result = games_sea::create_game(txn, dto2).await;
 
             Ok::<_, AppError>(result)

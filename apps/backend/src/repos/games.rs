@@ -37,7 +37,7 @@ pub async fn create_game<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     join_code: &str,
 ) -> Result<Game, DomainError> {
-    let dto = games_adapter::GameCreate::new(join_code, None, None, None::<String>);
+    let dto = games_adapter::GameCreate::new(join_code);
     let game = games_adapter::create_game(conn, dto).await?;
     Ok(Game::from(game))
 }

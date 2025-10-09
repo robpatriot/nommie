@@ -28,18 +28,23 @@ pub struct CredentialsCreate {
 }
 
 impl CredentialsCreate {
-    pub fn new(
-        user_id: i64,
-        email: impl Into<String>,
-        google_sub: Option<impl Into<String>>,
-        password_hash: Option<impl Into<String>>,
-    ) -> Self {
+    pub fn new(user_id: i64, email: impl Into<String>) -> Self {
         Self {
             user_id,
             email: email.into(),
-            google_sub: google_sub.map(|s| s.into()),
-            password_hash: password_hash.map(|s| s.into()),
+            google_sub: None,
+            password_hash: None,
         }
+    }
+
+    pub fn with_google_sub(mut self, google_sub: impl Into<String>) -> Self {
+        self.google_sub = Some(google_sub.into());
+        self
+    }
+
+    pub fn with_password_hash(mut self, password_hash: impl Into<String>) -> Self {
+        self.password_hash = Some(password_hash.into());
+        self
     }
 }
 
@@ -55,21 +60,29 @@ pub struct CredentialsUpdate {
 }
 
 impl CredentialsUpdate {
-    pub fn new(
-        id: i64,
-        user_id: i64,
-        email: impl Into<String>,
-        google_sub: Option<impl Into<String>>,
-        password_hash: Option<impl Into<String>>,
-        last_login: Option<time::OffsetDateTime>,
-    ) -> Self {
+    pub fn new(id: i64, user_id: i64, email: impl Into<String>) -> Self {
         Self {
             id,
             user_id,
             email: email.into(),
-            google_sub: google_sub.map(|s| s.into()),
-            password_hash: password_hash.map(|s| s.into()),
-            last_login,
+            google_sub: None,
+            password_hash: None,
+            last_login: None,
         }
+    }
+
+    pub fn with_google_sub(mut self, google_sub: impl Into<String>) -> Self {
+        self.google_sub = Some(google_sub.into());
+        self
+    }
+
+    pub fn with_password_hash(mut self, password_hash: impl Into<String>) -> Self {
+        self.password_hash = Some(password_hash.into());
+        self
+    }
+
+    pub fn with_last_login(mut self, last_login: time::OffsetDateTime) -> Self {
+        self.last_login = Some(last_login);
+        self
     }
 }

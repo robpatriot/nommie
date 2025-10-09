@@ -12,18 +12,28 @@ pub struct GameCreate {
 }
 
 impl GameCreate {
-    pub fn new(
-        join_code: impl Into<String>,
-        created_by: Option<i64>,
-        visibility: Option<GameVisibility>,
-        name: Option<impl Into<String>>,
-    ) -> Self {
+    pub fn new(join_code: impl Into<String>) -> Self {
         Self {
             join_code: join_code.into(),
-            created_by,
-            visibility,
-            name: name.map(|n| n.into()),
+            created_by: None,
+            visibility: None,
+            name: None,
         }
+    }
+
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn with_visibility(mut self, visibility: GameVisibility) -> Self {
+        self.visibility = Some(visibility);
+        self
+    }
+
+    pub fn by(mut self, user_id: i64) -> Self {
+        self.created_by = Some(user_id);
+        self
     }
 }
 
@@ -68,17 +78,27 @@ pub struct GameUpdateRound {
 }
 
 impl GameUpdateRound {
-    pub fn new(
-        id: i64,
-        current_round: Option<i16>,
-        hand_size: Option<i16>,
-        dealer_pos: Option<i16>,
-    ) -> Self {
+    pub fn new(id: i64) -> Self {
         Self {
             id,
-            current_round,
-            hand_size,
-            dealer_pos,
+            current_round: None,
+            hand_size: None,
+            dealer_pos: None,
         }
+    }
+
+    pub fn with_current_round(mut self, round: i16) -> Self {
+        self.current_round = Some(round);
+        self
+    }
+
+    pub fn with_hand_size(mut self, size: i16) -> Self {
+        self.hand_size = Some(size);
+        self
+    }
+
+    pub fn with_dealer_pos(mut self, pos: i16) -> Self {
+        self.dealer_pos = Some(pos);
+        self
     }
 }
