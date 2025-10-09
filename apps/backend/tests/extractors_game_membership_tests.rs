@@ -10,6 +10,7 @@ use backend::entities::games::{self, GameState, GameVisibility};
 use backend::entities::{game_players, users};
 use backend::extractors::{CurrentUser, GameId, GameMembership};
 use backend::infra::state::build_state;
+use backend::repos::memberships::GameRole;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
 use common::assert_problem_details_structure;
@@ -43,24 +44,55 @@ async fn echo_membership(
     }))
 }
 
-/// Test-only handler that requires specific role
-#[allow(dead_code)]
-async fn echo_membership_with_role(
+/// Test-only handler that requires Player role (rejects Spectators)
+async fn player_only_action(
     current_user: CurrentUser,
     game_id: GameId,
     membership: GameMembership,
 ) -> Result<impl Responder, backend::AppError> {
-    // This handler would use RoleGuard::Exactly(GameRole::Player) in real usage
+    use backend::errors::ErrorCode;
+
+    // Enforce Player role
+    if membership.role != GameRole::Player {
+        return Err(backend::AppError::forbidden_with_code(
+            ErrorCode::InsufficientRole,
+            "This action requires Player role",
+        ));
+    }
+
     #[derive(serde::Serialize)]
     struct Out {
         user_id: String,
         game_id: i64,
         role: String,
+        message: String,
     }
     Ok(web::Json(Out {
         user_id: current_user.sub,
         game_id: game_id.0,
         role: format!("{:?}", membership.role),
+        message: "Player action successful".to_string(),
+    }))
+}
+
+/// Test-only handler that accepts any member (Player or Spectator)
+async fn spectator_allowed_action(
+    current_user: CurrentUser,
+    game_id: GameId,
+    membership: GameMembership,
+) -> Result<impl Responder, backend::AppError> {
+    #[derive(serde::Serialize)]
+    struct Out {
+        user_id: String,
+        game_id: i64,
+        role: String,
+        message: String,
+    }
+    Ok(web::Json(Out {
+        user_id: current_user.sub,
+        game_id: game_id.0,
+        role: format!("{:?}", membership.role),
+        message: "Any member can view this".to_string(),
     }))
 }
 
@@ -483,4 +515,208 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
     .await;
 
     Ok(())
+}
+
+#[actix_web::test]
+async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::Error>> {
+    // Test that handlers can enforce role-based access control
+    let security_config =
+        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .with_security(security_config.clone())
+        .build()
+        .await?;
+
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+
+    // Create a test user
+    let user_sub = unique_str("test-user");
+    let user_email = unique_email("test");
+    let now = OffsetDateTime::now_utc();
+    let user = users::ActiveModel {
+        id: sea_orm::NotSet,
+        sub: Set(user_sub.clone()),
+        username: Set(Some("player1".to_string())),
+        is_ai: Set(false),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    let user = user.insert(shared.transaction()).await?;
+
+    // Create a test game
+    let game = games::ActiveModel {
+        visibility: Set(GameVisibility::Public),
+        state: Set(GameState::Lobby),
+        rules_version: Set("1.0.0".to_string()),
+        lock_version: Set(1),
+        created_at: Set(now),
+        updated_at: Set(now),
+        ..Default::default()
+    };
+    let game = game.insert(shared.transaction()).await?;
+
+    // Create a Player membership (currently all memberships are Players)
+    let membership = game_players::ActiveModel {
+        id: sea_orm::NotSet,
+        game_id: Set(game.id),
+        user_id: Set(user.id),
+        turn_order: Set(1),
+        is_ready: Set(false),
+        created_at: Set(now),
+    };
+    membership.insert(shared.transaction()).await?;
+
+    // Create a valid JWT token
+    let token = mint_access_token(
+        &user_sub,
+        &user_email,
+        std::time::SystemTime::now(),
+        &security_config,
+    )
+    .unwrap();
+
+    // Build test app with player-only route
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route(
+                "/games/{game_id}/player-action",
+                web::post().to(player_only_action),
+            );
+        })
+        .build()
+        .await?;
+
+    // Make request - should succeed because user is a Player
+    let req = test::TestRequest::post()
+        .uri(&format!("/games/{}/player-action", game.id))
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .to_request();
+    req.extensions_mut().insert(shared.clone());
+
+    let resp = test::call_service(&app, req).await;
+
+    // Assert success
+    assert!(resp.status().is_success());
+
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["role"], "Player");
+    assert_eq!(body["message"], "Player action successful");
+
+    // Cleanup
+    shared.rollback().await?;
+
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::Error>> {
+    // Test that handlers accepting any role work correctly
+    let security_config =
+        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .with_security(security_config.clone())
+        .build()
+        .await?;
+
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+
+    // Create a test user
+    let user_sub = unique_str("test-user");
+    let user_email = unique_email("test");
+    let now = OffsetDateTime::now_utc();
+    let user = users::ActiveModel {
+        id: sea_orm::NotSet,
+        sub: Set(user_sub.clone()),
+        username: Set(Some("viewer".to_string())),
+        is_ai: Set(false),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+    let user = user.insert(shared.transaction()).await?;
+
+    // Create a test game
+    let game = games::ActiveModel {
+        visibility: Set(GameVisibility::Public),
+        state: Set(GameState::Lobby),
+        rules_version: Set("1.0.0".to_string()),
+        lock_version: Set(1),
+        created_at: Set(now),
+        updated_at: Set(now),
+        ..Default::default()
+    };
+    let game = game.insert(shared.transaction()).await?;
+
+    // Create membership
+    let membership = game_players::ActiveModel {
+        id: sea_orm::NotSet,
+        game_id: Set(game.id),
+        user_id: Set(user.id),
+        turn_order: Set(1),
+        is_ready: Set(false),
+        created_at: Set(now),
+    };
+    membership.insert(shared.transaction()).await?;
+
+    // Create a valid JWT token
+    let token = mint_access_token(
+        &user_sub,
+        &user_email,
+        std::time::SystemTime::now(),
+        &security_config,
+    )
+    .unwrap();
+
+    // Build test app with spectator-allowed route
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route(
+                "/games/{game_id}/view",
+                web::get().to(spectator_allowed_action),
+            );
+        })
+        .build()
+        .await?;
+
+    // Make request - should succeed for any member
+    let req = test::TestRequest::get()
+        .uri(&format!("/games/{}/view", game.id))
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .to_request();
+    req.extensions_mut().insert(shared.clone());
+
+    let resp = test::call_service(&app, req).await;
+
+    // Assert success
+    assert!(resp.status().is_success());
+
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["role"], "Player");
+    assert_eq!(body["message"], "Any member can view this");
+
+    // Cleanup
+    shared.rollback().await?;
+
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_game_role_hierarchy() {
+    // Unit test for GameRole::has_at_least logic
+    // This demonstrates the role hierarchy system
+
+    // Player has at least Player permission
+    assert!(GameRole::Player.has_at_least(GameRole::Player));
+
+    // Player has at least Spectator permission (Players can do everything Spectators can)
+    assert!(GameRole::Player.has_at_least(GameRole::Spectator));
+
+    // Spectator does NOT have at least Player permission
+    assert!(!GameRole::Spectator.has_at_least(GameRole::Player));
+
+    // Spectator has at least Spectator permission
+    assert!(GameRole::Spectator.has_at_least(GameRole::Spectator));
 }
