@@ -1,6 +1,6 @@
 # Nommie — Cursor Rules (Workspace)
 
-> Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and codegen.
+Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and codegen.
 
 ## General
 - Follow these rules exactly. If a request would break them, stop and ask.
@@ -19,7 +19,7 @@
 - Domain modules: no DB or Actix imports.
 - Use enums (not strings) for states, roles, and phases.
 - No `unwrap()` or `expect()` outside tests.
-- Remove unused imports entirely (don’t comment them out).
+- Remove unused imports entirely (don't comment them out).
 
 ## Transactions
 - All DB work runs through `with_txn` or `require_db`.
@@ -48,13 +48,13 @@
 
 ## Schema & Migrations
 - Schema lives in a single init migration under `apps/backend/migration`.
-- Don’t add separate migration files, SQL, or DDL elsewhere.
+- Don't add separate migration files, SQL, or DDL elsewhere.
 
 ## Env & pnpm
 - Source `.env` once per shell session before any pnpm commands:
   set -a; source .env; set +a
 - Never commit real `.env`.
-- Don’t read `DATABASE_URL` directly in code.
+- Don't read `DATABASE_URL` directly in code.
 
 ## Testing
 - Tests must be deterministic (seed time/RNG).
@@ -62,3 +62,4 @@
 - Use `SharedTxn` when tests need continuity.
 - Control tests needing committed data must use pooled DB setup.
 - Run backend tests with `pnpm be:test`.
+
