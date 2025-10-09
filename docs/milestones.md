@@ -1,7 +1,7 @@
 # 🗺️ Nommie — Milestone & Enhancement Roadmap
 
-This document outlines Nommie’s development path:  
-core milestones first, then optional and enhancement tracks that can be implemented at any time.
+This document outlines Nommie’s development path:
+Core milestones first, then optional and enhancement tracks that can be implemented at any time.
 
 ---
 
@@ -99,11 +99,12 @@ core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🕓 **10. Backend Domain Modules**
+### 🟨 **10. Backend Domain Modules**
 **Dependencies:** 7  
 **Details:**
 - Pure logic modules: `rules`, `bidding`, `tricks`, `scoring`, `state`.
 - No SeaORM in domain modules.
+**Progress:** ORM isolation and adapter layer complete; foundation ready for domain logic.  
 **Acceptance:** `grep` shows no ORM usage in domain code.
 
 ---
@@ -118,11 +119,12 @@ core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🕓 **12. Game Lifecycle (Happy Path)**
+### 🟨 **12. Game Lifecycle (Happy Path)**
 **Dependencies:** 9, 7, 10, 11  
 **Details:**
 - Complete flow: `create → join → ready → deal → bid → trump → tricks → scoring → next round`.
 - Integration test covers minimal end-to-end loop.
+**Progress:** Adapters, services, and transactional sentinel in place; game orchestration logic pending.  
 **Acceptance:** A full happy-path game completes successfully.
 
 ---
@@ -132,6 +134,7 @@ core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - AI performs bidding and legal plays.
 - Game advances automatically until human input is required.
+**Progress:** Infrastructure and deterministic test harness ready; logic pending.  
 **Acceptance:** Full AI-only games complete successfully.
 
 ---
@@ -141,11 +144,12 @@ core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - Invalid bids/plays return proper Problem Details.
 - Property tests confirm trick/scoring invariants.
+**Progress:** Core correctness and timestamp tests complete; property-based testing pending.  
 **Acceptance:** Error cases handled consistently; all properties hold.
 
 ---
 
-### 🕓 **15. Frontend UX Pass (Round 1)**
+### ✅ **15. Frontend UX Pass (Round 1)**
 **Dependencies:** 11, 13  
 **Details:**
 - Hand display, trick area, bidding UI, trump selector.
@@ -159,16 +163,18 @@ core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.
 - Planned CI: GitHub Actions gates merges with lint, tests, and schema checks.
+**Progress:** Local grep gates and lint/test guards complete; remote CI integration pending.  
 **Acceptance:** CI green gate required for merges; schema re-applies cleanly.
 
 ---
 
-### 🕓 **17. Documentation & Decision Log**
+### 🟨 **17. Documentation & Decision Log**
 **Dependencies:** 11  
 **Details:**
 - README: setup and reset flow.
 - CONTRIBUTING: module layout, extractor policy, `_test` guard.
 - DECISIONS.md: locked technical decisions.
+**Progress:** `.cursorrules` and roadmap current; README/CONTRIBUTING need refresh for layering and DTO policies.  
 **Acceptance:** New developers can onboard independently.
 
 ---
@@ -179,6 +185,7 @@ core milestones first, then optional and enhancement tracks that can be implemen
 - Logs include `user_id` and `game_id` when relevant.
 - Frontend displays `trace_id` on error surfaces.
 - `/health` endpoint checks DB connectivity.
+**Progress:** Trace IDs active; enrichment and health route pending.  
 **Acceptance:** Logs actionable; trace ID visible end-to-end.
 
 ---
@@ -187,6 +194,7 @@ core milestones first, then optional and enhancement tracks that can be implemen
 **Dependencies:** 16, 10  
 **Details:**
 - Grafana, Tempo, Loki, and Prometheus in Docker Compose.
+**Progress:** Docker baseline complete; observability stack not yet deployed.  
 **Acceptance:** Metrics, logs, and traces integrated and viewable.
 
 ---
@@ -198,7 +206,7 @@ Independent improvements that enhance robustness, performance, and developer exp
 ---
 
 ### **1. Architecture & Reliability**
-- **WebSockets / Server Push:** Replace polling with WebSockets or SSE. Backend emits live game-state updates.  
+- **WebSockets / Server Push:** Replace polling with WebSockets or SSE.  
   *Acceptance:* Real-time updates replace polling.
 - **Deployment Stub:** Minimal production-style environment including FE, BE, DB, and observability stubs.  
   *Acceptance:* Application runs in minimal production configuration.
@@ -212,7 +220,9 @@ Independent improvements that enhance robustness, performance, and developer exp
 - **PII-Safe Logging:** Mask or hash sensitive identifiers in logs.  
 - **Error Code Catalog:** Centralize all SCREAMING_SNAKE error codes.  
 - **Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.  
-- **Determinism Tools:** Introduce injectable clock, seeded RNG, and mock time for reproducible tests.
+- **Determinism Tools:** Introduce injectable clock, seeded RNG, and mock time for reproducible tests.  
+
+*Progress:* Transactional harness and DTO structure already support deterministic time injection and data hygiene hooks.
 
 ---
 
@@ -243,7 +253,3 @@ Independent improvements that enhance robustness, performance, and developer exp
 - **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus for full observability.  
   *Acceptance:* Metrics, logs, and traces visible in dashboards.  
 - **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id`.
-
----
-
-*End of Roadmap.*
