@@ -1,3 +1,3 @@
 pub mod pii;
 
-pub use pii::{redact, redacted, Redacted};
+pub use pii::{redact, Redacted};

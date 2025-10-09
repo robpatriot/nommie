@@ -99,12 +99,6 @@ impl<'a> fmt::Debug for Redacted<'a> {
     }
 }
 
-/// Convenience constructor for creating a Redacted wrapper.
-#[inline]
-pub fn redacted(s: &str) -> Redacted<'_> {
-    Redacted(s)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -188,7 +182,7 @@ mod tests {
     #[test]
     fn test_redacted_convenience_constructor() {
         let sensitive = "admin@test.org";
-        let redacted = redacted(sensitive);
+        let redacted = Redacted(sensitive);
 
         assert_eq!(format!("{redacted}"), "a***@test.org");
     }
