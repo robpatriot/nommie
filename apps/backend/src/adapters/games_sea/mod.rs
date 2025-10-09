@@ -58,3 +58,40 @@ pub async fn create_game<C: ConnectionTrait + Send + Sync>(
 
     game_active.insert(conn).await
 }
+
+pub async fn update_state<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    dto: GameUpdateState,
+) -> Result<games::Model, sea_orm::DbErr> {
+    // Fetch existing game
+    let existing = games::Entity::find_by_id(dto.id)
+        .one(conn)
+        .await?
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))?;
+
+    // Update only state and updated_at; keep created_at unchanged
+    let mut active: games::ActiveModel = existing.into();
+    active.state = Set(dto.state);
+    active.updated_at = Set(time::OffsetDateTime::now_utc());
+
+    active.update(conn).await
+}
+
+pub async fn update_metadata<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    dto: GameUpdateMetadata,
+) -> Result<games::Model, sea_orm::DbErr> {
+    // Fetch existing game
+    let existing = games::Entity::find_by_id(dto.id)
+        .one(conn)
+        .await?
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))?;
+
+    // Update metadata fields and updated_at; keep created_at unchanged
+    let mut active: games::ActiveModel = existing.into();
+    active.name = Set(dto.name);
+    active.visibility = Set(dto.visibility);
+    active.updated_at = Set(time::OffsetDateTime::now_utc());
+
+    active.update(conn).await
+}
