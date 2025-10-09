@@ -1,12 +1,12 @@
 //! Snapshot API tests covering all game phases.
 
 use backend::domain::bidding::{place_bid, set_trump, Bid};
-use backend::domain::cards::{Card, Rank, Suit, Trump};
 use backend::domain::fixtures::CardFixtures;
 use backend::domain::rules::PLAYERS;
 use backend::domain::snapshot::{snapshot, PhaseSnapshot};
 use backend::domain::state::{GameState, Phase, RoundState};
 use backend::domain::tricks::play_card;
+use backend::domain::{Card, Rank, Suit, Trump};
 
 /// Build a minimal GameState in Init phase.
 fn build_init_state() -> GameState {

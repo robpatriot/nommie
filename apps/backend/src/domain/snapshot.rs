@@ -2,10 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::cards::{Card, Trump};
 use crate::domain::rules::{valid_bid_range, PLAYERS};
 use crate::domain::state::{GameState, Phase, PlayerId, Seat};
 use crate::domain::tricks::legal_moves;
+use crate::domain::{Card, Trump};
 
 /// Game-level header present in all snapshots.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

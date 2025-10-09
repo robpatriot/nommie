@@ -88,7 +88,7 @@ pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), D
 pub fn set_trump(
     state: &mut GameState,
     who: PlayerId,
-    trump: crate::domain::cards::Trump,
+    trump: crate::domain::Trump,
 ) -> Result<(), DomainError> {
     if state.phase != Phase::TrumpSelect {
         return Err(DomainError::validation(

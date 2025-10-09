@@ -1,6 +1,6 @@
-use crate::domain::cards::{card_beats, hand_has_suit, Card, Trump};
 use crate::domain::rules::PLAYERS;
 use crate::domain::state::{advance_turn, GameState, Phase, PlayerId, RoundState};
+use crate::domain::{card_beats, hand_has_suit, Card, Trump};
 use crate::errors::domain::{DomainError, ValidationKind};
 
 /// Compute legal cards the player may play, independent of turn enforcement.

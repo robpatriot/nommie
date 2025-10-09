@@ -1,4 +1,4 @@
-use super::cards::Card;
+use super::Card;
 
 /// Centralized helper for parsing hardcoded card tokens in fixtures and demo data.
 ///

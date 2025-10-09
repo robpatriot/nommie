@@ -1,5 +1,5 @@
-use crate::domain::cards::{Card, Suit, Trump};
 use crate::domain::rules::PLAYERS;
+use crate::domain::{Card, Suit, Trump};
 
 pub type PlayerId = u8; // 0..=3
 pub type Seat = u8; // 0..=3, positional alias for PlayerId
