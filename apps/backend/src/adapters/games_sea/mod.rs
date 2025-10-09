@@ -6,6 +6,10 @@ use sea_orm::{
 
 use crate::entities::games;
 
+pub mod dto;
+
+pub use dto::{GameCreate, GameUpdateMetadata, GameUpdateRound, GameUpdateState};
+
 // Adapter functions return DbErr; repos layer maps to DomainError via From<DbErr>.
 
 pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
@@ -30,20 +34,20 @@ pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
 
 pub async fn create_game<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    join_code: String,
+    dto: GameCreate,
 ) -> Result<games::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
     let game_active = games::ActiveModel {
         id: NotSet,
-        created_by: NotSet,
-        visibility: Set(games::GameVisibility::Private),
+        created_by: Set(dto.created_by),
+        visibility: Set(dto.visibility.unwrap_or(games::GameVisibility::Private)),
         state: Set(games::GameState::Lobby),
         created_at: Set(now),
         updated_at: Set(now),
         started_at: NotSet,
         ended_at: NotSet,
-        name: NotSet,
-        join_code: Set(Some(join_code)),
+        name: Set(dto.name),
+        join_code: Set(Some(dto.join_code)),
         rules_version: Set("1.0".to_string()),
         rng_seed: NotSet,
         current_round: NotSet,

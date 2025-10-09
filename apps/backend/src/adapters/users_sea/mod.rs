@@ -8,7 +8,7 @@ use crate::entities::{user_credentials, users};
 
 pub mod dto;
 
-pub use dto::{CredentialsCreate, CredentialsUpdate};
+pub use dto::{CredentialsCreate, CredentialsUpdate, UserCreate};
 
 // Adapter functions return DbErr; repos layer maps to DomainError via From<DbErr>.
 
@@ -24,16 +24,14 @@ pub async fn find_credentials_by_email<C: ConnectionTrait + Send + Sync>(
 
 pub async fn create_user<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    sub: String,
-    username: String,
-    is_ai: bool,
+    dto: UserCreate,
 ) -> Result<users::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
     let user_active = users::ActiveModel {
         id: NotSet,
-        sub: Set(sub),
-        username: Set(Some(username)),
-        is_ai: Set(is_ai),
+        sub: Set(dto.sub),
+        username: Set(Some(dto.username)),
+        is_ai: Set(dto.is_ai),
         created_at: Set(now),
         updated_at: Set(now),
     };

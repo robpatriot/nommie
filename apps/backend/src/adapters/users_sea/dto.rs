@@ -1,5 +1,23 @@
 //! DTOs for users_sea adapter.
 
+/// DTO for creating a new user.
+#[derive(Debug, Clone)]
+pub struct UserCreate {
+    pub sub: String,
+    pub username: String,
+    pub is_ai: bool,
+}
+
+impl UserCreate {
+    pub fn new(sub: impl Into<String>, username: impl Into<String>, is_ai: bool) -> Self {
+        Self {
+            sub: sub.into(),
+            username: username.into(),
+            is_ai,
+        }
+    }
+}
+
 /// DTO for creating new user credentials.
 #[derive(Debug, Clone)]
 pub struct CredentialsCreate {

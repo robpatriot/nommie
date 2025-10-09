@@ -72,15 +72,14 @@ pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     membership: GameMembership,
 ) -> Result<GameMembership, DomainError> {
-    let updated = memberships_adapter::update_membership(
-        conn,
+    let dto = memberships_adapter::MembershipUpdate::new(
         membership.id,
         membership.game_id,
         membership.user_id,
         membership.turn_order,
         membership.is_ready,
-    )
-    .await?;
+    );
+    let updated = memberships_adapter::update_membership(conn, dto).await?;
     Ok(GameMembership {
         id: updated.id,
         game_id: updated.game_id,

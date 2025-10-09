@@ -45,8 +45,8 @@ pub async fn create_user<C: ConnectionTrait + Send + Sync>(
     username: &str,
     is_ai: bool,
 ) -> Result<User, DomainError> {
-    let user =
-        users_adapter::create_user(conn, sub.to_string(), username.to_string(), is_ai).await?;
+    let dto = users_adapter::UserCreate::new(sub, username, is_ai);
+    let user = users_adapter::create_user(conn, dto).await?;
     Ok(User::from(user))
 }
 
