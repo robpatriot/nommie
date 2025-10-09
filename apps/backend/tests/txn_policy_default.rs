@@ -2,6 +2,9 @@
 //!
 //! This test binary runs without mod common, so it uses the OnceLock default
 //! of CommitOnOk policy. It verifies that the default policy works correctly.
+//!
+//! Also contains tests that require committed data (e.g., database constraints)
+//! since they need the CommitOnOk policy to work properly.
 
 // Initialize logging directly (no mod common)
 mod support;
@@ -13,7 +16,11 @@ fn init_logging() {
 use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, TxnPolicy};
+use backend::entities::games::{self, GameState, GameVisibility};
+use backend::error::AppError;
+use backend::errors::ErrorCode;
 use backend::infra::state::build_state;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use support::db_games::{count_games_by_name_pool, delete_games_by_name, insert_game_stub};
 use ulid::Ulid;
 
@@ -93,6 +100,86 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
 
     assert!(result.is_err());
     assert_eq!(count_games_by_name_pool(&state, &name).await?, before);
+
+    Ok(())
+}
+
+/// Test that verifies the unique join_code constraint works correctly.
+/// This test needs committed data, so it runs in this file with CommitOnOk policy.
+#[tokio::test]
+async fn test_join_code_unique_constraint() -> Result<(), Box<dyn std::error::Error>> {
+    // Verify we're using the commit policy
+    assert_eq!(current(), TxnPolicy::CommitOnOk);
+
+    let state = build_state().with_db(DbProfile::Test).build().await?;
+
+    // Use a unique join code to avoid conflicts with other test runs (max 10 chars)
+    let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+    let join_code = format!("T{}", timestamp % 100000000); // Keep it under 10 chars
+
+    // First transaction: insert a game with a specific join_code (will commit on Ok)
+    with_txn(None, &state, |txn| {
+        let join_code = join_code.clone();
+        Box::pin(async move {
+            let now = time::OffsetDateTime::now_utc();
+            let game1 = games::ActiveModel {
+                visibility: Set(GameVisibility::Public),
+                state: Set(GameState::Lobby),
+                rules_version: Set("nommie-1.0.0".to_string()),
+                join_code: Set(Some(join_code)),
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            };
+
+            let inserted = games::Entity::insert(game1).exec(txn).await?;
+            assert!(inserted.last_insert_id > 0);
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    // Second transaction: try to insert another game with same join_code
+    // This should fail with JoinCodeConflict
+    let result = with_txn(None, &state, |txn| {
+        let join_code = join_code.clone();
+        Box::pin(async move {
+            let now = time::OffsetDateTime::now_utc();
+            let game2 = games::ActiveModel {
+                visibility: Set(GameVisibility::Private),
+                state: Set(GameState::Lobby),
+                rules_version: Set("nommie-1.0.0".to_string()),
+                join_code: Set(Some(join_code)), // Same join_code
+                created_at: Set(now),
+                updated_at: Set(now),
+                ..Default::default()
+            };
+
+            games::Entity::insert(game2)
+                .exec(txn)
+                .await
+                .map_err(|e| AppError::from(backend::infra::db_errors::map_db_err(e)))
+        })
+    })
+    .await;
+
+    // Assert the insert fails with JoinCodeConflict
+    assert!(result.is_err(), "Expected duplicate join_code to fail");
+    assert_eq!(result.unwrap_err().code(), ErrorCode::JoinCodeConflict);
+
+    // Cleanup: delete the game we inserted to leave DB unchanged
+    with_txn(None, &state, |txn| {
+        let join_code = join_code.clone();
+        Box::pin(async move {
+            games::Entity::delete_many()
+                .filter(games::Column::JoinCode.eq(join_code))
+                .exec(txn)
+                .await?;
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
 
     Ok(())
 }

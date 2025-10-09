@@ -1,3 +1,16 @@
+//! Adapter tests validating that games_sea works identically with pooled connections and transactions.
+//!
+//! These tests verify the "generic over C: ConnectionTrait" design by running the same
+//! operations through both connection types and asserting equivalence.
+//!
+//! **Important:** While this file uses `mod common` (RollbackOnOk policy), some tests
+//! intentionally use pooled connections via `require_db()` which auto-commit their changes.
+//! These tests perform manual cleanup to leave the database unchanged.
+//!
+//! Pattern:
+//! - Pooled path: operations commit → manual cleanup with delete_games_by_name
+//! - Transaction path: operations auto-rollback via RollbackOnOk policy
+
 mod common;
 mod support;
 
