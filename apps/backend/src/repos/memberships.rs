@@ -56,9 +56,8 @@ pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
     is_ready: bool,
     role: GameRole,
 ) -> Result<GameMembership, DomainError> {
-    let membership =
-        memberships_adapter::create_membership(conn, game_id, user_id, turn_order, is_ready)
-            .await?;
+    let dto = memberships_adapter::MembershipCreate::new(game_id, user_id, turn_order, is_ready);
+    let membership = memberships_adapter::create_membership(conn, dto).await?;
     Ok(GameMembership {
         id: membership.id,
         game_id: membership.game_id,

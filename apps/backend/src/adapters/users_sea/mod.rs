@@ -6,6 +6,10 @@ use sea_orm::{
 
 use crate::entities::{user_credentials, users};
 
+pub mod dto;
+
+pub use dto::{CredentialsCreate, CredentialsUpdate};
+
 // Adapter functions return DbErr; repos layer maps to DomainError via From<DbErr>.
 
 pub async fn find_credentials_by_email<C: ConnectionTrait + Send + Sync>(
@@ -39,17 +43,15 @@ pub async fn create_user<C: ConnectionTrait + Send + Sync>(
 
 pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    user_id: i64,
-    email: String,
-    google_sub: Option<String>,
+    dto: CredentialsCreate,
 ) -> Result<user_credentials::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
     let credential_active = user_credentials::ActiveModel {
         id: NotSet,
-        user_id: Set(user_id),
-        password_hash: Set(None),
-        email: Set(email),
-        google_sub: Set(google_sub),
+        user_id: Set(dto.user_id),
+        password_hash: Set(dto.password_hash),
+        email: Set(dto.email),
+        google_sub: Set(dto.google_sub),
         last_login: Set(Some(now)),
         created_at: Set(now),
         updated_at: Set(now),
@@ -58,23 +60,17 @@ pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
     credential_active.insert(conn).await
 }
 
-#[allow(clippy::too_many_arguments)]
 pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    id: i64,
-    user_id: i64,
-    password_hash: Option<String>,
-    email: String,
-    google_sub: Option<String>,
-    last_login: Option<time::OffsetDateTime>,
+    dto: CredentialsUpdate,
 ) -> Result<user_credentials::Model, sea_orm::DbErr> {
     let credentials = user_credentials::ActiveModel {
-        id: Set(id),
-        user_id: Set(user_id),
-        password_hash: Set(password_hash),
-        email: Set(email),
-        google_sub: Set(google_sub),
-        last_login: Set(last_login),
+        id: Set(dto.id),
+        user_id: Set(dto.user_id),
+        password_hash: Set(dto.password_hash),
+        email: Set(dto.email),
+        google_sub: Set(dto.google_sub),
+        last_login: Set(dto.last_login),
         created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };

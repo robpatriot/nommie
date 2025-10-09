@@ -6,6 +6,10 @@ use sea_orm::{
 
 use crate::entities::game_players;
 
+pub mod dto;
+
+pub use dto::{MembershipCreate, MembershipSetReady};
+
 // Adapter functions return DbErr; repos layer maps to DomainError via From<DbErr>.
 
 pub async fn find_membership<C: ConnectionTrait + Send + Sync>(
@@ -22,18 +26,15 @@ pub async fn find_membership<C: ConnectionTrait + Send + Sync>(
 
 pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    game_id: i64,
-    user_id: i64,
-    turn_order: i32,
-    is_ready: bool,
+    dto: MembershipCreate,
 ) -> Result<game_players::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
     let membership_active = game_players::ActiveModel {
         id: NotSet,
-        game_id: Set(game_id),
-        user_id: Set(user_id),
-        turn_order: Set(turn_order),
-        is_ready: Set(is_ready),
+        game_id: Set(dto.game_id),
+        user_id: Set(dto.user_id),
+        turn_order: Set(dto.turn_order),
+        is_ready: Set(dto.is_ready),
         created_at: Set(now),
     };
 
@@ -55,6 +56,29 @@ pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
         user_id: Set(user_id),
         turn_order: Set(turn_order),
         is_ready: Set(is_ready),
+        created_at: NotSet,
+    };
+    membership.update(conn).await
+}
+
+pub async fn set_membership_ready<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    dto: MembershipSetReady,
+) -> Result<game_players::Model, sea_orm::DbErr> {
+    use sea_orm::EntityTrait;
+
+    // Fetch the existing membership to preserve other fields
+    let existing = game_players::Entity::find_by_id(dto.id)
+        .one(conn)
+        .await?
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Membership not found".to_string()))?;
+
+    let membership = game_players::ActiveModel {
+        id: Set(dto.id),
+        game_id: Set(existing.game_id),
+        user_id: Set(existing.user_id),
+        turn_order: Set(existing.turn_order),
+        is_ready: Set(dto.is_ready),
         created_at: NotSet,
     };
     membership.update(conn).await

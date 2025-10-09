@@ -56,13 +56,8 @@ pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
     email: &str,
     google_sub: Option<&str>,
 ) -> Result<UserCredentials, DomainError> {
-    let credential = users_adapter::create_credentials(
-        conn,
-        user_id,
-        email.to_string(),
-        google_sub.map(|s| s.to_string()),
-    )
-    .await?;
+    let dto = users_adapter::CredentialsCreate::new(user_id, email, google_sub, None::<String>);
+    let credential = users_adapter::create_credentials(conn, dto).await?;
     Ok(UserCredentials::from(credential))
 }
 
@@ -70,16 +65,15 @@ pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     credentials: UserCredentials,
 ) -> Result<UserCredentials, DomainError> {
-    let credential = users_adapter::update_credentials(
-        conn,
+    let dto = users_adapter::CredentialsUpdate::new(
         credentials.id,
         credentials.user_id,
-        credentials.password_hash,
         credentials.email,
         credentials.google_sub,
+        credentials.password_hash,
         credentials.last_login,
-    )
-    .await?;
+    );
+    let credential = users_adapter::update_credentials(conn, dto).await?;
     Ok(UserCredentials::from(credential))
 }
 
