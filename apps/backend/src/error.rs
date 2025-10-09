@@ -416,25 +416,31 @@ impl ResponseError for AppError {
             }
         }
 
-        let is_unauthorized = matches!(
-            self,
-            AppError::Unauthorized
-                | AppError::UnauthorizedMissingBearer
-                | AppError::UnauthorizedInvalidJwt
-                | AppError::UnauthorizedExpiredJwt
-        );
-
-        let is_service_unavailable = status == StatusCode::SERVICE_UNAVAILABLE;
-
-        // Build step-by-step to avoid borrowing a temporary
+        // Build response with appropriate headers based on status code
+        // Header rules (enforced in production, validated in tests):
+        // - 401 Unauthorized: MUST have WWW-Authenticate: Bearer, MUST NOT have Retry-After
+        // - 503 Service Unavailable: MUST have Retry-After, MUST NOT have WWW-Authenticate
+        // - Other errors (400, 404, 409, etc.): MUST NOT have either header
         let mut builder = HttpResponse::build(status);
         builder.insert_header((CONTENT_TYPE, "application/problem+json"));
-        builder.insert_header(("x-trace-id", trace_id)); // keep custom
-        if is_unauthorized {
-            builder.insert_header((WWW_AUTHENTICATE, "Bearer"));
-        }
-        if is_service_unavailable {
-            builder.insert_header((RETRY_AFTER, "1"));
+        builder.insert_header(("x-trace-id", trace_id));
+
+        // Apply status-specific headers according to RFC 7235 and RFC 7231
+        match status {
+            StatusCode::UNAUTHORIZED => {
+                // RFC 7235: 401 responses must include WWW-Authenticate
+                builder.insert_header((WWW_AUTHENTICATE, "Bearer"));
+                // Note: Retry-After is explicitly NOT set for 401
+            }
+            StatusCode::SERVICE_UNAVAILABLE => {
+                // RFC 7231: 503 responses should include Retry-After
+                builder.insert_header((RETRY_AFTER, "1"));
+                // Note: WWW-Authenticate is explicitly NOT set for 503
+            }
+            _ => {
+                // Other status codes (400, 404, 409, etc.) do not require
+                // WWW-Authenticate or Retry-After headers
+            }
         }
 
         builder.json(problem_details)

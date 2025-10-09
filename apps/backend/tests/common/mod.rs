@@ -74,50 +74,55 @@ pub async fn assert_problem_details_structure(
         "Content-Type must be application/problem+json (got {content_type})"
     );
 
-    // Header-specific assertions based on status code
+    // Validate HTTP header rules (defined in src/error.rs error_response):
+    // - 401: WWW-Authenticate: Bearer (no Retry-After)
+    // - 503: Retry-After (no WWW-Authenticate)
+    // - 400/404/409: neither header
     match expected_status {
         401 => {
-            // 401 responses should have WWW-Authenticate: Bearer and no Retry-After
+            // RFC 7235: 401 must have WWW-Authenticate
             let www_auth = headers.get("WWW-Authenticate");
             assert!(
                 www_auth.is_some(),
-                "401 responses should have WWW-Authenticate header"
+                "401 responses must have WWW-Authenticate header per RFC 7235"
             );
             assert_eq!(www_auth.unwrap().to_str().unwrap(), "Bearer");
+            // Verify no Retry-After on 401
             assert!(
                 headers.get("Retry-After").is_none(),
-                "401 responses should not have Retry-After header"
+                "401 responses must not have Retry-After header"
             );
         }
         503 => {
-            // 503 responses should have Retry-After and no WWW-Authenticate
+            // RFC 7231: 503 should have Retry-After
             let retry_after = headers.get("Retry-After");
             assert!(
                 retry_after.is_some(),
-                "503 responses should have Retry-After header"
+                "503 responses must have Retry-After header per RFC 7231"
             );
             assert!(
                 !retry_after.unwrap().to_str().unwrap().is_empty(),
                 "Retry-After should not be empty"
             );
+            // Verify no WWW-Authenticate on 503
             assert!(
                 headers.get("WWW-Authenticate").is_none(),
-                "503 responses should not have WWW-Authenticate header"
+                "503 responses must not have WWW-Authenticate header"
             );
         }
         400 | 404 | 409 => {
-            // 400/404/409 responses should have neither WWW-Authenticate nor Retry-After
+            // These status codes should have neither special header
             assert!(
                 headers.get("WWW-Authenticate").is_none(),
-                "{expected_status} responses should not have WWW-Authenticate header"
+                "{expected_status} responses must not have WWW-Authenticate header"
             );
             assert!(
                 headers.get("Retry-After").is_none(),
-                "{expected_status} responses should not have Retry-After header"
+                "{expected_status} responses must not have Retry-After header"
             );
         }
         _ => {
-            // For other status codes, we don't enforce specific header requirements
+            // For other status codes, no specific header requirements are enforced
         }
     }
 
