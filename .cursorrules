@@ -21,6 +21,11 @@ Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and 
 - No `unwrap()` or `expect()` outside tests.
 - Remove unused imports entirely (don't comment them out).
 
+## String Handling
+- Query/lookup methods: accept `&str` to avoid unnecessary allocations.
+- Mutating operations: take owned `String` (use `Option<String>` when optional).
+- DTO constructors: use `impl Into<String>` for flexible initialization.
+
 ## Transactions
 - All DB work runs through `with_txn` or `require_db`.
 - `with_txn` closures return `Result<_, AppError>`.
