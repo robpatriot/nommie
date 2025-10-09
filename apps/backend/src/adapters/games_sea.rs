@@ -30,7 +30,7 @@ pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
 
 pub async fn create_game<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    join_code: &str,
+    join_code: String,
 ) -> Result<games::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
     let game_active = games::ActiveModel {
@@ -43,7 +43,7 @@ pub async fn create_game<C: ConnectionTrait + Send + Sync>(
         started_at: NotSet,
         ended_at: NotSet,
         name: NotSet,
-        join_code: Set(Some(join_code.to_string())),
+        join_code: Set(Some(join_code)),
         rules_version: Set("1.0".to_string()),
         rng_seed: NotSet,
         current_round: NotSet,

@@ -55,7 +55,7 @@ pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
         user_id: Set(user_id),
         turn_order: Set(turn_order),
         is_ready: Set(is_ready),
-        created_at: Set(time::OffsetDateTime::now_utc()),
+        created_at: NotSet,
     };
     membership.update(conn).await
 }

@@ -20,15 +20,15 @@ pub async fn find_credentials_by_email<C: ConnectionTrait + Send + Sync>(
 
 pub async fn create_user<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    sub: &str,
-    username: &str,
+    sub: String,
+    username: String,
     is_ai: bool,
 ) -> Result<users::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
     let user_active = users::ActiveModel {
         id: NotSet,
-        sub: Set(sub.to_string()),
-        username: Set(Some(username.to_string())),
+        sub: Set(sub),
+        username: Set(Some(username)),
         is_ai: Set(is_ai),
         created_at: Set(now),
         updated_at: Set(now),
@@ -40,16 +40,16 @@ pub async fn create_user<C: ConnectionTrait + Send + Sync>(
 pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     user_id: i64,
-    email: &str,
-    google_sub: Option<&str>,
+    email: String,
+    google_sub: Option<String>,
 ) -> Result<user_credentials::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
     let credential_active = user_credentials::ActiveModel {
         id: NotSet,
         user_id: Set(user_id),
         password_hash: Set(None),
-        email: Set(email.to_string()),
-        google_sub: Set(google_sub.map(|s| s.to_string())),
+        email: Set(email),
+        google_sub: Set(google_sub),
         last_login: Set(Some(now)),
         created_at: Set(now),
         updated_at: Set(now),
@@ -67,7 +67,6 @@ pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
     email: String,
     google_sub: Option<String>,
     last_login: Option<time::OffsetDateTime>,
-    created_at: time::OffsetDateTime,
 ) -> Result<user_credentials::Model, sea_orm::DbErr> {
     let credentials = user_credentials::ActiveModel {
         id: Set(id),
@@ -76,7 +75,7 @@ pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
         email: Set(email),
         google_sub: Set(google_sub),
         last_login: Set(last_login),
-        created_at: Set(created_at),
+        created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
     credentials.update(conn).await
