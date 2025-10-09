@@ -1,9 +1,8 @@
 //! Membership repository functions for domain layer (generic over ConnectionTrait).
 
-use sea_orm::{ConnectionTrait, Set};
+use sea_orm::ConnectionTrait;
 
 use crate::adapters::memberships_sea as memberships_adapter;
-use crate::entities::game_players;
 use crate::errors::domain::DomainError;
 
 /// Game membership domain model
@@ -74,22 +73,29 @@ pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     membership: GameMembership,
 ) -> Result<GameMembership, DomainError> {
-    let active: game_players::ActiveModel = membership.into();
-    let membership = memberships_adapter::update_membership(conn, active).await?;
+    let updated = memberships_adapter::update_membership(
+        conn,
+        membership.id,
+        membership.game_id,
+        membership.user_id,
+        membership.turn_order,
+        membership.is_ready,
+    )
+    .await?;
     Ok(GameMembership {
-        id: membership.id,
-        game_id: membership.game_id,
-        user_id: membership.user_id,
-        turn_order: membership.turn_order,
-        is_ready: membership.is_ready,
+        id: updated.id,
+        game_id: updated.game_id,
+        user_id: updated.user_id,
+        turn_order: updated.turn_order,
+        is_ready: updated.is_ready,
         role: GameRole::Player, // For now, all members are players
     })
 }
 
 // Conversions between SeaORM models and domain models
 
-impl From<game_players::Model> for GameMembership {
-    fn from(model: game_players::Model) -> Self {
+impl From<crate::entities::game_players::Model> for GameMembership {
+    fn from(model: crate::entities::game_players::Model) -> Self {
         Self {
             id: model.id,
             game_id: model.game_id,
@@ -97,19 +103,6 @@ impl From<game_players::Model> for GameMembership {
             turn_order: model.turn_order,
             is_ready: model.is_ready,
             role: GameRole::Player, // For now, all members are players
-        }
-    }
-}
-
-impl From<GameMembership> for game_players::ActiveModel {
-    fn from(domain: GameMembership) -> Self {
-        Self {
-            id: Set(domain.id),
-            game_id: Set(domain.game_id),
-            user_id: Set(domain.user_id),
-            turn_order: Set(domain.turn_order),
-            is_ready: Set(domain.is_ready),
-            created_at: Set(time::OffsetDateTime::now_utc()),
         }
     }
 }

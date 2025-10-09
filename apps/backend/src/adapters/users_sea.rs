@@ -58,11 +58,27 @@ pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
     credential_active.insert(conn).await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    mut credentials: user_credentials::ActiveModel,
+    id: i64,
+    user_id: i64,
+    password_hash: Option<String>,
+    email: String,
+    google_sub: Option<String>,
+    last_login: Option<time::OffsetDateTime>,
+    created_at: time::OffsetDateTime,
 ) -> Result<user_credentials::Model, sea_orm::DbErr> {
-    credentials.updated_at = Set(time::OffsetDateTime::now_utc());
+    let credentials = user_credentials::ActiveModel {
+        id: Set(id),
+        user_id: Set(user_id),
+        password_hash: Set(password_hash),
+        email: Set(email),
+        google_sub: Set(google_sub),
+        last_login: Set(last_login),
+        created_at: Set(created_at),
+        updated_at: Set(time::OffsetDateTime::now_utc()),
+    };
     credentials.update(conn).await
 }
 

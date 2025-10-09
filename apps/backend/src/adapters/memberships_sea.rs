@@ -42,8 +42,20 @@ pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
 
 pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    membership: game_players::ActiveModel,
+    id: i64,
+    game_id: i64,
+    user_id: i64,
+    turn_order: i32,
+    is_ready: bool,
 ) -> Result<game_players::Model, sea_orm::DbErr> {
     // Note: game_players table doesn't have updated_at field
+    let membership = game_players::ActiveModel {
+        id: Set(id),
+        game_id: Set(game_id),
+        user_id: Set(user_id),
+        turn_order: Set(turn_order),
+        is_ready: Set(is_ready),
+        created_at: Set(time::OffsetDateTime::now_utc()),
+    };
     membership.update(conn).await
 }
