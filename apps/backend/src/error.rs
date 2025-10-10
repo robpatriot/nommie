@@ -32,6 +32,8 @@ pub struct ProblemDetails {
     pub detail: String,
     pub code: String,
     pub trace_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<serde_json::Value>,
 }
 
 #[derive(Error, Debug)]
@@ -65,7 +67,11 @@ pub enum AppError {
     #[error("Configuration error: {detail}")]
     Config { detail: String },
     #[error("Conflict: {detail}")]
-    Conflict { code: ErrorCode, detail: String },
+    Conflict {
+        code: ErrorCode,
+        detail: String,
+        extensions: Option<serde_json::Value>,
+    },
     #[error("Database unavailable")]
     DbUnavailable,
     #[error("Timeout: {detail}")]
@@ -215,6 +221,19 @@ impl AppError {
         Self::Conflict {
             code,
             detail: detail.into(),
+            extensions: None,
+        }
+    }
+
+    pub fn conflict_with_extensions(
+        code: ErrorCode,
+        detail: impl Into<String>,
+        extensions: serde_json::Value,
+    ) -> Self {
+        Self::Conflict {
+            code,
+            detail: detail.into(),
+            extensions: Some(extensions),
         }
     }
 
@@ -229,12 +248,44 @@ impl AppError {
         }
     }
 
+    /// Extract extensions from the error variant if present
+    fn extensions(&self) -> Option<serde_json::Value> {
+        match self {
+            AppError::Conflict { extensions, .. } => extensions.clone(),
+            _ => None,
+        }
+    }
+
+    /// Parse lock version numbers from an optimistic lock error detail string
+    /// Expects format: "...expected version X, actual version Y..."
+    fn parse_lock_versions(detail: &str) -> Option<serde_json::Value> {
+        let expected_prefix = "expected version ";
+        let actual_prefix = ", actual version ";
+
+        let expected_start = detail.find(expected_prefix)?;
+        let expected_str_start = expected_start + expected_prefix.len();
+        let actual_start = detail.find(actual_prefix)?;
+        let expected_str = &detail[expected_str_start..actual_start];
+
+        let actual_str_start = actual_start + actual_prefix.len();
+        let actual_end = detail[actual_str_start..]
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(detail.len() - actual_str_start);
+        let actual_str = &detail[actual_str_start..actual_str_start + actual_end];
+
+        let expected: i32 = expected_str.parse().ok()?;
+        let actual: i32 = actual_str.parse().ok()?;
+
+        Some(serde_json::json!({ "expected": expected, "actual": actual }))
+    }
+
     /// Private canonical method for building ProblemDetails
     /// This is the single source of truth for ProblemDetails construction
     fn to_problem_details_with_trace_id(&self, trace_id: String) -> ProblemDetails {
         let status = self.status();
         let code = self.code().as_str();
         let detail = self.detail();
+        let extensions = self.extensions();
 
         ProblemDetails {
             type_: format!("https://nommie.app/errors/{}", code.to_uppercase()),
@@ -243,6 +294,7 @@ impl AppError {
             detail,
             code: code.to_string(),
             trace_id,
+            extensions,
         }
     }
 
@@ -344,7 +396,20 @@ impl From<crate::errors::domain::DomainError> for AppError {
                     ConflictKind::GoogleSubMismatch => ErrorCode::GoogleSubMismatch,
                     ConflictKind::Other(_) => ErrorCode::Conflict, // generic conflict fallback
                 };
-                AppError::Conflict { code, detail }
+
+                // For OptimisticLock, try to extract version info from detail string
+                let extensions = if matches!(kind, ConflictKind::OptimisticLock) {
+                    // Parse "expected version X, actual version Y" from detail
+                    Self::parse_lock_versions(&detail)
+                } else {
+                    None
+                };
+
+                AppError::Conflict {
+                    code,
+                    detail,
+                    extensions,
+                }
             }
             crate::errors::domain::DomainError::NotFound(kind, detail) => {
                 let code = match kind {

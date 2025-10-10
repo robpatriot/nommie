@@ -321,3 +321,61 @@ async fn test_require_db_with_database() {
     let body = test::read_body(resp).await;
     assert_eq!(body, "Success");
 }
+
+/// Test endpoint that returns an optimistic lock conflict with extensions
+async fn test_optimistic_lock_error() -> Result<HttpResponse, AppError> {
+    Err(AppError::conflict_with_extensions(
+        ErrorCode::OptimisticLock,
+        "Resource was modified concurrently (expected version 5, actual version 7). Please refresh and retry.",
+        serde_json::json!({ "expected": 5, "actual": 7 }),
+    ))
+}
+
+/// Test that optimistic lock conflicts include extensions with version info
+#[actix_web::test]
+async fn test_optimistic_lock_extensions() {
+    let state = build_state().build().await.expect("create test state");
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.route(
+                "/_test/optimistic_lock",
+                web::get().to(test_optimistic_lock_error),
+            );
+        })
+        .build()
+        .await
+        .expect("create test app");
+
+    let req = test::TestRequest::get()
+        .uri("/_test/optimistic_lock")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+
+    // Should return 409 Conflict
+    assert_eq!(resp.status().as_u16(), 409);
+
+    // Parse body as JSON
+    let body = test::read_body(resp).await;
+    let problem: serde_json::Value =
+        serde_json::from_slice(&body).expect("valid JSON problem details");
+
+    // Verify standard Problem+JSON fields
+    assert_eq!(problem["status"], 409);
+    assert_eq!(problem["code"], "OPTIMISTIC_LOCK");
+    assert!(problem["detail"]
+        .as_str()
+        .unwrap()
+        .contains("expected version 5"));
+    assert!(problem["detail"]
+        .as_str()
+        .unwrap()
+        .contains("actual version 7"));
+    assert!(problem["trace_id"].is_string());
+
+    // Verify extensions field with version info
+    let extensions = problem["extensions"]
+        .as_object()
+        .expect("extensions present");
+    assert_eq!(extensions["expected"], 5);
+    assert_eq!(extensions["actual"], 7);
+}
