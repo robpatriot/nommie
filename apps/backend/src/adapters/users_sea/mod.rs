@@ -81,3 +81,13 @@ pub async fn find_user_by_id<C: ConnectionTrait + Send + Sync>(
 ) -> Result<Option<users::Model>, sea_orm::DbErr> {
     users::Entity::find_by_id(user_id).one(conn).await
 }
+
+pub async fn find_user_by_sub<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    sub: &str,
+) -> Result<Option<users::Model>, sea_orm::DbErr> {
+    users::Entity::find()
+        .filter(users::Column::Sub.eq(sub))
+        .one(conn)
+        .await
+}

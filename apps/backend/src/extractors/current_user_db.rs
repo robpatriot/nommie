@@ -1,13 +1,12 @@
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 
 use super::current_user::CurrentUser;
 use crate::db::require_db;
 use crate::db::txn::SharedTxn;
-use crate::entities::users;
 use crate::error::AppError;
+use crate::repos::users;
 use crate::state::app_state::AppState;
 
 /// Database-backed current user record
@@ -39,17 +38,11 @@ impl FromRequest for CurrentUserRecord {
             // Look up user by sub in database
             let user = if let Some(shared_txn) = SharedTxn::from_req(&req) {
                 // Use shared transaction if present
-                users::Entity::find()
-                    .filter(users::Column::Sub.eq(&current_user.sub))
-                    .one(shared_txn.transaction())
-                    .await?
+                users::find_user_by_sub(shared_txn.transaction(), &current_user.sub).await?
             } else {
                 // Fall back to pooled connection
                 let db = require_db(app_state)?;
-                users::Entity::find()
-                    .filter(users::Column::Sub.eq(&current_user.sub))
-                    .one(db)
-                    .await?
+                users::find_user_by_sub(db, &current_user.sub).await?
             };
 
             let user = user.ok_or(AppError::forbidden_user_not_found())?;

@@ -1,6 +1,5 @@
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use super::current_user::CurrentUser;
 use super::game_id::GameId;
@@ -9,6 +8,7 @@ use crate::db::txn::SharedTxn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::repos::memberships::{GameMembership as ServiceGameMembership, GameRole};
+use crate::repos::users;
 use crate::services::memberships::MembershipService;
 use crate::state::app_state::AppState;
 
@@ -81,16 +81,10 @@ impl FromRequest for GameMembership {
 
             // Find user by sub to get user_id
             let user = if let Some(shared_txn) = SharedTxn::from_req(&req) {
-                crate::entities::users::Entity::find()
-                    .filter(crate::entities::users::Column::Sub.eq(&current_user.sub))
-                    .one(shared_txn.transaction())
-                    .await?
+                users::find_user_by_sub(shared_txn.transaction(), &current_user.sub).await?
             } else {
                 let db = require_db(app_state)?;
-                crate::entities::users::Entity::find()
-                    .filter(crate::entities::users::Column::Sub.eq(&current_user.sub))
-                    .one(db)
-                    .await?
+                users::find_user_by_sub(db, &current_user.sub).await?
             };
 
             let user = user.ok_or_else(|| {

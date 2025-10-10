@@ -94,6 +94,14 @@ pub async fn find_user_by_id<C: ConnectionTrait + Send + Sync>(
     Ok(user.map(User::from))
 }
 
+pub async fn find_user_by_sub<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    sub: &str,
+) -> Result<Option<User>, DomainError> {
+    let user = users_adapter::find_user_by_sub(conn, sub).await?;
+    Ok(user.map(User::from))
+}
+
 // Conversions between SeaORM models and domain models
 
 impl From<crate::entities::users::Model> for User {

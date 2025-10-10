@@ -1,13 +1,12 @@
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpRequest};
-use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
 
 use crate::db::require_db;
 use crate::db::txn::SharedTxn;
-use crate::entities::games;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
+use crate::repos::games;
 use crate::state::app_state::AppState;
 
 /// Game ID extracted from the route path parameter
@@ -51,13 +50,11 @@ impl FromRequest for GameId {
             // Check if game exists in database
             let game = if let Some(shared_txn) = SharedTxn::from_req(&req) {
                 // Use shared transaction if present
-                games::Entity::find_by_id(game_id)
-                    .one(shared_txn.transaction())
-                    .await?
+                games::find_by_id(shared_txn.transaction(), game_id).await?
             } else {
                 // Fall back to pooled connection
                 let db = require_db(app_state)?;
-                games::Entity::find_by_id(game_id).one(db).await?
+                games::find_by_id(db, game_id).await?
             };
 
             game.ok_or_else(|| {
