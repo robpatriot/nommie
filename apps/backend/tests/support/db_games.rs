@@ -21,8 +21,9 @@ pub async fn insert_game_stub<C: ConnectionTrait>(conn: &C, name: &str) -> Resul
         rules_version: Set("nommie-1.0.0".to_string()),
         rng_seed: Set(None),
         current_round: Set(None),
-        hand_size: Set(None),
-        dealer_pos: Set(None),
+        starting_dealer_pos: Set(None),
+        current_trick_no: Set(0),
+        current_round_id: Set(None),
         lock_version: Set(0),
         ..Default::default()
     };

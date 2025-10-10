@@ -364,8 +364,8 @@ async fn test_deterministic_dealing_reproducible() -> Result<(), AppError> {
             assert_eq!(game2.state, DbGameState::Bidding);
 
             // Same seed should produce same initial state
-            assert_eq!(game1.hand_size, game2.hand_size);
-            assert_eq!(game1.dealer_pos, game2.dealer_pos);
+            assert_eq!(game1.hand_size(), game2.hand_size());
+            assert_eq!(game1.dealer_pos(), game2.dealer_pos());
             assert_eq!(game1.current_round, game2.current_round);
 
             // Note: Without persisting hands, we can't verify the actual cards dealt

@@ -135,8 +135,9 @@ pub async fn create_test_game_with_options(
         rules_version: Set("1.0".to_string()),
         rng_seed: Set(Some(12345)),
         current_round: Set(Some(1)),
-        hand_size: Set(Some(13)),
-        dealer_pos: Set(Some(0)),
+        starting_dealer_pos: Set(Some(0)),
+        current_trick_no: Set(0),
+        current_round_id: Set(None),
         lock_version: Set(1),
     };
 

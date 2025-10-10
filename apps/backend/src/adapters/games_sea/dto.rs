@@ -85,8 +85,8 @@ impl GameUpdateMetadata {
 pub struct GameUpdateRound {
     pub id: i64,
     pub current_round: Option<i16>,
-    pub hand_size: Option<i16>,
-    pub dealer_pos: Option<i16>,
+    pub starting_dealer_pos: Option<i16>,
+    pub current_trick_no: Option<i16>,
     pub current_lock_version: i32,
 }
 
@@ -95,8 +95,8 @@ impl GameUpdateRound {
         Self {
             id,
             current_round: None,
-            hand_size: None,
-            dealer_pos: None,
+            starting_dealer_pos: None,
+            current_trick_no: None,
             current_lock_version,
         }
     }
@@ -106,13 +106,13 @@ impl GameUpdateRound {
         self
     }
 
-    pub fn with_hand_size(mut self, size: i16) -> Self {
-        self.hand_size = Some(size);
+    pub fn with_starting_dealer_pos(mut self, pos: i16) -> Self {
+        self.starting_dealer_pos = Some(pos);
         self
     }
 
-    pub fn with_dealer_pos(mut self, pos: i16) -> Self {
-        self.dealer_pos = Some(pos);
+    pub fn with_current_trick_no(mut self, trick_no: i16) -> Self {
+        self.current_trick_no = Some(trick_no);
         self
     }
 }

@@ -1,5 +1,11 @@
 pub mod ai_profiles;
 pub mod game_players;
+pub mod game_rounds;
 pub mod games;
+pub mod round_bids;
+pub mod round_hands;
+pub mod round_scores;
+pub mod round_tricks;
+pub mod trick_plays;
 pub mod user_credentials;
 pub mod users;

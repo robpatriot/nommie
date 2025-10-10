@@ -128,8 +128,9 @@ pub async fn create_game<C: ConnectionTrait + Send + Sync>(
         rules_version: Set("1.0".to_string()),
         rng_seed: NotSet,
         current_round: NotSet,
-        hand_size: NotSet,
-        dealer_pos: NotSet,
+        starting_dealer_pos: NotSet,
+        current_trick_no: Set(0),
+        current_round_id: NotSet,
         lock_version: Set(1),
     };
 
@@ -179,11 +180,14 @@ pub async fn update_round<C: ConnectionTrait + Send + Sync>(
         if let Some(round) = dto.current_round {
             update = update.col_expr(games::Column::CurrentRound, Expr::val(Some(round)).into());
         }
-        if let Some(size) = dto.hand_size {
-            update = update.col_expr(games::Column::HandSize, Expr::val(Some(size)).into());
+        if let Some(pos) = dto.starting_dealer_pos {
+            update = update.col_expr(
+                games::Column::StartingDealerPos,
+                Expr::val(Some(pos)).into(),
+            );
         }
-        if let Some(pos) = dto.dealer_pos {
-            update = update.col_expr(games::Column::DealerPos, Expr::val(Some(pos)).into());
+        if let Some(trick_no) = dto.current_trick_no {
+            update = update.col_expr(games::Column::CurrentTrickNo, Expr::val(trick_no).into());
         }
         update
     })

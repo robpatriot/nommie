@@ -144,8 +144,8 @@ async fn test_deal_round_transitions_correctly() -> Result<(), AppError> {
 
             assert_eq!(game.state, GameState::Bidding);
             assert_eq!(game.current_round, Some(1));
-            assert_eq!(game.hand_size, Some(13)); // First round has 13 cards
-            assert_eq!(game.dealer_pos, Some(0)); // First round dealer is seat 0
+            assert_eq!(game.hand_size(), Some(13)); // First round has 13 cards
+            assert_eq!(game.dealer_pos(), Some(0)); // First round dealer is seat 0
 
             Ok::<_, AppError>(())
         })

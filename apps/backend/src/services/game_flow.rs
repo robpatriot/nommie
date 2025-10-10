@@ -63,28 +63,35 @@ impl GameFlowService {
         // Deal hands using domain logic
         let hands = deal_hands(4, hand_size, seed)?;
 
-        // Dealer rotates each round (round 1 -> dealer 0, round 2 -> dealer 1, etc.)
-        let dealer_pos = ((next_round - 1) % 4) as i16;
-
-        // Update DB: state, round number, hand_size, dealer_pos
+        // Update DB: state and round number
         let update_state = GameUpdateState::new(game_id, DbGameState::Bidding, game.lock_version);
         let updated_game = games_sea::update_state(conn, update_state).await?;
 
-        let update_round = GameUpdateRound::new(game_id, updated_game.lock_version)
-            .with_current_round(next_round as i16)
-            .with_hand_size(hand_size as i16)
-            .with_dealer_pos(dealer_pos);
-        games_sea::update_round(conn, update_round).await?;
+        // On first round, set starting_dealer_pos (defaults to 0)
+        let mut update_round = GameUpdateRound::new(game_id, updated_game.lock_version)
+            .with_current_round(next_round as i16);
+
+        if next_round == 1 {
+            // Initialize starting dealer position on first round
+            let starting_dealer = 0; // Could be randomized or determined by game rules
+            update_round = update_round.with_starting_dealer_pos(starting_dealer);
+        }
+
+        let updated_game = games_sea::update_round(conn, update_round).await?;
 
         // NOTE: Hands are stored in memory for now; full persistence TBD
         // The domain GameState is not persisted yet, only the DB state fields
         let _ = hands; // Acknowledge we dealt them but don't persist yet
 
+        // Compute current dealer for logging (hand_size and dealer_pos are now computed)
+        let computed_hand_size = updated_game.hand_size().unwrap_or(0);
+        let computed_dealer_pos = updated_game.dealer_pos().unwrap_or(0);
+
         info!(
             game_id,
             round = next_round,
-            hand_size = hand_size,
-            dealer_pos = dealer_pos,
+            hand_size = computed_hand_size,
+            dealer_pos = computed_dealer_pos,
             "Round dealt successfully"
         );
         debug!(game_id, round = next_round, "Transition: -> Bidding");
@@ -121,7 +128,7 @@ impl GameFlowService {
             .into());
         }
 
-        let hand_size = game.hand_size.ok_or_else(|| {
+        let hand_size = game.hand_size().ok_or_else(|| {
             DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
         })? as u8;
 
