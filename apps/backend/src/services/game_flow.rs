@@ -12,7 +12,7 @@ use crate::domain::{deal_hands, hand_size_for_round, Card};
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, hands, plays, rounds, tricks};
+use crate::repos::{bids, hands, plays, rounds, scores, tricks};
 
 /// Result type for game flow operations containing final outcome summary.
 #[derive(Debug, Clone)]
@@ -349,6 +349,129 @@ impl GameFlowService {
         Ok(())
     }
 
+    /// Score the round: calculate final scores for all players and persist.
+    ///
+    /// Counts tricks won, applies domain scoring logic, and saves to round_scores.
+    /// Transitions game to Scoring phase and marks round as complete.
+    pub async fn score_round<C: ConnectionTrait + Send + Sync>(
+        &self,
+        conn: &C,
+        game_id: i64,
+    ) -> Result<(), AppError> {
+        info!(game_id, "Scoring round");
+
+        // Load game
+        let game = games_sea::require_game(conn, game_id).await?;
+
+        let current_round_no = game.current_round.ok_or_else(|| {
+            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
+        })?;
+
+        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+            .await?
+            .ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                    "Round not found",
+                )
+            })?;
+
+        // Load all bids for this round
+        let all_bids = bids::find_all_by_round(conn, round.id).await?;
+        if all_bids.len() != 4 {
+            return Err(DomainError::validation(
+                ValidationKind::Other("INCOMPLETE_BIDS".into()),
+                format!("Need 4 bids, got {}", all_bids.len()),
+            )
+            .into());
+        }
+
+        // Load all tricks to count wins per player
+        let all_tricks = tricks::find_all_by_round(conn, round.id).await?;
+
+        // Count tricks won by each player
+        let mut tricks_won = [0i16; 4];
+        for trick in &all_tricks {
+            if trick.winner_seat >= 0 && trick.winner_seat < 4 {
+                tricks_won[trick.winner_seat as usize] += 1;
+            }
+        }
+
+        // Get previous totals (for cumulative scoring)
+        let previous_totals = if current_round_no > 1 {
+            // Find previous round and get its scores
+            let prev_round_no = current_round_no - 1;
+            let prev_round = rounds::find_by_game_and_round(conn, game_id, prev_round_no)
+                .await?
+                .ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("PREV_ROUND_NOT_FOUND".into()),
+                        "Previous round not found",
+                    )
+                })?;
+
+            let prev_scores = scores::find_all_by_round(conn, prev_round.id).await?;
+            let mut totals = [0i16; 4];
+            for score in prev_scores {
+                if score.player_seat >= 0 && score.player_seat < 4 {
+                    totals[score.player_seat as usize] = score.total_score_after;
+                }
+            }
+            totals
+        } else {
+            [0, 0, 0, 0]
+        };
+
+        // Calculate and persist scores for all 4 players
+        for seat in 0..4 {
+            let bid = all_bids
+                .iter()
+                .find(|b| b.player_seat == seat)
+                .map(|b| b.bid_value)
+                .unwrap_or(0);
+
+            let tricks = tricks_won[seat as usize];
+            let bid_met = bid == tricks;
+
+            // Domain scoring formula: tricks + 10 if bid met
+            let base_score = tricks;
+            let bonus = if bid_met { 10 } else { 0 };
+            let round_score = base_score + bonus;
+            let total_after = previous_totals[seat as usize] + round_score;
+
+            scores::create_score(
+                conn,
+                scores::ScoreData {
+                    round_id: round.id,
+                    player_seat: seat,
+                    bid_value: bid,
+                    tricks_won: tricks,
+                    bid_met,
+                    base_score,
+                    bonus,
+                    round_score,
+                    total_score_after: total_after,
+                },
+            )
+            .await?;
+        }
+
+        // Mark round as complete
+        rounds::complete_round(conn, round.id).await?;
+
+        // Transition to Scoring phase
+        let update = GameUpdateState::new(game_id, DbGameState::Scoring, game.lock_version);
+        games_sea::update_state(conn, update).await?;
+
+        info!(
+            game_id,
+            round = current_round_no,
+            "Round scored and completed"
+        );
+
+        Ok(())
+    }
+
     /// Advance to the next round after scoring completes.
     ///
     /// Transitions from Scoring -> BetweenRounds or Completed.
@@ -378,10 +501,16 @@ impl GameFlowService {
             info!(game_id, rounds_played = current_round, "Game completed");
             debug!(game_id, "Transition: Scoring -> Completed");
         } else {
-            // More rounds to play
+            // More rounds to play - transition to BetweenRounds and reset trick counter
             let update =
                 GameUpdateState::new(game_id, DbGameState::BetweenRounds, game.lock_version);
-            games_sea::update_state(conn, update).await?;
+            let updated_game = games_sea::update_state(conn, update).await?;
+
+            // Reset current_trick_no for next round
+            let reset_trick =
+                GameUpdateRound::new(game_id, updated_game.lock_version).with_current_trick_no(0);
+            games_sea::update_round(conn, reset_trick).await?;
+
             info!(game_id, current_round, "Advanced to BetweenRounds");
             debug!(game_id, "Transition: Scoring -> BetweenRounds");
         }
