@@ -1,7 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::error::AppError;
 use crate::state::security_config::SecurityConfig;
@@ -71,16 +72,41 @@ pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Cla
     })
 }
 
+/// Extract the 'sub' claim from a JWT token for logging purposes.
+///
+/// This performs minimal validation - just enough to decode the token.
+/// It does NOT validate expiration, signature thoroughly, or other security claims.
+/// Use this ONLY for observability (logging, tracing), never for authentication.
+///
+/// For authentication, use `verify_access_token()` instead.
+///
+/// Returns None if the token is invalid or missing a 'sub' claim.
+pub fn extract_sub_for_logging(token: &str, secret: &[u8]) -> Option<String> {
+    // Configure minimal validation - we only care about the algorithm
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.validate_exp = false; // Skip expiration check for logging
+    validation.validate_nbf = false;
+    validation.validate_aud = false;
+    validation.required_spec_claims.clear();
+
+    // Decode the token
+    let token_data = decode::<Value>(token, &DecodingKey::from_secret(secret), &validation).ok()?;
+
+    // Extract the 'sub' claim
+    token_data.claims.get("sub")?.as_str().map(String::from)
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use actix_web::http::StatusCode;
     use actix_web::ResponseError;
-    // Import the shared test helper
     use backend_test_support::problem_details::assert_problem_details_from_http_response;
+    use jsonwebtoken::{encode, EncodingKey, Header};
+    use serde_json::json;
 
-    use super::{mint_access_token, verify_access_token};
+    use super::{extract_sub_for_logging, mint_access_token, verify_access_token};
     use crate::state::security_config::SecurityConfig;
     use crate::utils::unique::{unique_email, unique_str};
 
@@ -178,5 +204,70 @@ mod tests {
             }
             _ => panic!("Expected success since security config is provided"),
         }
+    }
+
+    #[test]
+    fn test_extract_sub_valid_token() {
+        let secret = b"test_secret";
+        let claims = json!({
+            "sub": "user123",
+            "exp": 9999999999u64, // Far future
+        });
+
+        let token = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret),
+        )
+        .unwrap();
+
+        let sub = extract_sub_for_logging(&token, secret);
+        assert_eq!(sub, Some("user123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_sub_expired_token() {
+        let secret = b"test_secret";
+        let claims = json!({
+            "sub": "user123",
+            "exp": 0u64, // Expired
+        });
+
+        let token = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret),
+        )
+        .unwrap();
+
+        // Should still extract sub even though token is expired (for logging)
+        let sub = extract_sub_for_logging(&token, secret);
+        assert_eq!(sub, Some("user123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_sub_invalid_token() {
+        let secret = b"test_secret";
+        let sub = extract_sub_for_logging("invalid_token", secret);
+        assert_eq!(sub, None);
+    }
+
+    #[test]
+    fn test_extract_sub_missing_sub_claim() {
+        let secret = b"test_secret";
+        let claims = json!({
+            "email": "user@example.com",
+            "exp": 9999999999u64,
+        });
+
+        let token = encode(
+            &Header::default(),
+            &claims,
+            &EncodingKey::from_secret(secret),
+        )
+        .unwrap();
+
+        let sub = extract_sub_for_logging(&token, secret);
+        assert_eq!(sub, None);
     }
 }

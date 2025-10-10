@@ -4,6 +4,7 @@
 //! and a test/bot helper that composes them into a happy path.
 
 use sea_orm::ConnectionTrait;
+use tracing::{debug, info};
 
 use crate::adapters::games_sea::{self, GameUpdateRound, GameUpdateState};
 use crate::domain::bidding::Bid;
@@ -37,6 +38,8 @@ impl GameFlowService {
         conn: &C,
         game_id: i64,
     ) -> Result<(), AppError> {
+        info!(game_id, "Dealing new round");
+
         // Load game from DB
         let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
             DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
@@ -79,6 +82,15 @@ impl GameFlowService {
         // The domain GameState is not persisted yet, only the DB state fields
         let _ = hands; // Acknowledge we dealt them but don't persist yet
 
+        info!(
+            game_id,
+            round = next_round,
+            hand_size = hand_size,
+            dealer_pos = dealer_pos,
+            "Round dealt successfully"
+        );
+        debug!(game_id, round = next_round, "Transition: -> Bidding");
+
         Ok(())
     }
 
@@ -93,6 +105,13 @@ impl GameFlowService {
         _membership_id: i64,
         bid_value: u8,
     ) -> Result<(), AppError> {
+        debug!(
+            game_id,
+            membership_id = _membership_id,
+            bid_value,
+            "Submitting bid"
+        );
+
         // Load game
         let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
             DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
@@ -124,6 +143,13 @@ impl GameFlowService {
         // TODO: Persist bid and check if all players have bid
         // For now, this is a no-op placeholder; full implementation requires bid storage
 
+        debug!(
+            game_id,
+            membership_id = _membership_id,
+            bid_value,
+            "Bid validated"
+        );
+
         Ok(())
     }
 
@@ -137,6 +163,8 @@ impl GameFlowService {
         _membership_id: i64,
         _card: Card,
     ) -> Result<(), AppError> {
+        debug!(game_id, membership_id = _membership_id, "Playing card");
+
         // Load game
         let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
             DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
@@ -164,6 +192,8 @@ impl GameFlowService {
         conn: &C,
         game_id: i64,
     ) -> Result<(), AppError> {
+        debug!(game_id, "Scoring trick");
+
         // Load game
         let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
             DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
@@ -190,6 +220,8 @@ impl GameFlowService {
         conn: &C,
         game_id: i64,
     ) -> Result<(), AppError> {
+        info!(game_id, "Advancing to next round");
+
         // Load game
         let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
             DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
@@ -208,11 +240,15 @@ impl GameFlowService {
             // All rounds complete
             let update = GameUpdateState::new(game_id, DbGameState::Completed, game.lock_version);
             games_sea::update_state(conn, update).await?;
+            info!(game_id, rounds_played = current_round, "Game completed");
+            debug!(game_id, "Transition: Scoring -> Completed");
         } else {
             // More rounds to play
             let update =
                 GameUpdateState::new(game_id, DbGameState::BetweenRounds, game.lock_version);
             games_sea::update_state(conn, update).await?;
+            info!(game_id, current_round, "Advanced to BetweenRounds");
+            debug!(game_id, "Transition: Scoring -> BetweenRounds");
         }
 
         Ok(())
@@ -232,6 +268,8 @@ impl GameFlowService {
         conn: &C,
         game_id: i64,
     ) -> Result<GameOutcome, AppError> {
+        info!(game_id, "Starting happy path test flow");
+
         // Load game to validate it exists
         let _game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
             DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
@@ -258,6 +296,8 @@ impl GameFlowService {
 
         // Advance to next round or complete
         self.advance_to_next_round(conn, game_id).await?;
+
+        info!(game_id, "Happy path test flow completed");
 
         // Return stub outcome
         Ok(GameOutcome {

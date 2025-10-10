@@ -3,6 +3,7 @@ mod support;
 
 use actix_web::test;
 use backend::infra::state::build_state;
+use serde_json::Value;
 use support::app_builder::create_test_app;
 
 #[actix_web::test]
@@ -18,7 +19,18 @@ async fn test_health_endpoint() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(resp.status().as_u16(), 200);
 
     let body = test::read_body(resp).await;
-    assert_eq!(body, "ok");
+    let json: Value = serde_json::from_slice(&body)?;
+
+    // Verify required fields are present
+    assert_eq!(json["status"], "ok");
+    assert_eq!(json["app_version"], "0.1.0");
+    assert!(json["db"].is_string());
+    assert!(json["migrations"].is_string());
+    assert!(json["time"].is_string());
+
+    // db field should be either "ok" or "error"
+    let db_status = json["db"].as_str().unwrap();
+    assert!(db_status == "ok" || db_status == "error");
 
     Ok(())
 }

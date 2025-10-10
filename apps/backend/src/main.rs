@@ -4,6 +4,7 @@ use backend::infra::state::build_state;
 use backend::middleware::cors::cors_middleware;
 use backend::middleware::request_trace::RequestTrace;
 use backend::middleware::structured_logger::StructuredLogger;
+use backend::middleware::trace_span::TraceSpan;
 use backend::routes;
 use backend::state::security_config::SecurityConfig;
 
@@ -46,8 +47,9 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .wrap(cors_middleware())
-            .wrap(RequestTrace)
             .wrap(StructuredLogger)
+            .wrap(RequestTrace)
+            .wrap(TraceSpan)
             .app_data(data.clone())
             .configure(routes::configure)
     })
