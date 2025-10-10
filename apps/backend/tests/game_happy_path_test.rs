@@ -213,7 +213,13 @@ async fn test_submit_bid_validates_phase() -> Result<(), AppError> {
             // Assert: should fail with phase mismatch
             assert!(result.is_err());
             let err = result.unwrap_err();
-            assert!(format!("{err:?}").contains("PhaseMismatch"));
+            // Check that the error is a Validation error with PhaseMismatch error code
+            use backend::errors::ErrorCode;
+            assert_eq!(
+                err.code(),
+                ErrorCode::PhaseMismatch,
+                "Expected PhaseMismatch error but got: {err:?}"
+            );
 
             Ok::<_, AppError>(())
         })

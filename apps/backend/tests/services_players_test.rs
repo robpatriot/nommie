@@ -56,9 +56,8 @@ async fn test_get_display_name_by_seat_invalid_seat() -> Result<(), AppError> {
                 Err(domain_err) => {
                     let err: AppError = domain_err.into();
                     match err {
-                        AppError::Validation { code, detail, .. } => {
+                        AppError::Validation { code, .. } => {
                             assert_eq!(code, ErrorCode::InvalidSeat);
-                            assert!(detail.contains("Seat must be between 0 and 3"));
                         }
                         _ => panic!("Expected Validation error for invalid seat"),
                     }
@@ -94,9 +93,8 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
                 Err(domain_err) => {
                     let err: AppError = domain_err.into();
                     match err {
-                        AppError::NotFound { code, detail, .. } => {
+                        AppError::NotFound { code, .. } => {
                             assert_eq!(code, ErrorCode::PlayerNotFound);
-                            assert!(detail.contains("Player not found at seat"));
                         }
                         _ => panic!("Expected NotFound error but got: {err:?}"),
                     }

@@ -123,11 +123,13 @@ async fn test_get_display_name_by_seat_missing_user() -> Result<(), AppError> {
             let result = players::get_display_name_by_seat(txn, game_id, 0).await;
 
             match result {
-                Err(DomainError::Infra(_, msg)) => {
-                    assert!(msg.contains("User not found for game player"));
+                Err(DomainError::Infra(kind, _)) => {
+                    use backend::errors::domain::InfraErrorKind;
+                    assert_eq!(kind, InfraErrorKind::DataCorruption);
                 }
-                Err(DomainError::NotFound(_, msg)) => {
-                    assert!(msg.contains("Player not found at seat"));
+                Err(DomainError::NotFound(kind, _)) => {
+                    use backend::errors::domain::NotFoundKind;
+                    assert_eq!(kind, NotFoundKind::Player);
                 }
                 Ok(display_name) => {
                     panic!("Expected error but got success: {display_name}");
