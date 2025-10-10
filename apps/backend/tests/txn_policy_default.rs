@@ -59,6 +59,7 @@ async fn test_default_commit_policy_persists_then_cleans_up(
     assert_eq!(count_games_by_name_pool(&state, &name).await?, before + 1);
 
     // Cleanup via with_txn to leave DB unchanged for other tests
+    // Uses with_txn to mirror the insert pattern; commits due to CommitOnOk policy
     with_txn(None, &state, |txn| {
         let name = name.clone();
         Box::pin(async move {
@@ -169,6 +170,7 @@ async fn test_join_code_unique_constraint() -> Result<(), Box<dyn std::error::Er
     assert_eq!(result.unwrap_err().code(), ErrorCode::JoinCodeConflict);
 
     // Cleanup: delete the game we inserted to leave DB unchanged
+    // Uses with_txn to mirror the insert pattern; commits due to CommitOnOk policy
     with_txn(None, &state, |txn| {
         let join_code = join_code.clone();
         Box::pin(async move {

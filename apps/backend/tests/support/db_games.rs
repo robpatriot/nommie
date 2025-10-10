@@ -48,6 +48,19 @@ pub async fn delete_games_by_name<C: ConnectionTrait>(
     Ok(res.rows_affected)
 }
 
+// Delete by join_code via txn-aware connection; returns affected count
+pub async fn delete_games_by_join_code<C: ConnectionTrait>(
+    conn: &C,
+    join_code: &str,
+) -> Result<u64, AppError> {
+    let res = games::Entity::delete_many()
+        .filter(games::Column::JoinCode.eq(Some(join_code.to_string())))
+        .exec(conn)
+        .await
+        .map_err(|e| AppError::from(map_db_err(e)))?;
+    Ok(res.rows_affected)
+}
+
 // Count visibility using a fresh pooled connection
 pub async fn count_games_by_name_pool(state: &AppState, name: &str) -> Result<i64, AppError> {
     let db = require_db(state)?;

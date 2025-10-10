@@ -21,7 +21,7 @@ use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use rand::Rng;
-use support::db_games::delete_games_by_name;
+use support::db_games::delete_games_by_join_code;
 use support::games_sea_helpers::run_game_flow;
 
 /// Test: pooled connection vs transaction equivalence
@@ -42,14 +42,9 @@ async fn test_games_flow_pooled_vs_txn_equivalence() -> Result<(), AppError> {
         .map_err(|e| AppError::internal(format!("pooled flow failed: {e}")))?;
 
     // Cleanup pooled path (data was committed)
-    with_txn(None, &state, |txn| {
-        let pooled_marker = pooled_marker.clone();
-        Box::pin(async move {
-            delete_games_by_name(txn, &pooled_marker).await?;
-            Ok::<_, AppError>(())
-        })
-    })
-    .await?;
+    // Uses pooled connection to mirror the insert pattern and ensure cleanup commits
+    let db = require_db(&state)?;
+    delete_games_by_join_code(db, &pooled_marker).await?;
 
     // Run flow with transaction (auto-rollback via test policy)
     let txn_probe = with_txn(None, &state, |txn| {
@@ -100,15 +95,9 @@ async fn test_games_flow_timestamp_policy_consistent() -> Result<(), AppError> {
         .await
         .map_err(|e| AppError::internal(format!("pooled timestamp test failed: {e}")))?;
 
-    // Cleanup pooled path
-    with_txn(None, &state, |txn| {
-        let pooled_marker = pooled_marker.clone();
-        Box::pin(async move {
-            delete_games_by_name(txn, &pooled_marker).await?;
-            Ok::<_, AppError>(())
-        })
-    })
-    .await?;
+    // Cleanup pooled path - use pooled connection to ensure cleanup commits
+    let db = require_db(&state)?;
+    delete_games_by_join_code(db, &pooled_marker).await?;
 
     // Run with transaction (auto-rollback)
     with_txn(None, &state, |txn| {
@@ -155,15 +144,9 @@ async fn test_games_error_behavior_consistent() -> Result<(), AppError> {
         "pooled: duplicate join_code should fail"
     );
 
-    // Cleanup pooled path
-    with_txn(None, &state, |txn| {
-        let pooled_marker = pooled_marker.clone();
-        Box::pin(async move {
-            delete_games_by_name(txn, &pooled_marker).await?;
-            Ok::<_, AppError>(())
-        })
-    })
-    .await?;
+    // Cleanup pooled path - use pooled connection to ensure cleanup commits
+    let db = require_db(&state)?;
+    delete_games_by_join_code(db, &pooled_marker).await?;
 
     // Test with transaction (auto-rollback)
     let txn_result = with_txn(None, &state, |txn| {
