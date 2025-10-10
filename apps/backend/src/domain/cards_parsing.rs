@@ -73,9 +73,89 @@ where
         .collect()
 }
 
+/// Parse card from stored JSONB format (e.g., suit="CLUBS", rank="TWO").
+/// This is used when reconstructing cards from database storage.
+pub fn from_stored_format(suit_str: &str, rank_str: &str) -> Result<Card, DomainError> {
+    let suit = match suit_str {
+        "CLUBS" => Suit::Clubs,
+        "DIAMONDS" => Suit::Diamonds,
+        "HEARTS" => Suit::Hearts,
+        "SPADES" => Suit::Spades,
+        _ => {
+            return Err(DomainError::validation(
+                ValidationKind::ParseCard,
+                format!("Invalid suit: {suit_str}"),
+            ))
+        }
+    };
+
+    let rank = match rank_str {
+        "TWO" => Rank::Two,
+        "THREE" => Rank::Three,
+        "FOUR" => Rank::Four,
+        "FIVE" => Rank::Five,
+        "SIX" => Rank::Six,
+        "SEVEN" => Rank::Seven,
+        "EIGHT" => Rank::Eight,
+        "NINE" => Rank::Nine,
+        "TEN" => Rank::Ten,
+        "JACK" => Rank::Jack,
+        "QUEEN" => Rank::Queen,
+        "KING" => Rank::King,
+        "ACE" => Rank::Ace,
+        _ => {
+            return Err(DomainError::validation(
+                ValidationKind::ParseCard,
+                format!("Invalid rank: {rank_str}"),
+            ))
+        }
+    };
+
+    Ok(Card { suit, rank })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_from_stored_format() {
+        // Test all suits
+        assert_eq!(
+            from_stored_format("CLUBS", "ACE").unwrap(),
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Ace
+            }
+        );
+        assert_eq!(
+            from_stored_format("DIAMONDS", "KING").unwrap(),
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::King
+            }
+        );
+        assert_eq!(
+            from_stored_format("HEARTS", "TWO").unwrap(),
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two
+            }
+        );
+        assert_eq!(
+            from_stored_format("SPADES", "TEN").unwrap(),
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ten
+            }
+        );
+
+        // Test parsing failures
+        assert!(from_stored_format("INVALID", "ACE").is_err());
+        assert!(from_stored_format("CLUBS", "INVALID").is_err());
+        assert!(from_stored_format("clubs", "ACE").is_err()); // lowercase should fail
+        assert!(from_stored_format("CLUBS", "ace").is_err()); // lowercase should fail
+    }
 
     #[test]
     fn test_from_str_parsing() {

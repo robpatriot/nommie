@@ -43,7 +43,7 @@ async fn get_snapshot(
 
             // Create game service and load game state
             let game_service = crate::services::games::GameService::new();
-            let state = game_service.load_game_state(id).await?;
+            let state = game_service.load_game_state(txn, id).await?;
 
             // Produce the snapshot via the domain function
             let snap = crate::domain::snapshot::snapshot(&state);

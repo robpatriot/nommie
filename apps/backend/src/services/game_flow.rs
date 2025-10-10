@@ -8,7 +8,8 @@ use tracing::{debug, info};
 
 use crate::adapters::games_sea::{self, GameUpdateRound, GameUpdateState};
 use crate::domain::bidding::Bid;
-use crate::domain::{card_beats, deal_hands, hand_size_for_round, Card, Rank, Suit};
+use crate::domain::cards_parsing::from_stored_format;
+use crate::domain::{card_beats, deal_hands, hand_size_for_round, Card, Suit};
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
@@ -28,46 +29,6 @@ pub struct GameFlowService;
 impl GameFlowService {
     pub fn new() -> Self {
         Self
-    }
-
-    /// Helper: Convert stored card (suit/rank strings) to domain Card
-    fn parse_stored_card(card: &plays::Card) -> Result<Card, DomainError> {
-        let suit = match card.suit.as_str() {
-            "CLUBS" => Suit::Clubs,
-            "DIAMONDS" => Suit::Diamonds,
-            "HEARTS" => Suit::Hearts,
-            "SPADES" => Suit::Spades,
-            _ => {
-                return Err(DomainError::validation(
-                    ValidationKind::ParseCard,
-                    format!("Invalid suit: {}", card.suit),
-                ))
-            }
-        };
-
-        let rank = match card.rank.as_str() {
-            "TWO" => Rank::Two,
-            "THREE" => Rank::Three,
-            "FOUR" => Rank::Four,
-            "FIVE" => Rank::Five,
-            "SIX" => Rank::Six,
-            "SEVEN" => Rank::Seven,
-            "EIGHT" => Rank::Eight,
-            "NINE" => Rank::Nine,
-            "TEN" => Rank::Ten,
-            "JACK" => Rank::Jack,
-            "QUEEN" => Rank::Queen,
-            "KING" => Rank::King,
-            "ACE" => Rank::Ace,
-            _ => {
-                return Err(DomainError::validation(
-                    ValidationKind::ParseCard,
-                    format!("Invalid rank: {}", card.rank),
-                ))
-            }
-        };
-
-        Ok(Card { suit, rank })
     }
 
     /// Deal a new round: generate hands and advance game to Bidding phase.
@@ -518,11 +479,11 @@ impl GameFlowService {
 
         // Parse all plays into domain cards and determine winner
         let mut winner_seat = all_plays[0].player_seat;
-        let mut winner_card = Self::parse_stored_card(&all_plays[0].card)?;
+        let mut winner_card = from_stored_format(&all_plays[0].card.suit, &all_plays[0].card.rank)?;
 
         // Compare each subsequent card to the current winner
         for play in &all_plays[1..] {
-            let challenger_card = Self::parse_stored_card(&play.card)?;
+            let challenger_card = from_stored_format(&play.card.suit, &play.card.rank)?;
 
             // Check if challenger beats current winner
             if card_beats(challenger_card, winner_card, lead_suit_domain, trump_domain) {
