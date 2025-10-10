@@ -12,6 +12,7 @@ use crate::domain::{deal_hands, hand_size_for_round, Card};
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
+use crate::repos::{bids, hands, rounds};
 
 /// Result type for game flow operations containing final outcome summary.
 #[derive(Debug, Clone)]
@@ -61,7 +62,7 @@ impl GameFlowService {
         let seed = game.rng_seed.unwrap_or(game_id) as u64;
 
         // Deal hands using domain logic
-        let hands = deal_hands(4, hand_size, seed)?;
+        let dealt_hands = deal_hands(4, hand_size, seed)?;
 
         // Update DB: state and round number
         let update_state = GameUpdateState::new(game_id, DbGameState::Bidding, game.lock_version);
@@ -79,13 +80,37 @@ impl GameFlowService {
 
         let updated_game = games_sea::update_round(conn, update_round).await?;
 
-        // NOTE: Hands are stored in memory for now; full persistence TBD
-        // The domain GameState is not persisted yet, only the DB state fields
-        let _ = hands; // Acknowledge we dealt them but don't persist yet
-
-        // Compute current dealer for logging (hand_size and dealer_pos are now computed)
+        // Compute current dealer (hand_size and dealer_pos are now computed)
         let computed_hand_size = updated_game.hand_size().unwrap_or(0);
         let computed_dealer_pos = updated_game.dealer_pos().unwrap_or(0);
+
+        // Create round record in DB
+        let round = rounds::create_round(
+            conn,
+            game_id,
+            next_round as i16,
+            computed_hand_size,
+            computed_dealer_pos,
+        )
+        .await?;
+
+        // Persist dealt hands to DB
+        let hands_to_store: Vec<(i16, Vec<hands::Card>)> = dealt_hands
+            .iter()
+            .enumerate()
+            .map(|(idx, hand)| {
+                let cards: Vec<hands::Card> = hand
+                    .iter()
+                    .map(|c| hands::Card {
+                        suit: format!("{:?}", c.suit).to_uppercase(),
+                        rank: format!("{:?}", c.rank).to_uppercase(),
+                    })
+                    .collect();
+                (idx as i16, cards)
+            })
+            .collect();
+
+        hands::create_hands(conn, round.id, hands_to_store).await?;
 
         info!(
             game_id,
@@ -101,21 +126,15 @@ impl GameFlowService {
 
     /// Submit a bid for a player in the current round.
     ///
-    /// This is a placeholder that validates phase and bid value but does not
-    /// persist per-player bid state yet (requires additional schema).
+    /// Validates phase and bid value, then persists the bid to the database.
     pub async fn submit_bid<C: ConnectionTrait + Send + Sync>(
         &self,
         conn: &C,
         game_id: i64,
-        _membership_id: i64,
+        player_seat: i16,
         bid_value: u8,
     ) -> Result<(), AppError> {
-        debug!(
-            game_id,
-            membership_id = _membership_id,
-            bid_value,
-            "Submitting bid"
-        );
+        debug!(game_id, player_seat, bid_value, "Submitting bid");
 
         // Load game
         let game = games_sea::require_game(conn, game_id).await?;
@@ -143,14 +162,29 @@ impl GameFlowService {
             .into());
         }
 
-        // TODO: Persist bid and check if all players have bid
-        // For now, this is a no-op placeholder; full implementation requires bid storage
+        // Find the current round
+        let current_round_no = game.current_round.ok_or_else(|| {
+            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
+        })?;
 
-        debug!(
+        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+            .await?
+            .ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                    "Round not found",
+                )
+            })?;
+
+        // Determine bid_order (how many bids have been placed already)
+        let bid_order = bids::count_bids_by_round(conn, round.id).await? as i16;
+
+        // Persist the bid
+        bids::create_bid(conn, round.id, player_seat, bid_value as i16, bid_order).await?;
+
+        info!(
             game_id,
-            membership_id = _membership_id,
-            bid_value,
-            "Bid validated"
+            player_seat, bid_value, bid_order, "Bid persisted successfully"
         );
 
         Ok(())
