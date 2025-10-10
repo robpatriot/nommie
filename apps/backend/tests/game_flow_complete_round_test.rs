@@ -41,10 +41,11 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
             assert_eq!(round.completed_at, None);
 
             // 2. Submit bids for all players
+            // Bids: 5 + 4 + 3 + 0 = 12 (not 13, so dealer rule OK)
             service.submit_bid(txn, game.id, 0, 5).await?;
             service.submit_bid(txn, game.id, 1, 4).await?;
             service.submit_bid(txn, game.id, 2, 3).await?;
-            service.submit_bid(txn, game.id, 3, 1).await?;
+            service.submit_bid(txn, game.id, 3, 0).await?;
 
             // Verify all bids persisted
             let all_bids = bids::find_all_by_round(txn, round.id).await?;
@@ -95,12 +96,12 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
             assert!(all_scores[2].bid_met);
             assert_eq!(all_scores[2].round_score, 13);
 
-            // Player 3: bid 1, won 1, met = 1 + 10 = 11
+            // Player 3: bid 0, won 1, not met = 1 + 0 = 1
             assert_eq!(all_scores[3].player_seat, 3);
-            assert_eq!(all_scores[3].bid_value, 1);
+            assert_eq!(all_scores[3].bid_value, 0);
             assert_eq!(all_scores[3].tricks_won, 1);
-            assert!(all_scores[3].bid_met);
-            assert_eq!(all_scores[3].round_score, 11);
+            assert!(!all_scores[3].bid_met);
+            assert_eq!(all_scores[3].round_score, 1);
 
             // Verify round is marked as complete
             let updated_round = rounds::find_by_id(txn, round.id).await?.unwrap();
@@ -139,12 +140,13 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
                 .await?
                 .unwrap();
 
+            // Bids: 7 + 3 + 2 + 0 = 12 (not 13, dealer rule OK)
             service.submit_bid(txn, game.id, 0, 7).await?;
             service.submit_bid(txn, game.id, 1, 3).await?;
             service.submit_bid(txn, game.id, 2, 2).await?;
-            service.submit_bid(txn, game.id, 3, 1).await?;
+            service.submit_bid(txn, game.id, 3, 0).await?;
 
-            // Simulate tricks: Player 0 wins 7, others win as bid
+            // Simulate tricks: P0 wins 7, P1 wins 3, P2 wins 2, P3 wins 1 (totals 13)
             for i in 0..7 {
                 tricks::create_trick(txn, round1.id, i, tricks::Suit::Hearts, 0).await?;
             }
@@ -160,8 +162,11 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
 
             // Check round 1 totals
             let totals1 = scores::get_current_totals(txn, game.id).await?;
-            // P0: 7+10=17, P1: 3+10=13, P2: 2+10=12, P3: 1+10=11
-            assert_eq!(totals1, [17, 13, 12, 11]);
+            // P0: bid 7, won 7, met -> 7+10=17
+            // P1: bid 3, won 3, met -> 3+10=13
+            // P2: bid 2, won 2, met -> 2+10=12
+            // P3: bid 0, won 1, not met -> 1+0=1
+            assert_eq!(totals1, [17, 13, 12, 1]);
 
             // Advance and deal round 2
             service.advance_to_next_round(txn, game.id).await?;
@@ -170,12 +175,13 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
                 .await?
                 .unwrap();
 
+            // Bids: 5 + 4 + 2 + 0 = 11 (not 12, dealer rule OK)
             service.submit_bid(txn, game.id, 0, 5).await?;
             service.submit_bid(txn, game.id, 1, 4).await?;
             service.submit_bid(txn, game.id, 2, 2).await?;
-            service.submit_bid(txn, game.id, 3, 1).await?;
+            service.submit_bid(txn, game.id, 3, 0).await?;
 
-            // Simulate round 2 tricks: P0 wins 5, P1 wins 4, P2 wins 2, P3 wins 1
+            // Simulate round 2 tricks: P0 wins 5, P1 wins 4, P2 wins 2, P3 wins 1 (totals 12)
             for i in 0..5 {
                 tricks::create_trick(txn, round2.id, i, tricks::Suit::Hearts, 0).await?;
             }
@@ -194,8 +200,8 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
             // P0: 17 + (5+10) = 32
             // P1: 13 + (4+10) = 27
             // P2: 12 + (2+10) = 24
-            // P3: 11 + (1+10) = 22
-            assert_eq!(totals2, [32, 27, 24, 22]);
+            // P3: 1 + (1+0) = 2  (bid 0, won 1, not met)
+            assert_eq!(totals2, [32, 27, 24, 2]);
 
             Ok::<_, AppError>(())
         })
