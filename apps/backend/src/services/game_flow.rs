@@ -12,7 +12,7 @@ use crate::domain::{deal_hands, hand_size_for_round, Card};
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, hands, rounds};
+use crate::repos::{bids, hands, plays, rounds, tricks};
 
 /// Result type for game flow operations containing final outcome summary.
 #[derive(Debug, Clone)]
@@ -192,15 +192,15 @@ impl GameFlowService {
 
     /// Play a card for a player in the current trick.
     ///
-    /// This is a placeholder that validates phase but does not persist trick state yet.
+    /// Persists the card play to the database.
     pub async fn play_card<C: ConnectionTrait + Send + Sync>(
         &self,
         conn: &C,
         game_id: i64,
-        _membership_id: i64,
-        _card: Card,
+        player_seat: i16,
+        card: Card,
     ) -> Result<(), AppError> {
-        debug!(game_id, membership_id = _membership_id, "Playing card");
+        debug!(game_id, player_seat, "Playing card");
 
         // Load game
         let game = games_sea::require_game(conn, game_id).await?;
@@ -213,15 +213,74 @@ impl GameFlowService {
             .into());
         }
 
-        // TODO: Load full GameState, call domain_play_card, persist updated state
-        // For now, this is a no-op placeholder
+        // Get current round
+        let current_round_no = game.current_round.ok_or_else(|| {
+            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
+        })?;
+
+        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+            .await?
+            .ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                    "Round not found",
+                )
+            })?;
+
+        // Get current trick number
+        let current_trick_no = game.current_trick_no;
+
+        // Find or create the current trick
+        // Note: This is simplified - real implementation would need to determine
+        // lead suit from first play and winner from domain logic after 4th play
+        let trick = if let Some(existing) =
+            tricks::find_by_round_and_trick(conn, round.id, current_trick_no).await?
+        {
+            existing
+        } else {
+            // First play in this trick - create trick record
+            // Use card's suit as lead suit
+            let lead_suit = match card.suit {
+                crate::domain::Suit::Clubs => tricks::Suit::Clubs,
+                crate::domain::Suit::Diamonds => tricks::Suit::Diamonds,
+                crate::domain::Suit::Hearts => tricks::Suit::Hearts,
+                crate::domain::Suit::Spades => tricks::Suit::Spades,
+            };
+
+            // Winner TBD (placeholder 0 until trick completes)
+            tricks::create_trick(conn, round.id, current_trick_no, lead_suit, 0).await?
+        };
+
+        // Determine play_order (how many plays already in this trick)
+        let play_order = plays::count_plays_by_trick(conn, trick.id).await? as i16;
+
+        // Convert domain Card to repo Card
+        let card_for_storage = plays::Card {
+            suit: format!("{:?}", card.suit).to_uppercase(),
+            rank: format!("{:?}", card.rank).to_uppercase(),
+        };
+
+        // Persist the play
+        plays::create_play(conn, trick.id, player_seat, card_for_storage, play_order).await?;
+
+        info!(
+            game_id,
+            player_seat,
+            trick_no = current_trick_no,
+            play_order,
+            "Card play persisted successfully"
+        );
 
         Ok(())
     }
 
     /// Score the current trick and determine winner.
     ///
-    /// This is a placeholder; requires full trick state persistence.
+    /// Note: This is a simplified version. Full implementation would:
+    /// 1. Load all 4 plays from current trick
+    /// 2. Use domain logic to determine winner (requires trump, etc.)
+    /// 3. Update trick winner_seat
+    /// 4. Increment current_trick_no or transition to Scoring if round complete
     pub async fn score_trick<C: ConnectionTrait + Send + Sync>(
         &self,
         conn: &C,
@@ -240,7 +299,52 @@ impl GameFlowService {
             .into());
         }
 
-        // TODO: Resolve trick winner using domain logic, update tricks_won, advance state
+        // Get current round and trick
+        let current_round_no = game.current_round.ok_or_else(|| {
+            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
+        })?;
+
+        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+            .await?
+            .ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                    "Round not found",
+                )
+            })?;
+
+        let current_trick_no = game.current_trick_no;
+
+        // Verify trick exists and has 4 plays
+        let trick = tricks::find_by_round_and_trick(conn, round.id, current_trick_no)
+            .await?
+            .ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("TRICK_NOT_FOUND".into()),
+                    "Trick not found",
+                )
+            })?;
+
+        let play_count = plays::count_plays_by_trick(conn, trick.id).await?;
+        if play_count != 4 {
+            return Err(DomainError::validation(
+                ValidationKind::Other("INCOMPLETE_TRICK".into()),
+                format!("Trick has {play_count} plays, need 4"),
+            )
+            .into());
+        }
+
+        // NOTE: Full implementation would:
+        // - Load all 4 plays
+        // - Call domain::tricks::resolve_current_trick() with trump
+        // - Update trick.winner_seat
+        // - Advance to next trick or Scoring phase
+
+        info!(
+            game_id,
+            trick_no = current_trick_no,
+            "Trick scoring placeholder executed"
+        );
 
         Ok(())
     }
