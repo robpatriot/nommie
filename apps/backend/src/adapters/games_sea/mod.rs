@@ -50,11 +50,14 @@ where
     if result.rows_affected == 0 {
         // Either the game doesn't exist or the lock version doesn't match
         // Check if game exists to distinguish between NotFound and OptimisticLock
-        let exists = games::Entity::find_by_id(id).one(conn).await?.is_some();
-        if exists {
-            return Err(sea_orm::DbErr::Custom(
-                "OPTIMISTIC_LOCK: Game was modified by another transaction".to_string(),
-            ));
+        let game = games::Entity::find_by_id(id).one(conn).await?;
+        if let Some(game) = game {
+            // Lock version mismatch - build structured payload
+            let payload = format!(
+                "OPTIMISTIC_LOCK:{{\"expected\":{},\"actual\":{}}}",
+                current_lock_version, game.lock_version
+            );
+            return Err(sea_orm::DbErr::Custom(payload));
         } else {
             return Err(sea_orm::DbErr::RecordNotFound("Game not found".to_string()));
         }

@@ -27,6 +27,27 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
         }
         sea_orm::DbErr::Custom(msg) if msg.starts_with("OPTIMISTIC_LOCK:") => {
             warn!(trace_id = %trace_id, "Optimistic lock conflict detected");
+
+            // Try to parse structured version info
+            if let Some(json_str) = msg.strip_prefix("OPTIMISTIC_LOCK:") {
+                #[derive(serde::Deserialize)]
+                struct LockInfo {
+                    expected: i32,
+                    actual: i32,
+                }
+
+                if let Ok(info) = serde_json::from_str::<LockInfo>(json_str) {
+                    return DomainError::conflict(
+                        ConflictKind::OptimisticLock,
+                        format!(
+                            "Resource was modified concurrently (expected version {}, actual version {}). Please refresh and retry.",
+                            info.expected, info.actual
+                        ),
+                    );
+                }
+            }
+
+            // Fallback for back-compat or parsing failures
             return DomainError::conflict(
                 ConflictKind::OptimisticLock,
                 "Resource was modified by another transaction; please retry",
