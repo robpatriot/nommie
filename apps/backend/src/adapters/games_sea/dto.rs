@@ -42,11 +42,16 @@ impl GameCreate {
 pub struct GameUpdateState {
     pub id: i64,
     pub state: GameState,
+    pub expected_lock_version: i32,
 }
 
 impl GameUpdateState {
-    pub fn new(id: i64, state: GameState) -> Self {
-        Self { id, state }
+    pub fn new(id: i64, state: GameState, expected_lock_version: i32) -> Self {
+        Self {
+            id,
+            state,
+            expected_lock_version,
+        }
     }
 }
 
@@ -56,14 +61,21 @@ pub struct GameUpdateMetadata {
     pub id: i64,
     pub name: Option<String>,
     pub visibility: GameVisibility,
+    pub expected_lock_version: i32,
 }
 
 impl GameUpdateMetadata {
-    pub fn new(id: i64, name: Option<impl Into<String>>, visibility: GameVisibility) -> Self {
+    pub fn new(
+        id: i64,
+        name: Option<impl Into<String>>,
+        visibility: GameVisibility,
+        expected_lock_version: i32,
+    ) -> Self {
         Self {
             id,
             name: name.map(|n| n.into()),
             visibility,
+            expected_lock_version,
         }
     }
 }
@@ -75,15 +87,17 @@ pub struct GameUpdateRound {
     pub current_round: Option<i16>,
     pub hand_size: Option<i16>,
     pub dealer_pos: Option<i16>,
+    pub expected_lock_version: i32,
 }
 
 impl GameUpdateRound {
-    pub fn new(id: i64) -> Self {
+    pub fn new(id: i64, expected_lock_version: i32) -> Self {
         Self {
             id,
             current_round: None,
             hand_size: None,
             dealer_pos: None,
+            expected_lock_version,
         }
     }
 

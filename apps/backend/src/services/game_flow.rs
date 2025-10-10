@@ -66,10 +66,10 @@ impl GameFlowService {
         let dealer_pos = ((next_round - 1) % 4) as i16;
 
         // Update DB: state, round number, hand_size, dealer_pos
-        let update_state = GameUpdateState::new(game_id, DbGameState::Bidding);
+        let update_state = GameUpdateState::new(game_id, DbGameState::Bidding, game.lock_version);
         games_sea::update_state(conn, update_state).await?;
 
-        let update_round = GameUpdateRound::new(game_id)
+        let update_round = GameUpdateRound::new(game_id, game.lock_version + 1)
             .with_current_round(next_round as i16)
             .with_hand_size(hand_size as i16)
             .with_dealer_pos(dealer_pos);
@@ -206,11 +206,12 @@ impl GameFlowService {
         let current_round = game.current_round.unwrap_or(0);
         if current_round >= 26 {
             // All rounds complete
-            let update = GameUpdateState::new(game_id, DbGameState::Completed);
+            let update = GameUpdateState::new(game_id, DbGameState::Completed, game.lock_version);
             games_sea::update_state(conn, update).await?;
         } else {
             // More rounds to play
-            let update = GameUpdateState::new(game_id, DbGameState::BetweenRounds);
+            let update =
+                GameUpdateState::new(game_id, DbGameState::BetweenRounds, game.lock_version);
             games_sea::update_state(conn, update).await?;
         }
 
@@ -246,8 +247,13 @@ impl GameFlowService {
         // Stub trump selection and trick play
         // This would require full GameState persistence to be meaningful
 
+        // Reload game to get updated lock_version after dealing
+        let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
+            DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
+        })?;
+
         // Transition to scoring
-        let update = GameUpdateState::new(game_id, DbGameState::Scoring);
+        let update = GameUpdateState::new(game_id, DbGameState::Scoring, game.lock_version);
         games_sea::update_state(conn, update).await?;
 
         // Advance to next round or complete

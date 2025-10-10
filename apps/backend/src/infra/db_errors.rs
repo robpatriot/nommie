@@ -25,6 +25,13 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
                 "Record not found",
             );
         }
+        sea_orm::DbErr::Custom(msg) if msg.starts_with("OPTIMISTIC_LOCK:") => {
+            warn!(trace_id = %trace_id, "Optimistic lock conflict detected");
+            return DomainError::conflict(
+                ConflictKind::OptimisticLock,
+                "Resource was modified by another transaction; please retry",
+            );
+        }
         sea_orm::DbErr::ConnectionAcquire(_) | sea_orm::DbErr::Conn(_) => {
             warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Database unavailable");
             return DomainError::infra(InfraErrorKind::DbUnavailable, "Database unavailable");

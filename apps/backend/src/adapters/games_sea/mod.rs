@@ -63,64 +63,141 @@ pub async fn update_state<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     dto: GameUpdateState,
 ) -> Result<games::Model, sea_orm::DbErr> {
-    // Fetch existing game
-    let existing = games::Entity::find_by_id(dto.id)
+    use sea_orm::sea_query::{Alias, Expr};
+
+    // Update with WHERE id = ? AND lock_version = ? (optimistic locking)
+    let now = time::OffsetDateTime::now_utc();
+
+    let result = games::Entity::update_many()
+        .col_expr(
+            games::Column::State,
+            Expr::val(dto.state).cast_as(Alias::new("game_state")),
+        )
+        .col_expr(games::Column::UpdatedAt, Expr::val(now).into())
+        .col_expr(
+            games::Column::LockVersion,
+            Expr::col(games::Column::LockVersion).add(1),
+        )
+        .filter(games::Column::Id.eq(dto.id))
+        .filter(games::Column::LockVersion.eq(dto.expected_lock_version))
+        .exec(conn)
+        .await?;
+
+    if result.rows_affected == 0 {
+        // Either the game doesn't exist or the lock version doesn't match
+        // Check if game exists to distinguish between NotFound and OptimisticLock
+        let exists = games::Entity::find_by_id(dto.id).one(conn).await?.is_some();
+        if exists {
+            return Err(sea_orm::DbErr::Custom(
+                "OPTIMISTIC_LOCK: Game was modified by another transaction".to_string(),
+            ));
+        } else {
+            return Err(sea_orm::DbErr::RecordNotFound("Game not found".to_string()));
+        }
+    }
+
+    // Fetch and return the updated game
+    games::Entity::find_by_id(dto.id)
         .one(conn)
         .await?
-        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))?;
-
-    // Update state, updated_at, and increment lock_version; keep created_at unchanged
-    let mut active: games::ActiveModel = existing.clone().into();
-    active.state = Set(dto.state);
-    active.updated_at = Set(time::OffsetDateTime::now_utc());
-    active.lock_version = Set(existing.lock_version + 1);
-
-    active.update(conn).await
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))
 }
 
 pub async fn update_metadata<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     dto: GameUpdateMetadata,
 ) -> Result<games::Model, sea_orm::DbErr> {
-    // Fetch existing game
-    let existing = games::Entity::find_by_id(dto.id)
+    use sea_orm::sea_query::{Alias, Expr};
+
+    // Update with WHERE id = ? AND lock_version = ? (optimistic locking)
+    let now = time::OffsetDateTime::now_utc();
+
+    let result = games::Entity::update_many()
+        .col_expr(games::Column::Name, Expr::val(dto.name).into())
+        .col_expr(
+            games::Column::Visibility,
+            Expr::val(dto.visibility).cast_as(Alias::new("game_visibility")),
+        )
+        .col_expr(games::Column::UpdatedAt, Expr::val(now).into())
+        .col_expr(
+            games::Column::LockVersion,
+            Expr::col(games::Column::LockVersion).add(1),
+        )
+        .filter(games::Column::Id.eq(dto.id))
+        .filter(games::Column::LockVersion.eq(dto.expected_lock_version))
+        .exec(conn)
+        .await?;
+
+    if result.rows_affected == 0 {
+        // Either the game doesn't exist or the lock version doesn't match
+        // Check if game exists to distinguish between NotFound and OptimisticLock
+        let exists = games::Entity::find_by_id(dto.id).one(conn).await?.is_some();
+        if exists {
+            return Err(sea_orm::DbErr::Custom(
+                "OPTIMISTIC_LOCK: Game was modified by another transaction".to_string(),
+            ));
+        } else {
+            return Err(sea_orm::DbErr::RecordNotFound("Game not found".to_string()));
+        }
+    }
+
+    // Fetch and return the updated game
+    games::Entity::find_by_id(dto.id)
         .one(conn)
         .await?
-        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))?;
-
-    // Update metadata fields, updated_at, and increment lock_version; keep created_at unchanged
-    let mut active: games::ActiveModel = existing.clone().into();
-    active.name = Set(dto.name);
-    active.visibility = Set(dto.visibility);
-    active.updated_at = Set(time::OffsetDateTime::now_utc());
-    active.lock_version = Set(existing.lock_version + 1);
-
-    active.update(conn).await
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))
 }
 
 pub async fn update_round<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     dto: GameUpdateRound,
 ) -> Result<games::Model, sea_orm::DbErr> {
-    // Fetch existing game
-    let existing = games::Entity::find_by_id(dto.id)
-        .one(conn)
-        .await?
-        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))?;
+    use sea_orm::sea_query::Expr;
 
-    // Update round fields, updated_at, and increment lock_version; keep created_at unchanged
-    let mut active: games::ActiveModel = existing.clone().into();
+    // Update with WHERE id = ? AND lock_version = ? (optimistic locking)
+    let now = time::OffsetDateTime::now_utc();
+
+    let mut update = games::Entity::update_many();
+
+    // Apply optional field updates
     if let Some(round) = dto.current_round {
-        active.current_round = Set(Some(round));
+        update = update.col_expr(games::Column::CurrentRound, Expr::val(Some(round)).into());
     }
     if let Some(size) = dto.hand_size {
-        active.hand_size = Set(Some(size));
+        update = update.col_expr(games::Column::HandSize, Expr::val(Some(size)).into());
     }
     if let Some(pos) = dto.dealer_pos {
-        active.dealer_pos = Set(Some(pos));
+        update = update.col_expr(games::Column::DealerPos, Expr::val(Some(pos)).into());
     }
-    active.updated_at = Set(time::OffsetDateTime::now_utc());
-    active.lock_version = Set(existing.lock_version + 1);
 
-    active.update(conn).await
+    // Always update updated_at and lock_version
+    let result = update
+        .col_expr(games::Column::UpdatedAt, Expr::val(now).into())
+        .col_expr(
+            games::Column::LockVersion,
+            Expr::col(games::Column::LockVersion).add(1),
+        )
+        .filter(games::Column::Id.eq(dto.id))
+        .filter(games::Column::LockVersion.eq(dto.expected_lock_version))
+        .exec(conn)
+        .await?;
+
+    if result.rows_affected == 0 {
+        // Either the game doesn't exist or the lock version doesn't match
+        // Check if game exists to distinguish between NotFound and OptimisticLock
+        let exists = games::Entity::find_by_id(dto.id).one(conn).await?.is_some();
+        if exists {
+            return Err(sea_orm::DbErr::Custom(
+                "OPTIMISTIC_LOCK: Game was modified by another transaction".to_string(),
+            ));
+        } else {
+            return Err(sea_orm::DbErr::RecordNotFound("Game not found".to_string()));
+        }
+    }
+
+    // Fetch and return the updated game
+    games::Entity::find_by_id(dto.id)
+        .one(conn)
+        .await?
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))
 }

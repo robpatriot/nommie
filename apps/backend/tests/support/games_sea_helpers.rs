@@ -97,7 +97,7 @@ pub async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
     // 3. First update: change state to Bidding
-    let update_dto = GameUpdateState::new(created.id, GameState::Bidding);
+    let update_dto = GameUpdateState::new(created.id, GameState::Bidding, created.lock_version);
     let updated1 = games_sea::update_state(conn, update_dto)
         .await
         .map_err(|e| AppError::db(format!("update_state failed: {e}")))?;
@@ -121,7 +121,7 @@ pub async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
     // 4. Second update: change state to TrickPlay
-    let update_dto2 = GameUpdateState::new(created.id, GameState::TrickPlay);
+    let update_dto2 = GameUpdateState::new(created.id, GameState::TrickPlay, updated1.lock_version);
     let updated2 = games_sea::update_state(conn, update_dto2)
         .await
         .map_err(|e| AppError::db(format!("update_state failed: {e}")))?;
@@ -145,8 +145,12 @@ pub async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
     // 5. Third update: change metadata (name)
-    let update_meta =
-        games_sea::GameUpdateMetadata::new(created.id, Some("UpdatedName"), updated2.visibility);
+    let update_meta = games_sea::GameUpdateMetadata::new(
+        created.id,
+        Some("UpdatedName"),
+        updated2.visibility,
+        updated2.lock_version,
+    );
     let updated3 = games_sea::update_metadata(conn, update_meta)
         .await
         .map_err(|e| AppError::db(format!("update_metadata failed: {e}")))?;
