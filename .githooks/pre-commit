@@ -55,6 +55,13 @@ if ((${#RUST_STAGED[@]} + ${#BACKEND_META[@]} > 0)); then
   pnpm be:lint
 else
   echo "  • be:lint skipped (no Rust changes)"
+# === Backend guardrails (staged-only) ===
+if [ -x "scripts/guardrails.sh" ]; then
+  echo "[pre-commit] Backend guardrails (staged)…"
+  scripts/guardrails.sh --staged
+else
+  echo "[pre-commit] NOTE: scripts/guardrails.sh not found or not executable; skipping guardrails"
+fi
 fi
 
 # Frontend ESLint — staged-only (TS/TSX), fallback if many files
@@ -131,4 +138,17 @@ else
 fi
 
 echo "[pre-commit] Phase B OK ✅"
+
+# -------------------------
+# Phase C: Checking guardrails
+# -------------------------
+
+echo "[pre-commit] Phase C: Running guardrails checks…"
+
+if ./scripts/guardrails.sh --staged; then
+  echo "[pre-commit] Phase C OK ✅"
+else
+  echo "[pre-commit] Phase C ❌ (guardrails failed)"
+  exit 1
+fi
 
