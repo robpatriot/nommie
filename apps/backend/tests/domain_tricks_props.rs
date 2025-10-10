@@ -44,12 +44,23 @@ proptest! {
     /// Property: Must follow suit when able
     #[test]
     fn prop_must_follow_suit_when_able(
-        lead_suit in support::domain_gens::suit(),
-        lead_rank in support::domain_gens::rank(),
-        off_suit_card in support::domain_gens::card(),
+        (lead_suit, lead_rank, off_suit_card) in prop::strategy::Strategy::prop_flat_map(
+            support::domain_gens::suit(),
+            |lead| {
+                let other_suits = vec![Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
+                    .into_iter()
+                    .filter(|s| *s != lead)
+                    .collect::<Vec<_>>();
+                (
+                    Just(lead),
+                    support::domain_gens::rank(),
+                    (prop::sample::select(other_suits), support::domain_gens::rank())
+                        .prop_map(|(s, r)| Card { suit: s, rank: r })
+                )
+            }
+        ),
     ) {
-        // Ensure off_suit_card is actually off-suit
-        prop_assume!(off_suit_card.suit != lead_suit);
+        // off_suit_card is guaranteed to be off-suit by construction
 
         use backend::domain::state::init_round;
 
@@ -81,11 +92,22 @@ proptest! {
     /// Property: Can play any card when void in led suit
     #[test]
     fn prop_can_play_any_when_void(
-        lead_suit in support::domain_gens::suit(),
-        player_card in support::domain_gens::card(),
+        (lead_suit, player_card) in prop::strategy::Strategy::prop_flat_map(
+            support::domain_gens::suit(),
+            |lead| {
+                let other_suits = vec![Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
+                    .into_iter()
+                    .filter(|s| *s != lead)
+                    .collect::<Vec<_>>();
+                (
+                    Just(lead),
+                    (prop::sample::select(other_suits), support::domain_gens::rank())
+                        .prop_map(|(s, r)| Card { suit: s, rank: r })
+                )
+            }
+        ),
     ) {
-        // Ensure player_card is NOT of the led suit (void)
-        prop_assume!(player_card.suit != lead_suit);
+        // player_card is guaranteed to NOT be of the led suit by construction
 
         use backend::domain::state::init_round;
 

@@ -1,8 +1,18 @@
 // Proptest prelude — shared configuration for integration tests.
 //
 // Env knobs:
-// - PROPTEST_CASES: number of cases per property (e.g. 32, 800).
+// - PROPTEST_CASES: number of cases per property (e.g. 32, 800, 5000).
 // - PROPTEST_MAX_SHRINK_MS: optional cap for shrinking time in milliseconds.
+//
+// To verify zero rejections (100% acceptance rate):
+// - Run with high case count: PROPTEST_CASES=5000 pnpm be:test
+// - If tests pass, reject count is < max_global_rejects (1024)
+// - If tests fail with "Too many global rejects", optimization needed
+// - Note: Proptest only reports reject counts on failure
+//
+// Best practices:
+// - Avoid prop_assume! - use dependent generators instead
+// - Generate valid inputs by construction, not by filtering
 
 pub fn proptest_prelude_config() -> proptest::prelude::ProptestConfig {
     // Start from a single base default to avoid repeated default() calls

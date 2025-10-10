@@ -79,12 +79,12 @@ proptest! {
     /// A player who has already bid cannot bid again.
     #[test]
     fn prop_cannot_bid_twice(
-        hand_size in 2u8..=13u8,
-        first_bid in 0u8..=13u8,
-        second_bid in 0u8..=13u8,
+        (hand_size, first_bid, second_bid) in prop::strategy::Strategy::prop_flat_map(
+            2u8..=13u8,
+            |hs| (Just(hs), 0u8..=hs, 0u8..=hs)
+        ),
     ) {
-        prop_assume!(first_bid <= hand_size);
-        prop_assume!(second_bid <= hand_size);
+        // Bids are generated based on hand_size, so they're always valid
 
         use backend::domain::state::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
@@ -118,11 +118,13 @@ proptest! {
     /// Property: Out of turn bids are rejected
     #[test]
     fn prop_out_of_turn_rejected(
-        hand_size in 2u8..=13u8,
-        bid_value in 0u8..=13u8,
+        (hand_size, bid_value) in prop::strategy::Strategy::prop_flat_map(
+            2u8..=13u8,
+            |hs| (Just(hs), 0u8..=hs)
+        ),
         wrong_player in 1u8..=3u8,
     ) {
-        prop_assume!(bid_value <= hand_size);
+        // bid_value is generated based on hand_size, so it's always valid
 
         use backend::domain::state::init_round;
         let hands = [vec![], vec![], vec![], vec![]];

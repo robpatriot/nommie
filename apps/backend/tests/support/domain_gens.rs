@@ -27,6 +27,16 @@ pub fn trump() -> impl Strategy<Value = Trump> {
     ]
 }
 
+/// Generate a random Trump excluding NO_TRUMP
+pub fn trump_suit() -> impl Strategy<Value = Trump> {
+    prop_oneof![
+        Just(Trump::Clubs),
+        Just(Trump::Diamonds),
+        Just(Trump::Hearts),
+        Just(Trump::Spades),
+    ]
+}
+
 /// Generate a random Rank
 pub fn rank() -> impl Strategy<Value = Rank> {
     prop_oneof![
@@ -49,6 +59,16 @@ pub fn rank() -> impl Strategy<Value = Rank> {
 /// Generate a single unique Card
 pub fn card() -> impl Strategy<Value = Card> {
     (suit(), rank()).prop_map(|(suit, rank)| Card { suit, rank })
+}
+
+/// Generate a card that is NOT of the given suit
+pub fn card_excluding_suit(excluded_suit: Suit) -> impl Strategy<Value = Card> {
+    let suits = vec![Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
+        .into_iter()
+        .filter(|s| *s != excluded_suit)
+        .collect::<Vec<_>>();
+
+    (prop::sample::select(suits), rank()).prop_map(|(suit, rank)| Card { suit, rank })
 }
 
 /// Generate a vector of N unique cards efficiently

@@ -61,12 +61,18 @@ proptest! {
     /// the highest trump wins; otherwise, the highest card of the lead suit wins.
     #[test]
     fn prop_trick_winner_with_trump(
-        trick_data in domain_gens::complete_trick(),
+        trick_data in prop::strategy::Strategy::prop_flat_map(
+            domain_gens::complete_trick(),
+            |(lead, plays, _trump, leader)| {
+                // Replace trump with a non-NoTrump value
+                (Just((lead, plays, leader)), domain_gens::trump_suit())
+                    .prop_map(|((lead, plays, leader), trump)| (lead, plays, trump, leader))
+            }
+        ),
     ) {
         let (_, plays, trump, _) = trick_data;
 
-        // Skip NO_TRUMP for this test
-        prop_assume!(trump != Trump::NoTrump);
+        // trump is guaranteed to NOT be NoTrump by construction
 
         let lead = plays[0].1.suit;
 
