@@ -62,6 +62,8 @@ pub enum ErrorCode {
     BadRequest,
     /// Invalid or missing HTTP header
     InvalidHeader,
+    /// Precondition required for this operation
+    PreconditionRequired,
 
     // Resource Not Found
     /// Game not found
@@ -152,6 +154,7 @@ impl ErrorCode {
             Self::ValidationError => "VALIDATION_ERROR",
             Self::BadRequest => "BAD_REQUEST",
             Self::InvalidHeader => "INVALID_HEADER",
+            Self::PreconditionRequired => "PRECONDITION_REQUIRED",
 
             // Resource Not Found
             Self::GameNotFound => "GAME_NOT_FOUND",
@@ -240,6 +243,10 @@ mod tests {
         assert_eq!(ErrorCode::ValidationError.as_str(), "VALIDATION_ERROR");
         assert_eq!(ErrorCode::BadRequest.as_str(), "BAD_REQUEST");
         assert_eq!(ErrorCode::InvalidHeader.as_str(), "INVALID_HEADER");
+        assert_eq!(
+            ErrorCode::PreconditionRequired.as_str(),
+            "PRECONDITION_REQUIRED"
+        );
         assert_eq!(ErrorCode::GameNotFound.as_str(), "GAME_NOT_FOUND");
         assert_eq!(ErrorCode::PlayerNotFound.as_str(), "PLAYER_NOT_FOUND");
         assert_eq!(ErrorCode::NotFound.as_str(), "NOT_FOUND");

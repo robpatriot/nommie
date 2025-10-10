@@ -1,6 +1,7 @@
 //! Game-related HTTP routes.
 
-use actix_web::http::header::ETAG;
+use actix_web::http::header::{ETAG, IF_NONE_MATCH};
+use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 
 use crate::adapters::games_sea;
@@ -16,6 +17,9 @@ use crate::state::app_state::AppState;
 /// Returns the current game snapshot as JSON with an ETag header for optimistic concurrency.
 /// This is a read-only endpoint that produces a public view of the game state
 /// without exposing private information (e.g., other players' hands).
+///
+/// Supports `If-None-Match` for HTTP caching: if the client's ETag matches the current version,
+/// returns `304 Not Modified` with no body.
 async fn get_snapshot(
     http_req: HttpRequest,
     game_id: GameId,
@@ -52,6 +56,27 @@ async fn get_snapshot(
     // Generate ETag from game ID and lock version
     let etag_value = game_etag(id, lock_version);
 
+    // Check If-None-Match header for HTTP caching
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        if let Ok(client_etag) = if_none_match.to_str() {
+            // Check for wildcard match (RFC 9110) or specific ETag match
+            // Wildcard "*" means "any representation exists"
+            let matches = client_etag.trim() == "*"
+                || client_etag
+                    .split(',')
+                    .map(str::trim)
+                    .any(|etag| etag == etag_value);
+
+            if matches {
+                // Resource hasn't changed, return 304 Not Modified
+                return Ok(HttpResponse::build(StatusCode::NOT_MODIFIED)
+                    .insert_header((ETAG, etag_value))
+                    .finish());
+            }
+        }
+    }
+
+    // Resource is new or modified, return full response
     Ok(HttpResponse::Ok()
         .insert_header((ETAG, etag_value))
         .json(snapshot))

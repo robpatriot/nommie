@@ -19,6 +19,7 @@ pub fn cors_middleware() -> Cors {
             header::CONTENT_TYPE,
             header::ACCEPT,
             header::IF_MATCH,
+            header::IF_NONE_MATCH,
         ])
         // Headers the browser is allowed to read from responses
         .expose_headers(vec![

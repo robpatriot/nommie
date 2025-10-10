@@ -170,6 +170,98 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 
 ---
 
+## 🔒 Backend: Optimistic Concurrency
+
+The backend uses optimistic locking with HTTP-native ETag/If-Match headers for safe concurrent updates.
+
+### How It Works
+
+1. **Reading Resources**: GET endpoints return an `ETag` header containing the resource version:
+   ```
+   ETag: "game-123-v5"
+   ```
+
+2. **Updating Resources**: PATCH/DELETE endpoints require an `If-Match` header with the last known ETag:
+   ```
+   If-Match: "game-123-v5"
+   ```
+   
+   If the `If-Match` header is missing, the server returns `428 Precondition Required`.
+
+3. **Conflict Detection**: If the resource has been modified since the client last read it, the server returns `409 Conflict`:
+   ```json
+   {
+     "type": "https://nommie.app/errors/OPTIMISTIC_LOCK",
+     "title": "Optimistic Lock",
+     "status": 409,
+     "code": "OPTIMISTIC_LOCK",
+     "detail": "Resource was modified concurrently (expected version 5, actual version 6). Please refresh and retry.",
+     "trace_id": "abc123",
+     "extensions": {
+       "expected": 5,
+       "actual": 6
+     }
+   }
+   ```
+
+4. **Caching**: GET endpoints support `If-None-Match` for HTTP caching:
+   - Single ETag: `If-None-Match: "game-123-v5"`
+   - Multiple ETags: `If-None-Match: "game-123-v4", "game-123-v5"`
+   - Wildcard: `If-None-Match: *` (matches any representation)
+   
+   If the client's ETag matches the current version, the server returns `304 Not Modified` with no body.
+
+### Implementation Details
+
+**For Developers Adding Mutation Endpoints:**
+
+Use the `ExpectedVersion` extractor to automatically parse the `If-Match` header:
+
+```rust
+use crate::http::etag::{ExpectedVersion, game_etag};
+
+async fn update_game(
+    game_id: GameId,
+    expected_version: ExpectedVersion, // Automatically parses If-Match
+    payload: Json<UpdatePayload>,
+) -> Result<HttpResponse, AppError> {
+    // Use expected_version.0 when calling the repository
+    game_repo::update(conn, game_id.0, expected_version.0, payload).await?;
+    
+    // Return new ETag in response
+    Ok(HttpResponse::Ok()
+        .insert_header((ETAG, game_etag(game_id.0, new_version)))
+        .json(result))
+}
+```
+
+**Observability:**
+
+Optimistic lock conflicts are logged with structured fields for monitoring:
+
+```rust
+warn!(
+    trace_id = %trace_id,
+    expected = 5,
+    actual = 6,
+    "Optimistic lock conflict detected"
+);
+```
+
+Use these logs to:
+- Monitor conflict frequency (high rates may indicate UX issues)
+- Correlate with specific operations or game states
+- Debug race conditions in concurrent scenarios
+
+**Architecture Notes:**
+
+- Repositories and services are generic over `C: ConnectionTrait`, making them work seamlessly with both pooled connections and transactions
+- All database operations go through `with_txn` or `require_db` for automatic transaction management
+- Error handling follows [RFC 7807 Problem Details](https://www.rfc-editor.org/rfc/rfc7807) format
+- The schema lives in a single init migration under `apps/backend/migration/`
+
+---
+
 ## 🗺️ Roadmap
 Milestone-driven: setup → core game loop → AI → polish.  
 👉 See [Milestones](docs/milestones.md).

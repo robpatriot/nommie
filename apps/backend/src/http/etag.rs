@@ -3,6 +3,10 @@
 //! This module provides utilities for generating and parsing ETags for games,
 //! enabling HTTP-native optimistic locking via ETag/If-Match headers.
 
+use actix_web::dev::Payload;
+use actix_web::http::header::IF_MATCH;
+use actix_web::{FromRequest, HttpRequest};
+
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 
@@ -59,6 +63,56 @@ pub fn parse_game_version_from_etag(s: &str) -> Result<i32, AppError> {
             format!("Invalid ETag format: version must be a valid integer, got: \"{version_str}\""),
         )
     })
+}
+
+/// Extractor that reads and parses the `If-Match` header to obtain the expected lock version.
+///
+/// This extractor is useful for PATCH and DELETE handlers that need to enforce optimistic locking.
+///
+/// # Errors
+/// Returns `AppError::precondition_required` (HTTP 428) if the `If-Match` header is missing.
+/// Returns `AppError::bad_request` with `ErrorCode::InvalidHeader` (HTTP 400) if:
+/// - The `If-Match` header cannot be parsed as a valid game ETag
+/// - The version cannot be extracted from the ETag
+///
+/// # Example
+/// ```ignore
+/// async fn update_game(
+///     game_id: GameId,
+///     expected_version: ExpectedVersion,
+/// ) -> Result<HttpResponse, AppError> {
+///     // Use expected_version.0 as the lock version
+///     Ok(HttpResponse::Ok().finish())
+/// }
+/// ```
+pub struct ExpectedVersion(pub i32);
+
+impl FromRequest for ExpectedVersion {
+    type Error = AppError;
+    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self, Self::Error>>>>;
+
+    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+        let req = req.clone();
+
+        Box::pin(async move {
+            // Extract If-Match header - return 428 if missing
+            let if_match = req.headers().get(IF_MATCH).ok_or_else(|| {
+                AppError::precondition_required("If-Match header is required for this operation")
+            })?;
+
+            let if_match_str = if_match.to_str().map_err(|_| {
+                AppError::bad_request(
+                    ErrorCode::InvalidHeader,
+                    "If-Match header contains invalid characters",
+                )
+            })?;
+
+            // Parse the version from the ETag
+            let version = parse_game_version_from_etag(if_match_str)?;
+
+            Ok(ExpectedVersion(version))
+        })
+    }
 }
 
 #[cfg(test)]

@@ -164,6 +164,14 @@ impl AppError {
         }
     }
 
+    pub fn precondition_required(detail: impl Into<String>) -> Self {
+        Self::Validation {
+            code: ErrorCode::PreconditionRequired,
+            detail: detail.into(),
+            status: StatusCode::PRECONDITION_REQUIRED,
+        }
+    }
+
     pub fn not_found(code: ErrorCode, detail: impl Into<String>) -> Self {
         Self::NotFound {
             code,
