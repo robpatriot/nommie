@@ -251,3 +251,84 @@ async fn test_snapshot_phase_structure() -> Result<(), AppError> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("build test state with DB");
+
+    // Get pooled DB and open a shared txn
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+
+    // Create a game in the database using the shared transaction
+    let now = time::OffsetDateTime::now_utc();
+    let game = games::ActiveModel {
+        visibility: Set(GameVisibility::Public),
+        state: Set(GameState::Bidding),
+        rules_version: Set("nommie-1.0.0".to_string()),
+        created_at: Set(now),
+        updated_at: Set(now),
+        lock_version: Set(5), // Set specific lock_version to verify in ETag
+        ..Default::default()
+    };
+    let game = game.insert(shared.transaction()).await?;
+    let game_id = game.id;
+    let lock_version = game.lock_version;
+
+    // Build test app
+    let app_state = actix_web::web::Data::new(state);
+    let app = test::init_service(
+        actix_web::App::new()
+            .app_data(app_state.clone())
+            .configure(routes::configure),
+    )
+    .await;
+
+    // Call the snapshot endpoint with injected shared transaction
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/games/{game_id}/snapshot"))
+        .to_request();
+    req.extensions_mut().insert(shared.clone());
+
+    let resp = test::call_service(&app, req).await;
+
+    // Assert 200 status
+    let status = resp.status();
+    assert_eq!(status, StatusCode::OK);
+
+    // Extract and verify ETag header before consuming response
+    let etag_str = resp
+        .headers()
+        .get("etag")
+        .expect("ETag header should be present")
+        .to_str()
+        .expect("ETag should be valid ASCII string")
+        .to_string(); // Clone the string before response is dropped
+
+    // Consume response body to fully release the response
+    let _body = test::read_body(resp).await;
+
+    // Verify ETag format: "game-{id}-v{version}"
+    let expected_etag = format!(r#""game-{game_id}-v{lock_version}""#);
+    assert_eq!(
+        etag_str, expected_etag,
+        "ETag should be in format \"game-{{id}}-v{{version}}\""
+    );
+
+    // Verify we can parse the version back
+    let parsed_version = backend::http::etag::parse_game_version_from_etag(&etag_str)
+        .expect("Should be able to parse version from ETag");
+    assert_eq!(
+        parsed_version, lock_version,
+        "Parsed version should match game lock_version"
+    );
+
+    // Cleanup — explicitly rollback the shared transaction
+    shared.rollback().await?;
+
+    Ok(())
+}

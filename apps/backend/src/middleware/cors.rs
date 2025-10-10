@@ -12,15 +12,19 @@ pub fn cors_middleware() -> Cors {
 
     let mut cors = Cors::default()
         // Allow common methods used by your API
-        .allowed_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+        .allowed_methods(vec!["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
         // Headers the browser may send
         .allowed_headers(vec![
             header::AUTHORIZATION,
             header::CONTENT_TYPE,
             header::ACCEPT,
+            header::IF_MATCH,
         ])
         // Headers the browser is allowed to read from responses
-        .expose_headers(vec![header::HeaderName::from_static("x-trace-id")])
+        .expose_headers(vec![
+            header::HeaderName::from_static("x-trace-id"),
+            header::ETAG,
+        ])
         .max_age(3600);
 
     // Add each origin explicitly

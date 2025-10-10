@@ -1,16 +1,19 @@
 //! Game-related HTTP routes.
 
+use actix_web::http::header::ETAG;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 
+use crate::adapters::games_sea;
 use crate::db::txn::with_txn;
 use crate::error::AppError;
 use crate::extractors::game_id::GameId;
+use crate::http::etag::game_etag;
 use crate::services::players::PlayerService;
 use crate::state::app_state::AppState;
 
 /// GET /api/games/{game_id}/snapshot
 ///
-/// Returns the current game snapshot as JSON.
+/// Returns the current game snapshot as JSON with an ETag header for optimistic concurrency.
 /// This is a read-only endpoint that produces a public view of the game state
 /// without exposing private information (e.g., other players' hands).
 async fn get_snapshot(
@@ -21,8 +24,19 @@ async fn get_snapshot(
     let id = game_id.0;
 
     // Load game state and produce snapshot within a transaction
-    let snapshot = with_txn(Some(&http_req), &app_state, |_txn| {
+    let (snapshot, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
+            // Fetch game from database to get lock_version
+            let game = games_sea::find_by_id(txn, id)
+                .await
+                .map_err(|e| AppError::db(format!("Failed to fetch game: {e}")))?
+                .ok_or_else(|| {
+                    AppError::not_found(
+                        crate::errors::ErrorCode::GameNotFound,
+                        format!("Game with ID {id} not found"),
+                    )
+                })?;
+
             // Create game service and load game state
             let game_service = crate::services::games::GameService::new();
             let state = game_service.load_game_state(id).await?;
@@ -30,12 +44,17 @@ async fn get_snapshot(
             // Produce the snapshot via the domain function
             let snap = crate::domain::snapshot::snapshot(&state);
 
-            Ok(snap)
+            Ok((snap, game.lock_version))
         })
     })
     .await?;
 
-    Ok(HttpResponse::Ok().json(snapshot))
+    // Generate ETag from game ID and lock version
+    let etag_value = game_etag(id, lock_version);
+
+    Ok(HttpResponse::Ok()
+        .insert_header((ETAG, etag_value))
+        .json(snapshot))
 }
 
 /// GET /api/games/{game_id}/players/{seat}/display_name

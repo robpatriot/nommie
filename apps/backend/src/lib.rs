@@ -18,6 +18,7 @@ pub mod entities;
 pub mod error;
 pub mod errors;
 pub mod extractors;
+pub mod http;
 pub mod infra;
 pub mod logging;
 pub mod middleware;
