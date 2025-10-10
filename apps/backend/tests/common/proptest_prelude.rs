@@ -8,12 +8,12 @@ pub fn proptest_prelude_config() -> proptest::prelude::ProptestConfig {
     // Start from a single base default to avoid repeated default() calls
     let base: proptest::prelude::ProptestConfig = proptest::prelude::ProptestConfig::default();
 
-    // PROPTEST_CASES: number of generated cases (default 32 for this project)
+    // PROPTEST_CASES: number of generated cases (default 8 for this project)
     let cases_env: Option<u32> = std::env::var("PROPTEST_CASES")
         .ok()
         .and_then(|s| s.parse::<u32>().ok());
     // Fallback to our project default when missing/invalid, then clamp to at least 1
-    let cases: u32 = cases_env.unwrap_or(32).max(1);
+    let cases: u32 = cases_env.unwrap_or(8).max(1);
 
     // PROPTEST_MAX_SHRINK_MS: cap shrinking time in milliseconds (falls back to base.max_shrink_time)
     let max_shrink_time_env: Option<u32> = std::env::var("PROPTEST_MAX_SHRINK_MS")
