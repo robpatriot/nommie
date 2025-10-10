@@ -266,14 +266,16 @@ impl GameFlowService {
     /// Set trump for the current round.
     ///
     /// The winning bidder (highest bid, earliest wins ties) selects trump.
+    /// Validates that the player_seat matches the winning bidder.
     /// Transitions game to TrickPlay phase.
     pub async fn set_trump<C: ConnectionTrait + Send + Sync>(
         &self,
         conn: &C,
         game_id: i64,
+        player_seat: i16,
         trump: rounds::Trump,
     ) -> Result<(), AppError> {
-        info!(game_id, trump = ?trump, "Setting trump");
+        info!(game_id, player_seat, trump = ?trump, "Setting trump");
 
         // Load game
         let game = games_sea::require_game(conn, game_id).await?;
@@ -300,6 +302,27 @@ impl GameFlowService {
                 )
             })?;
 
+        // Determine winning bidder and validate
+        let winning_bid = bids::find_winning_bid(conn, round.id)
+            .await?
+            .ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("NO_WINNING_BID".into()),
+                    "No winning bid found",
+                )
+            })?;
+
+        if winning_bid.player_seat != player_seat {
+            return Err(DomainError::validation(
+                ValidationKind::OutOfTurn,
+                format!(
+                    "Only the winning bidder (seat {}) can choose trump, not seat {}",
+                    winning_bid.player_seat, player_seat
+                ),
+            )
+            .into());
+        }
+
         // Set trump on the round
         rounds::update_trump(conn, round.id, trump).await?;
 
@@ -307,7 +330,12 @@ impl GameFlowService {
         let update = GameUpdateState::new(game_id, DbGameState::TrickPlay, game.lock_version);
         games_sea::update_state(conn, update).await?;
 
-        info!(game_id, trump = ?trump, "Trump set, transitioning to Trick Play");
+        info!(
+            game_id,
+            player_seat,
+            trump = ?trump,
+            "Trump set by winning bidder, transitioning to Trick Play"
+        );
         debug!(game_id, "Transition: TrumpSelection -> TrickPlay");
 
         Ok(())

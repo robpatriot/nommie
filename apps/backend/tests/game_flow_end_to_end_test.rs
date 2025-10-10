@@ -47,8 +47,9 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
             // (verified by submit_bid logic)
 
             // Step 3: Set trump (winning bidder selects)
+            // Player 2 has the highest bid (4), so they must choose trump
             service
-                .set_trump(txn, game.id, rounds::Trump::Hearts)
+                .set_trump(txn, game.id, 2, rounds::Trump::Hearts)
                 .await?;
 
             // Should now be in TrickPlay state
