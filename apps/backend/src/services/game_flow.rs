@@ -41,9 +41,7 @@ impl GameFlowService {
         info!(game_id, "Dealing new round");
 
         // Load game from DB
-        let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
-            DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
-        })?;
+        let game = games_sea::require_game(conn, game_id).await?;
 
         // Determine next round number
         let next_round = game.current_round.unwrap_or(0) + 1;
@@ -113,9 +111,7 @@ impl GameFlowService {
         );
 
         // Load game
-        let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
-            DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
-        })?;
+        let game = games_sea::require_game(conn, game_id).await?;
 
         if game.state != DbGameState::Bidding {
             return Err(DomainError::validation(
@@ -166,9 +162,7 @@ impl GameFlowService {
         debug!(game_id, membership_id = _membership_id, "Playing card");
 
         // Load game
-        let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
-            DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
-        })?;
+        let game = games_sea::require_game(conn, game_id).await?;
 
         if game.state != DbGameState::TrickPlay {
             return Err(DomainError::validation(
@@ -195,9 +189,7 @@ impl GameFlowService {
         debug!(game_id, "Scoring trick");
 
         // Load game
-        let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
-            DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
-        })?;
+        let game = games_sea::require_game(conn, game_id).await?;
 
         if game.state != DbGameState::TrickPlay {
             return Err(DomainError::validation(
@@ -223,9 +215,7 @@ impl GameFlowService {
         info!(game_id, "Advancing to next round");
 
         // Load game
-        let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
-            DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
-        })?;
+        let game = games_sea::require_game(conn, game_id).await?;
 
         if game.state != DbGameState::Scoring {
             return Err(DomainError::validation(
@@ -271,9 +261,7 @@ impl GameFlowService {
         info!(game_id, "Starting happy path test flow");
 
         // Load game to validate it exists
-        let _game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
-            DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
-        })?;
+        let _game = games_sea::require_game(conn, game_id).await?;
 
         // Deal first round
         self.deal_round(conn, game_id).await?;
@@ -286,9 +274,7 @@ impl GameFlowService {
         // This would require full GameState persistence to be meaningful
 
         // Reload game to get updated lock_version after dealing
-        let game = games_sea::find_by_id(conn, game_id).await?.ok_or_else(|| {
-            DomainError::not_found(crate::errors::domain::NotFoundKind::Game, "Game not found")
-        })?;
+        let game = games_sea::require_game(conn, game_id).await?;
 
         // Transition to scoring
         let update = GameUpdateState::new(game_id, DbGameState::Scoring, game.lock_version);

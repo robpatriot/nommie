@@ -80,6 +80,25 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
         .await
 }
 
+/// Find game by ID or return RecordNotFound error.
+///
+/// This is a convenience helper that converts `None` into a DbErr::RecordNotFound,
+/// eliminating the repetitive `ok_or_else` pattern when a game must exist.
+///
+/// # Example
+/// ```rust
+/// let game = require_game(conn, game_id).await?;
+/// // game is guaranteed to exist here
+/// ```
+pub async fn require_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<games::Model, sea_orm::DbErr> {
+    find_by_id(conn, game_id)
+        .await?
+        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))
+}
+
 pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     join_code: &str,
