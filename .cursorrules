@@ -19,7 +19,6 @@ Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and 
 - Domain modules: no DB or Actix imports.
 - Use enums (not strings) for states, roles, and phases.
 - No `unwrap()` or `expect()` outside tests.
-- Remove unused imports entirely (don't comment them out).
 
 ## String Handling
 - Query/lookup methods: accept `&str` to avoid unnecessary allocations.
@@ -58,7 +57,6 @@ Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and 
 ## Env & pnpm
 - Source `.env` once per shell session before any pnpm commands:
   set -a; source .env; set +a
-- Never commit real `.env`.
 - Don't read `DATABASE_URL` directly in code.
 
 ## Testing
@@ -66,5 +64,8 @@ Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and 
 - DB tests use `_test` DB (rollback enforced).
 - Use `SharedTxn` when tests need continuity.
 - Control tests needing committed data must use pooled DB setup.
-- Run backend tests with `pnpm be:test`.
+- Error assertions: use structured checks (error codes, variants) not string matching.
+  - ✅ `assert_eq!(err.code(), ErrorCode::PhaseMismatch)`
+  - ✅ `matches!(err, DomainError::Validation(ValidationKind::InvalidSeat, _))`
+  - ❌ `assert!(err.to_string().contains("phase mismatch"))`
 
