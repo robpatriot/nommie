@@ -79,7 +79,7 @@ pub async fn update_state<C: ConnectionTrait + Send + Sync>(
             Expr::col(games::Column::LockVersion).add(1),
         )
         .filter(games::Column::Id.eq(dto.id))
-        .filter(games::Column::LockVersion.eq(dto.expected_lock_version))
+        .filter(games::Column::LockVersion.eq(dto.current_lock_version))
         .exec(conn)
         .await?;
 
@@ -124,7 +124,7 @@ pub async fn update_metadata<C: ConnectionTrait + Send + Sync>(
             Expr::col(games::Column::LockVersion).add(1),
         )
         .filter(games::Column::Id.eq(dto.id))
-        .filter(games::Column::LockVersion.eq(dto.expected_lock_version))
+        .filter(games::Column::LockVersion.eq(dto.current_lock_version))
         .exec(conn)
         .await?;
 
@@ -178,7 +178,7 @@ pub async fn update_round<C: ConnectionTrait + Send + Sync>(
             Expr::col(games::Column::LockVersion).add(1),
         )
         .filter(games::Column::Id.eq(dto.id))
-        .filter(games::Column::LockVersion.eq(dto.expected_lock_version))
+        .filter(games::Column::LockVersion.eq(dto.current_lock_version))
         .exec(conn)
         .await?;
 

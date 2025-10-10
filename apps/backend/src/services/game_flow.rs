@@ -67,9 +67,9 @@ impl GameFlowService {
 
         // Update DB: state, round number, hand_size, dealer_pos
         let update_state = GameUpdateState::new(game_id, DbGameState::Bidding, game.lock_version);
-        games_sea::update_state(conn, update_state).await?;
+        let updated_game = games_sea::update_state(conn, update_state).await?;
 
-        let update_round = GameUpdateRound::new(game_id, game.lock_version + 1)
+        let update_round = GameUpdateRound::new(game_id, updated_game.lock_version)
             .with_current_round(next_round as i16)
             .with_hand_size(hand_size as i16)
             .with_dealer_pos(dealer_pos);
