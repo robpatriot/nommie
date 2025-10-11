@@ -92,6 +92,14 @@ pub async fn update_membership(
 
 // Conversions between SeaORM models and domain models
 
+pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Vec<GameMembership>, DomainError> {
+    let memberships = memberships_adapter::find_all_by_game(conn, game_id).await?;
+    Ok(memberships.into_iter().map(GameMembership::from).collect())
+}
+
 impl From<crate::entities::game_players::Model> for GameMembership {
     fn from(model: crate::entities::game_players::Model) -> Self {
         Self {

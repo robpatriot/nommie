@@ -74,3 +74,13 @@ pub async fn set_membership_ready(
     };
     membership.update(txn).await
 }
+
+pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Vec<game_players::Model>, sea_orm::DbErr> {
+    game_players::Entity::find()
+        .filter(game_players::Column::GameId.eq(game_id))
+        .all(conn)
+        .await
+}
