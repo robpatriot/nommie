@@ -1,6 +1,6 @@
-//! Bids repository functions for domain layer (generic over ConnectionTrait).
+//! Bids repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::bids_sea as bids_adapter;
 use crate::entities::round_bids;
@@ -20,8 +20,8 @@ pub struct Bid {
 // Free functions (generic) for bid operations
 
 /// Create a bid for a player
-pub async fn create_bid<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_bid(
+    txn: &DatabaseTransaction,
     round_id: i64,
     player_seat: i16,
     bid_value: i16,
@@ -33,7 +33,7 @@ pub async fn create_bid<C: ConnectionTrait + Send + Sync>(
         bid_value,
         bid_order,
     };
-    let bid = bids_adapter::create_bid(conn, dto).await?;
+    let bid = bids_adapter::create_bid(txn, dto).await?;
     Ok(Bid::from(bid))
 }
 

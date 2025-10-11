@@ -1,6 +1,6 @@
-//! Plays repository functions for domain layer (generic over ConnectionTrait).
+//! Plays repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::plays_sea as plays_adapter;
@@ -28,8 +28,8 @@ pub struct Card {
 // Free functions (generic) for play operations
 
 /// Create a card play
-pub async fn create_play<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_play(
+    txn: &DatabaseTransaction,
     trick_id: i64,
     player_seat: i16,
     card: Card,
@@ -41,7 +41,7 @@ pub async fn create_play<C: ConnectionTrait + Send + Sync>(
         card,
         play_order,
     };
-    let play = plays_adapter::create_play(conn, dto).await?;
+    let play = plays_adapter::create_play(txn, dto).await?;
     Ok(Play::from(play))
 }
 

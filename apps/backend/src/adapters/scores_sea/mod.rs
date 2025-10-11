@@ -1,8 +1,8 @@
-//! SeaORM adapter for scores repository - generic over ConnectionTrait.
+//! SeaORM adapter for scores repository.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder,
-    Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, Order,
+    QueryFilter, QueryOrder, Set,
 };
 
 use crate::entities::{game_rounds, round_scores};
@@ -37,8 +37,8 @@ pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Create a score record
-pub async fn create_score<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_score(
+    txn: &DatabaseTransaction,
     dto: ScoreCreate,
 ) -> Result<round_scores::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -57,25 +57,25 @@ pub async fn create_score<C: ConnectionTrait + Send + Sync>(
         created_at: Set(now),
     };
 
-    score.insert(conn).await
+    score.insert(txn).await
 }
 
 /// Get current total scores for all players in a game
 /// Returns [seat0, seat1, seat2, seat3] by finding latest round scores
-pub async fn get_current_totals<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn get_current_totals(
+    txn: &DatabaseTransaction,
     game_id: i64,
 ) -> Result<[i16; 4], sea_orm::DbErr> {
     // Find the latest round for this game
     let latest_round = game_rounds::Entity::find()
         .filter(game_rounds::Column::GameId.eq(game_id))
         .order_by(game_rounds::Column::RoundNo, Order::Desc)
-        .one(conn)
+        .one(txn)
         .await?;
 
     if let Some(round) = latest_round {
         // Get all scores for this round
-        let scores = find_all_by_round(conn, round.id).await?;
+        let scores = find_all_by_round(txn, round.id).await?;
 
         // Build array (initialize to 0)
         let mut totals = [0i16; 4];

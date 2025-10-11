@@ -1,7 +1,8 @@
-//! SeaORM adapter for user repository - generic over ConnectionTrait.
+//! SeaORM adapter for user repository.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, NotSet, QueryFilter, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, NotSet,
+    QueryFilter, Set,
 };
 
 use crate::entities::{user_credentials, users};
@@ -22,8 +23,8 @@ pub async fn find_credentials_by_email<C: ConnectionTrait + Send + Sync>(
         .await
 }
 
-pub async fn create_user<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_user(
+    txn: &DatabaseTransaction,
     dto: UserCreate,
 ) -> Result<users::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -36,11 +37,11 @@ pub async fn create_user<C: ConnectionTrait + Send + Sync>(
         updated_at: Set(now),
     };
 
-    user_active.insert(conn).await
+    user_active.insert(txn).await
 }
 
-pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_credentials(
+    txn: &DatabaseTransaction,
     dto: CredentialsCreate,
 ) -> Result<user_credentials::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -55,11 +56,11 @@ pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
         updated_at: Set(now),
     };
 
-    credential_active.insert(conn).await
+    credential_active.insert(txn).await
 }
 
-pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_credentials(
+    txn: &DatabaseTransaction,
     dto: CredentialsUpdate,
 ) -> Result<user_credentials::Model, sea_orm::DbErr> {
     let credentials = user_credentials::ActiveModel {
@@ -72,7 +73,7 @@ pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
         created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
-    credentials.update(conn).await
+    credentials.update(txn).await
 }
 
 pub async fn find_user_by_id<C: ConnectionTrait + Send + Sync>(

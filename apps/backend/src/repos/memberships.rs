@@ -1,6 +1,6 @@
-//! Membership repository functions for domain layer (generic over ConnectionTrait).
+//! Membership repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::memberships_sea as memberships_adapter;
 use crate::errors::domain::DomainError;
@@ -48,8 +48,8 @@ pub async fn find_membership<C: ConnectionTrait + Send + Sync>(
     Ok(membership.map(GameMembership::from))
 }
 
-pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_membership(
+    txn: &DatabaseTransaction,
     game_id: i64,
     user_id: i64,
     turn_order: i32,
@@ -57,7 +57,7 @@ pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
     role: GameRole,
 ) -> Result<GameMembership, DomainError> {
     let dto = memberships_adapter::MembershipCreate::new(game_id, user_id, turn_order, is_ready);
-    let membership = memberships_adapter::create_membership(conn, dto).await?;
+    let membership = memberships_adapter::create_membership(txn, dto).await?;
     Ok(GameMembership {
         id: membership.id,
         game_id: membership.game_id,
@@ -68,8 +68,8 @@ pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
     })
 }
 
-pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_membership(
+    txn: &DatabaseTransaction,
     membership: GameMembership,
 ) -> Result<GameMembership, DomainError> {
     let dto = memberships_adapter::MembershipUpdate::new(
@@ -79,7 +79,7 @@ pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
         membership.turn_order,
         membership.is_ready,
     );
-    let updated = memberships_adapter::update_membership(conn, dto).await?;
+    let updated = memberships_adapter::update_membership(txn, dto).await?;
     Ok(GameMembership {
         id: updated.id,
         game_id: updated.game_id,

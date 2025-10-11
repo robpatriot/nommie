@@ -1,4 +1,4 @@
-use sea_orm::ConnectionTrait;
+use sea_orm::DatabaseTransaction;
 use tracing::{debug, info, warn};
 use unicode_normalization::UnicodeNormalization;
 
@@ -103,9 +103,9 @@ impl UserService {
     /// This function is idempotent - calling it multiple times with the same email
     /// will return the same user without creating duplicates.
     /// Returns the User that was found or created.
-    pub async fn ensure_user<C: ConnectionTrait + Send + Sync>(
+    pub async fn ensure_user(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         email: &str,
         name: Option<&str>,
         google_sub: &str,
@@ -114,7 +114,7 @@ impl UserService {
         let clean_email = sanitize_email(email)?;
 
         // Look up existing user credentials by email
-        let existing_credential = users_repo::find_credentials_by_email(conn, &clean_email).await?;
+        let existing_credential = users_repo::find_credentials_by_email(txn, &clean_email).await?;
 
         match existing_credential {
             Some(credential) => {
@@ -153,10 +153,10 @@ impl UserService {
 
                 updated_credential.updated_at = get_current_time();
 
-                users_repo::update_credentials(conn, updated_credential).await?;
+                users_repo::update_credentials(txn, updated_credential).await?;
 
                 // Fetch and return the linked user
-                let user = users_repo::find_user_by_id(conn, user_id)
+                let user = users_repo::find_user_by_id(txn, user_id)
                     .await?
                     .ok_or_else(|| DomainError::not_found(NotFoundKind::User, "User not found"))?;
 
@@ -177,7 +177,7 @@ impl UserService {
 
                 // Create new user with auto-generated ID and sub from google_sub
                 let user = users_repo::create_user(
-                    conn,
+                    txn,
                     google_sub,
                     username.as_deref().unwrap_or("user"),
                     false,
@@ -185,7 +185,7 @@ impl UserService {
                 .await?;
 
                 // Create new user credentials with auto-generated ID
-                users_repo::create_credentials(conn, user.id, &clean_email, Some(google_sub))
+                users_repo::create_credentials(txn, user.id, &clean_email, Some(google_sub))
                     .await?;
 
                 // Log first user creation

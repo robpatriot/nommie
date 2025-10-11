@@ -1,6 +1,9 @@
-//! SeaORM adapter for rounds repository - generic over ConnectionTrait.
+//! SeaORM adapter for rounds repository.
 
-use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
+    Set,
+};
 
 use crate::entities::game_rounds;
 
@@ -30,8 +33,8 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Create a new round
-pub async fn create_round<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_round(
+    txn: &DatabaseTransaction,
     dto: RoundCreate,
 ) -> Result<game_rounds::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -47,16 +50,16 @@ pub async fn create_round<C: ConnectionTrait + Send + Sync>(
         completed_at: Set(None),
     };
 
-    round.insert(conn).await
+    round.insert(txn).await
 }
 
 /// Update trump selection for a round
-pub async fn update_trump<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_trump(
+    txn: &DatabaseTransaction,
     dto: RoundUpdateTrump,
 ) -> Result<game_rounds::Model, sea_orm::DbErr> {
     // Fetch the round
-    let round = find_by_id(conn, dto.round_id)
+    let round = find_by_id(txn, dto.round_id)
         .await?
         .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Round not found".to_string()))?;
 
@@ -64,18 +67,18 @@ pub async fn update_trump<C: ConnectionTrait + Send + Sync>(
     let mut round: game_rounds::ActiveModel = round.into();
     round.trump = Set(Some(dto.trump));
 
-    round.update(conn).await
+    round.update(txn).await
 }
 
 /// Mark a round as completed
-pub async fn complete_round<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn complete_round(
+    txn: &DatabaseTransaction,
     round_id: i64,
 ) -> Result<game_rounds::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
 
     // Fetch the round
-    let round = find_by_id(conn, round_id)
+    let round = find_by_id(txn, round_id)
         .await?
         .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Round not found".to_string()))?;
 
@@ -83,5 +86,5 @@ pub async fn complete_round<C: ConnectionTrait + Send + Sync>(
     let mut round: game_rounds::ActiveModel = round.into();
     round.completed_at = Set(Some(now));
 
-    round.update(conn).await
+    round.update(txn).await
 }

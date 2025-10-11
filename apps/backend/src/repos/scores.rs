@@ -1,6 +1,6 @@
-//! Scores repository functions for domain layer (generic over ConnectionTrait).
+//! Scores repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::scores_sea as scores_adapter;
 use crate::entities::round_scores;
@@ -39,8 +39,8 @@ pub struct ScoreData {
 // Free functions (generic) for score operations
 
 /// Create a score record for a player
-pub async fn create_score<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_score(
+    txn: &DatabaseTransaction,
     data: ScoreData,
 ) -> Result<Score, DomainError> {
     let dto = scores_adapter::ScoreCreate {
@@ -54,7 +54,7 @@ pub async fn create_score<C: ConnectionTrait + Send + Sync>(
         round_score: data.round_score,
         total_score_after: data.total_score_after,
     };
-    let score = scores_adapter::create_score(conn, dto).await?;
+    let score = scores_adapter::create_score(txn, dto).await?;
     Ok(Score::from(score))
 }
 
@@ -79,11 +79,11 @@ pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
 
 /// Get current total scores for all players in a game (latest round)
 /// Returns array of [seat0_total, seat1_total, seat2_total, seat3_total]
-pub async fn get_current_totals<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn get_current_totals(
+    txn: &DatabaseTransaction,
     game_id: i64,
 ) -> Result<[i16; 4], DomainError> {
-    let totals = scores_adapter::get_current_totals(conn, game_id).await?;
+    let totals = scores_adapter::get_current_totals(txn, game_id).await?;
     Ok(totals)
 }
 

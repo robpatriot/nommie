@@ -1,6 +1,9 @@
-//! SeaORM adapter for hands repository - generic over ConnectionTrait.
+//! SeaORM adapter for hands repository.
 
-use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
+    Set,
+};
 use serde_json::json;
 
 use crate::entities::round_hands;
@@ -34,8 +37,8 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Create a hand for a player
-pub async fn create_hand<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_hand(
+    txn: &DatabaseTransaction,
     dto: HandCreate,
 ) -> Result<round_hands::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -51,5 +54,5 @@ pub async fn create_hand<C: ConnectionTrait + Send + Sync>(
         created_at: Set(now),
     };
 
-    hand.insert(conn).await
+    hand.insert(txn).await
 }

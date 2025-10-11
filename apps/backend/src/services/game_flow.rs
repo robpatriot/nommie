@@ -3,7 +3,7 @@
 //! This service provides fine-grained transition methods for game state progression
 //! and a test/bot helper that composes them into a happy path.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::DatabaseTransaction;
 use tracing::{debug, info};
 
 use crate::adapters::games_sea::{self, GameUpdateRound, GameUpdateState};
@@ -35,15 +35,15 @@ impl GameFlowService {
     ///
     /// Expects game to be in Lobby (first round) or Complete (subsequent rounds).
     /// Uses rng_seed from DB; initializes to game_id if not set.
-    pub async fn deal_round<C: ConnectionTrait + Send + Sync>(
+    pub async fn deal_round(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
         info!(game_id, "Dealing new round");
 
         // Load game from DB
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         // Determine next round number
         let next_round = game.current_round.unwrap_or(0) + 1;
@@ -67,7 +67,7 @@ impl GameFlowService {
 
         // Update DB: state and round number
         let update_state = GameUpdateState::new(game_id, DbGameState::Bidding, game.lock_version);
-        let updated_game = games_sea::update_state(conn, update_state).await?;
+        let updated_game = games_sea::update_state(txn, update_state).await?;
 
         // On first round, set starting_dealer_pos (defaults to 0)
         let mut update_round = GameUpdateRound::new(game_id, updated_game.lock_version)
@@ -79,7 +79,7 @@ impl GameFlowService {
             update_round = update_round.with_starting_dealer_pos(starting_dealer);
         }
 
-        let updated_game = games_sea::update_round(conn, update_round).await?;
+        let updated_game = games_sea::update_round(txn, update_round).await?;
 
         // Compute current dealer (hand_size and dealer_pos are now computed)
         let computed_hand_size = updated_game.hand_size().unwrap_or(0);
@@ -87,7 +87,7 @@ impl GameFlowService {
 
         // Create round record in DB
         let round = rounds::create_round(
-            conn,
+            txn,
             game_id,
             next_round as i16,
             computed_hand_size,
@@ -111,7 +111,7 @@ impl GameFlowService {
             })
             .collect();
 
-        hands::create_hands(conn, round.id, hands_to_store).await?;
+        hands::create_hands(txn, round.id, hands_to_store).await?;
 
         info!(
             game_id,
@@ -128,9 +128,9 @@ impl GameFlowService {
     /// Submit a bid for a player in the current round.
     ///
     /// Validates phase and bid value, then persists the bid to the database.
-    pub async fn submit_bid<C: ConnectionTrait + Send + Sync>(
+    pub async fn submit_bid(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: i16,
         bid_value: u8,
@@ -138,7 +138,7 @@ impl GameFlowService {
         debug!(game_id, player_seat, bid_value, "Submitting bid");
 
         // Load game
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         if game.state != DbGameState::Bidding {
             return Err(DomainError::validation(
@@ -168,7 +168,7 @@ impl GameFlowService {
             DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
         })?;
 
-        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+        let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
                 DomainError::validation(
@@ -178,12 +178,12 @@ impl GameFlowService {
             })?;
 
         // Determine bid_order (how many bids have been placed already)
-        let bid_order = bids::count_bids_by_round(conn, round.id).await? as i16;
+        let bid_order = bids::count_bids_by_round(txn, round.id).await? as i16;
 
         // Dealer bid restriction: if this is the 4th (final) bid, check dealer rule
         if bid_order == 3 {
             // This is the dealer's bid - sum of all bids cannot equal hand_size
-            let existing_bids = bids::find_all_by_round(conn, round.id).await?;
+            let existing_bids = bids::find_all_by_round(txn, round.id).await?;
             let existing_sum: i16 = existing_bids.iter().map(|b| b.bid_value).sum();
             let proposed_sum = existing_sum + bid_value as i16;
 
@@ -199,7 +199,7 @@ impl GameFlowService {
         }
 
         // Persist the bid
-        bids::create_bid(conn, round.id, player_seat, bid_value as i16, bid_order).await?;
+        bids::create_bid(txn, round.id, player_seat, bid_value as i16, bid_order).await?;
 
         info!(
             game_id,
@@ -207,16 +207,16 @@ impl GameFlowService {
         );
 
         // Check if all 4 players have bid
-        let bid_count = bids::count_bids_by_round(conn, round.id).await?;
+        let bid_count = bids::count_bids_by_round(txn, round.id).await?;
         if bid_count == 4 {
             // All bids placed - transition to Trump Selection
-            let updated_game = games_sea::require_game(conn, game_id).await?;
+            let updated_game = games_sea::require_game(txn, game_id).await?;
             let update = GameUpdateState::new(
                 game_id,
                 DbGameState::TrumpSelection,
                 updated_game.lock_version,
             );
-            games_sea::update_state(conn, update).await?;
+            games_sea::update_state(txn, update).await?;
             info!(game_id, "All bids placed, transitioning to Trump Selection");
             debug!(game_id, "Transition: Bidding -> TrumpSelection");
         }
@@ -229,9 +229,9 @@ impl GameFlowService {
     /// The winning bidder (highest bid, earliest wins ties) selects trump.
     /// Validates that the player_seat matches the winning bidder.
     /// Transitions game to TrickPlay phase.
-    pub async fn set_trump<C: ConnectionTrait + Send + Sync>(
+    pub async fn set_trump(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: i16,
         trump: rounds::Trump,
@@ -239,7 +239,7 @@ impl GameFlowService {
         info!(game_id, player_seat, trump = ?trump, "Setting trump");
 
         // Load game
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         if game.state != DbGameState::TrumpSelection {
             return Err(DomainError::validation(
@@ -254,7 +254,7 @@ impl GameFlowService {
             DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
         })?;
 
-        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+        let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
                 DomainError::validation(
@@ -264,7 +264,7 @@ impl GameFlowService {
             })?;
 
         // Determine winning bidder and validate
-        let winning_bid = bids::find_winning_bid(conn, round.id)
+        let winning_bid = bids::find_winning_bid(txn, round.id)
             .await?
             .ok_or_else(|| {
                 DomainError::validation(
@@ -285,11 +285,11 @@ impl GameFlowService {
         }
 
         // Set trump on the round
-        rounds::update_trump(conn, round.id, trump).await?;
+        rounds::update_trump(txn, round.id, trump).await?;
 
         // Transition to TrickPlay
         let update = GameUpdateState::new(game_id, DbGameState::TrickPlay, game.lock_version);
-        games_sea::update_state(conn, update).await?;
+        games_sea::update_state(txn, update).await?;
 
         info!(
             game_id,
@@ -305,9 +305,9 @@ impl GameFlowService {
     /// Play a card for a player in the current trick.
     ///
     /// Persists the card play to the database.
-    pub async fn play_card<C: ConnectionTrait + Send + Sync>(
+    pub async fn play_card(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: i16,
         card: Card,
@@ -315,7 +315,7 @@ impl GameFlowService {
         debug!(game_id, player_seat, "Playing card");
 
         // Load game
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         if game.state != DbGameState::TrickPlay {
             return Err(DomainError::validation(
@@ -330,7 +330,7 @@ impl GameFlowService {
             DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
         })?;
 
-        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+        let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
                 DomainError::validation(
@@ -346,7 +346,7 @@ impl GameFlowService {
         // Note: This is simplified - real implementation would need to determine
         // lead suit from first play and winner from domain logic after 4th play
         let trick = if let Some(existing) =
-            tricks::find_by_round_and_trick(conn, round.id, current_trick_no).await?
+            tricks::find_by_round_and_trick(txn, round.id, current_trick_no).await?
         {
             existing
         } else {
@@ -360,11 +360,11 @@ impl GameFlowService {
             };
 
             // Winner TBD (placeholder 0 until trick completes)
-            tricks::create_trick(conn, round.id, current_trick_no, lead_suit, 0).await?
+            tricks::create_trick(txn, round.id, current_trick_no, lead_suit, 0).await?
         };
 
         // Determine play_order (how many plays already in this trick)
-        let play_order = plays::count_plays_by_trick(conn, trick.id).await? as i16;
+        let play_order = plays::count_plays_by_trick(txn, trick.id).await? as i16;
 
         // Convert domain Card to repo Card
         let card_for_storage = plays::Card {
@@ -373,7 +373,7 @@ impl GameFlowService {
         };
 
         // Persist the play
-        plays::create_play(conn, trick.id, player_seat, card_for_storage, play_order).await?;
+        plays::create_play(txn, trick.id, player_seat, card_for_storage, play_order).await?;
 
         info!(
             game_id,
@@ -384,7 +384,7 @@ impl GameFlowService {
         );
 
         // Check if trick is complete (4 plays)
-        let play_count = plays::count_plays_by_trick(conn, trick.id).await?;
+        let play_count = plays::count_plays_by_trick(txn, trick.id).await?;
         if play_count == 4 {
             // Trick complete - need to determine winner
             // For now, call score_trick which will handle winner determination
@@ -399,15 +399,15 @@ impl GameFlowService {
     ///
     /// Loads the 4 plays, uses domain logic to determine winner based on trump/lead,
     /// updates the trick with winner, and advances current_trick_no or transitions to Scoring.
-    pub async fn resolve_trick<C: ConnectionTrait + Send + Sync>(
+    pub async fn resolve_trick(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
         debug!(game_id, "Resolving trick");
 
         // Load game
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         if game.state != DbGameState::TrickPlay {
             return Err(DomainError::validation(
@@ -422,7 +422,7 @@ impl GameFlowService {
             DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
         })?;
 
-        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+        let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
                 DomainError::validation(
@@ -437,7 +437,7 @@ impl GameFlowService {
         })?;
 
         // Verify trick exists and has 4 plays
-        let trick = tricks::find_by_round_and_trick(conn, round.id, current_trick_no)
+        let trick = tricks::find_by_round_and_trick(txn, round.id, current_trick_no)
             .await?
             .ok_or_else(|| {
                 DomainError::validation(
@@ -446,7 +446,7 @@ impl GameFlowService {
                 )
             })?;
 
-        let all_plays = plays::find_all_by_trick(conn, trick.id).await?;
+        let all_plays = plays::find_all_by_trick(txn, trick.id).await?;
         if all_plays.len() != 4 {
             return Err(DomainError::validation(
                 ValidationKind::Other("INCOMPLETE_TRICK".into()),
@@ -512,7 +512,7 @@ impl GameFlowService {
             // Advance to next trick
             let update = GameUpdateRound::new(game_id, game.lock_version)
                 .with_current_trick_no(next_trick_no);
-            games_sea::update_round(conn, update).await?;
+            games_sea::update_round(txn, update).await?;
             info!(
                 game_id,
                 trick_no = current_trick_no,
@@ -529,21 +529,21 @@ impl GameFlowService {
     ///
     /// Counts tricks won, applies domain scoring logic, and saves to round_scores.
     /// Transitions game to Scoring phase and marks round as complete.
-    pub async fn score_round<C: ConnectionTrait + Send + Sync>(
+    pub async fn score_round(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
         info!(game_id, "Scoring round");
 
         // Load game
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         let current_round_no = game.current_round.ok_or_else(|| {
             DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
         })?;
 
-        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+        let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
                 DomainError::validation(
@@ -553,7 +553,7 @@ impl GameFlowService {
             })?;
 
         // Load all bids for this round
-        let all_bids = bids::find_all_by_round(conn, round.id).await?;
+        let all_bids = bids::find_all_by_round(txn, round.id).await?;
         if all_bids.len() != 4 {
             return Err(DomainError::validation(
                 ValidationKind::Other("INCOMPLETE_BIDS".into()),
@@ -563,7 +563,7 @@ impl GameFlowService {
         }
 
         // Load all tricks to count wins per player
-        let all_tricks = tricks::find_all_by_round(conn, round.id).await?;
+        let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
 
         // Count tricks won by each player
         let mut tricks_won = [0i16; 4];
@@ -577,7 +577,7 @@ impl GameFlowService {
         let previous_totals = if current_round_no > 1 {
             // Find previous round and get its scores
             let prev_round_no = current_round_no - 1;
-            let prev_round = rounds::find_by_game_and_round(conn, game_id, prev_round_no)
+            let prev_round = rounds::find_by_game_and_round(txn, game_id, prev_round_no)
                 .await?
                 .ok_or_else(|| {
                     DomainError::validation(
@@ -586,7 +586,7 @@ impl GameFlowService {
                     )
                 })?;
 
-            let prev_scores = scores::find_all_by_round(conn, prev_round.id).await?;
+            let prev_scores = scores::find_all_by_round(txn, prev_round.id).await?;
             let mut totals = [0i16; 4];
             for score in prev_scores {
                 if score.player_seat >= 0 && score.player_seat < 4 {
@@ -616,7 +616,7 @@ impl GameFlowService {
             let total_after = previous_totals[seat as usize] + round_score;
 
             scores::create_score(
-                conn,
+                txn,
                 scores::ScoreData {
                     round_id: round.id,
                     player_seat: seat,
@@ -633,11 +633,11 @@ impl GameFlowService {
         }
 
         // Mark round as complete
-        rounds::complete_round(conn, round.id).await?;
+        rounds::complete_round(txn, round.id).await?;
 
         // Transition to Scoring phase
         let update = GameUpdateState::new(game_id, DbGameState::Scoring, game.lock_version);
-        games_sea::update_state(conn, update).await?;
+        games_sea::update_state(txn, update).await?;
 
         info!(
             game_id,
@@ -651,15 +651,15 @@ impl GameFlowService {
     /// Advance to the next round after scoring completes.
     ///
     /// Transitions from Scoring -> BetweenRounds or Completed.
-    pub async fn advance_to_next_round<C: ConnectionTrait + Send + Sync>(
+    pub async fn advance_to_next_round(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
         info!(game_id, "Advancing to next round");
 
         // Load game
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         if game.state != DbGameState::Scoring {
             return Err(DomainError::validation(
@@ -673,19 +673,19 @@ impl GameFlowService {
         if current_round >= 26 {
             // All rounds complete
             let update = GameUpdateState::new(game_id, DbGameState::Completed, game.lock_version);
-            games_sea::update_state(conn, update).await?;
+            games_sea::update_state(txn, update).await?;
             info!(game_id, rounds_played = current_round, "Game completed");
             debug!(game_id, "Transition: Scoring -> Completed");
         } else {
             // More rounds to play - transition to BetweenRounds and reset trick counter
             let update =
                 GameUpdateState::new(game_id, DbGameState::BetweenRounds, game.lock_version);
-            let updated_game = games_sea::update_state(conn, update).await?;
+            let updated_game = games_sea::update_state(txn, update).await?;
 
             // Reset current_trick_no for next round
             let reset_trick =
                 GameUpdateRound::new(game_id, updated_game.lock_version).with_current_trick_no(0);
-            games_sea::update_round(conn, reset_trick).await?;
+            games_sea::update_round(txn, reset_trick).await?;
 
             info!(game_id, current_round, "Advanced to BetweenRounds");
             debug!(game_id, "Transition: Scoring -> BetweenRounds");
@@ -703,18 +703,18 @@ impl GameFlowService {
     ///
     /// NOTE: This is a stub implementation demonstrating the structure.
     /// Full implementation requires complete state persistence.
-    pub async fn run_happy_path<C: ConnectionTrait + Send + Sync>(
+    pub async fn run_happy_path(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<GameOutcome, AppError> {
         info!(game_id, "Starting happy path test flow");
 
         // Load game to validate it exists
-        let _game = games_sea::require_game(conn, game_id).await?;
+        let _game = games_sea::require_game(txn, game_id).await?;
 
         // Deal first round
-        self.deal_round(conn, game_id).await?;
+        self.deal_round(txn, game_id).await?;
 
         // Stub bidding: all players bid 1 (placeholder)
         // In a real implementation, this would loop through memberships and call submit_bid
@@ -724,14 +724,14 @@ impl GameFlowService {
         // This would require full GameState persistence to be meaningful
 
         // Reload game to get updated lock_version after dealing
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         // Transition to scoring
         let update = GameUpdateState::new(game_id, DbGameState::Scoring, game.lock_version);
-        games_sea::update_state(conn, update).await?;
+        games_sea::update_state(txn, update).await?;
 
         // Advance to next round or complete
-        self.advance_to_next_round(conn, game_id).await?;
+        self.advance_to_next_round(txn, game_id).await?;
 
         info!(game_id, "Happy path test flow completed");
 

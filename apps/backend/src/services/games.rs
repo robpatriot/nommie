@@ -1,6 +1,6 @@
 //! Game state loading and construction services.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::DatabaseTransaction;
 
 use crate::adapters::games_sea;
 use crate::domain::cards_parsing::from_stored_format;
@@ -19,16 +19,16 @@ impl GameService {
         Self
     }
 
-    /// Load GameState from database (stateless, generic over ConnectionTrait).
+    /// Load GameState from database (requires transaction for consistent snapshot).
     ///
     /// Reconstructs in-memory GameState by loading all persisted data for the current round.
-    pub async fn load_game_state<C: ConnectionTrait + Send + Sync>(
+    pub async fn load_game_state(
         &self,
-        conn: &C,
+        txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<GameState, AppError> {
         // 1. Load game record
-        let game = games_sea::require_game(conn, game_id).await?;
+        let game = games_sea::require_game(txn, game_id).await?;
 
         // 2. Check if game has started (has a current round)
         let current_round_no = match game.current_round {
@@ -63,7 +63,7 @@ impl GameService {
         })? as u8;
 
         // 3. Load round record
-        let round = rounds::find_by_game_and_round(conn, game_id, current_round_no)
+        let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
                 DomainError::validation(
@@ -73,7 +73,7 @@ impl GameService {
             })?;
 
         // 4. Load player hands
-        let all_hands = hands::find_all_by_round(conn, round.id).await?;
+        let all_hands = hands::find_all_by_round(txn, round.id).await?;
         let mut hands_array: [Vec<Card>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         for hand in all_hands {
@@ -88,7 +88,7 @@ impl GameService {
         }
 
         // 5. Load bids
-        let all_bids = bids::find_all_by_round(conn, round.id).await?;
+        let all_bids = bids::find_all_by_round(txn, round.id).await?;
         let mut bids_array = [None, None, None, None];
         for bid in &all_bids {
             if bid.player_seat >= 0 && bid.player_seat < 4 {
@@ -98,7 +98,7 @@ impl GameService {
 
         // 6. Determine winning bidder
         let winning_bidder = if bids_array.iter().all(|b| b.is_some()) {
-            bids::find_winning_bid(conn, round.id)
+            bids::find_winning_bid(txn, round.id)
                 .await?
                 .map(|b| b.player_seat as u8)
         } else {
@@ -115,7 +115,7 @@ impl GameService {
         });
 
         // 8. Count tricks won
-        let all_tricks = tricks::find_all_by_round(conn, round.id).await?;
+        let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
         let mut tricks_won = [0u8; 4];
         for trick in &all_tricks {
             if trick.winner_seat >= 0 && trick.winner_seat < 4 {
@@ -127,9 +127,9 @@ impl GameService {
         let current_trick_no = game.current_trick_no;
         let (trick_plays, trick_lead) = if let DbGameState::TrickPlay = game.state {
             if let Some(current_trick) =
-                tricks::find_by_round_and_trick(conn, round.id, current_trick_no).await?
+                tricks::find_by_round_and_trick(txn, round.id, current_trick_no).await?
             {
-                let all_plays = plays::find_all_by_trick(conn, current_trick.id).await?;
+                let all_plays = plays::find_all_by_trick(txn, current_trick.id).await?;
 
                 let plays = all_plays
                     .iter()
@@ -155,7 +155,7 @@ impl GameService {
         };
 
         // 10. Load cumulative scores
-        let scores_total = scores::get_current_totals(conn, game_id).await?;
+        let scores_total = scores::get_current_totals(txn, game_id).await?;
 
         // 11. Convert DB phase to domain Phase
         let phase = match game.state {

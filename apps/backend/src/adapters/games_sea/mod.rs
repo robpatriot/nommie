@@ -1,7 +1,8 @@
-//! SeaORM adapter for game repository - generic over ConnectionTrait.
+//! SeaORM adapter for game repository.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, NotSet, QueryFilter, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, NotSet,
+    QueryFilter, Set,
 };
 
 use crate::entities::games;
@@ -21,14 +22,13 @@ pub use dto::{GameCreate, GameUpdateMetadata, GameUpdateRound, GameUpdateState};
 /// - Refetches and returns the updated model
 ///
 /// The caller provides a closure that configures entity-specific columns.
-async fn optimistic_update_then_fetch<C, F>(
-    conn: &C,
+async fn optimistic_update_then_fetch<F>(
+    txn: &DatabaseTransaction,
     id: i64,
     current_lock_version: i32,
     configure_update: F,
 ) -> Result<games::Model, sea_orm::DbErr>
 where
-    C: ConnectionTrait + Send + Sync,
     F: FnOnce(sea_orm::UpdateMany<games::Entity>) -> sea_orm::UpdateMany<games::Entity>,
 {
     use sea_orm::sea_query::Expr;
@@ -44,13 +44,13 @@ where
         )
         .filter(games::Column::Id.eq(id))
         .filter(games::Column::LockVersion.eq(current_lock_version))
-        .exec(conn)
+        .exec(txn)
         .await?;
 
     if result.rows_affected == 0 {
         // Either the game doesn't exist or the lock version doesn't match
         // Check if game exists to distinguish between NotFound and OptimisticLock
-        let game = games::Entity::find_by_id(id).one(conn).await?;
+        let game = games::Entity::find_by_id(id).one(txn).await?;
         if let Some(game) = game {
             // Lock version mismatch - build structured payload
             let payload = format!(
@@ -65,7 +65,7 @@ where
 
     // Fetch and return the updated game
     games::Entity::find_by_id(id)
-        .one(conn)
+        .one(txn)
         .await?
         .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))
 }
@@ -109,8 +109,8 @@ pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
         .await
 }
 
-pub async fn create_game<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_game(
+    txn: &DatabaseTransaction,
     dto: GameCreate,
 ) -> Result<games::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -134,16 +134,16 @@ pub async fn create_game<C: ConnectionTrait + Send + Sync>(
         lock_version: Set(1),
     };
 
-    game_active.insert(conn).await
+    game_active.insert(txn).await
 }
 
-pub async fn update_state<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_state(
+    txn: &DatabaseTransaction,
     dto: GameUpdateState,
 ) -> Result<games::Model, sea_orm::DbErr> {
     use sea_orm::sea_query::{Alias, Expr};
 
-    optimistic_update_then_fetch(conn, dto.id, dto.current_lock_version, |update| {
+    optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |update| {
         update.col_expr(
             games::Column::State,
             Expr::val(dto.state).cast_as(Alias::new("game_state")),
@@ -152,13 +152,13 @@ pub async fn update_state<C: ConnectionTrait + Send + Sync>(
     .await
 }
 
-pub async fn update_metadata<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_metadata(
+    txn: &DatabaseTransaction,
     dto: GameUpdateMetadata,
 ) -> Result<games::Model, sea_orm::DbErr> {
     use sea_orm::sea_query::{Alias, Expr};
 
-    optimistic_update_then_fetch(conn, dto.id, dto.current_lock_version, |update| {
+    optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |update| {
         update
             .col_expr(games::Column::Name, Expr::val(dto.name).into())
             .col_expr(
@@ -169,13 +169,13 @@ pub async fn update_metadata<C: ConnectionTrait + Send + Sync>(
     .await
 }
 
-pub async fn update_round<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_round(
+    txn: &DatabaseTransaction,
     dto: GameUpdateRound,
 ) -> Result<games::Model, sea_orm::DbErr> {
     use sea_orm::sea_query::Expr;
 
-    optimistic_update_then_fetch(conn, dto.id, dto.current_lock_version, |mut update| {
+    optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |mut update| {
         // Apply optional field updates
         if let Some(round) = dto.current_round {
             update = update.col_expr(games::Column::CurrentRound, Expr::val(Some(round)).into());

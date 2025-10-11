@@ -1,8 +1,8 @@
-//! SeaORM adapter for tricks repository - generic over ConnectionTrait.
+//! SeaORM adapter for tricks repository.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait,
-    QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 
 use crate::entities::round_tricks;
@@ -48,8 +48,8 @@ pub async fn count_tricks_by_round<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Create a trick
-pub async fn create_trick<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_trick(
+    txn: &DatabaseTransaction,
     dto: TrickCreate,
 ) -> Result<round_tricks::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -63,5 +63,5 @@ pub async fn create_trick<C: ConnectionTrait + Send + Sync>(
         created_at: Set(now),
     };
 
-    trick.insert(conn).await
+    trick.insert(txn).await
 }

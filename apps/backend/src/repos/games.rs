@@ -1,6 +1,6 @@
-//! Game repository functions for domain layer (generic over ConnectionTrait).
+//! Game repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::games_sea as games_adapter;
 use crate::entities::games;
@@ -33,12 +33,9 @@ pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
     Ok(game.map(Game::from))
 }
 
-pub async fn create_game<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    join_code: &str,
-) -> Result<Game, DomainError> {
+pub async fn create_game(txn: &DatabaseTransaction, join_code: &str) -> Result<Game, DomainError> {
     let dto = games_adapter::GameCreate::new(join_code);
-    let game = games_adapter::create_game(conn, dto).await?;
+    let game = games_adapter::create_game(txn, dto).await?;
     Ok(Game::from(game))
 }
 

@@ -1,6 +1,6 @@
-//! Hands repository functions for domain layer (generic over ConnectionTrait).
+//! Hands repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::hands_sea as hands_adapter;
@@ -27,8 +27,8 @@ pub struct Card {
 // Free functions (generic) for hand operations
 
 /// Create hands for all players in a round
-pub async fn create_hands<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_hands(
+    txn: &DatabaseTransaction,
     round_id: i64,
     hands: Vec<(i16, Vec<Card>)>, // Vec of (player_seat, cards)
 ) -> Result<Vec<Hand>, DomainError> {
@@ -39,7 +39,7 @@ pub async fn create_hands<C: ConnectionTrait + Send + Sync>(
             player_seat: seat,
             cards,
         };
-        let hand = hands_adapter::create_hand(conn, dto).await?;
+        let hand = hands_adapter::create_hand(txn, dto).await?;
         results.push(Hand::from(hand));
     }
     Ok(results)

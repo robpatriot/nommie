@@ -1,8 +1,8 @@
-//! SeaORM adapter for plays repository - generic over ConnectionTrait.
+//! SeaORM adapter for plays repository.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait,
-    QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 use serde_json::json;
 
@@ -36,8 +36,8 @@ pub async fn count_plays_by_trick<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Create a play
-pub async fn create_play<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_play(
+    txn: &DatabaseTransaction,
     dto: PlayCreate,
 ) -> Result<trick_plays::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -54,5 +54,5 @@ pub async fn create_play<C: ConnectionTrait + Send + Sync>(
         played_at: Set(now),
     };
 
-    play.insert(conn).await
+    play.insert(txn).await
 }

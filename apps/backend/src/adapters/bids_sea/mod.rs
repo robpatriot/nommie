@@ -1,8 +1,8 @@
-//! SeaORM adapter for bids repository - generic over ConnectionTrait.
+//! SeaORM adapter for bids repository.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait,
-    QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, Order,
+    PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 
 use crate::entities::round_bids;
@@ -48,8 +48,8 @@ pub async fn find_winning_bid<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Create a bid
-pub async fn create_bid<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_bid(
+    txn: &DatabaseTransaction,
     dto: BidCreate,
 ) -> Result<round_bids::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -63,5 +63,5 @@ pub async fn create_bid<C: ConnectionTrait + Send + Sync>(
         created_at: Set(now),
     };
 
-    bid.insert(conn).await
+    bid.insert(txn).await
 }

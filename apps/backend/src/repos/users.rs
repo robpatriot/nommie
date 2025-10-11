@@ -1,6 +1,6 @@
-//! User repository functions for domain layer (generic over ConnectionTrait).
+//! User repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::users_sea as users_adapter;
 use crate::errors::domain::DomainError;
@@ -39,19 +39,19 @@ pub async fn find_credentials_by_email<C: ConnectionTrait + Send + Sync>(
     Ok(credential.map(UserCredentials::from))
 }
 
-pub async fn create_user<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_user(
+    txn: &DatabaseTransaction,
     sub: &str,
     username: &str,
     is_ai: bool,
 ) -> Result<User, DomainError> {
     let dto = users_adapter::UserCreate::new(sub, username, is_ai);
-    let user = users_adapter::create_user(conn, dto).await?;
+    let user = users_adapter::create_user(txn, dto).await?;
     Ok(User::from(user))
 }
 
-pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_credentials(
+    txn: &DatabaseTransaction,
     user_id: i64,
     email: &str,
     google_sub: Option<&str>,
@@ -60,12 +60,12 @@ pub async fn create_credentials<C: ConnectionTrait + Send + Sync>(
     if let Some(sub) = google_sub {
         dto = dto.with_google_sub(sub);
     }
-    let credential = users_adapter::create_credentials(conn, dto).await?;
+    let credential = users_adapter::create_credentials(txn, dto).await?;
     Ok(UserCredentials::from(credential))
 }
 
-pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_credentials(
+    txn: &DatabaseTransaction,
     credentials: UserCredentials,
 ) -> Result<UserCredentials, DomainError> {
     let mut dto = users_adapter::CredentialsUpdate::new(
@@ -82,7 +82,7 @@ pub async fn update_credentials<C: ConnectionTrait + Send + Sync>(
     if let Some(login) = credentials.last_login {
         dto = dto.with_last_login(login);
     }
-    let credential = users_adapter::update_credentials(conn, dto).await?;
+    let credential = users_adapter::update_credentials(txn, dto).await?;
     Ok(UserCredentials::from(credential))
 }
 

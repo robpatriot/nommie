@@ -1,7 +1,8 @@
-//! SeaORM adapter for membership repository - generic over ConnectionTrait.
+//! SeaORM adapter for membership repository.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, NotSet, QueryFilter, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, NotSet,
+    QueryFilter, Set,
 };
 
 use crate::entities::game_players;
@@ -24,8 +25,8 @@ pub async fn find_membership<C: ConnectionTrait + Send + Sync>(
         .await
 }
 
-pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_membership(
+    txn: &DatabaseTransaction,
     dto: MembershipCreate,
 ) -> Result<game_players::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
@@ -39,11 +40,11 @@ pub async fn create_membership<C: ConnectionTrait + Send + Sync>(
         updated_at: Set(now),
     };
 
-    membership_active.insert(conn).await
+    membership_active.insert(txn).await
 }
 
-pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_membership(
+    txn: &DatabaseTransaction,
     dto: MembershipUpdate,
 ) -> Result<game_players::Model, sea_orm::DbErr> {
     let membership = game_players::ActiveModel {
@@ -55,11 +56,11 @@ pub async fn update_membership<C: ConnectionTrait + Send + Sync>(
         created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
-    membership.update(conn).await
+    membership.update(txn).await
 }
 
-pub async fn set_membership_ready<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn set_membership_ready(
+    txn: &DatabaseTransaction,
     dto: MembershipSetReady,
 ) -> Result<game_players::Model, sea_orm::DbErr> {
     let membership = game_players::ActiveModel {
@@ -71,5 +72,5 @@ pub async fn set_membership_ready<C: ConnectionTrait + Send + Sync>(
         created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
-    membership.update(conn).await
+    membership.update(txn).await
 }

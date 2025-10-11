@@ -3,7 +3,7 @@
 use backend::adapters::games_sea::{self, GameCreate, GameUpdateState};
 use backend::entities::games::{GameState, GameVisibility};
 use backend::error::AppError;
-use sea_orm::ConnectionTrait;
+use sea_orm::DatabaseTransaction;
 
 /// GameProbe: sanitized game state for equivalence comparison.
 /// Excludes id (or normalizes it) so two separate creations can be compared.
@@ -44,15 +44,15 @@ impl GameProbe {
 /// 8. Update metadata (name change)
 /// 9. Assert created_at still unchanged, updated_at advanced
 /// 10. Return GameProbe
-pub async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn run_game_flow(
+    txn: &DatabaseTransaction,
     unique_marker: &str,
 ) -> Result<GameProbe, AppError> {
     // 1. Create game (use unique_marker for both join_code and name for easy cleanup)
     let dto = GameCreate::new(unique_marker)
         .with_visibility(GameVisibility::Private)
         .with_name(unique_marker);
-    let created = games_sea::create_game(conn, dto)
+    let created = games_sea::create_game(txn, dto)
         .await
         .map_err(|e| AppError::db(format!("create_game failed: {e}")))?;
 
@@ -74,11 +74,11 @@ pub async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
     let original_updated_at = created.updated_at;
 
     // 2. Fetch by id and by join_code; assert consistency
-    let by_id = games_sea::find_by_id(conn, created.id)
+    let by_id = games_sea::find_by_id(txn, created.id)
         .await
         .map_err(|e| AppError::db(format!("find_by_id failed: {e}")))?
         .expect("game should exist by id");
-    let by_join_code = games_sea::find_by_join_code(conn, unique_marker)
+    let by_join_code = games_sea::find_by_join_code(txn, unique_marker)
         .await
         .map_err(|e| AppError::db(format!("find_by_join_code failed: {e}")))?
         .expect("game should exist by join_code");
@@ -98,7 +98,7 @@ pub async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
 
     // 3. First update: change state to Bidding
     let update_dto = GameUpdateState::new(created.id, GameState::Bidding, created.lock_version);
-    let updated1 = games_sea::update_state(conn, update_dto)
+    let updated1 = games_sea::update_state(txn, update_dto)
         .await
         .map_err(|e| AppError::db(format!("update_state failed: {e}")))?;
 
@@ -122,7 +122,7 @@ pub async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
 
     // 4. Second update: change state to TrickPlay
     let update_dto2 = GameUpdateState::new(created.id, GameState::TrickPlay, updated1.lock_version);
-    let updated2 = games_sea::update_state(conn, update_dto2)
+    let updated2 = games_sea::update_state(txn, update_dto2)
         .await
         .map_err(|e| AppError::db(format!("update_state failed: {e}")))?;
 
@@ -151,7 +151,7 @@ pub async fn run_game_flow<C: ConnectionTrait + Send + Sync>(
         updated2.visibility,
         updated2.lock_version,
     );
-    let updated3 = games_sea::update_metadata(conn, update_meta)
+    let updated3 = games_sea::update_metadata(txn, update_meta)
         .await
         .map_err(|e| AppError::db(format!("update_metadata failed: {e}")))?;
 

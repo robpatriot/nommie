@@ -1,6 +1,6 @@
-//! Tricks repository functions for domain layer (generic over ConnectionTrait).
+//! Tricks repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::tricks_sea as tricks_adapter;
 use crate::entities::round_tricks;
@@ -29,8 +29,8 @@ pub enum Suit {
 // Free functions (generic) for trick operations
 
 /// Create a completed trick
-pub async fn create_trick<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_trick(
+    txn: &DatabaseTransaction,
     round_id: i64,
     trick_no: i16,
     lead_suit: Suit,
@@ -42,7 +42,7 @@ pub async fn create_trick<C: ConnectionTrait + Send + Sync>(
         lead_suit: lead_suit.into(),
         winner_seat,
     };
-    let trick = tricks_adapter::create_trick(conn, dto).await?;
+    let trick = tricks_adapter::create_trick(txn, dto).await?;
     Ok(Trick::from(trick))
 }
 

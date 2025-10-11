@@ -1,6 +1,6 @@
-//! Round repository functions for domain layer (generic over ConnectionTrait).
+//! Round repository functions for domain layer.
 
-use sea_orm::ConnectionTrait;
+use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::rounds_sea as rounds_adapter;
 use crate::entities::game_rounds;
@@ -51,8 +51,8 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Create a new round
-pub async fn create_round<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn create_round(
+    txn: &DatabaseTransaction,
     game_id: i64,
     round_no: i16,
     hand_size: i16,
@@ -64,13 +64,13 @@ pub async fn create_round<C: ConnectionTrait + Send + Sync>(
         hand_size,
         dealer_pos,
     };
-    let round = rounds_adapter::create_round(conn, dto).await?;
+    let round = rounds_adapter::create_round(txn, dto).await?;
     Ok(Round::from(round))
 }
 
 /// Update trump selection for a round
-pub async fn update_trump<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn update_trump(
+    txn: &DatabaseTransaction,
     round_id: i64,
     trump: Trump,
 ) -> Result<Round, DomainError> {
@@ -78,16 +78,16 @@ pub async fn update_trump<C: ConnectionTrait + Send + Sync>(
         round_id,
         trump: trump.into(),
     };
-    let round = rounds_adapter::update_trump(conn, dto).await?;
+    let round = rounds_adapter::update_trump(txn, dto).await?;
     Ok(Round::from(round))
 }
 
 /// Mark a round as completed
-pub async fn complete_round<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
+pub async fn complete_round(
+    txn: &DatabaseTransaction,
     round_id: i64,
 ) -> Result<Round, DomainError> {
-    let round = rounds_adapter::complete_round(conn, round_id).await?;
+    let round = rounds_adapter::complete_round(txn, round_id).await?;
     Ok(Round::from(round))
 }
 
