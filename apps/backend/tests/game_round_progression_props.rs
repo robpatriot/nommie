@@ -109,11 +109,7 @@ async fn test_state_monotonicity() -> Result<(), AppError> {
 }
 
 /// Test: lock_version increments across persisted steps
-///
-/// NOTE: This test is expected to FAIL until service layer implements:
-/// - Bid persistence to database with lock_version updates
 #[tokio::test]
-#[ignore = "Service layer not yet implemented"]
 async fn test_lock_version_increments() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -205,12 +201,7 @@ async fn test_timestamp_invariants() -> Result<(), AppError> {
 }
 
 /// Test: Complete a deterministic first trick
-///
-/// NOTE: This test is expected to FAIL until service layer implements:
-/// - Bidding state transitions to TrumpSelection
-/// - Trump selection logic
 #[tokio::test]
-#[ignore = "Service layer not yet implemented"]
 async fn test_deterministic_first_trick() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -226,11 +217,12 @@ async fn test_deterministic_first_trick() -> Result<(), AppError> {
             // Deal round (will be in Bidding state)
             service.deal_round(txn, game_id).await?;
 
-            // Submit bids for all 4 players (valid bids for hand_size=13)
-            service.submit_bid(txn, game_id, 0, 5).await?;
+            // Submit bids for all 4 players in turn order (dealer=0, so turn order is 1,2,3,0)
+            // Valid bids for hand_size=13
             service.submit_bid(txn, game_id, 1, 6).await?;
             service.submit_bid(txn, game_id, 2, 3).await?;
             service.submit_bid(txn, game_id, 3, 4).await?;
+            service.submit_bid(txn, game_id, 0, 5).await?; // Dealer bids last
 
             // After bidding, should be in TrumpSelection phase
             let game = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
@@ -256,11 +248,7 @@ async fn test_deterministic_first_trick() -> Result<(), AppError> {
 }
 
 /// Test: Granular round progression with state checks
-///
-/// NOTE: This test is expected to FAIL until service layer implements:
-/// - Complete bidding phase with state transitions
 #[tokio::test]
-#[ignore = "Service layer not yet implemented"]
 async fn test_granular_round_progression() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -285,11 +273,11 @@ async fn test_granular_round_progression() -> Result<(), AppError> {
             let game = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
             state_history.push(game.state);
 
-            // Submit bids
-            service.submit_bid(txn, game_id, 0, 4).await?;
+            // Submit bids in turn order (dealer=0, so turn order is 1,2,3,0)
             service.submit_bid(txn, game_id, 1, 5).await?;
             service.submit_bid(txn, game_id, 2, 3).await?;
             service.submit_bid(txn, game_id, 3, 2).await?;
+            service.submit_bid(txn, game_id, 0, 4).await?; // Dealer bids last
 
             let game = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
             state_history.push(game.state);
@@ -420,11 +408,7 @@ async fn test_invalid_bid_fails() -> Result<(), AppError> {
 }
 
 /// Test: Out of turn bid should fail
-///
-/// NOTE: This test is expected to FAIL until service layer implements:
-/// - Turn order validation in submit_bid
 #[tokio::test]
-#[ignore = "Service layer not yet implemented"]
 async fn test_out_of_turn_bid_fails() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)

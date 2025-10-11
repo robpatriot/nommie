@@ -180,6 +180,25 @@ impl GameFlowService {
         // Determine bid_order (how many bids have been placed already)
         let bid_order = bids::count_bids_by_round(txn, round.id).await? as i16;
 
+        // Turn order validation: bidding starts at dealer+1, then proceeds clockwise
+        let dealer_pos = game.dealer_pos().ok_or_else(|| {
+            DomainError::validation(
+                ValidationKind::Other("NO_DEALER".into()),
+                "Dealer position not set",
+            )
+        })?;
+
+        let expected_seat = (dealer_pos + 1 + bid_order) % 4;
+        if player_seat != expected_seat {
+            return Err(DomainError::validation(
+                ValidationKind::OutOfTurn,
+                format!(
+                    "Not your turn to bid. Expected player {expected_seat} (seat {expected_seat}), got player {player_seat}"
+                ),
+            )
+            .into());
+        }
+
         // Dealer bid restriction: if this is the 4th (final) bid, check dealer rule
         if bid_order == 3 {
             // This is the dealer's bid - sum of all bids cannot equal hand_size
@@ -205,6 +224,12 @@ impl GameFlowService {
             game_id,
             player_seat, bid_value, bid_order, "Bid persisted successfully"
         );
+
+        // Bump lock_version on game to reflect bid state change
+        // This ensures each bid increments the version, not just state transitions
+        let updated_game = games_sea::require_game(txn, game_id).await?;
+        let lock_bump = GameUpdateRound::new(game_id, updated_game.lock_version);
+        games_sea::update_round(txn, lock_bump).await?;
 
         // Check if all 4 players have bid
         let bid_count = bids::count_bids_by_round(txn, round.id).await?;
