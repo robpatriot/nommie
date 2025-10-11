@@ -127,8 +127,24 @@ impl GameFlowService {
 
     /// Submit a bid for a player in the current round.
     ///
-    /// Validates phase and bid value, then persists the bid to the database.
+    /// Public method that records the bid and processes game state (transitions + AI).
     pub async fn submit_bid(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        player_seat: i16,
+        bid_value: u8,
+    ) -> Result<(), AppError> {
+        self.submit_bid_internal(txn, game_id, player_seat, bid_value)
+            .await?;
+        self.process_game_state(txn, game_id).await?;
+        Ok(())
+    }
+
+    /// Internal bid submission - just records the bid without processing.
+    ///
+    /// Used by AI loop to avoid recursion. Handlers should use submit_bid() instead.
+    async fn submit_bid_internal(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
@@ -231,30 +247,29 @@ impl GameFlowService {
         let lock_bump = GameUpdateRound::new(game_id, updated_game.lock_version);
         games_sea::update_round(txn, lock_bump).await?;
 
-        // Check if all 4 players have bid
-        let bid_count = bids::count_bids_by_round(txn, round.id).await?;
-        if bid_count == 4 {
-            // All bids placed - transition to Trump Selection
-            let updated_game = games_sea::require_game(txn, game_id).await?;
-            let update = GameUpdateState::new(
-                game_id,
-                DbGameState::TrumpSelection,
-                updated_game.lock_version,
-            );
-            games_sea::update_state(txn, update).await?;
-            info!(game_id, "All bids placed, transitioning to Trump Selection");
-            debug!(game_id, "Transition: Bidding -> TrumpSelection");
-        }
-
         Ok(())
     }
 
     /// Set trump for the current round.
     ///
-    /// The winning bidder (highest bid, earliest wins ties) selects trump.
-    /// Validates that the player_seat matches the winning bidder.
-    /// Transitions game to TrickPlay phase.
+    /// Public method that sets trump and processes game state (transitions + AI).
     pub async fn set_trump(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        player_seat: i16,
+        trump: rounds::Trump,
+    ) -> Result<(), AppError> {
+        self.set_trump_internal(txn, game_id, player_seat, trump)
+            .await?;
+        self.process_game_state(txn, game_id).await?;
+        Ok(())
+    }
+
+    /// Internal trump setting - just sets trump without processing.
+    ///
+    /// Used by AI loop to avoid recursion. Handlers should use set_trump() instead.
+    async fn set_trump_internal(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
@@ -312,25 +327,36 @@ impl GameFlowService {
         // Set trump on the round
         rounds::update_trump(txn, round.id, trump).await?;
 
-        // Transition to TrickPlay
-        let update = GameUpdateState::new(game_id, DbGameState::TrickPlay, game.lock_version);
-        games_sea::update_state(txn, update).await?;
-
         info!(
             game_id,
             player_seat,
             trump = ?trump,
-            "Trump set by winning bidder, transitioning to Trick Play"
+            "Trump set by winning bidder"
         );
-        debug!(game_id, "Transition: TrumpSelection -> TrickPlay");
 
         Ok(())
     }
 
     /// Play a card for a player in the current trick.
     ///
-    /// Persists the card play to the database.
+    /// Public method that records the card play and processes game state (transitions + AI).
     pub async fn play_card(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        player_seat: i16,
+        card: Card,
+    ) -> Result<(), AppError> {
+        self.play_card_internal(txn, game_id, player_seat, card)
+            .await?;
+        self.process_game_state(txn, game_id).await?;
+        Ok(())
+    }
+
+    /// Internal card play - just records the play without processing.
+    ///
+    /// Used by AI loop to avoid recursion. Handlers should use play_card() instead.
+    async fn play_card_internal(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
@@ -408,17 +434,11 @@ impl GameFlowService {
             "Card play persisted successfully"
         );
 
-        // Check if trick is complete (4 plays)
-        let play_count = plays::count_plays_by_trick(txn, trick.id).await?;
-        if play_count == 4 {
-            // Trick complete - auto-resolve it
-            debug!(
-                game_id,
-                trick_no = current_trick_no,
-                "Trick complete, auto-resolving"
-            );
-            self.resolve_trick(txn, game_id).await?;
-        }
+        // Bump lock_version on game to reflect card play state change
+        // This ensures each card play increments the version (consistent with bid behavior)
+        let updated_game = games_sea::require_game(txn, game_id).await?;
+        let lock_bump = GameUpdateRound::new(game_id, updated_game.lock_version);
+        games_sea::update_round(txn, lock_bump).await?;
 
         Ok(())
     }
@@ -817,175 +837,325 @@ impl GameFlowService {
             info!(game_id, "All players ready, starting game");
             // Deal first round
             self.deal_round(txn, game_id).await?;
-            // Process AI turns if needed
-            self.process_ai_turns(txn, game_id).await?;
+            // Process game state to handle transitions and AI actions
+            self.process_game_state(txn, game_id).await?;
         }
 
         Ok(())
     }
 
-    /// Process AI turns in a loop until a human player's turn or game phase change.
+    /// Process game state after any action or transition.
     ///
-    /// This orchestrator:
-    /// 1. Checks whose turn it is (or what action is needed)
-    /// 2. If it's an AI player, triggers their action
-    /// 3. Repeats until it's a human's turn or the phase requires no immediate action
+    /// This is the core orchestrator that:
+    /// 1. Checks if a state transition is needed and applies it
+    /// 2. Checks if an AI player needs to act and executes the action
+    /// 3. Loops until no more transitions or AI actions are needed
     ///
-    /// Includes retry logic and timeout protection.
-    pub async fn process_ai_turns(
+    /// This is a loop-based approach to avoid deep recursion and stack overflow.
+    pub async fn process_game_state(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
+        const MAX_ITERATIONS: usize = 2000; // Allow for full 26-round game with all actions
+
+        for _iteration in 0..MAX_ITERATIONS {
+            let game = games_sea::require_game(txn, game_id).await?;
+
+            // Priority 1: Check if we need a state transition
+            if self.check_and_apply_transition_internal(txn, &game).await? {
+                // Transition happened, loop again
+                continue;
+            }
+
+            // Priority 2: Check if an AI needs to act
+            if self.check_and_execute_ai_action(txn, &game).await? {
+                // AI acted, loop again
+                continue;
+            }
+
+            // Nothing to do - we're done
+            return Ok(());
+        }
+
+        Err(AppError::internal(format!(
+            "process_game_state exceeded max iterations {MAX_ITERATIONS}"
+        )))
+    }
+
+    /// Check if current game state requires a transition and apply it.
+    ///
+    /// Returns true if a transition was applied.
+    /// Does NOT call process_game_state - the caller loops instead.
+    async fn check_and_apply_transition_internal(
+        &self,
+        txn: &DatabaseTransaction,
+        game: &crate::entities::games::Model,
+    ) -> Result<bool, AppError> {
+        use crate::entities::games::GameState as DbGameState;
+
+        match game.state {
+            DbGameState::Bidding => {
+                // Check if all 4 bids are in -> transition to TrumpSelection
+                let current_round_no = game.current_round.ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("NO_ROUND".into()),
+                        "No current round",
+                    )
+                })?;
+                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
+                    .await?
+                    .ok_or_else(|| {
+                        DomainError::validation(
+                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                            "Round not found",
+                        )
+                    })?;
+
+                let bid_count = bids::count_bids_by_round(txn, round.id).await?;
+                if bid_count == 4 {
+                    // All bids placed - transition to Trump Selection
+                    let update = GameUpdateState::new(
+                        game.id,
+                        DbGameState::TrumpSelection,
+                        game.lock_version,
+                    );
+                    games_sea::update_state(txn, update).await?;
+                    info!(game.id, "All bids placed, transitioning to Trump Selection");
+                    debug!(game.id, "Transition: Bidding -> TrumpSelection");
+                    return Ok(true);
+                }
+            }
+            DbGameState::TrumpSelection => {
+                // Check if trump is set -> transition to TrickPlay
+                let current_round_no = game.current_round.ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("NO_ROUND".into()),
+                        "No current round",
+                    )
+                })?;
+                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
+                    .await?
+                    .ok_or_else(|| {
+                        DomainError::validation(
+                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                            "Round not found",
+                        )
+                    })?;
+
+                if round.trump.is_some() {
+                    // Trump is set - transition to TrickPlay
+                    let updated_game = games_sea::require_game(txn, game.id).await?;
+                    let update = GameUpdateState::new(
+                        game.id,
+                        DbGameState::TrickPlay,
+                        updated_game.lock_version,
+                    );
+                    games_sea::update_state(txn, update).await?;
+                    info!(game.id, "Trump set, transitioning to Trick Play");
+                    debug!(game.id, "Transition: TrumpSelection -> TrickPlay");
+                    return Ok(true);
+                }
+            }
+            DbGameState::TrickPlay => {
+                // Check if current trick is complete (4 plays) -> resolve trick
+                let current_round_no = game.current_round.ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("NO_ROUND".into()),
+                        "No current round",
+                    )
+                })?;
+                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
+                    .await?
+                    .ok_or_else(|| {
+                        DomainError::validation(
+                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                            "Round not found",
+                        )
+                    })?;
+
+                if let Some(trick) =
+                    tricks::find_by_round_and_trick(txn, round.id, game.current_trick_no).await?
+                {
+                    let play_count = plays::count_plays_by_trick(txn, trick.id).await?;
+                    if play_count == 4 {
+                        // Trick complete - resolve it
+                        debug!(
+                            game.id,
+                            trick_no = game.current_trick_no,
+                            "Trick complete, resolving"
+                        );
+                        self.resolve_trick(txn, game.id).await?;
+                        // Note: resolve_trick will call process_game_state
+                        return Ok(true);
+                    }
+                }
+            }
+            DbGameState::Scoring => {
+                // Check if round is scored (completed_at set) -> advance to next round
+                let current_round_no = game.current_round.ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("NO_ROUND".into()),
+                        "No current round",
+                    )
+                })?;
+                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
+                    .await?
+                    .ok_or_else(|| {
+                        DomainError::validation(
+                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                            "Round not found",
+                        )
+                    })?;
+
+                if round.completed_at.is_some() {
+                    // Round scored - advance to next round
+                    self.advance_to_next_round(txn, game.id).await?;
+                    // Note: advance_to_next_round will call process_game_state
+                    return Ok(true);
+                } else {
+                    // Need to score the round first
+                    self.score_round(txn, game.id).await?;
+                    // Note: score_round will call process_game_state
+                    return Ok(true);
+                }
+            }
+            DbGameState::BetweenRounds => {
+                // Automatically deal next round
+                self.deal_round(txn, game.id).await?;
+                // Note: deal_round will call process_game_state
+                return Ok(true);
+            }
+            DbGameState::Lobby
+            | DbGameState::Dealing
+            | DbGameState::Completed
+            | DbGameState::Abandoned => {
+                // No automatic transitions
+            }
+        }
+
+        Ok(false)
+    }
+
+    /// Check if an AI player needs to act and execute the action.
+    ///
+    /// Returns true if an AI action was executed (which will trigger recursive processing).
+    async fn check_and_execute_ai_action(
+        &self,
+        txn: &DatabaseTransaction,
+        game: &crate::entities::games::Model,
+    ) -> Result<bool, AppError> {
         use sea_orm::{EntityTrait, JoinType, QuerySelect, RelationTrait};
 
         use crate::ai::create_ai;
         use crate::entities::ai_profiles;
         use crate::repos::memberships;
 
-        const MAX_RETRIES_PER_ACTION: usize = 3;
-        const MAX_NO_PROGRESS_ITERATIONS: usize = 100; // Set high to allow full game
+        // Determine whose turn it is
+        let action_info = self.determine_next_action(txn, game).await?;
 
-        let mut last_state = None;
-        let mut no_progress_count = 0;
+        let Some((player_seat, action_type)) = action_info else {
+            return Ok(false); // No action needed
+        };
 
-        for iteration in 0.. {
-            // Load game state
-            let game = games_sea::require_game(txn, game_id).await?;
-
-            // Track state changes to detect infinite loops
-            let current_state_key = (
-                game.state.clone(),
-                game.current_round,
-                game.current_trick_no,
+        // Check if this player is an AI
+        let memberships = memberships::find_all_by_game(txn, game.id).await?;
+        let Some(player) = memberships
+            .iter()
+            .find(|m| m.turn_order == player_seat as i32)
+        else {
+            // No player found at this seat (test scenario or empty game)
+            // Stop AI processing - human needs to act or game setup incomplete
+            debug!(
+                game.id,
+                player_seat, "No player found at seat, stopping AI processing"
             );
-            if last_state == Some(current_state_key.clone()) {
-                no_progress_count += 1;
-                if no_progress_count > MAX_NO_PROGRESS_ITERATIONS {
-                    return Err(AppError::internal(format!(
-                        "AI processing stalled: no progress after {} iterations (state: {:?}, round: {:?})",
-                        MAX_NO_PROGRESS_ITERATIONS, game.state, game.current_round
-                    )));
-                }
-            } else {
-                no_progress_count = 0;
-                last_state = Some(current_state_key);
-            }
+            return Ok(false);
+        };
 
-            // Determine what action is needed and whose turn it is
-            let action_info = self.determine_next_action(txn, &game).await?;
+        // Check if user is AI and get their AI profile
+        let ai_info = crate::entities::users::Entity::find_by_id(player.user_id)
+            .join(
+                JoinType::LeftJoin,
+                crate::entities::users::Relation::AiProfiles.def(),
+            )
+            .select_also(ai_profiles::Entity)
+            .one(txn)
+            .await?;
 
-            let Some((player_seat, action_type)) = action_info else {
-                // No action right now - check if we should exit or continue
-                if game.state == DbGameState::Completed || game.state == DbGameState::Abandoned {
-                    debug!(game_id, iteration, "Game complete, exiting");
-                    return Ok(());
-                }
-                // State transition happened, continue loop
-                debug!(game_id, iteration, state = ?game.state, "No action, continuing for state transition");
-                continue;
-            };
+        let Some((user, maybe_profile)) = ai_info else {
+            return Err(DomainError::validation(
+                ValidationKind::Other("USER_NOT_FOUND".into()),
+                "User not found",
+            )
+            .into());
+        };
 
-            // Check if this player is an AI
-            let memberships = memberships::find_all_by_game(txn, game_id).await?;
-            let player = memberships
-                .iter()
-                .find(|m| m.turn_order == player_seat as i32)
-                .ok_or_else(|| {
-                    DomainError::validation(
-                        ValidationKind::Other("PLAYER_NOT_FOUND".into()),
-                        format!("Player at seat {player_seat} not found"),
-                    )
-                })?;
-
-            // Check if user is AI and get their AI profile
-            let ai_info = crate::entities::users::Entity::find_by_id(player.user_id)
-                .join(
-                    JoinType::LeftJoin,
-                    crate::entities::users::Relation::AiProfiles.def(),
-                )
-                .select_also(ai_profiles::Entity)
-                .one(txn)
-                .await?;
-
-            let Some((user, maybe_profile)) = ai_info else {
-                return Err(DomainError::validation(
-                    ValidationKind::Other("USER_NOT_FOUND".into()),
-                    "User not found",
-                )
-                .into());
-            };
-
-            if !user.is_ai {
-                // Human player's turn - stop processing
-                debug!(
-                    game_id,
-                    player_seat, iteration, "Human player's turn, stopping AI processing"
-                );
-                return Ok(());
-            }
-
-            // This is an AI player - trigger their action
-            let profile = maybe_profile.ok_or_else(|| {
-                DomainError::validation(
-                    ValidationKind::Other("AI_PROFILE_NOT_FOUND".into()),
-                    format!("AI profile not found for user {}", user.id),
-                )
-            })?;
-
-            info!(
-                game_id,
-                player_seat,
-                action = ?action_type,
-                iteration,
-                "Processing AI turn"
+        if !user.is_ai {
+            // Human player's turn - stop processing
+            debug!(
+                game.id,
+                player_seat, "Human player's turn, stopping AI processing"
             );
-
-            // Create AI player
-            let ai_type = profile.playstyle.as_deref().unwrap_or("random");
-            let ai = create_ai(ai_type, profile.config.as_ref())
-                .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
-
-            // Execute action with retries
-            let mut last_retry_result = Ok(());
-            for retry in 0..MAX_RETRIES_PER_ACTION {
-                match self
-                    .execute_ai_action(txn, game_id, player_seat, action_type, ai.as_ref())
-                    .await
-                {
-                    Ok(()) => {
-                        info!(
-                            game_id,
-                            player_seat,
-                            action = ?action_type,
-                            retry,
-                            "AI action executed successfully"
-                        );
-                        last_retry_result = Ok(());
-                        break;
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            game_id,
-                            player_seat,
-                            retry,
-                            error = ?e,
-                            "AI action failed"
-                        );
-                        last_retry_result = Err(e);
-                        if retry == MAX_RETRIES_PER_ACTION - 1 {
-                            // All retries exhausted - for now, fail the game
-                            // TODO: implement fallback random play for production
-                            return last_retry_result;
-                        }
-                    }
-                }
-            }
-            last_retry_result?;
+            return Ok(false);
         }
 
-        // Loop should exit via return statements, this is unreachable
-        unreachable!("AI processing loop should exit via return statements")
+        // This is an AI player - trigger their action
+        let profile = maybe_profile.ok_or_else(|| {
+            DomainError::validation(
+                ValidationKind::Other("AI_PROFILE_NOT_FOUND".into()),
+                format!("AI profile not found for user {}", user.id),
+            )
+        })?;
+
+        info!(
+        game.id,
+            player_seat,
+            action = ?action_type,
+            "Processing AI turn"
+        );
+
+        // Create AI player
+        let ai_type = profile.playstyle.as_deref().unwrap_or("random");
+        let ai = create_ai(ai_type, profile.config.as_ref())
+            .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
+
+        // Execute action with retries
+        const MAX_RETRIES_PER_ACTION: usize = 3;
+        let mut last_error = None;
+
+        for retry in 0..MAX_RETRIES_PER_ACTION {
+            match self
+                .execute_ai_action(txn, game.id, player_seat, action_type, ai.as_ref())
+                .await
+            {
+                Ok(()) => {
+                    info!(
+                    game.id,
+                        player_seat,
+                        action = ?action_type,
+                        retry,
+                        "AI action executed successfully"
+                    );
+                    // Action method will call process_game_state, continuing the chain
+                    return Ok(true);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                    game.id,
+                        player_seat,
+                        retry,
+                        error = ?e,
+                        "AI action failed"
+                    );
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        // All retries exhausted
+        Err(last_error
+            .unwrap_or_else(|| AppError::internal("AI action failed with no error details")))
     }
 
     /// Determine what action is needed next and whose turn it is.
@@ -1001,15 +1171,8 @@ impl GameFlowService {
         use crate::repos::{bids, tricks};
 
         match game.state {
-            DbGameState::Lobby | DbGameState::Dealing => {
-                // Waiting for external trigger
-                Ok(None)
-            }
-            DbGameState::BetweenRounds => {
-                // Automatically deal next round for AI games
-                self.deal_round(txn, game.id).await?;
-                // Don't return an action; let the loop re-check
-                // by returning a sentinel value
+            DbGameState::Lobby | DbGameState::Dealing | DbGameState::BetweenRounds => {
+                // No action needed - check_and_apply_transition handles state changes
                 Ok(None)
             }
             DbGameState::Bidding => {
@@ -1127,14 +1290,10 @@ impl GameFlowService {
                     Ok(Some((leader, ActionType::Play)))
                 }
             }
-            DbGameState::Scoring => {
-                // Need to score the round
-                self.score_round(txn, game.id).await?;
-                self.advance_to_next_round(txn, game.id).await?;
-                // Return None to let loop re-evaluate
+            DbGameState::Scoring | DbGameState::Completed | DbGameState::Abandoned => {
+                // No action needed - check_and_apply_transition handles Scoring state
                 Ok(None)
             }
-            DbGameState::Completed | DbGameState::Abandoned => Ok(None),
         }
     }
 
@@ -1155,7 +1314,9 @@ impl GameFlowService {
         match action_type {
             ActionType::Bid => {
                 let bid = ai.choose_bid(&state)?;
-                self.submit_bid(txn, game_id, player_seat, bid).await?;
+                // Use internal version to avoid recursion (loop handles processing)
+                self.submit_bid_internal(txn, game_id, player_seat, bid)
+                    .await?;
             }
             ActionType::Trump => {
                 let trump_suit = ai.choose_trump(&state)?;
@@ -1166,11 +1327,15 @@ impl GameFlowService {
                     crate::domain::Suit::Hearts => rounds::Trump::Hearts,
                     crate::domain::Suit::Spades => rounds::Trump::Spades,
                 };
-                self.set_trump(txn, game_id, player_seat, trump).await?;
+                // Use internal version to avoid recursion (loop handles processing)
+                self.set_trump_internal(txn, game_id, player_seat, trump)
+                    .await?;
             }
             ActionType::Play => {
                 let card = ai.choose_play(&state)?;
-                self.play_card(txn, game_id, player_seat, card).await?;
+                // Use internal version to avoid recursion (loop handles processing)
+                self.play_card_internal(txn, game_id, player_seat, card)
+                    .await?;
             }
         }
 

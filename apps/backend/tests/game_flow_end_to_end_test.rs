@@ -44,16 +44,11 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
             service.submit_bid(txn, game.id, 3, 2).await?;
             service.submit_bid(txn, game.id, 0, 3).await?; // Dealer bids last
 
-            // After 4th bid, should auto-transition to TrumpSelection
-            // (verified by submit_bid logic)
-
             // Step 3: Set trump (winning bidder selects)
             // Player 2 has the highest bid (4), so they must choose trump
             service
                 .set_trump(txn, game.id, 2, rounds::Trump::Hearts)
                 .await?;
-
-            // Should now be in TrickPlay state
 
             // Step 4: Play cards for one complete trick (simplified - just create trick with winner)
             // In a real game, we'd call play_card 4 times
