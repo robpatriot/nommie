@@ -255,7 +255,10 @@ Use these logs to:
 
 **Architecture Notes:**
 
-- Repositories and services are generic over `C: ConnectionTrait`, making them work seamlessly with both pooled connections and transactions
+- Repositories and services choose connection types based on operation semantics:
+  - Single reads and unrelated multi-reads: `ConnectionTrait` (accepts pool or transaction)
+  - Related multi-reads (consistent snapshot): `DatabaseTransaction`
+  - Any mutation: `DatabaseTransaction`
 - All database operations go through `with_txn` or `require_db` for automatic transaction management
 - Error handling follows [RFC 7807 Problem Details](https://www.rfc-editor.org/rfc/rfc7807) format
 - The schema lives in a single init migration under `apps/backend/migration/`
