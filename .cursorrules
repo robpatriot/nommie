@@ -7,25 +7,21 @@ Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and 
 - No commentary in edits — implement directly.
 - Never run any git commands other than diff
 
-## Persistence Design
-- Repos and services are **stateless** and **generic** over `C: ConnectionTrait`.
-- They take `&C`, so the same code works with a `DatabaseConnection` or a `DatabaseTransaction`.
+## Persistence & Transactions
+
+### Repository and Service Design
+- Repos and services are stateless and accept connections as parameters.
 - Only SeaORM adapters depend on SeaORM; services depend only on repo traits.
 
-## Backend Code
-- Handlers return `Result<T, AppError>` — never `HttpResponse`.
-- All DB access via `require_db(&state)` or `with_txn(&state, …)`.
-- Only **SeaORM adapters** may `use sea_orm::*`.
-- Domain modules: no DB or Actix imports.
-- Use enums (not strings) for states, roles, and phases.
-- No `unwrap()` or `expect()` outside tests.
+### Connection Type Requirements
+- Single reads: use `ConnectionTrait`
+- Multiple unrelated reads: use `ConnectionTrait`
+- Multiple related reads (need consistent snapshot): use `DatabaseTransaction`
+- Any mutation: use `DatabaseTransaction`
 
-## String Handling
-- Query/lookup methods: accept `&str` to avoid unnecessary allocations.
-- Mutating operations: take owned `String` (use `Option<String>` when optional).
-- DTO constructors: use `impl Into<String>` for flexible initialization.
+Related data = queries with invariants between them (game + its round + that round's bids; round + its tricks + those tricks' plays).
 
-## Transactions
+### Transaction Execution
 - All DB work runs through `with_txn` or `require_db`.
 - `with_txn` closures return `Result<_, AppError>`.
 - Nested transactions only via `SharedTxn` in tests.
@@ -33,22 +29,34 @@ Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and 
 - Tests: always rollback.
 - Never call `begin`, `commit`, or `rollback` directly.
 
+## Backend Code
+- Handlers return `Result<T, AppError>` — never `HttpResponse`.
+- All DB access via `require_db(&state)` or `with_txn(&state, …)`.
+- Only SeaORM adapters may `use sea_orm::*`.
+- Domain modules: no DB or Actix imports.
+- Use enums (not strings) for states, roles, and phases.
+- No `unwrap()` or `expect()` outside tests.
+
+## String Handling
+- Query/lookup methods: accept `&str`.
+- Mutating operations: take owned `String` (use `Option<String>` when optional).
+- DTO constructors: use `impl Into<String>`.
+
 ## Extractors
 - Allowed: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`.
 - `ValidatedJson<T>` maps validation errors to `AppError` Problem Details.
 
 ## Error Handling
 - Errors follow Problem Details: `{ type, title, status, detail, code, trace_id }`.
-- Create all errors via central `AppError` helpers.
-- `code` comes from the registry (no ad-hoc strings).
+- Create errors via `AppError` helpers.
+- `code` comes from registry (no ad-hoc strings).
 - Never leak raw serde/SQL/OAuth errors.
 
 ## ETags & Caching
-- All mutable endpoints (`PATCH`, `DELETE`) must enforce conditional requests via `If-Match`/`ETag` to prevent lost updates.
-- All safe endpoints (`GET`, `HEAD`) must support `If-None-Match` and return `304 Not Modified` when applicable.
-- `ETag` values must uniquely identify the current state of the resource (e.g., hash of content or `updated_at`).
-- Never issue weak ETags or combine `ETag` with `Last-Modified`.
-- Clients are expected to cache `ETag` responses and resend them for conditional requests.
+- Mutable endpoints (`PATCH`, `DELETE`): enforce `If-Match`/`ETag`.
+- Safe endpoints (`GET`, `HEAD`): support `If-None-Match`, return `304` when applicable.
+- `ETag` must uniquely identify resource state.
+- Never issue weak ETags or combine with `Last-Modified`.
 
 ## Logging
 - Logs must include `trace_id`.
@@ -58,20 +66,16 @@ Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and 
 - `AppState.db` is private — access via `state.db()` / `require_db(&state)`.
 
 ## Schema & Migrations
-- Schema lives in a single init migration under `apps/backend/migration`.
+- Schema lives in single init migration under `apps/backend/migration`.
 - Don't add separate migration files, SQL, or DDL elsewhere.
 
 ## Env & pnpm
-- Source `.env` once per shell session before any pnpm commands:
-  set -a; source .env; set +a
+- Source `.env` once per shell session: `set -a; source .env; set +a`
 - Don't read `DATABASE_URL` directly in code.
 
 ## Testing
 - Tests must be deterministic (seed time/RNG).
 - DB tests use `_test` DB (rollback enforced).
-- Use `SharedTxn` when tests need continuity.
-- Control tests needing committed data must use pooled DB setup.
-- Error assertions: use structured checks (error codes, variants) not string matching.
-  - ✅ `assert_eq!(err.code(), ErrorCode::PhaseMismatch)`
-  - ✅ `matches!(err, DomainError::Validation(ValidationKind::InvalidSeat, _))`
-  - ❌ `assert!(err.to_string().contains("phase mismatch"))`
+- `SharedTxn` for tests needing continuity.
+- Committed data tests use pooled DB setup.
+- Error assertions: use structured checks (error codes, variants), not string matching.
