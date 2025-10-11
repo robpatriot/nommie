@@ -65,61 +65,6 @@ async fn setup_game_with_players<C: ConnectionTrait>(
 }
 
 #[tokio::test]
-async fn test_happy_path() -> Result<(), AppError> {
-    let state = build_state()
-        .with_db(DbProfile::Test)
-        .build()
-        .await
-        .expect("build test state with DB");
-
-    with_txn(None, &state, |txn| {
-        Box::pin(async move {
-            // Arrange: create game with 4 ready players
-            let game_id = setup_game_with_players(txn, 42).await?;
-
-            // Capture initial state
-            let game_before = games::Entity::find_by_id(game_id)
-                .one(txn)
-                .await?
-                .expect("game should exist");
-            let created_at_before = game_before.created_at;
-            let lock_version_before = game_before.lock_version;
-
-            // Act: run happy path (stub implementation for now)
-            let service = GameFlowService::new();
-            let outcome = service.run_happy_path(txn, game_id).await?;
-
-            // Assert: outcome is deterministic
-            assert_eq!(outcome.game_id, game_id);
-            assert_eq!(outcome.rounds_played, 1);
-
-            // Assert: final state advanced
-            let game_after = games::Entity::find_by_id(game_id)
-                .one(txn)
-                .await?
-                .expect("game should exist");
-
-            // State should have advanced from Lobby
-            assert_ne!(game_after.state, GameState::Lobby);
-
-            // created_at should be stable
-            assert_eq!(game_after.created_at, created_at_before);
-
-            // updated_at should have changed
-            assert!(game_after.updated_at > created_at_before);
-
-            // lock_version should have increased
-            assert!(game_after.lock_version > lock_version_before);
-
-            Ok::<_, AppError>(())
-        })
-    })
-    .await?;
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn test_deal_round_transitions_correctly() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)

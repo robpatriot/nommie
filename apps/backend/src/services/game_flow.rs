@@ -15,14 +15,6 @@ use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::{bids, hands, plays, rounds, scores, tricks};
 
-/// Result type for game flow operations containing final outcome summary.
-#[derive(Debug, Clone)]
-pub struct GameOutcome {
-    pub game_id: i64,
-    pub final_scores: [i16; 4],
-    pub rounds_played: u8,
-}
-
 /// Game flow service - generic over ConnectionTrait for transaction support.
 pub struct GameFlowService;
 
@@ -745,55 +737,6 @@ impl GameFlowService {
         }
 
         Ok(())
-    }
-
-    /// Test/bot helper: run a deterministic happy path for a single round.
-    ///
-    /// This composes the transition methods to execute a minimal flow:
-    /// deal -> bid (all players) -> trump select -> play tricks -> score -> advance.
-    ///
-    /// Returns outcome summary for assertions.
-    ///
-    /// NOTE: This is a stub implementation demonstrating the structure.
-    /// Full implementation requires complete state persistence.
-    pub async fn run_happy_path(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-    ) -> Result<GameOutcome, AppError> {
-        info!(game_id, "Starting happy path test flow");
-
-        // Load game to validate it exists
-        let _game = games_sea::require_game(txn, game_id).await?;
-
-        // Deal first round
-        self.deal_round(txn, game_id).await?;
-
-        // Stub bidding: all players bid 1 (placeholder)
-        // In a real implementation, this would loop through memberships and call submit_bid
-        // For now, we just transition the state manually for demo purposes
-
-        // Stub trump selection and trick play
-        // This would require full GameState persistence to be meaningful
-
-        // Reload game to get updated lock_version after dealing
-        let game = games_sea::require_game(txn, game_id).await?;
-
-        // Transition to scoring
-        let update = GameUpdateState::new(game_id, DbGameState::Scoring, game.lock_version);
-        games_sea::update_state(txn, update).await?;
-
-        // Advance to next round or complete
-        self.advance_to_next_round(txn, game_id).await?;
-
-        info!(game_id, "Happy path test flow completed");
-
-        // Return stub outcome
-        Ok(GameOutcome {
-            game_id,
-            final_scores: [0, 0, 0, 0],
-            rounds_played: 1,
-        })
     }
 
     /// Mark a player as ready and check if game should start.
