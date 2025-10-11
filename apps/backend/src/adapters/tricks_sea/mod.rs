@@ -65,3 +65,21 @@ pub async fn create_trick(
 
     trick.insert(txn).await
 }
+
+/// Update trick winner
+pub async fn update_winner(
+    txn: &DatabaseTransaction,
+    trick_id: i64,
+    winner_seat: i16,
+) -> Result<round_tricks::Model, sea_orm::DbErr> {
+    let trick = round_tricks::ActiveModel {
+        id: Set(trick_id),
+        round_id: sea_orm::NotSet,
+        trick_no: sea_orm::NotSet,
+        lead_suit: sea_orm::NotSet,
+        winner_seat: Set(winner_seat),
+        created_at: sea_orm::NotSet,
+    };
+
+    trick.update(txn).await
+}

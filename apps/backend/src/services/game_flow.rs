@@ -411,10 +411,13 @@ impl GameFlowService {
         // Check if trick is complete (4 plays)
         let play_count = plays::count_plays_by_trick(txn, trick.id).await?;
         if play_count == 4 {
-            // Trick complete - need to determine winner
-            // For now, call score_trick which will handle winner determination
-            // In a full implementation, this would be handled automatically
-            debug!(game_id, trick_no = current_trick_no, "Trick complete");
+            // Trick complete - auto-resolve it
+            debug!(
+                game_id,
+                trick_no = current_trick_no,
+                "Trick complete, auto-resolving"
+            );
+            self.resolve_trick(txn, game_id).await?;
         }
 
         Ok(())
@@ -524,15 +527,20 @@ impl GameFlowService {
             "Trick winner determined"
         );
 
+        // Update trick with winner
+        tricks::update_winner(txn, trick.id, winner_seat).await?;
+
         // Advance to next trick or Scoring phase
         let next_trick_no = current_trick_no + 1;
         if next_trick_no >= hand_size {
-            // All tricks complete - ready for scoring
+            // All tricks complete - transition to Scoring
             info!(
                 game_id,
                 trick_no = current_trick_no,
-                "All tricks complete, ready for scoring"
+                "All tricks complete, transitioning to Scoring"
             );
+            let update = GameUpdateState::new(game_id, DbGameState::Scoring, game.lock_version);
+            games_sea::update_state(txn, update).await?;
         } else {
             // Advance to next trick
             let update = GameUpdateRound::new(game_id, game.lock_version)
@@ -868,9 +876,14 @@ impl GameFlowService {
             let action_info = self.determine_next_action(txn, &game).await?;
 
             let Some((player_seat, action_type)) = action_info else {
-                // No action needed - exit
-                debug!(game_id, iteration, state = ?game.state, "No AI action needed, exiting");
-                return Ok(());
+                // No action right now - check if we should exit or continue
+                if game.state == DbGameState::Completed || game.state == DbGameState::Abandoned {
+                    debug!(game_id, iteration, "Game complete, exiting");
+                    return Ok(());
+                }
+                // State transition happened, continue loop
+                debug!(game_id, iteration, state = ?game.state, "No action, continuing for state transition");
+                continue;
             };
 
             // Check if this player is an AI
@@ -1078,19 +1091,12 @@ impl GameFlowService {
                     tricks::find_by_round_and_trick(txn, round.id, current_trick_no).await?;
 
                 if let Some(trick) = maybe_trick {
+                    // Trick exists - determine next player based on current plays
                     let play_count = plays::count_plays_by_trick(txn, trick.id).await? as i16;
-                    if play_count >= 4 {
-                        // Trick complete - need to resolve it
-                        self.resolve_trick(txn, game.id).await?;
-                        // Return None to let loop re-evaluate
-                        Ok(None)
-                    } else {
-                        // Determine next player
-                        let all_plays = plays::find_all_by_trick(txn, trick.id).await?;
-                        let first_player = all_plays.first().map(|p| p.player_seat).unwrap_or(0);
-                        let next_seat = (first_player + play_count) % 4;
-                        Ok(Some((next_seat, ActionType::Play)))
-                    }
+                    let all_plays = plays::find_all_by_trick(txn, trick.id).await?;
+                    let first_player = all_plays.first().map(|p| p.player_seat).unwrap_or(0);
+                    let next_seat = (first_player + play_count) % 4;
+                    Ok(Some((next_seat, ActionType::Play)))
                 } else {
                     // First play of trick - need to determine leader
                     let leader = if current_trick_no == 0 {

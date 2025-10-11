@@ -74,6 +74,16 @@ pub async fn count_tricks_by_round<C: ConnectionTrait + Send + Sync>(
     Ok(count)
 }
 
+/// Update trick winner
+pub async fn update_winner(
+    txn: &DatabaseTransaction,
+    trick_id: i64,
+    winner_seat: i16,
+) -> Result<(), DomainError> {
+    tricks_adapter::update_winner(txn, trick_id, winner_seat).await?;
+    Ok(())
+}
+
 // Conversions between SeaORM models and domain models
 
 impl From<round_tricks::Model> for Trick {
