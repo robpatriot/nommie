@@ -767,6 +767,417 @@ impl GameFlowService {
             rounds_played: 1,
         })
     }
+
+    /// Mark a player as ready and check if game should start.
+    ///
+    /// If all players are ready after this call, automatically deals the first round.
+    pub async fn mark_ready(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        user_id: i64,
+    ) -> Result<(), AppError> {
+        use crate::adapters::memberships_sea;
+        use crate::repos::memberships;
+
+        info!(game_id, user_id, "Marking player ready");
+
+        // Find membership
+        let membership = memberships::find_membership(txn, game_id, user_id)
+            .await?
+            .ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("NOT_IN_GAME".into()),
+                    "Player not in game",
+                )
+            })?;
+
+        // Mark ready
+        let dto = memberships_sea::MembershipSetReady {
+            id: membership.id,
+            is_ready: true,
+        };
+        memberships_sea::set_membership_ready(txn, dto).await?;
+
+        info!(game_id, user_id, "Player marked ready");
+
+        // Check if all players are ready
+        let all_memberships = memberships::find_all_by_game(txn, game_id).await?;
+        let all_ready = all_memberships.iter().all(|m| m.is_ready);
+
+        if all_ready && all_memberships.len() == 4 {
+            info!(game_id, "All players ready, starting game");
+            // Deal first round
+            self.deal_round(txn, game_id).await?;
+            // Process AI turns if needed
+            self.process_ai_turns(txn, game_id).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Process AI turns in a loop until a human player's turn or game phase change.
+    ///
+    /// This orchestrator:
+    /// 1. Checks whose turn it is (or what action is needed)
+    /// 2. If it's an AI player, triggers their action
+    /// 3. Repeats until it's a human's turn or the phase requires no immediate action
+    ///
+    /// Includes retry logic and timeout protection.
+    pub async fn process_ai_turns(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+    ) -> Result<(), AppError> {
+        use sea_orm::{EntityTrait, JoinType, QuerySelect, RelationTrait};
+
+        use crate::ai::create_ai;
+        use crate::entities::ai_profiles;
+        use crate::repos::memberships;
+
+        const MAX_RETRIES_PER_ACTION: usize = 3;
+        const MAX_NO_PROGRESS_ITERATIONS: usize = 100; // Set high to allow full game
+
+        let mut last_state = None;
+        let mut no_progress_count = 0;
+
+        for iteration in 0.. {
+            // Load game state
+            let game = games_sea::require_game(txn, game_id).await?;
+
+            // Track state changes to detect infinite loops
+            let current_state_key = (
+                game.state.clone(),
+                game.current_round,
+                game.current_trick_no,
+            );
+            if last_state == Some(current_state_key.clone()) {
+                no_progress_count += 1;
+                if no_progress_count > MAX_NO_PROGRESS_ITERATIONS {
+                    return Err(AppError::internal(format!(
+                        "AI processing stalled: no progress after {} iterations (state: {:?}, round: {:?})",
+                        MAX_NO_PROGRESS_ITERATIONS, game.state, game.current_round
+                    )));
+                }
+            } else {
+                no_progress_count = 0;
+                last_state = Some(current_state_key);
+            }
+
+            // Determine what action is needed and whose turn it is
+            let action_info = self.determine_next_action(txn, &game).await?;
+
+            let Some((player_seat, action_type)) = action_info else {
+                // No action needed - exit
+                debug!(game_id, iteration, state = ?game.state, "No AI action needed, exiting");
+                return Ok(());
+            };
+
+            // Check if this player is an AI
+            let memberships = memberships::find_all_by_game(txn, game_id).await?;
+            let player = memberships
+                .iter()
+                .find(|m| m.turn_order == player_seat as i32)
+                .ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("PLAYER_NOT_FOUND".into()),
+                        format!("Player at seat {player_seat} not found"),
+                    )
+                })?;
+
+            // Check if user is AI and get their AI profile
+            let ai_info = crate::entities::users::Entity::find_by_id(player.user_id)
+                .join(
+                    JoinType::LeftJoin,
+                    crate::entities::users::Relation::AiProfiles.def(),
+                )
+                .select_also(ai_profiles::Entity)
+                .one(txn)
+                .await?;
+
+            let Some((user, maybe_profile)) = ai_info else {
+                return Err(DomainError::validation(
+                    ValidationKind::Other("USER_NOT_FOUND".into()),
+                    "User not found",
+                )
+                .into());
+            };
+
+            if !user.is_ai {
+                // Human player's turn - stop processing
+                debug!(
+                    game_id,
+                    player_seat, iteration, "Human player's turn, stopping AI processing"
+                );
+                return Ok(());
+            }
+
+            // This is an AI player - trigger their action
+            let profile = maybe_profile.ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("AI_PROFILE_NOT_FOUND".into()),
+                    format!("AI profile not found for user {}", user.id),
+                )
+            })?;
+
+            info!(
+                game_id,
+                player_seat,
+                action = ?action_type,
+                iteration,
+                "Processing AI turn"
+            );
+
+            // Create AI player
+            let ai_type = profile.playstyle.as_deref().unwrap_or("random");
+            let ai = create_ai(ai_type, profile.config.as_ref())
+                .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
+
+            // Execute action with retries
+            let mut last_retry_result = Ok(());
+            for retry in 0..MAX_RETRIES_PER_ACTION {
+                match self
+                    .execute_ai_action(txn, game_id, player_seat, action_type, ai.as_ref())
+                    .await
+                {
+                    Ok(()) => {
+                        info!(
+                            game_id,
+                            player_seat,
+                            action = ?action_type,
+                            retry,
+                            "AI action executed successfully"
+                        );
+                        last_retry_result = Ok(());
+                        break;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            game_id,
+                            player_seat,
+                            retry,
+                            error = ?e,
+                            "AI action failed"
+                        );
+                        last_retry_result = Err(e);
+                        if retry == MAX_RETRIES_PER_ACTION - 1 {
+                            // All retries exhausted - for now, fail the game
+                            // TODO: implement fallback random play for production
+                            return last_retry_result;
+                        }
+                    }
+                }
+            }
+            last_retry_result?;
+        }
+
+        // Loop should exit via return statements, this is unreachable
+        unreachable!("AI processing loop should exit via return statements")
+    }
+
+    /// Determine what action is needed next and whose turn it is.
+    ///
+    /// Returns None if no action is needed (game complete or waiting).
+    /// Returns Some((seat, action_type)) if an action is needed.
+    async fn determine_next_action(
+        &self,
+        txn: &DatabaseTransaction,
+        game: &crate::entities::games::Model,
+    ) -> Result<Option<(i16, ActionType)>, AppError> {
+        use crate::entities::games::GameState as DbGameState;
+        use crate::repos::{bids, tricks};
+
+        match game.state {
+            DbGameState::Lobby | DbGameState::Dealing => {
+                // Waiting for external trigger
+                Ok(None)
+            }
+            DbGameState::BetweenRounds => {
+                // Automatically deal next round for AI games
+                self.deal_round(txn, game.id).await?;
+                // Don't return an action; let the loop re-check
+                // by returning a sentinel value
+                Ok(None)
+            }
+            DbGameState::Bidding => {
+                // Determine whose turn to bid
+                let current_round_no = game.current_round.ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("NO_ROUND".into()),
+                        "No current round",
+                    )
+                })?;
+                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
+                    .await?
+                    .ok_or_else(|| {
+                        DomainError::validation(
+                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                            "Round not found",
+                        )
+                    })?;
+
+                let bid_count = bids::count_bids_by_round(txn, round.id).await? as i16;
+                if bid_count >= 4 {
+                    // All bids placed - no action needed (state transition will happen)
+                    Ok(None)
+                } else {
+                    let dealer_pos = game.dealer_pos().unwrap_or(0);
+                    let next_seat = (dealer_pos + 1 + bid_count) % 4;
+                    Ok(Some((next_seat, ActionType::Bid)))
+                }
+            }
+            DbGameState::TrumpSelection => {
+                // Winning bidder needs to select trump
+                let current_round_no = game.current_round.ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("NO_ROUND".into()),
+                        "No current round",
+                    )
+                })?;
+                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
+                    .await?
+                    .ok_or_else(|| {
+                        DomainError::validation(
+                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                            "Round not found",
+                        )
+                    })?;
+
+                let winning_bid =
+                    bids::find_winning_bid(txn, round.id)
+                        .await?
+                        .ok_or_else(|| {
+                            DomainError::validation(
+                                ValidationKind::Other("NO_WINNING_BID".into()),
+                                "No winning bid found",
+                            )
+                        })?;
+
+                Ok(Some((winning_bid.player_seat, ActionType::Trump)))
+            }
+            DbGameState::TrickPlay => {
+                // Determine whose turn to play
+                let current_trick_no = game.current_trick_no;
+                let current_round_no = game.current_round.ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("NO_ROUND".into()),
+                        "No current round",
+                    )
+                })?;
+                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
+                    .await?
+                    .ok_or_else(|| {
+                        DomainError::validation(
+                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
+                            "Round not found",
+                        )
+                    })?;
+
+                // Check if trick exists
+                let maybe_trick =
+                    tricks::find_by_round_and_trick(txn, round.id, current_trick_no).await?;
+
+                if let Some(trick) = maybe_trick {
+                    let play_count = plays::count_plays_by_trick(txn, trick.id).await? as i16;
+                    if play_count >= 4 {
+                        // Trick complete - need to resolve it
+                        self.resolve_trick(txn, game.id).await?;
+                        // Return None to let loop re-evaluate
+                        Ok(None)
+                    } else {
+                        // Determine next player
+                        let all_plays = plays::find_all_by_trick(txn, trick.id).await?;
+                        let first_player = all_plays.first().map(|p| p.player_seat).unwrap_or(0);
+                        let next_seat = (first_player + play_count) % 4;
+                        Ok(Some((next_seat, ActionType::Play)))
+                    }
+                } else {
+                    // First play of trick - need to determine leader
+                    let leader = if current_trick_no == 0 {
+                        // First trick: winning bidder leads
+                        let winning_bid =
+                            bids::find_winning_bid(txn, round.id)
+                                .await?
+                                .ok_or_else(|| {
+                                    DomainError::validation(
+                                        ValidationKind::Other("NO_WINNING_BID".into()),
+                                        "No winning bid found",
+                                    )
+                                })?;
+                        winning_bid.player_seat
+                    } else {
+                        // Subsequent tricks: previous trick winner leads
+                        let prev_trick =
+                            tricks::find_by_round_and_trick(txn, round.id, current_trick_no - 1)
+                                .await?
+                                .ok_or_else(|| {
+                                    DomainError::validation(
+                                        ValidationKind::Other("PREV_TRICK_NOT_FOUND".into()),
+                                        "Previous trick not found",
+                                    )
+                                })?;
+                        prev_trick.winner_seat
+                    };
+                    Ok(Some((leader, ActionType::Play)))
+                }
+            }
+            DbGameState::Scoring => {
+                // Need to score the round
+                self.score_round(txn, game.id).await?;
+                self.advance_to_next_round(txn, game.id).await?;
+                // Return None to let loop re-evaluate
+                Ok(None)
+            }
+            DbGameState::Completed | DbGameState::Abandoned => Ok(None),
+        }
+    }
+
+    /// Execute an AI action.
+    async fn execute_ai_action(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        player_seat: i16,
+        action_type: ActionType,
+        ai: &dyn crate::ai::AiPlayer,
+    ) -> Result<(), AppError> {
+        use crate::domain::player_view::VisibleGameState;
+
+        // Load visible game state for this player
+        let state = VisibleGameState::load(txn, game_id, player_seat).await?;
+
+        match action_type {
+            ActionType::Bid => {
+                let bid = ai.choose_bid(&state)?;
+                self.submit_bid(txn, game_id, player_seat, bid).await?;
+            }
+            ActionType::Trump => {
+                let trump_suit = ai.choose_trump(&state)?;
+                // Convert Suit to rounds::Trump
+                let trump = match trump_suit {
+                    crate::domain::Suit::Clubs => rounds::Trump::Clubs,
+                    crate::domain::Suit::Diamonds => rounds::Trump::Diamonds,
+                    crate::domain::Suit::Hearts => rounds::Trump::Hearts,
+                    crate::domain::Suit::Spades => rounds::Trump::Spades,
+                };
+                self.set_trump(txn, game_id, player_seat, trump).await?;
+            }
+            ActionType::Play => {
+                let card = ai.choose_play(&state)?;
+                self.play_card(txn, game_id, player_seat, card).await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Type of action needed from a player.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ActionType {
+    Bid,
+    Trump,
+    Play,
 }
 
 impl Default for GameFlowService {

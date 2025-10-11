@@ -95,6 +95,7 @@ enum AiProfiles {
     UserId,
     Playstyle,
     Difficulty,
+    Config,
     CreatedAt,
     UpdatedAt,
 }
@@ -553,6 +554,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(AiProfiles::UserId).big_integer().not_null())
                     .col(ColumnDef::new(AiProfiles::Playstyle).string().null())
                     .col(ColumnDef::new(AiProfiles::Difficulty).integer().null())
+                    .col(ColumnDef::new(AiProfiles::Config).json_binary().null())
                     .col(
                         ColumnDef::new(AiProfiles::CreatedAt)
                             .timestamp_with_time_zone()

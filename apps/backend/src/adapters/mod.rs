@@ -1,5 +1,6 @@
 //! Adapters for external dependencies.
 
+pub mod ai_profiles_sea;
 pub mod bids_sea;
 pub mod games_sea;
 pub mod hands_sea;

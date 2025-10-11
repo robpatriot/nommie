@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod game_flow;
 pub mod games;
 pub mod memberships;

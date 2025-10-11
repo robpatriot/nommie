@@ -7,6 +7,7 @@ pub mod cards_serde;
 pub mod cards_types;
 pub mod dealing;
 pub mod fixtures;
+pub mod player_view;
 pub mod rules;
 pub mod scoring;
 pub mod snapshot;

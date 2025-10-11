@@ -1,5 +1,6 @@
 //! Repository traits for domain layer.
 
+pub mod ai_profiles;
 pub mod bids;
 pub mod games;
 pub mod hands;
