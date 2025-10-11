@@ -79,12 +79,12 @@ async fn test_load_state_after_bidding() -> Result<(), AppError> {
             let flow_service = GameFlowService::new();
             let game_service = GameService::new();
 
-            // Deal and bid
+            // Deal and bid (Round 1: dealer at seat 0, bidding starts at seat 1)
             flow_service.deal_round(txn, game.id).await?;
-            flow_service.submit_bid(txn, game.id, 0, 5).await?;
             flow_service.submit_bid(txn, game.id, 1, 4).await?;
             flow_service.submit_bid(txn, game.id, 2, 3).await?;
-            flow_service.submit_bid(txn, game.id, 3, 0).await?; // Dealer
+            flow_service.submit_bid(txn, game.id, 3, 0).await?;
+            flow_service.submit_bid(txn, game.id, 0, 5).await?; // Dealer
 
             // Load state
             let loaded_state = game_service.load_game_state(txn, game.id).await?;
@@ -126,14 +126,14 @@ async fn test_load_state_after_trump() -> Result<(), AppError> {
             let flow_service = GameFlowService::new();
             let game_service = GameService::new();
 
-            // Deal, bid, set trump
+            // Deal, bid, set trump (Round 1: dealer at seat 0, bidding starts at seat 1)
             flow_service.deal_round(txn, game.id).await?;
-            flow_service.submit_bid(txn, game.id, 0, 5).await?;
-            flow_service.submit_bid(txn, game.id, 1, 4).await?;
+            flow_service.submit_bid(txn, game.id, 1, 5).await?; // Highest bidder
             flow_service.submit_bid(txn, game.id, 2, 3).await?;
             flow_service.submit_bid(txn, game.id, 3, 0).await?;
+            flow_service.submit_bid(txn, game.id, 0, 4).await?; // Dealer
             flow_service
-                .set_trump(txn, game.id, 0, rounds::Trump::Hearts)
+                .set_trump(txn, game.id, 1, rounds::Trump::Hearts) // Winner: seat 1
                 .await?;
 
             // Load state
@@ -178,14 +178,14 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
             let flow_service = GameFlowService::new();
             let game_service = GameService::new();
 
-            // Set up game in TrickPlay phase with some plays
+            // Set up game in TrickPlay phase with some plays (Round 1: dealer at seat 0, bidding starts at seat 1)
             flow_service.deal_round(txn, game.id).await?;
-            flow_service.submit_bid(txn, game.id, 0, 3).await?;
             flow_service.submit_bid(txn, game.id, 1, 3).await?;
-            flow_service.submit_bid(txn, game.id, 2, 4).await?;
+            flow_service.submit_bid(txn, game.id, 2, 4).await?; // Highest bidder
             flow_service.submit_bid(txn, game.id, 3, 2).await?;
+            flow_service.submit_bid(txn, game.id, 0, 3).await?; // Dealer
             flow_service
-                .set_trump(txn, game.id, 2, rounds::Trump::Spades)
+                .set_trump(txn, game.id, 2, rounds::Trump::Spades) // Winner: seat 2
                 .await?;
 
             // Manually create a trick with 2 plays (mid-trick)
@@ -264,12 +264,12 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
             let flow_service = GameFlowService::new();
             let game_service = GameService::new();
 
-            // Complete one full round
+            // Complete one full round (Round 1: dealer at seat 0, bidding starts at seat 1)
             flow_service.deal_round(txn, game.id).await?;
-            flow_service.submit_bid(txn, game.id, 0, 7).await?;
             flow_service.submit_bid(txn, game.id, 1, 3).await?;
             flow_service.submit_bid(txn, game.id, 2, 2).await?;
             flow_service.submit_bid(txn, game.id, 3, 0).await?;
+            flow_service.submit_bid(txn, game.id, 0, 7).await?; // Dealer
 
             let round1 = rounds::find_by_game_and_round(txn, game.id, 1)
                 .await?

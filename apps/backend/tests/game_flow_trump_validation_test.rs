@@ -32,11 +32,12 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
             service.deal_round(txn, game.id).await?;
 
             // All players submit bids
-            // Bids: 2 + 3 + 4 + 3 = 12
-            service.submit_bid(txn, game.id, 0, 2).await?;
+            // Round 1: dealer at seat 0, bidding starts at seat 1
+            // Bids: 3 + 4 + 3 + 2 = 12
             service.submit_bid(txn, game.id, 1, 3).await?;
             service.submit_bid(txn, game.id, 2, 4).await?; // Highest bid - seat 2 wins
             service.submit_bid(txn, game.id, 3, 3).await?;
+            service.submit_bid(txn, game.id, 0, 2).await?; // Dealer bids last
 
             // After 4th bid, should be in TrumpSelection phase
             let game_after_bids = games_sea::find_by_id(txn, game.id).await?.unwrap();
@@ -112,30 +113,31 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
             service.deal_round(txn, game.id).await?;
 
             // All players submit bids with a tie
+            // Round 1: dealer at seat 0, bidding starts at seat 1
             // Bids: 4 + 2 + 4 + 2 = 12
-            // Seats 0 and 2 both bid 4, but seat 0 bid first
-            service.submit_bid(txn, game.id, 0, 4).await?; // First to bid 4
-            service.submit_bid(txn, game.id, 1, 2).await?;
-            service.submit_bid(txn, game.id, 2, 4).await?; // Also bids 4, but later
-            service.submit_bid(txn, game.id, 3, 2).await?;
+            // Seats 1 and 3 both bid 4, but seat 1 bid first
+            service.submit_bid(txn, game.id, 1, 4).await?; // First to bid 4
+            service.submit_bid(txn, game.id, 2, 2).await?;
+            service.submit_bid(txn, game.id, 3, 4).await?; // Also bids 4, but later
+            service.submit_bid(txn, game.id, 0, 2).await?; // Dealer bids last
 
-            // Seat 0 should be the winner (earliest bidder among tied highest)
-            // Only seat 0 should be able to set trump
+            // Seat 1 should be the winner (earliest bidder among tied highest)
+            // Only seat 1 should be able to set trump
             let result = service
-                .set_trump(txn, game.id, 2, rounds::Trump::Hearts)
+                .set_trump(txn, game.id, 3, rounds::Trump::Hearts)
                 .await;
             assert!(
                 result.is_err(),
-                "Seat 2 should not be able to set trump despite tied bid"
+                "Seat 3 should not be able to set trump despite tied bid"
             );
 
-            // Seat 0 should succeed
+            // Seat 1 should succeed
             let result = service
-                .set_trump(txn, game.id, 0, rounds::Trump::Clubs)
+                .set_trump(txn, game.id, 1, rounds::Trump::Clubs)
                 .await;
             assert!(
                 result.is_ok(),
-                "Seat 0 should win trump selection (earliest tied bid)"
+                "Seat 1 should win trump selection (earliest tied bid)"
             );
 
             Ok::<_, AppError>(())

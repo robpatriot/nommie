@@ -37,11 +37,12 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
                                                      // State should be Bidding after deal (verified in other tests)
 
             // Step 2: All players submit bids
-            // Bids: 3 + 3 + 4 + 2 = 12 (not 13, dealer rule OK)
-            service.submit_bid(txn, game.id, 0, 3).await?;
+            // Round 1: dealer at seat 0, bidding starts at seat 1
+            // Bids: 3 + 4 + 2 + 3 = 12 (not 13, dealer rule OK)
             service.submit_bid(txn, game.id, 1, 3).await?;
             service.submit_bid(txn, game.id, 2, 4).await?; // Highest bid
             service.submit_bid(txn, game.id, 3, 2).await?;
+            service.submit_bid(txn, game.id, 0, 3).await?; // Dealer bids last
 
             // After 4th bid, should auto-transition to TrumpSelection
             // (verified by submit_bid logic)

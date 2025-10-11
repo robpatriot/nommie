@@ -41,17 +41,18 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
             assert_eq!(round.completed_at, None);
 
             // 2. Submit bids for all players
-            // Bids: 5 + 4 + 3 + 0 = 12 (not 13, so dealer rule OK)
-            service.submit_bid(txn, game.id, 0, 5).await?;
+            // Round 1: dealer is at seat 0, so bidding starts at seat 1
+            // Bids: 4 + 3 + 0 + 5 = 12 (not 13, so dealer rule OK)
             service.submit_bid(txn, game.id, 1, 4).await?;
             service.submit_bid(txn, game.id, 2, 3).await?;
             service.submit_bid(txn, game.id, 3, 0).await?;
+            service.submit_bid(txn, game.id, 0, 5).await?; // Dealer bids last
 
-            // Verify all bids persisted
+            // Verify all bids persisted (in bid order: seats 1, 2, 3, 0)
             let all_bids = bids::find_all_by_round(txn, round.id).await?;
             assert_eq!(all_bids.len(), 4);
-            assert_eq!(all_bids[0].bid_value, 5);
-            assert_eq!(all_bids[1].bid_value, 4);
+            assert_eq!(all_bids[0].bid_value, 4); // Seat 1
+            assert_eq!(all_bids[1].bid_value, 3); // Seat 2
 
             // 3. Simulate tricks (create trick records manually for this test)
             // Player 0 wins 5 tricks, player 1 wins 4, player 2 wins 3, player 3 wins 1
@@ -140,11 +141,12 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
                 .await?
                 .unwrap();
 
-            // Bids: 7 + 3 + 2 + 0 = 12 (not 13, dealer rule OK)
-            service.submit_bid(txn, game.id, 0, 7).await?;
+            // Round 1: dealer at seat 0, bidding starts at seat 1
+            // Bids: 3 + 2 + 0 + 7 = 12 (not 13, dealer rule OK)
             service.submit_bid(txn, game.id, 1, 3).await?;
             service.submit_bid(txn, game.id, 2, 2).await?;
             service.submit_bid(txn, game.id, 3, 0).await?;
+            service.submit_bid(txn, game.id, 0, 7).await?; // Dealer bids last
 
             // Simulate tricks: P0 wins 7, P1 wins 3, P2 wins 2, P3 wins 1 (totals 13)
             for i in 0..7 {
@@ -175,11 +177,12 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
                 .await?
                 .unwrap();
 
-            // Bids: 5 + 4 + 2 + 0 = 11 (not 12, dealer rule OK)
-            service.submit_bid(txn, game.id, 0, 5).await?;
-            service.submit_bid(txn, game.id, 1, 4).await?;
+            // Round 2: dealer at seat 1, bidding starts at seat 2
+            // Bids: 2 + 0 + 5 + 4 = 11 (not 12, dealer rule OK)
             service.submit_bid(txn, game.id, 2, 2).await?;
             service.submit_bid(txn, game.id, 3, 0).await?;
+            service.submit_bid(txn, game.id, 0, 5).await?;
+            service.submit_bid(txn, game.id, 1, 4).await?; // Dealer bids last
 
             // Simulate round 2 tricks: P0 wins 5, P1 wins 4, P2 wins 2, P3 wins 1 (totals 12)
             for i in 0..5 {
