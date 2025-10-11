@@ -36,6 +36,7 @@ Related data = queries with invariants between them (game + its round + that rou
 - Domain modules: no DB or Actix imports.
 - Use enums (not strings) for states, roles, and phases.
 - No `unwrap()` or `expect()` outside tests.
+- Always use inline format strings: `format!("value: {variable}")` never `format!("value: {}", variable)`.
 
 ## String Handling
 - Query/lookup methods: accept `&str`.
