@@ -330,6 +330,13 @@ impl GameHistory {
     ///
     /// Returns all rounds (completed and partially completed current round) with their
     /// bids, trump selector, trump choice, and scores.
+    ///
+    /// TODO: Consider caching game history since it only changes on round completion.
+    /// Could be cached in RoundContext or a separate GameHistoryCache structure.
+    /// For now, this is loaded on-demand which is acceptable since:
+    /// - History is only needed for score table display (infrequent)
+    /// - AI players can cache it themselves if needed
+    /// - Query cost is low (few rounds per game, simple joins)
     pub async fn load<C: ConnectionTrait + Send + Sync>(
         conn: &C,
         game_id: i64,
