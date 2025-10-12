@@ -12,6 +12,8 @@ pub struct Model {
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
     pub config: Option<Json>,
+    #[sea_orm(column_name = "memory_level")]
+    pub memory_level: Option<i32>,
     #[sea_orm(column_name = "created_at")]
     pub created_at: OffsetDateTime,
     #[sea_orm(column_name = "updated_at")]

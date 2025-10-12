@@ -14,6 +14,7 @@ pub struct AiProfile {
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
+    pub memory_level: Option<i32>,
     pub created_at: time::OffsetDateTime,
     pub updated_at: time::OffsetDateTime,
 }
@@ -26,6 +27,7 @@ impl From<ai_profiles::Model> for AiProfile {
             playstyle: model.playstyle,
             difficulty: model.difficulty,
             config: model.config,
+            memory_level: model.memory_level,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
@@ -39,6 +41,7 @@ pub async fn create_profile(
     playstyle: Option<String>,
     difficulty: Option<i32>,
     config: Option<serde_json::Value>,
+    memory_level: Option<i32>,
 ) -> Result<AiProfile, DomainError> {
     let mut dto = ai_profiles_adapter::AiProfileCreate::new(user_id);
     if let Some(ps) = playstyle {
@@ -49,6 +52,9 @@ pub async fn create_profile(
     }
     if let Some(cfg) = config {
         dto = dto.with_config(cfg);
+    }
+    if let Some(ml) = memory_level {
+        dto = dto.with_memory_level(ml);
     }
     let profile = ai_profiles_adapter::create_profile(txn, dto).await?;
     Ok(AiProfile::from(profile))
@@ -93,6 +99,9 @@ pub async fn update_profile(
     }
     if let Some(cfg) = profile.config {
         dto = dto.with_config(cfg);
+    }
+    if let Some(ml) = profile.memory_level {
+        dto = dto.with_memory_level(ml);
     }
     let updated = ai_profiles_adapter::update_profile(txn, dto).await?;
     Ok(AiProfile::from(updated))

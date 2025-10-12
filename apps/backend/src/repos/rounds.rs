@@ -50,6 +50,15 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
     Ok(round.map(Round::from))
 }
 
+/// Find all rounds for a game
+pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Vec<Round>, DomainError> {
+    let rounds = rounds_adapter::find_all_by_game(conn, game_id).await?;
+    Ok(rounds.into_iter().map(Round::from).collect())
+}
+
 /// Create a new round
 pub async fn create_round(
     txn: &DatabaseTransaction,

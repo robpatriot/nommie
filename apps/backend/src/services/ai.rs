@@ -22,6 +22,7 @@ impl AiService {
     /// * `txn` - Database transaction
     /// * `ai_type` - Type/playstyle of AI (e.g., "random", "aggressive", "defensive")
     /// * `config` - Optional JSON config for the AI (e.g., seed, difficulty settings)
+    /// * `memory_level` - Optional memory level (0-100, where 100 is perfect memory)
     ///
     /// # Returns
     /// User ID of the created AI user
@@ -30,6 +31,7 @@ impl AiService {
         txn: &DatabaseTransaction,
         ai_type: &str,
         config: Option<serde_json::Value>,
+        memory_level: Option<i32>,
     ) -> Result<i64, DomainError> {
         // Generate unique sub for AI
         let random_id = rand::random::<u32>();
@@ -39,6 +41,7 @@ impl AiService {
         debug!(
             ai_type = %ai_type,
             sub = %sub,
+            memory_level = ?memory_level,
             "Creating AI user"
         );
 
@@ -46,7 +49,15 @@ impl AiService {
         let user = users_repo::create_user(txn, &sub, &username, true).await?;
 
         // Create AI profile
-        ai_profiles::create_profile(txn, user.id, Some(ai_type.to_string()), None, config).await?;
+        ai_profiles::create_profile(
+            txn,
+            user.id,
+            Some(ai_type.to_string()),
+            None,
+            config,
+            memory_level,
+        )
+        .await?;
 
         debug!(
             user_id = user.id,

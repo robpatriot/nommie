@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use rand::prelude::*;
 
 use super::trait_def::{AiError, AiPlayer};
-use crate::domain::player_view::VisibleGameState;
+use crate::domain::player_view::CurrentRoundInfo;
 use crate::domain::{Card, Suit};
 
 /// AI that makes random legal moves.
@@ -33,7 +33,7 @@ impl RandomPlayer {
 }
 
 impl AiPlayer for RandomPlayer {
-    fn choose_bid(&self, state: &VisibleGameState) -> Result<u8, AiError> {
+    fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
         let legal_bids = state
             .legal_bids()
             .map_err(|e| AiError::Internal(format!("Failed to get legal bids: {e}")))?;
@@ -54,7 +54,7 @@ impl AiPlayer for RandomPlayer {
         Ok(choice)
     }
 
-    fn choose_play(&self, state: &VisibleGameState) -> Result<Card, AiError> {
+    fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError> {
         let legal_plays = state
             .legal_plays()
             .map_err(|e| AiError::Internal(format!("Failed to get legal plays: {e}")))?;
@@ -75,7 +75,7 @@ impl AiPlayer for RandomPlayer {
         Ok(choice)
     }
 
-    fn choose_trump(&self, _state: &VisibleGameState) -> Result<Suit, AiError> {
+    fn choose_trump(&self, _state: &CurrentRoundInfo) -> Result<Suit, AiError> {
         // Random trump selection from 4 suits (we don't include NoTrump for now)
         let suits = [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades];
 

@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-use crate::domain::player_view::VisibleGameState;
+use crate::domain::player_view::CurrentRoundInfo;
 use crate::domain::{Card, Suit};
 use crate::error::AppError;
 
@@ -44,15 +44,15 @@ pub trait AiPlayer: Send + Sync {
     /// Choose a bid value.
     ///
     /// The AI should query `state.legal_bids()` to get valid options.
-    fn choose_bid(&self, state: &VisibleGameState) -> Result<u8, AiError>;
+    fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError>;
 
     /// Choose a card to play.
     ///
     /// The AI should query `state.legal_plays()` to get valid cards.
-    fn choose_play(&self, state: &VisibleGameState) -> Result<Card, AiError>;
+    fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError>;
 
     /// Choose trump suit.
     ///
     /// The AI can choose any of the 4 suits or NoTrump.
-    fn choose_trump(&self, state: &VisibleGameState) -> Result<Suit, AiError>;
+    fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Suit, AiError>;
 }

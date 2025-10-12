@@ -24,6 +24,7 @@ pub async fn create_profile(
         playstyle: Set(dto.playstyle),
         difficulty: Set(dto.difficulty),
         config: Set(dto.config),
+        memory_level: Set(dto.memory_level),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -51,6 +52,7 @@ pub async fn update_profile(
         playstyle: Set(dto.playstyle),
         difficulty: Set(dto.difficulty),
         config: Set(dto.config),
+        memory_level: Set(dto.memory_level),
         created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };

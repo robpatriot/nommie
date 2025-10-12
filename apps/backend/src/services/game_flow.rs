@@ -384,8 +384,8 @@ impl GameFlowService {
 
         // SECURITY: Validate the card is in the player's remaining hand
         // This prevents cheating by playing cards they don't have or already played
-        use crate::domain::player_view::VisibleGameState;
-        let player_state = VisibleGameState::load(txn, game_id, player_seat).await?;
+        use crate::domain::player_view::CurrentRoundInfo;
+        let player_state = CurrentRoundInfo::load(txn, game_id, player_seat).await?;
 
         if !player_state.hand.contains(&card) {
             return Err(DomainError::validation(
@@ -1372,7 +1372,7 @@ impl GameFlowService {
         ai: &dyn crate::ai::AiPlayer,
         round_context: Option<&crate::services::round_context::RoundContext>,
     ) -> Result<(), AppError> {
-        use crate::domain::player_view::VisibleGameState;
+        use crate::domain::player_view::CurrentRoundInfo;
 
         // Build visible game state - use cache if available
         let state = if let Some(context) = round_context {
@@ -1383,7 +1383,7 @@ impl GameFlowService {
                 .await?
         } else {
             // Fallback: Load everything from DB
-            VisibleGameState::load(txn, game_id, player_seat).await?
+            CurrentRoundInfo::load(txn, game_id, player_seat).await?
         };
 
         match action_type {

@@ -7,6 +7,7 @@ pub struct AiProfileCreate {
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
+    pub memory_level: Option<i32>,
 }
 
 impl AiProfileCreate {
@@ -16,6 +17,7 @@ impl AiProfileCreate {
             playstyle: None,
             difficulty: None,
             config: None,
+            memory_level: None,
         }
     }
 
@@ -31,6 +33,11 @@ impl AiProfileCreate {
 
     pub fn with_config(mut self, config: serde_json::Value) -> Self {
         self.config = Some(config);
+        self
+    }
+
+    pub fn with_memory_level(mut self, memory_level: i32) -> Self {
+        self.memory_level = Some(memory_level);
         self
     }
 }
@@ -43,6 +50,7 @@ pub struct AiProfileUpdate {
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
+    pub memory_level: Option<i32>,
 }
 
 impl AiProfileUpdate {
@@ -53,6 +61,7 @@ impl AiProfileUpdate {
             playstyle: None,
             difficulty: None,
             config: None,
+            memory_level: None,
         }
     }
 
@@ -68,6 +77,11 @@ impl AiProfileUpdate {
 
     pub fn with_config(mut self, config: serde_json::Value) -> Self {
         self.config = Some(config);
+        self
+    }
+
+    pub fn with_memory_level(mut self, memory_level: i32) -> Self {
+        self.memory_level = Some(memory_level);
         self
     }
 }

@@ -31,19 +31,19 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
-    // Create 4 AI players with deterministic seeds
+    // Create 4 AI players with deterministic seeds and full memory
     let ai_service = AiService::new();
     let ai1 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 12345})))
+        .create_ai_user(txn, "random", Some(json!({"seed": 12345})), Some(100))
         .await?;
     let ai2 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 67890})))
+        .create_ai_user(txn, "random", Some(json!({"seed": 67890})), Some(100))
         .await?;
     let ai3 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 11111})))
+        .create_ai_user(txn, "random", Some(json!({"seed": 11111})), Some(100))
         .await?;
     let ai4 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 22222})))
+        .create_ai_user(txn, "random", Some(json!({"seed": 22222})), Some(100))
         .await?;
 
     // Create game - need to create manually to ensure proper initial state

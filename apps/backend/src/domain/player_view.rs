@@ -1,7 +1,8 @@
 //! Player view of game state - what information is visible to a player.
 //!
-//! This module provides VisibleGameState which represents all information
-//! available to a player at their decision point, including legal moves.
+//! This module provides CurrentRoundInfo which represents all information
+//! available to a player at their decision point for the current round, including legal moves.
+//! It also provides GameHistory for accessing all public game history (bids, trumps, scores).
 
 use sea_orm::ConnectionTrait;
 
@@ -10,7 +11,7 @@ use crate::domain::{valid_bid_range, Card, Trump};
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, hands, plays, rounds, tricks};
+use crate::repos::{bids, hands, plays, rounds, scores, tricks};
 
 /// Helper function to determine who should lead a trick.
 ///
@@ -34,11 +35,11 @@ pub fn determine_trick_leader(
     }
 }
 
-/// Information visible to a player at a decision point.
+/// Information visible to a player at a decision point for the current round.
 ///
 /// Used by both AI players and to render UI for human players.
 #[derive(Debug, Clone)]
-pub struct VisibleGameState {
+pub struct CurrentRoundInfo {
     pub game_id: i64,
     pub player_seat: i16,
     pub game_state: DbGameState,
@@ -68,8 +69,8 @@ pub struct VisibleGameState {
     pub trick_leader: Option<i16>,
 }
 
-impl VisibleGameState {
-    /// Load visible game state for a player from the database.
+impl CurrentRoundInfo {
+    /// Load current round info for a player from the database.
     pub async fn load<C: ConnectionTrait + Send + Sync>(
         conn: &C,
         game_id: i64,
@@ -296,4 +297,135 @@ impl VisibleGameState {
             Trump::NoTrump,
         ]
     }
+}
+
+/// Complete game history including all rounds with bids, trumps, and scores.
+///
+/// Used for score table display and AI game history access.
+#[derive(Debug, Clone)]
+pub struct GameHistory {
+    pub rounds: Vec<RoundHistory>,
+}
+
+/// History of a single round.
+#[derive(Debug, Clone)]
+pub struct RoundHistory {
+    pub round_no: i16,
+    pub dealer_seat: i16,
+    pub bids: [Option<u8>; 4],
+    pub trump_selector_seat: Option<i16>,
+    pub trump: Option<Trump>,
+    pub scores: [RoundScoreDetail; 4],
+}
+
+/// Score details for a player in a round.
+#[derive(Debug, Clone, Copy)]
+pub struct RoundScoreDetail {
+    pub round_score: i16,
+    pub cumulative_score: i16,
+}
+
+impl GameHistory {
+    /// Load complete game history for a game.
+    ///
+    /// Returns all rounds (completed and partially completed current round) with their
+    /// bids, trump selector, trump choice, and scores.
+    pub async fn load<C: ConnectionTrait + Send + Sync>(
+        conn: &C,
+        game_id: i64,
+    ) -> Result<Self, AppError> {
+        // Load all rounds for this game
+        let all_rounds = rounds::find_all_by_game(conn, game_id).await?;
+
+        let mut round_histories = Vec::new();
+
+        for round in all_rounds {
+            // Load bids for this round
+            let bid_records = bids::find_all_by_round(conn, round.id).await?;
+            let mut bids = [None; 4];
+            for bid in &bid_records {
+                if bid.player_seat >= 0 && bid.player_seat < 4 {
+                    bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
+                }
+            }
+
+            // Calculate trump_selector_seat (winning bidder) from bids
+            // Only calculate if all bids are present
+            let trump_selector_seat = if bids.iter().all(|b| b.is_some()) {
+                calculate_winning_bidder(&bids, round.dealer_pos)
+            } else {
+                None
+            };
+
+            // Convert trump
+            let trump = round.trump.map(|t| match t {
+                rounds::Trump::Clubs => Trump::Clubs,
+                rounds::Trump::Diamonds => Trump::Diamonds,
+                rounds::Trump::Hearts => Trump::Hearts,
+                rounds::Trump::Spades => Trump::Spades,
+                rounds::Trump::NoTrump => Trump::NoTrump,
+            });
+
+            // Load scores for this round (if the round is completed)
+            let score_records = scores::find_all_by_round(conn, round.id).await?;
+            let mut round_scores = [RoundScoreDetail {
+                round_score: 0,
+                cumulative_score: 0,
+            }; 4];
+
+            for score in score_records {
+                if score.player_seat >= 0 && score.player_seat < 4 {
+                    round_scores[score.player_seat as usize] = RoundScoreDetail {
+                        round_score: score.round_score,
+                        cumulative_score: score.total_score_after,
+                    };
+                }
+            }
+
+            round_histories.push(RoundHistory {
+                round_no: round.round_no,
+                dealer_seat: round.dealer_pos,
+                bids,
+                trump_selector_seat,
+                trump,
+                scores: round_scores,
+            });
+        }
+
+        Ok(GameHistory {
+            rounds: round_histories,
+        })
+    }
+}
+
+/// Calculate the winning bidder from bids.
+///
+/// Returns the seat of the player with the highest bid.
+/// Ties are broken by earliest bidder (from dealer+1 clockwise).
+fn calculate_winning_bidder(bids: &[Option<u8>; 4], dealer_pos: i16) -> Option<i16> {
+    let mut best_bid: Option<u8> = None;
+    let mut winner: Option<i16> = None;
+
+    // Start from dealer+1 and go clockwise
+    let start = (dealer_pos + 1) % 4;
+
+    for i in 0..4 {
+        let seat = (start + i) % 4;
+        if let Some(bid_value) = bids[seat as usize] {
+            match best_bid {
+                None => {
+                    best_bid = Some(bid_value);
+                    winner = Some(seat);
+                }
+                Some(curr) => {
+                    if bid_value > curr {
+                        best_bid = Some(bid_value);
+                        winner = Some(seat);
+                    }
+                }
+            }
+        }
+    }
+
+    winner
 }

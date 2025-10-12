@@ -32,6 +32,20 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
     game_rounds::Entity::find_by_id(round_id).one(conn).await
 }
 
+/// Find all rounds for a game (ordered by round_no)
+pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Vec<game_rounds::Model>, sea_orm::DbErr> {
+    use sea_orm::QueryOrder;
+
+    game_rounds::Entity::find()
+        .filter(game_rounds::Column::GameId.eq(game_id))
+        .order_by_asc(game_rounds::Column::RoundNo)
+        .all(conn)
+        .await
+}
+
 /// Create a new round
 pub async fn create_round(
     txn: &DatabaseTransaction,

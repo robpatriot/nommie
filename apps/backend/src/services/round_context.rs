@@ -175,7 +175,7 @@ impl RoundContext {
             .is_some()
     }
 
-    /// Build VisibleGameState for a player using cached data.
+    /// Build CurrentRoundInfo for a player using cached data.
     ///
     /// Only loads mutable state (current trick plays, played cards, bids during bidding) from database,
     /// everything else comes from the cache.
@@ -185,7 +185,7 @@ impl RoundContext {
         player_seat: i16,
         game_state: crate::entities::games::GameState,
         current_trick_no: i16,
-    ) -> Result<crate::domain::player_view::VisibleGameState, AppError> {
+    ) -> Result<crate::domain::player_view::CurrentRoundInfo, AppError> {
         use crate::entities::games::GameState as DbGameState;
         use crate::repos::{plays, tricks};
 
@@ -259,8 +259,8 @@ impl RoundContext {
             None
         };
 
-        // Build VisibleGameState using cached data + computed remaining hand
-        Ok(crate::domain::player_view::VisibleGameState {
+        // Build CurrentRoundInfo using cached data + computed remaining hand
+        Ok(crate::domain::player_view::CurrentRoundInfo {
             game_id: self.game_id,
             player_seat,
             game_state,

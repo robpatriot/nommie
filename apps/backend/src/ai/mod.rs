@@ -4,10 +4,13 @@
 //! - AI trait for different AI implementations
 //! - RandomPlayer: makes random legal moves (seedable for tests)
 //! - AI orchestration helpers
+//! - Memory modes and card play history access
 
+pub mod memory;
 mod random;
 mod trait_def;
 
+pub use memory::{get_round_card_plays, MemoryMode, TrickPlays};
 pub use random::RandomPlayer;
 use serde_json::Value as JsonValue;
 pub use trait_def::{AiError, AiPlayer};
