@@ -6,7 +6,10 @@ use backend::state::app_state::AppState;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 
 // Insert a minimal valid games row using txn-aware connection
-pub async fn insert_game_stub<C: ConnectionTrait>(conn: &C, name: &str) -> Result<(), AppError> {
+pub async fn insert_minimal_game_for_test<C: ConnectionTrait>(
+    conn: &C,
+    name: &str,
+) -> Result<(), AppError> {
     let now = time::OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         created_by: Set(None),

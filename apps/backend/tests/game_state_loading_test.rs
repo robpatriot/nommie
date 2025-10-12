@@ -326,7 +326,7 @@ async fn test_load_state_lobby() -> Result<(), AppError> {
             // Load state without dealing any rounds
             let loaded_state = game_service.load_game_state(txn, game.id).await?;
 
-            // Should return minimal stub
+            // Should return empty initial state (no rounds exist yet)
             assert_eq!(loaded_state.phase, Phase::Init);
             assert_eq!(loaded_state.round_no, 0);
             assert_eq!(loaded_state.hand_size, 0);

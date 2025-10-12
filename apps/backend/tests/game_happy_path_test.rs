@@ -192,7 +192,7 @@ async fn test_submit_bid_after_deal() -> Result<(), AppError> {
             // Act: submit valid bid
             let result = service.submit_bid(txn, game_id, 1, 5).await;
 
-            // Assert: should succeed (even though it's a stub implementation)
+            // Assert: bid submission should succeed
             assert!(result.is_ok());
 
             Ok::<_, AppError>(())

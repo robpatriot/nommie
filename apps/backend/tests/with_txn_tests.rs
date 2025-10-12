@@ -9,7 +9,7 @@ use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, TxnPolicy};
 use backend::infra::state::build_state;
-use support::db_games::{count_games_by_name_pool, insert_game_stub};
+use support::db_games::{count_games_by_name_pool, insert_minimal_game_for_test};
 use tracing::debug;
 use ulid::Ulid;
 
@@ -31,7 +31,7 @@ async fn test_rollback_policy() -> Result<(), Box<dyn std::error::Error>> {
     with_txn(None, &state, |txn| {
         let name = name.clone();
         Box::pin(async move {
-            insert_game_stub(txn, &name).await?;
+            insert_minimal_game_for_test(txn, &name).await?;
             debug!("inserted games row inside txn");
             Ok::<_, backend::error::AppError>(())
         })
@@ -62,7 +62,7 @@ async fn test_rollback_policy_on_error() -> Result<(), Box<dyn std::error::Error
     let result = with_txn(None, &state, |txn| {
         let name = name.clone();
         Box::pin(async move {
-            insert_game_stub(txn, &name).await?;
+            insert_minimal_game_for_test(txn, &name).await?;
             debug!("inserted games row inside txn before error");
 
             Err::<(), _>(backend::error::AppError::Internal {

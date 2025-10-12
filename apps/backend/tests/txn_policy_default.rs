@@ -21,7 +21,9 @@ use backend::error::AppError;
 use backend::errors::ErrorCode;
 use backend::infra::state::build_state;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
-use support::db_games::{count_games_by_name_pool, delete_games_by_name, insert_game_stub};
+use support::db_games::{
+    count_games_by_name_pool, delete_games_by_name, insert_minimal_game_for_test,
+};
 use ulid::Ulid;
 
 #[test]
@@ -50,7 +52,7 @@ async fn test_default_commit_policy_persists_then_cleans_up(
     with_txn(None, &state, |txn| {
         let name = name.clone();
         Box::pin(async move {
-            insert_game_stub(txn, &name).await?;
+            insert_minimal_game_for_test(txn, &name).await?;
             Ok::<_, backend::error::AppError>(())
         })
     })
@@ -90,7 +92,7 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
     let result = with_txn(None, &state, |txn| {
         let name = name.clone();
         Box::pin(async move {
-            insert_game_stub(txn, &name).await?;
+            insert_minimal_game_for_test(txn, &name).await?;
             Err::<(), _>(backend::error::AppError::Internal {
                 code: backend::errors::ErrorCode::InternalError,
                 detail: "test error".to_string(),
