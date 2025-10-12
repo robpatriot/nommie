@@ -75,7 +75,7 @@ impl VisibleGameState {
                 )
             })?;
 
-        // Load player's hand
+        // Load player's original dealt hand
         let hand_record = hands::find_by_round_and_seat(conn, round.id, player_seat)
             .await?
             .ok_or_else(|| {
@@ -85,11 +85,33 @@ impl VisibleGameState {
                 )
             })?;
 
-        let hand: Vec<Card> = hand_record
+        let original_hand: Vec<Card> = hand_record
             .cards
             .iter()
             .map(|c| from_stored_format(&c.suit, &c.rank))
             .collect::<Result<Vec<_>, _>>()?;
+
+        // Load all cards this player has played this round (across all tricks)
+        let all_round_tricks = tricks::find_all_by_round(conn, round.id).await?;
+        let mut played_cards: Vec<Card> = Vec::new();
+
+        for trick in all_round_tricks {
+            let trick_plays = plays::find_all_by_trick(conn, trick.id).await?;
+            for play in trick_plays {
+                if play.player_seat == player_seat {
+                    let card = from_stored_format(&play.card.suit, &play.card.rank)?;
+                    played_cards.push(card);
+                }
+            }
+        }
+
+        // Compute remaining hand = original - played
+        let mut hand = original_hand;
+        for played in played_cards {
+            if let Some(pos) = hand.iter().position(|c| *c == played) {
+                hand.remove(pos);
+            }
+        }
 
         // Load bids
         let bid_records = bids::find_all_by_round(conn, round.id).await?;

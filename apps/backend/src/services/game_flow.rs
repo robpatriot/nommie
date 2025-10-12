@@ -382,6 +382,32 @@ impl GameFlowService {
                 )
             })?;
 
+        // SECURITY: Validate the card is in the player's remaining hand
+        // This prevents cheating by playing cards they don't have or already played
+        use crate::domain::player_view::VisibleGameState;
+        let player_state = VisibleGameState::load(txn, game_id, player_seat).await?;
+
+        if !player_state.hand.contains(&card) {
+            return Err(DomainError::validation(
+                ValidationKind::CardNotInHand,
+                format!(
+                    "Card {:?} of {:?} is not in player's hand",
+                    card.rank, card.suit
+                ),
+            )
+            .into());
+        }
+
+        // Also validate it's a legal play (suit following rules)
+        let legal_plays = player_state.legal_plays()?;
+        if !legal_plays.contains(&card) {
+            return Err(DomainError::validation(
+                ValidationKind::MustFollowSuit,
+                "Must follow suit if possible",
+            )
+            .into());
+        }
+
         // Get current trick number
         let current_trick_no = game.current_trick_no;
 
@@ -795,12 +821,22 @@ impl GameFlowService {
     /// 3. Loops until no more transitions or AI actions are needed
     ///
     /// This is a loop-based approach to avoid deep recursion and stack overflow.
+    ///
+    /// Performance: Maintains RoundContext cache across iterations within the same round,
+    /// only reloading when the round number changes. This avoids ~1,400 redundant cache
+    /// creations per game (reduces to ~26, once per round).
     pub async fn process_game_state(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
+        use crate::entities::games::GameState as DbGameState;
+        use crate::services::round_context::RoundContext;
+
         const MAX_ITERATIONS: usize = 2000; // Allow for full 26-round game with all actions
+
+        // Cache that persists across iterations within the same round
+        let mut cached_round: Option<(i16, RoundContext)> = None;
 
         for _iteration in 0..MAX_ITERATIONS {
             let game = games_sea::require_game(txn, game_id).await?;
@@ -811,9 +847,49 @@ impl GameFlowService {
                 continue;
             }
 
-            // Priority 2: Check if an AI needs to act
-            if self.check_and_execute_ai_action(txn, &game).await? {
-                // AI acted, loop again
+            // Check if we need cache and if it needs refreshing
+            let needs_cache = matches!(
+                game.state,
+                DbGameState::Bidding | DbGameState::TrumpSelection | DbGameState::TrickPlay
+            );
+
+            if needs_cache {
+                if let Some(current_round) = game.current_round {
+                    // Check if cache is stale (different round or doesn't exist)
+                    let is_stale = cached_round
+                        .as_ref()
+                        .is_none_or(|(cached_round_no, _)| *cached_round_no != current_round);
+
+                    if is_stale {
+                        // Load fresh cache for new round
+                        debug!(
+                            game_id,
+                            round_no = current_round,
+                            "Creating RoundContext cache for new round"
+                        );
+                        let context = RoundContext::load(txn, game_id, current_round).await?;
+                        cached_round = Some((current_round, context));
+                    }
+                    // else: reuse existing cache (optimization!)
+                }
+            } else {
+                // Not in a state that benefits from caching
+                if cached_round.is_some() {
+                    debug!(game_id, "Clearing RoundContext cache (exited round states)");
+                    cached_round = None;
+                }
+            }
+
+            // Priority 2: Check if an AI needs to act (pass cache if available)
+            if self
+                .check_and_execute_ai_action_with_cache(
+                    txn,
+                    &game,
+                    cached_round.as_ref().map(|(_, ctx)| ctx),
+                )
+                .await?
+            {
+                // AI acted, loop again (cache remains valid for next iteration!)
                 continue;
             }
 
@@ -980,13 +1056,17 @@ impl GameFlowService {
         Ok(false)
     }
 
-    /// Check if an AI player needs to act and execute the action.
+    /// Check if an AI player needs to act and execute the action (with optional cache).
     ///
     /// Returns true if an AI action was executed (which will trigger recursive processing).
-    async fn check_and_execute_ai_action(
+    ///
+    /// If round_context is provided, uses it to avoid redundant database queries.
+    /// Otherwise, loads player/AI data from database (slower fallback).
+    async fn check_and_execute_ai_action_with_cache(
         &self,
         txn: &DatabaseTransaction,
         game: &crate::entities::games::Model,
+        round_context: Option<&crate::services::round_context::RoundContext>,
     ) -> Result<bool, AppError> {
         use sea_orm::{EntityTrait, JoinType, QuerySelect, RelationTrait};
 
@@ -1001,91 +1081,130 @@ impl GameFlowService {
             return Ok(false); // No action needed
         };
 
-        // Check if this player is an AI
-        let memberships = memberships::find_all_by_game(txn, game.id).await?;
-        let Some(player) = memberships
-            .iter()
-            .find(|m| m.turn_order == player_seat as i32)
-        else {
-            // No player found at this seat (test scenario or empty game)
-            // Stop AI processing - human needs to act or game setup incomplete
-            debug!(
-                game.id,
-                player_seat, "No player found at seat, stopping AI processing"
-            );
-            return Ok(false);
+        // Check if this player is an AI (use cache if available)
+        let (user_id, profile) = if let Some(ctx) = round_context {
+            // Fast path: Use cached player data
+            // If no players exist (test scenario), fall through to slow path
+            if ctx.players.is_empty() {
+                // No players means no AI to process (test scenario or empty game)
+                debug!(game.id, "No players in game, stopping AI processing");
+                return Ok(false);
+            }
+
+            let player = ctx
+                .players
+                .iter()
+                .find(|m| m.turn_order == player_seat as i32);
+
+            let Some(player) = player else {
+                // Player not found at this seat - stop AI processing
+                debug!(
+                    game.id,
+                    player_seat, "No player at seat, stopping AI processing"
+                );
+                return Ok(false);
+            };
+
+            let profile = ctx.get_ai_profile(player.user_id);
+
+            if profile.is_none() {
+                debug!(
+                    game.id,
+                    player_seat, "Human player's turn, stopping AI processing"
+                );
+                return Ok(false);
+            }
+
+            (player.user_id, profile.cloned())
+        } else {
+            // Slow path: Load from database (used for Lobby, Dealing, etc.)
+            let memberships = memberships::find_all_by_game(txn, game.id).await?;
+            let Some(player) = memberships
+                .iter()
+                .find(|m| m.turn_order == player_seat as i32)
+            else {
+                debug!(
+                    game.id,
+                    player_seat, "No player found at seat, stopping AI processing"
+                );
+                return Ok(false);
+            };
+
+            let ai_info = crate::entities::users::Entity::find_by_id(player.user_id)
+                .join(
+                    JoinType::LeftJoin,
+                    crate::entities::users::Relation::AiProfiles.def(),
+                )
+                .select_also(ai_profiles::Entity)
+                .one(txn)
+                .await?;
+
+            let Some((user, maybe_profile)) = ai_info else {
+                return Err(DomainError::validation(
+                    ValidationKind::Other("USER_NOT_FOUND".into()),
+                    "User not found",
+                )
+                .into());
+            };
+
+            if !user.is_ai {
+                debug!(
+                    game.id,
+                    player_seat, "Human player's turn, stopping AI processing"
+                );
+                return Ok(false);
+            }
+
+            let profile = maybe_profile.ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("AI_PROFILE_NOT_FOUND".into()),
+                    format!("AI profile not found for user {}", user.id),
+                )
+            })?;
+
+            (user.id, Some(profile))
         };
 
-        // Check if user is AI and get their AI profile
-        let ai_info = crate::entities::users::Entity::find_by_id(player.user_id)
-            .join(
-                JoinType::LeftJoin,
-                crate::entities::users::Relation::AiProfiles.def(),
-            )
-            .select_also(ai_profiles::Entity)
-            .one(txn)
-            .await?;
+        let profile = profile
+            .ok_or_else(|| AppError::internal(format!("AI profile missing for user {user_id}")))?;
 
-        let Some((user, maybe_profile)) = ai_info else {
-            return Err(DomainError::validation(
-                ValidationKind::Other("USER_NOT_FOUND".into()),
-                "User not found",
-            )
-            .into());
-        };
-
-        if !user.is_ai {
-            // Human player's turn - stop processing
-            debug!(
-                game.id,
-                player_seat, "Human player's turn, stopping AI processing"
-            );
-            return Ok(false);
-        }
-
-        // This is an AI player - trigger their action
-        let profile = maybe_profile.ok_or_else(|| {
-            DomainError::validation(
-                ValidationKind::Other("AI_PROFILE_NOT_FOUND".into()),
-                format!("AI profile not found for user {}", user.id),
-            )
-        })?;
-
-        info!(
-        game.id,
-            player_seat,
-            action = ?action_type,
-            "Processing AI turn"
-        );
+        info!(game.id, player_seat, action = ?action_type, "Processing AI turn");
 
         // Create AI player
         let ai_type = profile.playstyle.as_deref().unwrap_or("random");
         let ai = create_ai(ai_type, profile.config.as_ref())
             .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
 
-        // Execute action with retries
+        // Execute action with retries, using cache if available
         const MAX_RETRIES_PER_ACTION: usize = 3;
         let mut last_error = None;
 
         for retry in 0..MAX_RETRIES_PER_ACTION {
             match self
-                .execute_ai_action(txn, game.id, player_seat, action_type, ai.as_ref())
+                .execute_ai_action_with_cache(
+                    txn,
+                    game.id,
+                    player_seat,
+                    action_type,
+                    ai.as_ref(),
+                    round_context,
+                )
                 .await
             {
                 Ok(()) => {
                     info!(
-                    game.id,
+                        game.id,
                         player_seat,
                         action = ?action_type,
                         retry,
+                        cached = round_context.is_some(),
                         "AI action executed successfully"
                     );
-                    // Action method will call process_game_state, continuing the chain
                     return Ok(true);
                 }
                 Err(e) => {
                     tracing::warn!(
-                    game.id,
+                        game.id,
                         player_seat,
                         retry,
                         error = ?e,
@@ -1240,19 +1359,32 @@ impl GameFlowService {
         }
     }
 
-    /// Execute an AI action.
-    async fn execute_ai_action(
+    /// Execute an AI action with optional round context cache.
+    ///
+    /// If round_context is provided, uses cached data to build player view.
+    /// Otherwise, loads all data from database (slower but always works).
+    async fn execute_ai_action_with_cache(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: i16,
         action_type: ActionType,
         ai: &dyn crate::ai::AiPlayer,
+        round_context: Option<&crate::services::round_context::RoundContext>,
     ) -> Result<(), AppError> {
         use crate::domain::player_view::VisibleGameState;
 
-        // Load visible game state for this player
-        let state = VisibleGameState::load(txn, game_id, player_seat).await?;
+        // Build visible game state - use cache if available
+        let state = if let Some(context) = round_context {
+            // Fast path: Use cached data
+            let game = crate::adapters::games_sea::require_game(txn, game_id).await?;
+            context
+                .build_visible_state(txn, player_seat, game.state, game.current_trick_no)
+                .await?
+        } else {
+            // Fallback: Load everything from DB
+            VisibleGameState::load(txn, game_id, player_seat).await?
+        };
 
         match action_type {
             ActionType::Bid => {

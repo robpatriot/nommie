@@ -63,6 +63,22 @@ pub async fn find_by_user_id<C: ConnectionTrait + Send + Sync>(
     Ok(profile.map(AiProfile::from))
 }
 
+/// Find AI profiles for multiple user IDs (batch query for optimization).
+pub async fn find_batch_by_user_ids<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    user_ids: &[i64],
+) -> Result<Vec<ai_profiles::Model>, DomainError> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    let profiles = ai_profiles::Entity::find()
+        .filter(ai_profiles::Column::UserId.is_in(user_ids.iter().copied()))
+        .all(conn)
+        .await
+        .map_err(crate::infra::db_errors::map_db_err)?;
+
+    Ok(profiles)
+}
+
 /// Update an AI profile's configuration.
 pub async fn update_profile(
     txn: &DatabaseTransaction,
