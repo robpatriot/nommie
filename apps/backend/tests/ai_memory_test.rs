@@ -1,10 +1,9 @@
-//! Tests for AI memory modes and game history access.
+//! Tests for AI-specific memory modes and card play access.
 
 use backend::ai::memory::{get_round_card_plays, MemoryMode};
 use backend::config::db::DbProfile;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::domain::player_view::GameHistory;
 use backend::error::AppError;
 use backend::infra::state::build_state;
 
@@ -93,7 +92,7 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
 }
 
 #[actix_web::test]
-async fn test_game_history_empty_game() -> Result<(), AppError> {
+async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     let state = build_state()
         .with_db(DbProfile::Test)
         .build()
@@ -103,16 +102,18 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
-    // Create a game with no rounds
     use backend::entities::games::{self, GameState, GameVisibility};
+    use backend::entities::round_tricks::{self, CardSuit};
+    use backend::entities::{game_rounds, trick_plays};
     use sea_orm::{ActiveModelTrait, NotSet, Set};
+    use serde_json::json;
     use time::OffsetDateTime;
 
     let game = games::ActiveModel {
         id: NotSet,
         created_by: Set(Some(1)),
         visibility: Set(GameVisibility::Public),
-        state: Set(GameState::Lobby),
+        state: Set(GameState::TrickPlay),
         created_at: Set(OffsetDateTime::now_utc()),
         updated_at: Set(OffsetDateTime::now_utc()),
         started_at: Set(None),
@@ -121,18 +122,208 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
         join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(12345)),
-        current_round: Set(None),
-        starting_dealer_pos: Set(None),
-        current_trick_no: Set(0),
+        current_round: Set(Some(1)),
+        starting_dealer_pos: Set(Some(0)),
+        current_trick_no: Set(2),
         current_round_id: Set(None),
         lock_version: Set(0),
     }
     .insert(txn)
     .await?;
 
-    // Load game history - should be empty
-    let history = GameHistory::load(txn, game.id).await?;
-    assert!(history.rounds.is_empty());
+    let round = game_rounds::ActiveModel {
+        id: NotSet,
+        game_id: Set(game.id),
+        round_no: Set(1),
+        hand_size: Set(13),
+        dealer_pos: Set(0),
+        trump: Set(None),
+        created_at: Set(OffsetDateTime::now_utc()),
+        completed_at: Set(None),
+    }
+    .insert(txn)
+    .await?;
+
+    // Create trick 0 with 4 plays
+    let trick0 = round_tricks::ActiveModel {
+        id: NotSet,
+        round_id: Set(round.id),
+        trick_no: Set(0),
+        lead_suit: Set(CardSuit::Hearts),
+        winner_seat: Set(2),
+        created_at: Set(OffsetDateTime::now_utc()),
+    }
+    .insert(txn)
+    .await?;
+
+    for (seat, suit, rank) in [
+        (0, "HEARTS", "ACE"),
+        (1, "HEARTS", "KING"),
+        (2, "HEARTS", "QUEEN"),
+        (3, "HEARTS", "JACK"),
+    ] {
+        trick_plays::ActiveModel {
+            id: NotSet,
+            trick_id: Set(trick0.id),
+            player_seat: Set(seat),
+            card: Set(json!({"suit": suit, "rank": rank})),
+            play_order: Set(seat),
+            played_at: Set(OffsetDateTime::now_utc()),
+        }
+        .insert(txn)
+        .await?;
+    }
+
+    // Create trick 1 with 4 plays
+    let trick1 = round_tricks::ActiveModel {
+        id: NotSet,
+        round_id: Set(round.id),
+        trick_no: Set(1),
+        lead_suit: Set(CardSuit::Spades),
+        winner_seat: Set(1),
+        created_at: Set(OffsetDateTime::now_utc()),
+    }
+    .insert(txn)
+    .await?;
+
+    for (seat, suit, rank) in [
+        (2, "SPADES", "TEN"),
+        (3, "SPADES", "NINE"),
+        (0, "SPADES", "EIGHT"),
+        (1, "SPADES", "SEVEN"),
+    ] {
+        trick_plays::ActiveModel {
+            id: NotSet,
+            trick_id: Set(trick1.id),
+            player_seat: Set(seat),
+            card: Set(json!({"suit": suit, "rank": rank})),
+            play_order: Set((seat + 2) % 4),
+            played_at: Set(OffsetDateTime::now_utc()),
+        }
+        .insert(txn)
+        .await?;
+    }
+
+    // Test Full mode - should return all tricks
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full).await?;
+    assert_eq!(plays.len(), 2);
+    assert_eq!(plays[0].trick_no, 0);
+    assert_eq!(plays[0].plays.len(), 4);
+    assert_eq!(plays[1].trick_no, 1);
+    assert_eq!(plays[1].plays.len(), 4);
+
+    // Test None mode - should return empty
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::None).await?;
+    assert!(plays.is_empty());
+
+    // Test Partial mode - currently returns full (TODO: implement impairment)
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }).await?;
+    assert_eq!(plays.len(), 2); // Currently same as Full
+
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("Failed to build test state");
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+    let txn = shared.transaction();
+
+    use backend::repos::{ai_profiles, users as users_repo};
+
+    // Create a user
+    let user = users_repo::create_user(txn, "ai_test_123", "Test AI", true).await?;
+
+    // Create AI profile with memory level 75
+    let profile = ai_profiles::create_profile(
+        txn,
+        user.id,
+        Some("random".to_string()),
+        Some(5),
+        None,
+        Some(75),
+    )
+    .await?;
+
+    assert_eq!(profile.memory_level, Some(75));
+
+    // Load it back
+    let loaded = ai_profiles::find_by_user_id(txn, user.id)
+        .await?
+        .expect("Profile should exist");
+
+    assert_eq!(loaded.memory_level, Some(75));
+
+    // Update memory level to 100 (Full)
+    let mut updated_profile = loaded.clone();
+    updated_profile.memory_level = Some(100);
+    let updated = ai_profiles::update_profile(txn, updated_profile).await?;
+
+    assert_eq!(updated.memory_level, Some(100));
+
+    // Verify MemoryMode conversions work with persisted values
+    use backend::ai::memory::MemoryMode;
+    assert_eq!(
+        MemoryMode::from_db_value(updated.memory_level),
+        MemoryMode::Full
+    );
+
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppError> {
+    let state = build_state()
+        .with_db(DbProfile::Test)
+        .build()
+        .await
+        .expect("Failed to build test state");
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+    let txn = shared.transaction();
+
+    use backend::ai::memory::MemoryMode;
+    use backend::repos::ai_profiles;
+    use backend::services::ai::AiService;
+    use serde_json::json;
+
+    let ai_service = AiService::new();
+
+    // Create AI with Partial memory (level 60)
+    let user_id = ai_service
+        .create_ai_user(txn, "random", Some(json!({"seed": 12345})), Some(60))
+        .await?;
+
+    // Load the profile
+    let profile = ai_profiles::find_by_user_id(txn, user_id)
+        .await?
+        .expect("AI profile should exist");
+
+    assert_eq!(profile.memory_level, Some(60));
+    assert_eq!(
+        MemoryMode::from_db_value(profile.memory_level),
+        MemoryMode::Partial { level: 60 }
+    );
+
+    // Create AI with Full memory (None -> defaults to Full)
+    let user_id2 = ai_service
+        .create_ai_user(txn, "random", Some(json!({"seed": 67890})), None)
+        .await?;
+
+    let profile2 = ai_profiles::find_by_user_id(txn, user_id2)
+        .await?
+        .expect("AI profile should exist");
+
+    assert_eq!(profile2.memory_level, None);
+    assert_eq!(
+        MemoryMode::from_db_value(profile2.memory_level),
+        MemoryMode::Full
+    );
 
     Ok(())
 }
