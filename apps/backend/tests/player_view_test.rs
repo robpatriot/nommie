@@ -28,7 +28,7 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
 
     let game = games::ActiveModel {
         id: NotSet,
-        created_by: Set(Some(1)),
+        created_by: Set(None),
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         created_at: Set(OffsetDateTime::now_utc()),
@@ -75,7 +75,7 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
     // Create a game
     let game = games::ActiveModel {
         id: NotSet,
-        created_by: Set(Some(1)),
+        created_by: Set(None),
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Bidding),
         created_at: Set(OffsetDateTime::now_utc()),
@@ -219,7 +219,7 @@ async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
 
     let game = games::ActiveModel {
         id: NotSet,
-        created_by: Set(Some(1)),
+        created_by: Set(None),
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Bidding),
         created_at: Set(OffsetDateTime::now_utc()),

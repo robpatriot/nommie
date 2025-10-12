@@ -43,7 +43,7 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
 
     let game = games::ActiveModel {
         id: NotSet,
-        created_by: Set(Some(1)),
+        created_by: Set(None),
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Bidding),
         created_at: Set(OffsetDateTime::now_utc()),
@@ -111,7 +111,7 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
 
     let game = games::ActiveModel {
         id: NotSet,
-        created_by: Set(Some(1)),
+        created_by: Set(None),
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::TrickPlay),
         created_at: Set(OffsetDateTime::now_utc()),
