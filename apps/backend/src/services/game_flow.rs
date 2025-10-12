@@ -1374,12 +1374,12 @@ impl GameFlowService {
     ) -> Result<(), AppError> {
         use crate::domain::player_view::CurrentRoundInfo;
 
-        // Build visible game state - use cache if available
+        // Build current round info - use cache if available
         let state = if let Some(context) = round_context {
             // Fast path: Use cached data
             let game = crate::adapters::games_sea::require_game(txn, game_id).await?;
             context
-                .build_visible_state(txn, player_seat, game.state, game.current_trick_no)
+                .build_current_round_info(txn, player_seat, game.state, game.current_trick_no)
                 .await?
         } else {
             // Fallback: Load everything from DB

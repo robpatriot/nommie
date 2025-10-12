@@ -179,7 +179,7 @@ impl RoundContext {
     ///
     /// Only loads mutable state (current trick plays, played cards, bids during bidding) from database,
     /// everything else comes from the cache.
-    pub async fn build_visible_state(
+    pub async fn build_current_round_info(
         &self,
         txn: &DatabaseTransaction,
         player_seat: i16,
