@@ -412,8 +412,8 @@ impl GameFlowService {
         let current_trick_no = game.current_trick_no;
 
         // Find or create the current trick
-        // Note: This is simplified - real implementation would need to determine
-        // lead suit from first play and winner from domain logic after 4th play
+        // Lead suit is determined from the first play.
+        // Winner is set to 0 initially and determined by resolve_trick() after all 4 plays.
         let trick = if let Some(existing) =
             tricks::find_by_round_and_trick(txn, round.id, current_trick_no).await?
         {
@@ -428,7 +428,7 @@ impl GameFlowService {
                 crate::domain::Suit::Spades => tricks::Suit::Spades,
             };
 
-            // Winner TBD (placeholder 0 until trick completes)
+            // Winner placeholder - will be determined by resolve_trick() after 4th play
             tricks::create_trick(txn, round.id, current_trick_no, lead_suit, 0).await?
         };
 

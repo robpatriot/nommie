@@ -33,6 +33,9 @@ pub struct RoundContext {
     /// All 4 bids (indexed by seat 0-3)
     pub bids: [Option<u8>; 4],
 
+    /// Cumulative scores entering this round (indexed by seat 0-3)
+    pub scores: [i16; 4],
+
     /// Player roster (game memberships)
     pub players: Vec<crate::repos::memberships::GameMembership>,
 
@@ -103,6 +106,10 @@ impl RoundContext {
             rounds::Trump::NoTrump => Trump::NoTrump,
         });
 
+        // Load cumulative scores from completed rounds
+        use crate::repos::scores;
+        let scores = scores::get_scores_for_completed_rounds(txn, game_id, round_no).await?;
+
         // Load players (may be empty in test scenarios)
         let players = crate::repos::memberships::find_all_by_game(txn, game_id).await?;
 
@@ -132,6 +139,7 @@ impl RoundContext {
             trump,
             hands,
             bids,
+            scores,
             players,
             ai_profiles,
         })
@@ -205,7 +213,7 @@ impl RoundContext {
         let mut played_cards: Vec<Card> = Vec::new();
         let mut current_trick_plays = Vec::new();
 
-        for trick in all_round_tricks {
+        for trick in &all_round_tricks {
             let trick_plays = plays::find_all_by_trick(txn, trick.id).await?;
 
             for play in trick_plays {
@@ -232,6 +240,25 @@ impl RoundContext {
             }
         }
 
+        // Determine trick leader (who should play first)
+        let trick_leader = if game_state == DbGameState::TrickPlay {
+            let prev_trick_winner = if current_trick_no > 0 {
+                all_round_tricks
+                    .iter()
+                    .find(|t| t.trick_no == current_trick_no - 1)
+                    .map(|t| t.winner_seat)
+            } else {
+                None
+            };
+            crate::domain::player_view::determine_trick_leader(
+                current_trick_no,
+                &bids,
+                prev_trick_winner,
+            )
+        } else {
+            None
+        };
+
         // Build VisibleGameState using cached data + computed remaining hand
         Ok(crate::domain::player_view::VisibleGameState {
             game_id: self.game_id,
@@ -245,7 +272,8 @@ impl RoundContext {
             trump: self.trump,
             trick_no: current_trick_no,
             current_trick_plays,
-            scores: [0; 4], // TODO: Cache scores too
+            scores: self.scores,
+            trick_leader,
         })
     }
 }

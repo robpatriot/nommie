@@ -12,6 +12,28 @@ use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::{bids, hands, plays, rounds, tricks};
 
+/// Helper function to determine who should lead a trick.
+///
+/// For trick 0: highest bidder leads.
+/// For other tricks: winner of previous trick leads.
+pub fn determine_trick_leader(
+    trick_no: i16,
+    bids: &[Option<u8>],
+    prev_trick_winner: Option<i16>,
+) -> Option<i16> {
+    if trick_no == 0 {
+        // First trick - leader is highest bidder
+        bids.iter()
+            .enumerate()
+            .filter_map(|(seat, bid)| bid.map(|b| (seat as i16, b)))
+            .max_by_key(|(_, bid)| *bid)
+            .map(|(seat, _)| seat)
+    } else {
+        // Not first trick - leader is winner of previous trick
+        prev_trick_winner
+    }
+}
+
 /// Information visible to a player at a decision point.
 ///
 /// Used by both AI players and to render UI for human players.
@@ -41,6 +63,9 @@ pub struct VisibleGameState {
 
     /// Cumulative scores for all players
     pub scores: [i16; 4],
+
+    /// Player who should lead the current trick (None if not in TrickPlay)
+    pub trick_leader: Option<i16>,
 }
 
 impl VisibleGameState {
@@ -144,8 +169,24 @@ impl VisibleGameState {
             }
         }
 
-        // Load scores (stub - would load from previous round's scores)
-        let scores = [0, 0, 0, 0]; // TODO: load cumulative scores
+        // Load cumulative scores from completed rounds
+        use crate::repos::scores;
+        let scores = scores::get_scores_for_completed_rounds(conn, game_id, current_round).await?;
+
+        // Determine trick leader (who should play first)
+        let trick_leader = if game.state == DbGameState::TrickPlay {
+            let current_trick_no = game.current_trick_no;
+            let prev_trick_winner = if current_trick_no > 0 {
+                tricks::find_by_round_and_trick(conn, round.id, current_trick_no - 1)
+                    .await?
+                    .map(|t| t.winner_seat)
+            } else {
+                None
+            };
+            determine_trick_leader(current_trick_no, &bids, prev_trick_winner)
+        } else {
+            None
+        };
 
         Ok(Self {
             game_id,
@@ -160,6 +201,7 @@ impl VisibleGameState {
             trick_no: game.current_trick_no,
             current_trick_plays,
             scores,
+            trick_leader,
         })
     }
 
@@ -201,12 +243,11 @@ impl VisibleGameState {
         // Determine whose turn it is
         let play_count = self.current_trick_plays.len();
         let leader_seat = if play_count == 0 {
-            // First play of trick - determined by previous trick winner or bidding winner
-            // For now, assume current turn logic handles this
-            // This is a simplification - full logic would track trick leader
-            self.player_seat // Placeholder
+            // First play of trick - use the computed trick leader
+            // (highest bidder for trick 0, previous trick winner otherwise)
+            self.trick_leader.unwrap_or(0)
         } else {
-            // Not first play - need to follow turn order
+            // Not first play - follow turn order from first player
             let first_player = self.current_trick_plays[0].0;
             (first_player + play_count as i16) % 4
         };

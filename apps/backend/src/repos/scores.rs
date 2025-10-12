@@ -87,6 +87,42 @@ pub async fn get_current_totals(
     Ok(totals)
 }
 
+/// Get cumulative scores from all completed rounds before a given round.
+/// Returns array of [seat0_total, seat1_total, seat2_total, seat3_total]
+///
+/// For round 1, returns all zeros (no rounds completed yet).
+/// For round N, returns the total_score_after from round N-1 (N-1 completed rounds).
+pub async fn get_scores_for_completed_rounds<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+    round_no: i16,
+) -> Result<[i16; 4], DomainError> {
+    if round_no <= 1 {
+        // First round - no previous scores
+        return Ok([0; 4]);
+    }
+
+    // Load previous round
+    let prev_round_no = round_no - 1;
+    let prev_round =
+        crate::repos::rounds::find_by_game_and_round(conn, game_id, prev_round_no).await?;
+
+    let Some(prev_round) = prev_round else {
+        // Previous round doesn't exist - return zeros
+        return Ok([0; 4]);
+    };
+
+    // Load scores from that round
+    let mut score_array = [0i16; 4];
+    let scores_list = find_all_by_round(conn, prev_round.id).await?;
+    for score in scores_list {
+        if score.player_seat >= 0 && score.player_seat < 4 {
+            score_array[score.player_seat as usize] = score.total_score_after;
+        }
+    }
+    Ok(score_array)
+}
+
 // Conversions between SeaORM models and domain models
 
 impl From<round_scores::Model> for Score {

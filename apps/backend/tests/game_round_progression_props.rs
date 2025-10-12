@@ -232,12 +232,9 @@ async fn test_deterministic_first_trick() -> Result<(), AppError> {
                 "After all bids, should be in TrumpSelection"
             );
 
-            // Highest bidder (player 1, bid 6) should select trump
-            // For now, this is a placeholder - service may not yet implement trump selection
-            // We'll just assert the state advanced correctly
-
-            // Note: If trump selection and trick play are not yet implemented,
-            // these tests will serve as specification for future implementation
+            // Trump selection is implemented in GameFlowService::set_trump()
+            // but not yet exposed via HTTP API for human players.
+            // This test verifies that bidding phase completes correctly.
 
             Ok::<_, AppError>(())
         })

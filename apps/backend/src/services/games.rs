@@ -34,7 +34,7 @@ impl GameService {
         let current_round_no = match game.current_round {
             Some(round_no) => round_no,
             None => {
-                // Game hasn't started yet - return minimal stub
+                // Game hasn't started yet - return empty initial state (no rounds exist)
                 let phase = match game.state {
                     DbGameState::Lobby => Phase::Init,
                     DbGameState::Dealing => Phase::Init,
