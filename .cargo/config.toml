@@ -1,0 +1,15 @@
+# Cargo build configuration for Nommie project
+
+[build]
+# Optimize for faster dev builds
+# Note: Jobs defaults to number of CPU cores, which is optimal
+
+[profile.dev]
+# Split debug info for faster linking on Linux
+split-debuginfo = "unpacked"
+
+# Optimize dependencies in dev mode for faster runtime (tests, dev server)
+# while keeping your own code unoptimized for fast iteration
+[profile.dev.package."*"]
+opt-level = 1
+
