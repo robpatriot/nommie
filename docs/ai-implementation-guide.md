@@ -421,7 +421,7 @@ pub enum Trump {
 }
 ```
 
-**Conversion**: You can convert `Suit` to `Trump` easily (`Trump::from(suit)`), but note that `choose_trump()` requires returning a `Suit`, not a `Trump`.
+**Conversion**: You can convert `Suit` to `Trump` easily (`Trump::from(suit)`).
 
 ### GameState
 
@@ -718,7 +718,7 @@ if legal_bids.is_empty() {
 ### Error Handling Pattern
 
 ```rust
-fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
+fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
     // 1. Get legal moves, wrapping domain errors
     let legal_bids = state.legal_bids()
         .map_err(|e| AiError::Internal(format!("Failed to get legal bids: {e}")))?;
@@ -745,7 +745,7 @@ fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
 
 **Don't do this**:
 ```rust
-fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
+fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
     let legal_bids = state.legal_bids().unwrap();  // ❌ Can panic!
     Ok(legal_bids[0])  // ❌ Can panic if empty!
 }
@@ -753,7 +753,7 @@ fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
 
 **Do this instead**:
 ```rust
-fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
+fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
     let legal_bids = state.legal_bids()
         .map_err(|e| AiError::Internal(format!("{e}")))?;  // ✅
     
@@ -780,12 +780,12 @@ mod tests {
         let ai1 = MyAI::new(Some(12345));
         let ai2 = MyAI::new(Some(12345));
         
-        // Create mock game state
-        // (You'll need to construct CurrentRoundInfo for testing)
+        // Create mock game state and context
+        // (You'll need to construct CurrentRoundInfo and GameContext for testing)
         
         // Verify both AIs make same decisions
-        let bid1 = ai1.choose_bid(&state).unwrap();
-        let bid2 = ai2.choose_bid(&state).unwrap();
+        let bid1 = ai1.choose_bid(&state, &context).unwrap();
+        let bid2 = ai2.choose_bid(&state, &context).unwrap();
         assert_eq!(bid1, bid2);
     }
     
@@ -867,15 +867,15 @@ impl MyAI {
 }
 
 impl AiPlayer for MyAI {
-    fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
+    fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
         // Implementation
     }
     
-    fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError> {
+    fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
         // Implementation
     }
     
-    fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Suit, AiError> {
+    fn choose_trump(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Trump, AiError> {
         // Implementation
     }
 }
