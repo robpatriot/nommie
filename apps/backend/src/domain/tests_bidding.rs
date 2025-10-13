@@ -48,8 +48,9 @@ fn trump_selection_only_by_winner() {
     // correct player
     assert!(crate::domain::set_trump(&mut state, 1, Trump::Spades).is_ok());
     assert_eq!(state.phase, Phase::Trick { trick_no: 1 });
-    assert_eq!(state.leader, 1);
-    assert_eq!(state.turn, 1);
+    // First trick is led by player to left of dealer (turn_start)
+    assert_eq!(state.leader, 0);
+    assert_eq!(state.turn, 0);
     assert_eq!(state.round.trump, Some(Trump::Spades));
     assert!(state.round.trick_plays.is_empty());
     assert!(state.round.trick_lead.is_none());

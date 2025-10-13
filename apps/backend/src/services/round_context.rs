@@ -252,7 +252,7 @@ impl RoundContext {
             };
             crate::domain::player_view::determine_trick_leader(
                 current_trick_no,
-                &bids,
+                self.dealer_pos,
                 prev_trick_winner,
             )
         } else {

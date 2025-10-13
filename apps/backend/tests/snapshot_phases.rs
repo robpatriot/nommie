@@ -160,16 +160,39 @@ fn trick_snapshot_legals() {
     match snap.phase {
         PhaseSnapshot::Trick(t) => {
             assert_eq!(t.trick_no, 1);
-            assert_eq!(t.leader, 2); // bid winner leads
-            assert_eq!(t.to_act, 2);
+            assert_eq!(t.leader, 1); // player to left of dealer (dealer=0, so 1) leads
+            assert_eq!(t.to_act, 1);
             assert_eq!(t.current_trick.len(), 0);
-            // Playable should be all cards in player 2's hand (no lead yet)
+            // Playable should be all cards in player 1's hand (no lead yet)
             assert_eq!(t.playable.len(), 3);
         }
         _ => panic!("Expected Trick phase"),
     }
 
-    // Play first card (player 2 leads with AH)
+    // Play first card (player 1 leads with AD)
+    play_card(
+        &mut state,
+        1,
+        Card {
+            suit: Suit::Diamonds,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
+
+    let snap = snapshot(&state);
+    match snap.phase {
+        PhaseSnapshot::Trick(t) => {
+            assert_eq!(t.to_act, 2); // next player after 1
+            assert_eq!(t.current_trick.len(), 1);
+            // Player 2 has only Hearts, so is void in Diamonds and can play any card
+            assert_eq!(t.playable.len(), 3);
+            assert!(t.playable.iter().all(|c| c.suit == Suit::Hearts));
+        }
+        _ => panic!("Expected Trick phase"),
+    }
+
+    // Play second card (player 2 plays AH, void in diamonds)
     play_card(
         &mut state,
         2,
@@ -180,35 +203,12 @@ fn trick_snapshot_legals() {
     )
     .unwrap();
 
+    // Play third card (player 3 has no diamonds, can play any spade)
     let snap = snapshot(&state);
     match snap.phase {
         PhaseSnapshot::Trick(t) => {
-            assert_eq!(t.to_act, 3); // next player
-            assert_eq!(t.current_trick.len(), 1);
-            // Player 3 has only Spades, so is void in Hearts and can play any card
-            assert_eq!(t.playable.len(), 3);
-            assert!(t.playable.iter().all(|c| c.suit == Suit::Spades));
-        }
-        _ => panic!("Expected Trick phase"),
-    }
-
-    // Play second card (player 3 plays AS, void in hearts)
-    play_card(
-        &mut state,
-        3,
-        Card {
-            suit: Suit::Spades,
-            rank: Rank::Ace,
-        },
-    )
-    .unwrap();
-
-    // Play third card (player 0 has no hearts, can play any club)
-    let snap = snapshot(&state);
-    match snap.phase {
-        PhaseSnapshot::Trick(t) => {
-            assert_eq!(t.to_act, 0);
-            // Player 0 is void in hearts, can play any card
+            assert_eq!(t.to_act, 3);
+            // Player 3 is void in diamonds, can play any card
             assert_eq!(t.playable.len(), 3);
         }
         _ => panic!("Expected Trick phase"),
@@ -350,25 +350,7 @@ fn complete_and_gameover_snapshots() {
 
     set_trump(&mut state, 3, Trump::NoTrump).unwrap();
 
-    // Play single trick
-    play_card(
-        &mut state,
-        3,
-        Card {
-            suit: Suit::Spades,
-            rank: Rank::Ace,
-        },
-    )
-    .unwrap();
-    play_card(
-        &mut state,
-        0,
-        Card {
-            suit: Suit::Clubs,
-            rank: Rank::Ace,
-        },
-    )
-    .unwrap();
+    // Play single trick - player 1 leads (dealer+1)
     play_card(
         &mut state,
         1,
@@ -387,6 +369,24 @@ fn complete_and_gameover_snapshots() {
         },
     )
     .unwrap();
+    play_card(
+        &mut state,
+        3,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        0,
+        Card {
+            suit: Suit::Clubs,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
 
     // Should be in Scoring
     assert_eq!(state.phase, Phase::Scoring);
@@ -398,7 +398,7 @@ fn complete_and_gameover_snapshots() {
     let snap = snapshot(&state);
     match snap.phase {
         PhaseSnapshot::Complete(c) => {
-            assert_eq!(c.round.tricks_won[3], 1);
+            assert_eq!(c.round.tricks_won[1], 1); // Player 1 won with AD
             assert_eq!(c.round.bid_winner, Some(3));
         }
         _ => panic!("Expected Complete phase"),
@@ -411,8 +411,9 @@ fn complete_and_gameover_snapshots() {
     let snap = snapshot(&state);
     match snap.phase {
         PhaseSnapshot::GameOver => {
-            // Totals preserved
-            assert_eq!(snap.game.scores_total[3], 11); // 1 trick + 10 bonus
+            // Totals preserved - player 1 won the trick but bid 0, so 1 point (no bonus)
+            // Player 3 bid 1 but won 0 tricks, so 0 points
+            assert_eq!(snap.game.scores_total[1], 1); // 1 trick, bid was 0 so no bonus
         }
         _ => panic!("Expected GameOver phase"),
     }

@@ -15,20 +15,16 @@ use crate::repos::{bids, hands, plays, rounds, scores, tricks};
 
 /// Helper function to determine who should lead a trick.
 ///
-/// For trick 0: highest bidder leads.
+/// For trick 0: player to left of dealer (dealer_pos + 1) leads.
 /// For other tricks: winner of previous trick leads.
 pub fn determine_trick_leader(
     trick_no: i16,
-    bids: &[Option<u8>],
+    dealer_pos: i16,
     prev_trick_winner: Option<i16>,
 ) -> Option<i16> {
     if trick_no == 0 {
-        // First trick - leader is highest bidder
-        bids.iter()
-            .enumerate()
-            .filter_map(|(seat, bid)| bid.map(|b| (seat as i16, b)))
-            .max_by_key(|(_, bid)| *bid)
-            .map(|(seat, _)| seat)
+        // First trick - leader is player to left of dealer
+        Some((dealer_pos + 1) % 4)
     } else {
         // Not first trick - leader is winner of previous trick
         prev_trick_winner
@@ -184,7 +180,7 @@ impl CurrentRoundInfo {
             } else {
                 None
             };
-            determine_trick_leader(current_trick_no, &bids, prev_trick_winner)
+            determine_trick_leader(current_trick_no, dealer_pos, prev_trick_winner)
         } else {
             None
         };
@@ -245,7 +241,7 @@ impl CurrentRoundInfo {
         let play_count = self.current_trick_plays.len();
         let leader_seat = if play_count == 0 {
             // First play of trick - use the computed trick leader
-            // (highest bidder for trick 0, previous trick winner otherwise)
+            // (player to left of dealer for trick 0, previous trick winner otherwise)
             self.trick_leader.unwrap_or(0)
         } else {
             // Not first play - follow turn order from first player

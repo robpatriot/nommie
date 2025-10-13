@@ -1325,17 +1325,14 @@ impl GameFlowService {
                 } else {
                     // First play of trick - need to determine leader
                     let leader = if current_trick_no == 0 {
-                        // First trick: winning bidder leads
-                        let winning_bid =
-                            bids::find_winning_bid(txn, round.id)
-                                .await?
-                                .ok_or_else(|| {
-                                    DomainError::validation(
-                                        ValidationKind::Other("NO_WINNING_BID".into()),
-                                        "No winning bid found",
-                                    )
-                                })?;
-                        winning_bid.player_seat
+                        // First trick: player to left of dealer leads
+                        let dealer_pos = game.dealer_pos().ok_or_else(|| {
+                            DomainError::validation(
+                                ValidationKind::Other("NO_DEALER_POS".into()),
+                                "Dealer position not set",
+                            )
+                        })?;
+                        (dealer_pos + 1) % 4
                     } else {
                         // Subsequent tricks: previous trick winner leads
                         let prev_trick =

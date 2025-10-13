@@ -41,6 +41,7 @@ These rules are **locked** — all game logic, extractors, tests, and UI must co
 ---
 
 ## Trick Play
+- The **player to the left of the dealer** leads the first trick of each round.
 - Players must **follow suit** if able.
 - If no card of the lead suit, they may play any card.
 - Trick winner =

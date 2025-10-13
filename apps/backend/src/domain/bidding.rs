@@ -99,8 +99,9 @@ pub fn set_trump(
     match state.round.winning_bidder {
         Some(bidder) if bidder == who => {
             state.round.trump = Some(trump);
-            state.leader = bidder;
-            state.turn = bidder;
+            // First trick is led by player to left of dealer (turn_start)
+            state.leader = state.turn_start;
+            state.turn = state.turn_start;
             state.trick_no = 1;
             state.round.trick_plays.clear();
             state.round.trick_lead = None;

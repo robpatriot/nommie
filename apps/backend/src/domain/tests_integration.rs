@@ -35,7 +35,16 @@ fn happy_path_round_small() {
     place_bid(&mut state, 3, Bid(1)).unwrap();
     assert_eq!(state.round.winning_bidder, Some(1));
     crate::domain::set_trump(&mut state, 1, Trump::Hearts).unwrap();
-    // Trick 1: lead 1
+    // Trick 1: player 0 leads (dealer + 1)
+    play_card(
+        &mut state,
+        0,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
     play_card(
         &mut state,
         1,
@@ -60,15 +69,6 @@ fn happy_path_round_small() {
         Card {
             suit: Suit::Spades,
             rank: Rank::Nine,
-        },
-    )
-    .unwrap();
-    play_card(
-        &mut state,
-        0,
-        Card {
-            suit: Suit::Spades,
-            rank: Rank::Ace,
         },
     )
     .unwrap();
