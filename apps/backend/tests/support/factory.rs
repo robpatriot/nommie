@@ -86,7 +86,48 @@ pub async fn create_test_user_with_randomization(
     Ok(inserted.id)
 }
 
-/// Create a test game with a creator user
+/// Create a fresh game in Lobby state with no rounds or configuration.
+///
+/// This creates a truly fresh game suitable for testing game initialization,
+/// AI memory with empty games, or player view tests.
+///
+/// # Arguments
+/// * `conn` - Database connection or transaction
+///
+/// # Returns
+/// ID of the created game
+pub async fn create_fresh_lobby_game(conn: &impl ConnectionTrait) -> Result<i64, AppError> {
+    let user_id = create_test_user(conn, "creator", Some("Creator")).await?;
+    let now = OffsetDateTime::now_utc();
+
+    let game = games::ActiveModel {
+        id: NotSet,
+        created_by: Set(Some(user_id)),
+        visibility: Set(GameVisibility::Public),
+        state: Set(GameState::Lobby),
+        created_at: Set(now),
+        updated_at: Set(now),
+        started_at: Set(None),
+        ended_at: Set(None),
+        name: Set(Some("Test Game".to_string())),
+        join_code: Set(None),
+        rules_version: Set("1.0".to_string()),
+        rng_seed: Set(Some(12345)),
+        current_round: Set(None),
+        starting_dealer_pos: Set(None),
+        current_trick_no: Set(0),
+        current_round_id: Set(None),
+        lock_version: Set(0),
+    };
+
+    let inserted = game.insert(conn).await?;
+    Ok(inserted.id)
+}
+
+/// Create a test game with a creator user.
+///
+/// This creates a game that's already configured (has round 1, dealer position set).
+/// For a truly fresh lobby game, use `create_fresh_lobby_game()` instead.
 ///
 /// # Arguments
 /// * `conn` - Database connection or transaction
@@ -97,7 +138,10 @@ pub async fn create_test_game(conn: &impl ConnectionTrait) -> Result<i64, AppErr
     create_test_game_with_options(conn, None, None).await
 }
 
-/// Create a test game with custom join code and randomization options
+/// Create a test game with custom join code and randomization options.
+///
+/// This builds on `create_fresh_lobby_game()` and then configures the game
+/// with round 1 and dealer position already set.
 ///
 /// # Arguments
 /// * `conn` - Database connection or transaction
@@ -111,36 +155,31 @@ pub async fn create_test_game_with_options(
     join_code: Option<String>,
     randomize_join_code: Option<bool>,
 ) -> Result<i64, AppError> {
-    // Create a user first to use as created_by
-    let user_id = create_test_user(conn, "creator", Some("Creator")).await?;
+    // Start with a fresh lobby game
+    let game_id = create_fresh_lobby_game(conn).await?;
 
-    let now = OffsetDateTime::now_utc();
+    // Update it with test-specific configuration
+    use backend::entities::games::Entity as GamesEntity;
+    use sea_orm::{ActiveModelTrait, EntityTrait, IntoActiveModel};
+
+    let game = GamesEntity::find_by_id(game_id)
+        .one(conn)
+        .await?
+        .ok_or_else(|| AppError::internal("Failed to find just-created game"))?;
+
     let final_join_code = if randomize_join_code.unwrap_or(false) {
         format!("C{}", rand::random::<u32>() % 1000000)
     } else {
         join_code.unwrap_or_else(|| "ABC123".to_string())
     };
 
-    let game = games::ActiveModel {
-        id: NotSet,
-        created_by: Set(Some(user_id)),
-        visibility: Set(GameVisibility::Public),
-        state: Set(GameState::Lobby),
-        created_at: Set(now),
-        updated_at: Set(now),
-        started_at: Set(None),
-        ended_at: Set(None),
-        name: Set(Some("Test Game".to_string())),
-        join_code: Set(Some(final_join_code)),
-        rules_version: Set("1.0".to_string()),
-        rng_seed: Set(Some(12345)),
-        current_round: Set(Some(1)),
-        starting_dealer_pos: Set(Some(0)),
-        current_trick_no: Set(0),
-        current_round_id: Set(None),
-        lock_version: Set(1),
-    };
+    let mut active_game = game.into_active_model();
+    active_game.join_code = Set(Some(final_join_code));
+    active_game.current_round = Set(Some(1));
+    active_game.starting_dealer_pos = Set(Some(0));
+    active_game.lock_version = Set(1);
 
-    let inserted = game.insert(conn).await?;
-    Ok(inserted.id)
+    active_game.update(conn).await?;
+
+    Ok(game_id)
 }

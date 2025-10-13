@@ -3,12 +3,15 @@
 //! These tests cover public information accessible to all players,
 //! including game history for score tables.
 
+mod support;
+
 use backend::config::db::DbProfile;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::domain::player_view::GameHistory;
 use backend::error::AppError;
 use backend::infra::state::build_state;
+use support::factory::create_fresh_lobby_game;
 
 #[actix_web::test]
 async fn test_game_history_empty_game() -> Result<(), AppError> {
@@ -21,35 +24,9 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
-    // Create a game with no rounds
-    use backend::entities::games::{self, GameState, GameVisibility};
-    use sea_orm::{ActiveModelTrait, NotSet, Set};
-    use time::OffsetDateTime;
+    let game_id = create_fresh_lobby_game(txn).await?;
 
-    let game = games::ActiveModel {
-        id: NotSet,
-        created_by: Set(None),
-        visibility: Set(GameVisibility::Public),
-        state: Set(GameState::Lobby),
-        created_at: Set(OffsetDateTime::now_utc()),
-        updated_at: Set(OffsetDateTime::now_utc()),
-        started_at: Set(None),
-        ended_at: Set(None),
-        name: Set(Some("Test Game".to_string())),
-        join_code: Set(None),
-        rules_version: Set("1".to_string()),
-        rng_seed: Set(Some(12345)),
-        current_round: Set(None),
-        starting_dealer_pos: Set(None),
-        current_trick_no: Set(0),
-        current_round_id: Set(None),
-        lock_version: Set(0),
-    }
-    .insert(txn)
-    .await?;
-
-    // Load game history - should be empty
-    let history = GameHistory::load(txn, game.id).await?;
+    let history = GameHistory::load(txn, game_id).await?;
     assert!(history.rounds.is_empty());
 
     Ok(())

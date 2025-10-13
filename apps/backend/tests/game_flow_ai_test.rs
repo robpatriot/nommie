@@ -47,33 +47,7 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         .create_ai_user(txn, "random", Some(json!({"seed": 22222})), Some(100))
         .await?;
 
-    // Create game - need to create manually to ensure proper initial state
-    use backend::entities::games::{self, GameState as DbGameState, GameVisibility};
-    use sea_orm::{ActiveModelTrait, NotSet, Set};
-    use time::OffsetDateTime;
-
-    let creator_id = support::factory::create_test_user(txn, "creator", Some("Creator")).await?;
-    let now = OffsetDateTime::now_utc();
-    let game = games::ActiveModel {
-        id: NotSet,
-        created_by: Set(Some(creator_id)),
-        visibility: Set(GameVisibility::Public),
-        state: Set(DbGameState::Lobby),
-        created_at: Set(now),
-        updated_at: Set(now),
-        started_at: Set(None),
-        ended_at: Set(None),
-        name: Set(Some("AI Test Game".to_string())),
-        join_code: Set(Some(format!("AI{}", rand::random::<u32>() % 1000000))),
-        rules_version: Set("1.0".to_string()),
-        rng_seed: Set(Some(12345)),
-        current_round: Set(None), // No round yet - will be set when we deal
-        starting_dealer_pos: Set(None), // Will be set when we deal
-        current_trick_no: Set(0),
-        current_round_id: Set(None),
-        lock_version: Set(0),
-    };
-    let game_id = game.insert(txn).await?.id;
+    let game_id = support::factory::create_fresh_lobby_game(txn).await?;
 
     // Add AI players to game as memberships
     use backend::repos::memberships;

@@ -5,8 +5,8 @@ use actix_web::{test, web, HttpMessage, Responder};
 use backend::config::db::DbProfile;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
+use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::entities::{game_players, users};
 use backend::extractors::{CurrentUser, GameId, GameMembership};
 use backend::infra::state::build_state;
 use backend::repos::memberships::GameRole;
@@ -17,6 +17,7 @@ use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
 use support::app_builder::create_test_app;
 use support::auth::mint_test_token;
+use support::factory::create_test_user;
 use time::OffsetDateTime;
 
 /// Test-only handler that echoes back the membership for testing
@@ -107,25 +108,14 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
 
-    // Create a test user
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
-    let now = OffsetDateTime::now_utc();
-    let user = users::ActiveModel {
-        id: sea_orm::NotSet,
-        sub: Set(user_sub.clone()),
-        username: Set(Some("testuser".to_string())),
-        is_ai: Set(false),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
-    let user = user.insert(shared.transaction()).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
 
-    // Create a test game
+    let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
@@ -137,11 +127,10 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     };
     let game = game.insert(shared.transaction()).await?;
 
-    // Create a game membership
     let membership = game_players::ActiveModel {
         id: sea_orm::NotSet,
         game_id: Set(game.id),
-        user_id: Set(user.id),
+        user_id: Set(user_id),
         turn_order: Set(1),
         is_ready: Set(false),
         created_at: Set(now),
@@ -149,10 +138,8 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     };
     let membership = membership.insert(shared.transaction()).await?;
 
-    // Create a valid JWT token
     let token = mint_test_token(&user_sub, &user_email, &security_config);
 
-    // Build test app with echo route
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route(
@@ -163,7 +150,6 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Make request with valid token and inject the shared txn
     let req = test::TestRequest::get()
         .uri(&format!("/games/{}/membership", game.id))
         .insert_header(("Authorization", format!("Bearer {token}")))
@@ -172,7 +158,6 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
 
     let resp = test::call_service(&app, req).await;
 
-    // Assert success
     assert!(resp.status().is_success());
 
     let body: Value = test::read_body_json(resp).await;
@@ -183,7 +168,6 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(body["is_ready"], false);
     assert_eq!(body["role"], "Player");
 
-    // Cleanup
     shared.rollback().await?;
 
     Ok(())
@@ -207,18 +191,10 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
     // Create a test user
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
-    let now = OffsetDateTime::now_utc();
-    let user = users::ActiveModel {
-        id: sea_orm::NotSet,
-        sub: Set(user_sub.clone()),
-        username: Set(Some("testuser".to_string())),
-        is_ai: Set(false),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
-    user.insert(shared.transaction()).await?;
+    let _user_id = create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
 
     // Create a test game
+    let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
@@ -230,10 +206,8 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
     };
     let game = game.insert(shared.transaction()).await?;
 
-    // Create a valid JWT token
     let token = mint_test_token(&user_sub, &user_email, &security_config);
 
-    // Build test app with echo route
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route(
@@ -265,7 +239,6 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    // Cleanup
     shared.rollback().await?;
 
     Ok(())
@@ -336,7 +309,6 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
     )
     .await;
 
-    // Cleanup
     shared.rollback().await?;
 
     Ok(())
@@ -355,25 +327,14 @@ async fn test_membership_composition_with_current_user_and_game_id(
         .build()
         .await?;
 
-    // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
 
-    // Create a test user
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
-    let now = OffsetDateTime::now_utc();
-    let user = users::ActiveModel {
-        id: sea_orm::NotSet,
-        sub: Set(user_sub.clone()),
-        username: Set(Some("testuser".to_string())),
-        is_ai: Set(false),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
-    let user = user.insert(shared.transaction()).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
 
-    // Create a test game
+    let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
@@ -385,11 +346,10 @@ async fn test_membership_composition_with_current_user_and_game_id(
     };
     let game = game.insert(shared.transaction()).await?;
 
-    // Create a game membership
     let membership = game_players::ActiveModel {
         id: sea_orm::NotSet,
         game_id: Set(game.id),
-        user_id: Set(user.id),
+        user_id: Set(user_id),
         turn_order: Set(2),
         is_ready: Set(true),
         created_at: Set(now),
@@ -397,10 +357,8 @@ async fn test_membership_composition_with_current_user_and_game_id(
     };
     let membership = membership.insert(shared.transaction()).await?;
 
-    // Create a valid JWT token
     let token = mint_test_token(&user_sub, &user_email, &security_config);
 
-    // Build test app with echo route
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route(
@@ -411,7 +369,6 @@ async fn test_membership_composition_with_current_user_and_game_id(
         .build()
         .await?;
 
-    // Make request with valid token and inject the shared txn
     let req = test::TestRequest::get()
         .uri(&format!("/games/{}/membership", game.id))
         .insert_header(("Authorization", format!("Bearer {token}")))
@@ -420,7 +377,6 @@ async fn test_membership_composition_with_current_user_and_game_id(
 
     let resp = test::call_service(&app, req).await;
 
-    // Assert success
     assert!(resp.status().is_success());
 
     let body: Value = test::read_body_json(resp).await;
@@ -432,7 +388,6 @@ async fn test_membership_composition_with_current_user_and_game_id(
     assert_eq!(body["is_ready"], true);
     assert_eq!(body["role"], "Player");
 
-    // Cleanup
     shared.rollback().await?;
 
     Ok(())
@@ -506,18 +461,10 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     // Create a test user
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
-    let now = OffsetDateTime::now_utc();
-    let user = users::ActiveModel {
-        id: sea_orm::NotSet,
-        sub: Set(user_sub.clone()),
-        username: Set(Some("player1".to_string())),
-        is_ai: Set(false),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
-    let user = user.insert(shared.transaction()).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("player1")).await?;
 
     // Create a test game
+    let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
@@ -533,7 +480,7 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     let membership = game_players::ActiveModel {
         id: sea_orm::NotSet,
         game_id: Set(game.id),
-        user_id: Set(user.id),
+        user_id: Set(user_id),
         turn_order: Set(1),
         is_ready: Set(false),
         created_at: Set(now),
@@ -564,14 +511,12 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
 
     let resp = test::call_service(&app, req).await;
 
-    // Assert success
     assert!(resp.status().is_success());
 
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["role"], "Player");
     assert_eq!(body["message"], "Player action successful");
 
-    // Cleanup
     shared.rollback().await?;
 
     Ok(())
@@ -594,18 +539,10 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     // Create a test user
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
-    let now = OffsetDateTime::now_utc();
-    let user = users::ActiveModel {
-        id: sea_orm::NotSet,
-        sub: Set(user_sub.clone()),
-        username: Set(Some("viewer".to_string())),
-        is_ai: Set(false),
-        created_at: Set(now),
-        updated_at: Set(now),
-    };
-    let user = user.insert(shared.transaction()).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("viewer")).await?;
 
     // Create a test game
+    let now = OffsetDateTime::now_utc();
     let game = games::ActiveModel {
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
@@ -621,7 +558,7 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     let membership = game_players::ActiveModel {
         id: sea_orm::NotSet,
         game_id: Set(game.id),
-        user_id: Set(user.id),
+        user_id: Set(user_id),
         turn_order: Set(1),
         is_ready: Set(false),
         created_at: Set(now),
@@ -652,14 +589,12 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
 
     let resp = test::call_service(&app, req).await;
 
-    // Assert success
     assert!(resp.status().is_success());
 
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["role"], "Player");
     assert_eq!(body["message"], "Any member can view this");
 
-    // Cleanup
     shared.rollback().await?;
 
     Ok(())

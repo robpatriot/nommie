@@ -22,7 +22,6 @@ async fn test_create_bid_and_find_all() -> Result<(), AppError> {
             let game = games::create_game(txn, &join_code).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            // Create bids for players
             let bid1 = bids::create_bid(txn, round.id, 0, 5, 0).await?;
             let _bid2 = bids::create_bid(txn, round.id, 1, 7, 1).await?;
             let _bid3 = bids::create_bid(txn, round.id, 2, 3, 2).await?;
@@ -31,7 +30,6 @@ async fn test_create_bid_and_find_all() -> Result<(), AppError> {
             assert_eq!(bid1.bid_value, 5);
             assert_eq!(bid1.bid_order, 0);
 
-            // Find all bids
             let all_bids = bids::find_all_by_round(txn, round.id).await?;
             assert_eq!(all_bids.len(), 3);
 
@@ -63,15 +61,12 @@ async fn test_count_bids() -> Result<(), AppError> {
             let game = games::create_game(txn, &join_code).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            // Initially 0 bids
             let count = bids::count_bids_by_round(txn, round.id).await?;
             assert_eq!(count, 0);
 
-            // Add some bids
             bids::create_bid(txn, round.id, 0, 5, 0).await?;
             bids::create_bid(txn, round.id, 1, 7, 1).await?;
 
-            // Count should be 2
             let count = bids::count_bids_by_round(txn, round.id).await?;
             assert_eq!(count, 2);
 
@@ -98,12 +93,10 @@ async fn test_find_winning_bid_highest() -> Result<(), AppError> {
             let game = games::create_game(txn, &join_code).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            // Create bids with different values
             bids::create_bid(txn, round.id, 0, 5, 0).await?;
             bids::create_bid(txn, round.id, 1, 9, 1).await?; // Highest
             bids::create_bid(txn, round.id, 2, 3, 2).await?;
 
-            // Find winner
             let winner = bids::find_winning_bid(txn, round.id).await?;
             assert!(winner.is_some());
             let winner = winner.unwrap();
@@ -133,12 +126,10 @@ async fn test_find_winning_bid_tiebreaker() -> Result<(), AppError> {
             let game = games::create_game(txn, &join_code).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            // Create bids with same value (tie)
             bids::create_bid(txn, round.id, 0, 7, 0).await?; // First - should win tie
             bids::create_bid(txn, round.id, 1, 7, 1).await?; // Second
             bids::create_bid(txn, round.id, 2, 5, 2).await?;
 
-            // Find winner - should be first bidder (bid_order=0)
             let winner = bids::find_winning_bid(txn, round.id).await?;
             assert!(winner.is_some());
             let winner = winner.unwrap();
@@ -169,7 +160,6 @@ async fn test_find_winning_bid_none() -> Result<(), AppError> {
             let game = games::create_game(txn, &join_code).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            // No bids placed
             let winner = bids::find_winning_bid(txn, round.id).await?;
             assert!(winner.is_none());
 
@@ -196,19 +186,14 @@ async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
             let game = games::create_game(txn, &join_code).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            // Create first bid for seat 0
             bids::create_bid(txn, round.id, 0, 5, 0).await?;
 
-            // Try to create duplicate bid for same seat
             let result = bids::create_bid(txn, round.id, 0, 7, 1).await;
 
             assert!(result.is_err(), "Duplicate bid should fail");
 
-            // Verify it's a conflict error
             match result.unwrap_err() {
-                backend::errors::domain::DomainError::Conflict(_, _) => {
-                    // Expected
-                }
+                backend::errors::domain::DomainError::Conflict(_, _) => {}
                 e => panic!("Expected Conflict error, got {e:?}"),
             }
 
@@ -235,19 +220,14 @@ async fn test_unique_constraint_round_order() -> Result<(), AppError> {
             let game = games::create_game(txn, &join_code).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            // Create first bid with order 0
             bids::create_bid(txn, round.id, 0, 5, 0).await?;
 
-            // Try to create another bid with same bid_order
             let result = bids::create_bid(txn, round.id, 1, 7, 0).await;
 
             assert!(result.is_err(), "Duplicate bid_order should fail");
 
-            // Verify it's a conflict error
             match result.unwrap_err() {
-                backend::errors::domain::DomainError::Conflict(_, _) => {
-                    // Expected
-                }
+                backend::errors::domain::DomainError::Conflict(_, _) => {}
                 e => panic!("Expected Conflict error, got {e:?}"),
             }
 
