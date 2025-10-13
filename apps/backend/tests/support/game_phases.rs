@@ -163,6 +163,189 @@ fn find_winning_bidder(bids: &[u8; 4], dealer_pos: i32) -> i32 {
     winner as i32
 }
 
+/// Set up a game at a specific round number (between rounds).
+///
+/// Creates a game in BetweenRounds state with:
+/// - 4 ready players
+/// - All previous rounds completed with simple scoring
+/// - Ready to deal the next round
+///
+/// # Arguments
+/// * `txn` - Database transaction
+/// * `rng_seed` - Seed for deterministic RNG
+/// * `completed_rounds` - Number of rounds already completed (1-26)
+///
+/// # Returns
+/// PhaseSetup with game_id, user_ids, round_id (of last completed round), and dealer position
+///
+/// # Example
+/// ```
+/// // Set up game with 25 rounds completed, ready to deal round 26
+/// let setup = setup_game_at_round(txn, 12345, 25).await?;
+/// // Now deal the next round...
+/// service.deal_round(txn, setup.game_id).await?;
+/// ```
+pub async fn setup_game_at_round(
+    txn: &DatabaseTransaction,
+    rng_seed: i64,
+    completed_rounds: i32,
+) -> Result<PhaseSetup, AppError> {
+    use backend::entities::games::{self, GameState, GameVisibility};
+    use backend::repos::{bids, memberships, rounds, scores};
+    use sea_orm::{ActiveModelTrait, NotSet, Set};
+    use time::OffsetDateTime;
+
+    if !(0..=26).contains(&completed_rounds) {
+        return Err(AppError::from(
+            backend::errors::domain::DomainError::validation(
+                backend::errors::domain::ValidationKind::Other("INVALID_ROUND".into()),
+                format!("completed_rounds must be 0-26, got {}", completed_rounds),
+            ),
+        ));
+    }
+
+    // Create 4 test users
+    let user_ids = vec![
+        super::factory::create_test_user(
+            txn,
+            &format!("r{}_p1", completed_rounds),
+            Some("Player 1"),
+        )
+        .await?,
+        super::factory::create_test_user(
+            txn,
+            &format!("r{}_p2", completed_rounds),
+            Some("Player 2"),
+        )
+        .await?,
+        super::factory::create_test_user(
+            txn,
+            &format!("r{}_p3", completed_rounds),
+            Some("Player 3"),
+        )
+        .await?,
+        super::factory::create_test_user(
+            txn,
+            &format!("r{}_p4", completed_rounds),
+            Some("Player 4"),
+        )
+        .await?,
+    ];
+
+    // Create game in BetweenRounds state (or Lobby if 0 rounds completed)
+    let now = OffsetDateTime::now_utc();
+    let game_state = if completed_rounds == 0 {
+        GameState::Lobby
+    } else {
+        GameState::BetweenRounds
+    };
+
+    let game = games::ActiveModel {
+        id: NotSet,
+        created_by: Set(Some(user_ids[0])),
+        visibility: Set(GameVisibility::Public),
+        state: Set(game_state),
+        created_at: Set(now),
+        updated_at: Set(now),
+        started_at: Set(if completed_rounds > 0 {
+            Some(now)
+        } else {
+            None
+        }),
+        ended_at: Set(None),
+        name: Set(Some(format!("Test Game at Round {}", completed_rounds))),
+        join_code: Set(Some(format!(
+            "R{}{}",
+            completed_rounds,
+            rand::random::<u32>() % 100000
+        ))),
+        rules_version: Set("1.0".to_string()),
+        rng_seed: Set(Some(rng_seed)),
+        current_round: Set(if completed_rounds > 0 {
+            Some(completed_rounds as i16)
+        } else {
+            None
+        }),
+        starting_dealer_pos: Set(if completed_rounds > 0 { Some(0) } else { None }),
+        current_trick_no: Set(0),
+        current_round_id: Set(None), // No active round
+        lock_version: Set(0),
+    };
+    let game_id = game.insert(txn).await?.id;
+
+    // Add players as memberships
+    for (i, user_id) in user_ids.iter().enumerate() {
+        memberships::create_membership(
+            txn,
+            game_id,
+            *user_id,
+            i as i32,
+            true, // All ready
+            memberships::GameRole::Player,
+        )
+        .await?;
+    }
+
+    let mut last_round_id = 0;
+
+    // Create completed rounds with simple scoring
+    for round_no in 1..=completed_rounds {
+        let hand_size =
+            backend::domain::rules::hand_size_for_round(round_no as u8).ok_or_else(|| {
+                AppError::from(backend::errors::domain::DomainError::validation(
+                    backend::errors::domain::ValidationKind::InvalidHandSize,
+                    format!("Invalid round number: {}", round_no),
+                ))
+            })?;
+
+        let dealer_pos = ((round_no - 1) % 4) as i16;
+
+        let round =
+            rounds::create_round(txn, game_id, round_no as i16, hand_size as i16, dealer_pos)
+                .await?;
+
+        last_round_id = round.id;
+
+        // Create simple bids and scores for each player
+        // Each player gets 4 points per round (simplified for test setup)
+        for seat in 0..4 {
+            // Create bid records (bid_order = seat for simplicity)
+            bids::create_bid(txn, round.id, seat, 1, seat).await?;
+
+            // Create score records
+            scores::create_score(
+                txn,
+                scores::ScoreData {
+                    round_id: round.id,
+                    player_seat: seat,
+                    bid_value: 1,
+                    tricks_won: 1,
+                    bid_met: false,
+                    base_score: 1,
+                    bonus: 0,
+                    round_score: 4,
+                    total_score_after: (4 * round_no) as i16,
+                },
+            )
+            .await?;
+        }
+
+        // Mark round as completed
+        rounds::complete_round(txn, round.id).await?;
+    }
+
+    Ok(PhaseSetup {
+        game_id,
+        user_ids,
+        round_id: last_round_id,
+        dealer_pos: if completed_rounds > 0 {
+            (completed_rounds - 1) % 4
+        } else {
+            0
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
