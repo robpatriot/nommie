@@ -18,6 +18,7 @@ use serde_json::json;
 /// 2. Marks all AI players ready (triggers auto-start and AI orchestration)
 /// 3. Verifies the game progresses through at least one complete round
 #[tokio::test]
+#[cfg_attr(not(feature = "slow-tests"), ignore)]
 async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     // Build test state
     let state = build_state()
