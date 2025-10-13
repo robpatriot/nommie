@@ -15,7 +15,7 @@ use rand::prelude::*;
 
 use super::trait_def::{AiError, AiPlayer};
 use crate::domain::player_view::CurrentRoundInfo;
-use crate::domain::{Card, Trump};
+use crate::domain::{Card, GameContext, Trump};
 
 /// AI that makes random legal moves.
 ///
@@ -90,7 +90,7 @@ impl RandomPlayer {
 }
 
 impl AiPlayer for RandomPlayer {
-    fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
+    fn choose_bid(&self, state: &CurrentRoundInfo, _context: &GameContext) -> Result<u8, AiError> {
         // Pattern 1: Always get legal moves first
         // This handles dealer restriction and turn order automatically
         let legal_bids = state
@@ -118,7 +118,11 @@ impl AiPlayer for RandomPlayer {
         Ok(choice)
     }
 
-    fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError> {
+    fn choose_play(
+        &self,
+        state: &CurrentRoundInfo,
+        _context: &GameContext,
+    ) -> Result<Card, AiError> {
         // Pattern 1: Get legal plays (handles follow-suit rule automatically)
         let legal_plays = state
             .legal_plays()
@@ -144,7 +148,11 @@ impl AiPlayer for RandomPlayer {
         Ok(choice)
     }
 
-    fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Trump, AiError> {
+    fn choose_trump(
+        &self,
+        state: &CurrentRoundInfo,
+        _context: &GameContext,
+    ) -> Result<Trump, AiError> {
         // Pattern 1: Get all legal trump options (5 choices including NoTrump)
         let legal_trumps = state.legal_trumps();
 

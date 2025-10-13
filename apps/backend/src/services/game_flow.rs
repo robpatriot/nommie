@@ -822,7 +822,7 @@ impl GameFlowService {
     ///
     /// This is a loop-based approach to avoid deep recursion and stack overflow.
     ///
-    /// Performance: Maintains RoundContext cache across iterations within the same round,
+    /// Performance: Maintains RoundCache across iterations within the same round,
     /// only reloading when the round number changes. This avoids ~1,400 redundant cache
     /// creations per game (reduces to ~26, once per round).
     pub async fn process_game_state(
@@ -831,12 +831,16 @@ impl GameFlowService {
         game_id: i64,
     ) -> Result<(), AppError> {
         use crate::entities::games::GameState as DbGameState;
-        use crate::services::round_context::RoundContext;
+        use crate::services::round_cache::RoundCache;
 
         const MAX_ITERATIONS: usize = 2000; // Allow for full 26-round game with all actions
 
         // Cache that persists across iterations within the same round
-        let mut cached_round: Option<(i16, RoundContext)> = None;
+        let mut cached_round: Option<(i16, RoundCache)> = None;
+
+        // Game history cache - loaded once and updated incrementally after round completion
+        // This persists across all rounds in the game and is passed to AIs for strategic analysis
+        let mut game_history: Option<crate::domain::player_view::GameHistory> = None;
 
         for _iteration in 0..MAX_ITERATIONS {
             let game = games_sea::require_game(txn, game_id).await?;
@@ -854,6 +858,13 @@ impl GameFlowService {
             );
 
             if needs_cache {
+                // Load game history if not yet loaded
+                if game_history.is_none() {
+                    debug!(game_id, "Loading GameHistory cache");
+                    game_history =
+                        Some(crate::domain::player_view::GameHistory::load(txn, game_id).await?);
+                }
+
                 if let Some(current_round) = game.current_round {
                     // Check if cache is stale (different round or doesn't exist)
                     let is_stale = cached_round
@@ -865,17 +876,27 @@ impl GameFlowService {
                         debug!(
                             game_id,
                             round_no = current_round,
-                            "Creating RoundContext cache for new round"
+                            "Creating RoundCache for new round"
                         );
-                        let context = RoundContext::load(txn, game_id, current_round).await?;
-                        cached_round = Some((current_round, context));
+                        let cache = RoundCache::load(txn, game_id, current_round).await?;
+                        cached_round = Some((current_round, cache));
+
+                        // Reload game history when round changes (history was updated with new scores)
+                        debug!(
+                            game_id,
+                            round_no = current_round,
+                            "Reloading GameHistory cache for new round"
+                        );
+                        game_history = Some(
+                            crate::domain::player_view::GameHistory::load(txn, game_id).await?,
+                        );
                     }
                     // else: reuse existing cache (optimization!)
                 }
             } else {
                 // Not in a state that benefits from caching
                 if cached_round.is_some() {
-                    debug!(game_id, "Clearing RoundContext cache (exited round states)");
+                    debug!(game_id, "Clearing RoundCache (exited round states)");
                     cached_round = None;
                 }
             }
@@ -886,6 +907,7 @@ impl GameFlowService {
                     txn,
                     &game,
                     cached_round.as_ref().map(|(_, ctx)| ctx),
+                    game_history.as_ref(),
                 )
                 .await?
             {
@@ -1060,13 +1082,15 @@ impl GameFlowService {
     ///
     /// Returns true if an AI action was executed (which will trigger recursive processing).
     ///
-    /// If round_context is provided, uses it to avoid redundant database queries.
+    /// If round_cache is provided, uses it to avoid redundant database queries.
+    /// If game_history is provided, wraps it in GameContext and passes to AI methods.
     /// Otherwise, loads player/AI data from database (slower fallback).
     async fn check_and_execute_ai_action_with_cache(
         &self,
         txn: &DatabaseTransaction,
         game: &crate::entities::games::Model,
-        round_context: Option<&crate::services::round_context::RoundContext>,
+        round_cache: Option<&crate::services::round_cache::RoundCache>,
+        game_history: Option<&crate::domain::player_view::GameHistory>,
     ) -> Result<bool, AppError> {
         use sea_orm::{EntityTrait, JoinType, QuerySelect, RelationTrait};
 
@@ -1082,7 +1106,7 @@ impl GameFlowService {
         };
 
         // Check if this player is an AI (use cache if available)
-        let (user_id, profile) = if let Some(ctx) = round_context {
+        let (user_id, profile) = if let Some(ctx) = round_cache {
             // Fast path: Use cached player data
             // If no players exist (test scenario), fall through to slow path
             if ctx.players.is_empty() {
@@ -1181,24 +1205,68 @@ impl GameFlowService {
         let mut last_error = None;
 
         for retry in 0..MAX_RETRIES_PER_ACTION {
-            match self
-                .execute_ai_action_with_cache(
-                    txn,
-                    game.id,
-                    player_seat,
-                    action_type,
-                    ai.as_ref(),
-                    round_context,
-                )
-                .await
-            {
+            // Build current round info - use cache if available
+            let state = if let Some(cache) = round_cache {
+                // Fast path: Use cached data
+                let game_model = crate::adapters::games_sea::require_game(txn, game.id).await?;
+                cache
+                    .build_current_round_info(
+                        txn,
+                        player_seat,
+                        game_model.state,
+                        game_model.current_trick_no,
+                    )
+                    .await?
+            } else {
+                // Fallback: Load everything from DB
+                use crate::domain::player_view::CurrentRoundInfo;
+                CurrentRoundInfo::load(txn, game.id, player_seat).await?
+            };
+
+            // Create GameContext with cached game history
+            let history = game_history.ok_or_else(|| {
+                AppError::internal("GameHistory not available - should be cached by orchestration")
+            })?;
+            let game_context = crate::domain::GameContext::new(history.clone());
+
+            // Execute AI decision and persist the action
+            let result = match action_type {
+                ActionType::Bid => {
+                    let bid = ai.choose_bid(&state, &game_context)?;
+                    // Use internal version to avoid recursion (loop handles processing)
+                    self.submit_bid_internal(txn, game.id, player_seat, bid)
+                        .await
+                }
+                ActionType::Trump => {
+                    let trump_choice = ai.choose_trump(&state, &game_context)?;
+                    // Convert domain::Trump to rounds::Trump
+                    let trump = match trump_choice {
+                        crate::domain::Trump::Clubs => rounds::Trump::Clubs,
+                        crate::domain::Trump::Diamonds => rounds::Trump::Diamonds,
+                        crate::domain::Trump::Hearts => rounds::Trump::Hearts,
+                        crate::domain::Trump::Spades => rounds::Trump::Spades,
+                        crate::domain::Trump::NoTrump => rounds::Trump::NoTrump,
+                    };
+                    // Use internal version to avoid recursion (loop handles processing)
+                    self.set_trump_internal(txn, game.id, player_seat, trump)
+                        .await
+                }
+                ActionType::Play => {
+                    let card = ai.choose_play(&state, &game_context)?;
+                    // Use internal version to avoid recursion (loop handles processing)
+                    self.play_card_internal(txn, game.id, player_seat, card)
+                        .await
+                }
+            };
+
+            match result {
                 Ok(()) => {
                     info!(
                         game.id,
                         player_seat,
                         action = ?action_type,
                         retry,
-                        cached = round_context.is_some(),
+                        cached = round_cache.is_some(),
                         "AI action executed successfully"
                     );
                     return Ok(true);
@@ -1355,65 +1423,6 @@ impl GameFlowService {
                 Ok(None)
             }
         }
-    }
-
-    /// Execute an AI action with optional round context cache.
-    ///
-    /// If round_context is provided, uses cached data to build player view.
-    /// Otherwise, loads all data from database (slower but always works).
-    async fn execute_ai_action_with_cache(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-        player_seat: i16,
-        action_type: ActionType,
-        ai: &dyn crate::ai::AiPlayer,
-        round_context: Option<&crate::services::round_context::RoundContext>,
-    ) -> Result<(), AppError> {
-        use crate::domain::player_view::CurrentRoundInfo;
-
-        // Build current round info - use cache if available
-        let state = if let Some(context) = round_context {
-            // Fast path: Use cached data
-            let game = crate::adapters::games_sea::require_game(txn, game_id).await?;
-            context
-                .build_current_round_info(txn, player_seat, game.state, game.current_trick_no)
-                .await?
-        } else {
-            // Fallback: Load everything from DB
-            CurrentRoundInfo::load(txn, game_id, player_seat).await?
-        };
-
-        match action_type {
-            ActionType::Bid => {
-                let bid = ai.choose_bid(&state)?;
-                // Use internal version to avoid recursion (loop handles processing)
-                self.submit_bid_internal(txn, game_id, player_seat, bid)
-                    .await?;
-            }
-            ActionType::Trump => {
-                let trump_choice = ai.choose_trump(&state)?;
-                // Convert domain::Trump to rounds::Trump
-                let trump = match trump_choice {
-                    crate::domain::Trump::Clubs => rounds::Trump::Clubs,
-                    crate::domain::Trump::Diamonds => rounds::Trump::Diamonds,
-                    crate::domain::Trump::Hearts => rounds::Trump::Hearts,
-                    crate::domain::Trump::Spades => rounds::Trump::Spades,
-                    crate::domain::Trump::NoTrump => rounds::Trump::NoTrump,
-                };
-                // Use internal version to avoid recursion (loop handles processing)
-                self.set_trump_internal(txn, game_id, player_seat, trump)
-                    .await?;
-            }
-            ActionType::Play => {
-                let card = ai.choose_play(&state)?;
-                // Use internal version to avoid recursion (loop handles processing)
-                self.play_card_internal(txn, game_id, player_seat, card)
-                    .await?;
-            }
-        }
-
-        Ok(())
     }
 }
 

@@ -26,21 +26,21 @@
 //! }
 //!
 //! impl AiPlayer for MyAI {
-//!     fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
+//!     fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
 //!         let legal_bids = state.legal_bids()
 //!             .map_err(|e| AiError::Internal(format!("{e}")))?;
 //!         // Your bidding logic here
 //!         Ok(legal_bids[0])
 //!     }
 //!
-//!     fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError> {
+//!     fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
 //!         let legal_plays = state.legal_plays()
 //!             .map_err(|e| AiError::Internal(format!("{e}")))?;
 //!         // Your card selection logic here
 //!         Ok(legal_plays[0])
 //!     }
 //!
-//!     fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Trump, AiError> {
+//!     fn choose_trump(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Trump, AiError> {
 //!         // Your trump selection logic here
 //!         Ok(Trump::Spades)
 //!     }
@@ -50,7 +50,7 @@
 use std::fmt;
 
 use crate::domain::player_view::CurrentRoundInfo;
-use crate::domain::{Card, Trump};
+use crate::domain::{Card, GameContext, Trump};
 use crate::error::AppError;
 
 /// Errors that can occur during AI decision-making.
@@ -88,6 +88,20 @@ impl From<AiError> for AppError {
 /// when it's the AI's turn to make a decision. The AI receives complete visible game state
 /// via [`CurrentRoundInfo`] and must return a legal move.
 ///
+/// # Common Parameters
+///
+/// All three decision methods receive the same parameters:
+///
+/// * `state: &CurrentRoundInfo` - Complete visible game state for the current round, including:
+///   - Your hand, position, and seat
+///   - All bids and scores
+///   - Current trick state and plays
+///   - Helper methods for legal moves (`legal_bids()`, `legal_plays()`, `legal_trumps()`)
+///
+/// * `context: &GameContext` - Game-wide context including:
+///   - Complete game history via `context.game_history()` for strategic analysis
+///   - Historical data persisting across all rounds
+///
 /// # Thread Safety
 ///
 /// Implementations must be `Send + Sync` as the game engine may call methods from different threads.
@@ -111,19 +125,19 @@ impl From<AiError> for AppError {
 /// pub struct SimpleAI;
 ///
 /// impl AiPlayer for SimpleAI {
-///     fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
+///     fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
 ///         let legal_bids = state.legal_bids()
 ///             .map_err(|e| AiError::Internal(format!("{e}")))?;
 ///         Ok(legal_bids[0])  // Bid the minimum legal value
 ///     }
 ///
-///     fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError> {
+///     fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
 ///         let legal_plays = state.legal_plays()
 ///             .map_err(|e| AiError::Internal(format!("{e}")))?;
 ///         Ok(legal_plays[0])  // Play the first legal card
 ///     }
 ///
-///     fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Trump, AiError> {
+///     fn choose_trump(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Trump, AiError> {
 ///         Ok(Trump::Spades)  // Always choose Spades
 ///     }
 /// }
@@ -136,10 +150,6 @@ pub trait AiPlayer: Send + Sync {
     /// Called once per round when it's the AI's turn to bid. The AI must return a legal
     /// bid value (0 to hand_size). The dealer has a special restriction: cannot bid a value
     /// that makes the sum of all bids equal to hand_size.
-    ///
-    /// # Arguments
-    ///
-    /// * `state` - Complete visible game state including hand, previous bids, and scores
     ///
     /// # Returns
     ///
@@ -156,7 +166,7 @@ pub trait AiPlayer: Send + Sync {
     /// # Example
     ///
     /// ```rust,ignore
-    /// fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
+    /// fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
     ///     let legal_bids = state.legal_bids()
     ///         .map_err(|e| AiError::Internal(format!("{e}")))?;
     ///     
@@ -178,16 +188,12 @@ pub trait AiPlayer: Send + Sync {
     ///         .ok_or_else(|| AiError::Internal("Failed to choose bid".into()))
     /// }
     /// ```
-    fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError>;
+    fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError>;
 
     /// Choose a card to play during trick play.
     ///
     /// Called during each trick when it's the AI's turn to play. The AI must return a legal
     /// card from its hand. Must follow suit if able (enforced by `state.legal_plays()`).
-    ///
-    /// # Arguments
-    ///
-    /// * `state` - Complete visible game state including hand, current trick plays, and trump
     ///
     /// # Returns
     ///
@@ -204,7 +210,7 @@ pub trait AiPlayer: Send + Sync {
     /// # Example
     ///
     /// ```rust,ignore
-    /// fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError> {
+    /// fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
     ///     let legal_plays = state.legal_plays()
     ///         .map_err(|e| AiError::Internal(format!("{e}")))?;
     ///     
@@ -220,16 +226,13 @@ pub trait AiPlayer: Send + Sync {
     ///     }
     /// }
     /// ```
-    fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError>;
+    fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext)
+        -> Result<Card, AiError>;
 
     /// Choose trump after winning the bid.
     ///
     /// Called when the AI has the highest bid and must select trump for the round.
     /// Can choose from the four suits (Clubs, Diamonds, Hearts, Spades) or NoTrump.
-    ///
-    /// # Arguments
-    ///
-    /// * `state` - Complete visible game state including hand and all bids
     ///
     /// # Returns
     ///
@@ -243,7 +246,7 @@ pub trait AiPlayer: Send + Sync {
     /// # Example
     ///
     /// ```rust,ignore
-    /// fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Trump, AiError> {
+    /// fn choose_trump(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Trump, AiError> {
     ///     // Count cards per suit
     ///     let mut suit_counts = [
     ///         (Trump::Clubs, 0),
@@ -276,5 +279,9 @@ pub trait AiPlayer: Send + Sync {
     ///     }
     /// }
     /// ```
-    fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Trump, AiError>;
+    fn choose_trump(
+        &self,
+        state: &CurrentRoundInfo,
+        context: &GameContext,
+    ) -> Result<Trump, AiError>;
 }
