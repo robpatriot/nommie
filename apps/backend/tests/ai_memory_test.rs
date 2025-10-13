@@ -294,9 +294,15 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
 
     let ai_service = AiService::new();
 
-    // Create AI with Partial memory (level 60)
+    // Create AI template user with Partial memory (level 60)
     let user_id = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 12345})), Some(60))
+        .create_ai_template_user(
+            txn,
+            "Random Bot (Partial Memory)",
+            "random",
+            Some(json!({"seed": 12345})),
+            Some(60),
+        )
         .await?;
 
     // Load the profile
@@ -310,9 +316,15 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
         MemoryMode::Partial { level: 60 }
     );
 
-    // Create AI with Full memory (None -> defaults to Full)
+    // Create AI template user with Full memory (None -> defaults to Full)
     let user_id2 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 67890})), None)
+        .create_ai_template_user(
+            txn,
+            "Random Bot (Full Memory)",
+            "random",
+            Some(json!({"seed": 67890})),
+            None,
+        )
         .await?;
 
     let profile2 = ai_profiles::find_by_user_id(txn, user_id2)

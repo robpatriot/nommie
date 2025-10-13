@@ -1106,7 +1106,7 @@ impl GameFlowService {
         };
 
         // Check if this player is an AI (use cache if available)
-        let (user_id, profile) = if let Some(ctx) = round_cache {
+        let (user_id, game_player_id, profile) = if let Some(ctx) = round_cache {
             // Fast path: Use cached player data
             // If no players exist (test scenario), fall through to slow path
             if ctx.players.is_empty() {
@@ -1139,7 +1139,7 @@ impl GameFlowService {
                 return Ok(false);
             }
 
-            (player.user_id, profile.cloned())
+            (player.user_id, player.id, profile.cloned())
         } else {
             // Slow path: Load from database (used for Lobby, Dealing, etc.)
             let memberships = memberships::find_all_by_game(txn, game.id).await?;
@@ -1186,7 +1186,7 @@ impl GameFlowService {
                 )
             })?;
 
-            (user.id, Some(profile))
+            (user.id, player.id, Some(profile))
         };
 
         let profile = profile
@@ -1194,11 +1194,44 @@ impl GameFlowService {
 
         info!(game.id, player_seat, action = ?action_type, "Processing AI turn");
 
-        // Create AI player
+        // Load any AI overrides for this game instance
+        let ai_override =
+            crate::repos::ai_overrides::find_by_game_player_id(txn, game_player_id).await?;
+
+        // Resolve effective AI configuration (overrides take precedence over profile)
+        let effective_memory_level = ai_override
+            .as_ref()
+            .and_then(|o| o.memory_level)
+            .or(profile.memory_level)
+            .unwrap_or(100);
+
+        let effective_config = if let Some(ref override_data) = ai_override {
+            if let Some(ref override_config) = override_data.config {
+                // Merge configs: override fields take precedence
+                crate::services::ai::merge_json_configs(
+                    profile.config.as_ref(),
+                    Some(override_config),
+                )
+            } else {
+                profile.config.clone()
+            }
+        } else {
+            profile.config.clone()
+        };
+
+        // Create AI player with effective config
         let ai_type = profile.playstyle.as_deref().unwrap_or("random");
-        let config = crate::ai::AiConfig::from_json(profile.config.as_ref());
+        let config = crate::ai::AiConfig::from_json(effective_config.as_ref());
         let ai = create_ai(ai_type, config)
             .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
+
+        debug!(
+            game.id,
+            player_seat,
+            memory_level = effective_memory_level,
+            has_overrides = ai_override.is_some(),
+            "AI configuration resolved"
+        );
 
         // Execute action with retries, using cache if available
         const MAX_RETRIES_PER_ACTION: usize = 3;

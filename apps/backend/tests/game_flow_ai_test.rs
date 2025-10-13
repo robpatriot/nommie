@@ -13,10 +13,11 @@ use serde_json::json;
 
 /// Test that a full game with 4 AI players completes successfully.
 ///
-/// This test:
-/// 1. Creates a game with 4 AI players (seeded for determinism)
-/// 2. Marks all AI players ready (triggers auto-start and AI orchestration)
-/// 3. Verifies the game progresses through at least one complete round
+/// This test demonstrates the NEW reusable AI pattern:
+/// 1. Creates reusable AI template users (only once)
+/// 2. Uses the same AI templates in a game with per-instance overrides
+/// 3. Marks all AI players ready (triggers auto-start and AI orchestration)
+/// 4. Verifies the game completes all 26 rounds
 #[tokio::test]
 #[cfg_attr(not(feature = "slow-tests"), ignore)]
 async fn test_full_game_with_ai_players() -> Result<(), AppError> {
@@ -32,32 +33,93 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
-    // Create 4 AI players with deterministic seeds and full memory
+    // Create reusable AI template users (these could be reused across many games)
     let ai_service = AiService::new();
+
+    // Create 4 distinct AI template users to demonstrate reusable pattern
     let ai1 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 12345})), Some(100))
+        .create_ai_template_user(
+            txn,
+            "Random Bot 1",
+            "random",
+            Some(json!({"seed": 12345})),
+            Some(100),
+        )
         .await?;
+
     let ai2 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 67890})), Some(100))
+        .create_ai_template_user(
+            txn,
+            "Random Bot 2",
+            "random",
+            Some(json!({"seed": 67890})),
+            Some(100),
+        )
         .await?;
+
     let ai3 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 11111})), Some(100))
+        .create_ai_template_user(
+            txn,
+            "Random Bot 3",
+            "random",
+            Some(json!({"seed": 11111})),
+            Some(100),
+        )
         .await?;
+
     let ai4 = ai_service
-        .create_ai_user(txn, "random", Some(json!({"seed": 22222})), Some(100))
+        .create_ai_template_user(
+            txn,
+            "Random Bot 4",
+            "random",
+            Some(json!({"seed": 22222})),
+            Some(100),
+        )
         .await?;
 
     let game_id = support::factory::create_fresh_lobby_game(txn).await?;
 
-    // Add AI players to game as memberships
-    use backend::repos::memberships;
-    memberships::create_membership(txn, game_id, ai1, 0, false, memberships::GameRole::Player)
+    // Add AIs to game - demonstrating override capability
+    use backend::services::ai::AiInstanceOverrides;
+
+    // Seat 0: Default config
+    ai_service
+        .add_ai_to_game(txn, game_id, ai1, 0, None)
         .await?;
-    memberships::create_membership(txn, game_id, ai2, 1, false, memberships::GameRole::Player)
+
+    // Seat 1: Override name
+    ai_service
+        .add_ai_to_game(
+            txn,
+            game_id,
+            ai2,
+            1,
+            Some(AiInstanceOverrides {
+                name: Some("Custom Name Bot".to_string()),
+                memory_level: None,
+                config: None,
+            }),
+        )
         .await?;
-    memberships::create_membership(txn, game_id, ai3, 2, false, memberships::GameRole::Player)
+
+    // Seat 2: Default config
+    ai_service
+        .add_ai_to_game(txn, game_id, ai3, 2, None)
         .await?;
-    memberships::create_membership(txn, game_id, ai4, 3, false, memberships::GameRole::Player)
+
+    // Seat 3: Override config and memory (demonstrates full override)
+    ai_service
+        .add_ai_to_game(
+            txn,
+            game_id,
+            ai4,
+            3,
+            Some(AiInstanceOverrides {
+                name: Some("Hard Mode Bot".to_string()),
+                memory_level: Some(50),               // Reduced memory
+                config: Some(json!({"seed": 99999})), // Different seed
+            }),
+        )
         .await?;
 
     // Create gameflow service
@@ -89,6 +151,7 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         game.current_round.unwrap(),
         game.state
     );
+    println!("✅ Demonstrated reusable AI templates with per-instance overrides");
 
     // Rollback transaction
     shared.rollback().await?;

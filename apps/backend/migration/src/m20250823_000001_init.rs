@@ -102,6 +102,18 @@ enum AiProfiles {
 }
 
 #[derive(Iden)]
+enum AiOverrides {
+    Table,
+    Id,
+    GamePlayerId,
+    Name,
+    MemoryLevel,
+    Config,
+    CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
 enum GameRounds {
     Table,
     Id,
@@ -574,6 +586,60 @@ impl MigrationTrait for Migration {
                             .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
+                    .to_owned(),
+            )
+            .await?;
+
+        // ai_overrides - per-instance AI configuration overrides
+        manager
+            .create_table(
+                Table::create()
+                    .table(AiOverrides::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(AiOverrides::Id)
+                            .big_integer()
+                            .not_null()
+                            .primary_key()
+                            .auto_increment(),
+                    )
+                    .col(
+                        ColumnDef::new(AiOverrides::GamePlayerId)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(AiOverrides::Name).string().null())
+                    .col(ColumnDef::new(AiOverrides::MemoryLevel).integer().null())
+                    .col(ColumnDef::new(AiOverrides::Config).json_binary().null())
+                    .col(
+                        ColumnDef::new(AiOverrides::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiOverrides::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_ai_overrides_game_player_id")
+                            .from(AiOverrides::Table, AiOverrides::GamePlayerId)
+                            .to(GamePlayers::Table, GamePlayers::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // Create unique index on ai_overrides.game_player_id
+        manager
+            .create_index(
+                Index::create()
+                    .name("ux_ai_overrides_game_player_id")
+                    .table(AiOverrides::Table)
+                    .col(AiOverrides::GamePlayerId)
+                    .unique()
                     .to_owned(),
             )
             .await?;
