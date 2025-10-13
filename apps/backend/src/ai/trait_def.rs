@@ -3,7 +3,7 @@
 use std::fmt;
 
 use crate::domain::player_view::CurrentRoundInfo;
-use crate::domain::{Card, Suit};
+use crate::domain::{Card, Trump};
 use crate::error::AppError;
 
 /// Errors that can occur during AI decision-making.
@@ -54,5 +54,5 @@ pub trait AiPlayer: Send + Sync {
     /// Choose trump suit.
     ///
     /// The AI can choose any of the 4 suits or NoTrump.
-    fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Suit, AiError>;
+    fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Trump, AiError>;
 }

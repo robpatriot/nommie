@@ -1391,13 +1391,14 @@ impl GameFlowService {
                     .await?;
             }
             ActionType::Trump => {
-                let trump_suit = ai.choose_trump(&state)?;
-                // Convert Suit to rounds::Trump
-                let trump = match trump_suit {
-                    crate::domain::Suit::Clubs => rounds::Trump::Clubs,
-                    crate::domain::Suit::Diamonds => rounds::Trump::Diamonds,
-                    crate::domain::Suit::Hearts => rounds::Trump::Hearts,
-                    crate::domain::Suit::Spades => rounds::Trump::Spades,
+                let trump_choice = ai.choose_trump(&state)?;
+                // Convert domain::Trump to rounds::Trump
+                let trump = match trump_choice {
+                    crate::domain::Trump::Clubs => rounds::Trump::Clubs,
+                    crate::domain::Trump::Diamonds => rounds::Trump::Diamonds,
+                    crate::domain::Trump::Hearts => rounds::Trump::Hearts,
+                    crate::domain::Trump::Spades => rounds::Trump::Spades,
+                    crate::domain::Trump::NoTrump => rounds::Trump::NoTrump,
                 };
                 // Use internal version to avoid recursion (loop handles processing)
                 self.set_trump_internal(txn, game_id, player_seat, trump)

@@ -6,7 +6,7 @@ use rand::prelude::*;
 
 use super::trait_def::{AiError, AiPlayer};
 use crate::domain::player_view::CurrentRoundInfo;
-use crate::domain::{Card, Suit};
+use crate::domain::{Card, Trump};
 
 /// AI that makes random legal moves.
 ///
@@ -75,15 +75,18 @@ impl AiPlayer for RandomPlayer {
         Ok(choice)
     }
 
-    fn choose_trump(&self, _state: &CurrentRoundInfo) -> Result<Suit, AiError> {
-        // Random trump selection from 4 suits (we don't include NoTrump for now)
-        let suits = [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades];
+    fn choose_trump(&self, state: &CurrentRoundInfo) -> Result<Trump, AiError> {
+        let legal_trumps = state.legal_trumps();
+
+        if legal_trumps.is_empty() {
+            return Err(AiError::InvalidMove("No legal trumps available".into()));
+        }
 
         let mut rng = self
             .rng
             .lock()
             .map_err(|e| AiError::Internal(format!("RNG lock poisoned: {e}")))?;
-        let choice = suits
+        let choice = legal_trumps
             .choose(&mut *rng)
             .copied()
             .ok_or_else(|| AiError::Internal("Failed to choose random trump".into()))?;
