@@ -6,12 +6,8 @@ use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::repos::{games, rounds, scores};
 use backend::services::game_flow::GameFlowService;
+use support::game_phases::setup_game_in_trick_play_phase;
 use tracing::info;
-use ulid::Ulid;
-
-fn short_join_code() -> String {
-    format!("{}", Ulid::new()).chars().take(10).collect()
-}
 
 /// Test: End-to-end game flow for one complete round
 /// Deal -> Bid -> SetTrump -> PlayCards -> ResolveTricks -> ScoreRound -> AdvanceRound
@@ -25,38 +21,20 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
+            // Set up game in TrickPlay phase (Round 1: dealer at seat 0, bids: 3, 3, 4, 2, trump: Hearts)
+            let setup =
+                setup_game_in_trick_play_phase(txn, 12345, [3, 3, 4, 2], rounds::Trump::Hearts)
+                    .await?;
             let service = GameFlowService::new();
 
-            // Step 1: Deal round 1
-            service.deal_round(txn, game.id).await?;
+            let game_after_setup = games::find_by_id(txn, setup.game_id).await?.unwrap();
+            assert_eq!(game_after_setup.id, setup.game_id); // Type check
 
-            let game_after_deal = games::find_by_id(txn, game.id).await?.unwrap();
-            assert_eq!(game_after_deal.id, game.id); // Type check
-                                                     // State should be Bidding after deal (verified in other tests)
-
-            // Step 2: All players submit bids
-            // Round 1: dealer at seat 0, bidding starts at seat 1
-            // Bids: 3 + 4 + 2 + 3 = 12 (not 13, dealer rule OK)
-            service.submit_bid(txn, game.id, 1, 3).await?;
-            service.submit_bid(txn, game.id, 2, 4).await?; // Highest bid
-            service.submit_bid(txn, game.id, 3, 2).await?;
-            service.submit_bid(txn, game.id, 0, 3).await?; // Dealer bids last
-
-            // Step 3: Set trump (winning bidder selects)
-            // Player 2 has the highest bid (4), so they must choose trump
-            service
-                .set_trump(txn, game.id, 2, rounds::Trump::Hearts)
-                .await?;
-
-            // Step 4: Play cards for one complete trick (simplified - just create trick with winner)
+            // Play cards for one complete trick (simplified - just create trick with winner)
             // In a real game, we'd call play_card 4 times
             // For this test, we'll manually create the trick and plays, then call resolve_trick
 
-            let round = rounds::find_by_game_and_round(txn, game.id, 1)
-                .await?
-                .unwrap();
+            let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
 
             // Create trick 0 manually
             use backend::repos::{plays, tricks};
@@ -108,8 +86,8 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
             )
             .await?;
 
-            // Step 5: Resolve trick (determines winner)
-            service.resolve_trick(txn, game.id).await?;
+            // Resolve trick (determines winner)
+            service.resolve_trick(txn, setup.game_id).await?;
 
             // Winner should be seat 0 (Ace of trump suit)
             // current_trick_no should have advanced to 1
@@ -173,8 +151,8 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
                 tricks::create_trick(txn, round.id, i, tricks::Suit::Diamonds, 3).await?;
             }
 
-            // Step 6: Score the round
-            service.score_round(txn, game.id).await?;
+            // Score the round
+            service.score_round(txn, setup.game_id).await?;
 
             // Verify scores
             let all_scores = scores::find_all_by_round(txn, round.id).await?;
@@ -192,8 +170,8 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
             assert!(all_scores[2].bid_met);
             assert_eq!(all_scores[2].round_score, 14);
 
-            // Step 7: Advance to next round
-            service.advance_to_next_round(txn, game.id).await?;
+            // Advance to next round
+            service.advance_to_next_round(txn, setup.game_id).await?;
 
             // Game should be in BetweenRounds state
             // current_trick_no should be reset to 0

@@ -5,12 +5,7 @@ use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::repos::{games, rounds};
-use ulid::Ulid;
-
-// Helper to create a short join code (max 10 chars)
-fn short_join_code() -> String {
-    format!("{}", Ulid::new()).chars().take(10).collect()
-}
+use support::test_utils::short_join_code;
 
 /// Test: create_round and find_by_id roundtrip
 #[tokio::test]

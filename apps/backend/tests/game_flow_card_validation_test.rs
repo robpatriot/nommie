@@ -28,57 +28,19 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
-    // Create 4 test users
-    let user1 = support::factory::create_test_user(txn, "player1", Some("Player 1")).await?;
-    let user2 = support::factory::create_test_user(txn, "player2", Some("Player 2")).await?;
-    let user3 = support::factory::create_test_user(txn, "player3", Some("Player 3")).await?;
-    let user4 = support::factory::create_test_user(txn, "player4", Some("Player 4")).await?;
-
-    // Create a game with a deterministic seed
-    use backend::entities::games::{self, GameState as DbGameState, GameVisibility};
-    use sea_orm::{ActiveModelTrait, NotSet, Set};
-    use time::OffsetDateTime;
-
-    let now = OffsetDateTime::now_utc();
-    let game = games::ActiveModel {
-        id: NotSet,
-        created_by: Set(Some(user1)),
-        visibility: Set(GameVisibility::Public),
-        state: Set(DbGameState::Lobby),
-        created_at: Set(now),
-        updated_at: Set(now),
-        started_at: Set(None),
-        ended_at: Set(None),
-        name: Set(Some("Duplicate Card Test".to_string())),
-        join_code: Set(Some(format!("TEST{}", rand::random::<u32>() % 1000000))),
-        rules_version: Set("1.0".to_string()),
-        rng_seed: Set(Some(12345)),
-        current_round: Set(None),
-        starting_dealer_pos: Set(None),
-        current_trick_no: Set(0),
-        current_round_id: Set(None),
-        lock_version: Set(0),
-    };
-    let game_id = game.insert(txn).await?.id;
-
-    // Add all players
-    use backend::repos::memberships;
-    memberships::create_membership(txn, game_id, user1, 0, false, memberships::GameRole::Player)
-        .await?;
-    memberships::create_membership(txn, game_id, user2, 1, false, memberships::GameRole::Player)
-        .await?;
-    memberships::create_membership(txn, game_id, user3, 2, false, memberships::GameRole::Player)
-        .await?;
-    memberships::create_membership(txn, game_id, user4, 3, false, memberships::GameRole::Player)
-        .await?;
+    // Set up game with 4 players (not ready yet, so we can start the game properly)
+    let options = support::game_setup::GameSetupOptions::default()
+        .with_rng_seed(12345)
+        .with_ready(false);
+    let setup = support::game_setup::setup_game_with_options(txn, options).await?;
+    let game_id = setup.game_id;
 
     let service = GameFlowService::new();
 
     // Start the game
-    service.mark_ready(txn, game_id, user1).await?;
-    service.mark_ready(txn, game_id, user2).await?;
-    service.mark_ready(txn, game_id, user3).await?;
-    service.mark_ready(txn, game_id, user4).await?;
+    for user_id in &setup.user_ids {
+        service.mark_ready(txn, game_id, *user_id).await?;
+    }
 
     // Get current round and player hands from database
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;

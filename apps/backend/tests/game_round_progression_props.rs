@@ -8,62 +8,12 @@ mod support;
 
 use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
-use backend::entities::games::{self, GameState as DbGameState, GameVisibility};
-use backend::entities::users;
+use backend::entities::games::{self, GameState as DbGameState};
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::services::game_flow::GameFlowService;
-use backend::utils::unique::unique_str;
-use sea_orm::{ActiveModelTrait, ConnectionTrait, EntityTrait, NotSet, Set};
-use support::db_memberships::create_test_game_player_with_ready;
-
-/// Helper to create a test game with 4 ready players and a fixed rng_seed
-async fn setup_game_with_players<C: ConnectionTrait>(
-    conn: &C,
-    rng_seed: i64,
-) -> Result<i64, AppError> {
-    let now = time::OffsetDateTime::now_utc();
-
-    // Create 4 users with unique subs
-    let mut user_ids = Vec::new();
-    for i in 0..4 {
-        let user = users::ActiveModel {
-            id: NotSet,
-            sub: Set(unique_str(&format!("test_user_{rng_seed}_{i}"))),
-            username: Set(Some(format!("player{i}_{rng_seed}"))),
-            is_ai: Set(false),
-            created_at: Set(now),
-            updated_at: Set(now),
-        };
-        let inserted_user = user.insert(conn).await?;
-        user_ids.push(inserted_user.id);
-    }
-
-    // Create game
-    let game = games::ActiveModel {
-        visibility: Set(GameVisibility::Private),
-        state: Set(DbGameState::Lobby),
-        rules_version: Set("nommie-1.0.0".to_string()),
-        created_at: Set(now),
-        updated_at: Set(now),
-        rng_seed: Set(Some(rng_seed)),
-        ..Default::default()
-    };
-
-    let inserted_game = games::Entity::insert(game)
-        .exec(conn)
-        .await
-        .map_err(|e| backend::error::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
-
-    let game_id = inserted_game.last_insert_id;
-
-    // Create 4 game_players all marked ready
-    for (i, user_id) in user_ids.iter().enumerate() {
-        create_test_game_player_with_ready(conn, game_id, *user_id, i as i32, true).await?;
-    }
-
-    Ok(game_id)
-}
+use sea_orm::EntityTrait;
+use support::game_setup::setup_game_with_players;
 
 /// Test: State monotonicity - game state should only advance forward
 #[tokio::test]
@@ -76,7 +26,7 @@ async fn test_state_monotonicity() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 42).await?;
+            let game_id = setup_game_with_players(txn, 42).await?.game_id;
 
             // Initial state: Lobby
             let game = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
@@ -119,7 +69,7 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 123).await?;
+            let game_id = setup_game_with_players(txn, 123).await?.game_id;
 
             // Capture initial lock_version
             let game_before = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
@@ -164,7 +114,7 @@ async fn test_timestamp_invariants() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 456).await?;
+            let game_id = setup_game_with_players(txn, 456).await?.game_id;
 
             // Capture initial timestamps
             let game_before = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
@@ -211,7 +161,7 @@ async fn test_deterministic_first_trick() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 999).await?;
+            let game_id = setup_game_with_players(txn, 999).await?.game_id;
             let service = GameFlowService::new();
 
             // Deal round (will be in Bidding state)
@@ -255,7 +205,7 @@ async fn test_granular_round_progression() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 777).await?;
+            let game_id = setup_game_with_players(txn, 777).await?.game_id;
             let service = GameFlowService::new();
 
             // Track state transitions
@@ -332,8 +282,8 @@ async fn test_deterministic_dealing_reproducible() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create two games with the same seed
-            let game_id1 = setup_game_with_players(txn, 12345).await?;
-            let game_id2 = setup_game_with_players(txn, 12345).await?;
+            let game_id1 = setup_game_with_players(txn, 12345).await?.game_id;
+            let game_id2 = setup_game_with_players(txn, 12345).await?.game_id;
 
             let service = GameFlowService::new();
 
@@ -375,7 +325,7 @@ async fn test_invalid_bid_fails() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 888).await?;
+            let game_id = setup_game_with_players(txn, 888).await?.game_id;
             let service = GameFlowService::new();
 
             // Deal round
@@ -415,7 +365,7 @@ async fn test_out_of_turn_bid_fails() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 333).await?;
+            let game_id = setup_game_with_players(txn, 333).await?.game_id;
             let service = GameFlowService::new();
 
             // Deal round
@@ -458,7 +408,7 @@ async fn test_bid_in_wrong_phase_fails() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 555).await?;
+            let game_id = setup_game_with_players(txn, 555).await?.game_id;
             let service = GameFlowService::new();
 
             // Try to bid without dealing first (still in Lobby)

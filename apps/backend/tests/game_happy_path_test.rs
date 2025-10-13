@@ -8,61 +8,12 @@ mod support;
 
 use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
-use backend::entities::games::{self, GameState, GameVisibility};
-use backend::entities::users;
+use backend::entities::games::{self, GameState};
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::services::game_flow::GameFlowService;
-use sea_orm::{ActiveModelTrait, ConnectionTrait, EntityTrait, NotSet, Set};
-use support::db_memberships::create_test_game_player_with_ready;
-
-/// Helper to create a test game with 4 ready players
-async fn setup_game_with_players<C: ConnectionTrait>(
-    conn: &C,
-    rng_seed: i64,
-) -> Result<i64, AppError> {
-    let now = time::OffsetDateTime::now_utc();
-
-    // First, create 4 users
-    let mut user_ids = Vec::new();
-    for i in 0..4 {
-        let user = users::ActiveModel {
-            id: NotSet,
-            sub: Set(format!("test_user_{rng_seed}_{i}")),
-            username: Set(Some(format!("player{i}_{rng_seed}"))),
-            is_ai: Set(false),
-            created_at: Set(now),
-            updated_at: Set(now),
-        };
-        let inserted_user = user.insert(conn).await?;
-        user_ids.push(inserted_user.id);
-    }
-
-    // Create game
-    let game = games::ActiveModel {
-        visibility: Set(GameVisibility::Private),
-        state: Set(GameState::Lobby),
-        rules_version: Set("nommie-1.0.0".to_string()),
-        created_at: Set(now),
-        updated_at: Set(now),
-        rng_seed: Set(Some(rng_seed)),
-        ..Default::default()
-    };
-
-    let inserted_game = games::Entity::insert(game)
-        .exec(conn)
-        .await
-        .map_err(|e| backend::error::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
-
-    let game_id = inserted_game.last_insert_id;
-
-    // Create 4 game_players all marked ready
-    for (i, user_id) in user_ids.iter().enumerate() {
-        create_test_game_player_with_ready(conn, game_id, *user_id, i as i32, true).await?;
-    }
-
-    Ok(game_id)
-}
+use sea_orm::EntityTrait;
+use support::game_setup::setup_game_with_players;
 
 #[tokio::test]
 async fn test_deal_round_transitions_correctly() -> Result<(), AppError> {
@@ -75,7 +26,8 @@ async fn test_deal_round_transitions_correctly() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Arrange: create game in Lobby
-            let game_id = setup_game_with_players(txn, 123).await?;
+            let game_setup = setup_game_with_players(txn, 123).await?;
+            let game_id = game_setup.game_id;
 
             // Act: deal first round
             let service = GameFlowService::new();
@@ -111,8 +63,8 @@ async fn test_deal_round_with_different_seeds_differs() -> Result<(), AppError> 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create two games with different seeds
-            let game_id1 = setup_game_with_players(txn, 111).await?;
-            let game_id2 = setup_game_with_players(txn, 222).await?;
+            let game_id1 = setup_game_with_players(txn, 111).await?.game_id;
+            let game_id2 = setup_game_with_players(txn, 222).await?.game_id;
 
             let service = GameFlowService::new();
 
@@ -149,7 +101,7 @@ async fn test_submit_bid_validates_phase() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Arrange: create game in Lobby (not Bidding)
-            let game_id = setup_game_with_players(txn, 456).await?;
+            let game_id = setup_game_with_players(txn, 456).await?.game_id;
 
             // Act: try to submit bid without dealing first
             let service = GameFlowService::new();
@@ -185,7 +137,7 @@ async fn test_submit_bid_after_deal() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Arrange: create game and deal
-            let game_id = setup_game_with_players(txn, 789).await?;
+            let game_id = setup_game_with_players(txn, 789).await?.game_id;
             let service = GameFlowService::new();
             service.deal_round(txn, game_id).await?;
 

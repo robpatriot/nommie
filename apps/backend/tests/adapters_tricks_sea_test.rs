@@ -5,11 +5,7 @@ use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::repos::{games, rounds, tricks};
-use ulid::Ulid;
-
-fn short_join_code() -> String {
-    format!("{}", Ulid::new()).chars().take(10).collect()
-}
+use support::test_utils::short_join_code;
 
 /// Test: create_trick and find_by_round_and_trick
 #[tokio::test]

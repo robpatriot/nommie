@@ -12,11 +12,7 @@ use backend::entities::games::{GameState, GameVisibility};
 use backend::error::AppError;
 use backend::errors::domain::{ConflictKind, DomainError, NotFoundKind};
 use backend::infra::state::build_state;
-use ulid::Ulid;
-
-fn unique_join_code() -> String {
-    format!("{}", Ulid::new()).chars().take(10).collect()
-}
+use support::test_utils::short_join_code as unique_join_code;
 
 /// Test: create_game and find_by_id
 #[tokio::test]

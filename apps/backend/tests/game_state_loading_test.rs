@@ -8,11 +8,11 @@ use backend::infra::state::build_state;
 use backend::repos::{games, rounds, tricks};
 use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
-use ulid::Ulid;
-
-fn short_join_code() -> String {
-    format!("{}", Ulid::new()).chars().take(10).collect()
-}
+use support::game_phases::{
+    setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
+    setup_game_in_trump_selection_phase,
+};
+use support::test_utils::short_join_code;
 
 /// Test: Load game state from database after dealing
 #[tokio::test]
@@ -25,17 +25,12 @@ async fn test_load_state_after_deal() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
-
-            let flow_service = GameFlowService::new();
+            // Set up game in Bidding phase
+            let setup = setup_game_in_bidding_phase(txn, 12345).await?;
             let game_service = GameService::new();
 
-            // Deal round 1
-            flow_service.deal_round(txn, game.id).await?;
-
             // Load state from DB
-            let loaded_state = game_service.load_game_state(txn, game.id).await?;
+            let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
             // Verify state reconstruction
             assert_eq!(loaded_state.phase, Phase::Bidding);
@@ -73,21 +68,12 @@ async fn test_load_state_after_bidding() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
-
-            let flow_service = GameFlowService::new();
+            // Set up game in TrumpSelection phase (Round 1: dealer at seat 0, bids: 5, 4, 3, 0)
+            let setup = setup_game_in_trump_selection_phase(txn, 12346, [5, 4, 3, 0]).await?;
             let game_service = GameService::new();
 
-            // Deal and bid (Round 1: dealer at seat 0, bidding starts at seat 1)
-            flow_service.deal_round(txn, game.id).await?;
-            flow_service.submit_bid(txn, game.id, 1, 4).await?;
-            flow_service.submit_bid(txn, game.id, 2, 3).await?;
-            flow_service.submit_bid(txn, game.id, 3, 0).await?;
-            flow_service.submit_bid(txn, game.id, 0, 5).await?; // Dealer
-
             // Load state
-            let loaded_state = game_service.load_game_state(txn, game.id).await?;
+            let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
             // Should be in TrumpSelection phase now
             assert_eq!(loaded_state.phase, Phase::TrumpSelect);
@@ -120,24 +106,14 @@ async fn test_load_state_after_trump() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
-
-            let flow_service = GameFlowService::new();
+            // Set up game in TrickPlay phase (Round 1: dealer at seat 0, bids: 4, 5, 3, 0, trump: Hearts)
+            let setup =
+                setup_game_in_trick_play_phase(txn, 12347, [4, 5, 3, 0], rounds::Trump::Hearts)
+                    .await?;
             let game_service = GameService::new();
 
-            // Deal, bid, set trump (Round 1: dealer at seat 0, bidding starts at seat 1)
-            flow_service.deal_round(txn, game.id).await?;
-            flow_service.submit_bid(txn, game.id, 1, 5).await?; // Highest bidder
-            flow_service.submit_bid(txn, game.id, 2, 3).await?;
-            flow_service.submit_bid(txn, game.id, 3, 0).await?;
-            flow_service.submit_bid(txn, game.id, 0, 4).await?; // Dealer
-            flow_service
-                .set_trump(txn, game.id, 1, rounds::Trump::Hearts) // Winner: seat 1
-                .await?;
-
             // Load state
-            let loaded_state = game_service.load_game_state(txn, game.id).await?;
+            let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
             // Should be in TrickPlay phase
             assert_eq!(loaded_state.phase, Phase::Trick { trick_no: 1 });
@@ -172,26 +148,14 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
-
-            let flow_service = GameFlowService::new();
+            // Set up game in TrickPlay phase (Round 1: dealer at seat 0, bids: 3, 3, 4, 2, trump: Spades)
+            let setup =
+                setup_game_in_trick_play_phase(txn, 12348, [3, 3, 4, 2], rounds::Trump::Spades)
+                    .await?;
             let game_service = GameService::new();
 
-            // Set up game in TrickPlay phase with some plays (Round 1: dealer at seat 0, bidding starts at seat 1)
-            flow_service.deal_round(txn, game.id).await?;
-            flow_service.submit_bid(txn, game.id, 1, 3).await?;
-            flow_service.submit_bid(txn, game.id, 2, 4).await?; // Highest bidder
-            flow_service.submit_bid(txn, game.id, 3, 2).await?;
-            flow_service.submit_bid(txn, game.id, 0, 3).await?; // Dealer
-            flow_service
-                .set_trump(txn, game.id, 2, rounds::Trump::Spades) // Winner: seat 2
-                .await?;
-
             // Manually create a trick with 2 plays (mid-trick)
-            let round = rounds::find_by_game_and_round(txn, game.id, 1)
-                .await?
-                .unwrap();
+            let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
 
             use backend::repos::plays;
             let trick = tricks::create_trick(txn, round.id, 0, tricks::Suit::Hearts, 0).await?;
@@ -219,7 +183,7 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
             .await?;
 
             // Load state
-            let loaded_state = game_service.load_game_state(txn, game.id).await?;
+            let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
             // Verify trick is partially loaded
             assert_eq!(loaded_state.round.trick_plays.len(), 2);
@@ -258,39 +222,33 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
-
+            // Set up game in Bidding phase
+            let setup = setup_game_in_bidding_phase(txn, 12349).await?;
             let flow_service = GameFlowService::new();
             let game_service = GameService::new();
 
             // Complete one full round (Round 1: dealer at seat 0, bidding starts at seat 1)
-            flow_service.deal_round(txn, game.id).await?;
-            flow_service.submit_bid(txn, game.id, 1, 3).await?;
-            flow_service.submit_bid(txn, game.id, 2, 2).await?;
-            flow_service.submit_bid(txn, game.id, 3, 0).await?;
-            flow_service.submit_bid(txn, game.id, 0, 7).await?; // Dealer
-
-            let round1 = rounds::find_by_game_and_round(txn, game.id, 1)
-                .await?
-                .unwrap();
+            flow_service.submit_bid(txn, setup.game_id, 1, 3).await?;
+            flow_service.submit_bid(txn, setup.game_id, 2, 2).await?;
+            flow_service.submit_bid(txn, setup.game_id, 3, 0).await?;
+            flow_service.submit_bid(txn, setup.game_id, 0, 7).await?; // Dealer
 
             // Create tricks with winners
             for i in 0..7 {
-                tricks::create_trick(txn, round1.id, i, tricks::Suit::Hearts, 0).await?;
+                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Hearts, 0).await?;
             }
             for i in 7..10 {
-                tricks::create_trick(txn, round1.id, i, tricks::Suit::Spades, 1).await?;
+                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Spades, 1).await?;
             }
             for i in 10..12 {
-                tricks::create_trick(txn, round1.id, i, tricks::Suit::Clubs, 2).await?;
+                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Clubs, 2).await?;
             }
-            tricks::create_trick(txn, round1.id, 12, tricks::Suit::Diamonds, 3).await?;
+            tricks::create_trick(txn, setup.round_id, 12, tricks::Suit::Diamonds, 3).await?;
 
-            flow_service.score_round(txn, game.id).await?;
+            flow_service.score_round(txn, setup.game_id).await?;
 
             // Load state - should have scores
-            let loaded_state = game_service.load_game_state(txn, game.id).await?;
+            let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
             // Verify cumulative scores loaded
             // P0: 7+10=17, P1: 3+10=13, P2: 2+10=12, P3: 1+0=1 (didn't meet bid 0)
