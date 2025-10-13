@@ -14,8 +14,8 @@ These rules are **locked** — all game logic, extractors, tests, and UI must co
 ## Rounds
 - The game lasts **26 rounds**.
 - Hand size schedule:
-  13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2,
-  2, 2, 2,
+  13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 
+  2, 2, 2, 2,
   3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
 - Each round is dealt from a freshly shuffled standard 52-card deck.
 - **Dealer** rotates clockwise each round.
