@@ -1172,7 +1172,8 @@ impl GameFlowService {
 
         // Create AI player
         let ai_type = profile.playstyle.as_deref().unwrap_or("random");
-        let ai = create_ai(ai_type, profile.config.as_ref())
+        let config = crate::ai::AiConfig::from_json(profile.config.as_ref());
+        let ai = create_ai(ai_type, config)
             .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
 
         // Execute action with retries, using cache if available
