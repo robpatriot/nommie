@@ -13,6 +13,7 @@ use support::game_phases::{
     setup_game_in_trump_selection_phase,
 };
 use support::test_utils::short_join_code;
+use support::trick_helpers::create_tricks_by_winner_counts;
 
 /// Test: Load game state from database after dealing
 #[tokio::test]
@@ -233,17 +234,8 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
             flow_service.submit_bid(txn, setup.game_id, 3, 0).await?;
             flow_service.submit_bid(txn, setup.game_id, 0, 7).await?; // Dealer
 
-            // Create tricks with winners
-            for i in 0..7 {
-                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Hearts, 0).await?;
-            }
-            for i in 7..10 {
-                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Spades, 1).await?;
-            }
-            for i in 10..12 {
-                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Clubs, 2).await?;
-            }
-            tricks::create_trick(txn, setup.round_id, 12, tricks::Suit::Diamonds, 3).await?;
+            // Create tricks with winners: P0 wins 7, P1 wins 3, P2 wins 2, P3 wins 1
+            create_tricks_by_winner_counts(txn, setup.round_id, [7, 3, 2, 1]).await?;
 
             flow_service.score_round(txn, setup.game_id).await?;
 

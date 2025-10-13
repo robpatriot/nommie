@@ -4,9 +4,10 @@ mod support;
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
-use backend::repos::{bids, games, rounds, scores, tricks};
+use backend::repos::{bids, games, rounds, scores};
 use backend::services::game_flow::GameFlowService;
 use support::game_phases::setup_game_in_bidding_phase;
+use support::trick_helpers::create_tricks_by_winner_counts;
 
 /// Test: Complete round flow - deal, bid, score
 #[tokio::test]
@@ -43,20 +44,8 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
             assert_eq!(all_bids[0].bid_value, 4); // Seat 1
             assert_eq!(all_bids[1].bid_value, 3); // Seat 2
 
-            // Simulate tricks (create trick records manually for this test)
-            // Player 0 wins 5 tricks, player 1 wins 4, player 2 wins 3, player 3 wins 1
-            for trick_no in 0..5 {
-                tricks::create_trick(txn, setup.round_id, trick_no, tricks::Suit::Hearts, 0)
-                    .await?;
-            }
-            for trick_no in 5..9 {
-                tricks::create_trick(txn, setup.round_id, trick_no, tricks::Suit::Spades, 1)
-                    .await?;
-            }
-            for trick_no in 9..12 {
-                tricks::create_trick(txn, setup.round_id, trick_no, tricks::Suit::Clubs, 2).await?;
-            }
-            tricks::create_trick(txn, setup.round_id, 12, tricks::Suit::Diamonds, 3).await?;
+            // Simulate tricks: Player 0 wins 5, player 1 wins 4, player 2 wins 3, player 3 wins 1
+            create_tricks_by_winner_counts(txn, setup.round_id, [5, 4, 3, 1]).await?;
 
             // Score the round
             service.score_round(txn, setup.game_id).await?;
@@ -134,16 +123,7 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
             service.submit_bid(txn, setup.game_id, 0, 7).await?; // Dealer bids last
 
             // Simulate tricks: P0 wins 7, P1 wins 3, P2 wins 2, P3 wins 1 (totals 13)
-            for i in 0..7 {
-                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Hearts, 0).await?;
-            }
-            for i in 7..10 {
-                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Spades, 1).await?;
-            }
-            for i in 10..12 {
-                tricks::create_trick(txn, setup.round_id, i, tricks::Suit::Clubs, 2).await?;
-            }
-            tricks::create_trick(txn, setup.round_id, 12, tricks::Suit::Diamonds, 3).await?;
+            create_tricks_by_winner_counts(txn, setup.round_id, [7, 3, 2, 1]).await?;
 
             service.score_round(txn, setup.game_id).await?;
 
@@ -170,16 +150,7 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
             service.submit_bid(txn, setup.game_id, 1, 4).await?; // Dealer bids last
 
             // Simulate round 2 tricks: P0 wins 5, P1 wins 4, P2 wins 2, P3 wins 1 (totals 12)
-            for i in 0..5 {
-                tricks::create_trick(txn, round2.id, i, tricks::Suit::Hearts, 0).await?;
-            }
-            for i in 5..9 {
-                tricks::create_trick(txn, round2.id, i, tricks::Suit::Spades, 1).await?;
-            }
-            for i in 9..11 {
-                tricks::create_trick(txn, round2.id, i, tricks::Suit::Clubs, 2).await?;
-            }
-            tricks::create_trick(txn, round2.id, 11, tricks::Suit::Diamonds, 3).await?;
+            create_tricks_by_winner_counts(txn, round2.id, [5, 4, 2, 1]).await?;
 
             service.score_round(txn, setup.game_id).await?;
 

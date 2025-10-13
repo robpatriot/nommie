@@ -92,64 +92,12 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
             // Winner should be seat 0 (Ace of trump suit)
             // current_trick_no should have advanced to 1
 
-            // For testing scoring, let's create all 13 tricks with known winners
-            // P0 wins 3, P1 wins 3, P2 wins 4 (meets bid), P3 wins 3
-            for i in 1..3 {
-                let trick = tricks::create_trick(txn, round.id, i, tricks::Suit::Hearts, 0).await?;
-                plays::create_play(
-                    txn,
-                    trick.id,
-                    0,
-                    plays::Card {
-                        suit: "HEARTS".into(),
-                        rank: "ACE".into(),
-                    },
-                    0,
-                )
+            // For testing scoring, create all 13 tricks with known winners
+            // Trick 0 already created above, so create tricks 1-12
+            // P0 wins tricks 0-2 (3 total), P1 wins 3-5 (3 total), P2 wins 6-9 (4 total), P3 wins 10-12 (3 total)
+            use support::trick_helpers::create_tricks_with_winners;
+            create_tricks_with_winners(txn, round.id, &[0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3], 1)
                 .await?;
-                plays::create_play(
-                    txn,
-                    trick.id,
-                    1,
-                    plays::Card {
-                        suit: "HEARTS".into(),
-                        rank: "TWO".into(),
-                    },
-                    1,
-                )
-                .await?;
-                plays::create_play(
-                    txn,
-                    trick.id,
-                    2,
-                    plays::Card {
-                        suit: "HEARTS".into(),
-                        rank: "THREE".into(),
-                    },
-                    2,
-                )
-                .await?;
-                plays::create_play(
-                    txn,
-                    trick.id,
-                    3,
-                    plays::Card {
-                        suit: "HEARTS".into(),
-                        rank: "FOUR".into(),
-                    },
-                    3,
-                )
-                .await?;
-            }
-            for i in 3..6 {
-                tricks::create_trick(txn, round.id, i, tricks::Suit::Spades, 1).await?;
-            }
-            for i in 6..10 {
-                tricks::create_trick(txn, round.id, i, tricks::Suit::Clubs, 2).await?;
-            }
-            for i in 10..13 {
-                tricks::create_trick(txn, round.id, i, tricks::Suit::Diamonds, 3).await?;
-            }
 
             // Score the round
             service.score_round(txn, setup.game_id).await?;

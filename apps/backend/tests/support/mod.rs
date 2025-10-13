@@ -11,3 +11,4 @@ pub mod game_phases;
 pub mod game_setup;
 pub mod games_sea_helpers;
 pub mod test_utils;
+pub mod trick_helpers;
