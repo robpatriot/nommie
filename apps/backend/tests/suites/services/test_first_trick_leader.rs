@@ -8,11 +8,23 @@ use backend::domain::state::Phase;
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::repos::rounds;
+use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
 
 use crate::support::game_phases::setup_game_in_trick_play_phase;
+use crate::support::trick_helpers::create_tricks_by_winner_counts;
 
-/// Test: Verify that turn_start, leader, and turn are set to dealer+1 after trump selection
+/// Test: Verify the first trick leader rotates with dealer position across rounds.
+///
+/// This tests the critical rule from docs/rules.md:
+/// "The player to the left of the dealer leads the first trick of each round."
+///
+/// The test progresses through 2 complete rounds to verify:
+/// - Round 1: dealer=0 → first player=1 (dealer+1)
+/// - Round 2: dealer=1 → first player=2 (dealer+1)
+///
+/// This ensures that as the dealer rotates clockwise, the first trick leader
+/// also rotates clockwise, always staying one position to the left of the dealer.
 #[tokio::test]
 async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
     let state = build_state()
@@ -23,101 +35,83 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            // Round 1: dealer at seat 0
-            // Therefore, first bidder and first trick leader should be seat 1 (left of dealer)
+            let game_service = GameService::new();
+            let flow_service = GameFlowService::new();
+
+            // Set up game in Round 1 trick play phase
             let setup =
-                setup_game_in_trick_play_phase(txn, 55555, [4, 5, 3, 0], rounds::Trump::Hearts)
+                setup_game_in_trick_play_phase(txn, 60000, [4, 5, 3, 0], rounds::Trump::Hearts)
                     .await?;
 
-            assert_eq!(setup.dealer_pos, 0, "Test assumes dealer is at seat 0");
-
-            let game_service = GameService::new();
+            // === ROUND 1: Verify dealer=0, first player=1 ===
             let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
-            // Verify we're in trick phase
+            assert_eq!(setup.dealer_pos, 0, "Round 1 should have dealer at seat 0");
             assert_eq!(loaded_state.phase, Phase::Trick { trick_no: 1 });
-
-            // CRITICAL: turn_start should be player to left of dealer (0 + 1) % 4 = 1
             assert_eq!(
                 loaded_state.turn_start, 1,
-                "turn_start should be player to left of dealer (dealer=0, so turn_start=1)"
+                "Round 1: dealer=0, turn_start should be 1 (dealer+1)"
             );
-
-            // CRITICAL: leader should be player to left of dealer for first trick
             assert_eq!(
                 loaded_state.leader, 1,
-                "leader should be player to left of dealer (dealer=0, so leader=1)"
+                "Round 1: dealer=0, leader should be 1 (dealer+1)"
             );
-
-            // CRITICAL: turn should be player to left of dealer (no cards played yet)
             assert_eq!(
                 loaded_state.turn, 1,
-                "turn should be player to left of dealer (dealer=0, so turn=1)"
+                "Round 1: dealer=0, turn should be 1 (dealer+1)"
+            );
+
+            // Complete Round 1: create all tricks and score
+            // Hand size for round 1 is 13, so we need 13 tricks
+            // Winners: [5, 4, 3, 0] to match bids exactly (everyone gets bonus)
+            create_tricks_by_winner_counts(txn, setup.round_id, [5, 4, 3, 0]).await?;
+            flow_service.score_round(txn, setup.game_id).await?;
+
+            // === ROUND 2: Deal and progress to trick play ===
+            flow_service.deal_round(txn, setup.game_id).await?;
+
+            // Round 2 has hand_size=12, dealer should be (0+1)%4=1
+            // Submit bids in turn order (starting at dealer+1 = seat 2)
+            // Bids: seat 2→3, seat 3→4, seat 0→2, seat 1(dealer)→2
+            // Winner: seat 3 with bid=4
+            flow_service.submit_bid(txn, setup.game_id, 2, 3).await?;
+            flow_service.submit_bid(txn, setup.game_id, 3, 4).await?;
+            flow_service.submit_bid(txn, setup.game_id, 0, 2).await?;
+            flow_service.submit_bid(txn, setup.game_id, 1, 2).await?;
+
+            // Set trump (winning bidder is seat 3)
+            flow_service
+                .set_trump(txn, setup.game_id, 3, rounds::Trump::Spades)
+                .await?;
+
+            // === ROUND 2: Verify dealer=1, first player=2 ===
+            let loaded_state2 = game_service.load_game_state(txn, setup.game_id).await?;
+
+            let game2 = backend::adapters::games_sea::require_game(txn, setup.game_id).await?;
+            let dealer2 = game2.dealer_pos().expect("Round 2 should have dealer");
+
+            assert_eq!(
+                dealer2, 1,
+                "Round 2 should have dealer at seat 1 (rotated from 0)"
+            );
+            assert_eq!(loaded_state2.phase, Phase::Trick { trick_no: 1 });
+            assert_eq!(
+                loaded_state2.turn_start, 2,
+                "Round 2: dealer=1, turn_start should be 2 (dealer+1)"
+            );
+            assert_eq!(
+                loaded_state2.leader, 2,
+                "Round 2: dealer=1, leader should be 2 (dealer+1)"
+            );
+            assert_eq!(
+                loaded_state2.turn, 2,
+                "Round 2: dealer=1, turn should be 2 (dealer+1)"
             );
 
             Ok::<_, AppError>(())
         })
     })
     .await?;
-
-    Ok(())
-}
-
-/// Test: Verify first trick leader with different dealer positions
-#[tokio::test]
-async fn test_first_trick_leader_rotates_with_dealer() -> Result<(), AppError> {
-    let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
-        .build()
-        .await
-        .expect("build test state with DB");
-
-    // Test all 4 possible dealer positions
-    for dealer_pos in 0..4 {
-        let expected_first_player = (dealer_pos + 1) % 4;
-
-        with_txn(None, &state, move |txn| {
-            Box::pin(async move {
-                // Create a game at a specific round to get desired dealer position
-                // Round N has dealer = (N - 1) % 4, so to get dealer = X, we need round (X + 1)
-                // For simplicity, just verify with round 1 and dealer 0
-                // (full implementation would set up each round properly)
-                if dealer_pos == 0 {
-                    let setup = setup_game_in_trick_play_phase(
-                        txn,
-                        60000 + dealer_pos as i64,
-                        [4, 5, 3, 0],
-                        rounds::Trump::Hearts,
-                    )
-                    .await?;
-
-                    let game_service = GameService::new();
-                    let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
-
-                    assert_eq!(
-                        loaded_state.turn_start, expected_first_player as u8,
-                        "For dealer={}, turn_start should be {}",
-                        dealer_pos, expected_first_player
-                    );
-
-                    assert_eq!(
-                        loaded_state.leader, expected_first_player as u8,
-                        "For dealer={}, leader should be {}",
-                        dealer_pos, expected_first_player
-                    );
-
-                    assert_eq!(
-                        loaded_state.turn, expected_first_player as u8,
-                        "For dealer={}, turn should be {}",
-                        dealer_pos, expected_first_player
-                    );
-                }
-
-                Ok::<_, AppError>(())
-            })
-        })
-        .await?;
-    }
 
     Ok(())
 }
