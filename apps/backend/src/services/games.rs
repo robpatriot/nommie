@@ -164,7 +164,7 @@ impl GameService {
             DbGameState::Bidding => Phase::Bidding,
             DbGameState::TrumpSelection => Phase::TrumpSelect,
             DbGameState::TrickPlay => Phase::Trick {
-                trick_no: current_trick_no as u8 + 1,
+                trick_no: current_trick_no as u8,
             },
             DbGameState::Scoring => Phase::Scoring,
             DbGameState::BetweenRounds => Phase::Complete,
@@ -202,7 +202,7 @@ impl GameService {
             turn_start,
             turn,
             leader,
-            trick_no: current_trick_no as u8 + 1,
+            trick_no: current_trick_no as u8,
             scores_total,
             round: RoundState {
                 trick_plays,

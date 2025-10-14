@@ -224,7 +224,7 @@ async fn create_test_round_with_plays(
     let trick = round_tricks::ActiveModel {
         id: NotSet,
         round_id: Set(round.id),
-        trick_no: Set(0),
+        trick_no: Set(1),
         lead_suit: Set(CardSuit::Hearts),
         winner_seat: Set(2),
         created_at: Set(OffsetDateTime::now_utc()),

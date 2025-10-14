@@ -39,7 +39,7 @@ impl RoundMemory {
 /// What an AI remembers about a single completed trick.
 #[derive(Debug, Clone)]
 pub struct TrickMemory {
-    /// Trick number (0-indexed)
+    /// Trick number (1 to hand_size)
     pub trick_no: i16,
     /// What the AI remembers about each play (seat, card memory)
     pub plays: Vec<(i16, PlayMemory)>,

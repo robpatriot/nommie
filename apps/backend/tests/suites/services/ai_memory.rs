@@ -125,7 +125,7 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         rng_seed: Set(Some(12345)),
         current_round: Set(Some(1)),
         starting_dealer_pos: Set(Some(0)),
-        current_trick_no: Set(2),
+        current_trick_no: Set(3),
         current_round_id: Set(None),
         lock_version: Set(0),
     }
@@ -145,11 +145,11 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     .insert(txn)
     .await?;
 
-    // Create trick 0 with 4 plays
+    // Create trick 1 with 4 plays
     let trick0 = round_tricks::ActiveModel {
         id: NotSet,
         round_id: Set(round.id),
-        trick_no: Set(0),
+        trick_no: Set(1),
         lead_suit: Set(CardSuit::Hearts),
         winner_seat: Set(2),
         created_at: Set(OffsetDateTime::now_utc()),
@@ -175,11 +175,11 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         .await?;
     }
 
-    // Create trick 1 with 4 plays
+    // Create trick 2 with 4 plays
     let trick1 = round_tricks::ActiveModel {
         id: NotSet,
         round_id: Set(round.id),
-        trick_no: Set(1),
+        trick_no: Set(2),
         lead_suit: Set(CardSuit::Spades),
         winner_seat: Set(1),
         created_at: Set(OffsetDateTime::now_utc()),
@@ -208,9 +208,9 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     // Test Full mode - should return all tricks with Exact memory
     let plays = get_round_card_plays(txn, round.id, MemoryMode::Full, None).await?;
     assert_eq!(plays.len(), 2);
-    assert_eq!(plays[0].trick_no, 0);
+    assert_eq!(plays[0].trick_no, 1);
     assert_eq!(plays[0].plays.len(), 4);
-    assert_eq!(plays[1].trick_no, 1);
+    assert_eq!(plays[1].trick_no, 2);
     assert_eq!(plays[1].plays.len(), 4);
 
     // Verify Full mode returns Exact memory

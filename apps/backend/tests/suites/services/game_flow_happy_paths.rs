@@ -278,7 +278,7 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
             let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
 
             use backend::repos::plays;
-            let trick0 = tricks::create_trick(txn, round.id, 0, tricks::Suit::Hearts, 0).await?;
+            let trick0 = tricks::create_trick(txn, round.id, 1, tricks::Suit::Hearts, 0).await?;
 
             plays::create_play(
                 txn,
@@ -327,8 +327,8 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
 
             service.resolve_trick(txn, setup.game_id).await?;
 
-            // P0 wins tricks 0-2 (3 total), P1 wins 3-5 (3 total), P2 wins 6-9 (4 total), P3 wins 10-12 (3 total)
-            create_tricks_with_winners(txn, round.id, &[0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3], 1)
+            // P0 wins tricks 2-3 (2 total), P1 wins 4-6 (3 total), P2 wins 7-10 (4 total), P3 wins 11-13 (3 total)
+            create_tricks_with_winners(txn, round.id, &[0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3], 2)
                 .await?;
 
             service.score_round(txn, setup.game_id).await?;

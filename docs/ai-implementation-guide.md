@@ -323,7 +323,7 @@ Every decision method receives `CurrentRoundInfo` with complete visible game sta
 ```rust
 player_seat: i16        // Your position (0-3)
 dealer_pos: i16         // Who is dealing this round (0-3)
-current_round: i16      // Round number (0-25)
+current_round: i16      // Round number (1-26)
 hand_size: u8           // Cards per player this round
 game_state: GameState   // Current phase: Bidding, TrumpSelection, or TrickPlay
 ```
@@ -347,12 +347,12 @@ trump: Option<Trump>    // Trump suit if selected (None during bidding)
 
 #### Current Trick
 ```rust
-trick_no: i16                      // Which trick (0 to hand_size-1)
+trick_no: i16                      // Which trick (1 to hand_size)
 current_trick_plays: Vec<(i16, Card)>  // Cards played in this trick so far
                                        // Format: (seat_position, card)
                                        // Empty at start, up to 4 entries
 trick_leader: Option<i16>          // Who should lead this trick
-                                   // (highest bidder for trick 0,
+                                   // (left of dealer for trick 1,
                                    //  previous winner otherwise)
 ```
 
@@ -676,7 +676,7 @@ pub struct GameHistory {
 
 ```rust
 pub struct RoundHistory {
-    pub round_no: i16,                      // Round number (0-25)
+    pub round_no: i16,                      // Round number (1-26)
     pub dealer_seat: i16,                   // Who dealt this round
     pub bids: [Option<u8>; 4],             // Bids by each player
     pub trump_selector_seat: Option<i16>,  // Who won the bid
@@ -777,7 +777,7 @@ pub struct RoundMemory {
 }
 
 pub struct TrickMemory {
-    pub trick_no: i16,                      // Trick number (0-indexed)
+    pub trick_no: i16,                      // Trick number (1 to hand_size)
     pub plays: Vec<(i16, PlayMemory)>,      // (seat, what AI remembers)
 }
 ```

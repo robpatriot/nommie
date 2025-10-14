@@ -422,7 +422,7 @@ impl GameFlowService {
                     Ok(Some((next_seat, ActionType::Play)))
                 } else {
                     // First play of trick - need to determine leader
-                    let leader = if current_trick_no == 0 {
+                    let leader = if current_trick_no == 1 {
                         // First trick: player to left of dealer leads
                         let dealer_pos = game.dealer_pos().ok_or_else(|| {
                             DomainError::validation(

@@ -265,7 +265,7 @@ impl GameFlowService {
                 GameUpdateState::new(game_id, DbGameState::BetweenRounds, game.lock_version);
             let updated_game = games_sea::update_state(txn, update).await?;
 
-            // Reset current_trick_no for next round
+            // Reset current_trick_no to 0 (no active trick between rounds)
             let reset_trick =
                 GameUpdateRound::new(game_id, updated_game.lock_version).with_current_trick_no(0);
             games_sea::update_round(txn, reset_trick).await?;

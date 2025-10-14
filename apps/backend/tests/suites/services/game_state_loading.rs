@@ -145,7 +145,7 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
             let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
 
             use backend::repos::plays;
-            let trick = tricks::create_trick(txn, round.id, 0, tricks::Suit::Hearts, 0).await?;
+            let trick = tricks::create_trick(txn, round.id, 1, tricks::Suit::Hearts, 0).await?;
             plays::create_play(
                 txn,
                 trick.id,

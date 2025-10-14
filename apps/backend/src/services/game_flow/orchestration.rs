@@ -2,7 +2,7 @@ use sea_orm::DatabaseTransaction;
 use tracing::{debug, info};
 
 use super::GameFlowService;
-use crate::adapters::games_sea::{self, GameUpdateState};
+use crate::adapters::games_sea::{self, GameUpdateRound, GameUpdateState};
 use crate::adapters::memberships_sea;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
@@ -224,14 +224,20 @@ impl GameFlowService {
                     })?;
 
                 if round.trump.is_some() {
-                    // Trump is set - transition to TrickPlay
+                    // Trump is set - transition to TrickPlay and initialize to trick 1
                     let updated_game = games_sea::require_game(txn, game.id).await?;
                     let update = GameUpdateState::new(
                         game.id,
                         DbGameState::TrickPlay,
                         updated_game.lock_version,
                     );
-                    games_sea::update_state(txn, update).await?;
+                    let updated_game = games_sea::update_state(txn, update).await?;
+
+                    // Initialize current_trick_no to 1 (first trick)
+                    let update_trick = GameUpdateRound::new(game.id, updated_game.lock_version)
+                        .with_current_trick_no(1);
+                    games_sea::update_round(txn, update_trick).await?;
+
                     info!(game.id, "Trump set, transitioning to Trick Play");
                     debug!(game.id, "Transition: TrumpSelection -> TrickPlay");
                     return Ok(true);

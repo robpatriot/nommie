@@ -478,7 +478,7 @@ impl GameFlowService {
 
         // Advance to next trick or Scoring phase
         let next_trick_no = current_trick_no + 1;
-        if next_trick_no >= hand_size {
+        if next_trick_no > hand_size {
             // All tricks complete - transition to Scoring
             info!(
                 game_id,

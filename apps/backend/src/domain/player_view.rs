@@ -121,7 +121,7 @@ pub struct CurrentRoundInfo {
     /// (trump cards beat non-trump regardless of rank).
     pub trump: Option<Trump>,
 
-    /// Current trick number (0 to hand_size-1)
+    /// Current trick number (1 to hand_size)
     ///
     /// Each round has exactly `hand_size` tricks.
     pub trick_no: i16,
@@ -144,7 +144,7 @@ pub struct CurrentRoundInfo {
     ///
     /// - `Some(seat)` during TrickPlay phase
     /// - `None` in other phases
-    /// - Player to left of dealer leads trick 0, thereafter winner of previous trick leads
+    /// - Player to left of dealer leads trick 1, thereafter winner of previous trick leads
     pub trick_leader: Option<i16>,
 }
 
@@ -512,7 +512,7 @@ pub struct GameHistory {
 /// Contains all information about a round: bids, trump choice, and scores.
 #[derive(Debug, Clone)]
 pub struct RoundHistory {
-    /// Round number (0-25)
+    /// Round number (1-26)
     pub round_no: i16,
 
     /// Who dealt this round (0-3)
