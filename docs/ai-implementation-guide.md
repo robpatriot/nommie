@@ -63,6 +63,61 @@ Nommie is a 4-player trick-taking card game with bidding. Here are the complete 
 
 ---
 
+## Indexing Reference
+
+**Important**: The game uses a mix of 0-based and 1-based indexing depending on the domain concept.
+
+### 1-Based Indexing (Human-Natural)
+
+**Rounds**: 1-26
+- Round 1 has hand_size 13
+- Round 2 has hand_size 12
+- Round 13 has hand_size 2 (first of four 2-card rounds)
+- Round 26 has hand_size 13 (final round)
+
+**Tricks**: 1 to hand_size
+- In Round 1 (hand_size 13): tricks are numbered 1-13
+- In Round 2 (hand_size 12): tricks are numbered 1-12
+- In Round 13 (hand_size 2): tricks are numbered 1-2
+
+### 0-Based Indexing (Array/Programming)
+
+**Players/Seats**: 0-3
+- Seat 0, Seat 1, Seat 2, Seat 3
+- Used for array indexing (e.g., `bids[seat]`, `scores[seat]`)
+
+### Accessing Historical Data
+
+When working with `GameHistory`:
+```rust
+// Round numbers are 1-26
+for round in &history.rounds {
+    // round.round_no will be 1, 2, 3, ..., 26
+    if round.round_no == 2 {
+        // This is Round 2, which has hand_size 12
+    }
+}
+
+// Vec index != round number
+let round_2 = &history.rounds[1];  // Vec index 1 = Round 2
+assert_eq!(round_2.round_no, 2);   // round_no field = 2
+```
+
+When working with `RoundMemory`:
+```rust
+// Trick numbers are 1 to hand_size
+if let Some(memory) = context.round_memory() {
+    for trick in &memory.tricks {
+        // trick.trick_no will be 1, 2, 3, ..., hand_size
+        if trick.trick_no == 1 {
+            // This is the first trick of the current round
+        }
+    }
+}
+```
+
+---
+
 ## RNG & Determinism
 
 Nommie uses a deterministic RNG architecture to enable game replay and debugging:
