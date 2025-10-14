@@ -28,7 +28,8 @@ These rules are **locked** — all game logic, extractors, tests, and UI must co
 - The **dealer always bids last**.
   - Dealer’s restriction: cannot choose a bid that would make
     `sum(all 4 bids) == hand_size`.
-- A player may bid **0**, but **not more than 3 rounds in a row**.
+- A player may bid **0**, but cannot do so **more than three rounds in a row**.
+  - After three consecutive 0-bids, that player must bid at least 1 in the next round.
 - Once all 4 bids are in:
   - **Highest bid** wins the right to select trump.
   - If tied, the earliest bidder among the tied players wins.
@@ -37,6 +38,11 @@ These rules are **locked** — all game logic, extractors, tests, and UI must co
 
 ## Trump Selection
 - The winning bidder chooses the **trump suit** for that round.
+  - Valid choices: ♠, ♥, ♦, ♣, or **No Trumps**.
+- If **No Trumps** is chosen:
+  - There are *no trump cards* for that round.
+  - Each trick is won by the **highest card of the lead suit**.
+  - All other suits have no special power.
 
 ---
 
@@ -44,9 +50,9 @@ These rules are **locked** — all game logic, extractors, tests, and UI must co
 - The **player to the left of the dealer** leads the first trick of each round.
 - Players must **follow suit** if able.
 - If no card of the lead suit, they may play any card.
-- Trick winner =
-  - highest trump played, or
-  - if no trumps, highest card of the lead suit.
+- Trick winner:
+  - If the round has a trump suit **and** any trump cards are played, the trick is won by the **highest trump**.
+  - Otherwise (either **No Trumps** round, or **no trump cards were played**), the trick is won by the **highest card of the lead suit**.
 - Trick winner leads the next trick.
 - Each round has exactly **hand_size tricks**.
 
