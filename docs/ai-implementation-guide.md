@@ -144,8 +144,9 @@ All three methods receive the same two parameters:
 - Helper methods for legal moves: `legal_bids()`, `legal_plays()`, `legal_trumps()`
 
 **`context: &GameContext`** - Game-wide context including:
-- Complete game history via `context.game_history()` for strategic analysis
-- Round memory via `context.round_memory()` for card counting (completed tricks this round)
+- Game ID
+- Complete game history via `context.game_history()` for strategic analysis (returns `Option<&GameHistory>`)
+- Round memory via `context.round_memory()` for card counting (returns `Option<&RoundMemory>`)
 - Historical data persisting across all rounds (bids, trumps, scores from past rounds)
 
 ### Required Methods
@@ -583,42 +584,47 @@ Access all completed rounds to:
 - Adapt strategy based on score differential
 - Build statistical models for opponent behavior
 
+**Note on Architecture**: `GameContext` is provided for your AI's strategic analysis and decision-making. The game engine validates all your moves (bid legality, consecutive zero bids rule, etc.) using its own authoritative data from the database, so you cannot bypass game rules by manipulating context. Your AI receives read-only views of the game state.
+
 ### Accessing History
 
 Game history is cached by the game engine and accessed via `context.game_history()`:
 
 ```rust
 fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
-    // Access cached game history (no database connection needed!)
-    let history = context.game_history();
-    
-    // Analyze opponent's recent bidding pattern
-    let opponent_seat = (state.player_seat + 1) % 4;
-    
-    let recent_bids: Vec<u8> = history.rounds
-        .iter()
-        .rev()
-        .take(5)  // Last 5 rounds
-        .filter_map(|r| r.bids[opponent_seat as usize])
-        .collect();
-    
-    let avg_recent = if !recent_bids.is_empty() {
-        recent_bids.iter().sum::<u8>() as f64 / recent_bids.len() as f64
-    } else {
-        0.0
-    };
-    
-    // Use avg_recent to inform your bid...
-    
-    // Your bidding logic
     let legal_bids = state.legal_bids()
         .map_err(|e| AiError::Internal(format!("{e}")))?;
+    
+    // Access game history if available (returns Option<&GameHistory>)
+    if let Some(history) = context.game_history() {
+        // Analyze opponent's recent bidding pattern
+        let opponent_seat = (state.player_seat + 1) % 4;
+        
+        let recent_bids: Vec<u8> = history.rounds
+            .iter()
+            .rev()
+            .take(5)  // Last 5 rounds
+            .filter_map(|r| r.bids[opponent_seat as usize])
+            .collect();
+        
+        let avg_recent = if !recent_bids.is_empty() {
+            recent_bids.iter().sum::<u8>() as f64 / recent_bids.len() as f64
+        } else {
+            0.0
+        };
+        
+        // Use avg_recent to inform your bid...
+        // (Your strategic logic here)
+    }
+    
+    // Fallback bidding logic when history not available or not needed
     Ok(legal_bids[0])
 }
 ```
 
 **Key Points**:
-- `context.game_history()` returns `&GameHistory` (always available in production)
+- `context.game_history()` returns `Option<&GameHistory>` (available once game starts)
+- Always check `if let Some(history)` before using
 - History is updated automatically after each round completes
 - No database connection or async code required in your AI
 - Separate from `CurrentRoundInfo` for clean architectural separation
@@ -656,33 +662,34 @@ fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<
     let legal_bids = state.legal_bids()
         .map_err(|e| AiError::Internal(format!("{e}")))?;
     
-    // Analyze all opponents
-    let history = context.game_history();
-    let mut opponent_aggression = [0.0; 4];
-    
-    for (seat, aggression) in opponent_aggression.iter_mut().enumerate() {
-        if seat == state.player_seat as usize {
-            continue; // Skip self
-        }
+    // Analyze all opponents if history available
+    if let Some(history) = context.game_history() {
+        let mut opponent_aggression = [0.0; 4];
         
-        let mut total = 0.0;
-        let mut count = 0;
-        
-        for round in &history.rounds {
-            if let Some(bid) = round.bids[seat] {
-                // High bid relative to hand size = aggressive
-                let hand_size = round.scores[seat].cumulative_score; // Example metric
-                total += bid as f64;
-                count += 1;
+        for (seat, aggression) in opponent_aggression.iter_mut().enumerate() {
+            if seat == state.player_seat as usize {
+                continue; // Skip self
             }
+            
+            let mut total = 0.0;
+            let mut count = 0;
+            
+            for round in &history.rounds {
+                if let Some(bid) = round.bids[seat] {
+                    // High bid relative to hand size = aggressive
+                    let hand_size = round.scores[seat].cumulative_score; // Example metric
+                    total += bid as f64;
+                    count += 1;
+                }
+            }
+            
+            *aggression = if count > 0 { total / count as f64 } else { 0.0 };
         }
         
-        *aggression = if count > 0 { total / count as f64 } else { 0.0 };
+        // Use aggression scores to inform your bid strategy...
     }
     
-    // Use aggression scores to inform your bid strategy...
-    
-    // Make bid decision
+    // Make bid decision (with or without history analysis)
     Ok(legal_bids[0])
 }
 ```
@@ -830,16 +837,16 @@ fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result
 
 ### Usage Example: Card Counting
 
-Count high cards that have been played:
+Count high cards that have been played (requires memory to be available):
 
 ```rust
-fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
+fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
     use crate::domain::{PlayMemory, Rank};
     
-    let legal_bids = state.legal_bids()
+    let legal_plays = state.legal_plays()
         .map_err(|e| AiError::Internal(format!("{e}")))?;
     
-    // Count high cards we've seen played
+    // Count high cards we've seen played (only if memory available)
     let mut high_cards_played = 0;
     
     if let Some(memory) = context.round_memory() {
@@ -868,12 +875,14 @@ fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<
         .filter(|c| matches!(c.rank, Rank::Jack | Rank::Queen | Rank::King | Rank::Ace))
         .count();
     
-    // Adjust bid based on how many high cards remain unknown
-    // (If memory is poor, we might overestimate, making the AI more risky!)
+    // Calculate how many high cards remain unknown
+    // (If memory is poor, we might underestimate, affecting play strategy!)
     let estimated_remaining_highs = 16 - high_cards_played - high_cards_in_hand;
     
-    // Your bidding logic using this information...
-    Ok(legal_bids[0])
+    // Use this information to inform card play decision...
+    // (e.g., play more aggressively if few high cards remain)
+    
+    Ok(legal_plays[0])
 }
 ```
 
@@ -1226,6 +1235,9 @@ mod tests {
 - Validate preconditions and check for empty legal move lists
 - Keep decision logic fast (< 1 second per decision)
 - Write unit tests for your AI
+- Check `if let Some(history) = context.game_history()` before using history
+- Check `if let Some(memory) = context.round_memory()` before using memory
+- Have fallback logic when history or memory is unavailable
 
 ### ❌ DON'T
 
@@ -1235,6 +1247,8 @@ mod tests {
 - Don't directly play from `state.hand` without checking `legal_plays()`
 - Don't modify shared state without proper synchronization
 - Don't make assumptions about array lengths without validation
+- Don't assume `context.game_history()` or `context.round_memory()` always return `Some`
+- Don't try to bypass game rules using context (game engine validates with authoritative data)
 
 ---
 

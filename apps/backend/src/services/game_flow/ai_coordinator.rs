@@ -194,13 +194,15 @@ impl GameFlowService {
             let history = game_history.ok_or_else(|| {
                 AppError::internal("GameHistory not available - should be cached by orchestration")
             })?;
-            let game_context = crate::domain::GameContext::new(history.clone());
+            let game_context =
+                crate::domain::GameContext::new(game.id).with_history(history.clone());
 
             // Execute AI decision and persist the action
             let result = match action_type {
                 ActionType::Bid => {
                     let bid = ai.choose_bid(&state, &game_context)?;
                     // Use internal version to avoid recursion (loop handles processing)
+                    // Service loads its own validation data (trust boundary)
                     self.submit_bid_internal(txn, game.id, player_seat, bid)
                         .await
                 }

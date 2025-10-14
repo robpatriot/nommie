@@ -1,30 +1,39 @@
-//! Game-wide context and services for AI players.
+//! Game context combining game-wide and player-specific state.
 //!
-//! This module provides GameContext, which gives AI players access to
-//! game-wide data and services that persist across rounds, separate from
-//! the current round state (CurrentRoundInfo).
+//! This module provides GameContext, which unifies game identification,
+//! historical data, and optional player-specific round information into
+//! a single cohesive structure used by both HTTP handlers and AI systems.
 
-use super::player_view::GameHistory;
+use super::player_view::{CurrentRoundInfo, GameHistory};
 use super::round_memory::RoundMemory;
+use crate::errors::domain::{DomainError, ValidationKind};
 
-/// Game-wide context and services available to AI players.
+/// Complete game context available at any point in a game.
 ///
-/// Provides access to historical data and game-wide services that are
-/// independent of the current round state. This is passed as a separate
-/// parameter to AI decision methods alongside CurrentRoundInfo.
+/// Combines game-wide data (id, history) with optional player-specific
+/// current round information. Used by both HTTP handlers and AI systems.
+///
+/// # Progressive Enhancement
+///
+/// Fields are optional to support different game states:
+/// - **Lobby**: Just `game_id`
+/// - **Game started**: `game_id` + `history`
+/// - **Player action**: `game_id` + `history` + `round_info`
+/// - **AI player**: All fields + `round_memory`
 ///
 /// # For AI Developers
 ///
 /// Use `GameContext` to access game-wide information:
 /// - **Game history**: Complete history of all rounds for strategic analysis
-/// - **Future**: AI memory, game statistics, opponent models, etc.
+/// - **Round info**: Current round state from your perspective
+/// - **Round memory**: Your AI's memory of played cards (based on memory_level)
 ///
 /// # Example
 ///
 /// ```rust,ignore
 /// fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
 ///     // Access game history for strategic decisions
-///     let history = context.game_history();
+///     let history = context.game_history().ok_or(...)?;
 ///     
 ///     // Analyze opponent patterns over recent rounds
 ///     let recent_rounds = history.rounds.iter().rev().take(5);
@@ -37,77 +46,95 @@ use super::round_memory::RoundMemory;
 ///     Ok(legal_bids[0])
 /// }
 /// ```
-///
-/// # Design
-///
-/// `GameContext` is separate from `CurrentRoundInfo` because:
-/// - Different lifecycle: game-wide vs per-round
-/// - Different scope: all players/rounds vs single player/round
-/// - Extensibility: natural place for future game-wide services
 #[derive(Debug, Clone)]
 pub struct GameContext {
-    /// Complete game history including all rounds with bids, trumps, and scores.
-    game_history: GameHistory,
-    /// AI's memory of completed tricks in the current round.
+    /// Game ID
+    pub game_id: i64,
+
+    /// Complete game history (all rounds, bids, scores)
+    ///
+    /// Available once game has started (round 1+).
+    /// `None` in lobby state before game starts.
+    history: Option<GameHistory>,
+
+    /// Current round state from a specific player's perspective
+    ///
+    /// Only available when context is loaded for a specific player.
+    /// Used by HTTP handlers to render UI and by services for player actions.
+    round_info: Option<CurrentRoundInfo>,
+
+    /// AI's memory of completed tricks in the current round
+    ///
     /// Filtered by the AI's memory_level setting.
+    /// Only present for AI players.
     round_memory: Option<RoundMemory>,
 }
 
 impl GameContext {
-    /// Create a new GameContext with the given game history.
-    ///
-    /// This is typically called by the game orchestration layer, not by AI implementations.
-    pub fn new(game_history: GameHistory) -> Self {
+    /// Create minimal context with just game_id (e.g., lobby state).
+    pub fn new(game_id: i64) -> Self {
         Self {
-            game_history,
+            game_id,
+            history: None,
+            round_info: None,
             round_memory: None,
         }
     }
 
-    /// Create a GameContext with both game history and round memory.
-    ///
-    /// This is a builder-style method for adding round memory after construction.
+    /// Builder: Add game history.
+    pub fn with_history(mut self, history: GameHistory) -> Self {
+        self.history = Some(history);
+        self
+    }
+
+    /// Builder: Add player round info.
+    pub fn with_round_info(mut self, round_info: CurrentRoundInfo) -> Self {
+        self.round_info = Some(round_info);
+        self
+    }
+
+    /// Builder: Add AI round memory.
     pub fn with_round_memory(mut self, round_memory: Option<RoundMemory>) -> Self {
         self.round_memory = round_memory;
         self
     }
 
-    /// Access complete game history for strategic analysis.
+    /// Access game history (for validation, UI, AI strategy).
     ///
-    /// Returns all rounds (completed and partially completed current round) with their
-    /// bids, trump selections, and scores. This data is cached by the orchestration
-    /// layer and updated after each round completes.
+    /// Returns `None` if game hasn't started yet (lobby state).
+    pub fn game_history(&self) -> Option<&GameHistory> {
+        self.history.as_ref()
+    }
+
+    /// Require game history or return error.
     ///
-    /// # For AI Developers
+    /// Use this in contexts where history must be present (e.g., mid-game actions).
+    pub fn require_history(&self) -> Result<&GameHistory, DomainError> {
+        self.history.as_ref().ok_or_else(|| {
+            DomainError::validation(
+                ValidationKind::Other("NO_HISTORY".into()),
+                "Game history not available (game may not have started)",
+            )
+        })
+    }
+
+    /// Access player's current round info.
     ///
-    /// Use this to build advanced strategies that learn from opponent behavior:
-    /// - Analyze opponent bidding tendencies (aggressive vs conservative)
-    /// - Track trump selection patterns by player
-    /// - Adapt strategy based on score differential
-    /// - Build statistical models of opponent play
+    /// Returns `None` if context wasn't loaded for a specific player.
+    pub fn round_info(&self) -> Option<&CurrentRoundInfo> {
+        self.round_info.as_ref()
+    }
+
+    /// Require round info or return error.
     ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// // Calculate opponent's average bid over last 5 rounds
-    /// let history = context.game_history();
-    /// let opponent_seat = (state.player_seat + 1) % 4;
-    ///
-    /// let recent_bids: Vec<u8> = history.rounds
-    ///     .iter()
-    ///     .rev()
-    ///     .take(5)
-    ///     .filter_map(|r| r.bids[opponent_seat as usize])
-    ///     .collect();
-    ///
-    /// let avg_bid = if !recent_bids.is_empty() {
-    ///     recent_bids.iter().sum::<u8>() as f64 / recent_bids.len() as f64
-    /// } else {
-    ///     0.0
-    /// };
-    /// ```
-    pub fn game_history(&self) -> &GameHistory {
-        &self.game_history
+    /// Use this in contexts where round info must be present (e.g., player actions).
+    pub fn require_round_info(&self) -> Result<&CurrentRoundInfo, DomainError> {
+        self.round_info.as_ref().ok_or_else(|| {
+            DomainError::validation(
+                ValidationKind::Other("NO_ROUND_INFO".into()),
+                "Round info not available",
+            )
+        })
     }
 
     /// Access AI's memory of completed tricks in the current round.
