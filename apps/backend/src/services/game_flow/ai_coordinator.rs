@@ -156,7 +156,6 @@ impl GameFlowService {
         // Create AI player with effective config
         let ai_type = profile.playstyle.as_deref().unwrap_or("random");
         let config = AiConfig::from_json(effective_config.as_ref());
-        let ai_seed = config.seed();
         let use_memory_recency = config.memory_recency();
         let ai = create_ai(ai_type, config)
             .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
@@ -228,10 +227,17 @@ impl GameFlowService {
                 if !raw_plays.is_empty() {
                     let memory_mode =
                         crate::ai::MemoryMode::from_db_value(Some(effective_memory_level));
+
+                    // Derive deterministic memory seed from game seed (not AI config seed)
+                    // This ensures memory is stable within a round and unique per player
+                    let memory_seed = game.rng_seed.map(|game_seed| {
+                        crate::domain::derive_memory_seed(game_seed, current_round_no, player_seat)
+                    });
+
                     let degraded_tricks = crate::ai::apply_memory_degradation(
                         raw_plays,
                         memory_mode,
-                        ai_seed,
+                        memory_seed,
                         use_memory_recency,
                     );
 

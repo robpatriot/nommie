@@ -13,7 +13,7 @@ impl GameFlowService {
     /// Deal a new round: generate hands and advance game to Bidding phase.
     ///
     /// Expects game to be in Lobby (first round) or Complete (subsequent rounds).
-    /// Uses rng_seed from DB; initializes to game_id if not set.
+    /// Uses derive_dealing_seed(game.rng_seed, round_no) for deterministic dealing.
     pub async fn deal_round(
         &self,
         txn: &DatabaseTransaction,
@@ -38,11 +38,15 @@ impl GameFlowService {
             DomainError::validation(ValidationKind::InvalidHandSize, "Invalid round number")
         })?;
 
-        // Determine seed (use game_id as fallback)
-        let seed = game.rng_seed.unwrap_or(game_id) as u64;
+        // Derive deterministic dealing seed from game seed
+        // Game seed is generated from entropy at creation, then all randomness flows from it
+        let game_seed = game
+            .rng_seed
+            .ok_or_else(|| AppError::internal("Game missing rng_seed"))?;
+        let dealing_seed = crate::domain::derive_dealing_seed(game_seed, next_round);
 
         // Deal hands using domain logic
-        let dealt_hands = deal_hands(4, hand_size, seed)?;
+        let dealt_hands = deal_hands(4, hand_size, dealing_seed)?;
 
         // Update DB: state and round number
         let update_state = GameUpdateState::new(game_id, DbGameState::Bidding, game.lock_version);

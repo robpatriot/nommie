@@ -574,7 +574,10 @@ async fn test_create_game_defaults() -> Result<(), AppError> {
             assert_eq!(game.state, GameState::Lobby);
             assert_eq!(game.name, None);
             assert_eq!(game.created_by, None);
-            assert_eq!(game.rng_seed, None);
+            assert!(
+                game.rng_seed.is_some(),
+                "rng_seed should be generated at creation"
+            );
             assert_eq!(game.current_round, None);
             assert_eq!(game.starting_dealer_pos, None);
             assert_eq!(game.current_trick_no, 0);

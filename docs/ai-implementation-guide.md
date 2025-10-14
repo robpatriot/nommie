@@ -7,16 +7,17 @@ This guide provides everything you need to implement a custom AI player for Nomm
 ## Table of Contents
 
 1. [Game Rules](#game-rules)
-2. [Quick Start](#quick-start)
-3. [The AiPlayer Trait](#the-aiplayer-trait)
-4. [Available Game State](#available-game-state)
-5. [Core Data Types](#core-data-types)
-6. [Reference Implementation: RandomPlayer](#reference-implementation-randomplayer)
-7. [Advanced: GameHistory API](#advanced-gamehistory-api)
-8. [Advanced: AI Memory System](#advanced-ai-memory-system)
-9. [Error Handling](#error-handling)
-10. [Testing Your AI](#testing-your-ai)
-11. [Submission Requirements](#submission-requirements)
+2. [RNG & Determinism](#rng--determinism)
+3. [Quick Start](#quick-start)
+4. [The AiPlayer Trait](#the-aiplayer-trait)
+5. [Available Game State](#available-game-state)
+6. [Core Data Types](#core-data-types)
+7. [Reference Implementation: RandomPlayer](#reference-implementation-randomplayer)
+8. [Advanced: GameHistory API](#advanced-gamehistory-api)
+9. [Advanced: AI Memory System](#advanced-ai-memory-system)
+10. [Error Handling](#error-handling)
+11. [Testing Your AI](#testing-your-ai)
+12. [Submission Requirements](#submission-requirements)
 
 ---
 
@@ -59,6 +60,34 @@ Nommie is a 4-player trick-taking card game with bidding. Here are the complete 
 ### Game End
 - After round 26, highest total score wins
 - Multiple players can tie for the win
+
+---
+
+## RNG & Determinism
+
+Nommie uses a deterministic RNG architecture to enable game replay and debugging:
+
+### How It Works
+
+1. **Game Creation**: When a game is created, `games.rng_seed` is initialized from entropy (`rand::random::<i64>()`). This is the master seed for all game randomness.
+
+2. **Seed Derivation**: All randomness is derived from the game seed using context-specific derivation functions:
+   - **Card Dealing**: `derive_dealing_seed(game_seed, round_no)` generates a unique-but-deterministic seed for each round's shuffle.
+   - **AI Memory**: `derive_memory_seed(game_seed, round_no, player_seat)` generates a unique-but-deterministic seed for each player's memory degradation in each round.
+
+3. **AI Decisions**: Your AI implementation can optionally accept a seed via `AiConfig::seed`. This is recommended for testing but optional for production.
+
+### For AI Implementers
+
+- **Production**: Use `rand::thread_rng()` or `StdRng::from_entropy()` for non-deterministic decision-making.
+- **Testing**: Accept an optional seed in your constructor (as `Option<u64>`) and seed your RNG with `StdRng::seed_from_u64(seed)` when provided.
+- **Memory**: The AI memory system is always deterministic (both prod and test) because it uses the derived memory seed. You don't need to do anything special.
+
+### Benefits
+
+- **Reproducibility**: Given a `game_seed`, the entire game flow (dealing, memory) can be replayed exactly.
+- **Debugging**: Bugs can be traced to specific seeds and reproduced reliably.
+- **Testing**: Tests use deterministic seeds while production uses entropy—best of both worlds.
 
 ---
 

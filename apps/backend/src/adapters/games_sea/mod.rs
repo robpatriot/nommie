@@ -114,6 +114,11 @@ pub async fn create_game(
     dto: GameCreate,
 ) -> Result<games::Model, sea_orm::DbErr> {
     let now = time::OffsetDateTime::now_utc();
+
+    // Generate RNG seed from entropy for deterministic-but-unpredictable gameplay
+    // This seed is used to derive all game randomness (dealing, AI memory, etc.)
+    let rng_seed = rand::random::<i64>();
+
     let game_active = games::ActiveModel {
         id: NotSet,
         created_by: Set(dto.created_by),
@@ -126,7 +131,7 @@ pub async fn create_game(
         name: Set(dto.name),
         join_code: Set(Some(dto.join_code)),
         rules_version: Set("1.0".to_string()),
-        rng_seed: NotSet,
+        rng_seed: Set(Some(rng_seed)),
         current_round: NotSet,
         starting_dealer_pos: NotSet,
         current_trick_no: Set(0),
