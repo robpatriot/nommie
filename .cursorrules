@@ -6,6 +6,7 @@ Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and 
 - Follow these rules exactly. If a request would break them, stop and ask.
 - No commentary in edits — implement directly.
 - Never run any git commands other than diff
+- No deprecated or legacy code: Never use `#[deprecated]` or leave legacy/compatibility functions. Refactor callers instead.
 
 ## Persistence & Transactions
 
@@ -44,7 +45,7 @@ Related data = queries with invariants between them (game + its round + that rou
 - DTO constructors: use `impl Into<String>`.
 
 ## Extractors
-- Allowed: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`.
+- Allowed: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `CachedGameContext`, `ValidatedJson<T>`.
 - `ValidatedJson<T>` maps validation errors to `AppError` Problem Details.
 
 ## Error Handling
