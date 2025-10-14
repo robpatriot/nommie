@@ -1310,6 +1310,20 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // Drop ai_overrides (must be before game_players due to FK)
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ux_ai_overrides_game_player_id")
+                    .table(AiOverrides::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(AiOverrides::Table).to_owned())
+            .await?;
+
         manager
             .drop_index(
                 Index::drop()

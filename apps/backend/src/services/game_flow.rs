@@ -842,6 +842,10 @@ impl GameFlowService {
         // This persists across all rounds in the game and is passed to AIs for strategic analysis
         let mut game_history: Option<crate::domain::player_view::GameHistory> = None;
 
+        // Undegraded card plays cache - loaded once per round, degraded per-AI on demand
+        // Contains all completed tricks for the current round (not including current trick in progress)
+        let mut cached_round_plays: Option<Vec<crate::ai::memory::TrickPlays>> = None;
+
         for _iteration in 0..MAX_ITERATIONS {
             let game = games_sea::require_game(txn, game_id).await?;
 
@@ -890,6 +894,26 @@ impl GameFlowService {
                         game_history = Some(
                             crate::domain::player_view::GameHistory::load(txn, game_id).await?,
                         );
+
+                        // Load undegraded card plays for the new round
+                        // This will be degraded per-AI based on their memory_level
+                        debug!(
+                            game_id,
+                            round_no = current_round,
+                            "Loading card plays cache for new round"
+                        );
+                        cached_round_plays = if let Some(round) =
+                            crate::repos::rounds::find_by_game_and_round(
+                                txn,
+                                game_id,
+                                current_round,
+                            )
+                            .await?
+                        {
+                            Some(load_raw_plays_for_round(txn, round.id).await?)
+                        } else {
+                            None
+                        };
                     }
                     // else: reuse existing cache (optimization!)
                 }
@@ -898,6 +922,10 @@ impl GameFlowService {
                 if cached_round.is_some() {
                     debug!(game_id, "Clearing RoundCache (exited round states)");
                     cached_round = None;
+                }
+                if cached_round_plays.is_some() {
+                    debug!(game_id, "Clearing card plays cache (exited round states)");
+                    cached_round_plays = None;
                 }
             }
 
@@ -908,6 +936,7 @@ impl GameFlowService {
                     &game,
                     cached_round.as_ref().map(|(_, ctx)| ctx),
                     game_history.as_ref(),
+                    cached_round_plays.as_ref(),
                 )
                 .await?
             {
@@ -1084,6 +1113,7 @@ impl GameFlowService {
     ///
     /// If round_cache is provided, uses it to avoid redundant database queries.
     /// If game_history is provided, wraps it in GameContext and passes to AI methods.
+    /// If cached_round_plays is provided, uses it for building AI memory (degraded per-AI).
     /// Otherwise, loads player/AI data from database (slower fallback).
     async fn check_and_execute_ai_action_with_cache(
         &self,
@@ -1091,6 +1121,7 @@ impl GameFlowService {
         game: &crate::entities::games::Model,
         round_cache: Option<&crate::services::round_cache::RoundCache>,
         game_history: Option<&crate::domain::player_view::GameHistory>,
+        cached_round_plays: Option<&Vec<crate::ai::memory::TrickPlays>>,
     ) -> Result<bool, AppError> {
         use sea_orm::{EntityTrait, JoinType, QuerySelect, RelationTrait};
 
@@ -1222,6 +1253,7 @@ impl GameFlowService {
         // Create AI player with effective config
         let ai_type = profile.playstyle.as_deref().unwrap_or("random");
         let config = crate::ai::AiConfig::from_json(effective_config.as_ref());
+        let ai_seed = config.seed(); // Get seed before moving config
         let ai = create_ai(ai_type, config)
             .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
 
@@ -1256,11 +1288,40 @@ impl GameFlowService {
                 CurrentRoundInfo::load(txn, game.id, player_seat).await?
             };
 
-            // Create GameContext with cached game history
+            // Create GameContext with cached game history and round memory
             let history = game_history.ok_or_else(|| {
                 AppError::internal("GameHistory not available - should be cached by orchestration")
             })?;
-            let game_context = crate::domain::GameContext::new(history.clone());
+
+            // Build round memory for this AI (if they have memory enabled)
+            let round_memory = if effective_memory_level > 0 {
+                if let Some(raw_plays) = cached_round_plays {
+                    // Degrade memory based on AI's memory level and seed
+                    let memory_mode =
+                        crate::ai::MemoryMode::from_db_value(Some(effective_memory_level));
+                    let degraded_tricks = crate::ai::memory::apply_memory_degradation(
+                        raw_plays.clone(),
+                        memory_mode,
+                        ai_seed,
+                    );
+
+                    if !degraded_tricks.is_empty() {
+                        Some(crate::domain::RoundMemory::new(
+                            memory_mode,
+                            degraded_tricks,
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let game_context =
+                crate::domain::GameContext::new(history.clone()).with_round_memory(round_memory);
 
             // Execute AI decision and persist the action
             let result = match action_type {
@@ -1465,6 +1526,38 @@ enum ActionType {
     Bid,
     Trump,
     Play,
+}
+
+/// Load all completed tricks for a round without memory degradation.
+///
+/// This is used for caching - the raw plays are then degraded per-AI
+/// based on their individual memory levels.
+async fn load_raw_plays_for_round(
+    txn: &DatabaseTransaction,
+    round_id: i64,
+) -> Result<Vec<crate::ai::memory::TrickPlays>, AppError> {
+    use crate::domain::cards_parsing::from_stored_format;
+    use crate::repos::{plays, tricks};
+
+    let all_tricks = tricks::find_all_by_round(txn, round_id).await?;
+    let mut result = Vec::new();
+
+    for trick in all_tricks {
+        let play_records = plays::find_all_by_trick(txn, trick.id).await?;
+
+        let mut trick_plays = Vec::new();
+        for play in play_records {
+            let card = from_stored_format(&play.card.suit, &play.card.rank)?;
+            trick_plays.push((play.player_seat, card));
+        }
+
+        result.push(crate::ai::memory::TrickPlays {
+            trick_no: trick.trick_no,
+            plays: trick_plays,
+        });
+    }
+
+    Ok(result)
 }
 
 impl Default for GameFlowService {

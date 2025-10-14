@@ -77,15 +77,16 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
     .await?;
 
     // Test with Full mode - should return empty vec (no plays yet)
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full).await?;
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full, None).await?;
     assert!(plays.is_empty());
 
     // Test with None mode - should return empty vec
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::None).await?;
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::None, None).await?;
     assert!(plays.is_empty());
 
     // Test with Partial mode - should return empty vec
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }).await?;
+    let plays =
+        get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42)).await?;
     assert!(plays.is_empty());
 
     Ok(())
@@ -204,21 +205,31 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         .await?;
     }
 
-    // Test Full mode - should return all tricks
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full).await?;
+    // Test Full mode - should return all tricks with Exact memory
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full, None).await?;
     assert_eq!(plays.len(), 2);
     assert_eq!(plays[0].trick_no, 0);
     assert_eq!(plays[0].plays.len(), 4);
     assert_eq!(plays[1].trick_no, 1);
     assert_eq!(plays[1].plays.len(), 4);
 
+    // Verify Full mode returns Exact memory
+    for (_seat, play_memory) in &plays[0].plays {
+        assert!(play_memory.is_exact(), "Full mode should have exact memory");
+    }
+
     // Test None mode - should return empty
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::None).await?;
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::None, None).await?;
     assert!(plays.is_empty());
 
-    // Test Partial mode - currently returns full (TODO: implement impairment)
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }).await?;
-    assert_eq!(plays.len(), 2); // Currently same as Full
+    // Test Partial mode with seed - should return degraded memory
+    let plays_partial =
+        get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42)).await?;
+    assert_eq!(plays_partial.len(), 2); // Same number of tricks
+
+    // Note: At level 50 with only 8 cards (2 tricks * 4 cards), degradation is probabilistic.
+    // We don't assert degradation here since it may not occur in small samples.
+    // More comprehensive degradation tests are in ai_memory_degradation_test.rs
 
     Ok(())
 }

@@ -13,9 +13,10 @@ This guide provides everything you need to implement a custom AI player for Nomm
 5. [Core Data Types](#core-data-types)
 6. [Reference Implementation: RandomPlayer](#reference-implementation-randomplayer)
 7. [Advanced: GameHistory API](#advanced-gamehistory-api)
-8. [Error Handling](#error-handling)
-9. [Testing Your AI](#testing-your-ai)
-10. [Submission Requirements](#submission-requirements)
+8. [Advanced: AI Memory System](#advanced-ai-memory-system)
+9. [Error Handling](#error-handling)
+10. [Testing Your AI](#testing-your-ai)
+11. [Submission Requirements](#submission-requirements)
 
 ---
 
@@ -144,6 +145,7 @@ All three methods receive the same two parameters:
 
 **`context: &GameContext`** - Game-wide context including:
 - Complete game history via `context.game_history()` for strategic analysis
+- Round memory via `context.round_memory()` for card counting (completed tricks this round)
 - Historical data persisting across all rounds (bids, trumps, scores from past rounds)
 
 ### Required Methods
@@ -683,6 +685,311 @@ fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<
     // Make bid decision
     Ok(legal_bids[0])
 }
+```
+
+---
+
+## Advanced: AI Memory System
+
+AIs have configurable memory of completed tricks within the current round. This simulates different skill levels - from perfect card counting to poor recall - and makes games more realistic and varied.
+
+### What is AI Memory?
+
+**Round Memory** gives your AI access to cards played in **completed tricks** from the **current round only**:
+- ✅ Tricks that have already finished this round
+- ❌ NOT the current trick in progress (already in `CurrentRoundInfo.current_trick_plays`)
+- ❌ NOT tricks from previous rounds (not realistic to remember across rounds)
+
+Memory fidelity depends on the AI's **memory_level** setting (0-100):
+- **0 (None)**: No memory - can't remember any previous tricks
+- **1-99 (Partial)**: Degraded memory - some cards forgotten or vaguely remembered
+- **100 (Full)**: Perfect memory - remembers every card exactly
+
+### Accessing Round Memory
+
+Access memory via `context.round_memory()`:
+
+```rust
+fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
+    // Check if we have memory available
+    if let Some(memory) = context.round_memory() {
+        // Use memory to inform decision...
+    }
+    
+    // Your card selection logic
+    let legal_plays = state.legal_plays()
+        .map_err(|e| AiError::Internal(format!("{e}")))?;
+    Ok(legal_plays[0])
+}
+```
+
+**Returns `None` when**:
+- AI has memory_level = 0 (no memory enabled)
+- No tricks completed yet this round
+
+### Memory Structure
+
+```rust
+pub struct RoundMemory {
+    pub mode: MemoryMode,           // Memory level that produced this
+    pub tricks: Vec<TrickMemory>,   // Completed tricks
+}
+
+pub struct TrickMemory {
+    pub trick_no: i16,                      // Trick number (0-indexed)
+    pub plays: Vec<(i16, PlayMemory)>,      // (seat, what AI remembers)
+}
+```
+
+### PlayMemory: What Your AI Remembers
+
+Each card in memory is represented by a `PlayMemory` enum that reflects memory fidelity:
+
+```rust
+pub enum PlayMemory {
+    /// Perfect recall - knows the exact card
+    Exact(Card),
+    
+    /// Partial recall - remembers suit but not rank
+    /// Example: "Someone played a heart, don't remember which"
+    Suit(Suit),
+    
+    /// Weak recall - only remembers high/medium/low category
+    /// Example: "Someone played a high card"
+    RankCategory(RankCategory),  // High, Medium, or Low
+    
+    /// No memory of this card
+    Forgotten,
+}
+```
+
+**RankCategory**:
+- **High**: Jack, Queen, King, Ace
+- **Medium**: 7, 8, 9, 10
+- **Low**: 2, 3, 4, 5, 6
+
+### Memory Degradation
+
+At partial memory levels, cards are forgotten probabilistically:
+- **High cards** (Aces, Kings) are more memorable than low cards
+- **Memory level** controls overall recall probability
+- **Deterministic**: Same AI seed produces same forgotten cards (for reproducibility)
+
+**Example at level 50**:
+- Ace: ~50% exact recall, ~30% suit-only, ~15% category, ~5% forgotten
+- Two: ~35% exact recall, ~25% suit-only, ~15% category, ~25% forgotten
+
+### Usage Example: Void Detection
+
+Detect when an opponent is void in a suit:
+
+```rust
+fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
+    use crate::domain::{PlayMemory, Suit};
+    
+    // Track which opponents might be void in hearts
+    let mut possibly_void_in_hearts = [false; 4];
+    
+    if let Some(memory) = context.round_memory() {
+        for trick in &memory.tricks {
+            // Find tricks where hearts were led
+            if let Some((_, first_play)) = trick.plays.first() {
+                if let PlayMemory::Exact(first_card) = first_play {
+                    if first_card.suit == Suit::Hearts {
+                        // Hearts were led - check who followed suit
+                        for (seat, play_memory) in &trick.plays[1..] {
+                            match play_memory {
+                                PlayMemory::Exact(card) if card.suit != Suit::Hearts => {
+                                    // They played non-heart when hearts led = void!
+                                    possibly_void_in_hearts[*seat as usize] = true;
+                                }
+                                PlayMemory::Suit(suit) if *suit != Suit::Hearts => {
+                                    // Remember suit but not rank - still void!
+                                    possibly_void_in_hearts[*seat as usize] = true;
+                                }
+                                PlayMemory::Forgotten => {
+                                    // Can't tell - might be void or might have forgotten
+                                }
+                                _ => {
+                                    // Played hearts or we have vague memory
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Use void information to make decision...
+    let legal_plays = state.legal_plays()
+        .map_err(|e| AiError::Internal(format!("{e}")))?;
+    Ok(legal_plays[0])
+}
+```
+
+### Usage Example: Card Counting
+
+Count high cards that have been played:
+
+```rust
+fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
+    use crate::domain::{PlayMemory, Rank};
+    
+    let legal_bids = state.legal_bids()
+        .map_err(|e| AiError::Internal(format!("{e}")))?;
+    
+    // Count high cards we've seen played
+    let mut high_cards_played = 0;
+    
+    if let Some(memory) = context.round_memory() {
+        for trick in &memory.tricks {
+            for (_, play_memory) in &trick.plays {
+                match play_memory {
+                    PlayMemory::Exact(card) => {
+                        if matches!(card.rank, Rank::Jack | Rank::Queen | Rank::King | Rank::Ace) {
+                            high_cards_played += 1;
+                        }
+                    }
+                    PlayMemory::RankCategory(cat) if matches!(cat, RankCategory::High) => {
+                        // We know it was high, even if we forgot the exact card
+                        high_cards_played += 1;
+                    }
+                    _ => {
+                        // Can't determine from degraded/forgotten memory
+                    }
+                }
+            }
+        }
+    }
+    
+    // Count high cards in our hand
+    let high_cards_in_hand = state.hand.iter()
+        .filter(|c| matches!(c.rank, Rank::Jack | Rank::Queen | Rank::King | Rank::Ace))
+        .count();
+    
+    // Adjust bid based on how many high cards remain unknown
+    // (If memory is poor, we might overestimate, making the AI more risky!)
+    let estimated_remaining_highs = 16 - high_cards_played - high_cards_in_hand;
+    
+    // Your bidding logic using this information...
+    Ok(legal_bids[0])
+}
+```
+
+### Helper Methods
+
+```rust
+impl PlayMemory {
+    /// Check if memory is exact (not degraded)
+    pub fn is_exact(&self) -> bool;
+    
+    /// Check if completely forgotten
+    pub fn is_forgotten(&self) -> bool;
+    
+    /// Get exact card if memory is perfect, None otherwise
+    pub fn exact_card(&self) -> Option<Card>;
+}
+
+impl RoundMemory {
+    /// Check if memory is empty (no completed tricks)
+    pub fn is_empty(&self) -> bool;
+    
+    /// Get number of completed tricks remembered
+    pub fn len(&self) -> usize;
+}
+```
+
+### Strategic Implications
+
+Different memory levels create different playing styles:
+
+**Full Memory (100)**:
+- Can count cards perfectly within the round
+- Detect voids with certainty
+- Play optimally based on known information
+- More "computer-like" and predictable
+
+**Partial Memory (30-70)**:
+- Sometimes forgets key cards
+- May misremember which suit was played
+- More human-like with occasional mistakes
+- Creates interesting risk/reward tradeoffs
+
+**No Memory (0)**:
+- Must rely only on current trick and hand
+- Cannot count cards or track voids
+- Simulates beginners or distracted players
+- Makes more conservative or random decisions
+
+### Best Practices
+
+✅ **DO**:
+- Check `if let Some(memory) = context.round_memory()` before using
+- Handle all `PlayMemory` variants in your logic
+- Gracefully handle `Forgotten` and degraded memory
+- Use exact memory when available, make educated guesses otherwise
+- Remember: current trick is in `state.current_trick_plays`, NOT in round memory
+
+❌ **DON'T**:
+- Assume memory is always available (it's `Option<RoundMemory>`)
+- Assume all memory is exact (check variant before using)
+- Try to access cards from previous rounds (not included)
+- Panic if memory is degraded - handle gracefully
+
+### Memory-Aware Strategy Example
+
+```rust
+fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
+    let legal_plays = state.legal_plays()
+        .map_err(|e| AiError::Internal(format!("{e}")))?;
+    
+    // Strategy: If we have good memory and know opponent is void, play accordingly
+    if let Some(memory) = context.round_memory() {
+        // Analyze memory quality
+        let mut exact_count = 0;
+        let mut total_count = 0;
+        
+        for trick in &memory.tricks {
+            for (_, play_memory) in &trick.plays {
+                total_count += 1;
+                if play_memory.is_exact() {
+                    exact_count += 1;
+                }
+            }
+        }
+        
+        let memory_quality = if total_count > 0 {
+            (exact_count as f64) / (total_count as f64)
+        } else {
+            0.0
+        };
+        
+        if memory_quality > 0.7 {
+            // High confidence - use sophisticated strategy
+            // (void detection, card counting, etc.)
+        } else if memory_quality > 0.3 {
+            // Medium confidence - use simpler heuristics
+            // (track suits played, avoid risky plays)
+        } else {
+            // Low confidence - play conservatively
+            // (don't rely on memory much)
+        }
+    }
+    
+    // Fallback logic when no memory or low confidence
+    Ok(legal_plays[0])
+}
+```
+
+### Configuration
+
+AI memory level is configured per AI player:
+- **Default level**: Set in AI profile (applies to all games)
+- **Per-game override**: Can be customized for specific games
+- **Resolution**: Per-game override → AI profile → 100 (Full)
+
+Your AI implementation doesn't control this - it just receives the filtered memory through `GameContext`.
 
 ---
 
@@ -951,9 +1258,10 @@ mod tests {
 
 ```rust
 // Tracks cards played in CURRENT TRICK using CurrentRoundInfo.current_trick_plays
-// Uses AI Memory (when implemented) to remember cards from previous tricks this round
+// Uses context.round_memory() to remember cards from completed tricks this round
 // Calculates probability of remaining cards in current round
 // Makes optimal decisions based on known information
+// (Note: Effectiveness depends on AI's memory_level setting)
 ```
 
 ### Adaptive Player
@@ -978,6 +1286,8 @@ For questions about:
 - AI trait definition: `apps/backend/src/ai/trait_def.rs`
 - Random player example: `apps/backend/src/ai/random.rs`
 - Game state view: `apps/backend/src/domain/player_view.rs`
+- Game context: `apps/backend/src/domain/game_context.rs`
+- Round memory types: `apps/backend/src/domain/round_memory.rs`
 - Card types: `apps/backend/src/domain/cards_types.rs`
 
 ---

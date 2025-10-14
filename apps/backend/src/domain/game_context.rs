@@ -5,6 +5,7 @@
 //! the current round state (CurrentRoundInfo).
 
 use super::player_view::GameHistory;
+use super::round_memory::RoundMemory;
 
 /// Game-wide context and services available to AI players.
 ///
@@ -47,6 +48,9 @@ use super::player_view::GameHistory;
 pub struct GameContext {
     /// Complete game history including all rounds with bids, trumps, and scores.
     game_history: GameHistory,
+    /// AI's memory of completed tricks in the current round.
+    /// Filtered by the AI's memory_level setting.
+    round_memory: Option<RoundMemory>,
 }
 
 impl GameContext {
@@ -54,7 +58,18 @@ impl GameContext {
     ///
     /// This is typically called by the game orchestration layer, not by AI implementations.
     pub fn new(game_history: GameHistory) -> Self {
-        Self { game_history }
+        Self {
+            game_history,
+            round_memory: None,
+        }
+    }
+
+    /// Create a GameContext with both game history and round memory.
+    ///
+    /// This is a builder-style method for adding round memory after construction.
+    pub fn with_round_memory(mut self, round_memory: Option<RoundMemory>) -> Self {
+        self.round_memory = round_memory;
+        self
     }
 
     /// Access complete game history for strategic analysis.
@@ -95,7 +110,49 @@ impl GameContext {
         &self.game_history
     }
 
-    // Future methods:
-    // pub fn ai_memory(&self) -> Option<&AiMemory> { ... }
-    // pub fn game_stats(&self) -> &GameStats { ... }
+    /// Access AI's memory of completed tricks in the current round.
+    ///
+    /// Returns `None` if:
+    /// - AI has memory_level = 0 (no memory)
+    /// - No tricks have been completed yet in this round
+    ///
+    /// # For AI Developers
+    ///
+    /// Use this to make strategic decisions based on what cards have been played
+    /// earlier in the round:
+    /// - Track which suits opponents are void in
+    /// - Remember which high cards have been played
+    /// - Build card counting strategies
+    ///
+    /// Note: Memory fidelity depends on your AI's memory_level setting:
+    /// - 100 (Full): Perfect recall of all cards
+    /// - 50 (Partial): Some cards forgotten, especially low cards
+    /// - 0 (None): No historical memory (returns None)
+    ///
+    /// The current trick in progress is NOT included here - it's available
+    /// via `CurrentRoundInfo.current_trick_plays` instead.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Check if opponent showed void in hearts earlier this round
+    /// if let Some(memory) = context.round_memory() {
+    ///     for trick in &memory.tricks {
+    ///         for (seat, play_memory) in &trick.plays {
+    ///             if *seat == opponent_seat {
+    ///                 match play_memory {
+    ///                     PlayMemory::Exact(card) if card.suit != Suit::Hearts => {
+    ///                         // Opponent played non-heart when hearts were led
+    ///                         // They're void in hearts!
+    ///                     }
+    ///                     _ => {}
+    ///                 }
+    ///             }
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn round_memory(&self) -> Option<&RoundMemory> {
+        self.round_memory.as_ref()
+    }
 }

@@ -79,7 +79,7 @@ mod random;
 mod trait_def;
 
 pub use config::AiConfig;
-pub use memory::{get_round_card_plays, MemoryMode, TrickPlays};
+pub use memory::{apply_memory_degradation, get_round_card_plays, MemoryMode, TrickPlays};
 pub use random::RandomPlayer;
 pub use trait_def::{AiError, AiPlayer};
 
