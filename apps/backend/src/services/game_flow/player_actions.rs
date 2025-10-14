@@ -3,7 +3,7 @@ use tracing::{debug, info};
 
 use super::GameFlowService;
 use crate::adapters::games_sea::{self, GameUpdateRound, GameUpdateState};
-use crate::domain::bidding::Bid;
+use crate::domain::bidding::{validate_consecutive_zero_bids, Bid};
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::{card_beats, Card, Suit};
 use crate::entities::games::GameState as DbGameState;
@@ -31,6 +31,12 @@ impl GameFlowService {
     /// Internal bid submission - just records the bid without processing.
     ///
     /// Used by AI loop to avoid recursion. Handlers should use submit_bid() instead.
+    ///
+    /// # Security
+    ///
+    /// This method loads its own validation data from the database rather than
+    /// accepting pre-built context. Services are trust boundaries and must not
+    /// rely on caller-provided data for security checks.
     pub(super) async fn submit_bid_internal(
         &self,
         txn: &DatabaseTransaction,
@@ -55,6 +61,11 @@ impl GameFlowService {
             DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
         })? as u8;
 
+        // Find the current round (needed for validation)
+        let current_round_no = game.current_round.ok_or_else(|| {
+            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
+        })?;
+
         // Validate bid range using domain logic
         let bid = Bid(bid_value);
         let valid_range = crate::domain::valid_bid_range(hand_size);
@@ -66,10 +77,12 @@ impl GameFlowService {
             .into());
         }
 
-        // Find the current round
-        let current_round_no = game.current_round.ok_or_else(|| {
-            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
-        })?;
+        // Validate consecutive zero bids rule (if bidding 0)
+        if bid_value == 0 {
+            // Load game history for validation (service owns its validation data)
+            let history = crate::domain::player_view::GameHistory::load(txn, game_id).await?;
+            validate_consecutive_zero_bids(&history, player_seat, current_round_no)?;
+        }
 
         let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?

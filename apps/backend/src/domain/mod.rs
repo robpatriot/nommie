@@ -19,6 +19,8 @@ pub mod tricks;
 #[cfg(test)]
 mod tests_bidding;
 #[cfg(test)]
+mod tests_consecutive_zeros;
+#[cfg(test)]
 mod tests_conversions;
 #[cfg(test)]
 mod tests_integration;
