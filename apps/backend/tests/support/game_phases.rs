@@ -288,8 +288,10 @@ pub async fn setup_game_at_round(
 
     let mut last_round_id = 0;
 
-    // Create completed rounds with simple scoring
-    for round_no in 1..=completed_rounds {
+    // Create only the last completed round with accumulated scores
+    // This is much faster than creating all previous rounds
+    if completed_rounds > 0 {
+        let round_no = completed_rounds;
         let hand_size =
             backend::domain::rules::hand_size_for_round(round_no as u8).ok_or_else(|| {
                 AppError::from(backend::errors::domain::DomainError::validation(
@@ -308,11 +310,12 @@ pub async fn setup_game_at_round(
 
         // Create simple bids and scores for each player
         // Each player gets 4 points per round (simplified for test setup)
+        // total_score_after represents accumulated score from all completed rounds
         for seat in 0..4 {
             // Create bid records (bid_order = seat for simplicity)
             bids::create_bid(txn, round.id, seat, 1, seat).await?;
 
-            // Create score records
+            // Create score records with accumulated totals
             scores::create_score(
                 txn,
                 scores::ScoreData {
