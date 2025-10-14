@@ -2,6 +2,16 @@
 
 Repo-root workspace rules. Applies to all Cursor prompts, edits, refactors, and codegen.
 
+## Development Workflow
+- **Before executing any pnpm commands**, source `.env` once per shell session:
+  ```bash
+  set -a; source .env; set +a
+  ```
+  This must be done once and only once per shell. Do not source `.env` repeatedly.
+- After completing backend code changes, run the linter: `pnpm be:lint`
+- After completing backend development or when testing during development, run tests: `pnpm be:test`
+  - Append additional arguments to run specific test subsets as needed.
+
 ## General
 - Follow these rules exactly. If a request would break them, stop and ask.
 - No commentary in edits — implement directly.
@@ -67,13 +77,10 @@ Related data = queries with invariants between them (game + its round + that rou
 ## AppState
 - `AppState.db` is private — access via `state.db()` / `require_db(&state)`.
 
-## Schema & Migrations
-- Schema lives in single init migration under `apps/backend/migration`.
-- Don't add separate migration files, SQL, or DDL elsewhere.
-
-## Env & pnpm
-- Source `.env` once per shell session: `set -a; source .env; set +a`
-- Don't read `DATABASE_URL` directly in code.
+## Schema & Migrations (Pre-Production)
+- **We have NOT gone to production yet — freely modify the schema as needed.**
+- Schema lives in the single initial migration file under `apps/backend/migration`.
+- **Always update the initial migration file directly — do NOT create sequential migrations.**
 
 ## Testing
 - Tests must be deterministic (seed time/RNG).
