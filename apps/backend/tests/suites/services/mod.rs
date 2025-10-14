@@ -18,3 +18,4 @@ pub mod player_view;
 pub mod services_players;
 pub mod services_users;
 pub mod snapshot_phases;
+pub mod test_first_trick_leader;

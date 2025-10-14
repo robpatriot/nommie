@@ -174,7 +174,7 @@ impl GameService {
 
         // 12. Determine turn_start, turn, leader
         let dealer_pos = game.dealer_pos().unwrap_or(0) as u8;
-        let turn_start = dealer_pos;
+        let turn_start = (dealer_pos + 1) % 4;
 
         let leader = all_tricks
             .last()
