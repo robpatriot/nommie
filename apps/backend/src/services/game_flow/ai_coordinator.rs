@@ -156,6 +156,8 @@ impl GameFlowService {
         // Create AI player with effective config
         let ai_type = profile.playstyle.as_deref().unwrap_or("random");
         let config = AiConfig::from_json(effective_config.as_ref());
+        let ai_seed = config.seed();
+        let use_memory_recency = config.memory_recency();
         let ai = create_ai(ai_type, config)
             .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
 
@@ -164,6 +166,7 @@ impl GameFlowService {
             player_seat,
             memory_level = effective_memory_level,
             has_overrides = ai_override.is_some(),
+            memory_recency = use_memory_recency,
             "AI configuration resolved"
         );
 
@@ -190,12 +193,66 @@ impl GameFlowService {
                 CurrentRoundInfo::load(txn, game.id, player_seat).await?
             };
 
-            // Create GameContext with cached game history
+            // Build RoundMemory if memory is enabled
+            let round_memory = if effective_memory_level > 0 {
+                let current_round_no = game.current_round.ok_or_else(|| {
+                    AppError::internal("No current round when building AI memory")
+                })?;
+                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
+                    .await?
+                    .ok_or_else(|| AppError::internal("Round not found when building AI memory"))?;
+
+                // Load all completed tricks for this round
+                let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
+                let mut raw_plays = Vec::new();
+
+                for trick in all_tricks {
+                    let play_records = plays::find_all_by_trick(txn, trick.id).await?;
+                    let mut trick_plays = Vec::new();
+
+                    for play in play_records {
+                        let card = crate::domain::cards_parsing::from_stored_format(
+                            &play.card.suit,
+                            &play.card.rank,
+                        )?;
+                        trick_plays.push((play.player_seat, card));
+                    }
+
+                    raw_plays.push(crate::ai::TrickPlays {
+                        trick_no: trick.trick_no,
+                        plays: trick_plays,
+                    });
+                }
+
+                // Apply memory degradation
+                if !raw_plays.is_empty() {
+                    let memory_mode =
+                        crate::ai::MemoryMode::from_db_value(Some(effective_memory_level));
+                    let degraded_tricks = crate::ai::apply_memory_degradation(
+                        raw_plays,
+                        memory_mode,
+                        ai_seed,
+                        use_memory_recency,
+                    );
+
+                    Some(crate::domain::RoundMemory::new(
+                        memory_mode,
+                        degraded_tricks,
+                    ))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            // Create GameContext with cached game history and round memory
             let history = game_history.ok_or_else(|| {
                 AppError::internal("GameHistory not available - should be cached by orchestration")
             })?;
-            let game_context =
-                crate::domain::GameContext::new(game.id).with_history(history.clone());
+            let game_context = crate::domain::GameContext::new(game.id)
+                .with_history(history.clone())
+                .with_round_memory(round_memory);
 
             // Execute AI decision and persist the action
             let result = match action_type {

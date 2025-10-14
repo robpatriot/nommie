@@ -147,6 +147,8 @@ All three methods receive the same two parameters:
 - Game ID
 - Complete game history via `context.game_history()` for strategic analysis (returns `Option<&GameHistory>`)
 - Round memory via `context.round_memory()` for card counting (returns `Option<&RoundMemory>`)
+  - Memory quality affected by AI's `memory_level` setting (0-100)
+  - Optional recency bias via `memory_recency` config (recent tricks remembered better)
 - Historical data persisting across all rounds (bids, trumps, scores from past rounds)
 
 ### Required Methods
@@ -206,10 +208,14 @@ fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result
     // Play highest card if leading, lowest if following
     if state.current_trick_plays.is_empty() {
         // Leading - play highest card
-        Ok(*legal_plays.iter().max().unwrap())
+        legal_plays.iter().max()
+            .copied()
+            .ok_or_else(|| AiError::Internal("No legal plays available".into()))
     } else {
         // Following - play lowest card
-        Ok(*legal_plays.iter().min().unwrap())
+        legal_plays.iter().min()
+            .copied()
+            .ok_or_else(|| AiError::Internal("No legal plays available".into()))
     }
 }
 ```
@@ -664,29 +670,28 @@ fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<
     
     // Analyze all opponents if history available
     if let Some(history) = context.game_history() {
-        let mut opponent_aggression = [0.0; 4];
+        let mut opponent_avg_bid = [0.0; 4];
         
-        for (seat, aggression) in opponent_aggression.iter_mut().enumerate() {
+        for (seat, avg_bid) in opponent_avg_bid.iter_mut().enumerate() {
             if seat == state.player_seat as usize {
                 continue; // Skip self
             }
             
-            let mut total = 0.0;
-            let mut count = 0;
+            let mut bid_sum = 0.0;
+            let mut bid_count = 0;
             
             for round in &history.rounds {
                 if let Some(bid) = round.bids[seat] {
-                    // High bid relative to hand size = aggressive
-                    let hand_size = round.scores[seat].cumulative_score; // Example metric
-                    total += bid as f64;
-                    count += 1;
+                    bid_sum += bid as f64;
+                    bid_count += 1;
                 }
             }
             
-            *aggression = if count > 0 { total / count as f64 } else { 0.0 };
+            *avg_bid = if bid_count > 0 { bid_sum / bid_count as f64 } else { 0.0 };
         }
         
-        // Use aggression scores to inform your bid strategy...
+        // Use average bids to inform your bid strategy...
+        // (e.g., higher avg_bid suggests more aggressive opponent)
     }
     
     // Make bid decision (with or without history analysis)
@@ -781,14 +786,22 @@ At partial memory levels, cards are forgotten probabilistically:
 - **High cards** (Aces, Kings) are more memorable than low cards
 - **Memory level** controls overall recall probability
 - **Deterministic**: Same AI seed produces same forgotten cards (for reproducibility)
+- **Recency bias** (optional): Recent tricks remembered better than older ones
 
-**Example at level 50**:
+**Example at level 50 (no recency bias)**:
 - Ace: ~50% exact recall, ~30% suit-only, ~15% category, ~5% forgotten
 - Two: ~35% exact recall, ~25% suit-only, ~15% category, ~25% forgotten
 
+**With recency bias enabled (`memory_recency: true`)**:
+- Last 3 tricks: 10% boost to recall (e.g., Ace goes from 50% → 55%)
+- Older tricks: No penalty (same as base level)
+- Creates more human-like memory where recent events are clearer
+
 ### Usage Example: Void Detection
 
-Detect when an opponent is void in a suit:
+Detect when an opponent is void in a suit.
+
+**Note**: With recency bias enabled, void detection is slightly more reliable for recent tricks (last 3 get 10% boost) while older tricks maintain standard memory quality.
 
 ```rust
 fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
@@ -918,18 +931,21 @@ Different memory levels create different playing styles:
 - Detect voids with certainty
 - Play optimally based on known information
 - More "computer-like" and predictable
+- Recency bias has no effect (perfect recall)
 
 **Partial Memory (30-70)**:
 - Sometimes forgets key cards
 - May misremember which suit was played
 - More human-like with occasional mistakes
 - Creates interesting risk/reward tradeoffs
+- **When recency bias enabled**: Last 3 tricks remembered ~10% better, making recent void detection more reliable while older tricks maintain base memory level
 
 **No Memory (0)**:
 - Must rely only on current trick and hand
 - Cannot count cards or track voids
 - Simulates beginners or distracted players
 - Makes more conservative or random decisions
+- Recency bias has no effect (no memory at all)
 
 ### Best Practices
 
@@ -993,12 +1009,28 @@ fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result
 
 ### Configuration
 
-AI memory level is configured per AI player:
+AI memory is configured at two levels:
+
+**Memory Level** (0-100):
 - **Default level**: Set in AI profile (applies to all games)
 - **Per-game override**: Can be customized for specific games
 - **Resolution**: Per-game override → AI profile → 100 (Full)
 
-Your AI implementation doesn't control this - it just receives the filtered memory through `GameContext`.
+**Memory Recency Bias** (optional):
+- Configured via AI profile `config` JSON field: `{"memory_recency": true}`
+- Default: `false` (disabled) - uniform memory across all tricks
+- When enabled: Last 3 tricks get 10% better recall than older tricks
+- Only affects partial memory levels (1-99), not Full (100) or None (0)
+
+**Example AI Config with Recency**:
+```json
+{
+  "seed": 12345,
+  "memory_recency": true
+}
+```
+
+Your AI implementation doesn't control these settings - it just receives the filtered memory through `GameContext`.
 
 ---
 
@@ -1238,6 +1270,7 @@ mod tests {
 - Check `if let Some(history) = context.game_history()` before using history
 - Check `if let Some(memory) = context.round_memory()` before using memory
 - Have fallback logic when history or memory is unavailable
+- Consider whether your AI would benefit from `memory_recency: true` (more human-like recall)
 
 ### ❌ DON'T
 
@@ -1276,6 +1309,7 @@ mod tests {
 // Calculates probability of remaining cards in current round
 // Makes optimal decisions based on known information
 // (Note: Effectiveness depends on AI's memory_level setting)
+// (Note: With memory_recency enabled, more accurate for recent tricks than older ones)
 ```
 
 ### Adaptive Player

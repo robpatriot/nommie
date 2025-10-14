@@ -25,10 +25,19 @@ use serde_json::Value as JsonValue;
 /// {"seed": 12345}
 /// ```
 ///
+/// AI with seed and memory recency:
+/// ```json
+/// {
+///   "seed": 12345,
+///   "memory_recency": true
+/// }
+/// ```
+///
 /// AI with seed and custom fields:
 /// ```json
 /// {
 ///   "seed": 12345,
+///   "memory_recency": false,
 ///   "aggression": 0.7,
 ///   "risk_tolerance": "high"
 /// }
@@ -53,6 +62,19 @@ pub struct AiConfig {
     /// - Replaying games with consistent AI decisions
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
+
+    /// Optional memory recency bias for AI memory system.
+    ///
+    /// When enabled, AIs will remember recent tricks better than older tricks
+    /// within the current round. This provides more realistic human-like memory
+    /// where recent events are clearer than distant ones.
+    ///
+    /// - `true`: Apply 1.1x boost to memory recall for last 3 tricks
+    /// - `false` or `None`: Uniform memory across all tricks (default)
+    ///
+    /// Currently uses gentle recency bias (10% boost for recent, no penalty for old).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_recency: Option<bool>,
 
     /// AI-specific configuration.
     ///
@@ -83,11 +105,13 @@ impl AiConfig {
                 // Try to deserialize, falling back to empty config on error
                 serde_json::from_value(json.clone()).unwrap_or_else(|_| Self {
                     seed: None,
+                    memory_recency: None,
                     custom: JsonValue::Object(serde_json::Map::new()),
                 })
             }
             None => Self {
                 seed: None,
+                memory_recency: None,
                 custom: JsonValue::Object(serde_json::Map::new()),
             },
         }
@@ -96,6 +120,13 @@ impl AiConfig {
     /// Get the RNG seed, if configured.
     pub fn seed(&self) -> Option<u64> {
         self.seed
+    }
+
+    /// Check if memory recency bias is enabled.
+    ///
+    /// Returns true if explicitly enabled, false otherwise (default: false).
+    pub fn memory_recency(&self) -> bool {
+        self.memory_recency.unwrap_or(false)
     }
 
     /// Get a custom configuration field by key.
@@ -115,6 +146,7 @@ impl AiConfig {
     pub fn empty() -> Self {
         Self {
             seed: None,
+            memory_recency: None,
             custom: JsonValue::Object(serde_json::Map::new()),
         }
     }
@@ -123,6 +155,7 @@ impl AiConfig {
     pub fn with_seed(seed: u64) -> Self {
         Self {
             seed: Some(seed),
+            memory_recency: None,
             custom: JsonValue::Object(serde_json::Map::new()),
         }
     }

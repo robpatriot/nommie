@@ -118,8 +118,13 @@ pub async fn get_round_card_plays<C: ConnectionTrait + Send + Sync>(
         });
     }
 
-    // Apply memory degradation based on mode and seed
-    Ok(apply_memory_degradation(raw_plays, memory_mode, ai_seed))
+    // Apply memory degradation based on mode and seed (no recency bias in this helper)
+    Ok(apply_memory_degradation(
+        raw_plays,
+        memory_mode,
+        ai_seed,
+        false,
+    ))
 }
 
 /// Apply memory degradation to raw trick plays based on memory mode.
@@ -128,10 +133,17 @@ pub async fn get_round_card_plays<C: ConnectionTrait + Send + Sync>(
 ///
 /// This is public to allow game orchestration to cache raw plays and degrade them
 /// per-AI based on individual memory levels.
+///
+/// # Recency Bias
+///
+/// When `use_recency` is true, recent tricks get a gentle memory boost:
+/// - Last 3 tricks: 1.1x boost (10% better recall)
+/// - Older tricks: No penalty (1.0x)
 pub fn apply_memory_degradation(
     plays: Vec<TrickPlays>,
     memory_mode: MemoryMode,
     seed: Option<u64>,
+    use_recency: bool,
 ) -> Vec<TrickMemory> {
     match memory_mode {
         MemoryMode::None => {
@@ -140,6 +152,7 @@ pub fn apply_memory_degradation(
         }
         MemoryMode::Full => {
             // Perfect memory - convert to TrickMemory with Exact cards
+            // Note: Recency doesn't affect Full memory mode
             plays
                 .into_iter()
                 .map(|trick| {
@@ -160,14 +173,31 @@ pub fn apply_memory_degradation(
                 StdRng::from_entropy()
             };
 
+            // Calculate total tricks for recency calculation
+            let total_tricks = plays.len();
+
             plays
                 .into_iter()
-                .map(|trick| {
+                .enumerate()
+                .map(|(idx, trick)| {
+                    // Calculate recency boost if enabled
+                    let recency_boost = if use_recency {
+                        // Last 3 tricks get 1.1x boost, older tricks no penalty
+                        let tricks_from_end = total_tricks.saturating_sub(idx);
+                        if tricks_from_end <= 3 {
+                            1.1 // 10% boost for recent tricks
+                        } else {
+                            1.0 // No penalty for older tricks
+                        }
+                    } else {
+                        1.0 // No recency bias
+                    };
+
                     let plays = trick
                         .plays
                         .into_iter()
                         .map(|(seat, card)| {
-                            let memory = degrade_card_memory(&card, level, &mut rng);
+                            let memory = degrade_card_memory(&card, level, recency_boost, &mut rng);
                             (seat, memory)
                         })
                         .collect();
@@ -178,20 +208,27 @@ pub fn apply_memory_degradation(
     }
 }
 
-/// Degrade memory of a single card based on memory level.
+/// Degrade memory of a single card based on memory level and recency.
 ///
 /// Higher memory level = better recall.
 /// High-value cards (Aces, Kings) are more memorable than low cards.
-fn degrade_card_memory<R: Rng>(card: &Card, level: i32, rng: &mut R) -> PlayMemory {
+/// Recency boost (1.0-1.1) improves recall for recent tricks.
+fn degrade_card_memory<R: Rng>(
+    card: &Card,
+    level: i32,
+    recency_boost: f64,
+    rng: &mut R,
+) -> PlayMemory {
     // Calculate card importance weight (high cards more memorable)
     let importance_weight = card_importance_weight(card.rank);
 
     // Calculate probability of exact recall
-    // Formula: base_prob * (0.5 + importance * 0.5)
-    // At level=50 with Ace (importance=1.0): 50% * (0.5 + 0.5) = 50%
-    // At level=50 with 2 (importance=0.4): 50% * (0.5 + 0.2) = 35%
+    // Formula: base_prob * (0.5 + importance * 0.5) * recency_boost
+    // At level=50 with Ace (importance=1.0), recent (1.1x): 50% * (0.5 + 0.5) * 1.1 = 55%
+    // At level=50 with 2 (importance=0.4), old (1.0x): 50% * (0.5 + 0.2) * 1.0 = 35%
     let base_prob = (level as f64) / 100.0;
-    let remember_exactly = base_prob * (0.5 + importance_weight * 0.5);
+    let remember_exactly = base_prob * (0.5 + importance_weight * 0.5) * recency_boost;
+    let remember_exactly = remember_exactly.min(1.0); // Cap at 100%
 
     if rng.gen_bool(remember_exactly) {
         // Perfect recall
@@ -199,7 +236,8 @@ fn degrade_card_memory<R: Rng>(card: &Card, level: i32, rng: &mut R) -> PlayMemo
     }
 
     // Degraded memory - what do we still remember?
-    let partial_prob = base_prob * 0.7; // Lower threshold for partial memory
+    // Also apply recency boost to partial memory
+    let partial_prob = (base_prob * 0.7 * recency_boost).min(1.0);
 
     if rng.gen_bool(partial_prob) {
         // Remember suit but not exact rank
