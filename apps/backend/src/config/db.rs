@@ -9,6 +9,10 @@ pub enum DbProfile {
     Prod,
     /// Test database profile - enforces safety rules
     Test,
+    /// SQLite in-memory database (ephemeral, fastest)
+    InMemory,
+    /// SQLite file-based database (persistent, configurable file)
+    SqliteFile { file: Option<String> },
 }
 
 /// Database owner enum for different access levels
@@ -57,6 +61,12 @@ fn db_name(profile: DbProfile) -> Result<String, AppError> {
                 )));
             }
             Ok(db_name)
+        }
+        DbProfile::InMemory | DbProfile::SqliteFile { .. } => {
+            // SQLite profiles don't need database names from environment
+            Err(AppError::config(
+                "SQLite profiles don't use database names from environment variables",
+            ))
         }
     }
 }

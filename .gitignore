@@ -17,6 +17,9 @@ docs/env.example.txt
 # Postgres data
 postgres_data/
 
+# SQLite data
+data/sqlite/*.db
+
 # Next.js
 .next/
 out/

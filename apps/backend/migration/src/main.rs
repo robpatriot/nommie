@@ -3,50 +3,43 @@ use std::env;
 
 use ::backend::config::db::{DbOwner, DbProfile};
 use ::backend::infra::db::connect_db;
-use migration::Migrator;
-use sea_orm_migration::prelude::*;
-use sea_orm_migration::sea_orm::Statement;
+use migration::{migrate_internal, MigrationCommand};
 
 #[tokio::main]
 async fn main() {
-    // Select prod|test via env (your pattern)
+    // Set up logging to stdout for CLI - only show our migration info, no timestamps
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stdout)
+        .without_time()
+        .with_target(false)
+        .with_thread_ids(false)
+        .with_thread_names(false)
+        .with_line_number(false)
+        .with_file(false)
+        .with_env_filter("migration=info,sqlx=warn")
+        .init();
+
+    // Select database profile via env - no default for safety
     let profile = match env::var("MIGRATION_TARGET").as_deref() {
-        Ok("test") => DbProfile::Test,
-        _ => DbProfile::Prod,
+        Ok("prod") => DbProfile::Prod,
+        Ok("pg_test") => DbProfile::Test,
+        Ok("sqlite_test") => DbProfile::SqliteFile { file: None },
+        _ => {
+            eprintln!("❌ MIGRATION_TARGET must be set to one of: prod, pg_test, sqlite_test");
+            eprintln!("   This prevents accidental production database operations");
+            std::process::exit(1);
+        }
     };
 
     // Subcommand: up | down | fresh | reset | refresh | status
     let cmd = env::args().nth(1).unwrap_or_else(|| "up".to_string());
-
-    // Connect with owner privileges (can create/drop types/tables)
-    let db = connect_db(profile.clone(), DbOwner::Owner)
-        .await
-        .expect("Failed to connect to database");
-
-    // ----- Diagnostics (safe to keep, helpful when things look 'no-op') -----
-    println!("▶ cmd={cmd}  profile={profile:?}");
-    let stmt = Statement::from_string(
-        db.get_database_backend(),
-        String::from("select current_database() as name"),
-    );
-    if let Some(row) = db.query_one(stmt).await.expect("current_database() failed") {
-        let db_name: String = row.try_get("", "name").expect("extract db name");
-        println!("▶ connected to DB: {db_name}");
-    } else {
-        println!("▶ connected to DB: <unknown>");
-    }
-    let mig_count = <migration::Migrator as MigratorTrait>::migrations().len();
-    println!("▶ runner sees {mig_count} migration(s)");
-    // -----------------------------------------------------------------------
-
-    // Dispatch to SeaORM's runner
-    let result = match cmd.as_str() {
-        "up" => Migrator::up(&db, None).await,
-        "down" => Migrator::down(&db, None).await,
-        "fresh" => Migrator::fresh(&db).await, // drop all tables, then up()
-        "reset" => Migrator::reset(&db).await, // rollback all applied migrations
-        "refresh" => Migrator::refresh(&db).await, // rollback all, then up()
-        "status" => Migrator::status(&db).await,
+    let command = match cmd.as_str() {
+        "up" => MigrationCommand::Up,
+        "down" => MigrationCommand::Down,
+        "fresh" => MigrationCommand::Fresh,
+        "reset" => MigrationCommand::Reset,
+        "refresh" => MigrationCommand::Refresh,
+        "status" => MigrationCommand::Status,
         other => {
             eprintln!(
                 "Unknown command: {other}. Use: up | down | fresh | reset | refresh | status"
@@ -55,11 +48,14 @@ async fn main() {
         }
     };
 
-    match result {
-        Ok(()) => println!("✅ {cmd} OK for {:?}", profile),
-        Err(e) => {
-            eprintln!("❌ {cmd} failed for {:?}: {e}", profile);
-            std::process::exit(1);
-        }
+    // Connect with owner privileges (can create/drop types/tables)
+    let db = connect_db(profile.clone(), DbOwner::Owner)
+        .await
+        .expect("Failed to connect to database");
+
+    // Use internal migration function
+    if let Err(e) = migrate_internal(&db, command).await {
+        eprintln!("Migration failed: {e}");
+        std::process::exit(1);
     }
 }

@@ -28,10 +28,13 @@ The system is **full-stack** and **Docker-first**, with a clean split between fr
 ---
 
 ## 🗄️ Database & Infrastructure
-- **Database:** PostgreSQL
-- **Docker Compose:** manages Postgres (roles, DBs, grants, search_path)
-- **Schema Management:** single SQL init file (source of truth)
+- **Database:** PostgreSQL (production), SQLite (testing/local dev)
+- **PostgreSQL:** Docker Compose manages Postgres (roles, DBs, grants, search_path)
+- **SQLite:** In-memory for fast testing, file-based for local development
+- **Schema Management:** SeaORM migrations with backend branching
 - **Test DB:** programmatically recreated from init SQL at startup, `_test` guard enforced
+- **Environment Variables:**
+  - `SQLITE_DB_DIR`: Directory for SQLite file databases (default: `./data/sqlite`)
 
 ---
 

@@ -4,11 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sea-orm-migration = { version = "1.1", features = ["runtime-tokio-rustls", "cli", "sqlx-postgres", "with-time"] }
+sea-orm-migration = { version = "1.1", features = ["runtime-tokio-rustls", "cli", "sqlx-postgres", "sqlx-sqlite", "with-time"] }
 tokio = { version = "1.0", features = ["full"] }
 backend = { path = ".." }
 async-trait = "0.1"
 uuid = { version = "1.0", features = ["v4"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
 
 [[bin]]
 name = "migration"

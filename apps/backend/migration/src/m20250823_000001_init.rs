@@ -308,52 +308,62 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Create Postgres enums
-        manager
-            .create_type(
-                PgType::create()
-                    .as_enum(GameStateEnum::Type)
-                    .values([
-                        "LOBBY",
-                        "DEALING",
-                        "BIDDING",
-                        "TRUMP_SELECTION",
-                        "TRICK_PLAY",
-                        "SCORING",
-                        "BETWEEN_ROUNDS",
-                        "COMPLETED",
-                        "ABANDONED",
-                    ])
-                    .to_owned(),
-            )
-            .await?;
+        // Create Postgres enums (PostgreSQL only)
+        match manager.get_database_backend() {
+            sea_orm::DatabaseBackend::Postgres => {
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(GameStateEnum::Type)
+                            .values([
+                                "LOBBY",
+                                "DEALING",
+                                "BIDDING",
+                                "TRUMP_SELECTION",
+                                "TRICK_PLAY",
+                                "SCORING",
+                                "BETWEEN_ROUNDS",
+                                "COMPLETED",
+                                "ABANDONED",
+                            ])
+                            .to_owned(),
+                    )
+                    .await?;
 
-        manager
-            .create_type(
-                PgType::create()
-                    .as_enum(GameVisibilityEnum::Type)
-                    .values(["PUBLIC", "PRIVATE"])
-                    .to_owned(),
-            )
-            .await?;
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(GameVisibilityEnum::Type)
+                            .values(["PUBLIC", "PRIVATE"])
+                            .to_owned(),
+                    )
+                    .await?;
 
-        manager
-            .create_type(
-                PgType::create()
-                    .as_enum(CardSuitEnum::Type)
-                    .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES"])
-                    .to_owned(),
-            )
-            .await?;
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(CardSuitEnum::Type)
+                            .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES"])
+                            .to_owned(),
+                    )
+                    .await?;
 
-        manager
-            .create_type(
-                PgType::create()
-                    .as_enum(CardTrumpEnum::Type)
-                    .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES", "NO_TRUMP"])
-                    .to_owned(),
-            )
-            .await?;
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(CardTrumpEnum::Type)
+                            .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES", "NO_TRUMP"])
+                            .to_owned(),
+                    )
+                    .await?;
+            }
+            sea_orm::DatabaseBackend::Sqlite => {
+                // SQLite doesn't need enum types - they're stored as TEXT
+            }
+            _ => {
+                return Err(DbErr::Custom("Unsupported database backend".into()));
+            }
+        }
 
         // games table
         manager
@@ -1369,22 +1379,32 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(Games::Table).to_owned())
             .await?;
 
-        // Drop enum types
-        manager
-            .drop_type(PgType::drop().name(CardTrumpEnum::Type).to_owned())
-            .await?;
+        // Drop enum types (PostgreSQL only)
+        match manager.get_database_backend() {
+            sea_orm::DatabaseBackend::Postgres => {
+                manager
+                    .drop_type(PgType::drop().name(CardTrumpEnum::Type).to_owned())
+                    .await?;
 
-        manager
-            .drop_type(PgType::drop().name(CardSuitEnum::Type).to_owned())
-            .await?;
+                manager
+                    .drop_type(PgType::drop().name(CardSuitEnum::Type).to_owned())
+                    .await?;
 
-        manager
-            .drop_type(PgType::drop().name(GameVisibilityEnum::Type).to_owned())
-            .await?;
+                manager
+                    .drop_type(PgType::drop().name(GameVisibilityEnum::Type).to_owned())
+                    .await?;
 
-        manager
-            .drop_type(PgType::drop().name(GameStateEnum::Type).to_owned())
-            .await?;
+                manager
+                    .drop_type(PgType::drop().name(GameStateEnum::Type).to_owned())
+                    .await?;
+            }
+            sea_orm::DatabaseBackend::Sqlite => {
+                // SQLite doesn't have enum types to drop
+            }
+            _ => {
+                return Err(DbErr::Custom("Unsupported database backend".into()));
+            }
+        }
 
         manager
             .drop_index(

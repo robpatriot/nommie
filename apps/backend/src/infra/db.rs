@@ -11,34 +11,74 @@ pub async fn connect_db(
     profile: DbProfile,
     owner: DbOwner,
 ) -> Result<DatabaseConnection, AppError> {
-    // Check profile before consuming it
-    let is_test = matches!(profile, DbProfile::Test);
+    match profile {
+        DbProfile::InMemory => {
+            // SQLite in-memory database
+            let opt = ConnectOptions::new("sqlite::memory:");
+            let conn = Database::connect(opt).await?;
+            Ok(conn)
+        }
+        DbProfile::SqliteFile { file } => {
+            // SQLite file-based database
+            let db_path = if let Some(file) = file {
+                // If a specific file is provided, use it as-is (could be absolute or relative)
+                file
+            } else {
+                // Use default directory and filename
+                let db_dir =
+                    std::env::var("SQLITE_DB_DIR").unwrap_or_else(|_| "./data/sqlite".to_string());
+                format!("{}/dev.db", db_dir)
+            };
 
-    // Build database URL from environment variables
-    let database_url = db_url(profile, owner)?;
+            // Debug logging
+            tracing::info!("SQLite file path: {}", db_path);
 
-    // Configure connection options
-    let mut opt = ConnectOptions::new(&database_url);
+            // Lazy directory creation (only for non-empty parent paths)
+            if let Some(parent) = std::path::Path::new(&db_path).parent() {
+                if !parent.as_os_str().is_empty() {
+                    tracing::info!("Creating SQLite directory: {:?}", parent);
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        AppError::config(format!("Failed to create SQLite directory: {e}"))
+                    })?;
+                }
+            }
 
-    // For test profile, use smaller pool but keep query logging for diagnostics
-    if is_test {
-        opt.max_connections(10)
-            .min_connections(2)
-            .connect_timeout(Duration::from_secs(3))
-            .idle_timeout(Duration::from_secs(30))
-            .sqlx_logging(true); // Keep query logging in tests - valuable for debugging
-    } else {
-        // Production: larger pool with query logging
-        opt.max_connections(20)
-            .min_connections(5)
-            .connect_timeout(Duration::from_secs(5))
-            .idle_timeout(Duration::from_secs(600))
-            .sqlx_logging(true);
+            let url = format!("sqlite:{}?mode=rwc", db_path);
+            tracing::info!("SQLite connection URL: {}", url);
+            let conn = Database::connect(url).await.map_err(|e| {
+                AppError::config(format!(
+                    "Failed to connect to SQLite database at {}: {}",
+                    db_path, e
+                ))
+            })?;
+
+            Ok(conn)
+        }
+        DbProfile::Prod | DbProfile::Test => {
+            // PostgreSQL databases (existing logic)
+            let is_test = matches!(profile, DbProfile::Test);
+            let database_url = db_url(profile, owner)?;
+
+            let mut opt = ConnectOptions::new(&database_url);
+
+            if is_test {
+                opt.max_connections(10)
+                    .min_connections(2)
+                    .connect_timeout(Duration::from_secs(3))
+                    .idle_timeout(Duration::from_secs(30))
+                    .sqlx_logging(true);
+            } else {
+                opt.max_connections(20)
+                    .min_connections(5)
+                    .connect_timeout(Duration::from_secs(5))
+                    .idle_timeout(Duration::from_secs(600))
+                    .sqlx_logging(true);
+            }
+
+            let conn = Database::connect(opt).await?;
+            Ok(conn)
+        }
     }
-
-    // Connect to database
-    let conn = Database::connect(opt).await?;
-    Ok(conn)
 }
 
 #[cfg(test)]

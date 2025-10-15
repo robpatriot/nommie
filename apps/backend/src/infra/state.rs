@@ -7,8 +7,9 @@ use crate::state::security_config::SecurityConfig;
 
 /// Builder for creating AppState instances (used in both tests and main)
 ///
-/// The StateBuilder supports one database connection path:
-/// - `.with_db(..)` - Connect to a real database using a profile
+/// The StateBuilder supports multiple database connection paths:
+/// - `.with_db(..)` - Connect to a database using a profile
+/// - `.sqlite_file(..)` - Override SQLite file for SqliteFile profile
 pub struct StateBuilder {
     security_config: SecurityConfig,
     db_profile: Option<crate::config::db::DbProfile>,
@@ -29,6 +30,20 @@ impl StateBuilder {
         self
     }
 
+    /// Override SQLite file for SqliteFile profile
+    ///
+    /// This method only has an effect when the current profile is `SqliteFile { file: None }`.
+    /// It will update the embedded file option to the provided value.
+    pub fn sqlite_file(mut self, file: impl Into<String>) -> Self {
+        if let Some(crate::config::db::DbProfile::SqliteFile {
+            file: ref mut file_option @ None,
+        }) = self.db_profile
+        {
+            *file_option = Some(file.into());
+        }
+        self
+    }
+
     /// Override the security configuration
     pub fn with_security(mut self, security_config: SecurityConfig) -> Self {
         self.security_config = security_config;
@@ -38,9 +53,22 @@ impl StateBuilder {
     /// Build the AppState
     pub async fn build(self) -> Result<AppState, AppError> {
         if let Some(profile) = self.db_profile {
-            // Connect to real database and ensure schema is ready
-            let conn = connect_db(profile, DbOwner::App).await?;
-            ensure_schema_ready(&conn).await;
+            // Connect to database
+            let conn = connect_db(profile.clone(), DbOwner::App).await?;
+
+            // Handle schema initialization based on profile type
+            match profile {
+                crate::config::db::DbProfile::InMemory => {
+                    // InMemory databases are always fresh - skip schema check
+                    // Tests will apply full migration manually using migrate_internal
+                }
+                _ => {
+                    // PostgreSQL and SqliteFile profiles use standard schema check
+                    // This ensures CLI migrations have been run first
+                    ensure_schema_ready(&conn).await;
+                }
+            }
+
             Ok(AppState::new(conn, self.security_config))
         } else {
             // No DB profile provided - create AppState without database

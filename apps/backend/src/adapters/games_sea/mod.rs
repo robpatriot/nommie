@@ -149,10 +149,18 @@ pub async fn update_state(
     use sea_orm::sea_query::{Alias, Expr};
 
     optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |update| {
-        update.col_expr(
-            games::Column::State,
-            Expr::val(dto.state).cast_as(Alias::new("game_state")),
-        )
+        // Runtime dispatch based on database backend
+        let state_expr = match txn.get_database_backend() {
+            sea_orm::DatabaseBackend::Postgres => {
+                // PostgreSQL needs explicit cast to enum type
+                Expr::val(dto.state).cast_as(Alias::new("game_state"))
+            }
+            _ => {
+                // SQLite and others - just use string value
+                Expr::val(dto.state).into()
+            }
+        };
+        update.col_expr(games::Column::State, state_expr)
     })
     .await
 }
@@ -164,12 +172,21 @@ pub async fn update_metadata(
     use sea_orm::sea_query::{Alias, Expr};
 
     optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |update| {
+        // Runtime dispatch for visibility enum
+        let visibility_expr = match txn.get_database_backend() {
+            sea_orm::DatabaseBackend::Postgres => {
+                // PostgreSQL needs explicit cast to enum type
+                Expr::val(dto.visibility).cast_as(Alias::new("game_visibility"))
+            }
+            _ => {
+                // SQLite and others - just use string value
+                Expr::val(dto.visibility).into()
+            }
+        };
+
         update
             .col_expr(games::Column::Name, Expr::val(dto.name).into())
-            .col_expr(
-                games::Column::Visibility,
-                Expr::val(dto.visibility).cast_as(Alias::new("game_visibility")),
-            )
+            .col_expr(games::Column::Visibility, visibility_expr)
     })
     .await
 }
