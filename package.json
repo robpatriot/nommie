@@ -35,8 +35,8 @@
     "db:svc:logs": "docker compose logs -f postgres",
     "db:svc:ready": "docker exec -it nommie-postgres pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
     "db:svc:psql": "docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
-    "db:mig:up": "cargo run --manifest-path apps/backend/migration/Cargo.toml -- up",
-    "db:mig:refresh": "cargo run --manifest-path apps/backend/migration/Cargo.toml -- refresh"
+    "db:mig:up": "cargo run --manifest-path apps/migration-cli/Cargo.toml -- up",
+    "db:mig:refresh": "cargo run --manifest-path apps/migration-cli/Cargo.toml -- refresh"
   },
   "devDependencies": {}
 }

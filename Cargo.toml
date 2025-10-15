@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "apps/backend",
-    "apps/backend/migration",
+    "apps/migration-cli",
+    "packages/migration",
     "packages/backend-test-support",
 ]
 resolver = "2"

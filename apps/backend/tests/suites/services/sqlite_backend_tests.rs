@@ -10,7 +10,7 @@ use backend::repos::users;
 use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
 // Import the migration function for full schema testing
-use migration::migrate_internal;
+use migration::migrate;
 use migration::MigrationCommand;
 use sea_orm::ConnectionTrait;
 use unicode_normalization::UnicodeNormalization;
@@ -21,7 +21,7 @@ async fn test_sqlite_memory_works() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().with_db(DbProfile::InMemory).build().await?;
 
     // Apply full migration manually
-    migrate_internal(
+    migrate(
         state.db().expect("Database should be available"),
         MigrationCommand::Fresh,
     )
@@ -64,7 +64,7 @@ async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>
         backend::config::db::DbOwner::Owner,
     )
     .await?;
-    migration::migrate_internal(&conn, migration::MigrationCommand::Fresh).await?;
+    migration::migrate(&conn, migration::MigrationCommand::Fresh).await?;
 
     // Create state with the temporary file
     let state1 = build_state()
@@ -143,7 +143,7 @@ async fn test_sqlite_default_file() -> Result<(), Box<dyn std::error::Error>> {
         backend::config::db::DbOwner::Owner,
     )
     .await?;
-    migration::migrate_internal(&conn, migration::MigrationCommand::Fresh).await?;
+    migration::migrate(&conn, migration::MigrationCommand::Fresh).await?;
 
     // Create state with the temporary file
     let state = build_state()
@@ -181,7 +181,7 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     let memory_state = build_state().with_db(DbProfile::InMemory).build().await?;
 
     // Apply full migration manually
-    migrate_internal(
+    migrate(
         memory_state.db().expect("Database should be available"),
         MigrationCommand::Fresh,
     )
@@ -216,7 +216,7 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
         backend::config::db::DbOwner::Owner,
     )
     .await?;
-    migration::migrate_internal(&conn, migration::MigrationCommand::Fresh).await?;
+    migration::migrate(&conn, migration::MigrationCommand::Fresh).await?;
 
     let file_state = build_state()
         .with_db(DbProfile::SqliteFile {

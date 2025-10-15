@@ -22,12 +22,12 @@ pub enum MigrationCommand {
     Status,
 }
 
-/// Internal migration function that bypasses environment parsing
+/// Migration function that bypasses environment parsing
 /// Used by both CLI and tests
-pub async fn migrate_internal(
+pub async fn migrate(
     db: &DatabaseConnection,
     command: MigrationCommand,
-) -> Result<(), ::backend::error::AppError> {
+) -> Result<(), sea_orm::DbErr> {
     let db_info = get_db_diagnostics(db).await?;
 
     // Log diagnostics to tracing (controlled by logging config)
@@ -52,7 +52,7 @@ pub async fn migrate_internal(
         }
         Err(e) => {
             tracing::error!("❌ {command:?} failed for {}: {e}", db_info.profile);
-            Err(::backend::error::AppError::from(e))
+            Err(e)
         }
     }
 }
@@ -66,7 +66,7 @@ struct DbDiagnostics {
 
 async fn get_db_diagnostics(
     db: &DatabaseConnection,
-) -> Result<DbDiagnostics, ::backend::error::AppError> {
+) -> Result<DbDiagnostics, sea_orm::DbErr> {
     let profile = format!("{:?}", db.get_database_backend());
 
     let name = match db.get_database_backend() {
@@ -75,13 +75,8 @@ async fn get_db_diagnostics(
                 db.get_database_backend(),
                 String::from("select current_database() as name"),
             );
-            if let Some(row) = db
-                .query_one(stmt)
-                .await
-                .map_err(::backend::error::AppError::from)?
-            {
-                row.try_get("", "name")
-                    .map_err(::backend::error::AppError::from)?
+            if let Some(row) = db.query_one(stmt).await? {
+                row.try_get("", "name")?
             } else {
                 "<unknown>".to_string()
             }
@@ -91,13 +86,8 @@ async fn get_db_diagnostics(
                 db.get_database_backend(),
                 String::from("select sqlite_version() as name"),
             );
-            if let Some(row) = db
-                .query_one(stmt)
-                .await
-                .map_err(::backend::error::AppError::from)?
-            {
-                row.try_get("", "name")
-                    .map_err(::backend::error::AppError::from)?
+            if let Some(row) = db.query_one(stmt).await? {
+                row.try_get("", "name")?
             } else {
                 "<unknown>".to_string()
             }

@@ -81,6 +81,24 @@ pub async fn connect_db(
     }
 }
 
+/// Connect to database for migration purposes (always uses Owner privileges)
+/// Target string should be one of: "prod", "pg_test", "sqlite_test"
+pub async fn connect_db_for_migration(target: &str) -> Result<DatabaseConnection, AppError> {
+    let profile = match target {
+        "prod" => DbProfile::Prod,
+        "pg_test" => DbProfile::Test,
+        "sqlite_test" => DbProfile::SqliteFile { file: None },
+        _ => {
+            return Err(AppError::config(format!(
+                "Invalid migration target '{}'. Must be one of: prod, pg_test, sqlite_test",
+                target
+            )));
+        }
+    };
+
+    connect_db(profile, DbOwner::Owner).await
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

@@ -1,9 +1,7 @@
-// apps/backend/migration/src/main.rs
 use std::env;
 
-use ::backend::config::db::{DbOwner, DbProfile};
-use ::backend::infra::db::connect_db;
-use migration::{migrate_internal, MigrationCommand};
+use backend::infra::db::connect_db_for_migration;
+use migration::{migrate, MigrationCommand};
 
 #[tokio::main]
 async fn main() {
@@ -19,11 +17,9 @@ async fn main() {
         .with_env_filter("migration=info,sqlx=warn")
         .init();
 
-    // Select database profile via env - no default for safety
-    let profile = match env::var("MIGRATION_TARGET").as_deref() {
-        Ok("prod") => DbProfile::Prod,
-        Ok("pg_test") => DbProfile::Test,
-        Ok("sqlite_test") => DbProfile::SqliteFile { file: None },
+    // Select database target via env - no default for safety
+    let target = match env::var("MIGRATION_TARGET").as_deref() {
+        Ok("prod") | Ok("pg_test") | Ok("sqlite_test") => env::var("MIGRATION_TARGET").unwrap(),
         _ => {
             eprintln!("❌ MIGRATION_TARGET must be set to one of: prod, pg_test, sqlite_test");
             eprintln!("   This prevents accidental production database operations");
@@ -49,12 +45,12 @@ async fn main() {
     };
 
     // Connect with owner privileges (can create/drop types/tables)
-    let db = connect_db(profile.clone(), DbOwner::Owner)
+    let db = connect_db_for_migration(&target)
         .await
         .expect("Failed to connect to database");
 
-    // Use internal migration function
-    if let Err(e) = migrate_internal(&db, command).await {
+    // Use migration function
+    if let Err(e) = migrate(&db, command).await {
         eprintln!("Migration failed: {e}");
         std::process::exit(1);
     }

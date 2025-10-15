@@ -29,6 +29,7 @@ ulid = "1.2.1"
 bytes = "1.0"
 regex = "1"
 unicode-normalization = "0.1"
+migration = { path = "../../packages/migration" }
 
 [dev-dependencies]
 ctor = "0.2"
@@ -39,7 +40,6 @@ backend-test-support = { path = "../../packages/backend-test-support" }
 futures-util = "0.3"
 proptest = "1.5"
 tempfile = "3.8"
-migration = { path = "migration" }
 
 [[bin]]
 name = "backend"
