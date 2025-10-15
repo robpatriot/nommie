@@ -5,6 +5,7 @@
 
 use backend::config::db::DbProfile;
 use backend::db::txn::with_txn;
+use backend::infra::state::build_state;
 use backend::repos::users;
 use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
@@ -17,10 +18,7 @@ use unicode_normalization::UnicodeNormalization;
 #[tokio::test]
 async fn test_sqlite_memory_works() -> Result<(), Box<dyn std::error::Error>> {
     // InMemory profile skips schema check in StateBuilder::build()
-    let state = backend::infra::state::StateBuilder::new()
-        .with_db(DbProfile::InMemory)
-        .build()
-        .await?;
+    let state = build_state().with_db(DbProfile::InMemory).build().await?;
 
     // Apply full migration manually
     migrate_internal(
@@ -69,7 +67,7 @@ async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>
     migration::migrate_internal(&conn, migration::MigrationCommand::Fresh).await?;
 
     // Create state with the temporary file
-    let state1 = backend::infra::state::StateBuilder::new()
+    let state1 = build_state()
         .with_db(DbProfile::SqliteFile {
             file: Some(db_path.to_string_lossy().to_string()),
         })
@@ -148,7 +146,7 @@ async fn test_sqlite_default_file() -> Result<(), Box<dyn std::error::Error>> {
     migration::migrate_internal(&conn, migration::MigrationCommand::Fresh).await?;
 
     // Create state with the temporary file
-    let state = backend::infra::state::StateBuilder::new()
+    let state = build_state()
         .with_db(DbProfile::SqliteFile {
             file: Some(db_path.to_string_lossy().to_string()),
         })
@@ -180,10 +178,7 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     use std::time::Instant;
 
     // Test SQLite memory with full migration
-    let memory_state = backend::infra::state::StateBuilder::new()
-        .with_db(DbProfile::InMemory)
-        .build()
-        .await?;
+    let memory_state = build_state().with_db(DbProfile::InMemory).build().await?;
 
     // Apply full migration manually
     migrate_internal(
@@ -223,7 +218,7 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     .await?;
     migration::migrate_internal(&conn, migration::MigrationCommand::Fresh).await?;
 
-    let file_state = backend::infra::state::StateBuilder::new()
+    let file_state = build_state()
         .with_db(DbProfile::SqliteFile {
             file: Some(db_path.to_string_lossy().to_string()),
         })
