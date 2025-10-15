@@ -9,7 +9,6 @@ use crate::state::security_config::SecurityConfig;
 ///
 /// The StateBuilder supports multiple database connection paths:
 /// - `.with_db(..)` - Connect to a database using a profile
-/// - `.sqlite_file(..)` - Override SQLite file for SqliteFile profile
 pub struct StateBuilder {
     security_config: SecurityConfig,
     db_profile: Option<crate::config::db::DbProfile>,
@@ -27,20 +26,6 @@ impl StateBuilder {
     /// Set the database profile
     pub fn with_db(mut self, profile: crate::config::db::DbProfile) -> Self {
         self.db_profile = Some(profile);
-        self
-    }
-
-    /// Override SQLite file for SqliteFile profile
-    ///
-    /// This method only has an effect when the current profile is `SqliteFile { file: None }`.
-    /// It will update the embedded file option to the provided value.
-    pub fn sqlite_file(mut self, file: impl Into<String>) -> Self {
-        if let Some(crate::config::db::DbProfile::SqliteFile {
-            file: ref mut file_option @ None,
-        }) = self.db_profile
-        {
-            *file_option = Some(file.into());
-        }
         self
     }
 
