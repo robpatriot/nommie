@@ -139,7 +139,7 @@ Your AI implements three methods, each receiving **read‑only** views:
 - `game_history() -> Option<&GameHistory>` (available once game starts)
 - `round_memory() -> Option<&RoundMemory>` (**completed** tricks only; **not** the current trick)
 
-**Memory determinism:** Outcomes are fully deterministic for a given `game_seed` and salts; see **Appendix C**.
+**Memory determinism:** Outcomes are fully deterministic for a given `game_seed` and salts; see **RNG & Determinism** and **Appendix C**.
 
 ### `GameHistory` / `RoundHistory`
 - `RoundHistory` includes `hand_size: u8` field for each round
@@ -351,15 +351,9 @@ fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, A
         }
 
         // Example use: target bid scaled by our current hand_size and peer aggression
-        let my_hs = state.hand_size as f64;
-        let opponents_aggr = (avg_pct.iter().sum::<f64>() - avg_pct[me]) / 3.0;
-        let base = (my_hs * 0.35).round() as u8; // base heuristic
-        let adjust = if opponents_aggr > 0.45 { 1 } else { 0 }; // nudge up if table is aggressive
-        let target = base.saturating_add(adjust);
-
-        // Clamp to legal range by choosing nearest legal value
-        if let Some(&best) = legal.iter().min_by_key(|&&b| (b as i16 - target as i16).abs()) {
-            return Ok(best);
+        // Use avg_pct (opponent bid % by hand_size) together with your current hand evaluation
+// to compute a target bid here. Then choose a legal bid closest to that target.
+        if let Some(&best) = legal.first() { return Ok(best); }
         }
     }
 
@@ -455,7 +449,8 @@ pub struct RoundScoreDetail {
 ```rust
 pub struct RoundMemory { pub mode: MemoryMode, pub tricks: Vec<TrickMemory> }
 
-pub struct TrickMemory { pub trick_no: i16, pub plays: Vec<(i16, PlayMemory)> }
+pub struct TrickMemory {
+    pub trick_no: i16, // 1..=hand_size (1-based, matches Indexing Reference) pub plays: Vec<(i16, PlayMemory)> }
 
 pub enum PlayMemory {
     Exact(Card),
