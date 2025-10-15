@@ -141,6 +141,11 @@ Your AI implements three methods, each receiving **read‑only** views:
 
 **Memory determinism:** Outcomes are fully deterministic for a given `game_seed` and salts; see **Appendix C**.
 
+### `GameHistory` / `RoundHistory`
+- `RoundHistory` includes `hand_size: u8` field for each round
+- **Use `r.hand_size` directly** instead of calculating from `round_no`
+- Prevents off-by-one errors when analyzing historical data
+
 ---
 
 ## Core Data Types
@@ -181,6 +186,7 @@ Your AI implements three methods, each receiving **read‑only** views:
 - Use a **single source of truth** for turn order and indexing (see table above).
 - Separate **strategy** (your logic) from **legality** (engine helpers).
 - Treat `game_history()` and `round_memory()` as **optional** (`Option`), with safe fallbacks.
+- Use `r.hand_size` from `RoundHistory` instead of calculating from `round_no`.
 
 ❌ **Don’t**
 - Double‑count the current trick by mixing `current_trick_plays` with `round_memory()`.
@@ -321,14 +327,6 @@ mod tests {
 
 #### C.1 — Opponent Analysis using GameHistory
 ```rust
-fn hand_size_for_round(round_no: i16) -> u8 {
-    // round_no is 1..=26
-    const HAND_SIZES: [u8; 26] = [
-        13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
-    ];
-    HAND_SIZES[(round_no as usize - 1).clamp(0, 25)]
-}
-
 fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, AiError> {
     let legal = state.legal_bids().map_err(|e| AiError::Internal(format!("{e}")))?;
 
@@ -342,7 +340,7 @@ fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, A
 
             for r in &hist.rounds {
                 if let Some(b) = r.bids[seat] {
-                    let hs = hand_size_for_round(r.round_no) as f64;
+                    let hs = r.hand_size as f64;
                     if hs > 0.0 {
                         sum_pct += (b as f64) / hs;
                         n += 1.0;
@@ -439,6 +437,7 @@ pub struct GameHistory { pub rounds: Vec<RoundHistory> }
 
 pub struct RoundHistory {
     pub round_no: i16,                     // 1–26
+    pub hand_size: u8,                     // Number of cards each player had this round
     pub dealer_seat: i16,                  // 0–3
     pub bids: [Option<u8>; 4],
     pub trump_selector_seat: Option<i16>,

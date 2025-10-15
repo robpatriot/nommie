@@ -515,6 +515,9 @@ pub struct RoundHistory {
     /// Round number (1-26)
     pub round_no: i16,
 
+    /// Hand size for this round (number of cards each player had)
+    pub hand_size: u8,
+
     /// Who dealt this round (0-3)
     pub dealer_seat: i16,
 
@@ -610,6 +613,7 @@ impl GameHistory {
 
             round_histories.push(RoundHistory {
                 round_no: round.round_no,
+                hand_size: round.hand_size as u8,
                 dealer_seat: round.dealer_pos,
                 bids,
                 trump_selector_seat,

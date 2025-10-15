@@ -10,8 +10,12 @@ use crate::errors::domain::{DomainError, ValidationKind};
 
 /// Helper to create a round with specified bids
 fn make_round(round_no: i16, bids: [Option<u8>; 4]) -> RoundHistory {
+    // Calculate hand size for this round
+    let hand_size = crate::domain::hand_size_for_round(round_no as u8).unwrap_or(13) as u8;
+
     RoundHistory {
         round_no,
+        hand_size,
         dealer_seat: 0,
         bids,
         trump_selector_seat: None,
