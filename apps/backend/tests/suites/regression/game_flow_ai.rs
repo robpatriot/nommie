@@ -6,6 +6,7 @@ use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::services::ai::AiService;
 use backend::services::game_flow::GameFlowService;
+use backend_test_support::logging;
 use serde_json::json;
 
 /// Test that a full game with 4 AI players completes successfully.
@@ -18,6 +19,7 @@ use serde_json::json;
 #[tokio::test]
 #[cfg_attr(not(feature = "slow-tests"), ignore)]
 async fn test_full_game_with_ai_players() -> Result<(), AppError> {
+    logging::init();
     // Build test state
     let state = build_state()
         .with_db(DbProfile::Test)
@@ -143,12 +145,12 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         "Game should complete all 26 rounds"
     );
 
-    println!(
+    tracing::info!(
         "✅ Game completed successfully: {} rounds, state: {:?}",
         game.current_round.unwrap(),
         game.state
     );
-    println!("✅ Demonstrated reusable AI templates with per-instance overrides");
+    tracing::info!("✅ Demonstrated reusable AI templates with per-instance overrides");
 
     // Rollback transaction
     shared.rollback().await?;
