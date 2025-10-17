@@ -88,29 +88,15 @@ async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>
                 .await?;
 
             assert_eq!(user.username, Some("Persistent User".to_string()));
-            println!("Created user with ID: {}", user.id);
 
             // Try to find the user by ID instead of email
             let user_by_id = users::find_user_by_id(txn, user.id).await?;
-            println!("User by ID: {:?}", user_by_id);
             assert!(user_by_id.is_some());
 
             // Also try to find by email - need to use the same sanitization as ensure_user
             // normalize_email does: email.trim().nfkc().collect::<String>().to_lowercase()
             let clean_email = test_email.trim().nfkc().collect::<String>().to_lowercase();
-            println!("Original email: '{}'", test_email);
-            println!("Sanitized email: '{}'", clean_email);
             let user_opt = users::find_credentials_by_email(txn, &clean_email).await?;
-            println!("User by email: {:?}", user_opt);
-
-            // Let's also check what's actually in the user_credentials table
-            let all_credentials = txn
-                .query_all(sea_orm::Statement::from_string(
-                    sea_orm::DatabaseBackend::Sqlite,
-                    "SELECT * FROM user_credentials",
-                ))
-                .await?;
-            println!("All credentials in table: {:?}", all_credentials);
 
             assert!(user_opt.is_some());
 
@@ -243,8 +229,8 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     let file_time = start.elapsed();
 
     // Both should be fast, but memory should be faster
-    println!("SQLite Memory: {:?}", memory_time);
-    println!("SQLite File: {:?}", file_time);
+    tracing::debug!("SQLite Memory: {:?}", memory_time);
+    tracing::debug!("SQLite File: {:?}", file_time);
 
     // Both should complete in reasonable time (< 1 second for 10 operations)
     assert!(memory_time.as_millis() < 1000);
