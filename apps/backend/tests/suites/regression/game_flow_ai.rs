@@ -143,12 +143,12 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         "Game should complete all 26 rounds"
     );
 
-    println!(
+    tracing::info!(
         "✅ Game completed successfully: {} rounds, state: {:?}",
         game.current_round.unwrap(),
         game.state
     );
-    println!("✅ Demonstrated reusable AI templates with per-instance overrides");
+    tracing::info!("✅ Demonstrated reusable AI templates with per-instance overrides");
 
     // Rollback transaction
     shared.rollback().await?;
