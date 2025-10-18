@@ -11,7 +11,7 @@ use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
 use unicode_normalization::UnicodeNormalization;
 
-use crate::support::test_utils::shared_sqlite_temp_dir;
+use crate::support::test_utils::shared_sqlite_temp_file;
 
 #[tokio::test]
 async fn test_sqlite_memory_works() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,9 +43,8 @@ async fn test_sqlite_memory_works() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>> {
-    // Test SQLite file with unique database for this test
-    let temp_dir = shared_sqlite_temp_dir();
-    let db_path = temp_dir.join("file_persistence.db");
+    // Test SQLite file with shared database
+    let db_path = shared_sqlite_temp_file();
 
     // Create state with the shared file (schema will be auto-migrated)
     let state1 = build_state()
@@ -96,9 +95,8 @@ async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_sqlite_default_file() -> Result<(), Box<dyn std::error::Error>> {
-    // Test SQLite file with unique database for this test
-    let temp_dir = shared_sqlite_temp_dir();
-    let db_path = temp_dir.join("default_file.db");
+    // Test SQLite file with shared database
+    let db_path = shared_sqlite_temp_file();
 
     // Create state with the shared file (schema will be auto-migrated)
     let state = build_state()
@@ -152,9 +150,8 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     .await?;
     let memory_time = start.elapsed();
 
-    // Test SQLite file with unique database for this test
-    let temp_dir = shared_sqlite_temp_dir();
-    let db_path = temp_dir.join("performance.db");
+    // Test SQLite file with shared database
+    let db_path = shared_sqlite_temp_file();
 
     let file_state = build_state()
         .with_db(DbProfile::SqliteFile {

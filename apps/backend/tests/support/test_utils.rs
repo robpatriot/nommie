@@ -46,19 +46,21 @@ pub fn shared_sqlite_temp_dir() -> std::path::PathBuf {
     test_dir
 }
 
-/// Get a shared temporary SQLite file path for file-based tests within the same nextest run.
+/// Get the shared SQLite database file path for all integration tests.
 ///
-/// This is a convenience function that returns the default test.db file path
-/// in the shared temp directory. For tests that need multiple database files,
-/// use `shared_sqlite_temp_dir()` instead.
+/// All SQLite file-based tests should use this function to ensure they use
+/// the same database file. This allows tests to share state and verify
+/// cross-test persistence scenarios.
+///
+/// The file is created within the shared temporary directory to keep test files organized.
 ///
 /// # Returns
-/// A PathBuf pointing to the shared temporary SQLite database file (test.db)
+/// A PathBuf pointing to the shared SQLite database file (test.db)
 ///
 /// # Examples
 /// ```
 /// let db_path = shared_sqlite_temp_file();
-/// // db_path is ready to use directly with SQLite
+/// // db_path points to the shared database file used by all tests
 /// ```
 pub fn shared_sqlite_temp_file() -> std::path::PathBuf {
     shared_sqlite_temp_dir().join("test.db")

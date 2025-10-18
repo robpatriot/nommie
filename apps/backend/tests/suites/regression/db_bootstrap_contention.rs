@@ -6,6 +6,8 @@ use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use tokio::time::{timeout, Duration};
 use {tracing, tracing_subscriber};
 
+use crate::support::test_utils::shared_sqlite_temp_file;
+
 // Helper: count applied migrations via seaql_migrations table.
 async fn migration_count(conn: &impl ConnectionTrait, backend: DatabaseBackend) -> i64 {
     conn.query_one(Statement::from_string(
@@ -127,8 +129,7 @@ async fn pg_contention_burst_all_ok_and_single_migrator() {
 #[cfg_attr(not(feature = "regression-tests"), ignore)]
 async fn sqlite_file_sidecar_lock_under_parallel_bootstrap() {
     // Build one shared file profile to contend on the sidecar lock.
-    let dir = tempfile::tempdir().expect("tempdir");
-    let db_path = dir.path().join("db.sqlite3");
+    let db_path = shared_sqlite_temp_file();
 
     assert_contention_run_once_then_idempotent(
         {
