@@ -1,6 +1,7 @@
 pub mod bids_sea;
 pub mod games_sea;
 pub mod hands_sea;
+pub mod infra_bootstrap;
 pub mod memberships_sea;
 pub mod optimistic_lock_repo_tests;
 pub mod players_sea;

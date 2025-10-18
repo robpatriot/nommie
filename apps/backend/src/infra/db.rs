@@ -18,6 +18,18 @@ use xxhash_rust::xxh3::xxh3_64;
 use crate::config::db::{db_url, sqlite_file_path, DbOwner, DbProfile};
 use crate::error::AppError;
 
+#[cfg(feature = "regression-tests")]
+pub mod test_infra_counters {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    pub static DID_RUN_MIGRATE_HOOK: AtomicUsize = AtomicUsize::new(0);
+    pub fn reset() {
+        DID_RUN_MIGRATE_HOOK.store(0, Ordering::SeqCst);
+    }
+    pub fn bump() {
+        DID_RUN_MIGRATE_HOOK.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
 /// Build the app DB *and* guarantee schema is current.
 /// - SQLite file: migrate pre-pool under OS file lock, then build pool.
 /// - SQLite memory: 1-conn pool; migrate; return.
@@ -367,6 +379,8 @@ async fn migrate_pg_with_lock(
 
     // With the advisory lock held, just run the migrator unconditionally.
     // SeaORM migrations are idempotent: this is safe and avoids TOCTOU checks.
+    #[cfg(feature = "regression-tests")]
+    crate::infra::db::test_infra_counters::bump();
     migrate(&txn, MigrationCommand::Up)
         .await
         .map_err(|e| AppError::config(format!("PG migrate failed: {e}")))?;
