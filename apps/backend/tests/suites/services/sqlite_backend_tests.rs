@@ -9,23 +9,14 @@ use backend::infra::state::build_state;
 use backend::repos::users;
 use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
-// Import the migration function for full schema testing
-use migration::migrate;
-use migration::MigrationCommand;
-use sea_orm::ConnectionTrait;
 use unicode_normalization::UnicodeNormalization;
+
+use crate::support::test_utils::shared_sqlite_temp_dir;
 
 #[tokio::test]
 async fn test_sqlite_memory_works() -> Result<(), Box<dyn std::error::Error>> {
-    // InMemory profile skips schema check in StateBuilder::build()
+    // build_state() now automatically handles schema migration
     let state = build_state().with_db(DbProfile::InMemory).build().await?;
-
-    // Apply full migration manually
-    migrate(
-        state.db().expect("Database should be available"),
-        MigrationCommand::Fresh,
-    )
-    .await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -52,21 +43,11 @@ async fn test_sqlite_memory_works() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>> {
-    // Create a temporary directory that will be auto-cleaned up
-    let temp_dir = tempfile::tempdir()?;
-    let db_path = temp_dir.path().join("test.db");
+    // Test SQLite file with unique database for this test
+    let temp_dir = shared_sqlite_temp_dir();
+    let db_path = temp_dir.join("file_persistence.db");
 
-    // Apply full migration to the temporary SQLite file
-    let conn = backend::infra::db::connect_db(
-        DbProfile::SqliteFile {
-            file: Some(db_path.to_string_lossy().to_string()),
-        },
-        backend::config::db::DbOwner::Owner,
-    )
-    .await?;
-    migration::migrate(&conn, migration::MigrationCommand::Fresh).await?;
-
-    // Create state with the temporary file
+    // Create state with the shared file (schema will be auto-migrated)
     let state1 = build_state()
         .with_db(DbProfile::SqliteFile {
             file: Some(db_path.to_string_lossy().to_string()),
@@ -88,30 +69,14 @@ async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>
                 .await?;
 
             assert_eq!(user.username, Some("Persistent User".to_string()));
-            println!("Created user with ID: {}", user.id);
 
-            // Try to find the user by ID instead of email
+            // Try to find the user by ID
             let user_by_id = users::find_user_by_id(txn, user.id).await?;
-            println!("User by ID: {:?}", user_by_id);
             assert!(user_by_id.is_some());
 
-            // Also try to find by email - need to use the same sanitization as ensure_user
-            // normalize_email does: email.trim().nfkc().collect::<String>().to_lowercase()
+            // Find by email using the same sanitization as ensure_user
             let clean_email = test_email.trim().nfkc().collect::<String>().to_lowercase();
-            println!("Original email: '{}'", test_email);
-            println!("Sanitized email: '{}'", clean_email);
             let user_opt = users::find_credentials_by_email(txn, &clean_email).await?;
-            println!("User by email: {:?}", user_opt);
-
-            // Let's also check what's actually in the user_credentials table
-            let all_credentials = txn
-                .query_all(sea_orm::Statement::from_string(
-                    sea_orm::DatabaseBackend::Sqlite,
-                    "SELECT * FROM user_credentials",
-                ))
-                .await?;
-            println!("All credentials in table: {:?}", all_credentials);
-
             assert!(user_opt.is_some());
 
             let credential = user_opt.unwrap();
@@ -131,21 +96,11 @@ async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_sqlite_default_file() -> Result<(), Box<dyn std::error::Error>> {
-    // Create a temporary directory that will be auto-cleaned up
-    let temp_dir = tempfile::tempdir()?;
-    let db_path = temp_dir.path().join("test.db");
+    // Test SQLite file with unique database for this test
+    let temp_dir = shared_sqlite_temp_dir();
+    let db_path = temp_dir.join("default_file.db");
 
-    // Apply full migration to the temporary SQLite file
-    let conn = backend::infra::db::connect_db(
-        DbProfile::SqliteFile {
-            file: Some(db_path.to_string_lossy().to_string()),
-        },
-        backend::config::db::DbOwner::Owner,
-    )
-    .await?;
-    migration::migrate(&conn, migration::MigrationCommand::Fresh).await?;
-
-    // Create state with the temporary file
+    // Create state with the shared file (schema will be auto-migrated)
     let state = build_state()
         .with_db(DbProfile::SqliteFile {
             file: Some(db_path.to_string_lossy().to_string()),
@@ -177,15 +132,8 @@ async fn test_sqlite_default_file() -> Result<(), Box<dyn std::error::Error>> {
 async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::error::Error>> {
     use std::time::Instant;
 
-    // Test SQLite memory with full migration
+    // build_state() now automatically handles schema migration
     let memory_state = build_state().with_db(DbProfile::InMemory).build().await?;
-
-    // Apply full migration manually
-    migrate(
-        memory_state.db().expect("Database should be available"),
-        MigrationCommand::Fresh,
-    )
-    .await?;
 
     let start = Instant::now();
     with_txn(None, &memory_state, |txn| {
@@ -204,19 +152,9 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     .await?;
     let memory_time = start.elapsed();
 
-    // Test SQLite file with temporary database
-    let temp_dir = tempfile::tempdir()?;
-    let db_path = temp_dir.path().join("test.db");
-
-    // Apply full migration to the temporary SQLite file
-    let conn = backend::infra::db::connect_db(
-        DbProfile::SqliteFile {
-            file: Some(db_path.to_string_lossy().to_string()),
-        },
-        backend::config::db::DbOwner::Owner,
-    )
-    .await?;
-    migration::migrate(&conn, migration::MigrationCommand::Fresh).await?;
+    // Test SQLite file with unique database for this test
+    let temp_dir = shared_sqlite_temp_dir();
+    let db_path = temp_dir.join("performance.db");
 
     let file_state = build_state()
         .with_db(DbProfile::SqliteFile {

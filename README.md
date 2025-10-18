@@ -60,8 +60,9 @@ The project does not use `dotenvx` or `dotenvy` - all environment loading is don
 
 ## Database & Migrations
 
-Migrations run with the **Owner** role. Choose a target DB via `MIGRATION_TARGET`.
+**Auto-Migration**: Empty databases are automatically migrated on first connection via `build_state()`.
 
+**Manual Migration Commands** (run with **Owner** role):
 - Migrate prod DB:
   - `pnpm db:migrate`  (equivalent to `MIGRATION_TARGET=prod … -- up`)
 - Fresh prod DB:

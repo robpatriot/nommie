@@ -311,51 +311,72 @@ impl MigrationTrait for Migration {
         // Create Postgres enums (PostgreSQL only)
         match manager.get_database_backend() {
             sea_orm::DatabaseBackend::Postgres => {
-                manager
-                    .create_type(
-                        PgType::create()
-                            .as_enum(GameStateEnum::Type)
-                            .values([
-                                "LOBBY",
-                                "DEALING",
-                                "BIDDING",
-                                "TRUMP_SELECTION",
-                                "TRICK_PLAY",
-                                "SCORING",
-                                "BETWEEN_ROUNDS",
-                                "COMPLETED",
-                                "ABANDONED",
-                            ])
-                            .to_owned(),
-                    )
-                    .await?;
+                // Helper function to check if enum exists
+                async fn enum_exists(manager: &SchemaManager<'_>, enum_name: &str) -> Result<bool, DbErr> {
+                    let result = manager.get_connection().query_one(sea_orm::Statement::from_string(
+                        sea_orm::DatabaseBackend::Postgres,
+                        format!("SELECT 1 FROM pg_type WHERE typname = '{}'", enum_name),
+                    )).await?;
+                    Ok(result.is_some())
+                }
 
-                manager
-                    .create_type(
-                        PgType::create()
-                            .as_enum(GameVisibilityEnum::Type)
-                            .values(["PUBLIC", "PRIVATE"])
-                            .to_owned(),
-                    )
-                    .await?;
+                // Create GameStateEnum if it doesn't exist
+                if !enum_exists(manager, "game_state").await? {
+                    manager
+                        .create_type(
+                            PgType::create()
+                                .as_enum(GameStateEnum::Type)
+                                .values([
+                                    "LOBBY",
+                                    "DEALING",
+                                    "BIDDING",
+                                    "TRUMP_SELECTION",
+                                    "TRICK_PLAY",
+                                    "SCORING",
+                                    "BETWEEN_ROUNDS",
+                                    "COMPLETED",
+                                    "ABANDONED",
+                                ])
+                                .to_owned(),
+                        )
+                        .await?;
+                }
 
-                manager
-                    .create_type(
-                        PgType::create()
-                            .as_enum(CardSuitEnum::Type)
-                            .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES"])
-                            .to_owned(),
-                    )
-                    .await?;
+                // Create GameVisibilityEnum if it doesn't exist
+                if !enum_exists(manager, "game_visibility").await? {
+                    manager
+                        .create_type(
+                            PgType::create()
+                                .as_enum(GameVisibilityEnum::Type)
+                                .values(["PUBLIC", "PRIVATE"])
+                                .to_owned(),
+                        )
+                        .await?;
+                }
 
-                manager
-                    .create_type(
-                        PgType::create()
-                            .as_enum(CardTrumpEnum::Type)
-                            .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES", "NO_TRUMP"])
-                            .to_owned(),
-                    )
-                    .await?;
+                // Create CardSuitEnum if it doesn't exist
+                if !enum_exists(manager, "card_suit").await? {
+                    manager
+                        .create_type(
+                            PgType::create()
+                                .as_enum(CardSuitEnum::Type)
+                                .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES"])
+                                .to_owned(),
+                        )
+                        .await?;
+                }
+
+                // Create CardTrumpEnum if it doesn't exist
+                if !enum_exists(manager, "card_trump").await? {
+                    manager
+                        .create_type(
+                            PgType::create()
+                                .as_enum(CardTrumpEnum::Type)
+                                .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES", "NO_TRUMP"])
+                                .to_owned(),
+                        )
+                        .await?;
+                }
             }
             sea_orm::DatabaseBackend::Sqlite => {
                 // SQLite doesn't need enum types - they're stored as TEXT
@@ -1383,19 +1404,19 @@ impl MigrationTrait for Migration {
         match manager.get_database_backend() {
             sea_orm::DatabaseBackend::Postgres => {
                 manager
-                    .drop_type(PgType::drop().name(CardTrumpEnum::Type).to_owned())
+                    .drop_type(PgType::drop().name(CardTrumpEnum::Type).if_exists().to_owned())
                     .await?;
 
                 manager
-                    .drop_type(PgType::drop().name(CardSuitEnum::Type).to_owned())
+                    .drop_type(PgType::drop().name(CardSuitEnum::Type).if_exists().to_owned())
                     .await?;
 
                 manager
-                    .drop_type(PgType::drop().name(GameVisibilityEnum::Type).to_owned())
+                    .drop_type(PgType::drop().name(GameVisibilityEnum::Type).if_exists().to_owned())
                     .await?;
 
                 manager
-                    .drop_type(PgType::drop().name(GameStateEnum::Type).to_owned())
+                    .drop_type(PgType::drop().name(GameStateEnum::Type).if_exists().to_owned())
                     .await?;
             }
             sea_orm::DatabaseBackend::Sqlite => {

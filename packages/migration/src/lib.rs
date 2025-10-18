@@ -1,5 +1,6 @@
 pub use sea_orm_migration::prelude::*;
-use sea_orm_migration::sea_orm::{DatabaseConnection, Statement};
+use sea_orm_migration::sea_orm::Statement;
+pub use sea_orm::ConnectionTrait;
 
 mod m20250823_000001_init; // keep filename + module name in sync
 
@@ -24,10 +25,14 @@ pub enum MigrationCommand {
 
 /// Migration function that bypasses environment parsing
 /// Used by both CLI and tests
-pub async fn migrate(
-    db: &DatabaseConnection,
+pub async fn migrate<C>(
+    db: &C,
     command: MigrationCommand,
-) -> Result<(), sea_orm::DbErr> {
+) -> Result<(), DbErr>
+where
+    C: ConnectionTrait,
+    for<'a> &'a C: sea_orm_migration::IntoSchemaManagerConnection<'a>,
+{
     let db_info = get_db_diagnostics(db).await?;
 
     // Log diagnostics to tracing (controlled by logging config)
@@ -65,7 +70,7 @@ struct DbDiagnostics {
 }
 
 async fn get_db_diagnostics(
-    db: &DatabaseConnection,
+    db: &impl ConnectionTrait,
 ) -> Result<DbDiagnostics, sea_orm::DbErr> {
     let profile = format!("{:?}", db.get_database_backend());
 

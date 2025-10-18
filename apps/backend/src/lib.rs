@@ -42,7 +42,7 @@ pub use extractors::current_user::{BackendClaims, CurrentUser};
 pub use extractors::current_user_db::CurrentUserRecord;
 pub use extractors::game_id::GameId;
 pub use extractors::jwt::JwtClaims;
-pub use infra::db::connect_db;
+pub use infra::db::bootstrap_db;
 pub use middleware::cors::cors_middleware;
 pub use middleware::request_trace::RequestTrace;
 pub use middleware::structured_logger::StructuredLogger;
