@@ -9,16 +9,5 @@ mod player_actions;
 mod round_lifecycle;
 
 /// Game flow service - generic over ConnectionTrait for transaction support.
+#[derive(Default)]
 pub struct GameFlowService;
-
-impl GameFlowService {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for GameFlowService {
-    fn default() -> Self {
-        Self::new()
-    }
-}

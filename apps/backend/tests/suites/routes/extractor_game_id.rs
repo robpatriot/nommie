@@ -1,5 +1,5 @@
 use actix_web::{test, web, HttpMessage, Responder};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
@@ -24,7 +24,11 @@ async fn echo(game_id: GameId) -> Result<impl Responder, backend::AppError> {
 #[actix_web::test]
 async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
@@ -76,7 +80,11 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
 #[actix_web::test]
 async fn invalid_id_non_numeric_is_400() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Build test app with echo route
     let app = create_test_app(state)
@@ -103,7 +111,11 @@ async fn invalid_id_non_numeric_is_400() -> Result<(), Box<dyn std::error::Error
 #[actix_web::test]
 async fn invalid_id_negative_is_400() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Build test app with echo route
     let app = create_test_app(state)
@@ -136,7 +148,11 @@ async fn invalid_id_negative_is_400() -> Result<(), Box<dyn std::error::Error>> 
 #[actix_web::test]
 async fn invalid_id_zero_is_400() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Build test app with echo route
     let app = create_test_app(state)
@@ -169,7 +185,11 @@ async fn invalid_id_zero_is_400() -> Result<(), Box<dyn std::error::Error>> {
 #[actix_web::test]
 async fn not_found_is_404() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Build test app with echo route
     let app = create_test_app(state)

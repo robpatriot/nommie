@@ -12,7 +12,13 @@ use crate::state::app_state::AppState;
 /// It returns a borrowed reference to the DatabaseConnection if available,
 /// or an AppError::db_unavailable() if the database is not configured.
 pub fn require_db(state: &AppState) -> Result<&DatabaseConnection, AppError> {
-    state.db().ok_or_else(AppError::db_unavailable)
+    state.db().ok_or_else(|| {
+        AppError::db_unavailable(
+            "database unavailable",
+            crate::error::Sentinel("database not configured in AppState"),
+            Some(1),
+        )
+    })
 }
 
 #[cfg(test)]
@@ -39,7 +45,7 @@ mod tests {
                 response,
                 "DB_UNAVAILABLE",
                 StatusCode::SERVICE_UNAVAILABLE,
-                Some("Database unavailable"),
+                Some("database unavailable"),
             )
             .await;
         } else {
@@ -62,7 +68,7 @@ mod tests {
                 response,
                 "DB_UNAVAILABLE",
                 StatusCode::SERVICE_UNAVAILABLE,
-                Some("Database unavailable"),
+                Some("database unavailable"),
             )
             .await;
         } else {

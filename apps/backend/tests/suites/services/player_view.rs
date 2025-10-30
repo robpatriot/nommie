@@ -1,9 +1,9 @@
-//! Tests for player view and game history access.
-//!
-//! These tests cover public information accessible to all players,
-//! including game history for score tables.
+// Tests for player view and game history access.
+//
+// These tests cover public information accessible to all players,
+// including game history for score tables.
 
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::domain::player_view::GameHistory;
@@ -11,11 +11,13 @@ use backend::error::AppError;
 use backend::infra::state::build_state;
 
 use crate::support::factory::create_fresh_lobby_game;
+use crate::support::test_utils::test_seed;
 
 #[actix_web::test]
 async fn test_game_history_empty_game() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -23,9 +25,13 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
-    let game_id = create_fresh_lobby_game(txn).await?;
+    let game_id = create_fresh_lobby_game(txn, "game_hist_empty").await?;
 
     let history = GameHistory::load(txn, game_id).await?;
+
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
+
     assert!(history.rounds.is_empty());
 
     Ok(())
@@ -34,7 +40,8 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
 #[actix_web::test]
 async fn test_game_history_with_rounds() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -61,7 +68,7 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
         name: Set(Some("Test Game".to_string())),
         join_code: Set(None),
         rules_version: Set("1".to_string()),
-        rng_seed: Set(Some(12345)),
+        rng_seed: Set(Some(test_seed("game_hist_rounds"))),
         current_round: Set(Some(2)),
         starting_dealer_pos: Set(Some(0)),
         current_trick_no: Set(0),
@@ -149,6 +156,9 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
     // Load game history
     let history = GameHistory::load(txn, game.id).await?;
 
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
+
     // Verify we have 2 rounds
     assert_eq!(history.rounds.len(), 2);
 
@@ -180,7 +190,8 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
 #[actix_web::test]
 async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -205,7 +216,7 @@ async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
         name: Set(Some("Test Game".to_string())),
         join_code: Set(None),
         rules_version: Set("1".to_string()),
-        rng_seed: Set(Some(12345)),
+        rng_seed: Set(Some(test_seed("trump_sel_tie_break"))),
         current_round: Set(Some(1)),
         starting_dealer_pos: Set(Some(2)),
         current_trick_no: Set(0),
@@ -246,6 +257,9 @@ async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
     }
 
     let history = GameHistory::load(txn, game.id).await?;
+
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
 
     assert_eq!(history.rounds.len(), 1);
     let r = &history.rounds[0];

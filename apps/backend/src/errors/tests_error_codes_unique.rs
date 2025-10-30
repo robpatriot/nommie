@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use backend::errors::ErrorCode;
+use crate::errors::ErrorCode;
 
 #[test]
 fn error_codes_are_unique() {

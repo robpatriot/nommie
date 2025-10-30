@@ -18,15 +18,37 @@ pub mod state;
 pub mod tricks;
 
 #[cfg(test)]
+mod domain_prop_helpers;
+#[cfg(test)]
+mod test_gens;
+#[cfg(test)]
+mod test_prelude;
+#[cfg(test)]
 mod tests_bidding;
 #[cfg(test)]
 mod tests_consecutive_zeros;
 #[cfg(test)]
 mod tests_conversions;
 #[cfg(test)]
+mod tests_domain_consistency;
+#[cfg(test)]
+mod tests_domain_dealing;
+#[cfg(test)]
 mod tests_integration;
 #[cfg(test)]
+mod tests_props_bidding;
+#[cfg(test)]
+mod tests_props_consistency;
+#[cfg(test)]
+mod tests_props_legality;
+#[cfg(test)]
+mod tests_props_trick_winner;
+#[cfg(test)]
+mod tests_props_tricks;
+#[cfg(test)]
 mod tests_scoring;
+#[cfg(test)]
+mod tests_snapshot_phases;
 #[cfg(test)]
 mod tests_tricks;
 

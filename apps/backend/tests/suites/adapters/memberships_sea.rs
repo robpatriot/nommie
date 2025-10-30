@@ -1,4 +1,5 @@
 use backend::adapters::memberships_sea::{MembershipCreate, MembershipSetReady};
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
@@ -8,7 +9,8 @@ use crate::support::factory::{create_test_game_with_options, create_test_user_wi
 #[tokio::test]
 async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -54,7 +56,8 @@ async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_set_ready_updates_only_updated_at() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");

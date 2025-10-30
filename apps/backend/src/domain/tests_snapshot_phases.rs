@@ -1,12 +1,12 @@
 //! Snapshot API tests covering all game phases.
 
-use backend::domain::bidding::{place_bid, set_trump, Bid};
-use backend::domain::fixtures::CardFixtures;
-use backend::domain::rules::PLAYERS;
-use backend::domain::snapshot::{snapshot, PhaseSnapshot};
-use backend::domain::state::{GameState, Phase, RoundState};
-use backend::domain::tricks::play_card;
-use backend::domain::{Card, Rank, Suit, Trump};
+use crate::domain::bidding::{place_bid, set_trump, Bid};
+use crate::domain::fixtures::CardFixtures;
+use crate::domain::rules::PLAYERS;
+use crate::domain::snapshot::{snapshot, PhaseSnapshot};
+use crate::domain::state::{GameState, Phase, RoundState};
+use crate::domain::tricks::play_card;
+use crate::domain::{Card, Rank, Suit, Trump};
 
 /// Build a minimal GameState in Init phase.
 fn build_init_state() -> GameState {
@@ -20,7 +20,7 @@ fn build_init_state() -> GameState {
         leader: 0,
         trick_no: 0,
         scores_total: [0, 0, 0, 0],
-        round: RoundState::new(),
+        round: RoundState::empty(),
     }
 }
 
@@ -44,7 +44,7 @@ fn start_round(round_no: u8, hands: [Vec<Card>; 4]) -> GameState {
         leader: turn_start,
         trick_no: 0,
         scores_total: [0, 0, 0, 0],
-        round: RoundState::new(),
+        round: RoundState::empty(),
     }
 }
 
@@ -392,7 +392,7 @@ fn complete_and_gameover_snapshots() {
     assert_eq!(state.phase, Phase::Scoring);
 
     // Apply scoring manually to reach Complete
-    backend::domain::scoring::apply_round_scoring(&mut state);
+    crate::domain::scoring::apply_round_scoring(&mut state);
     assert_eq!(state.phase, Phase::Complete);
 
     let snap = snapshot(&state);

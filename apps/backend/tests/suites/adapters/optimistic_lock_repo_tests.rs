@@ -1,13 +1,13 @@
-//! Repository-level tests for optimistic locking negative paths.
-//!
-//! These tests verify that the adapter correctly handles:
-//! 1. Attempting to update a non-existent game → NotFound
-//! 2. Attempting to update with a stale lock_version → OptimisticLock conflict
-//!
-//! All tests use transactions with automatic rollback via the test policy.
+// Repository-level tests for optimistic locking negative paths.
+//
+// These tests verify that the adapter correctly handles:
+// 1. Attempting to update a non-existent game → NotFound
+// 2. Attempting to update with a stale lock_version → OptimisticLock conflict
+//
+// All tests use transactions with automatic rollback via the test policy.
 
 use backend::adapters::games_sea::{self, GameCreate, GameUpdateState};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::games::GameState;
 use backend::error::AppError;
@@ -18,7 +18,8 @@ use backend::infra::state::build_state;
 #[tokio::test]
 async fn test_update_nonexistent_game_returns_not_found() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -69,7 +70,8 @@ async fn test_update_nonexistent_game_returns_not_found() -> Result<(), AppError
 #[tokio::test]
 async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -80,7 +82,7 @@ async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(
             let create_dto = GameCreate::new("LOCK001").with_name("OptimisticLockTest");
             let game = games_sea::create_game(txn, create_dto)
                 .await
-                .map_err(|e| AppError::db(format!("create_game failed: {e}")))?;
+                .map_err(|e| AppError::db("failed to create game", e))?;
 
             let initial_lock_version = game.lock_version;
             assert_eq!(initial_lock_version, 1, "initial lock_version should be 1");
@@ -89,7 +91,7 @@ async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(
             let update1 = GameUpdateState::new(game.id, GameState::Bidding, initial_lock_version);
             let game_after_update1 = games_sea::update_state(txn, update1)
                 .await
-                .map_err(|e| AppError::db(format!("first update failed: {e}")))?;
+                .map_err(|e| AppError::db("failed to update game state", e))?;
 
             assert_eq!(
                 game_after_update1.lock_version,
@@ -162,7 +164,8 @@ async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(
 #[tokio::test]
 async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -173,7 +176,7 @@ async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
             let create_dto = GameCreate::new("LOCK002").with_name("MultipleStaleTest");
             let game = games_sea::create_game(txn, create_dto)
                 .await
-                .map_err(|e| AppError::db(format!("create_game failed: {e}")))?;
+                .map_err(|e| AppError::db("failed to create game", e))?;
 
             let initial_version = game.lock_version;
 
@@ -181,7 +184,7 @@ async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
             let update1 = GameUpdateState::new(game.id, GameState::Bidding, initial_version);
             let game_v2 = games_sea::update_state(txn, update1)
                 .await
-                .map_err(|e| AppError::db(format!("first update failed: {e}")))?;
+                .map_err(|e| AppError::db("failed to update game state", e))?;
 
             assert_eq!(game_v2.lock_version, initial_version + 1);
 
@@ -189,7 +192,7 @@ async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
             let update2 = GameUpdateState::new(game.id, GameState::TrickPlay, game_v2.lock_version);
             let game_v3 = games_sea::update_state(txn, update2)
                 .await
-                .map_err(|e| AppError::db(format!("second update failed: {e}")))?;
+                .map_err(|e| AppError::db("failed to update game state", e))?;
 
             assert_eq!(game_v3.lock_version, initial_version + 2);
 

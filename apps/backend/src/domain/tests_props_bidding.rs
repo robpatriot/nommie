@@ -7,15 +7,15 @@
 //! - Turn order must be respected
 //! - After all bids are placed, highest bidder wins (ties go to earliest bidder)
 
-include!("../../common/proptest_prelude.rs");
-
-use backend::domain::bidding::{legal_bids, place_bid, Bid};
-use backend::domain::state::Phase;
-use backend::errors::domain::{DomainError, ValidationKind};
 use proptest::prelude::*;
 
+use crate::domain::bidding::{legal_bids, place_bid, Bid};
+use crate::domain::state::Phase;
+use crate::domain::test_prelude;
+use crate::errors::domain::{DomainError, ValidationKind};
+
 proptest! {
-    #![proptest_config(proptest_prelude_config())]
+    #![proptest_config(test_prelude::proptest_config())]
 
     /// Property: Legal bids are from a known finite set
     /// For any hand size, the set of legal bids is [0..=hand_size].
@@ -24,7 +24,7 @@ proptest! {
         hand_size in 2u8..=13u8,
         player in 0u8..=3u8,
     ) {
-        use backend::domain::state::init_round;
+        use crate::domain::state::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
@@ -55,7 +55,7 @@ proptest! {
         hand_size in 2u8..=13u8,
         invalid_bid in 14u8..=255u8, // Well outside valid range
     ) {
-        use backend::domain::state::init_round;
+        use crate::domain::state::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
@@ -86,7 +86,7 @@ proptest! {
     ) {
         // Bids are generated based on hand_size, so they're always valid
 
-        use backend::domain::state::init_round;
+        use crate::domain::state::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
@@ -126,7 +126,7 @@ proptest! {
     ) {
         // bid_value is generated based on hand_size, so it's always valid
 
-        use backend::domain::state::init_round;
+        use crate::domain::state::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
@@ -155,7 +155,7 @@ fn test_valid_bids_table() {
     ];
 
     for (hand_size, expected_values) in test_cases {
-        use backend::domain::state::init_round;
+        use crate::domain::state::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
@@ -181,7 +181,7 @@ fn test_invalid_bids_table() {
 
     for (hand_size, invalid_bids) in test_cases {
         for &bid_value in &invalid_bids {
-            use backend::domain::state::init_round;
+            use crate::domain::state::init_round;
             let hands = [vec![], vec![], vec![], vec![]];
             let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
             state.phase = Phase::Bidding;
@@ -207,7 +207,7 @@ fn test_invalid_bids_table() {
 /// Test: Bid in wrong phase is rejected
 #[test]
 fn test_bid_wrong_phase() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
     let hands = [vec![], vec![], vec![], vec![]];
     let mut state = init_round(1, 5, hands, 0, [0; 4]);
     state.phase = Phase::Init; // Not Bidding
@@ -228,7 +228,7 @@ fn test_bid_wrong_phase() {
 /// Test: Turn order is respected in sequence
 #[test]
 fn test_turn_order_sequence() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
     let hands = [vec![], vec![], vec![], vec![]];
     let mut state = init_round(1, 5, hands, 0, [0; 4]);
     state.phase = Phase::Bidding;
@@ -268,7 +268,7 @@ fn test_turn_order_sequence() {
 /// Test: Tie in bids goes to earliest bidder
 #[test]
 fn test_bid_tie_resolution() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
     let hands = [vec![], vec![], vec![], vec![]];
     let mut state = init_round(1, 5, hands, 0, [0; 4]);
     state.phase = Phase::Bidding;
@@ -292,7 +292,7 @@ fn test_bid_tie_resolution() {
 /// Test: Highest bidder wins with different start positions
 #[test]
 fn test_highest_bidder_wins() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Test case 1: Clear winner
     let hands = [vec![], vec![], vec![], vec![]];

@@ -1,5 +1,6 @@
 use actix_web::http::StatusCode;
 use actix_web::{test, web, App, HttpMessage};
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::error::AppError;
 use backend::infra::state::build_state;
 use backend::routes::games::configure_routes;
@@ -10,7 +11,8 @@ use crate::support::factory::{create_test_game, create_test_user};
 #[tokio::test]
 async fn test_get_player_display_name_success() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -47,13 +49,18 @@ async fn test_get_player_display_name_success() -> Result<(), AppError> {
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body["display_name"], "AliceUser");
 
+    // Rollback the transaction after all assertions complete
+    // (Reading the response body fully should have dropped request extensions)
+    shared.rollback().await?;
+
     Ok(())
 }
 
 #[tokio::test]
 async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -92,13 +99,17 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
     )
     .await;
 
+    // Rollback the transaction after all assertions complete
+    shared.rollback().await?;
+
     Ok(())
 }
 
 #[tokio::test]
 async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -139,13 +150,17 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
     )
     .await;
 
+    // Rollback the transaction after all assertions complete
+    shared.rollback().await?;
+
     Ok(())
 }
 
 #[tokio::test]
 async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -176,11 +191,15 @@ async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> 
     req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
+
     assert_eq!(resp.status(), StatusCode::OK);
 
     // Parse response body
     let body: serde_json::Value = test::read_body_json(resp).await;
     assert_eq!(body["display_name"], "bob");
+
+    // Rollback the transaction after all assertions complete
+    shared.rollback().await?;
 
     Ok(())
 }

@@ -14,7 +14,9 @@
 // - Avoid prop_assume! - use dependent generators instead
 // - Generate valid inputs by construction, not by filtering
 
-pub fn proptest_prelude_config() -> proptest::prelude::ProptestConfig {
+#[cfg(test)]
+#[allow(dead_code)] // Used by proptest via inner attribute; false-positive for dead_code.
+pub fn proptest_config() -> proptest::prelude::ProptestConfig {
     // Start from a single base default to avoid repeated default() calls
     let base: proptest::prelude::ProptestConfig = proptest::prelude::ProptestConfig::default();
 

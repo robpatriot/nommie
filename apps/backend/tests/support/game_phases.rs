@@ -1,7 +1,7 @@
-//! Game phase setup helpers for integration tests
-//!
-//! This module provides helpers for setting up games in specific phases
-//! (Bidding, TrumpSelection, TrickPlay) to reduce boilerplate in tests.
+// Game phase setup helpers for integration tests
+//
+// This module provides helpers for setting up games in specific phases
+// (Bidding, TrumpSelection, TrickPlay) to reduce boilerplate in tests.
 
 use backend::error::AppError;
 use backend::repos::rounds::Trump;
@@ -25,23 +25,23 @@ pub struct PhaseSetup {
 ///
 /// # Arguments
 /// * `txn` - Database transaction
-/// * `rng_seed` - Seed for deterministic RNG
+/// * `test_name` - Test name for unique seed generation
 ///
 /// # Returns
 /// PhaseSetup with game_id, user_ids, round_id, and dealer position
 ///
 /// # Example
 /// ```
-/// let setup = setup_game_in_bidding_phase(txn, 12345).await?;
+/// let setup = setup_game_in_bidding_phase(txn, "my_bidding_test").await?;
 /// // Now submit bids...
 /// service.submit_bid(txn, setup.game_id, 1, 5).await?;
 /// ```
 pub async fn setup_game_in_bidding_phase(
     txn: &DatabaseTransaction,
-    rng_seed: i64,
+    test_name: &str,
 ) -> Result<PhaseSetup, AppError> {
-    let game_setup = setup_game_with_players(txn, rng_seed).await?;
-    let service = GameFlowService::new();
+    let game_setup = setup_game_with_players(txn, test_name).await?;
+    let service = GameFlowService;
 
     // Deal the round
     service.deal_round(txn, game_setup.game_id).await?;
@@ -70,7 +70,7 @@ pub async fn setup_game_in_bidding_phase(
 ///
 /// # Arguments
 /// * `txn` - Database transaction
-/// * `rng_seed` - Seed for deterministic RNG
+/// * `test_name` - Test name for unique seed generation
 /// * `bids` - Array of 4 bid values (indexed by seat, not bid order)
 ///
 /// # Returns
@@ -78,17 +78,17 @@ pub async fn setup_game_in_bidding_phase(
 ///
 /// # Example
 /// ```
-/// let setup = setup_game_in_trump_selection_phase(txn, 12345, [3, 4, 2, 5]).await?;
+/// let setup = setup_game_in_trump_selection_phase(txn, "my_trump_test", [3, 4, 2, 5]).await?;
 /// // Now set trump...
 /// service.set_trump(txn, setup.game_id, winning_bidder, Trump::Hearts).await?;
 /// ```
 pub async fn setup_game_in_trump_selection_phase(
     txn: &DatabaseTransaction,
-    rng_seed: i64,
+    test_name: &str,
     bids: [u8; 4],
 ) -> Result<PhaseSetup, AppError> {
-    let phase_setup = setup_game_in_bidding_phase(txn, rng_seed).await?;
-    let service = GameFlowService::new();
+    let phase_setup = setup_game_in_bidding_phase(txn, test_name).await?;
+    let service = GameFlowService;
 
     // Submit all bids in dealer order
     // Bidding starts at (dealer_pos + 1) % 4
@@ -110,7 +110,7 @@ pub async fn setup_game_in_trump_selection_phase(
 ///
 /// # Arguments
 /// * `txn` - Database transaction
-/// * `rng_seed` - Seed for deterministic RNG
+/// * `test_name` - Test name for unique seed generation
 /// * `bids` - Array of 4 bid values (indexed by seat)
 /// * `trump` - Trump suit to set
 ///
@@ -119,18 +119,18 @@ pub async fn setup_game_in_trump_selection_phase(
 ///
 /// # Example
 /// ```
-/// let setup = setup_game_in_trick_play_phase(txn, 12345, [3, 4, 2, 5], Trump::Hearts).await?;
+/// let setup = setup_game_in_trick_play_phase(txn, "my_trick_test", [3, 4, 2, 5], Trump::Hearts).await?;
 /// // Now play cards...
 /// service.play_card(txn, setup.game_id, 0, card).await?;
 /// ```
 pub async fn setup_game_in_trick_play_phase(
     txn: &DatabaseTransaction,
-    rng_seed: i64,
+    test_name: &str,
     bids: [u8; 4],
     trump: Trump,
 ) -> Result<PhaseSetup, AppError> {
-    let phase_setup = setup_game_in_trump_selection_phase(txn, rng_seed, bids).await?;
-    let service = GameFlowService::new();
+    let phase_setup = setup_game_in_trump_selection_phase(txn, test_name, bids).await?;
+    let service = GameFlowService;
 
     // Determine winning bidder (highest bid, ties go to earliest bidder)
     let winning_bidder = find_winning_bidder(&bids, phase_setup.dealer_pos);
@@ -172,7 +172,7 @@ pub fn find_winning_bidder(bids: &[u8; 4], dealer_pos: i32) -> i32 {
 ///
 /// # Arguments
 /// * `txn` - Database transaction
-/// * `rng_seed` - Seed for deterministic RNG
+/// * `test_name` - Test name for unique seed generation
 /// * `completed_rounds` - Number of rounds already completed (1-26)
 ///
 /// # Returns
@@ -181,13 +181,13 @@ pub fn find_winning_bidder(bids: &[u8; 4], dealer_pos: i32) -> i32 {
 /// # Example
 /// ```
 /// // Set up game with 25 rounds completed, ready to deal round 26
-/// let setup = setup_game_at_round(txn, 12345, 25).await?;
+/// let setup = setup_game_at_round(txn, "my_multi_round_test", 25).await?;
 /// // Now deal the next round...
 /// service.deal_round(txn, setup.game_id).await?;
 /// ```
 pub async fn setup_game_at_round(
     txn: &DatabaseTransaction,
-    rng_seed: i64,
+    test_name: &str,
     completed_rounds: i32,
 ) -> Result<PhaseSetup, AppError> {
     use backend::entities::games::{self, GameState, GameVisibility};
@@ -208,25 +208,25 @@ pub async fn setup_game_at_round(
     let user_ids = vec![
         super::factory::create_test_user(
             txn,
-            &format!("r{}_p1", completed_rounds),
+            &super::test_utils::test_user_sub(&format!("{}_p1", test_name)),
             Some("Player 1"),
         )
         .await?,
         super::factory::create_test_user(
             txn,
-            &format!("r{}_p2", completed_rounds),
+            &super::test_utils::test_user_sub(&format!("{}_p2", test_name)),
             Some("Player 2"),
         )
         .await?,
         super::factory::create_test_user(
             txn,
-            &format!("r{}_p3", completed_rounds),
+            &super::test_utils::test_user_sub(&format!("{}_p3", test_name)),
             Some("Player 3"),
         )
         .await?,
         super::factory::create_test_user(
             txn,
-            &format!("r{}_p4", completed_rounds),
+            &super::test_utils::test_user_sub(&format!("{}_p4", test_name)),
             Some("Player 4"),
         )
         .await?,
@@ -260,7 +260,7 @@ pub async fn setup_game_at_round(
             rand::random::<u32>() % 100000
         ))),
         rules_version: Set("1.0".to_string()),
-        rng_seed: Set(Some(rng_seed)),
+        rng_seed: Set(Some(super::test_utils::test_seed(test_name))),
         current_round: Set(if completed_rounds > 0 {
             Some(completed_rounds as i16)
         } else {

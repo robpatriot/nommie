@@ -1,3 +1,4 @@
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
@@ -9,7 +10,8 @@ use crate::support::test_utils::short_join_code;
 #[tokio::test]
 async fn test_create_bid_and_find_all() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -48,7 +50,8 @@ async fn test_create_bid_and_find_all() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_count_bids() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -80,7 +83,8 @@ async fn test_count_bids() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_winning_bid_highest() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -113,7 +117,8 @@ async fn test_find_winning_bid_highest() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_winning_bid_tiebreaker() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -147,7 +152,8 @@ async fn test_find_winning_bid_tiebreaker() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_winning_bid_none() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -173,7 +179,8 @@ async fn test_find_winning_bid_none() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -207,7 +214,8 @@ async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_unique_constraint_round_order() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");

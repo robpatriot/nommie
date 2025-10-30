@@ -1,90 +1,10 @@
-//! Property tests for card dealing logic (pure domain, no DB).
-//!
-//! These tests validate that the dealing logic produces deterministic,
-//! non-overlapping hands from a standard 52-card deck.
-
-include!("../../common/proptest_prelude.rs");
+//! Integration tests for card dealing logic - simple deterministic tests
+//! that verify the public API works correctly for basic cases.
 
 use std::collections::HashSet;
 
-use backend::domain::dealing::deal_hands;
-use backend::domain::Card;
-use proptest::prelude::*;
-
-proptest! {
-    #![proptest_config(proptest_prelude_config())]
-
-    /// Property: Full deck has 52 unique cards
-    /// When dealing any valid combination, we expect the source deck to be complete.
-    #[test]
-    fn prop_full_deck_is_unique(
-        hand_size in 2u8..=13u8,
-        seed in any::<u64>(),
-    ) {
-        let hands = deal_hands(4, hand_size, seed).unwrap();
-
-        // Collect all dealt cards
-        let mut all_cards: Vec<Card> = Vec::new();
-        for hand in &hands {
-            all_cards.extend(hand.iter());
-        }
-
-        // Check uniqueness
-        let card_set: HashSet<Card> = all_cards.iter().copied().collect();
-        prop_assert_eq!(card_set.len(), all_cards.len(),
-            "All dealt cards must be unique");
-    }
-
-    /// Property: Dealing produces non-overlapping hands
-    /// Each hand must have distinct cards, and the union equals the dealt portion of the deck.
-    #[test]
-    fn prop_dealing_non_overlapping(
-        hand_size in 2u8..=13u8,
-        seed in any::<u64>(),
-    ) {
-        let hands = deal_hands(4, hand_size, seed).unwrap();
-
-        // Verify each hand has the correct size
-        for hand in &hands {
-            prop_assert_eq!(hand.len(), hand_size as usize,
-                "Each hand must have {} cards", hand_size);
-        }
-
-        // Verify no card appears in multiple hands
-        let mut all_cards: Vec<Card> = Vec::new();
-        for hand in &hands {
-            all_cards.extend(hand.iter());
-        }
-
-        let card_set: HashSet<Card> = all_cards.iter().copied().collect();
-        prop_assert_eq!(card_set.len(), all_cards.len(),
-            "No card should appear in multiple hands");
-
-        // Verify total cards dealt equals player_count * hand_size
-        prop_assert_eq!(all_cards.len(), 4 * hand_size as usize,
-            "Total cards dealt must equal 4 * {}", hand_size);
-    }
-
-    /// Property: Hand sizes are equal and sum correctly
-    #[test]
-    fn prop_hand_sizes_equal_and_sum(
-        hand_size in 2u8..=13u8,
-        seed in any::<u64>(),
-    ) {
-        let hands = deal_hands(4, hand_size, seed).unwrap();
-
-        // All hands must have the same size
-        for hand in &hands {
-            prop_assert_eq!(hand.len(), hand_size as usize,
-                "Hand size must be {}", hand_size);
-        }
-
-        // Total cards must be 4 * hand_size
-        let total: usize = hands.iter().map(|h| h.len()).sum();
-        prop_assert_eq!(total, 4 * hand_size as usize,
-            "Sum of all hand sizes must be {}", 4 * hand_size);
-    }
-}
+use crate::domain::dealing::deal_hands;
+use crate::domain::Card;
 
 /// Deterministic dealing test with known seed
 #[test]
@@ -191,4 +111,36 @@ fn test_no_duplicate_cards_across_hands() {
             );
         }
     }
+}
+
+#[test]
+fn test_dealing_produces_correct_hand_sizes() {
+    let hands = deal_hands(4, 5, 12345).unwrap();
+
+    // Verify each hand has the correct size
+    for hand in &hands {
+        assert_eq!(hand.len(), 5, "Each hand must have 5 cards");
+    }
+
+    // Verify total cards dealt equals player_count * hand_size
+    let total: usize = hands.iter().map(|h| h.len()).sum();
+    assert_eq!(total, 20, "Total cards dealt must equal 4 * 5");
+}
+
+#[test]
+fn test_dealing_hand_uniqueness() {
+    let hands = deal_hands(4, 3, 999).unwrap();
+
+    // Verify no card appears in multiple hands
+    let mut all_cards: Vec<Card> = Vec::new();
+    for hand in &hands {
+        all_cards.extend(hand.iter());
+    }
+
+    let card_set: HashSet<Card> = all_cards.iter().copied().collect();
+    assert_eq!(
+        card_set.len(),
+        all_cards.len(),
+        "No card should appear in multiple hands"
+    );
 }

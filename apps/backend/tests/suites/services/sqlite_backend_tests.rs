@@ -1,29 +1,51 @@
-//! SQLite backend tests
-//!
-//! Tests for SQLite in-memory and file-based database functionality.
-//! Verifies that both backends work correctly with the same business logic.
+// SQLite backend tests
+//
+// Tests for SQLite in-memory and file-based database functionality.
+// Verifies that both backends work correctly with the same business logic.
+//
+// ## Running SQLite File Tests Serially (Fallback)
+//
+// If you encounter intermittent "database is locked" errors when running SQLite file tests,
+// you can run them serially as a fallback:
+//
+// ```bash
+// # Option 1: Set test-threads = 1 for this test group
+// cargo nextest run --test-threads 1 sqlite_backend_tests
+//
+// # Option 2: Using nextest config in .config/nextest.toml:
+// # [[profile.default]]
+// # test-threads = 1
+//
+// # Option 3: Run specific file-based tests in sequence
+// cargo nextest run test_sqlite_file_persistence --test-threads 1
+// cargo nextest run test_sqlite_default_file --test-threads 1
+// cargo nextest run test_sqlite_memory_vs_file_performance --test-threads 1
+// ```
 
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
+use backend::infra::db::sqlite_diagnostics::{connection_id, sqlite_lock_probe};
 use backend::infra::state::build_state;
 use backend::repos::users;
 use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
 use unicode_normalization::UnicodeNormalization;
 
-use crate::support::test_utils::shared_sqlite_temp_file;
-
 #[tokio::test]
 async fn test_sqlite_memory_works() -> Result<(), Box<dyn std::error::Error>> {
     // build_state() now automatically handles schema migration
-    let state = build_state().with_db(DbProfile::InMemory).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::SqliteMemory)
+        .build()
+        .await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Test basic operations work with SQLite memory
             let test_email = unique_email("alice");
             let test_google_sub = unique_str("google-sub");
-            let service = UserService::new();
+            let service = UserService;
 
             let user = service
                 .ensure_user(txn, &test_email, Some("Alice"), &test_google_sub)
@@ -43,16 +65,18 @@ async fn test_sqlite_memory_works() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>> {
-    // Test SQLite file with shared database
-    let db_path = shared_sqlite_temp_file();
-
-    // Create state with the shared file (schema will be auto-migrated)
+    // Test SQLite file with default database
     let state1 = build_state()
-        .with_db(DbProfile::SqliteFile {
-            file: Some(db_path.to_string_lossy().to_string()),
-        })
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::SqliteFile)
         .build()
         .await?;
+
+    // Lock probe for tests
+    if let Some(db) = state1.db() {
+        let pool_id = connection_id(db);
+        let _ = sqlite_lock_probe(db, &pool_id).await;
+    }
 
     // Create some data and verify it in the same transaction
     let test_email = unique_email("persistent");
@@ -60,7 +84,7 @@ async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>
 
     with_txn(None, &state1, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
 
             // Create user
             let user = service
@@ -95,23 +119,25 @@ async fn test_sqlite_file_persistence() -> Result<(), Box<dyn std::error::Error>
 
 #[tokio::test]
 async fn test_sqlite_default_file() -> Result<(), Box<dyn std::error::Error>> {
-    // Test SQLite file with shared database
-    let db_path = shared_sqlite_temp_file();
-
-    // Create state with the shared file (schema will be auto-migrated)
+    // Test SQLite file with default database
     let state = build_state()
-        .with_db(DbProfile::SqliteFile {
-            file: Some(db_path.to_string_lossy().to_string()),
-        })
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::SqliteFile)
         .build()
         .await?;
+
+    // Lock probe for tests
+    if let Some(db) = state.db() {
+        let pool_id = connection_id(db);
+        let _ = sqlite_lock_probe(db, &pool_id).await;
+    }
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Just verify we can connect and do basic operations
             let test_email = unique_email("default");
             let test_google_sub = unique_str("default-sub");
-            let service = UserService::new();
+            let service = UserService;
 
             let user = service
                 .ensure_user(txn, &test_email, Some("Default User"), &test_google_sub)
@@ -131,12 +157,16 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     use std::time::Instant;
 
     // build_state() now automatically handles schema migration
-    let memory_state = build_state().with_db(DbProfile::InMemory).build().await?;
+    let memory_state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::SqliteMemory)
+        .build()
+        .await?;
 
     let start = Instant::now();
     with_txn(None, &memory_state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             for i in 0..10 {
                 let email = unique_email(&format!("memory_user_{}", i));
                 let sub = unique_str(&format!("memory-sub-{}", i));
@@ -150,20 +180,23 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     .await?;
     let memory_time = start.elapsed();
 
-    // Test SQLite file with shared database
-    let db_path = shared_sqlite_temp_file();
-
+    // Test SQLite file with default database
     let file_state = build_state()
-        .with_db(DbProfile::SqliteFile {
-            file: Some(db_path.to_string_lossy().to_string()),
-        })
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::SqliteFile)
         .build()
         .await?;
+
+    // Lock probe for tests
+    if let Some(db) = file_state.db() {
+        let pool_id = connection_id(db);
+        let _ = sqlite_lock_probe(db, &pool_id).await;
+    }
 
     let start = Instant::now();
     with_txn(None, &file_state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             for i in 0..10 {
                 let email = unique_email(&format!("file_user_{}", i));
                 let sub = unique_str(&format!("file-sub-{}", i));

@@ -6,13 +6,10 @@ use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::players;
 
 /// Player domain service.
+#[derive(Default)]
 pub struct PlayerService;
 
 impl PlayerService {
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Get the display name of a player in a game by seat.
     ///
     /// # Arguments
@@ -40,11 +37,5 @@ impl PlayerService {
         // Call repository and map DomainError to AppError
         let display_name = players::get_display_name_by_seat(conn, game_id, seat).await?;
         Ok(display_name)
-    }
-}
-
-impl Default for PlayerService {
-    fn default() -> Self {
-        Self::new()
     }
 }

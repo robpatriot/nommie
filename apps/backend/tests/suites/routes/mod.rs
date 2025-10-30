@@ -1,4 +1,3 @@
-pub mod error_codes_unique;
 pub mod error_mappings;
 pub mod error_shape;
 pub mod extractor_current_user_db;

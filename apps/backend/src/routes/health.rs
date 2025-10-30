@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse};
-use sea_orm::{ConnectionTrait, Statement};
+use migration::get_latest_migration_version;
+use sea_orm::ConnectionTrait;
 use serde::Serialize;
 use time::OffsetDateTime;
 
@@ -37,25 +38,16 @@ async fn health(app_state: web::Data<AppState>) -> Result<HttpResponse, AppError
         Ok(db) => {
             // Try a lightweight query to verify connection
             match db
-                .query_one(Statement::from_string(
-                    sea_orm::DatabaseBackend::Postgres,
+                .query_one(sea_orm::Statement::from_string(
+                    db.get_database_backend(),
                     "SELECT 1 as health_check".to_string(),
                 ))
                 .await
             {
                 Ok(_) => {
-                    // Query migration status
-                    let migration_version = match db
-                        .query_one(Statement::from_string(
-                            sea_orm::DatabaseBackend::Postgres,
-                            "SELECT version FROM seaql_migrations ORDER BY version DESC LIMIT 1"
-                                .to_string(),
-                        ))
-                        .await
-                    {
-                        Ok(Some(row)) => row
-                            .try_get::<String>("", "version")
-                            .unwrap_or_else(|_| "unknown".to_string()),
+                    // Query migration status using the new migration function
+                    let migration_version = match get_latest_migration_version(db).await {
+                        Ok(Some(version)) => version,
                         Ok(None) => "no_migrations".to_string(),
                         Err(_) => "unknown".to_string(),
                     };

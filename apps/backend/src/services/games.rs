@@ -12,13 +12,10 @@ use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::{bids, hands, plays, rounds, scores, tricks};
 
 /// Game domain service (stateless).
+#[derive(Default)]
 pub struct GameService;
 
 impl GameService {
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Load GameState from database (requires transaction for consistent snapshot).
     ///
     /// Reconstructs in-memory GameState by loading all persisted data for the current round.
@@ -53,7 +50,7 @@ impl GameService {
                     leader: 0,
                     trick_no: 0,
                     scores_total: [0, 0, 0, 0],
-                    round: RoundState::new(),
+                    round: RoundState::empty(),
                 });
             }
         };
@@ -213,11 +210,5 @@ impl GameService {
                 winning_bidder,
             },
         })
-    }
-}
-
-impl Default for GameService {
-    fn default() -> Self {
-        Self::new()
     }
 }

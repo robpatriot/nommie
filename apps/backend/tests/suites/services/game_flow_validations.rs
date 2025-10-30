@@ -1,13 +1,13 @@
-//! Integration tests for game flow validations.
-//!
-//! This module tests validation rules and error cases throughout the game flow:
-//! - Phase requirements
-//! - Dealer bid restrictions
-//! - Trump selection rules
-//! - Card play constraints
+// Integration tests for game flow validations.
+//
+// This module tests validation rules and error cases throughout the game flow:
+// - Phase requirements
+// - Dealer bid restrictions
+// - Trump selection rules
+// - Card play constraints
 
 use backend::adapters::games_sea;
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::{with_txn, SharedTxn};
 use backend::error::AppError;
@@ -19,7 +19,7 @@ use backend::services::game_flow::GameFlowService;
 use crate::support::game_phases::{
     setup_game_in_bidding_phase, setup_game_in_trump_selection_phase,
 };
-use crate::support::game_setup::{setup_game_with_players, GameSetupOptions};
+use crate::support::game_setup::setup_game_with_players;
 
 // ============================================================================
 // Phase Validation Tests
@@ -28,16 +28,19 @@ use crate::support::game_setup::{setup_game_with_players, GameSetupOptions};
 #[tokio::test]
 async fn test_submit_bid_rejects_wrong_phase() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 456).await?.game_id;
+            let game_id = setup_game_with_players(txn, "invalid_bid_validation")
+                .await?
+                .game_id;
 
-            let service = GameFlowService::new();
+            let service = GameFlowService;
             let result = service.submit_bid(txn, game_id, 1, 5).await;
 
             assert!(result.is_err());
@@ -63,15 +66,16 @@ async fn test_submit_bid_rejects_wrong_phase() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_dealer_bid_restriction_rejects_exact_sum() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let setup = setup_game_in_bidding_phase(txn, 12345).await?;
-            let service = GameFlowService::new();
+            let setup = setup_game_in_bidding_phase(txn, "bid_validation_basic").await?;
+            let service = GameFlowService;
 
             // Bidding starts at dealer + 1 = seat 1
             // First 3 non-dealer players bid: 5 + 4 + 3 = 12
@@ -102,15 +106,16 @@ async fn test_dealer_bid_restriction_rejects_exact_sum() -> Result<(), AppError>
 #[tokio::test]
 async fn test_dealer_bid_restriction_allows_non_exact_sum() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let setup = setup_game_in_bidding_phase(txn, 12346).await?;
-            let service = GameFlowService::new();
+            let setup = setup_game_in_bidding_phase(txn, "bid_validation_range").await?;
+            let service = GameFlowService;
 
             // First 3 non-dealer players bid: 5 + 4 + 3 = 12
             service.submit_bid(txn, setup.game_id, 1, 5).await?;
@@ -135,15 +140,16 @@ async fn test_dealer_bid_restriction_allows_non_exact_sum() -> Result<(), AppErr
 #[tokio::test]
 async fn test_dealer_bid_restriction_only_applies_to_dealer() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let setup = setup_game_in_bidding_phase(txn, 12347).await?;
-            let service = GameFlowService::new();
+            let setup = setup_game_in_bidding_phase(txn, "bid_validation_order").await?;
+            let service = GameFlowService;
 
             // Non-dealer players can bid any valid value
             service.submit_bid(txn, setup.game_id, 1, 13).await?; // Max bid OK for non-dealer
@@ -166,7 +172,8 @@ async fn test_dealer_bid_restriction_only_applies_to_dealer() -> Result<(), AppE
 #[tokio::test]
 async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -176,7 +183,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
             use backend::adapters::games_sea::{GameUpdateRound, GameUpdateState};
             use backend::entities::games::GameState as DbGameState;
 
-            let game_setup = setup_game_with_players(txn, 12348).await?;
+            let game_setup = setup_game_with_players(txn, "ready_state_validation").await?;
 
             // Manually create a round with hand_size = 2
             // Round 13 has hand_size 2, and with starting_dealer=0, dealer_pos=(0+13-1)%4=0
@@ -190,7 +197,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
                 .with_starting_dealer_pos(0);
             backend::adapters::games_sea::update_round(txn, update_round).await?;
 
-            let service = GameFlowService::new();
+            let service = GameFlowService;
 
             // Bids: 0 + 1 + 0 = 1, dealer cannot bid 1 (sum would be 2)
             service.submit_bid(txn, game_setup.game_id, 1, 0).await?;
@@ -215,7 +222,8 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -223,8 +231,10 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Round 1: dealer at seat 0, bids: 2, 3, 4, 3 = 12
-            let setup = setup_game_in_trump_selection_phase(txn, 12345, [2, 3, 4, 3]).await?;
-            let service = GameFlowService::new();
+            let setup =
+                setup_game_in_trump_selection_phase(txn, "trump_selection_valid", [2, 3, 4, 3])
+                    .await?;
+            let service = GameFlowService;
 
             let game_after_bids = games_sea::find_by_id(txn, setup.game_id).await?.unwrap();
             assert_eq!(
@@ -277,7 +287,8 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -286,8 +297,10 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
         Box::pin(async move {
             // Round 1: dealer at seat 0, bidding starts at seat 1
             // Bids: 2, 4, 2, 4 - Seats 1 and 3 both bid 4, but seat 1 bid first
-            let setup = setup_game_in_trump_selection_phase(txn, 12346, [2, 4, 2, 4]).await?;
-            let service = GameFlowService::new();
+            let setup =
+                setup_game_in_trump_selection_phase(txn, "trump_selection_tie", [2, 4, 2, 4])
+                    .await?;
+            let service = GameFlowService;
 
             let result = service
                 .set_trump(txn, setup.game_id, 3, rounds::Trump::Hearts)
@@ -320,7 +333,8 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -329,13 +343,17 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
-    let options = GameSetupOptions::default()
-        .with_rng_seed(12345)
-        .with_ready(false);
-    let setup = crate::support::game_setup::setup_game_with_options(txn, options).await?;
+    let setup = crate::support::game_setup::setup_game_with_players_ex(
+        txn,
+        "game_validation_seed",
+        4,
+        false,
+        backend::entities::games::GameVisibility::Private,
+    )
+    .await?;
     let game_id = setup.game_id;
 
-    let service = GameFlowService::new();
+    let service = GameFlowService;
 
     for user_id in &setup.user_ids {
         service.mark_ready(txn, game_id, *user_id).await?;

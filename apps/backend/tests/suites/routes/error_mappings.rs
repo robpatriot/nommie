@@ -1,7 +1,7 @@
-//! Tests for AppError mappings and HTTP responses.
-//!
-//! This module tests the precise mapping of database errors to AppError variants
-//! and ensures HTTP responses follow RFC 7807 Problem Details format.
+// Tests for AppError mappings and HTTP responses.
+//
+// This module tests the precise mapping of database errors to AppError variants
+// and ensures HTTP responses follow RFC 7807 Problem Details format.
 
 use actix_web::{test, web, App, HttpResponse, Result};
 use backend::error::AppError;
@@ -76,7 +76,13 @@ async fn test_unauthorized_responses() {
 async fn test_database_unavailable_response() {
     let app = test::init_service(App::new().route(
         "/db_unavailable",
-        web::get().to(|| test_handler(AppError::db_unavailable())),
+        web::get().to(|| {
+            test_handler(AppError::db_unavailable(
+                "database unavailable",
+                std::io::Error::other("test database unavailable for testing retry behavior"),
+                Some(1),
+            ))
+        }),
     ))
     .await;
 
@@ -87,7 +93,7 @@ async fn test_database_unavailable_response() {
 
     // Use the common helper for comprehensive validation
     use crate::common::assert_problem_details_structure;
-    assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "Database unavailable").await;
+    assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "database unavailable").await;
 }
 
 #[actix_web::test]
@@ -191,7 +197,12 @@ async fn test_not_found_response() {
 async fn test_config_error_response() {
     let app = test::init_service(App::new().route(
         "/config_error",
-        web::get().to(|| test_handler(AppError::config("Missing environment variable"))),
+        web::get().to(|| {
+            test_handler(AppError::config(
+                "environment variable missing",
+                std::io::Error::other("Missing environment variable"),
+            ))
+        }),
     ))
     .await;
 
@@ -202,7 +213,7 @@ async fn test_config_error_response() {
 
     // Use the common helper for comprehensive validation
     use crate::common::assert_problem_details_structure;
-    assert_problem_details_structure(resp, 500, "CONFIG_ERROR", "Missing environment variable")
+    assert_problem_details_structure(resp, 500, "CONFIG_ERROR", "environment variable missing")
         .await;
 }
 
@@ -210,7 +221,12 @@ async fn test_config_error_response() {
 async fn test_db_error_response() {
     let app = test::init_service(App::new().route(
         "/db_error",
-        web::get().to(|| test_handler(AppError::db("Database connection failed"))),
+        web::get().to(|| {
+            test_handler(AppError::db(
+                "database connection failed",
+                std::io::Error::other("Database connection refused"),
+            ))
+        }),
     ))
     .await;
 
@@ -221,7 +237,7 @@ async fn test_db_error_response() {
 
     // Use the common helper for comprehensive validation
     use crate::common::assert_problem_details_structure;
-    assert_problem_details_structure(resp, 500, "DB_ERROR", "Database connection failed").await;
+    assert_problem_details_structure(resp, 500, "DB_ERROR", "database connection failed").await;
 }
 
 #[actix_web::test]
@@ -254,7 +270,9 @@ async fn test_sea_orm_error_mapping() {
     let db_err = DbErr::Custom("Some other error".to_string());
     let app_error: AppError = backend::infra::db_errors::map_db_err(db_err).into();
 
-    assert!(matches!(app_error, AppError::Internal { .. }));
+    assert!(
+        matches!(app_error, AppError::Internal { code, detail: _, source: _ } if code == ErrorCode::InternalError)
+    );
     assert_eq!(app_error.code(), ErrorCode::InternalError);
 }
 

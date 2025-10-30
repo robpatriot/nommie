@@ -1,28 +1,14 @@
-use backend::config::db::{DbOwner, DbProfile};
-use backend::infra::db::bootstrap_db;
+use backend::config::db::{DbKind, RuntimeEnv};
+use backend::infra::db::{bootstrap_db, build_admin_pool};
 use futures::future::join_all;
-use migration::{Migrator, MigratorTrait};
-use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+use migration::{count_applied_migrations, Migrator, MigratorTrait};
+use sea_orm::{ConnectionTrait, DatabaseBackend};
 use tokio::time::{timeout, Duration};
 use {tracing, tracing_subscriber};
 
-use crate::support::test_utils::shared_sqlite_temp_file;
-
-// Helper: count applied migrations via seaql_migrations table.
-async fn migration_count(conn: &impl ConnectionTrait, backend: DatabaseBackend) -> i64 {
-    conn.query_one(Statement::from_string(
-        backend,
-        "SELECT COUNT(*) AS cnt FROM seaql_migrations",
-    ))
-    .await
-    .ok()
-    .flatten()
-    .and_then(|row| row.try_get::<i64>("", "cnt").ok())
-    .unwrap_or(0)
-}
-
 async fn assert_contention_run_once_then_idempotent(
-    make_profile: impl Fn() -> DbProfile + Send + Sync + 'static,
+    env: RuntimeEnv,
+    db_kind: DbKind,
     backend: DatabaseBackend,
     burst_n: usize,
     timeout_secs: u64,
@@ -32,19 +18,26 @@ async fn assert_contention_run_once_then_idempotent(
     // Compute total migrations known to the migrator
     let total_migrations = Migrator::migrations().len();
 
-    // Read baseline = migration_count(&pool, backend) using a pool from make_profile()
-    let baseline_pool = bootstrap_db(make_profile(), DbOwner::App)
+    // First bootstrap to ensure database is ready
+    let _baseline_bootstrap = bootstrap_db(env, db_kind)
         .await
-        .expect("baseline pool");
-    let baseline = migration_count(&baseline_pool, backend).await;
+        .expect("baseline bootstrap");
 
-    // Launch burst_n concurrent tasks, each calling bootstrap_db(make_profile(), DbOwner::App),
+    // Use admin pool for accurate migration count (admin credentials ensure full database access)
+    let baseline_admin_pool = build_admin_pool(env, db_kind)
+        .await
+        .expect("baseline admin pool");
+    let baseline = count_applied_migrations(&baseline_admin_pool)
+        .await
+        .unwrap_or(0);
+
+    // Launch burst_n concurrent tasks, each calling bootstrap_db(env, db_kind),
     // wrapped in a timeout of timeout_secs. After each completes, assert the pool
     // can execute "SELECT 1" for the given backend.
     let futs = (0..burst_n).map(|_| async {
         timeout(
             Duration::from_secs(timeout_secs),
-            bootstrap_db(make_profile(), DbOwner::App),
+            bootstrap_db(env, db_kind),
         )
         .await
     });
@@ -52,34 +45,51 @@ async fn assert_contention_run_once_then_idempotent(
 
     for r in results {
         let pool = r.expect("timeout").expect("bootstrap ok");
-        pool.execute(Statement::from_string(backend, "SELECT 1"))
+        pool.execute(sea_orm::Statement::from_string(backend, "SELECT 1"))
             .await
             .expect("usable pool");
     }
 
-    // Read after = migration_count(&fresh_pool, backend)
-    let after_pool = bootstrap_db(make_profile(), DbOwner::App)
+    // Read after = migration_count using admin pool for accurate count
+    let after_admin_pool = build_admin_pool(env, db_kind)
         .await
-        .expect("after pool");
-    let after = migration_count(&after_pool, backend).await;
+        .expect("after admin pool");
+    let after = count_applied_migrations(&after_admin_pool)
+        .await
+        .unwrap_or(0);
 
     // Compute:
     //     applied = after - baseline
-    //     expected_pending = max(0, total_migrations as i64 - baseline)
+    //     expected_pending = max(0, total_migrations - baseline)
     // ASSERT: applied == expected_pending
     let applied = after - baseline;
-    let expected_pending = std::cmp::max(0, total_migrations as i64 - baseline);
-    assert_eq!(
-        applied, expected_pending,
-        "applied migrations count mismatch: applied={}, expected_pending={}",
-        applied, expected_pending
-    );
+    let expected_pending = std::cmp::max(0, total_migrations - baseline);
+
+    // Handle the case where database already has migrations from previous run
+    // In this case, baseline should equal total_migrations (all already applied)
+    // and after should also equal total_migrations (idempotent)
+    // This means applied = 0 and expected_pending = 0 (nothing pending)
+    if baseline >= total_migrations && after >= total_migrations {
+        // Database was already fully migrated - all concurrent bootstraps should be idempotent
+        assert_eq!(
+            applied, 0,
+            "applied migrations count mismatch when already migrated: applied={}, baseline={}, after={}, total_migrations={}",
+            applied, baseline, after, total_migrations
+        );
+    } else {
+        // Database was not fully migrated - concurrent bootstraps should apply pending migrations
+        assert_eq!(
+            applied, expected_pending,
+            "applied migrations count mismatch: applied={}, expected_pending={}, baseline={}, after={}, total_migrations={}",
+            applied, expected_pending, baseline, after, total_migrations
+        );
+    }
 
     // Launch a second identical burst
     let futs2 = (0..burst_n).map(|_| async {
         timeout(
             Duration::from_secs(timeout_secs),
-            bootstrap_db(make_profile(), DbOwner::App),
+            bootstrap_db(env, db_kind),
         )
         .await
     });
@@ -87,16 +97,18 @@ async fn assert_contention_run_once_then_idempotent(
 
     for r in results2 {
         let pool = r.expect("timeout").expect("bootstrap ok");
-        pool.execute(Statement::from_string(backend, "SELECT 1"))
+        pool.execute(sea_orm::Statement::from_string(backend, "SELECT 1"))
             .await
             .expect("usable pool");
     }
 
-    // Read again_after = migration_count(&fresh_pool, backend)
-    let again_after_pool = bootstrap_db(make_profile(), DbOwner::App)
+    // Read again_after = migration_count using admin pool for accurate count
+    let again_after_admin_pool = build_admin_pool(env, db_kind)
         .await
-        .expect("again_after pool");
-    let again_after = migration_count(&again_after_pool, backend).await;
+        .expect("again_after admin pool");
+    let again_after = count_applied_migrations(&again_after_admin_pool)
+        .await
+        .unwrap_or(0);
 
     // ASSERT: again_after == after
     assert_eq!(
@@ -117,7 +129,8 @@ async fn assert_contention_run_once_then_idempotent(
 #[cfg_attr(not(feature = "regression-tests"), ignore)]
 async fn pg_contention_burst_all_ok_and_single_migrator() {
     assert_contention_run_once_then_idempotent(
-        || DbProfile::Test,
+        RuntimeEnv::Test,
+        DbKind::Postgres,
         DatabaseBackend::Postgres,
         6, // burst_n
         6, // timeout_secs
@@ -129,15 +142,9 @@ async fn pg_contention_burst_all_ok_and_single_migrator() {
 #[cfg_attr(not(feature = "regression-tests"), ignore)]
 async fn sqlite_file_sidecar_lock_under_parallel_bootstrap() {
     // Build one shared file profile to contend on the sidecar lock.
-    let db_path = shared_sqlite_temp_file();
-
     assert_contention_run_once_then_idempotent(
-        {
-            let path = db_path.clone();
-            move || DbProfile::SqliteFile {
-                file: Some(path.to_string_lossy().into()),
-            }
-        },
+        RuntimeEnv::Test,
+        DbKind::SqliteFile,
         DatabaseBackend::Sqlite,
         6, // burst_n
         6, // timeout_secs

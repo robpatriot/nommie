@@ -100,7 +100,16 @@ impl FromRequest for CachedGameContext {
             // Get database connection and load data
             let app_state = req
                 .app_data::<actix_web::web::Data<AppState>>()
-                .ok_or_else(|| AppError::internal("AppState not available"))?;
+                .ok_or_else(|| {
+                    AppError::internal(
+                        crate::errors::ErrorCode::InternalError,
+                        "AppState not available".to_string(),
+                        std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            "AppState missing from request",
+                        ),
+                    )
+                })?;
 
             // Start building context
             let mut context = GameContext::new(game_id.0);

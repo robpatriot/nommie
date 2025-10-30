@@ -1,14 +1,14 @@
-//! Integration tests for GET /api/games/{game_id}/snapshot caching behavior.
-//!
-//! Tests include:
-//! - ETag header presence and format
-//! - If-None-Match → 304 Not Modified caching
-//! - Wildcard and comma-separated ETag handling
+// Integration tests for GET /api/games/{game_id}/snapshot caching behavior.
+//
+// Tests include:
+// - ETag header presence and format
+// - If-None-Match → 304 Not Modified caching
+// - Wildcard and comma-separated ETag handling
 
 use actix_web::http::header::{HeaderValue, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
 use actix_web::{test, HttpMessage};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
@@ -21,7 +21,8 @@ use crate::support::snapshot_helpers::{create_snapshot_game, SnapshotGameOptions
 #[tokio::test]
 async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -79,7 +80,8 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -157,7 +159,8 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -220,7 +223,8 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -278,7 +282,8 @@ async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), A
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -327,7 +332,8 @@ async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");

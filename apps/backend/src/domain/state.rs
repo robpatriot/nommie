@@ -41,7 +41,7 @@ pub struct RoundState {
 }
 
 impl RoundState {
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
             trick_plays: Vec::with_capacity(4),
             trick_lead: None,
@@ -50,12 +50,6 @@ impl RoundState {
             bids: [None, None, None, None],
             winning_bidder: None,
         }
-    }
-}
-
-impl Default for RoundState {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -134,6 +128,6 @@ pub fn init_round(
         leader: turn_start,
         trick_no: 0,
         scores_total,
-        round: RoundState::new(),
+        round: RoundState::empty(),
     }
 }

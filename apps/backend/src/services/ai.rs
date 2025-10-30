@@ -33,6 +33,7 @@ pub fn merge_json_configs(
 }
 
 /// AI service for managing AI users and their decisions.
+#[derive(Default)]
 pub struct AiService;
 
 /// Optional overrides for AI instances in specific games.
@@ -44,10 +45,6 @@ pub struct AiInstanceOverrides {
 }
 
 impl AiService {
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Create a reusable AI template user.
     ///
     /// Creates both a user record (with `is_ai = true`) and an associated AI profile.
@@ -154,11 +151,5 @@ impl AiService {
         }
 
         Ok(membership.id)
-    }
-}
-
-impl Default for AiService {
-    fn default() -> Self {
-        Self::new()
     }
 }

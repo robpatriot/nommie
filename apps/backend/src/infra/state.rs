@@ -1,49 +1,47 @@
-use crate::config::db::{DbOwner, DbProfile};
+use crate::config::db::{DbKind, RuntimeEnv};
 use crate::error::AppError;
 use crate::infra::db::bootstrap_db;
 use crate::state::app_state::AppState;
 use crate::state::security_config::SecurityConfig;
 
 /// Builder for creating AppState instances (used in both tests and main)
+#[derive(Default)]
 pub struct StateBuilder {
     security_config: SecurityConfig,
-    db_profile: Option<DbProfile>,
+    env: Option<RuntimeEnv>,
+    db_kind: Option<DbKind>,
 }
 
 impl StateBuilder {
-    pub fn new() -> Self {
-        Self {
-            security_config: SecurityConfig::default(),
-            db_profile: None,
-        }
-    }
-    pub fn with_db(mut self, profile: DbProfile) -> Self {
-        self.db_profile = Some(profile);
+    pub fn with_env(mut self, env: RuntimeEnv) -> Self {
+        self.env = Some(env);
         self
     }
+
+    pub fn with_db(mut self, db_kind: DbKind) -> Self {
+        self.db_kind = Some(db_kind);
+        self
+    }
+
     pub fn with_security(mut self, security_config: SecurityConfig) -> Self {
         self.security_config = security_config;
         self
     }
 
     pub async fn build(self) -> Result<AppState, AppError> {
-        if let Some(profile) = self.db_profile {
-            // single entrypoint: build + migrate
-            let conn = bootstrap_db(profile, DbOwner::App).await?;
-            Ok(AppState::new(conn, self.security_config))
-        } else {
-            Ok(AppState::new_without_db(self.security_config))
+        match (self.env, self.db_kind) {
+            (Some(env), Some(db_kind)) => {
+                // Bootstrap database directly with env and db_kind
+                let conn = bootstrap_db(env, db_kind).await?;
+                Ok(AppState::new(conn, self.security_config))
+            }
+            _ => Ok(AppState::new_without_db(self.security_config)),
         }
     }
 }
 
-impl Default for StateBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 pub fn build_state() -> StateBuilder {
-    StateBuilder::new()
+    StateBuilder::default()
 }
 
 #[cfg(test)]

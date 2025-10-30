@@ -21,7 +21,54 @@ use crate::errors::ErrorCode;
 // use crate::logging::pii::Redacted; // not used in this module
 use crate::web::trace_ctx;
 
-// (legacy helper removed; DB error mapping lives in infra::db_errors)
+/// Boxed error type for storage in AppError variants
+type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+/// Sentinel error type for cases where no real underlying error exists
+#[derive(Debug, Error)]
+#[error("{0}")]
+pub struct Sentinel(pub &'static str);
+
+/// Convenience helper to create a boxed Sentinel error
+#[inline]
+pub fn src(msg: &'static str) -> BoxError {
+    Box::new(Sentinel(msg))
+}
+
+/// Helper to convert DomainError detail strings into error sources
+#[derive(Debug)]
+struct DomainErrorWrapper(String);
+
+impl std::error::Error for DomainErrorWrapper {}
+
+impl std::fmt::Display for DomainErrorWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Classify transient database errors into a suggested Retry-After (in seconds).
+///
+/// Rules:
+/// - SQLite contention: message contains "database is locked" → Some(1)
+/// - Postgres transients by SQLSTATE code:
+///   - codes starting with "08" (connection exceptions) → Some(1)
+///   - codes equal to one of: "55P03", "40001", "40P01", "53300" → Some(1)
+/// - Otherwise → None
+pub fn classify_transient(code: Option<&str>, message: &str) -> Option<u32> {
+    if message.contains("database is locked") {
+        return Some(1);
+    }
+    if let Some(c) = code {
+        if c.starts_with("08") {
+            return Some(1);
+        }
+        if matches!(c, "55P03" | "40001" | "40P01" | "53300") {
+            return Some(1);
+        }
+    }
+    None
+}
 
 #[derive(Serialize)]
 pub struct ProblemDetails {
@@ -45,7 +92,11 @@ pub enum AppError {
         status: StatusCode,
     },
     #[error("Database error: {detail}")]
-    Db { detail: String },
+    Db {
+        detail: String,
+        #[source]
+        source: BoxError,
+    },
     #[error("Not found: {detail}")]
     NotFound { code: ErrorCode, detail: String },
     #[error("Unauthorized")]
@@ -63,19 +114,38 @@ pub enum AppError {
     #[error("Bad request: {detail}")]
     BadRequest { code: ErrorCode, detail: String },
     #[error("Internal error: {detail}")]
-    Internal { code: ErrorCode, detail: String },
+    Internal {
+        code: ErrorCode,
+        detail: String,
+        #[source]
+        source: BoxError,
+    },
     #[error("Configuration error: {detail}")]
-    Config { detail: String },
+    Config {
+        detail: String,
+        #[source]
+        source: BoxError,
+    },
     #[error("Conflict: {detail}")]
     Conflict {
         code: ErrorCode,
         detail: String,
         extensions: Option<serde_json::Value>,
     },
-    #[error("Database unavailable")]
-    DbUnavailable,
+    #[error("Database unavailable: {reason}")]
+    DbUnavailable {
+        reason: String,
+        #[source]
+        source: BoxError,
+        retry_after_secs: Option<u32>,
+    },
     #[error("Timeout: {detail}")]
-    Timeout { code: ErrorCode, detail: String },
+    Timeout {
+        code: ErrorCode,
+        detail: String,
+        #[source]
+        source: BoxError,
+    },
 }
 
 impl AppError {
@@ -95,7 +165,7 @@ impl AppError {
             AppError::Internal { code, .. } => *code,
             AppError::Config { .. } => ErrorCode::ConfigError,
             AppError::Conflict { code, .. } => *code,
-            AppError::DbUnavailable => ErrorCode::DbUnavailable,
+            AppError::DbUnavailable { .. } => ErrorCode::DbUnavailable,
             AppError::Timeout { code, .. } => *code,
         }
     }
@@ -116,7 +186,7 @@ impl AppError {
             AppError::Internal { detail, .. } => detail.clone(),
             AppError::Config { detail, .. } => detail.clone(),
             AppError::Conflict { detail, .. } => detail.clone(),
-            AppError::DbUnavailable => "Database unavailable".to_string(),
+            AppError::DbUnavailable { reason, .. } => reason.clone(),
             AppError::Timeout { detail, .. } => detail.clone(),
         }
     }
@@ -137,7 +207,7 @@ impl AppError {
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Conflict { .. } => StatusCode::CONFLICT,
-            AppError::DbUnavailable => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::DbUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Timeout { .. } => StatusCode::GATEWAY_TIMEOUT,
         }
     }
@@ -147,13 +217,6 @@ impl AppError {
             code,
             detail: detail.into(),
             status: StatusCode::BAD_REQUEST,
-        }
-    }
-
-    pub fn internal(detail: impl Into<String>) -> Self {
-        Self::Internal {
-            code: ErrorCode::InternalError,
-            detail: detail.into(),
         }
     }
 
@@ -179,9 +242,27 @@ impl AppError {
         }
     }
 
-    pub fn db(detail: impl Into<String>) -> Self {
+    /// Create a database error with source
+    pub fn db(
+        detail: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
         Self::Db {
             detail: detail.into(),
+            source: Box::new(source),
+        }
+    }
+
+    /// Create an internal error with source
+    pub fn internal(
+        code: ErrorCode,
+        detail: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        Self::Internal {
+            code,
+            detail: detail.into(),
+            source: Box::new(source),
         }
     }
 
@@ -219,9 +300,14 @@ impl AppError {
         Self::ForbiddenUserNotFound
     }
 
-    pub fn config(detail: impl Into<String>) -> Self {
+    /// Create a configuration error with source
+    pub fn config(
+        detail: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
         Self::Config {
             detail: detail.into(),
+            source: Box::new(source),
         }
     }
 
@@ -245,15 +331,40 @@ impl AppError {
         }
     }
 
-    pub fn db_unavailable() -> Self {
-        Self::DbUnavailable
+    /// Create a db unavailable error (503) with optional retry_after_secs
+    pub fn db_unavailable(
+        reason: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+        retry_after_secs: Option<u32>,
+    ) -> Self {
+        Self::DbUnavailable {
+            reason: reason.into(),
+            source: Box::new(source),
+            retry_after_secs,
+        }
     }
 
-    pub fn timeout(code: ErrorCode, detail: impl Into<String>) -> Self {
+    /// Create a timeout error with source (504)
+    pub fn timeout(
+        code: ErrorCode,
+        detail: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
         Self::Timeout {
             code,
             detail: detail.into(),
+            source: Box::new(source),
         }
+    }
+
+    /// Create an internal error with a sentinel source (no real underlying error)
+    pub fn internal_msg(code: ErrorCode, detail: impl Into<String>, msg: &'static str) -> Self {
+        AppError::internal(code, detail, Sentinel(msg))
+    }
+
+    /// Create a config error with a sentinel source (no real underlying error)
+    pub fn config_msg(detail: impl Into<String>, msg: &'static str) -> Self {
+        AppError::config(detail, Sentinel(msg))
     }
 
     /// Extract extensions from the error variant if present
@@ -322,9 +433,7 @@ impl AppError {
 
 impl From<std::env::VarError> for AppError {
     fn from(e: std::env::VarError) -> Self {
-        AppError::Config {
-            detail: format!("env var error: {e}"),
-        }
+        AppError::config("environment variable missing", e)
     }
 }
 
@@ -333,6 +442,30 @@ impl From<sea_orm::DbErr> for AppError {
         // Delegate to infra adapter, then into AppError via DomainError mapping
         let de = crate::infra::db_errors::map_db_err(e);
         AppError::from(de)
+    }
+}
+
+impl From<sqlx::Error> for AppError {
+    fn from(e: sqlx::Error) -> Self {
+        let message = e.to_string();
+        let code_owned = if let sqlx::Error::Database(db) = &e {
+            db.code().map(|c| c.to_string())
+        } else {
+            None
+        };
+        let code = code_owned.as_deref();
+
+        if let Some(secs) = classify_transient(code, &message) {
+            let reason = if message.contains("database is locked") {
+                "database is locked".to_string()
+            } else {
+                format!("postgres transient error: {}", code.unwrap_or("unknown"))
+            };
+            return AppError::db_unavailable(reason, e, Some(secs));
+        }
+
+        // Fallback: non-transient or unknown error
+        AppError::db("database operation failed", e)
     }
 }
 
@@ -413,6 +546,7 @@ impl From<crate::errors::domain::DomainError> for AppError {
                     None
                 };
 
+                // Preserve original detail from DomainError (already client-safe and specific)
                 AppError::Conflict {
                     code,
                     detail,
@@ -427,20 +561,45 @@ impl From<crate::errors::domain::DomainError> for AppError {
                     NotFoundKind::Membership => ErrorCode::NotAMember,
                     NotFoundKind::Other(_) => ErrorCode::NotFound,
                 };
+                // Preserve original detail for NotFound (they're already client-safe)
                 AppError::NotFound { code, detail }
             }
-            crate::errors::domain::DomainError::Infra(kind, detail) => match kind {
-                InfraErrorKind::Timeout => AppError::timeout(ErrorCode::DbTimeout, detail),
-                InfraErrorKind::DbUnavailable => AppError::DbUnavailable,
-                InfraErrorKind::DataCorruption => AppError::Internal {
-                    code: ErrorCode::DataCorruption,
-                    detail,
-                },
-                InfraErrorKind::Other(_) => AppError::Internal {
-                    code: ErrorCode::InternalError,
-                    detail,
-                },
-            },
+            crate::errors::domain::DomainError::Infra(kind, detail) => {
+                match kind {
+                    InfraErrorKind::Timeout => {
+                        let detail_for_source = detail.clone();
+                        AppError::timeout(
+                            ErrorCode::DbTimeout,
+                            "operation timed out".to_string(),
+                            DomainErrorWrapper(detail_for_source),
+                        )
+                    }
+                    InfraErrorKind::DbUnavailable => {
+                        let detail_for_source = detail.clone();
+                        AppError::db_unavailable(
+                            detail,
+                            DomainErrorWrapper(detail_for_source),
+                            Some(1),
+                        )
+                    }
+                    InfraErrorKind::DataCorruption => {
+                        let detail_for_source = detail.clone();
+                        AppError::internal(
+                            ErrorCode::DataCorruption,
+                            "data corruption detected".to_string(),
+                            DomainErrorWrapper(detail_for_source),
+                        )
+                    }
+                    InfraErrorKind::Other(_) => {
+                        // Use a generic wrapper for source to avoid duplication
+                        AppError::internal(
+                            ErrorCode::InternalError,
+                            detail,
+                            DomainErrorWrapper("infrastructure failure".to_string()),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -478,7 +637,7 @@ impl ResponseError for AppError {
             }
             // Infra/system-level
             AppError::Db { .. }
-            | AppError::DbUnavailable
+            | AppError::DbUnavailable { .. }
             | AppError::Timeout { .. }
             | AppError::Internal { .. }
             | AppError::Config { .. } => {
@@ -510,8 +669,18 @@ impl ResponseError for AppError {
             }
             StatusCode::SERVICE_UNAVAILABLE => {
                 // RFC 7231: 503 responses should include Retry-After
-                builder.insert_header((RETRY_AFTER, "1"));
+                // Use retry_after_secs from DbUnavailable, otherwise default to 1
+                let retry_secs: u32 = match self {
+                    AppError::DbUnavailable {
+                        retry_after_secs, ..
+                    } => retry_after_secs.unwrap_or(1),
+                    _ => 1,
+                };
+                builder.insert_header((RETRY_AFTER, retry_secs.to_string()));
                 // Note: WWW-Authenticate is explicitly NOT set for 503
+            }
+            StatusCode::GATEWAY_TIMEOUT => {
+                // 504 responses do NOT include Retry-After or WWW-Authenticate
             }
             _ => {
                 // Other status codes (400, 404, 409, etc.) do not require
@@ -520,5 +689,136 @@ impl ResponseError for AppError {
         }
 
         builder.json(problem_details)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_transient_sqlite_locked() {
+        assert_eq!(
+            classify_transient(None, "xyz database is locked abc"),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn test_classify_transient_pg_codes() {
+        for code in ["55P03", "40001", "40P01", "53300", "08006"] {
+            assert_eq!(
+                classify_transient(Some(code), "irrelevant"),
+                Some(1),
+                "code {code}"
+            );
+        }
+        assert_eq!(classify_transient(Some("99999"), "irrelevant"), None);
+    }
+
+    #[test]
+    fn test_response_headers_db_unavailable_retry_after() {
+        #[derive(Debug)]
+        struct Dummy;
+        impl std::fmt::Display for Dummy {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "dummy")
+            }
+        }
+        impl std::error::Error for Dummy {}
+
+        let err = AppError::DbUnavailable {
+            reason: "down".to_string(),
+            source: Box::new(Dummy),
+            retry_after_secs: Some(5),
+        };
+        let resp = err.error_response();
+        assert_eq!(resp.status().as_u16(), 503);
+        let hdr = resp
+            .headers()
+            .get(actix_web::http::header::RETRY_AFTER)
+            .unwrap();
+        assert_eq!(hdr.to_str().unwrap(), "5");
+
+        let err2 = AppError::DbUnavailable {
+            reason: "down".to_string(),
+            source: Box::new(Dummy),
+            retry_after_secs: None,
+        };
+        let resp2 = err2.error_response();
+        assert_eq!(resp2.status().as_u16(), 503);
+        let hdr2 = resp2
+            .headers()
+            .get(actix_web::http::header::RETRY_AFTER)
+            .unwrap();
+        assert_eq!(hdr2.to_str().unwrap(), "1");
+    }
+
+    #[test]
+    fn test_response_headers_timeout_no_retry_after() {
+        #[derive(Debug)]
+        struct Dummy;
+        impl std::fmt::Display for Dummy {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "dummy")
+            }
+        }
+        impl std::error::Error for Dummy {}
+
+        let err = AppError::timeout(ErrorCode::DbTimeout, "deadline exceeded", Dummy);
+        let resp = err.error_response();
+        assert_eq!(resp.status().as_u16(), 504);
+        assert!(resp
+            .headers()
+            .get(actix_web::http::header::RETRY_AFTER)
+            .is_none());
+    }
+
+    #[test]
+    fn test_response_headers_unauthorized_www_authenticate() {
+        let err = AppError::unauthorized();
+        let resp = err.error_response();
+        assert_eq!(resp.status().as_u16(), 401);
+        let hdr = resp
+            .headers()
+            .get(actix_web::http::header::WWW_AUTHENTICATE)
+            .unwrap();
+        assert_eq!(hdr.to_str().unwrap(), "Bearer");
+        assert!(resp
+            .headers()
+            .get(actix_web::http::header::RETRY_AFTER)
+            .is_none());
+    }
+
+    #[test]
+    fn test_source_chain_and_display_not_duplicated() {
+        #[derive(Debug)]
+        struct Dummy;
+        impl std::fmt::Display for Dummy {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "inner-dummy")
+            }
+        }
+        impl std::error::Error for Dummy {}
+
+        let err = AppError::db("sqlx error: X", Dummy);
+        let outer = format!("{err}");
+        let src = std::error::Error::source(&err).unwrap();
+        let inner = format!("{src}");
+        assert_ne!(outer, inner);
+    }
+
+    #[test]
+    fn test_sentinel_source_chain() {
+        use std::error::Error;
+        let err = AppError::internal_msg(
+            ErrorCode::InternalError,
+            "operation failed",
+            "no real source available",
+        );
+        assert!(err.source().is_some());
+        let outer = format!("{}", err);
+        let inner = format!("{}", err.source().unwrap());
+        assert_ne!(outer, inner, "outer and inner messages should differ");
     }
 }

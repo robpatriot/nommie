@@ -107,9 +107,16 @@ where
             }
 
             // Get the security config from the request data
-            let app_state = req
-                .app_data::<web::Data<AppState>>()
-                .ok_or_else(|| AppError::internal("AppState not found"))?;
+            let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
+                AppError::internal(
+                    crate::errors::ErrorCode::InternalError,
+                    "AppState not found".to_string(),
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "AppState missing from request",
+                    ),
+                )
+            })?;
 
             // Verify the JWT token
             JwtClaims::verify(token, &app_state.security)

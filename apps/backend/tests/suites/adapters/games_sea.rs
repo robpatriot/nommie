@@ -1,9 +1,9 @@
-//! Adapter tests for games_sea - CRUD operations, constraints, and invariants.
+// Adapter tests for games_sea - CRUD operations, constraints, and invariants.
 
 use backend::adapters::games_sea::{
     self, GameCreate, GameUpdateMetadata, GameUpdateRound, GameUpdateState,
 };
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::games::{GameState, GameVisibility};
 use backend::error::AppError;
@@ -16,7 +16,8 @@ use crate::support::test_utils::short_join_code as unique_join_code;
 #[tokio::test]
 async fn test_create_and_find_by_id() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -56,7 +57,8 @@ async fn test_create_and_find_by_id() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_by_join_code() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -86,7 +88,8 @@ async fn test_find_by_join_code() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_by_id_not_found() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -109,7 +112,8 @@ async fn test_find_by_id_not_found() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_by_join_code_not_found() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -131,7 +135,8 @@ async fn test_find_by_join_code_not_found() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_require_game_exists() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -157,7 +162,8 @@ async fn test_require_game_exists() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_require_game_not_found() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -186,7 +192,8 @@ async fn test_require_game_not_found() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_duplicate_join_code_fails() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -223,7 +230,8 @@ async fn test_duplicate_join_code_fails() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_update_metadata() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -268,7 +276,8 @@ async fn test_update_metadata() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_update_round() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -307,7 +316,8 @@ async fn test_update_round() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_create_timestamps() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -347,7 +357,8 @@ async fn test_create_timestamps() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_update_timestamps() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -391,7 +402,8 @@ async fn test_update_timestamps() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_lock_version_increments() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -442,7 +454,8 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_update_metadata_clear_name() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -479,7 +492,8 @@ async fn test_update_metadata_clear_name() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_update_round_partial() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -518,7 +532,8 @@ async fn test_update_round_partial() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_update_state_transitions() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -559,7 +574,8 @@ async fn test_update_state_transitions() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_create_game_defaults() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");

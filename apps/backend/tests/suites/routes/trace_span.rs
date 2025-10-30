@@ -1,4 +1,4 @@
-//! Integration test for handler logs inheriting `trace_id` via a request span.
+// Integration test for handler logs inheriting `trace_id` via a request span.
 
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};

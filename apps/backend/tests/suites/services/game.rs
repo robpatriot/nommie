@@ -1,4 +1,4 @@
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::error::AppError;
@@ -8,7 +8,8 @@ use sea_orm::{EntityTrait, Set};
 #[tokio::test]
 async fn insert_defaults_and_fetch() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");

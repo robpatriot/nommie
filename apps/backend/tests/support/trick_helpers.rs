@@ -1,7 +1,7 @@
-//! Trick creation helpers for integration tests
-//!
-//! This module provides helpers for creating tricks with known winners,
-//! reducing boilerplate in tests that need to simulate complete rounds.
+// Trick creation helpers for integration tests
+//
+// This module provides helpers for creating tricks with known winners,
+// reducing boilerplate in tests that need to simulate complete rounds.
 
 use backend::error::AppError;
 use backend::repos::tricks;

@@ -1,9 +1,9 @@
-//! Integration tests for auth login endpoint.
-//!
-//! Tests both successful login flows and validation errors.
+// Integration tests for auth login endpoint.
+//
+// Tests both successful login flows and validation errors.
 
 use actix_web::test;
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
@@ -21,7 +21,8 @@ async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -94,7 +95,11 @@ async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::
 
 #[actix_web::test]
 async fn test_login_rejects_missing_required_fields() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let test_email = unique_email("test");
@@ -122,7 +127,11 @@ async fn test_login_rejects_missing_required_fields() -> Result<(), Box<dyn std:
 
 #[actix_web::test]
 async fn test_login_rejects_empty_email() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let test_google_sub = unique_str("google");
@@ -145,7 +154,11 @@ async fn test_login_rejects_empty_email() -> Result<(), Box<dyn std::error::Erro
 
 #[actix_web::test]
 async fn test_login_rejects_empty_google_sub() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let test_email = unique_email("test");
@@ -175,7 +188,11 @@ async fn test_login_rejects_empty_google_sub() -> Result<(), Box<dyn std::error:
 
 #[actix_web::test]
 async fn test_login_rejects_both_empty() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let login_data = json!({
@@ -199,7 +216,11 @@ async fn test_login_rejects_both_empty() -> Result<(), Box<dyn std::error::Error
 
 #[actix_web::test]
 async fn test_login_missing_email_field() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let test_google_sub = unique_str("google");
@@ -222,7 +243,11 @@ async fn test_login_missing_email_field() -> Result<(), Box<dyn std::error::Erro
 
 #[actix_web::test]
 async fn test_login_missing_google_sub_field() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let test_email = unique_email("test");
@@ -251,7 +276,11 @@ async fn test_login_missing_google_sub_field() -> Result<(), Box<dyn std::error:
 
 #[actix_web::test]
 async fn test_login_wrong_type_for_email() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let test_google_sub = unique_str("google");
@@ -281,7 +310,11 @@ async fn test_login_wrong_type_for_email() -> Result<(), Box<dyn std::error::Err
 
 #[actix_web::test]
 async fn test_login_wrong_type_for_google_sub() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let test_email = unique_email("test");
@@ -311,7 +344,11 @@ async fn test_login_wrong_type_for_google_sub() -> Result<(), Box<dyn std::error
 
 #[actix_web::test]
 async fn test_login_wrong_type_for_name() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let test_email = unique_email("test");

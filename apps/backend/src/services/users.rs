@@ -92,13 +92,10 @@ fn sanitize_email(email: &str) -> Result<String, DomainError> {
 }
 
 /// User domain service.
+#[derive(Default)]
 pub struct UserService;
 
 impl UserService {
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Ensures a user exists for Google OAuth, creating one if necessary.
     /// This function is idempotent - calling it multiple times with the same email
     /// will return the same user without creating duplicates.
@@ -138,7 +135,7 @@ impl UserService {
                 // User exists, update last_login and google_sub if needed
                 let user_id = credential.user_id;
                 let mut updated_credential = credential.clone();
-                updated_credential.last_login = Some(get_current_time());
+                updated_credential.last_login = Some(time::OffsetDateTime::now_utc());
 
                 // Only update google_sub if it's currently NULL
                 if updated_credential.google_sub.is_none() {
@@ -151,7 +148,7 @@ impl UserService {
                     updated_credential.google_sub = Some(google_sub.to_string());
                 }
 
-                updated_credential.updated_at = get_current_time();
+                updated_credential.updated_at = time::OffsetDateTime::now_utc();
 
                 users_repo::update_credentials(txn, updated_credential).await?;
 
@@ -200,17 +197,6 @@ impl UserService {
             }
         }
     }
-}
-
-impl Default for UserService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Gets the current UTC time as an OffsetDateTime
-fn get_current_time() -> time::OffsetDateTime {
-    time::OffsetDateTime::now_utc()
 }
 
 /// Derives a username from the provided name or email local-part.

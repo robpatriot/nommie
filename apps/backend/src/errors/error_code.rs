@@ -99,6 +99,20 @@ pub enum ErrorCode {
     /// Database timeout (gateway timeout)
     DbTimeout,
 
+    // Migration Errors
+    /// Migration lock acquisition timeout
+    LockTimeoutAcquire,
+    /// Migration body execution timeout
+    LockTimeoutBody,
+    /// Migration cancelled
+    MigrationCancelled,
+    /// Migration execution failed
+    MigrationFailed,
+    /// Post-migration verification mismatch
+    PostcheckMismatch,
+    /// SQLite file lock error (I/O or permission failure)
+    SqliteLockError,
+
     // Database Constraint Violations
     /// Unique constraint violation (SQLSTATE 23505; generic 409)
     UniqueViolation,
@@ -175,6 +189,14 @@ impl ErrorCode {
             Self::DbUnavailable => "DB_UNAVAILABLE",
             Self::DbPoolExhausted => "DB_POOL_EXHAUSTED",
             Self::DbTimeout => "DB_TIMEOUT",
+
+            // Migration Errors
+            Self::LockTimeoutAcquire => "LOCK_TIMEOUT_ACQUIRE",
+            Self::LockTimeoutBody => "LOCK_TIMEOUT_BODY",
+            Self::MigrationCancelled => "MIGRATION_CANCELLED",
+            Self::MigrationFailed => "MIGRATION_FAILED",
+            Self::PostcheckMismatch => "POSTCHECK_MISMATCH",
+            Self::SqliteLockError => "SQLITE_LOCK_ERROR",
 
             // Database Constraint Violations
             Self::UniqueViolation => "UNIQUE_VIOLATION",
@@ -255,6 +277,18 @@ mod tests {
         assert_eq!(ErrorCode::DbError.as_str(), "DB_ERROR");
         assert_eq!(ErrorCode::DbUnavailable.as_str(), "DB_UNAVAILABLE");
         assert_eq!(ErrorCode::DbPoolExhausted.as_str(), "DB_POOL_EXHAUSTED");
+        assert_eq!(
+            ErrorCode::LockTimeoutAcquire.as_str(),
+            "LOCK_TIMEOUT_ACQUIRE"
+        );
+        assert_eq!(ErrorCode::LockTimeoutBody.as_str(), "LOCK_TIMEOUT_BODY");
+        assert_eq!(
+            ErrorCode::MigrationCancelled.as_str(),
+            "MIGRATION_CANCELLED"
+        );
+        assert_eq!(ErrorCode::MigrationFailed.as_str(), "MIGRATION_FAILED");
+        assert_eq!(ErrorCode::PostcheckMismatch.as_str(), "POSTCHECK_MISMATCH");
+        assert_eq!(ErrorCode::SqliteLockError.as_str(), "SQLITE_LOCK_ERROR");
         assert_eq!(ErrorCode::UniqueViolation.as_str(), "UNIQUE_VIOLATION");
         assert_eq!(ErrorCode::FkViolation.as_str(), "FK_VIOLATION");
         assert_eq!(ErrorCode::CheckViolation.as_str(), "CHECK_VIOLATION");

@@ -12,7 +12,7 @@ fn make_state_with_hands(hands: [Vec<Card>; 4], hand_size: u8, turn_start: Playe
         leader: turn_start,
         trick_no: 0,
         scores_total: [0; 4],
-        round: RoundState::new(),
+        round: RoundState::empty(),
     }
 }
 

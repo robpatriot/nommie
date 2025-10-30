@@ -1,3 +1,4 @@
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
@@ -9,7 +10,8 @@ use crate::support::test_utils::short_join_code;
 #[tokio::test]
 async fn test_create_score_and_find() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -66,7 +68,8 @@ async fn test_create_score_and_find() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -159,7 +162,8 @@ async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_get_current_totals() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -311,7 +315,8 @@ async fn test_get_current_totals() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_get_current_totals_no_rounds() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -337,7 +342,8 @@ async fn test_get_current_totals_no_rounds() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -403,7 +409,8 @@ async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_bid_met_flag() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");

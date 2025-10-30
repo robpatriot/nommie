@@ -78,7 +78,11 @@ impl std::error::Error for AiError {}
 
 impl From<AiError> for AppError {
     fn from(err: AiError) -> Self {
-        AppError::internal(format!("AI error: {err}"))
+        AppError::internal(
+            crate::errors::ErrorCode::InternalError,
+            "AI operation failed",
+            err,
+        )
     }
 }
 

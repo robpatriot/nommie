@@ -7,23 +7,22 @@
 //! - Trick winner is highest card of led suit (no trump) or highest trump
 //! - Ties are impossible under standard deck ordering
 
-include!("../../common/proptest_prelude.rs");
-
-use backend::domain::state::Phase;
-use backend::domain::tricks::{legal_moves, play_card};
-use backend::domain::{Card, Rank, Suit, Trump};
-use backend::errors::domain::{DomainError, ValidationKind};
 use proptest::prelude::*;
 
+use crate::domain::state::Phase;
+use crate::domain::tricks::{legal_moves, play_card};
+use crate::domain::{test_prelude, Card, Rank, Suit, Trump};
+use crate::errors::domain::{DomainError, ValidationKind};
+
 proptest! {
-    #![proptest_config(proptest_prelude_config())]
+    #![proptest_config(test_prelude::proptest_config())]
 
     /// Property: First card establishes led suit
     #[test]
     fn prop_first_card_establishes_lead(
-        card in crate::support::domain_gens::card(),
+        card in crate::domain::test_gens::card(),
     ) {
-        use backend::domain::state::init_round;
+        use crate::domain::state::init_round;
         let hands = [vec![card], vec![], vec![], vec![]];
         let mut state = init_round(1, 5, hands, 0, [0; 4]);
         state.phase = Phase::Trick { trick_no: 1 };
@@ -44,7 +43,7 @@ proptest! {
     #[test]
     fn prop_must_follow_suit_when_able(
         (lead_suit, lead_rank, off_suit_card) in prop::strategy::Strategy::prop_flat_map(
-            crate::support::domain_gens::suit(),
+            crate::domain::test_gens::suit(),
             |lead| {
                 let other_suits = vec![Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
                     .into_iter()
@@ -52,8 +51,8 @@ proptest! {
                     .collect::<Vec<_>>();
                 (
                     Just(lead),
-                    crate::support::domain_gens::rank(),
-                    (prop::sample::select(other_suits), crate::support::domain_gens::rank())
+                    crate::domain::test_gens::rank(),
+                    (prop::sample::select(other_suits), crate::domain::test_gens::rank())
                         .prop_map(|(s, r)| Card { suit: s, rank: r })
                 )
             }
@@ -61,7 +60,7 @@ proptest! {
     ) {
         // off_suit_card is guaranteed to be off-suit by construction
 
-        use backend::domain::state::init_round;
+        use crate::domain::state::init_round;
 
         // Player 0 has a card of the led suit AND an off-suit card
         let lead_card = Card { suit: lead_suit, rank: lead_rank };
@@ -92,7 +91,7 @@ proptest! {
     #[test]
     fn prop_can_play_any_when_void(
         (lead_suit, player_card) in prop::strategy::Strategy::prop_flat_map(
-            crate::support::domain_gens::suit(),
+            crate::domain::test_gens::suit(),
             |lead| {
                 let other_suits = vec![Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
                     .into_iter()
@@ -100,7 +99,7 @@ proptest! {
                     .collect::<Vec<_>>();
                 (
                     Just(lead),
-                    (prop::sample::select(other_suits), crate::support::domain_gens::rank())
+                    (prop::sample::select(other_suits), crate::domain::test_gens::rank())
                         .prop_map(|(s, r)| Card { suit: s, rank: r })
                 )
             }
@@ -108,7 +107,7 @@ proptest! {
     ) {
         // player_card is guaranteed to NOT be of the led suit by construction
 
-        use backend::domain::state::init_round;
+        use crate::domain::state::init_round;
 
         // Player 0 has only cards NOT of the led suit
         let hands = [vec![player_card], vec![], vec![], vec![]];
@@ -133,7 +132,7 @@ proptest! {
 /// Test: Legal moves when holding lead suit
 #[test]
 fn test_legal_moves_with_lead_suit() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Player has: 2H, 5H, 7C
     // Lead suit is Hearts
@@ -182,7 +181,7 @@ fn test_legal_moves_with_lead_suit() {
 /// Test: Legal moves when void in lead suit
 #[test]
 fn test_legal_moves_when_void() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Player has: 7C, KD, AS
     // Lead suit is Hearts (player is void)
@@ -231,7 +230,7 @@ fn test_legal_moves_when_void() {
 /// Test: Legal moves on first play of trick
 #[test]
 fn test_legal_moves_first_play() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Player has: 2H, 5H, 7C
     // No lead suit yet (first to play)
@@ -269,7 +268,7 @@ fn test_legal_moves_first_play() {
 /// Test: Cannot play card not in hand
 #[test]
 fn test_cannot_play_card_not_in_hand() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Player has: 2H
     let hands = [
@@ -307,7 +306,7 @@ fn test_cannot_play_card_not_in_hand() {
 /// Test: Cannot play out of turn
 #[test]
 fn test_cannot_play_out_of_turn() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Player 1 has a card
     let hands = [
@@ -348,7 +347,7 @@ fn test_cannot_play_out_of_turn() {
 /// Test: Cannot play in wrong phase
 #[test]
 fn test_cannot_play_in_wrong_phase() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     let hands = [
         vec![Card {
@@ -385,7 +384,7 @@ fn test_cannot_play_in_wrong_phase() {
 /// Test: Trick winner with no trump (highest card of led suit wins)
 #[test]
 fn test_trick_winner_no_trump() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Set up 4 players with one card each
     let hands = [
@@ -463,7 +462,7 @@ fn test_trick_winner_no_trump() {
 /// Test: Trick winner with trump (highest trump wins)
 #[test]
 fn test_trick_winner_with_trump() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Set up 4 players with one card each
     let hands = [
@@ -541,7 +540,7 @@ fn test_trick_winner_with_trump() {
 /// Test: Complete trick advances to next trick or scoring
 #[test]
 fn test_complete_trick_advances_phase() {
-    use backend::domain::state::init_round;
+    use crate::domain::state::init_round;
 
     // Test case 1: Not last trick
     // All players have 2 cards

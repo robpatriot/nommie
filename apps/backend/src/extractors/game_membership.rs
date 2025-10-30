@@ -75,9 +75,16 @@ impl FromRequest for GameMembership {
             let game_id = GameId::from_request(&req, &mut payload).await?;
 
             // Get database connection from AppState
-            let app_state = req
-                .app_data::<web::Data<AppState>>()
-                .ok_or_else(|| AppError::internal("AppState not available"))?;
+            let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
+                AppError::internal(
+                    crate::errors::ErrorCode::InternalError,
+                    "AppState not available".to_string(),
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "AppState missing from request",
+                    ),
+                )
+            })?;
 
             // Find user by sub to get user_id
             let user = if let Some(shared_txn) = SharedTxn::from_req(&req) {
@@ -95,7 +102,7 @@ impl FromRequest for GameMembership {
             })?;
 
             // Resolve repo from AppState and call service with correct conn
-            let service = MembershipService::new();
+            let service = MembershipService;
             let membership = if let Some(shared_txn) = SharedTxn::from_req(&req) {
                 service
                     .find_membership(shared_txn.transaction(), game_id.0, user.id)

@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpServer};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::state::build_state;
 use backend::middleware::cors::cors_middleware;
 use backend::middleware::request_trace::RequestTrace;
@@ -27,7 +27,8 @@ async fn main() -> std::io::Result<()> {
 
     // Create application state using unified builder
     let app_state = match build_state()
-        .with_db(DbProfile::Prod)
+        .with_env(RuntimeEnv::Prod)
+        .with_db(DbKind::Postgres)
         .with_security(security_config)
         .build()
         .await
@@ -39,7 +40,7 @@ async fn main() -> std::io::Result<()> {
         }
     };
 
-    println!("✅ Database connected (migrations handled by pnpm db:migrate)");
+    println!("✅ Database connected");
 
     // Wrap AppState with web::Data before passing to HttpServer
     let data = web::Data::new(app_state);

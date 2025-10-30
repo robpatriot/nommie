@@ -1,8 +1,36 @@
-use std::env;
+use clap::{Parser, ValueEnum};
+use backend::config::db::{DbKind, RuntimeEnv};
+use backend::infra::db::orchestrate_migration;
+use migration::MigrationCommand;
 
-use backend::config::db::{DbOwner, DbProfile};
-use backend::infra::db::bootstrap_db;
-use migration::{migrate, MigrationCommand};
+#[derive(Clone, ValueEnum)]
+enum Env {
+    Prod,
+    Test,
+}
+
+#[derive(Clone, ValueEnum)]
+enum Db {
+    Postgres,
+    SqliteFile,
+}
+
+#[derive(Parser)]
+#[command(name = "migration-cli")]
+#[command(about = "Nommie database migration tool")]
+struct Args {
+    /// Migration command to run
+    #[arg(value_enum)]
+    command: String,
+    
+    /// Runtime environment
+    #[arg(short, long, value_enum, default_value = "test")]
+    env: Env,
+    
+    /// Database type
+    #[arg(short, long, value_enum, default_value = "postgres", help = "Database type: postgres, sqlite-file")]
+    db: Db,
+}
 
 #[tokio::main]
 async fn main() {
@@ -17,38 +45,56 @@ async fn main() {
         .with_env_filter("migration=info,sqlx=warn")
         .init();
 
-    let target = match env::var("MIGRATION_TARGET").as_deref() {
-        Ok("prod") | Ok("pg_test") | Ok("sqlite_test") => env::var("MIGRATION_TARGET").unwrap(),
-        _ => {
-            eprintln!("❌ MIGRATION_TARGET must be one of: prod | pg_test | sqlite_test");
-            std::process::exit(1);
+    let args = match Args::try_parse() {
+        Ok(args) => args,
+        Err(e) => {
+            // Check if this is a database type error and provide helpful message
+            if e.to_string().contains("invalid value") && e.to_string().contains("--db") {
+                eprintln!("❌ Unsupported database type provided.");
+                eprintln!("");
+                eprintln!("Note: SQLite in-memory databases are not supported for CLI operations.");
+                eprintln!("Reason: In-memory databases are ephemeral - each CLI command creates a fresh");
+                eprintln!("database that is destroyed when the command completes, making migration");
+                eprintln!("operations pointless.");
+                eprintln!("");
+                eprintln!("Supported database types:");
+                eprintln!("  • postgres    - PostgreSQL database");
+                eprintln!("  • sqlite-file - SQLite file database");
+                eprintln!("");
+                eprintln!("Example: cargo run --manifest-path apps/migration-cli/Cargo.toml -- --db sqlite-file status");
+                std::process::exit(1);
+            }
+            // For other errors, use clap's default error handling
+            eprintln!("{e}");
+            std::process::exit(2);
         }
     };
 
-    let cmd = env::args().nth(1).unwrap_or_else(|| "up".to_string());
-    let command = match cmd.as_str() {
+    let command = match args.command.as_str() {
         "up" => MigrationCommand::Up,
         "down" => MigrationCommand::Down,
         "fresh" => MigrationCommand::Fresh,
         "reset" => MigrationCommand::Reset,
         "refresh" => MigrationCommand::Refresh,
         "status" => MigrationCommand::Status,
-        other => { eprintln!("Unknown command: {other}. Use: up | down | fresh | reset | refresh | status"); std::process::exit(2); }
+        other => {
+            eprintln!("Unknown command: {other}. Use: up | down | fresh | reset | refresh | status");
+            std::process::exit(2);
+        }
     };
 
-    let profile = match target.as_str() {
-        "prod" => DbProfile::Prod,
-        "pg_test" => DbProfile::Test,
-        "sqlite_test" => DbProfile::SqliteFile { file: None },
-        _ => unreachable!(),
+    let env = match args.env {
+        Env::Prod => RuntimeEnv::Prod,
+        Env::Test => RuntimeEnv::Test,
     };
 
-    // Build connection and ensure schema with Owner privileges
-    let db = bootstrap_db(profile, DbOwner::Owner).await
-        .expect("DB bootstrap failed");
+    let db_kind = match args.db {
+        Db::Postgres => DbKind::Postgres,
+        Db::SqliteFile => DbKind::SqliteFile,
+    };
 
-    // Allow running the chosen command as well (e.g., status, fresh)
-    if let Err(e) = migrate(&db, command).await {
+    // Run migration orchestration
+    if let Err(e) = orchestrate_migration(env, db_kind, command).await {
         eprintln!("Migration failed: {e}");
         std::process::exit(1);
     }

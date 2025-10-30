@@ -1,16 +1,19 @@
-//! Tests for AI memory degradation functionality.
+// Tests for AI memory degradation functionality.
 
 use backend::ai::memory::{get_round_card_plays, MemoryMode};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
 
+use crate::support::test_utils::{test_seed, test_seed_u64};
+
 #[actix_web::test]
 async fn test_memory_degradation_determinism() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -22,18 +25,19 @@ async fn test_memory_degradation_determinism() -> Result<(), AppError> {
     let (round_id, _game_id) = create_test_round_with_plays(txn).await?;
 
     // Same seed should produce identical degradation
+    let test_seed_val = test_seed_u64("memory_deg_dtmism");
     let plays1 = get_round_card_plays(
         txn,
         round_id,
         MemoryMode::Partial { level: 50 },
-        Some(12345),
+        Some(test_seed_val),
     )
     .await?;
     let plays2 = get_round_card_plays(
         txn,
         round_id,
         MemoryMode::Partial { level: 50 },
-        Some(12345),
+        Some(test_seed_val),
     )
     .await?;
 
@@ -51,13 +55,18 @@ async fn test_memory_degradation_determinism() -> Result<(), AppError> {
     }
 
     // Different seed should produce different degradation (with high probability)
+    let different_seed = test_seed_u64("memory_deg_dtmism_alt");
     let plays3 = get_round_card_plays(
         txn,
         round_id,
         MemoryMode::Partial { level: 50 },
-        Some(99999),
+        Some(different_seed),
     )
     .await?;
+
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
+
     let mut found_difference = false;
     for (trick1, trick3) in plays1.iter().zip(plays3.iter()) {
         for ((_, mem1), (_, mem3)) in trick1.plays.iter().zip(trick3.plays.iter()) {
@@ -78,7 +87,8 @@ async fn test_memory_degradation_determinism() -> Result<(), AppError> {
 #[actix_web::test]
 async fn test_memory_levels() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -107,6 +117,10 @@ async fn test_memory_levels() -> Result<(), AppError> {
     // Level 10 - very poor memory (should forget most)
     let plays =
         get_round_card_plays(txn, round_id, MemoryMode::Partial { level: 10 }, Some(42)).await?;
+
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
+
     let mut forgotten_count = 0;
     let mut total_count = 0;
     for trick in &plays {
@@ -128,7 +142,8 @@ async fn test_memory_levels() -> Result<(), AppError> {
 #[actix_web::test]
 async fn test_partial_memory_types() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -141,6 +156,9 @@ async fn test_partial_memory_types() -> Result<(), AppError> {
     // Level 50 - moderate memory (should have mix of types)
     let plays =
         get_round_card_plays(txn, round_id, MemoryMode::Partial { level: 50 }, Some(42)).await?;
+
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
 
     use backend::domain::PlayMemory;
 
@@ -197,7 +215,7 @@ async fn create_test_round_with_plays(
         name: Set(Some("Test Game".to_string())),
         join_code: Set(None),
         rules_version: Set("1".to_string()),
-        rng_seed: Set(Some(12345)),
+        rng_seed: Set(Some(test_seed("helper_round_plays"))),
         current_round: Set(Some(1)),
         starting_dealer_pos: Set(Some(0)),
         current_trick_no: Set(1),

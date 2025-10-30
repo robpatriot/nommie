@@ -43,9 +43,16 @@ impl FromRequest for GameId {
             }
 
             // Get database connection from AppState
-            let app_state = req
-                .app_data::<web::Data<AppState>>()
-                .ok_or_else(|| AppError::internal("AppState not available"))?;
+            let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
+                AppError::internal(
+                    crate::errors::ErrorCode::InternalError,
+                    "AppState not available".to_string(),
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "AppState missing from request",
+                    ),
+                )
+            })?;
 
             // Check if game exists in database
             let game = if let Some(shared_txn) = SharedTxn::from_req(&req) {

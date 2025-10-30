@@ -123,8 +123,13 @@ impl GameFlowService {
             (user.id, player.id, Some(profile))
         };
 
-        let profile = profile
-            .ok_or_else(|| AppError::internal(format!("AI profile missing for user {user_id}")))?;
+        let profile = profile.ok_or_else(|| {
+            AppError::internal(
+                crate::errors::ErrorCode::InternalError,
+                "AI profile not available",
+                std::io::Error::other(format!("AI profile missing for user {user_id}")),
+            )
+        })?;
 
         info!(game.id, player_seat, action = ?action_type, "Processing AI turn");
 
@@ -157,8 +162,13 @@ impl GameFlowService {
         let ai_type = profile.playstyle.as_deref().unwrap_or("random");
         let config = AiConfig::from_json(effective_config.as_ref());
         let use_memory_recency = config.memory_recency();
-        let ai = create_ai(ai_type, config)
-            .ok_or_else(|| AppError::internal(format!("Unknown AI type: {ai_type}")))?;
+        let ai = create_ai(ai_type, config).ok_or_else(|| {
+            AppError::internal(
+                crate::errors::ErrorCode::InternalError,
+                "unknown AI type",
+                std::io::Error::other(format!("AI type '{ai_type}' is not supported")),
+            )
+        })?;
 
         debug!(
             game.id,
@@ -195,11 +205,23 @@ impl GameFlowService {
             // Build RoundMemory if memory is enabled
             let round_memory = if effective_memory_level > 0 {
                 let current_round_no = game.current_round.ok_or_else(|| {
-                    AppError::internal("No current round when building AI memory")
+                    AppError::internal_msg(
+                        crate::errors::ErrorCode::InternalError,
+                        "current round not available",
+                        "no current round when building AI memory",
+                    )
                 })?;
                 let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
                     .await?
-                    .ok_or_else(|| AppError::internal("Round not found when building AI memory"))?;
+                    .ok_or_else(|| {
+                        AppError::internal(
+                            crate::errors::ErrorCode::InternalError,
+                            "round data unavailable for memory",
+                            std::io::Error::other(format!(
+                                "round {current_round_no} not found when building AI memory"
+                            )),
+                        )
+                    })?;
 
                 // Load all completed tricks for this round
                 let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
@@ -254,7 +276,11 @@ impl GameFlowService {
 
             // Create GameContext with cached game history and round memory
             let history = game_history.ok_or_else(|| {
-                AppError::internal("GameHistory not available - should be cached by orchestration")
+                AppError::internal_msg(
+                    crate::errors::ErrorCode::InternalError,
+                    "game history not cached",
+                    "GameHistory not available - should be cached by orchestration",
+                )
             })?;
             let game_context = crate::domain::GameContext::new(game.id)
                 .with_history(history.clone())
@@ -317,8 +343,13 @@ impl GameFlowService {
         }
 
         // All retries exhausted
-        Err(last_error
-            .unwrap_or_else(|| AppError::internal("AI action failed with no error details")))
+        Err(last_error.unwrap_or_else(|| {
+            AppError::internal_msg(
+                crate::errors::ErrorCode::InternalError,
+                "AI action failed with no error details",
+                "all retry attempts exhausted with no error details captured",
+            )
+        }))
     }
 
     /// Determine what action is needed next and whose turn it is.

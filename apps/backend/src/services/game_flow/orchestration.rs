@@ -160,9 +160,13 @@ impl GameFlowService {
             return Ok(());
         }
 
-        Err(AppError::internal(format!(
-            "process_game_state exceeded max iterations {MAX_ITERATIONS}"
-        )))
+        Err(AppError::internal(
+            crate::errors::ErrorCode::InternalError,
+            "process_game_state exceeded maximum iterations",
+            std::io::Error::other(format!(
+                "process_game_state exceeded max iterations {MAX_ITERATIONS}"
+            )),
+        ))
     }
 
     /// Check if current game state requires a transition and apply it.

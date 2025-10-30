@@ -1,10 +1,10 @@
-//! Tests for extractors with SharedTxn injection
-//!
-//! These tests verify that DB-reading extractors can optionally use
-//! injected SharedTxn when present, and fall back to pooled connections otherwise.
+// Tests for extractors with SharedTxn injection
+//
+// These tests verify that DB-reading extractors can optionally use
+// injected SharedTxn when present, and fall back to pooled connections otherwise.
 
 use actix_web::{test, web, FromRequest};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
@@ -43,7 +43,8 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -87,7 +88,11 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
 #[actix_web::test]
 async fn test_game_id_with_shared_txn() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with Test DB (no security needed)
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Open a shared txn first
     let db = require_db(&state).expect("DB required for this test");

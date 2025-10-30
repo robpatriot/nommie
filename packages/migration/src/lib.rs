@@ -1,6 +1,6 @@
 pub use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_orm::Statement;
-pub use sea_orm::ConnectionTrait;
+pub use sea_orm::{ConnectionTrait, DatabaseConnection};
 
 mod m20250823_000001_init; // keep filename + module name in sync
 
@@ -25,20 +25,17 @@ pub enum MigrationCommand {
 
 /// Migration function that bypasses environment parsing
 /// Used by both CLI and tests
-pub async fn migrate<C>(
-    db: &C,
+pub async fn migrate(
+    db: &DatabaseConnection,
     command: MigrationCommand,
 ) -> Result<(), DbErr>
-where
-    C: ConnectionTrait,
-    for<'a> &'a C: sea_orm_migration::IntoSchemaManagerConnection<'a>,
 {
-    let db_info = get_db_diagnostics(db).await?;
+    let db_info_before = get_db_diagnostics(db).await?;
 
-    // Log diagnostics to tracing (controlled by logging config)
-    tracing::info!("▶ cmd={command:?}  profile={}", db_info.profile);
-    tracing::info!("▶ connected to DB: {}", db_info.name);
-    tracing::info!("▶ runner sees {} migration(s)", db_info.mig_count);
+    // Log diagnostics before command execution
+    tracing::info!("▶ cmd={command:?}  profile={}", db_info_before.profile);
+    tracing::info!("▶ connected to DB: {}", db_info_before.name);
+    tracing::info!("▶ BEFORE: runner has {} migration(s) defined, {} applied", db_info_before.defined_migrations_count, db_info_before.mig_count);
 
     // Execute the migration command
     let result = match command {
@@ -52,11 +49,16 @@ where
 
     match result {
         Ok(()) => {
-            tracing::info!("✅ {command:?} OK for {}", db_info.profile);
+            // Get diagnostics after command execution (except for Status command which doesn't change state)
+            if !matches!(command, MigrationCommand::Status) {
+                let db_info_after = get_db_diagnostics(db).await?;
+                tracing::info!("▶ AFTER: runner has {} migration(s) defined, {} applied", db_info_after.defined_migrations_count, db_info_after.mig_count);
+            }
+            tracing::info!("✅ {command:?} OK for {}", db_info_before.profile);
             Ok(())
         }
         Err(e) => {
-            tracing::error!("❌ {command:?} failed for {}: {e}", db_info.profile);
+            tracing::error!("❌ {command:?} failed for {}: {e}", db_info_before.profile);
             Err(e)
         }
     }
@@ -67,10 +69,11 @@ struct DbDiagnostics {
     profile: String,
     name: String,
     mig_count: usize,
+    defined_migrations_count: usize,
 }
 
 async fn get_db_diagnostics(
-    db: &impl ConnectionTrait,
+    db: &DatabaseConnection,
 ) -> Result<DbDiagnostics, sea_orm::DbErr> {
     let profile = format!("{:?}", db.get_database_backend());
 
@@ -89,10 +92,18 @@ async fn get_db_diagnostics(
         sea_orm::DatabaseBackend::Sqlite => {
             let stmt = Statement::from_string(
                 db.get_database_backend(),
-                String::from("select sqlite_version() as name"),
+                String::from("SELECT file FROM pragma_database_list WHERE name = 'main'"),
             );
             if let Some(row) = db.query_one(stmt).await? {
-                row.try_get("", "name")?
+                if let Ok(file) = row.try_get::<String>("", "file") {
+                    if file.is_empty() {
+                        ":memory:".to_string()
+                    } else {
+                        file
+                    }
+                } else {
+                    "<unknown>".to_string()
+                }
             } else {
                 "<unknown>".to_string()
             }
@@ -100,11 +111,37 @@ async fn get_db_diagnostics(
         _ => "<unsupported>".to_string(),
     };
 
-    let mig_count = <Migrator as MigratorTrait>::migrations().len();
+    // Count applied migrations using the new public function
+    let applied_migrations_count = count_applied_migrations(db).await.unwrap_or(0);
+    let defined_migrations_count = Migrator::migrations().len();
 
     Ok(DbDiagnostics {
         profile,
         name,
-        mig_count,
+        mig_count: applied_migrations_count,
+        defined_migrations_count,
     })
+}
+
+/// Count the number of migrations that have been applied to the database.
+/// Uses SeaORM's built-in `get_applied_migrations()` method.
+/// Returns 0 if the migration table doesn't exist yet.
+pub async fn count_applied_migrations(db: &DatabaseConnection) -> Result<usize, DbErr>
+{
+    match Migrator::get_applied_migrations(db).await {
+        Ok(migrations) => Ok(migrations.len()),
+        Err(DbErr::Exec(_)) => Ok(0), // Migration table doesn't exist yet
+        Err(e) => Err(e),
+    }
+}
+
+/// Get the version string of the latest applied migration.
+/// Returns None if no migrations have been applied or the migration table doesn't exist.
+pub async fn get_latest_migration_version(db: &DatabaseConnection) -> Result<Option<String>, DbErr>
+{
+    match Migrator::get_applied_migrations(db).await {
+        Ok(migrations) => Ok(migrations.last().map(|m| m.name().to_string())),
+        Err(DbErr::Exec(_)) => Ok(None), // Migration table doesn't exist yet
+        Err(e) => Err(e),
+    }
 }

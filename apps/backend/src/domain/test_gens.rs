@@ -1,8 +1,9 @@
 // Proptest generators for domain types.
 // These generators ensure unique cards and valid game states for property-based testing.
 
-use backend::domain::{Card, PlayerId, Rank, RoundState, Suit, Trump};
 use proptest::prelude::*;
+
+use crate::domain::{Card, PlayerId, Rank, Suit, Trump};
 
 /// Generate a random Suit
 pub fn suit() -> impl Strategy<Value = Suit> {
@@ -57,16 +58,6 @@ pub fn rank() -> impl Strategy<Value = Rank> {
 /// Generate a single unique Card
 pub fn card() -> impl Strategy<Value = Card> {
     (suit(), rank()).prop_map(|(suit, rank)| Card { suit, rank })
-}
-
-/// Generate a card that is NOT of the given suit
-pub fn card_excluding_suit(excluded_suit: Suit) -> impl Strategy<Value = Card> {
-    let suits = vec![Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
-        .into_iter()
-        .filter(|s| *s != excluded_suit)
-        .collect::<Vec<_>>();
-
-    (prop::sample::select(suits), rank()).prop_map(|(suit, rank)| Card { suit, rank })
 }
 
 /// Generate a vector of N unique cards efficiently
@@ -148,41 +139,6 @@ pub fn complete_trick() -> impl Strategy<Value = (PlayerId, Vec<(PlayerId, Card)
     })
 }
 
-/// Complete trick that respects follow-suit rules
-/// Returns (leader_seat, plays: [(seat, card); 4], trump, lead_suit, hands_before_trick)
-#[allow(clippy::type_complexity)]
-pub fn complete_trick_with_follow_suit(
-) -> impl Strategy<Value = (PlayerId, Vec<(PlayerId, Card)>, Trump, Suit, [Vec<Card>; 4])> {
-    (player_id(), trump(), unique_cards(4)).prop_map(|(leader, trump, cards)| {
-        let lead_suit = cards[0].suit;
-
-        // Build plays in seat order
-        let mut plays = Vec::with_capacity(4);
-        let mut hands: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
-
-        for (i, &card) in cards.iter().enumerate().take(4) {
-            let seat = (leader + i as u8) % 4;
-
-            // The hand for this player must contain this card
-            hands[seat as usize].push(card);
-            plays.push((seat, card));
-        }
-
-        (leader, plays, trump, lead_suit, hands)
-    })
-}
-
-/// Generate a hand containing at least one card of the given suit
-pub fn hand_with_suit(suit: Suit) -> impl Strategy<Value = Vec<Card>> {
-    (rank(), unique_cards_up_to(12)).prop_map(move |(r, mut rest)| {
-        let mut hand = vec![Card { suit, rank: r }];
-        // Remove any cards with the same suit from rest to avoid duplicates
-        rest.retain(|c| !(c.suit == suit && c.rank == r));
-        hand.extend(rest);
-        hand
-    })
-}
-
 /// Generate a hand containing NO cards of the given suit (more efficient version)
 pub fn hand_without_suit(excluded_suit: Suit) -> impl Strategy<Value = Vec<Card>> {
     // Generate cards only from the other 3 suits
@@ -221,17 +177,6 @@ pub fn hand_without_suit(excluded_suit: Suit) -> impl Strategy<Value = Vec<Card>
         }
         cards.truncate(count);
         cards
-    })
-}
-
-/// Generate a RoundState with a complete trick
-pub fn round_state_with_trick() -> impl Strategy<Value = RoundState> {
-    complete_trick().prop_map(|(_, plays, trump, lead)| {
-        let mut state = RoundState::new();
-        state.trick_plays = plays;
-        state.trick_lead = Some(lead);
-        state.trump = Some(trump);
-        state
     })
 }
 

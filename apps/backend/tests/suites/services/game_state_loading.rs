@@ -1,3 +1,4 @@
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;
 use backend::error::AppError;
@@ -17,15 +18,16 @@ use crate::support::trick_helpers::create_tricks_by_winner_counts;
 #[tokio::test]
 async fn test_load_state_after_deal() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let setup = setup_game_in_bidding_phase(txn, 12345).await?;
-            let game_service = GameService::new();
+            let setup = setup_game_in_bidding_phase(txn, "state_load_bidding").await?;
+            let game_service = GameService;
 
             let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
@@ -55,7 +57,8 @@ async fn test_load_state_after_deal() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_load_state_after_bidding() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -63,8 +66,9 @@ async fn test_load_state_after_bidding() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Round 1: dealer at seat 0, bids: 5, 4, 3, 0
-            let setup = setup_game_in_trump_selection_phase(txn, 12346, [5, 4, 3, 0]).await?;
-            let game_service = GameService::new();
+            let setup =
+                setup_game_in_trump_selection_phase(txn, "state_load_trump", [5, 4, 3, 0]).await?;
+            let game_service = GameService;
 
             let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
@@ -90,7 +94,8 @@ async fn test_load_state_after_bidding() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_load_state_after_trump() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -98,10 +103,14 @@ async fn test_load_state_after_trump() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Round 1: dealer at seat 0, bids: 4, 5, 3, 0, trump: Hearts
-            let setup =
-                setup_game_in_trick_play_phase(txn, 12347, [4, 5, 3, 0], rounds::Trump::Hearts)
-                    .await?;
-            let game_service = GameService::new();
+            let setup = setup_game_in_trick_play_phase(
+                txn,
+                "state_load_trick1",
+                [4, 5, 3, 0],
+                rounds::Trump::Hearts,
+            )
+            .await?;
+            let game_service = GameService;
 
             let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
@@ -128,7 +137,8 @@ async fn test_load_state_after_trump() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_load_state_mid_trick() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -136,10 +146,14 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Round 1: dealer at seat 0, bids: 3, 3, 4, 2, trump: Spades
-            let setup =
-                setup_game_in_trick_play_phase(txn, 12348, [3, 3, 4, 2], rounds::Trump::Spades)
-                    .await?;
-            let game_service = GameService::new();
+            let setup = setup_game_in_trick_play_phase(
+                txn,
+                "state_load_trick2",
+                [3, 3, 4, 2],
+                rounds::Trump::Spades,
+            )
+            .await?;
+            let game_service = GameService;
 
             // Manually create trick with 2 plays to test mid-trick state loading
             let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
@@ -200,16 +214,17 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_load_state_with_scores() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let setup = setup_game_in_bidding_phase(txn, 12349).await?;
-            let flow_service = GameFlowService::new();
-            let game_service = GameService::new();
+            let setup = setup_game_in_bidding_phase(txn, "state_load_current").await?;
+            let flow_service = GameFlowService;
+            let game_service = GameService;
 
             // Complete one full round (Round 1: dealer at seat 0, bidding starts at seat 1)
             flow_service.submit_bid(txn, setup.game_id, 1, 3).await?;
@@ -241,7 +256,8 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_load_state_lobby() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -251,7 +267,7 @@ async fn test_load_state_lobby() -> Result<(), AppError> {
             let join_code = short_join_code();
             let game = games::create_game(txn, &join_code).await?;
 
-            let game_service = GameService::new();
+            let game_service = GameService;
 
             // Load state without dealing any rounds
             let loaded_state = game_service.load_game_state(txn, game.id).await?;

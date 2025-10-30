@@ -1,3 +1,4 @@
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
@@ -9,7 +10,8 @@ use crate::support::test_utils::short_join_code;
 #[tokio::test]
 async fn test_create_trick_and_find() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -48,7 +50,8 @@ async fn test_create_trick_and_find() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -83,7 +86,8 @@ async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_count_tricks() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -117,7 +121,8 @@ async fn test_count_tricks() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_unique_constraint_round_trick() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -156,7 +161,8 @@ async fn test_unique_constraint_round_trick() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_all_suits_as_lead() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");

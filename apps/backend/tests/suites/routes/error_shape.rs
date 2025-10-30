@@ -1,5 +1,5 @@
 use actix_web::{test, web, HttpResponse};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::state::build_state;
 use backend::state::app_state::AppState;
 use backend::{AppError, ErrorCode};
@@ -43,17 +43,28 @@ async fn test_forbidden_error() -> Result<HttpResponse, AppError> {
 
 /// Test endpoint that returns an internal server error (500)
 async fn test_internal_error() -> Result<HttpResponse, AppError> {
-    Err(AppError::internal("Database connection failed"))
+    Err(AppError::internal(
+        ErrorCode::InternalError,
+        "database connection failed",
+        std::io::Error::other("Database connection refused by server"),
+    ))
 }
 
 /// Test endpoint that returns a database error (500)
 async fn test_db_error() -> Result<HttpResponse, AppError> {
-    Err(AppError::db("Connection timeout"))
+    Err(AppError::db(
+        "database connection timeout",
+        std::io::Error::other("Connection timeout after 30 seconds"),
+    ))
 }
 
-/// Test endpoint that returns a database unavailable error (500)
+/// Test endpoint that returns a database unavailable error (503)
 async fn test_db_unavailable_error() -> Result<HttpResponse, AppError> {
-    Err(AppError::db_unavailable())
+    Err(AppError::db_unavailable(
+        "database unavailable",
+        std::io::Error::other("test database unavailable for retry behavior validation"),
+        Some(1),
+    ))
 }
 
 // handler-only: validates error shape; no DB
@@ -109,14 +120,14 @@ async fn test_all_error_responses_conform_to_problem_details() {
             "/_test/internal",
             500,
             "INTERNAL_ERROR",
-            "Database connection failed",
+            "database connection failed",
         ),
-        ("/_test/db", 500, "DB_ERROR", "Connection timeout"),
+        ("/_test/db", 500, "DB_ERROR", "database connection timeout"),
         (
             "/_test/db_unavailable",
             503,
             "DB_UNAVAILABLE",
-            "Database unavailable",
+            "database unavailable",
         ),
     ];
 
@@ -207,7 +218,11 @@ async fn test_trace_ctx_outside_context() {
 async fn test_malformed_error_response_handling() {
     async fn malformed_error() -> Result<HttpResponse, AppError> {
         // This would create a malformed response if not handled properly
-        Err(AppError::internal("Malformed error test"))
+        Err(AppError::internal(
+            ErrorCode::InternalError,
+            "malformed error response",
+            std::io::Error::other("Test error for malformed response handling validation"),
+        ))
     }
 
     let state = build_state().build().await.expect("create test state");
@@ -225,7 +240,7 @@ async fn test_malformed_error_response_handling() {
     let resp = test::call_service(&app, req).await;
 
     // Validate error structure using centralized helper
-    assert_problem_details_structure(resp, 500, "INTERNAL_ERROR", "Malformed error test").await;
+    assert_problem_details_structure(resp, 500, "INTERNAL_ERROR", "malformed error response").await;
 }
 
 /// Test endpoint that uses require_db helper
@@ -283,7 +298,7 @@ async fn test_require_db_without_database() {
     let resp = test::call_service(&app, req).await;
 
     // Should return DB_UNAVAILABLE problem details with trace id
-    assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "Database unavailable").await;
+    assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "database unavailable").await;
 }
 
 // require_db: positive (DB configured)
@@ -291,7 +306,8 @@ async fn test_require_db_without_database() {
 #[actix_web::test]
 async fn test_require_db_with_database() {
     let state = build_state()
-        .with_db(DbProfile::Test) // build with Test DB
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres) // build with Test DB
         .build()
         .await
         .expect("create test state with DB");

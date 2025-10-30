@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 // tests/common/mod.rs
 use actix_web::body::BoxBody;
 use actix_web::dev::ServiceResponse;

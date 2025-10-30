@@ -1,10 +1,10 @@
-//! Integration tests for game flow happy paths.
-//!
-//! This module tests successful end-to-end game flows from game creation through
-//! round completion, scoring, and game completion. All tests verify deterministic
-//! outcomes and proper state transitions.
+// Integration tests for game flow happy paths.
+//
+// This module tests successful end-to-end game flows from game creation through
+// round completion, scoring, and game completion. All tests verify deterministic
+// outcomes and proper state transitions.
 
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState};
 use backend::error::AppError;
@@ -21,17 +21,18 @@ use crate::support::trick_helpers::{create_tricks_by_winner_counts, create_trick
 #[tokio::test]
 async fn test_deal_round_transitions_to_bidding() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_setup = setup_game_with_players(txn, 123).await?;
+            let game_setup = setup_game_with_players(txn, "game_flow_complete_success").await?;
             let game_id = game_setup.game_id;
 
-            let service = GameFlowService::new();
+            let service = GameFlowService;
             service.deal_round(txn, game_id).await?;
 
             let game = games::Entity::find_by_id(game_id)
@@ -56,17 +57,22 @@ async fn test_deal_round_transitions_to_bidding() -> Result<(), AppError> {
 async fn test_deal_round_with_different_seeds_produces_different_outcomes() -> Result<(), AppError>
 {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id1 = setup_game_with_players(txn, 111).await?.game_id;
-            let game_id2 = setup_game_with_players(txn, 222).await?.game_id;
+            let game_id1 = setup_game_with_players(txn, "concurrent_games_1")
+                .await?
+                .game_id;
+            let game_id2 = setup_game_with_players(txn, "concurrent_games_2")
+                .await?
+                .game_id;
 
-            let service = GameFlowService::new();
+            let service = GameFlowService;
 
             service.deal_round(txn, game_id1).await?;
             service.deal_round(txn, game_id2).await?;
@@ -88,15 +94,18 @@ async fn test_deal_round_with_different_seeds_produces_different_outcomes() -> R
 #[tokio::test]
 async fn test_submit_bid_succeeds_after_deal() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_id = setup_game_with_players(txn, 789).await?.game_id;
-            let service = GameFlowService::new();
+            let game_id = setup_game_with_players(txn, "round_progression")
+                .await?
+                .game_id;
+            let service = GameFlowService;
             service.deal_round(txn, game_id).await?;
 
             let result = service.submit_bid(txn, game_id, 1, 5).await;
@@ -114,15 +123,16 @@ async fn test_submit_bid_succeeds_after_deal() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let setup = setup_game_in_bidding_phase(txn, 12345).await?;
-            let service = GameFlowService::new();
+            let setup = setup_game_in_bidding_phase(txn, "bidding_happy_path").await?;
+            let service = GameFlowService;
 
             let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
             assert_eq!(round.round_no, 1);
@@ -196,15 +206,16 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let setup = setup_game_in_bidding_phase(txn, 12346).await?;
-            let service = GameFlowService::new();
+            let setup = setup_game_in_bidding_phase(txn, "trump_selection_happy").await?;
+            let service = GameFlowService;
 
             // Round 1: dealer at seat 0, bidding starts at seat 1
             // Bids: 3 + 2 + 0 + 7 = 12 (not 13, dealer rule OK)
@@ -259,7 +270,8 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_end_to_end_one_round() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -267,10 +279,14 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Set up game in TrickPlay phase (Round 1: dealer at seat 0, bids: 3, 3, 4, 2, trump: Hearts)
-            let setup =
-                setup_game_in_trick_play_phase(txn, 12345, [3, 3, 4, 2], rounds::Trump::Hearts)
-                    .await?;
-            let service = GameFlowService::new();
+            let setup = setup_game_in_trick_play_phase(
+                txn,
+                "trick_play_happy",
+                [3, 3, 4, 2],
+                rounds::Trump::Hearts,
+            )
+            .await?;
+            let service = GameFlowService;
 
             let game_after_setup = games_repo::find_by_id(txn, setup.game_id).await?.unwrap();
             assert_eq!(game_after_setup.id, setup.game_id);
@@ -363,15 +379,18 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_game_completes_after_final_round() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let setup = crate::support::game_phases::setup_game_at_round(txn, 12345, 25).await?;
-            let service = GameFlowService::new();
+            let setup =
+                crate::support::game_phases::setup_game_at_round(txn, "final_round_happy", 25)
+                    .await?;
+            let service = GameFlowService;
 
             let game = games::Entity::find_by_id(setup.game_id)
                 .one(txn)

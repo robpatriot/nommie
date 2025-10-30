@@ -1,4 +1,4 @@
-//! Helper functions for testing games_sea adapter
+// Helper functions for testing games_sea adapter
 
 use backend::adapters::games_sea::{self, GameCreate, GameUpdateState};
 use backend::entities::games::{GameState, GameVisibility};
@@ -54,7 +54,7 @@ pub async fn run_game_flow(
         .with_name(unique_marker);
     let created = games_sea::create_game(txn, dto)
         .await
-        .map_err(|e| AppError::db(format!("create_game failed: {e}")))?;
+        .map_err(|e| AppError::db("failed to create game", e))?;
 
     // Assert: timestamps set on create
     assert!(
@@ -76,11 +76,11 @@ pub async fn run_game_flow(
     // 2. Fetch by id and by join_code; assert consistency
     let by_id = games_sea::find_by_id(txn, created.id)
         .await
-        .map_err(|e| AppError::db(format!("find_by_id failed: {e}")))?
+        .map_err(|e| AppError::db("failed to fetch game", e))?
         .expect("game should exist by id");
     let by_join_code = games_sea::find_by_join_code(txn, unique_marker)
         .await
-        .map_err(|e| AppError::db(format!("find_by_join_code failed: {e}")))?
+        .map_err(|e| AppError::db("failed to fetch game by join code", e))?
         .expect("game should exist by join_code");
 
     assert_eq!(
@@ -100,7 +100,7 @@ pub async fn run_game_flow(
     let update_dto = GameUpdateState::new(created.id, GameState::Bidding, created.lock_version);
     let updated1 = games_sea::update_state(txn, update_dto)
         .await
-        .map_err(|e| AppError::db(format!("update_state failed: {e}")))?;
+        .map_err(|e| AppError::db("failed to update game state", e))?;
 
     assert_eq!(
         updated1.created_at, original_created_at,
@@ -124,7 +124,7 @@ pub async fn run_game_flow(
     let update_dto2 = GameUpdateState::new(created.id, GameState::TrickPlay, updated1.lock_version);
     let updated2 = games_sea::update_state(txn, update_dto2)
         .await
-        .map_err(|e| AppError::db(format!("update_state failed: {e}")))?;
+        .map_err(|e| AppError::db("failed to update game state", e))?;
 
     assert_eq!(
         updated2.created_at, original_created_at,
@@ -153,7 +153,7 @@ pub async fn run_game_flow(
     );
     let updated3 = games_sea::update_metadata(txn, update_meta)
         .await
-        .map_err(|e| AppError::db(format!("update_metadata failed: {e}")))?;
+        .map_err(|e| AppError::db("failed to update game metadata", e))?;
 
     assert_eq!(
         updated3.created_at, original_created_at,

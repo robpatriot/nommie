@@ -1,4 +1,4 @@
-//! JWT token generation helpers for tests
+// JWT token generation helpers for tests
 
 use std::time::SystemTime;
 

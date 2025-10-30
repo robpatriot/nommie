@@ -1,12 +1,12 @@
-//! Integration tests for GameMembership extractor.
-//!
-//! Tests the basic behavior of the GameMembership extractor including:
-//! - Successful extraction when user is a member
-//! - Error handling for non-members, invalid users, and missing games
-//! - Composition with CurrentUser and GameId extractors
+// Integration tests for GameMembership extractor.
+//
+// Tests the basic behavior of the GameMembership extractor including:
+// - Successful extraction when user is a member
+// - Error handling for non-members, invalid users, and missing games
+// - Composition with CurrentUser and GameId extractors
 
 use actix_web::{test, web, HttpMessage, Responder};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
@@ -55,7 +55,8 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -131,7 +132,8 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -202,7 +204,8 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -274,7 +277,8 @@ async fn test_membership_composition_with_current_user_and_game_id(
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -352,7 +356,8 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;

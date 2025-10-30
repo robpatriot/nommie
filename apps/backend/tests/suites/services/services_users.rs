@@ -1,6 +1,6 @@
 use actix_web::http::StatusCode;
 use actix_web::ResponseError;
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::user_credentials;
 use backend::error::AppError;
@@ -13,7 +13,8 @@ use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 #[tokio::test]
 async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -23,7 +24,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
             // First call - should create a new user
             let test_email = unique_email("alice");
             let test_google_sub = unique_str("google-sub");
-            let service = UserService::new();
+            let service = UserService;
             let user1 = service
                 .ensure_user(txn, &test_email, Some("Alice"), &test_google_sub)
                 .await?;
@@ -93,7 +94,8 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -103,7 +105,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
             let test_email = unique_email("bob");
             let original_google_sub = unique_str("google-sub-original");
             let different_google_sub = unique_str("google-sub-different");
-            let service = UserService::new();
+            let service = UserService;
 
             // Scenario 1: First login (no user/credential) → creates user + credentials, sets google_sub
             let user1 = service
@@ -199,7 +201,8 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -208,7 +211,7 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
         Box::pin(async move {
             let test_email = unique_email("charlie");
             let google_sub = unique_str("google-sub");
-            let service = UserService::new();
+            let service = UserService;
 
             // Create a user with NULL google_sub by directly inserting into the database
             // This simulates a legacy user who doesn't have a google_sub set yet
@@ -288,14 +291,15 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             let google_sub = unique_str("google-sub");
 
             // Create user with uppercase email and surrounding whitespace
@@ -344,14 +348,15 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
 #[tokio::test]
 async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             let google_sub = unique_str("google-sub");
 
             // Create user with composed Unicode (é as single character U+00E9)
@@ -384,14 +389,15 @@ async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_email_validation_missing_at_symbol() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             let google_sub = unique_str("google-sub");
 
             // Try to create user with email missing @ symbol
@@ -420,14 +426,15 @@ async fn test_email_validation_missing_at_symbol() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_email_validation_multiple_at_symbols() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             let google_sub = unique_str("google-sub");
 
             // Try to create user with email having multiple @ symbols
@@ -456,14 +463,15 @@ async fn test_email_validation_multiple_at_symbols() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_email_validation_empty_local_part() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             let google_sub = unique_str("google-sub");
 
             // Try to create user with email having empty local part
@@ -492,14 +500,15 @@ async fn test_email_validation_empty_local_part() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_email_validation_empty_domain() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             let google_sub = unique_str("google-sub");
 
             // Try to create user with email having empty domain part
@@ -528,14 +537,15 @@ async fn test_email_validation_empty_domain() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_email_validation_whitespace_only() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             let google_sub = unique_str("google-sub");
 
             // Try to create user with email that becomes empty after trimming

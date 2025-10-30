@@ -16,7 +16,7 @@ fn make_state_with_hands(hands: [Vec<Card>; 4], hand_size: u8, turn_start: Playe
         leader: turn_start,
         trick_no: 0,
         scores_total: [0; 4],
-        round: RoundState::new(),
+        round: RoundState::empty(),
     }
 }
 
@@ -133,7 +133,7 @@ fn play_card_errors_and_trick_resolution() {
 #[test]
 fn resolve_trick_multiple_cases() {
     // Create a RoundState with a full trick
-    let mut r = RoundState::new();
+    let mut r = RoundState::empty();
     r.trump = Some(Trump::Hearts);
     r.trick_lead = Some(Suit::Clubs);
     r.trick_plays = vec![
@@ -170,7 +170,7 @@ fn resolve_trick_multiple_cases() {
     assert_eq!(resolve_current_trick(&r), Some(3));
 
     // No trump played: highest of lead
-    let mut r2 = RoundState::new();
+    let mut r2 = RoundState::empty();
     r2.trump = Some(Trump::Spades);
     r2.trick_lead = Some(Suit::Diamonds);
     r2.trick_plays = vec![
@@ -209,7 +209,7 @@ fn resolve_trick_multiple_cases() {
 #[test]
 fn trick_resolution_no_trump() {
     // With NoTrump, only the lead suit matters
-    let mut r = RoundState::new();
+    let mut r = RoundState::empty();
     r.trump = Some(Trump::NoTrump);
     r.trick_lead = Some(Suit::Diamonds);
     r.trick_plays = vec![
@@ -246,7 +246,7 @@ fn trick_resolution_no_trump() {
     assert_eq!(resolve_current_trick(&r), Some(2));
 
     // Another case: all follow lead suit
-    let mut r2 = RoundState::new();
+    let mut r2 = RoundState::empty();
     r2.trump = Some(Trump::NoTrump);
     r2.trick_lead = Some(Suit::Clubs);
     r2.trick_plays = vec![
@@ -287,7 +287,7 @@ fn trick_resolution_no_trump() {
 fn resolve_trick_trump_arrives_late_and_wins() {
     // "Trump arrives late and wins": lead=Diamonds, trump=Spades; plays:
     // 9♦, K♦, 2♠, A♦ → player who played 2♠ wins
-    let mut r = RoundState::new();
+    let mut r = RoundState::empty();
     r.trump = Some(Trump::Spades);
     r.trick_lead = Some(Suit::Diamonds);
     r.trick_plays = vec![
@@ -332,7 +332,7 @@ fn resolve_trick_trump_arrives_late_and_wins() {
 fn resolve_trick_multiple_trumps_highest_trump_wins() {
     // "Multiple trumps: highest trump wins": lead=Hearts, trump=Spades; plays
     // include Q♠, 3♠, A♠ → A♠ wins
-    let mut r = RoundState::new();
+    let mut r = RoundState::empty();
     r.trump = Some(Trump::Spades);
     r.trick_lead = Some(Suit::Hearts);
     r.trick_plays = vec![
@@ -377,7 +377,7 @@ fn resolve_trick_multiple_trumps_highest_trump_wins() {
 fn resolve_trick_notrump_only_lead_matters() {
     // "NoTrump: only lead matters even if off-suit ranks are higher": lead=Clubs,
     // trump=NO_TRUMP; only one clubs card vs three off-suits; the lone clubs card wins
-    let mut r = RoundState::new();
+    let mut r = RoundState::empty();
     r.trump = Some(Trump::NoTrump);
     r.trick_lead = Some(Suit::Clubs);
     r.trick_plays = vec![

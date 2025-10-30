@@ -1,24 +1,22 @@
-include!("../../common/proptest_prelude.rs");
 /// Property-based tests for follow-suit legality rules
 use std::collections::HashSet;
 
-use backend::domain::Card;
 use proptest::prelude::*;
 
-use crate::support::domain_gens;
-use crate::support::domain_prop_helpers::legal_moves_helper;
+use crate::domain::domain_prop_helpers::legal_moves_helper;
+use crate::domain::{test_gens, test_prelude, Card};
 
 proptest! {
-    #![proptest_config(proptest_prelude_config())]
+    #![proptest_config(test_prelude::proptest_config())]
 
     /// Property: Follow-suit legality
     /// If a hand contains cards of the lead suit, every legal play must be of that suit.
     /// If not, the set of legal plays must be the entire hand.
     #[test]
     fn prop_follow_suit_legality(
-        lead_suit in domain_gens::suit(),
-        lead_rank in domain_gens::rank(),
-        other_cards in domain_gens::unique_cards_up_to(12),
+        lead_suit in test_gens::suit(),
+        lead_rank in test_gens::rank(),
+        other_cards in test_gens::unique_cards_up_to(12),
     ) {
         // Build hand with at least one card of lead_suit
         let mut hand_with = vec![Card { suit: lead_suit, rank: lead_rank }];
@@ -49,8 +47,8 @@ proptest! {
     /// Property: Follow-suit legality (no lead suit cards)
     /// If hand has no cards of the lead suit, all cards in hand are legal.
     #[test]
-    fn prop_follow_suit_when_void((lead_suit, hand_without) in domain_gens::suit().prop_flat_map(|s| {
-        (Just(s), domain_gens::hand_without_suit(s))
+    fn prop_follow_suit_when_void((lead_suit, hand_without) in test_gens::suit().prop_flat_map(|s| {
+        (Just(s), test_gens::hand_without_suit(s))
     })) {
         // hand_without is guaranteed to have no cards of lead_suit
         let legal = legal_moves_helper(&hand_without, Some(lead_suit));
@@ -66,8 +64,8 @@ proptest! {
     /// Legal plays must always be a subset of the hand, with no duplicates.
     #[test]
     fn prop_legal_plays_subset(
-        hand in domain_gens::hand(),
-        lead_suit_opt in proptest::option::of(domain_gens::suit()),
+        hand in test_gens::hand(),
+        lead_suit_opt in proptest::option::of(test_gens::suit()),
     ) {
         let legal = legal_moves_helper(&hand, lead_suit_opt);
 

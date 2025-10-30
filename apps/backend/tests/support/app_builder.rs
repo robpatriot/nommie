@@ -70,10 +70,10 @@ impl TestAppBuilder {
 /// ```rust
 /// use backend::infra::state::build_state;
 /// use support::app_builder::create_test_app;
-/// use backend::config::db::DbProfile;
+/// use backend::config::db::{RuntimeEnv, DbKind};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let state = build_state().with_db(DbProfile::Test).build().await?;
+/// let state = build_state().with_env(RuntimeEnv::Test).with_db(DbKind::Postgres).build().await?;
 /// let app = create_test_app(state).with_prod_routes().build().await?;
 /// # Ok(())
 /// # }

@@ -1,10 +1,10 @@
-//! Tests for SharedTxn::from_req helper method
-//!
-//! These tests verify that the from_req method correctly extracts SharedTxn
-//! from request extensions and returns None when not present.
+// Tests for SharedTxn::from_req helper method
+//
+// These tests verify that the from_req method correctly extracts SharedTxn
+// from request extensions and returns None when not present.
 
 use actix_web::test;
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::infra::state::build_state;
 use backend::SharedTxn;
@@ -12,7 +12,11 @@ use backend::SharedTxn;
 #[actix_web::test]
 async fn test_from_req_injected_case() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with Test DB
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");

@@ -31,9 +31,16 @@ impl FromRequest for CurrentUserRecord {
             let current_user = CurrentUser::from_request(&req, &mut payload).await?;
 
             // Get database connection from AppState
-            let app_state = req
-                .app_data::<web::Data<AppState>>()
-                .ok_or_else(|| AppError::internal("AppState not available"))?;
+            let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
+                AppError::internal(
+                    crate::errors::ErrorCode::InternalError,
+                    "AppState not available".to_string(),
+                    std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "AppState missing from request",
+                    ),
+                )
+            })?;
 
             // Look up user by sub in database
             let user = if let Some(shared_txn) = SharedTxn::from_req(&req) {

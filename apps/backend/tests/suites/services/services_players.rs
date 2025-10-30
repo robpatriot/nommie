@@ -1,4 +1,4 @@
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::errors::ErrorCode;
@@ -11,7 +11,8 @@ use crate::support::factory::{create_test_game, create_test_user};
 #[tokio::test]
 async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -24,7 +25,7 @@ async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
             create_test_game_player(txn, game_id, user_id, 0).await?;
 
             // Test the service
-            let service = PlayerService::new();
+            let service = PlayerService;
             let result = service.get_display_name_by_seat(txn, game_id, 0).await?;
 
             assert_eq!(result, "Alice");
@@ -39,7 +40,8 @@ async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_get_display_name_by_seat_invalid_seat() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -47,7 +49,7 @@ async fn test_get_display_name_by_seat_invalid_seat() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Test the service with invalid seat (no DB data needed for validation)
-            let service = PlayerService::new();
+            let service = PlayerService;
             let result = service.get_display_name_by_seat(txn, 1, 5).await;
 
             match result {
@@ -73,7 +75,8 @@ async fn test_get_display_name_by_seat_invalid_seat() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -84,7 +87,7 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
             let game_id = create_test_game(txn).await?;
 
             // Test the service
-            let service = PlayerService::new();
+            let service = PlayerService;
             let result = service.get_display_name_by_seat(txn, game_id, 0).await;
 
             match result {
@@ -112,7 +115,8 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
 #[tokio::test]
 async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -125,7 +129,7 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
             create_test_game_player(txn, game_id, user_id, 1).await?;
 
             // Test the service
-            let service = PlayerService::new();
+            let service = PlayerService;
             let result = service.get_display_name_by_seat(txn, game_id, 1).await?;
 
             assert_eq!(result, "bob");
@@ -140,7 +144,8 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
 #[tokio::test]
 async fn test_get_display_name_by_seat_multiple_seats() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -158,7 +163,7 @@ async fn test_get_display_name_by_seat_multiple_seats() -> Result<(), AppError> 
             create_test_game_player(txn, game_id, user3_id, 2).await?;
 
             // Test the service for different seats
-            let service = PlayerService::new();
+            let service = PlayerService;
 
             let result0 = service.get_display_name_by_seat(txn, game_id, 0).await?;
             assert_eq!(result0, "Alice");

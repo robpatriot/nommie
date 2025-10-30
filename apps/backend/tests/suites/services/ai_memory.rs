@@ -1,11 +1,13 @@
-//! Tests for AI-specific memory modes and card play access.
+// Tests for AI-specific memory modes and card play access.
 
 use backend::ai::memory::{get_round_card_plays, MemoryMode};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
+
+use crate::support::test_utils::test_seed;
 
 #[actix_web::test]
 async fn test_memory_mode_conversions() {
@@ -27,7 +29,8 @@ async fn test_memory_mode_conversions() {
 #[actix_web::test]
 async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -53,7 +56,7 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
         name: Set(Some("Test Game".to_string())),
         join_code: Set(None),
         rules_version: Set("1".to_string()),
-        rng_seed: Set(Some(12345)),
+        rng_seed: Set(Some(test_seed("round_card_plays_empty"))),
         current_round: Set(Some(1)),
         starting_dealer_pos: Set(Some(0)),
         current_trick_no: Set(0),
@@ -89,13 +92,17 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
         get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42)).await?;
     assert!(plays.is_empty());
 
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
+
     Ok(())
 }
 
 #[actix_web::test]
 async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -122,7 +129,7 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         name: Set(Some("Test Game".to_string())),
         join_code: Set(None),
         rules_version: Set("1".to_string()),
-        rng_seed: Set(Some(12345)),
+        rng_seed: Set(Some(test_seed("round_card_plays_tricks"))),
         current_round: Set(Some(1)),
         starting_dealer_pos: Set(Some(0)),
         current_trick_no: Set(3),
@@ -225,6 +232,10 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     // Test Partial mode with seed - should return degraded memory
     let plays_partial =
         get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42)).await?;
+
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
+
     assert_eq!(plays_partial.len(), 2); // Same number of tricks
 
     // Note: At level 50 with only 8 cards (2 tricks * 4 cards), degradation is probabilistic.
@@ -237,7 +248,8 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
 #[actix_web::test]
 async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -275,6 +287,9 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     updated_profile.memory_level = Some(100);
     let updated = ai_profiles::update_profile(txn, updated_profile).await?;
 
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
+
     assert_eq!(updated.memory_level, Some(100));
 
     // Verify MemoryMode conversions work with persisted values
@@ -290,7 +305,8 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
 #[actix_web::test]
 async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("Failed to build test state");
@@ -303,7 +319,7 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
     use backend::services::ai::AiService;
     use serde_json::json;
 
-    let ai_service = AiService::new();
+    let ai_service = AiService;
 
     // Create AI template user with Partial memory (level 60)
     let user_id = ai_service
@@ -311,7 +327,7 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
             txn,
             "Random Bot (Partial Memory)",
             "random",
-            Some(json!({"seed": 12345})),
+            Some(json!({"seed": test_seed("ai_mem_prof_ai1")})),
             Some(60),
         )
         .await?;
@@ -333,7 +349,7 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
             txn,
             "Random Bot (Full Memory)",
             "random",
-            Some(json!({"seed": 67890})),
+            Some(json!({"seed": test_seed("ai_mem_prof_ai2")})),
             None,
         )
         .await?;
@@ -341,6 +357,9 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
     let profile2 = ai_profiles::find_by_user_id(txn, user_id2)
         .await?
         .expect("AI profile should exist");
+
+    // Rollback the transaction immediately after last DB access
+    shared.rollback().await?;
 
     assert_eq!(profile2.memory_level, None);
     assert_eq!(

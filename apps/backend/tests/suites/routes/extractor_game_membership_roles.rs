@@ -1,12 +1,12 @@
-//! Integration tests for GameMembership extractor role-based access control.
-//!
-//! Tests role-based authorization patterns using the GameMembership extractor:
-//! - Player-only actions
-//! - Actions that allow any member (Player or Spectator)
-//! - Role hierarchy logic
+// Integration tests for GameMembership extractor role-based access control.
+//
+// Tests role-based authorization patterns using the GameMembership extractor:
+// - Player-only actions
+// - Actions that allow any member (Player or Spectator)
+// - Role hierarchy logic
 
 use actix_web::{test, web, HttpMessage, Responder};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
@@ -82,7 +82,8 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -160,7 +161,8 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;

@@ -1,3 +1,4 @@
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::errors::domain::{ConflictKind, DomainError};
@@ -9,7 +10,8 @@ use backend::utils::unique::{unique_email, unique_str};
 #[tokio::test]
 async fn test_find_credentials_by_email_not_found() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -35,7 +37,8 @@ async fn test_find_credentials_by_email_not_found() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_create_user_and_find_by_id_roundtrip() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -74,7 +77,8 @@ async fn test_create_user_and_find_by_id_roundtrip() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_find_user_by_id_not_found() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -100,7 +104,8 @@ async fn test_find_user_by_id_not_found() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_create_credentials_duplicate_email_unique_violation() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -142,7 +147,8 @@ async fn test_create_credentials_duplicate_email_unique_violation() -> Result<()
 #[tokio::test]
 async fn test_create_credentials_duplicate_google_sub_unique_violation() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -188,7 +194,8 @@ async fn test_create_credentials_duplicate_google_sub_unique_violation() -> Resu
 #[tokio::test]
 async fn test_update_credentials_idempotent() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -222,7 +229,8 @@ async fn test_update_credentials_idempotent() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_create_and_find_credentials_by_email_roundtrip() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -261,7 +269,8 @@ async fn test_create_and_find_credentials_by_email_roundtrip() -> Result<(), App
 #[tokio::test]
 async fn test_not_found_user_maps_to_typed_error() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");

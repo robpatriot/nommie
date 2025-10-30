@@ -1,33 +1,32 @@
-include!("../../common/proptest_prelude.rs");
-/// Property-based tests for trick winner resolution
-use backend::domain::{RoundState, Suit, Trump};
 use proptest::prelude::*;
 
-use crate::support::domain_gens;
-use crate::support::domain_prop_helpers::oracle_trick_winner;
+use crate::domain::domain_prop_helpers::oracle_trick_winner;
+use crate::domain::{test_gens, test_prelude};
+/// Property-based tests for trick winner resolution
+use crate::domain::{RoundState, Suit, Trump};
 
 proptest! {
-    #![proptest_config(proptest_prelude_config())]
+    #![proptest_config(test_prelude::proptest_config())]
 
     /// Property: Trick winner with NO_TRUMP
     /// In a fully played trick with no trump, the winner must be the highest-ranked card
     /// of the lead suit. Off-suit cards cannot win.
     #[test]
     fn prop_trick_winner_no_trump(
-        trick_data in domain_gens::complete_trick(),
+        trick_data in test_gens::complete_trick(),
     ) {
         let (_leader, plays, _, _) = trick_data;
         let lead = plays[0].1.suit;
         let trump = Trump::NoTrump;
 
         // Build RoundState
-        let mut state = RoundState::new();
+        let mut state = RoundState::empty();
         state.trick_plays = plays.clone();
         state.trick_lead = Some(lead);
         state.trump = Some(trump);
 
         // Get domain winner
-        let winner = backend::domain::tricks::resolve_current_trick(&state);
+        let winner = crate::domain::tricks::resolve_current_trick(&state);
         prop_assert!(winner.is_some(), "Complete trick must have a winner");
         let winner_id = winner.unwrap();
 
@@ -61,10 +60,10 @@ proptest! {
     #[test]
     fn prop_trick_winner_with_trump(
         trick_data in prop::strategy::Strategy::prop_flat_map(
-            domain_gens::complete_trick(),
+            test_gens::complete_trick(),
             |(lead, plays, _trump, leader)| {
                 // Replace trump with a non-NoTrump value
-                (Just((lead, plays, leader)), domain_gens::trump_suit())
+                (Just((lead, plays, leader)), test_gens::trump_suit())
                     .prop_map(|((lead, plays, leader), trump)| (lead, plays, trump, leader))
             }
         ),
@@ -76,13 +75,13 @@ proptest! {
         let lead = plays[0].1.suit;
 
         // Build RoundState
-        let mut state = RoundState::new();
+        let mut state = RoundState::empty();
         state.trick_plays = plays.clone();
         state.trick_lead = Some(lead);
         state.trump = Some(trump);
 
         // Get domain winner
-        let winner = backend::domain::tricks::resolve_current_trick(&state);
+        let winner = crate::domain::tricks::resolve_current_trick(&state);
         prop_assert!(winner.is_some(), "Complete trick must have a winner");
         let winner_id = winner.unwrap();
 
@@ -134,19 +133,19 @@ proptest! {
     /// The domain's trick_winner result must match an independent oracle implementation.
     #[test]
     fn prop_winner_oracle_cross_check(
-        trick_data in domain_gens::complete_trick(),
+        trick_data in test_gens::complete_trick(),
     ) {
         let (_, plays, trump, _) = trick_data;
         let lead = plays[0].1.suit;
 
         // Build RoundState
-        let mut state = RoundState::new();
+        let mut state = RoundState::empty();
         state.trick_plays = plays.clone();
         state.trick_lead = Some(lead);
         state.trump = Some(trump);
 
         // Get domain winner
-        let domain_winner = backend::domain::tricks::resolve_current_trick(&state);
+        let domain_winner = crate::domain::tricks::resolve_current_trick(&state);
         prop_assert!(domain_winner.is_some(), "Domain must return a winner for complete trick");
         let domain_winner_id = domain_winner.unwrap();
 
@@ -163,19 +162,19 @@ proptest! {
     /// After a trick completes, the next leader must be the trick winner.
     #[test]
     fn prop_next_leader_is_winner(
-        trick_data in domain_gens::complete_trick(),
+        trick_data in test_gens::complete_trick(),
     ) {
         let (_, plays, trump, _) = trick_data;
         let lead = plays[0].1.suit;
 
         // Build RoundState
-        let mut state = RoundState::new();
+        let mut state = RoundState::empty();
         state.trick_plays = plays.clone();
         state.trick_lead = Some(lead);
         state.trump = Some(trump);
 
         // Resolve trick
-        let winner = backend::domain::tricks::resolve_current_trick(&state);
+        let winner = crate::domain::tricks::resolve_current_trick(&state);
         prop_assert!(winner.is_some(), "Trick must have a winner");
         let winner_id = winner.unwrap();
 

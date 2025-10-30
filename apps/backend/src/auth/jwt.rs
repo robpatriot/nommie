@@ -28,7 +28,13 @@ pub fn mint_access_token(
 ) -> Result<String, AppError> {
     let iat = now
         .duration_since(UNIX_EPOCH)
-        .map_err(|_| AppError::internal("Failed to get current time"))?
+        .map_err(|e| {
+            AppError::internal(
+                crate::errors::ErrorCode::InternalError,
+                "Failed to get current time".to_string(),
+                e,
+            )
+        })?
         .as_secs() as i64;
 
     // 15 minutes expiration
@@ -46,7 +52,13 @@ pub fn mint_access_token(
         &claims,
         &EncodingKey::from_secret(&security.jwt_secret),
     )
-    .map_err(|e| AppError::internal(format!("Failed to encode JWT: {e}")))
+    .map_err(|e| {
+        AppError::internal(
+            crate::errors::ErrorCode::InternalError,
+            "failed to encode JWT",
+            e,
+        )
+    })
 }
 
 /// Verify JWT and return claims.
@@ -199,8 +211,7 @@ mod tests {
 
         match result {
             Ok(_) => {
-                // This should now succeed since we're passing the security config
-                // The old test was checking for missing env var, which is no longer relevant
+                // This should succeed since we're passing the security config
             }
             _ => panic!("Expected success since security config is provided"),
         }

@@ -32,7 +32,7 @@ pub mod web;
 
 // Re-exports for public API
 pub use auth::jwt::{mint_access_token, verify_access_token, Claims};
-pub use config::db::{db_url, DbOwner, DbProfile};
+pub use config::db::DbOwner;
 pub use db::txn::{with_txn, SharedTxn};
 pub use db::txn_policy::{set_txn_policy, TxnPolicy};
 pub use error::AppError;

@@ -1,4 +1,7 @@
-//! General test utilities
+// General test utilities
+
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 use ulid::Ulid;
 
@@ -16,52 +19,57 @@ pub fn short_join_code() -> String {
     format!("{}", Ulid::new()).chars().take(10).collect()
 }
 
-/// Get a shared temporary directory for SQLite file-based tests within the same nextest run.
+/// Generate a deterministic seed for a test based on its name.
 ///
-/// Creates a stable directory path that is shared across all parallel workers in the
-/// same nextest run, but unique across different runs. This allows file-based
-/// SQLite tests to test cross-process database contention and use different
-/// database files within the same directory.
+/// Creates a unique, deterministic seed for each test that remains consistent
+/// across test runs but differs between tests to avoid data conflicts.
 ///
-/// The directory is created within the system temp directory to keep test files organized.
+/// # Arguments
+/// * `test_name` - Name of the test (e.g., "test_full_game_with_ai_players")
 ///
 /// # Returns
-/// A PathBuf pointing to the shared temporary directory for SQLite databases
+/// A seed in the range 10000-1009999
 ///
-/// # Examples
+/// # Example
 /// ```
-/// let temp_dir = shared_sqlite_temp_dir();
-/// let db_path = temp_dir.join("test.db");
-/// // db_path is ready to use directly with SQLite
+/// let seed = test_seed("test_full_game_with_ai_players");
+/// assert!(seed >= 10000 && seed < 1010000);
 /// ```
-pub fn shared_sqlite_temp_dir() -> std::path::PathBuf {
-    // Create a dedicated subdirectory for nommie test files
-    let test_dir = std::env::temp_dir().join("nommie-tests");
-
-    // Ensure the test directory exists
-    if let Err(e) = std::fs::create_dir_all(&test_dir) {
-        panic!("Failed to create test directory {:?}: {}", test_dir, e);
-    }
-
-    test_dir
+pub fn test_seed(test_name: &str) -> i64 {
+    let mut hasher = DefaultHasher::new();
+    test_name.hash(&mut hasher);
+    (hasher.finish() % 1_000_000) as i64 + 10000 // Range: 10000-1009999
 }
 
-/// Get the shared SQLite database file path for all integration tests.
+/// Generate a deterministic seed as u64 for functions that require u64 seeds.
 ///
-/// All SQLite file-based tests should use this function to ensure they use
-/// the same database file. This allows tests to share state and verify
-/// cross-test persistence scenarios.
+/// This is a convenience function for cases where u64 is required instead of i64.
 ///
-/// The file is created within the shared temporary directory to keep test files organized.
+/// # Arguments
+/// * `test_name` - Name of the test (e.g., "test_full_game_with_ai_players")
 ///
 /// # Returns
-/// A PathBuf pointing to the shared SQLite database file (test.db)
+/// A seed in the range 10000-1009999 as u64
+pub fn test_seed_u64(test_name: &str) -> u64 {
+    test_seed(test_name) as u64
+}
+
+/// Generate a unique user sub for a test based on its name.
 ///
-/// # Examples
+/// Creates a consistent, test-specific user sub that avoids conflicts
+/// between concurrent tests while remaining deterministic.
+///
+/// # Arguments
+/// * `test_name` - Name of the test (e.g., "test_full_game_with_ai_players")
+///
+/// # Returns
+/// A user sub string in format "test_{sanitized_test_name}"
+///
+/// # Example
 /// ```
-/// let db_path = shared_sqlite_temp_file();
-/// // db_path points to the shared database file used by all tests
+/// let sub = test_user_sub("test_full_game_with_ai_players");
+/// assert_eq!(sub, "test_test_full_game_with_ai_players");
 /// ```
-pub fn shared_sqlite_temp_file() -> std::path::PathBuf {
-    shared_sqlite_temp_dir().join("test.db")
+pub fn test_user_sub(test_name: &str) -> String {
+    format!("test_{}", test_name.replace("::", "_"))
 }

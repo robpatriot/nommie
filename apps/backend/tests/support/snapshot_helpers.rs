@@ -1,7 +1,7 @@
-//! Test helpers for game snapshot integration tests
-//!
-//! Provides utilities for:
-//! - Creating minimal games with specific lock versions and states
+// Test helpers for game snapshot integration tests
+//
+// Provides utilities for:
+// - Creating minimal games with specific lock versions and states
 
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};

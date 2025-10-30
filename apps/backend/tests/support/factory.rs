@@ -4,6 +4,8 @@ use backend::error::AppError;
 use sea_orm::{ActiveModelTrait, ConnectionTrait, NotSet, Set};
 use time::OffsetDateTime;
 
+use super::test_utils::{test_seed, test_user_sub};
+
 /// Seed a user with a specific sub value for testing purposes.
 ///
 /// # Arguments
@@ -86,18 +88,25 @@ pub async fn create_test_user_with_randomization(
     Ok(inserted.id)
 }
 
-/// Create a fresh game in Lobby state with no rounds or configuration.
+/// Create a fresh game in Lobby state with test-specific unique seeds and user subs.
 ///
-/// This creates a truly fresh game suitable for testing game initialization,
-/// AI memory with empty games, or player view tests.
+/// This creates a truly fresh game with deterministic but unique seeds per test
+/// to avoid conflicts when running tests concurrently.
 ///
 /// # Arguments
 /// * `conn` - Database connection or transaction
+/// * `test_name` - Test name for unique seed generation (e.g., "game_hist_empty")
 ///
 /// # Returns
 /// ID of the created game
-pub async fn create_fresh_lobby_game(conn: &impl ConnectionTrait) -> Result<i64, AppError> {
-    let user_id = create_test_user(conn, "creator", Some("Creator")).await?;
+pub async fn create_fresh_lobby_game(
+    conn: &impl ConnectionTrait,
+    test_name: &str,
+) -> Result<i64, AppError> {
+    let user_sub = test_user_sub(&format!("{}_creator", test_name));
+    let rng_seed = test_seed(test_name);
+
+    let user_id = create_test_user(conn, &user_sub, Some("Creator")).await?;
     let now = OffsetDateTime::now_utc();
 
     let game = games::ActiveModel {
@@ -112,7 +121,7 @@ pub async fn create_fresh_lobby_game(conn: &impl ConnectionTrait) -> Result<i64,
         name: Set(Some("Test Game".to_string())),
         join_code: Set(None),
         rules_version: Set("1.0".to_string()),
-        rng_seed: Set(Some(12345)),
+        rng_seed: Set(Some(rng_seed)),
         current_round: Set(None),
         starting_dealer_pos: Set(None),
         current_trick_no: Set(0),
@@ -156,7 +165,7 @@ pub async fn create_test_game_with_options(
     randomize_join_code: Option<bool>,
 ) -> Result<i64, AppError> {
     // Start with a fresh lobby game
-    let game_id = create_fresh_lobby_game(conn).await?;
+    let game_id = create_fresh_lobby_game(conn, "test_game_with_opts").await?;
 
     // Update it with test-specific configuration
     use backend::entities::games::Entity as GamesEntity;
@@ -165,7 +174,16 @@ pub async fn create_test_game_with_options(
     let game = GamesEntity::find_by_id(game_id)
         .one(conn)
         .await?
-        .ok_or_else(|| AppError::internal("Failed to find just-created game"))?;
+        .ok_or_else(|| {
+            AppError::internal(
+                backend::errors::ErrorCode::InternalError,
+                "Failed to find just-created game".to_string(),
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "Game not found after creation",
+                ),
+            )
+        })?;
 
     let final_join_code = if randomize_join_code.unwrap_or(false) {
         format!("C{}", rand::random::<u32>() % 1000000)

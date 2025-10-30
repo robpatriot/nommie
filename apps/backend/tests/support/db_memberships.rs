@@ -1,4 +1,4 @@
-//! Test helpers for game_players (memberships) table operations
+// Test helpers for game_players (memberships) table operations
 
 use backend::entities::game_players;
 use backend::error::AppError;

@@ -33,7 +33,7 @@ async fn get_snapshot(
             // Fetch game from database to get lock_version
             let game = games_sea::find_by_id(txn, id)
                 .await
-                .map_err(|e| AppError::db(format!("Failed to fetch game: {e}")))?
+                .map_err(|e| AppError::db("failed to fetch game", e))?
                 .ok_or_else(|| {
                     AppError::not_found(
                         crate::errors::ErrorCode::GameNotFound,
@@ -42,7 +42,7 @@ async fn get_snapshot(
                 })?;
 
             // Create game service and load game state
-            let game_service = crate::services::games::GameService::new();
+            let game_service = crate::services::games::GameService;
             let state = game_service.load_game_state(txn, id).await?;
 
             // Produce the snapshot via the domain function
@@ -95,7 +95,7 @@ async fn get_player_display_name(
     // Get display name within a transaction
     let display_name = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let service = PlayerService::new();
+            let service = PlayerService;
             Ok(service.get_display_name_by_seat(txn, game_id, seat).await?)
         })
     })

@@ -56,7 +56,7 @@ async fn login(
     let user = with_txn(Some(&http_req), &app_state, |txn| {
         // Box the async block so its lifetime is tied to `txn` (no 'static)
         Box::pin(async move {
-            let service = UserService::new();
+            let service = UserService;
             Ok(service
                 .ensure_user(txn, &email, name.as_deref(), &google_sub)
                 .await?)

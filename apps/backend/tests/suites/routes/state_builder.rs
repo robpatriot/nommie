@@ -1,4 +1,4 @@
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
@@ -12,7 +12,11 @@ async fn builds_without_db() {
 
 #[tokio::test]
 async fn builds_with_test_db() -> Result<(), AppError> {
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
     assert!(state.db().is_some());
 
     // Test DB connectivity with an actual database operation

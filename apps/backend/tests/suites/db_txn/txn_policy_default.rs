@@ -13,9 +13,9 @@ fn init_logging() {
     backend_test_support::logging::init();
 }
 
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
-use backend::db::txn_policy::{current, TxnPolicy};
+use backend::db::txn_policy::{current, set_txn_policy, TxnPolicy};
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::error::AppError;
 use backend::errors::ErrorCode;
@@ -28,9 +28,26 @@ use crate::support::db_games::{
 };
 
 #[test]
-fn test_policy_is_commit_on_ok() {
-    // This test binary does not import mod common, so it should see the
-    // OnceLock default of CommitOnOk policy
+fn test_policy_default_and_once_lock_behavior() {
+    // These tests are in this file (not in unit tests) because this test binary
+    // does not import mod common, so it uses the OnceLock default behavior.
+    // If these tests were moved to unit tests, they would fail because unit tests
+    // run with the constructor that sets policy to RollbackOnOk, making it
+    // impossible to test the default CommitOnOk behavior and OnceLock mechanics.
+
+    // Verify we start with the default policy (OnceLock is empty, so returns default)
+    assert_eq!(current(), TxnPolicy::CommitOnOk);
+
+    // Set it to CommitOnOk - this should succeed since it's the first call
+    set_txn_policy(TxnPolicy::CommitOnOk);
+
+    // The policy should now be CommitOnOk
+    assert_eq!(current(), TxnPolicy::CommitOnOk);
+
+    // Try to set it to RollbackOnOk - this should have no effect due to OnceLock
+    set_txn_policy(TxnPolicy::RollbackOnOk);
+
+    // The policy should still be CommitOnOk, proving the OnceLock behavior
     assert_eq!(current(), TxnPolicy::CommitOnOk);
 }
 
@@ -41,7 +58,11 @@ async fn test_default_commit_policy_persists_then_cleans_up(
     assert_eq!(current(), TxnPolicy::CommitOnOk);
 
     // Build state with a real Test DB
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Use unique marker for name
     let name = Ulid::new().to_string();
@@ -83,7 +104,11 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
     assert_eq!(current(), TxnPolicy::CommitOnOk);
 
     // Build state with a real Test DB
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Use unique marker for name
     let name = Ulid::new().to_string();
@@ -94,10 +119,11 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
         let name = name.clone();
         Box::pin(async move {
             insert_minimal_game_for_test(txn, &name).await?;
-            Err::<(), _>(backend::error::AppError::Internal {
-                code: backend::errors::ErrorCode::InternalError,
-                detail: "test error".to_string(),
-            })
+            Err::<(), _>(backend::error::AppError::internal(
+                backend::errors::ErrorCode::InternalError,
+                "test error triggered",
+                std::io::Error::other("test error for rollback verification"),
+            ))
         })
     })
     .await;
@@ -115,7 +141,11 @@ async fn test_join_code_unique_constraint() -> Result<(), Box<dyn std::error::Er
     // Verify we're using the commit policy
     assert_eq!(current(), TxnPolicy::CommitOnOk);
 
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Use a unique join code to avoid conflicts with other test runs (max 10 chars)
     let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();

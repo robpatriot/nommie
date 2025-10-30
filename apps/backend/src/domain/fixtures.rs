@@ -20,9 +20,10 @@ impl CardFixtures {
     /// Vector of parsed Card instances
     ///
     /// # Safety
-    /// SAFETY: This function only accepts hardcoded valid card tokens that are
-    /// known to parse successfully. The allow is necessary because the parser
-    /// uses expect() for performance in fixture scenarios.
+    /// This function only accepts hardcoded valid card tokens that are
+    /// known to parse successfully. The `#[allow(clippy::expect_used)]` is
+    /// necessary because this function uses `.expect()` for performance in
+    /// fixture scenarios where parse failures should never occur.
     pub fn parse_hardcoded(tokens: &[&str]) -> Vec<Card> {
         tokens
             .iter()

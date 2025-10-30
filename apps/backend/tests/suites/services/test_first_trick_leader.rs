@@ -1,8 +1,9 @@
-//! Test that verifies the player to the left of the dealer leads the first trick.
-//!
-//! This test would have caught the bug in games.rs where turn_start was incorrectly
-//! set to dealer_pos instead of (dealer_pos + 1) % 4.
+// Test that verifies the player to the left of the dealer leads the first trick.
+//
+// This test would have caught the bug in games.rs where turn_start was incorrectly
+// set to dealer_pos instead of (dealer_pos + 1) % 4.
 
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;
 use backend::error::AppError;
@@ -28,20 +29,25 @@ use crate::support::trick_helpers::create_tricks_by_winner_counts;
 #[tokio::test]
 async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let game_service = GameService::new();
-            let flow_service = GameFlowService::new();
+            let game_service = GameService;
+            let flow_service = GameFlowService;
 
             // Set up game in Round 1 trick play phase
-            let setup =
-                setup_game_in_trick_play_phase(txn, 60000, [4, 5, 3, 0], rounds::Trump::Hearts)
-                    .await?;
+            let setup = setup_game_in_trick_play_phase(
+                txn,
+                "first_trick_leader1",
+                [4, 5, 3, 0],
+                rounds::Trump::Hearts,
+            )
+            .await?;
 
             // === ROUND 1: Verify dealer=0, first player=1 ===
             let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
@@ -120,7 +126,8 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_turn_start_consistency_domain_vs_db() -> Result<(), AppError> {
     let state = build_state()
-        .with_db(backend::config::db::DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .build()
         .await
         .expect("build test state with DB");
@@ -128,11 +135,15 @@ async fn test_turn_start_consistency_domain_vs_db() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create game via DB
-            let setup =
-                setup_game_in_trick_play_phase(txn, 70000, [3, 3, 4, 2], rounds::Trump::Spades)
-                    .await?;
+            let setup = setup_game_in_trick_play_phase(
+                txn,
+                "first_trick_leader2",
+                [3, 3, 4, 2],
+                rounds::Trump::Spades,
+            )
+            .await?;
 
-            let game_service = GameService::new();
+            let game_service = GameService;
             let loaded_from_db = game_service.load_game_state(txn, setup.game_id).await?;
 
             // Create equivalent state via domain init

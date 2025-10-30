@@ -1,6 +1,6 @@
 //! Helper functions for domain property-based tests
 
-use backend::domain::{hand_has_suit, Card, PlayerId, Rank, RoundState, Suit, Trump};
+use crate::domain::{hand_has_suit, Card, PlayerId, Rank, Suit, Trump};
 
 /// Independent oracle for trick winner to cross-check domain logic.
 /// Returns the index (0-3) of the winning play.
@@ -87,17 +87,4 @@ pub fn legal_moves_helper(hand: &[Card], lead: Option<Suit>) -> Vec<Card> {
     let mut any = hand.to_vec();
     any.sort();
     any
-}
-
-/// Helper to build a RoundState with trick data for testing
-pub fn build_trick_round_state(
-    plays: Vec<(PlayerId, Card)>,
-    trump: Trump,
-    lead: Suit,
-) -> RoundState {
-    let mut state = RoundState::new();
-    state.trick_plays = plays;
-    state.trick_lead = Some(lead);
-    state.trump = Some(trump);
-    state
 }

@@ -1,19 +1,278 @@
-use std::env;
 use std::path::{Path, PathBuf};
+use std::{env, process};
 
 use crate::error::AppError;
 
-/// Database profile enum for different environments
-#[derive(Debug, Clone, PartialEq)]
-pub enum DbProfile {
-    /// Production database profile
+/// Runtime environment enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RuntimeEnv {
+    /// Production environment
     Prod,
-    /// Test database profile - enforces safety rules
+    /// Test environment
     Test,
-    /// SQLite in-memory database (ephemeral, fastest)
-    InMemory,
-    /// SQLite file-based database (persistent, configurable file)
-    SqliteFile { file: Option<String> },
+}
+
+/// Database kind enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DbKind {
+    /// PostgreSQL database
+    Postgres,
+    /// SQLite file-based database
+    SqliteFile,
+    /// SQLite in-memory database
+    SqliteMemory,
+}
+
+/// Pool purpose enum
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PoolPurpose {
+    /// Application runtime pools
+    Runtime,
+    /// Migration/admin pools
+    Migration,
+}
+
+/// Connection settings - pool-level and database-specific per-connection settings
+#[derive(Debug, Clone)]
+pub struct ConnectionSettings {
+    // Pool-level settings (common to all databases)
+    pub pool_min: u32,
+    pub pool_max: u32,
+    pub acquire_timeout_ms: u64,
+    // Database-specific per-connection settings
+    pub db_settings: DbSettings,
+}
+
+/// Database-specific per-connection settings
+#[derive(Debug, Clone)]
+pub enum DbSettings {
+    Sqlite {
+        busy_timeout_ms: u32,
+    },
+    Postgres {
+        app_name: String,
+        statement_timeout: String,
+        idle_in_transaction_timeout: String,
+        lock_timeout: Option<String>,
+    },
+}
+
+/// Calculate baseline parallelism for the given environment
+fn calculate_baseline_parallelism(env: RuntimeEnv) -> Result<u32, AppError> {
+    match env {
+        RuntimeEnv::Prod => {
+            // Use physical CPU count for production
+            Ok(num_cpus::get_physical() as u32)
+        }
+        RuntimeEnv::Test => {
+            // Use available parallelism capped at 4 for nextest parallel execution
+            let available = std::thread::available_parallelism()
+                .map(|n| n.get() as u32)
+                .unwrap_or(1);
+            Ok(available.min(4))
+        }
+    }
+}
+
+/// Build connection settings from environment, database kind, and pool purpose
+pub fn build_connection_settings(
+    env: RuntimeEnv,
+    db_kind: DbKind,
+    purpose: PoolPurpose,
+) -> Result<ConnectionSettings, AppError> {
+    let baseline = calculate_baseline_parallelism(env)?;
+
+    // Calculate pool_max and acquire_timeout_ms based on env + db_kind, then adjust for purpose
+    let (pool_min, pool_max, acquire_timeout_ms, db_settings) = match (env, db_kind) {
+        (RuntimeEnv::Prod, DbKind::Postgres) => {
+            let pool_max = (baseline + 2).clamp(8, 16);
+            let db_settings = DbSettings::Postgres {
+                app_name: format!(
+                    "nommie-prod-{}-{}",
+                    if matches!(purpose, PoolPurpose::Migration) {
+                        "migrate"
+                    } else {
+                        "pool"
+                    },
+                    std::process::id()
+                ),
+                statement_timeout: "20000ms".to_string(),
+                idle_in_transaction_timeout: "120000ms".to_string(),
+                lock_timeout: Some("15000ms".to_string()),
+            };
+            (2, pool_max, 5000, db_settings)
+        }
+        (RuntimeEnv::Test, DbKind::Postgres) => {
+            let pool_max = (baseline + 2).clamp(8, 16);
+            let db_settings = DbSettings::Postgres {
+                app_name: format!(
+                    "nommie-test-{}-{}",
+                    if matches!(purpose, PoolPurpose::Migration) {
+                        "migrate"
+                    } else {
+                        "pool"
+                    },
+                    std::process::id()
+                ),
+                statement_timeout: "20000ms".to_string(),
+                idle_in_transaction_timeout: "120000ms".to_string(),
+                lock_timeout: Some("5000ms".to_string()),
+            };
+            (4, pool_max, 5000, db_settings)
+        }
+        (RuntimeEnv::Prod, DbKind::SqliteFile) => {
+            let pool_max = (baseline + 2).clamp(8, 16);
+            let db_settings = DbSettings::Sqlite {
+                busy_timeout_ms: 15000,
+            };
+            (2, pool_max, 2000, db_settings)
+        }
+        (RuntimeEnv::Test, DbKind::SqliteFile) => {
+            let db_settings = DbSettings::Sqlite {
+                busy_timeout_ms: 15000,
+            };
+            (2, 4, 2000, db_settings)
+        }
+        (RuntimeEnv::Test, DbKind::SqliteMemory) => {
+            // busy_timeout differs by purpose
+            let busy_timeout_ms = match purpose {
+                PoolPurpose::Runtime => 15000,
+                PoolPurpose::Migration => 500,
+            };
+            let db_settings = DbSettings::Sqlite { busy_timeout_ms };
+            (1, 1, 2000, db_settings)
+        }
+        (RuntimeEnv::Prod, DbKind::SqliteMemory) => {
+            return Err(AppError::config_msg(
+                "production cannot use SQLite in-memory database",
+                "SQLite in-memory database is not allowed in production environment",
+            ));
+        }
+    };
+
+    Ok(ConnectionSettings {
+        pool_min,
+        pool_max,
+        acquire_timeout_ms,
+        db_settings,
+    })
+}
+
+/// Validate database configuration
+pub fn validate_db_config(env: RuntimeEnv, db_kind: DbKind) -> Result<(), AppError> {
+    match (env, db_kind) {
+        (RuntimeEnv::Prod, DbKind::SqliteMemory) => Err(AppError::config_msg(
+            "production cannot use SQLite in-memory database",
+            "SQLite in-memory database is not allowed in production environment",
+        )),
+        _ => Ok(()),
+    }
+}
+
+/// Get SQLite file specification for the given database kind
+pub fn sqlite_file_spec(db_kind: DbKind, env: RuntimeEnv) -> Result<String, AppError> {
+    match db_kind {
+        DbKind::SqliteFile => {
+            // Inline sqlite_file_path logic
+            let db_name = match env {
+                RuntimeEnv::Prod => "nommie.db",
+                RuntimeEnv::Test => "nommie-test.db",
+            };
+            let raw = env::temp_dir().join("nommie-db").join(db_name);
+
+            // Create parent directories
+            if let Some(parent) = raw.parent() {
+                std::fs::create_dir_all(parent)
+                    .map_err(|e| AppError::config("failed to create database directory", e))?;
+            }
+
+            // Canonicalize the path
+            let canonical = canonicalize_lenient(&raw)?;
+
+            // Apply test isolation if enabled
+            let path = if env::var("NOMMIE_SQLITE_TEST_ISOLATE")
+                .map(|val| val == "1" || val.to_lowercase() == "true")
+                .unwrap_or(false)
+            {
+                let pid = process::id();
+
+                if let Some(extension) = canonical.extension() {
+                    let stem = canonical
+                        .file_stem()
+                        .unwrap_or(std::ffi::OsStr::new("nommie"));
+                    let new_filename = format!(
+                        "{}-{}.{}",
+                        stem.to_string_lossy(),
+                        pid,
+                        extension.to_string_lossy()
+                    );
+                    let mut path = canonical.clone();
+                    path.pop();
+                    path.push(new_filename);
+                    path
+                } else {
+                    // No extension, just append the suffix
+                    let new_filename = format!("{}-{}", canonical.display(), pid);
+                    PathBuf::from(new_filename)
+                }
+            } else {
+                canonical
+            };
+
+            Ok(path.to_string_lossy().to_string())
+        }
+        _ => Err(AppError::config_msg(
+            "sqlite file specification not available",
+            "sqlite_file_spec only works with SqliteFile database kind",
+        )),
+    }
+}
+
+/// Create connection string from environment, database kind, and database owner
+pub fn make_conn_spec(
+    env: RuntimeEnv,
+    db_kind: DbKind,
+    owner: DbOwner,
+) -> Result<String, AppError> {
+    match db_kind {
+        DbKind::Postgres => {
+            // Inline db_url logic
+            let host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
+            let port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
+
+            // Inline db_name logic
+            let db_name = match env {
+                RuntimeEnv::Prod => must_var("PROD_DB")?,
+                RuntimeEnv::Test => {
+                    let db_name = must_var("TEST_DB")?;
+                    if !db_name.ends_with("_test") {
+                        return Err(AppError::config_msg(
+                            "test database name invalid",
+                            "test database name must end with _test",
+                        ));
+                    }
+                    db_name
+                }
+            };
+
+            // Inline credentials logic
+            let (username, password) = match owner {
+                DbOwner::App => (must_var("APP_DB_USER")?, must_var("APP_DB_PASSWORD")?),
+                DbOwner::Owner => (
+                    must_var("NOMMIE_OWNER_USER")?,
+                    must_var("NOMMIE_OWNER_PASSWORD")?,
+                ),
+            };
+
+            let url = format!("postgresql://{username}:{password}@{host}:{port}/{db_name}");
+            Ok(url)
+        }
+        DbKind::SqliteFile => {
+            let file_spec = sqlite_file_spec(db_kind, env)?;
+            Ok(format!("sqlite:{}?mode=rwc", file_spec))
+        }
+        DbKind::SqliteMemory => Ok("sqlite::memory:".to_string()),
+    }
 }
 
 /// Database owner enum for different access levels
@@ -25,90 +284,9 @@ pub enum DbOwner {
     Owner,
 }
 
-/// Builds a database URL from environment variables based on profile and owner
-pub fn db_url(profile: DbProfile, owner: DbOwner) -> Result<String, AppError> {
-    let host = host()?;
-    let port = port()?;
-    let db_name = db_name(profile)?;
-    let (username, password) = credentials(owner)?;
-    Ok(format!(
-        "postgresql://{username}:{password}@{host}:{port}/{db_name}"
-    ))
-}
-
-/// Get database host from environment (defaults to localhost)
-fn host() -> Result<String, AppError> {
-    Ok(env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string()))
-}
-
-/// Get database port from environment (defaults to 5432)
-fn port() -> Result<String, AppError> {
-    Ok(env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string()))
-}
-
-/// Get database name based on profile
-fn db_name(profile: DbProfile) -> Result<String, AppError> {
-    match profile {
-        DbProfile::Prod => Ok(must_var("PROD_DB")?),
-        DbProfile::Test => {
-            let db_name = must_var("TEST_DB")?;
-            if !db_name.ends_with("_test") {
-                return Err(AppError::config(format!(
-                    "Test profile requires database name to end with '_test', but got: '{db_name}'"
-                )));
-            }
-            Ok(db_name)
-        }
-        DbProfile::InMemory | DbProfile::SqliteFile { .. } => Err(AppError::config(
-            "SQLite profiles don't use database names from environment variables",
-        )),
-    }
-}
-
-/// Get database credentials based on owner
-fn credentials(owner: DbOwner) -> Result<(String, String), AppError> {
-    match owner {
-        DbOwner::App => Ok((must_var("APP_DB_USER")?, must_var("APP_DB_PASSWORD")?)),
-        DbOwner::Owner => Ok((
-            must_var("NOMMIE_OWNER_USER")?,
-            must_var("NOMMIE_OWNER_PASSWORD")?,
-        )),
-    }
-}
-
 /// Get required environment variable or return error
 fn must_var(name: &str) -> Result<String, AppError> {
-    env::var(name)
-        .map_err(|_| AppError::config(format!("Required environment variable '{name}' is not set")))
-}
-
-/// Canonical, single source of truth for the SQLite file path.
-/// - Uses provided `file` if Some
-/// - Else `${SQLITE_DB_DIR:-./data/sqlite}/nommie.db`
-/// - Creates parent dir
-/// - Canonicalizes leniently (parent first if file not created yet)
-pub fn sqlite_file_path(profile: &DbProfile) -> Result<PathBuf, AppError> {
-    match profile {
-        DbProfile::SqliteFile { file } => {
-            let raw = match file {
-                Some(p) => PathBuf::from(p),
-                None => {
-                    let db_dir =
-                        env::var("SQLITE_DB_DIR").unwrap_or_else(|_| "./data/sqlite".to_string());
-                    Path::new(&db_dir).join("nommie.db")
-                }
-            };
-            if let Some(parent) = raw.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| {
-                    AppError::config(format!("create_dir_all({}): {e}", parent.display()))
-                })?;
-            }
-            canonicalize_lenient(&raw)
-        }
-        _ => Err(AppError::config(
-            "sqlite_file_path called for non-SQLite profile",
-        )),
-    }
+    env::var(name).map_err(|e| AppError::config("environment variable missing", e))
 }
 
 fn canonicalize_lenient(p: &Path) -> Result<PathBuf, AppError> {
@@ -119,113 +297,11 @@ fn canonicalize_lenient(p: &Path) -> Result<PathBuf, AppError> {
                 .parent()
                 .unwrap_or_else(|| Path::new("."))
                 .canonicalize()
-                .map_err(|e| AppError::config(format!("canonicalize({}): {e}", p.display())))?;
+                .map_err(|e| AppError::config("failed to canonicalize path", e))?;
             let file_name = p.file_name().ok_or_else(|| {
-                AppError::config(format!("path has no file name: {}", p.display()))
+                AppError::config_msg("path has no file name", "path has no file name")
             })?;
             Ok(parent.join(file_name))
         }
-    }
-}
-
-/// Stable db key for logging/metrics: "sqlite:file:<canonical path>"
-pub fn sqlite_db_key(profile: &DbProfile) -> Result<String, AppError> {
-    let path = sqlite_file_path(profile)?;
-    Ok(format!("sqlite:file:{}", path.display()))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn set_test_env() {
-        env::set_var("PROD_DB", "nommie");
-        env::set_var("TEST_DB", "nommie_test");
-        env::set_var("APP_DB_USER", "nommie_app");
-        env::set_var("APP_DB_PASSWORD", "app_password");
-        env::set_var("NOMMIE_OWNER_USER", "nommie_owner");
-        env::set_var("NOMMIE_OWNER_PASSWORD", "owner_password");
-    }
-    fn clear_test_env() {
-        for v in [
-            "PROD_DB",
-            "TEST_DB",
-            "APP_DB_USER",
-            "APP_DB_PASSWORD",
-            "NOMMIE_OWNER_USER",
-            "NOMMIE_OWNER_PASSWORD",
-            "POSTGRES_HOST",
-            "POSTGRES_PORT",
-        ] {
-            env::remove_var(v);
-        }
-    }
-    #[test]
-    fn test_db_url_prod_app() {
-        set_test_env();
-        let url = db_url(DbProfile::Prod, DbOwner::App).unwrap();
-        assert_eq!(
-            url,
-            "postgresql://nommie_app:app_password@localhost:5432/nommie"
-        );
-        clear_test_env();
-    }
-    #[test]
-    fn test_db_url_prod_owner() {
-        set_test_env();
-        let url = db_url(DbProfile::Prod, DbOwner::Owner).unwrap();
-        assert_eq!(
-            url,
-            "postgresql://nommie_owner:owner_password@localhost:5432/nommie"
-        );
-        clear_test_env();
-    }
-    #[test]
-    fn test_db_url_test_app() {
-        set_test_env();
-        let url = db_url(DbProfile::Test, DbOwner::App).unwrap();
-        assert_eq!(
-            url,
-            "postgresql://nommie_app:app_password@localhost:5432/nommie_test"
-        );
-        clear_test_env();
-    }
-    #[test]
-    fn test_db_url_test_owner() {
-        set_test_env();
-        let url = db_url(DbProfile::Test, DbOwner::Owner).unwrap();
-        assert_eq!(
-            url,
-            "postgresql://nommie_owner:owner_password@localhost:5432/nommie_test"
-        );
-        clear_test_env();
-    }
-    #[test]
-    fn test_db_url_with_custom_host_port() {
-        set_test_env();
-        env::set_var("POSTGRES_HOST", "db.example.com");
-        env::set_var("POSTGRES_PORT", "5433");
-        let url = db_url(DbProfile::Prod, DbOwner::App).unwrap();
-        assert_eq!(
-            url,
-            "postgresql://nommie_app:app_password@db.example.com:5433/nommie"
-        );
-        env::remove_var("POSTGRES_HOST");
-        env::remove_var("POSTGRES_PORT");
-        clear_test_env();
-    }
-    #[test]
-    fn test_db_url_test_invalid_name() {
-        set_test_env();
-        env::set_var("TEST_DB", "nommie_prod");
-        let result = db_url(DbProfile::Test, DbOwner::App);
-        assert!(result.is_err());
-        clear_test_env();
-    }
-    #[test]
-    fn sqlite_helpers_compile() {
-        let _ = sqlite_db_key(&DbProfile::SqliteFile {
-            file: Some("/tmp/whatever.db".into()),
-        });
     }
 }

@@ -1,5 +1,5 @@
 use actix_web::test;
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
@@ -14,7 +14,8 @@ async fn test_malformed_json_returns_400_with_rfc7807() -> Result<(), Box<dyn st
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config)
         .build()
         .await?;
@@ -45,7 +46,8 @@ async fn test_wrong_type_returns_400_with_rfc7807() -> Result<(), Box<dyn std::e
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config)
         .build()
         .await?;
@@ -86,7 +88,8 @@ async fn test_missing_required_field_returns_400_with_rfc7807(
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config)
         .build()
         .await?;
@@ -127,7 +130,8 @@ async fn test_valid_json_happy_path_unchanged() -> Result<(), Box<dyn std::error
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -178,7 +182,8 @@ async fn test_non_json_content_type_still_attempts_parse() -> Result<(), Box<dyn
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config)
         .build()
         .await?;
@@ -219,7 +224,8 @@ async fn test_empty_body_returns_400_with_rfc7807() -> Result<(), Box<dyn std::e
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config)
         .build()
         .await?;

@@ -1,5 +1,5 @@
 use actix_web::{test, HttpMessage};
-use backend::config::db::DbProfile;
+use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::infra::state::build_state;
@@ -18,7 +18,8 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -76,7 +77,8 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = build_state()
-        .with_db(DbProfile::Test)
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -115,7 +117,11 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
 #[actix_web::test]
 async fn test_me_db_unauthorized() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and default security config
-    let state = build_state().with_db(DbProfile::Test).build().await?;
+    let state = build_state()
+        .with_env(RuntimeEnv::Test)
+        .with_db(DbKind::Postgres)
+        .build()
+        .await?;
 
     // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;
