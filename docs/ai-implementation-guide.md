@@ -121,9 +121,11 @@ Your AI implements three methods, each receiving **read‑only** views:
 
 ## Available Game State
 
-### `CurrentRoundInfo` (high‑level fields)
+### `CurrentRoundInfo` (high-level fields)
+- `game_id: i64` — useful for fetching cached `GameHistory`/`RoundMemory`
 - `player_seat: i16` (0–3), `dealer_pos: i16` (0–3)  
 - `current_round: i16` (1–26), `hand_size: u8`, `game_state: GameState`
+- `hand: Vec<Card>` — remaining cards in your hand after removing plays already recorded
 - `bids: Vec<Option<u8>>`, `trump: Option<Trump>`
 - `trick_no: i16` (1..=hand_size)  
 - `current_trick_plays: Vec<(i16, Card)>`
