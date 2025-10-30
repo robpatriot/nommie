@@ -1,3 +1,4 @@
+pub mod shared_pool_cache;
 pub mod txn;
 pub mod txn_policy;
 

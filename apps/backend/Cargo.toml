@@ -51,6 +51,7 @@ unicode-normalization = "0.1"
 # Concurrency and hashing
 rand = "0.8"
 dashmap = "5.5"
+moka = { version = "0.12", features = ["future"] }
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
 # File system

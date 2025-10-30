@@ -1,16 +1,13 @@
 // Standard library imports
 use std::process;
 use std::str::FromStr;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 // External crate imports
-use dashmap::DashMap;
 use migration::{
     count_applied_migrations, get_latest_migration_version, migrate, MigrationCommand, Migrator,
     MigratorTrait,
 };
-use once_cell::sync::OnceCell;
 use rand::Rng;
 use sea_orm::{
     ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr,
@@ -18,10 +15,8 @@ use sea_orm::{
 };
 use sqlx::postgres::PgPoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
-use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
-use xxhash_rust::xxh3::xxh3_64;
 
 // Local module imports
 use super::diagnostics::{migration_counters, sqlite_diagnostics};
@@ -33,6 +28,7 @@ use crate::config::db::{
     build_connection_settings, make_conn_spec, sqlite_file_spec, validate_db_config,
     ConnectionSettings, DbSettings, PoolPurpose,
 };
+use crate::db::shared_pool_cache::get_or_create_shared_pool;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::logging::pii::Redacted;
@@ -149,144 +145,7 @@ async fn apply_db_settings(
     Ok(())
 }
 
-/// Pool cache key - distinguishes configs without storing secrets
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct PoolKey {
-    env: RuntimeEnv,
-    db_kind: DbKind,
-    db_url_hash: u64, // Hash of the db_url to avoid storing the full URL
-}
-
-impl PoolKey {
-    fn new(env: RuntimeEnv, db_kind: DbKind, db_url: &str) -> Self {
-        Self {
-            env,
-            db_kind,
-            db_url_hash: xxh3_64(db_url.as_bytes()),
-        }
-    }
-
-    /// Create a sanitized representation for logging purposes
-    fn sanitized_log_key(&self, _db_url: &str) -> String {
-        format!("{:?}:{:?}:{:x}", self.env, self.db_kind, self.db_url_hash)
-    }
-}
-
-/// Process-local cache of shared database pools.
-/// Uses DashMap for thread-safe concurrent access.
-static SHARED_POOL_CACHE: OnceCell<DashMap<PoolKey, Arc<DatabaseConnection>>> = OnceCell::new();
-
-/// Per-key initialization locks to prevent duplicate pool creation.
-/// Each (profile, db_url) key has its own mutex to avoid head-of-line blocking.
-static INIT_LOCKS: OnceCell<DashMap<PoolKey, Arc<Mutex<()>>>> = OnceCell::new();
-
-/// Get or create shared pool - idempotent and thread-safe
-async fn get_or_create_shared_pool(
-    env: RuntimeEnv,
-    db_kind: DbKind,
-) -> Result<Arc<DatabaseConnection>, AppError> {
-    // Build connection settings for runtime pool
-    let pool_cfg = build_connection_settings(env, db_kind, PoolPurpose::Runtime)?;
-    // Get the actual database URL for this profile/owner combination
-    let db_url = make_conn_spec(env, db_kind, DbOwner::App)?;
-
-    let pool_key = PoolKey::new(env, db_kind, &db_url);
-    let sanitized_key = pool_key.sanitized_log_key(&db_url);
-
-    // Initialize the caches if they don't exist
-    let cache = SHARED_POOL_CACHE.get_or_init(DashMap::new);
-
-    // Fast path: check if pool already exists
-    if let Some(existing_pool) = cache.get(&pool_key) {
-        debug!(
-            shared_pool = "reuse",
-            key = %Redacted(&sanitized_key),
-            env = ?pool_key.env,
-            db_kind = ?pool_key.db_kind,
-            "Reusing existing shared database pool"
-        );
-        return Ok(existing_pool.clone());
-    }
-
-    // Get or create the per-key mutex for this pool_key
-    let init_locks = INIT_LOCKS.get_or_init(DashMap::new);
-    let lock = {
-        // Get the mutex without holding the DashMap guard across await
-        let mutex_arc = {
-            let mutex_arc = init_locks.get(&pool_key).map(|e| e.value().clone());
-            match mutex_arc {
-                Some(arc) => arc,
-                None => {
-                    // Insert new mutex for this key and return it
-                    let new_mutex = Arc::new(Mutex::new(()));
-                    init_locks.insert(pool_key.clone(), new_mutex.clone());
-                    new_mutex
-                }
-            }
-        };
-        mutex_arc
-    };
-
-    // Acquire the per-key mutex
-    let wait_start = Instant::now();
-    let _guard = lock.lock().await;
-    let dedup_wait_ms = wait_start.elapsed().as_millis();
-
-    if dedup_wait_ms > 0 {
-        debug!(
-            shared_pool = "dedup_wait_ms",
-            key = %Redacted(&sanitized_key),
-            env = ?pool_key.env,
-            db_kind = ?pool_key.db_kind,
-            wait_ms = dedup_wait_ms,
-            "Waited for concurrent pool creation"
-        );
-    }
-
-    // Second cache check after acquiring mutex
-    if let Some(existing_pool) = cache.get(&pool_key) {
-        debug!(
-            shared_pool = "reuse",
-            key = %Redacted(&sanitized_key),
-            env = ?pool_key.env,
-            db_kind = ?pool_key.db_kind,
-            "Reusing pool created by concurrent thread"
-        );
-        return Ok(existing_pool.clone());
-    }
-
-    // Create new pool (critical section under per-key mutex)
-    let new_pool_result = {
-        info!(
-            "pool=about_to_build env={:?} db_kind={:?} owner=App",
-            pool_key.env, pool_key.db_kind
-        );
-        build_pool(env, db_kind, &pool_cfg).await
-    };
-
-    match new_pool_result {
-        Ok(pool) => {
-            let new_pool = Arc::new(pool);
-
-            // Insert into cache (critical section under per-key mutex)
-            cache.insert(pool_key.clone(), new_pool.clone());
-
-            // Clean up: remove the per-key mutex entry to avoid long-term accumulation
-            if let Some(init_locks) = INIT_LOCKS.get() {
-                init_locks.remove(&pool_key);
-            }
-
-            Ok(new_pool)
-        }
-        Err(e) => {
-            // Clean up: remove the per-key mutex entry on error to allow retries
-            if let Some(init_locks) = INIT_LOCKS.get() {
-                init_locks.remove(&pool_key);
-            }
-            Err(e)
-        }
-    }
-}
+// shared pool cache moved to crate::db::shared_pool_cache
 
 /// Determine database engine type for logging
 /// Build the app DB *and* guarantee schema is current.
@@ -973,64 +832,4 @@ async fn setup_sqlite_file_prerequisites(pool: &DatabaseConnection) -> Result<()
     .await?;
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use sea_orm::Database;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn test_pool_key_cache_behavior() {
-        use crate::config::db::{make_conn_spec, DbOwner};
-
-        // Create lightweight test connections
-        let db1 = Database::connect("sqlite::memory:").await.unwrap();
-
-        // Use real URL generation to test the actual flow
-        let url_sqlite_memory =
-            make_conn_spec(RuntimeEnv::Test, DbKind::SqliteMemory, DbOwner::App).unwrap();
-        let url_sqlite_memory_prod =
-            make_conn_spec(RuntimeEnv::Prod, DbKind::SqliteMemory, DbOwner::App).unwrap();
-
-        // Test 1: Same key parameters produce equal keys
-        let key1 = PoolKey::new(RuntimeEnv::Test, DbKind::SqliteMemory, &url_sqlite_memory);
-        let key2 = PoolKey::new(RuntimeEnv::Test, DbKind::SqliteMemory, &url_sqlite_memory);
-        assert_eq!(key1, key2);
-
-        // Test 2: Different env produces different keys (even with same URL for SQLite memory)
-        let key_test = PoolKey::new(RuntimeEnv::Test, DbKind::SqliteMemory, &url_sqlite_memory);
-        let key_prod = PoolKey::new(
-            RuntimeEnv::Prod,
-            DbKind::SqliteMemory,
-            &url_sqlite_memory_prod,
-        );
-        assert_ne!(key_test, key_prod);
-
-        // Test 3: Different db_kind produces different keys
-        let url_sqlite_file =
-            make_conn_spec(RuntimeEnv::Test, DbKind::SqliteFile, DbOwner::App).unwrap();
-        let key_memory = PoolKey::new(RuntimeEnv::Test, DbKind::SqliteMemory, &url_sqlite_memory);
-        let key_file = PoolKey::new(RuntimeEnv::Test, DbKind::SqliteFile, &url_sqlite_file);
-        assert_ne!(key_memory, key_file);
-
-        // Test 4: Cache insert and lookup with real URLs
-        let cache = SHARED_POOL_CACHE.get_or_init(DashMap::new);
-        let test_key = PoolKey::new(RuntimeEnv::Test, DbKind::SqliteMemory, &url_sqlite_memory);
-        let arc_db1 = Arc::new(db1);
-        cache.insert(test_key.clone(), arc_db1.clone());
-
-        // Cache hit - same key returns same Arc
-        let retrieved = cache.get(&test_key).unwrap();
-        assert!(Arc::ptr_eq(&arc_db1, retrieved.value()));
-
-        // Cache miss - different key returns None
-        let other_key = PoolKey::new(
-            RuntimeEnv::Prod,
-            DbKind::SqliteMemory,
-            &url_sqlite_memory_prod,
-        );
-        assert!(cache.get(&other_key).is_none());
-    }
 }
