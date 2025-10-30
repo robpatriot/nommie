@@ -7,6 +7,7 @@ use backend::infra::state::build_state;
 use backend::services::ai::AiService;
 use backend::services::game_flow::GameFlowService;
 use serde_json::json;
+use tracing::info;
 
 use crate::support::test_utils::test_seed;
 
@@ -156,11 +157,7 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         "Game should complete all 26 rounds"
     );
 
-    println!(
-        "✅ Game completed successfully: {} rounds, state: {:?}",
-        game.current_round.unwrap(),
-        game.state
-    );
+    info!(rounds = game.current_round.unwrap(), state = ?game.state, "Game completed successfully");
 
     Ok(())
 }

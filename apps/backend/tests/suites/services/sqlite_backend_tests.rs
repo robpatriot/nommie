@@ -29,6 +29,7 @@ use backend::infra::state::build_state;
 use backend::repos::users;
 use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
+use tracing::info;
 use unicode_normalization::UnicodeNormalization;
 
 #[tokio::test]
@@ -211,8 +212,7 @@ async fn test_sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::err
     let file_time = start.elapsed();
 
     // Both should be fast, but memory should be faster
-    println!("SQLite Memory: {:?}", memory_time);
-    println!("SQLite File: {:?}", file_time);
+    info!(?memory_time, ?file_time, "SQLite performance comparison");
 
     // Both should complete in reasonable time (< 1 second for 10 operations)
     assert!(memory_time.as_millis() < 1000);
