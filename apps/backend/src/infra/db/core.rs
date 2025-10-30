@@ -206,6 +206,7 @@ pub async fn bootstrap_db(
 
     //  Bootstrap ready marker - JUST BEFORE returning the pool
     info!("bootstrap=ready");
+    migration_counters::log_snapshot("bootstrap_db");
 
     // Return the shared pool (same connection that was migrated for InMemory, new pool for others)
     Ok((*shared_pool).clone())
@@ -405,6 +406,7 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, AppEr
         && (!expected_last.is_empty() && current_last.as_deref() == Some(&expected_last));
 
     if is_up_to_date {
+        migration_counters::fast_path_hit();
         debug!(
             fastpath = "hit",
             current_count = current_count,
@@ -413,6 +415,7 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, AppEr
             expected_last = %Redacted(&expected_last)
         );
     } else {
+        migration_counters::fast_path_miss();
         debug!(
             fastpath = "miss",
             current_count = current_count,
@@ -543,6 +546,7 @@ async fn orchestrate_migration_internal(
 
     //  Migrate done marker - AFTER migration orchestration completes (success or error)
     info!("migrate=done");
+    migration_counters::log_snapshot("migrate_orchestration");
 
     result
 }
@@ -594,6 +598,8 @@ where
 
         // Try to acquire lock
         if let Some(acquired_guard) = lock.try_acquire().await? {
+            migration_counters::add_lock_acquire_attempts(attempts as usize);
+            migration_counters::lock_acquired();
             debug!(
                 lock = "won",
                 env = ?env,
@@ -615,12 +621,14 @@ where
             delay_ms = delay_ms,
             elapsed_ms = start.elapsed().as_millis()
         );
+        migration_counters::lock_backoff_event();
 
         // Backoff with cancellation check
         tokio::select! {
             _ = tokio::time::sleep(Duration::from_millis(delay_ms)) => {
                 // Check acquire timeout after sleep
                 if start.elapsed() >= Duration::from_millis(lock_acquire_ms) {
+                    migration_counters::lock_acquire_timeout();
                     return Err(AppError::timeout(
                         ErrorCode::LockTimeoutAcquire,
                         "migration lock acquisition timeout",
@@ -724,12 +732,13 @@ async fn migrate_with_guard_controlled(
         task_result = &mut migration_task => {
             match task_result {
                 Ok(Ok(())) => Ok(()),
-                Ok(Err(e)) => Err(AppError::internal(
+                Ok(Err(e)) => { migration_counters::migration_failed(); Err(AppError::internal(
                     ErrorCode::MigrationFailed,
                     "migration execution failed",
                     e,
-                )),
+                )) },
                 Err(join_err) => {
+                    migration_counters::migration_failed();
                     if join_err.is_panic() {
                         Err(AppError::internal_msg(
                             ErrorCode::MigrationFailed,
@@ -754,6 +763,7 @@ async fn migrate_with_guard_controlled(
                 elapsed_ms = start.elapsed().as_millis(),
                 "Migration body timeout - task aborted"
             );
+            migration_counters::migration_body_timeout();
             Err(AppError::timeout(
                 ErrorCode::LockTimeoutBody,
                 "migration body timeout",
@@ -768,6 +778,7 @@ async fn migrate_with_guard_controlled(
                 elapsed_ms = start.elapsed().as_millis(),
                 "Migration cancelled during body execution - task aborted"
             );
+            migration_counters::migration_cancelled();
             Err(AppError::internal(
                 ErrorCode::MigrationCancelled,
                 "migration cancelled during execution",
@@ -798,6 +809,7 @@ async fn migrate_with_guard_controlled(
 
     // Verify migrations were actually applied
     if applied_count != expected_count {
+        migration_counters::postcheck_mismatch();
         let detail = format!(
             "Migration verification failed: expected {} migrations, but {} were applied (env={:?}, db_kind={:?})",
             expected_count, applied_count, env, db_kind
