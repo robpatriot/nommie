@@ -3,9 +3,6 @@ name = "backend"
 version = "0.1.0"
 edition = "2021"
 
-[features]
-regression-tests = []
-
 [dependencies]
 # Web server framework
 actix-web = { version = "4.4", features = ["macros"] }

@@ -9,7 +9,6 @@ use {tracing, tracing_subscriber};
 use crate::support::resolve_test_db_kind;
 
 #[tokio::test]
-#[cfg_attr(not(feature = "regression-tests"), ignore)]
 async fn contention_burst_all_ok_and_single_migrator() {
     let _ = tracing_subscriber::fmt::try_init();
 

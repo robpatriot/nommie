@@ -18,7 +18,7 @@ use crate::support::test_utils::test_seed;
 /// 3. Marks all AI players ready (triggers auto-start and AI orchestration)
 /// 4. Verifies the game completes all 26 rounds
 #[tokio::test]
-#[cfg_attr(not(feature = "regression-tests"), ignore)]
+#[ignore]
 async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     // Build test state
     let state = build_test_state().await?;

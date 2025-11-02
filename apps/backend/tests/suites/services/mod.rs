@@ -2,6 +2,7 @@ pub mod ai_memory;
 pub mod ai_memory_degradation;
 pub mod domain_error_mapping;
 pub mod game;
+pub mod game_flow_ai;
 pub mod game_flow_happy_paths;
 pub mod game_flow_validations;
 pub mod game_round_progression_props;

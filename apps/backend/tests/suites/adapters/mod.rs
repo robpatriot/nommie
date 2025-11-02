@@ -1,4 +1,5 @@
 pub mod bids_sea;
+pub mod db_bootstrap_contention;
 pub mod games_sea;
 pub mod hands_sea;
 pub mod infra_bootstrap;
