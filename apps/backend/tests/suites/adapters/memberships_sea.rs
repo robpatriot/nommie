@@ -7,7 +7,7 @@ use crate::support::factory::{create_test_game_with_options, create_test_user_wi
 
 #[tokio::test]
 async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -49,7 +49,7 @@ async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_set_ready_updates_only_updated_at() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

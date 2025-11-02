@@ -6,10 +6,11 @@ use backend::infra::state::build_state;
 use crate::support::resolve_test_db_kind;
 
 #[tokio::test]
-async fn builds_without_db() {
+async fn builds_without_db() -> Result<(), AppError> {
     // This should succeed and create an AppState without a database
-    let state = build_state().build().await.unwrap();
+    let state = build_state().build().await?;
     assert!(state.db().is_none());
+    Ok(())
 }
 
 #[tokio::test]

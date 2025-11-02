@@ -8,7 +8,7 @@ use crate::support::test_utils::short_join_code;
 /// Test: create_trick and find_by_round_and_trick
 #[tokio::test]
 async fn test_create_trick_and_find() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -43,7 +43,7 @@ async fn test_create_trick_and_find() -> Result<(), AppError> {
 /// Test: find_all_by_round returns tricks in order
 #[tokio::test]
 async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -74,7 +74,7 @@ async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
 /// Test: count_tricks_by_round
 #[tokio::test]
 async fn test_count_tricks() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -104,7 +104,7 @@ async fn test_count_tricks() -> Result<(), AppError> {
 /// Test: unique constraint on (round_id, trick_no)
 #[tokio::test]
 async fn test_unique_constraint_round_trick() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -139,7 +139,7 @@ async fn test_unique_constraint_round_trick() -> Result<(), AppError> {
 /// Test: all four suits can be used as lead
 #[tokio::test]
 async fn test_all_suits_as_lead() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

@@ -71,8 +71,8 @@ async fn test_db_unavailable_error() -> Result<HttpResponse, AppError> {
 /// Test that all error responses conform to ProblemDetails format
 /// This test consolidates all error type testing into a single, parameterized test
 #[actix_web::test]
-async fn test_all_error_responses_conform_to_problem_details() {
-    let state = build_test_state().await.expect("create test state");
+async fn test_all_error_responses_conform_to_problem_details() -> Result<(), AppError> {
+    let state = build_test_state().await?;
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/validation", web::get().to(test_validation_error))
@@ -91,8 +91,7 @@ async fn test_all_error_responses_conform_to_problem_details() {
                 );
         })
         .build()
-        .await
-        .expect("create test app");
+        .await?;
 
     // Test all error types to ensure they conform to ProblemDetails format
     let error_cases = vec![
@@ -136,24 +135,25 @@ async fn test_all_error_responses_conform_to_problem_details() {
         let resp = test::call_service(&app, req).await;
         assert_problem_details_structure(resp, status, code, detail).await;
     }
+
+    Ok(())
 }
 
 // handler-only: validates error shape; no DB
 /// Test that successful responses don't interfere with error handling
 #[actix_web::test]
-async fn test_successful_response_with_error_handling() {
+async fn test_successful_response_with_error_handling() -> Result<(), AppError> {
     async fn success_handler() -> Result<HttpResponse, AppError> {
         Ok(HttpResponse::Ok().body("Success"))
     }
 
-    let state = build_test_state().await.expect("create test state");
+    let state = build_test_state().await?;
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/success", web::get().to(success_handler));
         })
         .build()
-        .await
-        .expect("create test app");
+        .await?;
 
     let req = test::TestRequest::get().uri("/_test/success").to_request();
     let resp = test::call_service(&app, req).await;
@@ -172,12 +172,14 @@ async fn test_successful_response_with_error_handling() {
     // Body should be the success message
     let body = test::read_body(resp).await;
     assert_eq!(body, "Success");
+
+    Ok(())
 }
 
 // handler-only: validates error shape; no DB
 /// Test edge case: error with trace_id from task-local context
 #[actix_web::test]
-async fn test_error_with_trace_id_from_context() {
+async fn test_error_with_trace_id_from_context() -> Result<(), AppError> {
     async fn error_with_trace() -> Result<HttpResponse, AppError> {
         // Create error - trace_id will come from task-local context
         Err(AppError::invalid(
@@ -186,20 +188,21 @@ async fn test_error_with_trace_id_from_context() {
         ))
     }
 
-    let state = build_test_state().await.expect("create test state");
+    let state = build_test_state().await?;
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/no_trace", web::get().to(error_with_trace));
         })
         .build()
-        .await
-        .expect("create test app");
+        .await?;
 
     let req = test::TestRequest::get().uri("/_test/no_trace").to_request();
     let resp = test::call_service(&app, req).await;
 
     // Validate error structure using centralized helper
     assert_problem_details_structure(resp, 400, "NO_TRACE", "Error without trace").await;
+
+    Ok(())
 }
 
 // handler-only: validates error shape; no DB
@@ -215,7 +218,7 @@ async fn test_trace_ctx_outside_context() {
 // handler-only: validates error shape; no DB
 /// Test edge case: malformed error response handling
 #[actix_web::test]
-async fn test_malformed_error_response_handling() {
+async fn test_malformed_error_response_handling() -> Result<(), AppError> {
     async fn malformed_error() -> Result<HttpResponse, AppError> {
         // This would create a malformed response if not handled properly
         Err(AppError::internal(
@@ -225,14 +228,13 @@ async fn test_malformed_error_response_handling() {
         ))
     }
 
-    let state = build_test_state().await.expect("create test state");
+    let state = build_test_state().await?;
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/malformed", web::get().to(malformed_error));
         })
         .build()
-        .await
-        .expect("create test app");
+        .await?;
 
     let req = test::TestRequest::get()
         .uri("/_test/malformed")
@@ -241,6 +243,8 @@ async fn test_malformed_error_response_handling() {
 
     // Validate error structure using centralized helper
     assert_problem_details_structure(resp, 500, "INTERNAL_ERROR", "malformed error response").await;
+
+    Ok(())
 }
 
 /// Test endpoint that uses require_db helper
@@ -257,13 +261,10 @@ async fn test_require_db_endpoint(state: web::Data<AppState>) -> Result<HttpResp
 // require_db: negative (no DB configured)
 /// Test that require_db helper returns DB_UNAVAILABLE error when no DB is configured
 #[actix_web::test]
-async fn test_require_db_direct_without_database() {
+async fn test_require_db_direct_without_database() -> Result<(), AppError> {
     use backend::db::require_db;
 
-    let state = build_state()
-        .build()
-        .await
-        .expect("create test state without DB");
+    let state = build_state().build().await?;
 
     let res = require_db(&state);
     assert!(
@@ -273,24 +274,22 @@ async fn test_require_db_direct_without_database() {
 
     let err = res.unwrap_err();
     assert_eq!(err.code(), ErrorCode::DbUnavailable);
+
+    Ok(())
 }
 
 // require_db: negative (no DB configured)
 /// Test that require_db helper returns DB_UNAVAILABLE error when no DB is configured
 #[actix_web::test]
-async fn test_require_db_without_database() {
-    let state = build_state()
-        .build()
-        .await
-        .expect("create test state without DB");
+async fn test_require_db_without_database() -> Result<(), AppError> {
+    let state = build_state().build().await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/require_db", web::get().to(test_require_db_endpoint));
         })
         .build()
-        .await
-        .expect("create test app");
+        .await?;
 
     let req = test::TestRequest::get()
         .uri("/_test/require_db")
@@ -299,21 +298,22 @@ async fn test_require_db_without_database() {
 
     // Should return DB_UNAVAILABLE problem details with trace id
     assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "database unavailable").await;
+
+    Ok(())
 }
 
 // require_db: positive (DB configured)
 /// Test that require_db helper succeeds when DB is configured
 #[actix_web::test]
-async fn test_require_db_with_database() {
-    let state = build_test_state().await.expect("create test state with DB");
+async fn test_require_db_with_database() -> Result<(), AppError> {
+    let state = build_test_state().await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/require_db", web::get().to(test_require_db_endpoint));
         })
         .build()
-        .await
-        .expect("create test app");
+        .await?;
 
     let req = test::TestRequest::get()
         .uri("/_test/require_db")
@@ -330,6 +330,8 @@ async fn test_require_db_with_database() {
     // Body should be "Success"
     let body = test::read_body(resp).await;
     assert_eq!(body, "Success");
+
+    Ok(())
 }
 
 /// Test endpoint that returns an optimistic lock conflict with extensions
@@ -343,8 +345,8 @@ async fn test_optimistic_lock_error() -> Result<HttpResponse, AppError> {
 
 /// Test that optimistic lock conflicts include extensions with version info
 #[actix_web::test]
-async fn test_optimistic_lock_extensions() {
-    let state = build_state().build().await.expect("create test state");
+async fn test_optimistic_lock_extensions() -> Result<(), AppError> {
+    let state = build_state().build().await?;
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route(
@@ -353,8 +355,7 @@ async fn test_optimistic_lock_extensions() {
             );
         })
         .build()
-        .await
-        .expect("create test app");
+        .await?;
 
     let req = test::TestRequest::get()
         .uri("/_test/optimistic_lock")
@@ -388,4 +389,6 @@ async fn test_optimistic_lock_extensions() {
         .expect("extensions present");
     assert_eq!(extensions["expected"], 5);
     assert_eq!(extensions["actual"], 7);
+
+    Ok(())
 }

@@ -14,7 +14,7 @@ use crate::support::test_utils::short_join_code as unique_join_code;
 /// Test: create_game and find_by_id
 #[tokio::test]
 async fn test_create_and_find_by_id() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -50,7 +50,7 @@ async fn test_create_and_find_by_id() -> Result<(), AppError> {
 /// Test: find_by_join_code
 #[tokio::test]
 async fn test_find_by_join_code() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -76,7 +76,7 @@ async fn test_find_by_join_code() -> Result<(), AppError> {
 /// Test: find_by_id returns None for non-existent game
 #[tokio::test]
 async fn test_find_by_id_not_found() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -95,7 +95,7 @@ async fn test_find_by_id_not_found() -> Result<(), AppError> {
 /// Test: find_by_join_code returns None for non-existent code
 #[tokio::test]
 async fn test_find_by_join_code_not_found() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -113,7 +113,7 @@ async fn test_find_by_join_code_not_found() -> Result<(), AppError> {
 /// Test: require_game returns game if exists
 #[tokio::test]
 async fn test_require_game_exists() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -135,7 +135,7 @@ async fn test_require_game_exists() -> Result<(), AppError> {
 /// Test: require_game returns error if not found
 #[tokio::test]
 async fn test_require_game_not_found() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -160,7 +160,7 @@ async fn test_require_game_not_found() -> Result<(), AppError> {
 /// Test: duplicate join_code constraint violation
 #[tokio::test]
 async fn test_duplicate_join_code_fails() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -193,7 +193,7 @@ async fn test_duplicate_join_code_fails() -> Result<(), AppError> {
 /// Test: update_metadata changes name and visibility
 #[tokio::test]
 async fn test_update_metadata() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -234,7 +234,7 @@ async fn test_update_metadata() -> Result<(), AppError> {
 /// Test: update_round changes round fields
 #[tokio::test]
 async fn test_update_round() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -269,7 +269,7 @@ async fn test_update_round() -> Result<(), AppError> {
 /// Test: timestamp invariants on create
 #[tokio::test]
 async fn test_create_timestamps() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -305,7 +305,7 @@ async fn test_create_timestamps() -> Result<(), AppError> {
 /// Test: timestamp invariants on update
 #[tokio::test]
 async fn test_update_timestamps() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -345,7 +345,7 @@ async fn test_update_timestamps() -> Result<(), AppError> {
 /// Test: lock_version increments on each update
 #[tokio::test]
 async fn test_lock_version_increments() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -392,7 +392,7 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
 /// Test: update_metadata with None name clears the name
 #[tokio::test]
 async fn test_update_metadata_clear_name() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -425,7 +425,7 @@ async fn test_update_metadata_clear_name() -> Result<(), AppError> {
 /// Test: update_round with partial fields only updates specified fields
 #[tokio::test]
 async fn test_update_round_partial() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -460,7 +460,7 @@ async fn test_update_round_partial() -> Result<(), AppError> {
 /// Test: update_state transitions work correctly
 #[tokio::test]
 async fn test_update_state_transitions() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -497,7 +497,7 @@ async fn test_update_state_transitions() -> Result<(), AppError> {
 /// Test: create_game with minimal DTO uses defaults
 #[tokio::test]
 async fn test_create_game_defaults() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

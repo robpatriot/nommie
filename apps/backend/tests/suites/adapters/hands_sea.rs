@@ -8,7 +8,7 @@ use crate::support::test_utils::short_join_code;
 /// Test: create_hands and find_by_round_and_seat roundtrip
 #[tokio::test]
 async fn test_create_hands_and_find_by_seat() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -77,7 +77,7 @@ async fn test_create_hands_and_find_by_seat() -> Result<(), AppError> {
 /// Test: find_all_by_round returns all hands
 #[tokio::test]
 async fn test_find_all_by_round() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -141,7 +141,7 @@ async fn test_find_all_by_round() -> Result<(), AppError> {
 /// Test: find_by_round_and_seat returns None for non-existent hand
 #[tokio::test]
 async fn test_find_by_round_and_seat_not_found() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -164,7 +164,7 @@ async fn test_find_by_round_and_seat_not_found() -> Result<(), AppError> {
 /// Test: empty hands (player has no cards)
 #[tokio::test]
 async fn test_empty_hand() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -191,7 +191,7 @@ async fn test_empty_hand() -> Result<(), AppError> {
 /// Test: unique constraint on (round_id, player_seat)
 #[tokio::test]
 async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

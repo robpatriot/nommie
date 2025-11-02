@@ -9,7 +9,7 @@ use crate::support::factory::{create_test_game, create_test_user};
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -33,7 +33,7 @@ async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -57,7 +57,7 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -84,7 +84,7 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_missing_user() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

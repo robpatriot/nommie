@@ -8,7 +8,7 @@ use crate::support::test_utils::short_join_code;
 /// Test: create_play and find_all_by_trick
 #[tokio::test]
 async fn test_create_play_and_find_all() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -54,7 +54,7 @@ async fn test_create_play_and_find_all() -> Result<(), AppError> {
 /// Test: count_plays_by_trick
 #[tokio::test]
 async fn test_count_plays() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -90,7 +90,7 @@ async fn test_count_plays() -> Result<(), AppError> {
 /// Test: complete trick with 4 plays
 #[tokio::test]
 async fn test_complete_trick_with_four_plays() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -162,7 +162,7 @@ async fn test_complete_trick_with_four_plays() -> Result<(), AppError> {
 /// Test: unique constraint on (trick_id, player_seat)
 #[tokio::test]
 async fn test_unique_constraint_trick_seat() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -217,7 +217,7 @@ async fn test_unique_constraint_trick_seat() -> Result<(), AppError> {
 /// Test: unique constraint on (trick_id, play_order)
 #[tokio::test]
 async fn test_unique_constraint_trick_order() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -272,7 +272,7 @@ async fn test_unique_constraint_trick_order() -> Result<(), AppError> {
 /// Test: plays are ordered correctly
 #[tokio::test]
 async fn test_plays_ordering() -> Result<(), AppError> {
-    let state = build_test_state().await.expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
