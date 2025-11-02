@@ -540,7 +540,7 @@ async fn release_idempotence() {
 }
 
 #[tokio::test]
-async fn sqlite_path_normalization() {
+async fn path_normalization_sqlite_file() {
     // Test that normalize_lock_path correctly handles various path formats
 
     let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
@@ -548,7 +548,7 @@ async fn sqlite_path_normalization() {
     // Only test SQLite file path normalization
     if db_kind != DbKind::SqliteFile {
         println!(
-            "Skipping sqlite_path_normalization for DbKind::{:?}",
+            "Skipping path_normalization_sqlite_file for DbKind::{:?}",
             db_kind
         );
         return;
