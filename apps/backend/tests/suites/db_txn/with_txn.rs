@@ -3,13 +3,12 @@
 // This module now uses the common initialization which sets the
 // RollbackOnOk policy and does not persist writes to the database.
 
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, TxnPolicy};
-use backend::infra::state::build_state;
 use tracing::debug;
 use ulid::Ulid;
 
+use crate::support::build_test_state;
 use crate::support::db_games::{count_games_by_name_pool, insert_minimal_game_for_test};
 
 #[actix_web::test]
@@ -18,15 +17,10 @@ async fn test_rollback_policy() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(current(), TxnPolicy::RollbackOnOk);
 
     // Build state with a real Test DB
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await?;
+    let state = build_test_state().await?;
 
     // Use unique marker for name
     let name = Ulid::new().to_string();
-
     // Reads use fresh pool to check visibility post-rollback
     let before = count_games_by_name_pool(&state, &name).await?;
 
@@ -55,11 +49,7 @@ async fn test_rollback_policy_on_error() -> Result<(), Box<dyn std::error::Error
     assert_eq!(current(), TxnPolicy::RollbackOnOk);
 
     // Build state with a real Test DB
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await?;
+    let state = build_test_state().await?;
 
     // Use unique marker for name
     let name = Ulid::new().to_string();

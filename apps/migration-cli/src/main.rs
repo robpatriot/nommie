@@ -1,6 +1,6 @@
-use clap::{Parser, ValueEnum};
 use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::db::orchestrate_migration;
+use clap::{Parser, ValueEnum};
 use migration::MigrationCommand;
 
 #[derive(Clone, ValueEnum)]
@@ -22,13 +22,19 @@ struct Args {
     /// Migration command to run
     #[arg(value_enum)]
     command: String,
-    
+
     /// Runtime environment
     #[arg(short, long, value_enum, default_value = "test")]
     env: Env,
-    
+
     /// Database type
-    #[arg(short, long, value_enum, default_value = "postgres", help = "Database type: postgres, sqlite-file")]
+    #[arg(
+        short,
+        long,
+        value_enum,
+        default_value = "postgres",
+        help = "Database type: postgres, sqlite-file"
+    )]
     db: Db,
 }
 
@@ -53,8 +59,12 @@ async fn main() {
                 eprintln!("❌ Unsupported database type provided.");
                 eprintln!("");
                 eprintln!("Note: SQLite in-memory databases are not supported for CLI operations.");
-                eprintln!("Reason: In-memory databases are ephemeral - each CLI command creates a fresh");
-                eprintln!("database that is destroyed when the command completes, making migration");
+                eprintln!(
+                    "Reason: In-memory databases are ephemeral - each CLI command creates a fresh"
+                );
+                eprintln!(
+                    "database that is destroyed when the command completes, making migration"
+                );
                 eprintln!("operations pointless.");
                 eprintln!("");
                 eprintln!("Supported database types:");
@@ -78,7 +88,9 @@ async fn main() {
         "refresh" => MigrationCommand::Refresh,
         "status" => MigrationCommand::Status,
         other => {
-            eprintln!("Unknown command: {other}. Use: up | down | fresh | reset | refresh | status");
+            eprintln!(
+                "Unknown command: {other}. Use: up | down | fresh | reset | refresh | status"
+            );
             std::process::exit(2);
         }
     };

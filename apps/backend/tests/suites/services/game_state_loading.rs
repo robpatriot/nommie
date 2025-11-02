@@ -1,12 +1,11 @@
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use backend::repos::{games, rounds, tricks};
 use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
 
+use crate::support::build_test_state;
 use crate::support::game_phases::{
     setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
     setup_game_in_trump_selection_phase,
@@ -17,12 +16,7 @@ use crate::support::trick_helpers::create_tricks_by_winner_counts;
 /// Test: Load game state from database after dealing
 #[tokio::test]
 async fn test_load_state_after_deal() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -56,12 +50,7 @@ async fn test_load_state_after_deal() -> Result<(), AppError> {
 /// Test: Load state after bidding completes
 #[tokio::test]
 async fn test_load_state_after_bidding() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -93,12 +82,7 @@ async fn test_load_state_after_bidding() -> Result<(), AppError> {
 /// Test: Load state after trump selection
 #[tokio::test]
 async fn test_load_state_after_trump() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -136,12 +120,7 @@ async fn test_load_state_after_trump() -> Result<(), AppError> {
 /// Test: Load state with trick in progress
 #[tokio::test]
 async fn test_load_state_mid_trick() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -213,12 +192,7 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
 /// Test: Load state with cumulative scores
 #[tokio::test]
 async fn test_load_state_with_scores() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -255,12 +229,7 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
 /// Test: Load state for unstarted game (Lobby)
 #[tokio::test]
 async fn test_load_state_lobby() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

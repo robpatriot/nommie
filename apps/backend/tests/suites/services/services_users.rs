@@ -1,23 +1,18 @@
 use actix_web::http::StatusCode;
 use actix_web::ResponseError;
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::user_credentials;
 use backend::error::AppError;
 use backend::errors::ErrorCode;
-use backend::infra::state::build_state;
 use backend::services::users::UserService;
 use backend::utils::unique::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 
+use crate::support::build_test_state;
+
 #[tokio::test]
 async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -93,12 +88,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -200,12 +190,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -290,12 +275,7 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -347,12 +327,7 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
 
 #[tokio::test]
 async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -388,12 +363,7 @@ async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_email_validation_missing_at_symbol() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -425,12 +395,7 @@ async fn test_email_validation_missing_at_symbol() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_email_validation_multiple_at_symbols() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -462,12 +427,7 @@ async fn test_email_validation_multiple_at_symbols() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_email_validation_empty_local_part() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -499,12 +459,7 @@ async fn test_email_validation_empty_local_part() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_email_validation_empty_domain() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -536,12 +491,7 @@ async fn test_email_validation_empty_domain() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_email_validation_whitespace_only() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

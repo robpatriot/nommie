@@ -1,5 +1,4 @@
 use actix_web::{test, HttpMessage};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::infra::state::build_state;
@@ -11,15 +10,14 @@ use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
 use crate::support::auth::mint_test_token;
 use crate::support::factory::seed_user_with_sub;
+use crate::support::test_state_builder;
 
 #[actix_web::test]
 async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -76,9 +74,7 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and custom security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -116,12 +112,8 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
 
 #[actix_web::test]
 async fn test_me_db_unauthorized() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and default security config
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await?;
+    // Build state without database (test doesn't need it)
+    let state = build_state().build().await?;
 
     // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;

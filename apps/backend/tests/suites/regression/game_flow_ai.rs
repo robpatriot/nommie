@@ -1,14 +1,13 @@
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::GameState;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use backend::services::ai::AiService;
 use backend::services::game_flow::GameFlowService;
 use serde_json::json;
 use tracing::info;
 
+use crate::support::build_test_state;
 use crate::support::test_utils::test_seed;
 
 /// Test that a full game with 4 AI players completes successfully.
@@ -22,12 +21,7 @@ use crate::support::test_utils::test_seed;
 #[cfg_attr(not(feature = "regression-tests"), ignore)]
 async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     // Build test state
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     // Open SharedTxn for this test
     let db = require_db(&state).expect("DB required for this test");

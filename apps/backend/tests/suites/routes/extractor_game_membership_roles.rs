@@ -6,13 +6,11 @@
 // - Role hierarchy logic
 
 use actix_web::{test, web, HttpMessage, Responder};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::{CurrentUser, GameId, GameMembership};
-use backend::infra::state::build_state;
 use backend::repos::memberships::GameRole;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
@@ -23,6 +21,7 @@ use time::OffsetDateTime;
 use crate::support::app_builder::create_test_app;
 use crate::support::auth::mint_test_token;
 use crate::support::factory::create_test_user;
+use crate::support::test_state_builder;
 
 /// Test-only handler that requires Player role (rejects Spectators)
 async fn player_only_action(
@@ -81,9 +80,7 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     // Test that handlers can enforce role-based access control
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -160,9 +157,7 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     // Test that handlers accepting any role work correctly
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;

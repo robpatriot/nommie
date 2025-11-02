@@ -6,13 +6,11 @@
 // - Composition with CurrentUser and GameId extractors
 
 use actix_web::{test, web, HttpMessage, Responder};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::{CurrentUser, GameId, GameMembership};
-use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, Set};
@@ -23,6 +21,7 @@ use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
 use crate::support::auth::mint_test_token;
 use crate::support::factory::create_test_user;
+use crate::support::test_state_builder;
 
 /// Test-only handler that echoes back the membership for testing
 async fn echo_membership(
@@ -54,9 +53,7 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -131,9 +128,7 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -203,9 +198,7 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -276,9 +269,7 @@ async fn test_membership_composition_with_current_user_and_game_id(
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -355,9 +346,7 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;

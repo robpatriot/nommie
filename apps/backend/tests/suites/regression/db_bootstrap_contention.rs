@@ -1,4 +1,4 @@
-use backend::config::db::{DbKind, RuntimeEnv};
+use backend::config::db::RuntimeEnv;
 use backend::infra::db::{bootstrap_db, build_admin_pool};
 use futures::future::join_all;
 use migration::{count_applied_migrations, Migrator, MigratorTrait};
@@ -6,14 +6,17 @@ use sea_orm::{ConnectionTrait, DatabaseBackend};
 use tokio::time::{timeout, Duration};
 use {tracing, tracing_subscriber};
 
-async fn assert_contention_run_once_then_idempotent(
-    env: RuntimeEnv,
-    db_kind: DbKind,
-    backend: DatabaseBackend,
-    burst_n: usize,
-    timeout_secs: u64,
-) {
+use crate::support::resolve_test_db_kind;
+
+#[tokio::test]
+#[cfg_attr(not(feature = "regression-tests"), ignore)]
+async fn contention_burst_all_ok_and_single_migrator() {
     let _ = tracing_subscriber::fmt::try_init();
+
+    let env = RuntimeEnv::Test;
+    let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
+    let burst_n = 6;
+    let timeout_secs = 6;
 
     // Compute total migrations known to the migrator
     let total_migrations = Migrator::migrations().len();
@@ -30,6 +33,9 @@ async fn assert_contention_run_once_then_idempotent(
     let baseline = count_applied_migrations(&baseline_admin_pool)
         .await
         .unwrap_or(0);
+
+    // Determine the correct backend for database operations
+    let backend = DatabaseBackend::from(db_kind);
 
     // Launch burst_n concurrent tasks, each calling bootstrap_db(env, db_kind),
     // wrapped in a timeout of timeout_secs. After each completes, assert the pool
@@ -123,31 +129,4 @@ async fn assert_contention_run_once_then_idempotent(
         "total_migrations={}, baseline={}, after={}, applied={}, expected_pending={}, again_after={}",
         total_migrations, baseline, after, applied, expected_pending, again_after
     );
-}
-
-#[tokio::test]
-#[cfg_attr(not(feature = "regression-tests"), ignore)]
-async fn pg_contention_burst_all_ok_and_single_migrator() {
-    assert_contention_run_once_then_idempotent(
-        RuntimeEnv::Test,
-        DbKind::Postgres,
-        DatabaseBackend::Postgres,
-        6, // burst_n
-        6, // timeout_secs
-    )
-    .await;
-}
-
-#[tokio::test]
-#[cfg_attr(not(feature = "regression-tests"), ignore)]
-async fn sqlite_file_sidecar_lock_under_parallel_bootstrap() {
-    // Build one shared file profile to contend on the sidecar lock.
-    assert_contention_run_once_then_idempotent(
-        RuntimeEnv::Test,
-        DbKind::SqliteFile,
-        DatabaseBackend::Sqlite,
-        6, // burst_n
-        6, // timeout_secs
-    )
-    .await;
 }

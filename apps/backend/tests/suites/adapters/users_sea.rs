@@ -1,20 +1,15 @@
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::errors::domain::{ConflictKind, DomainError};
-use backend::infra::state::build_state;
 use backend::repos::users;
 use backend::utils::unique::{unique_email, unique_str};
+
+use crate::support::build_test_state;
 
 /// Test: find_credentials_by_email returns None when email doesn't exist
 #[tokio::test]
 async fn test_find_credentials_by_email_not_found() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -36,12 +31,7 @@ async fn test_find_credentials_by_email_not_found() -> Result<(), AppError> {
 /// Test: create_user and find_user_by_id roundtrip
 #[tokio::test]
 async fn test_create_user_and_find_by_id_roundtrip() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -76,12 +66,7 @@ async fn test_create_user_and_find_by_id_roundtrip() -> Result<(), AppError> {
 /// Test: find_user_by_id returns None for non-existent user
 #[tokio::test]
 async fn test_find_user_by_id_not_found() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -103,12 +88,7 @@ async fn test_find_user_by_id_not_found() -> Result<(), AppError> {
 /// Test: create_credentials with duplicate email returns typed unique violation error
 #[tokio::test]
 async fn test_create_credentials_duplicate_email_unique_violation() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -146,12 +126,7 @@ async fn test_create_credentials_duplicate_email_unique_violation() -> Result<()
 /// Test: create_credentials with duplicate google_sub returns typed unique violation error
 #[tokio::test]
 async fn test_create_credentials_duplicate_google_sub_unique_violation() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -193,12 +168,7 @@ async fn test_create_credentials_duplicate_google_sub_unique_violation() -> Resu
 /// Test: update_credentials idempotency - updating with same values succeeds
 #[tokio::test]
 async fn test_update_credentials_idempotent() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -228,12 +198,7 @@ async fn test_update_credentials_idempotent() -> Result<(), AppError> {
 /// Test: create credentials, find by email, verify roundtrip
 #[tokio::test]
 async fn test_create_and_find_credentials_by_email_roundtrip() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -268,12 +233,7 @@ async fn test_create_and_find_credentials_by_email_roundtrip() -> Result<(), App
 /// This test ensures the full error flow from adapter through repo to service
 #[tokio::test]
 async fn test_not_found_user_maps_to_typed_error() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

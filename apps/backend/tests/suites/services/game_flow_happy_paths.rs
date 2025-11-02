@@ -4,28 +4,22 @@
 // round completion, scoring, and game completion. All tests verify deterministic
 // outcomes and proper state transitions.
 
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState};
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use backend::repos::{bids, games as games_repo, rounds, scores, tricks};
 use backend::services::game_flow::GameFlowService;
 use sea_orm::EntityTrait;
 use tracing::info;
 
+use crate::support::build_test_state;
 use crate::support::game_phases::{setup_game_in_bidding_phase, setup_game_in_trick_play_phase};
 use crate::support::game_setup::setup_game_with_players;
 use crate::support::trick_helpers::{create_tricks_by_winner_counts, create_tricks_with_winners};
 
 #[tokio::test]
 async fn test_deal_round_transitions_to_bidding() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -56,12 +50,7 @@ async fn test_deal_round_transitions_to_bidding() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_deal_round_with_different_seeds_produces_different_outcomes() -> Result<(), AppError>
 {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -93,12 +82,7 @@ async fn test_deal_round_with_different_seeds_produces_different_outcomes() -> R
 
 #[tokio::test]
 async fn test_submit_bid_succeeds_after_deal() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -122,12 +106,7 @@ async fn test_submit_bid_succeeds_after_deal() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -205,12 +184,7 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -269,12 +243,7 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_end_to_end_one_round() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -378,12 +347,7 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_game_completes_after_final_round() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

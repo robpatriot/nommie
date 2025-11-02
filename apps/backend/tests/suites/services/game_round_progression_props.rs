@@ -3,25 +3,19 @@
 // These tests verify state monotonicity, lock_version increments, and timestamp invariants
 // across granular service steps (deal, bid, play tricks).
 
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState as DbGameState};
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use backend::services::game_flow::GameFlowService;
 use sea_orm::EntityTrait;
 
+use crate::support::build_test_state;
 use crate::support::game_setup::setup_game_with_players;
 
 /// Test: State monotonicity - game state should only advance forward
 #[tokio::test]
 async fn test_state_monotonicity() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -62,12 +56,7 @@ async fn test_state_monotonicity() -> Result<(), AppError> {
 /// Test: lock_version increments across persisted steps
 #[tokio::test]
 async fn test_lock_version_increments() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -110,12 +99,7 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
 /// Test: created_at constant, updated_at strictly increases
 #[tokio::test]
 async fn test_timestamp_invariants() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -160,12 +144,7 @@ async fn test_timestamp_invariants() -> Result<(), AppError> {
 /// Test: Complete a deterministic first trick
 #[tokio::test]
 async fn test_deterministic_first_trick() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -207,12 +186,7 @@ async fn test_deterministic_first_trick() -> Result<(), AppError> {
 /// Test: Granular round progression with state checks
 #[tokio::test]
 async fn test_granular_round_progression() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -286,12 +260,7 @@ async fn test_granular_round_progression() -> Result<(), AppError> {
 /// Test: Deterministic dealing with fixed seed produces reproducible results
 #[tokio::test]
 async fn test_deterministic_dealing_reproducible() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -335,12 +304,7 @@ async fn test_deterministic_dealing_reproducible() -> Result<(), AppError> {
 /// Test: Invalid bid should fail with appropriate error
 #[tokio::test]
 async fn test_invalid_bid_fails() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -378,12 +342,7 @@ async fn test_invalid_bid_fails() -> Result<(), AppError> {
 /// Test: Out of turn bid should fail
 #[tokio::test]
 async fn test_out_of_turn_bid_fails() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -424,12 +383,7 @@ async fn test_out_of_turn_bid_fails() -> Result<(), AppError> {
 /// Test: Bid in wrong phase should fail
 #[tokio::test]
 async fn test_bid_in_wrong_phase_fails() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

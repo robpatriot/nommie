@@ -4,13 +4,11 @@
 // injected SharedTxn when present, and fall back to pooled connections otherwise.
 
 use actix_web::{test, web, FromRequest};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::current_user_db::CurrentUserRecord;
 use backend::extractors::game_id::GameId;
-use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
@@ -18,6 +16,7 @@ use time::OffsetDateTime;
 
 use crate::support::auth::bearer_header;
 use crate::support::factory::seed_user_with_sub;
+use crate::support::{build_test_state, test_state_builder};
 
 /// Insert a minimal game, return its id
 async fn insert_test_game(
@@ -42,9 +41,7 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
     // Build state with Test DB + Security (JWT)
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -88,11 +85,7 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
 #[actix_web::test]
 async fn test_game_id_with_shared_txn() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with Test DB (no security needed)
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await?;
+    let state = build_test_state().await?;
 
     // Open a shared txn first
     let db = require_db(&state).expect("DB required for this test");

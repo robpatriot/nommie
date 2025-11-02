@@ -1,12 +1,11 @@
 // Tests for AI-specific memory modes and card play access.
 
 use backend::ai::memory::{get_round_card_plays, MemoryMode};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 
+use crate::support::build_test_state;
 use crate::support::test_utils::test_seed;
 
 #[actix_web::test]
@@ -28,12 +27,7 @@ async fn test_memory_mode_conversions() {
 
 #[actix_web::test]
 async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
@@ -100,12 +94,7 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
 
 #[actix_web::test]
 async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
@@ -247,12 +236,7 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
 
 #[actix_web::test]
 async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
@@ -304,12 +288,7 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
 
 #[actix_web::test]
 async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();

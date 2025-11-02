@@ -1,20 +1,14 @@
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use backend::repos::{games, rounds};
 
+use crate::support::build_test_state;
 use crate::support::test_utils::short_join_code;
 
 /// Test: create_round and find_by_id roundtrip
 #[tokio::test]
 async fn test_create_round_and_find_by_id_roundtrip() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -49,12 +43,7 @@ async fn test_create_round_and_find_by_id_roundtrip() -> Result<(), AppError> {
 /// Test: find_by_game_and_round locates correct round
 #[tokio::test]
 async fn test_find_by_game_and_round() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -88,12 +77,7 @@ async fn test_find_by_game_and_round() -> Result<(), AppError> {
 /// Test: find_by_game_and_round returns None for non-existent round
 #[tokio::test]
 async fn test_find_by_game_and_round_not_found() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -114,12 +98,7 @@ async fn test_find_by_game_and_round_not_found() -> Result<(), AppError> {
 /// Test: update_trump sets trump selection
 #[tokio::test]
 async fn test_update_trump() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -148,12 +127,7 @@ async fn test_update_trump() -> Result<(), AppError> {
 /// Test: update_trump with NoTrump
 #[tokio::test]
 async fn test_update_trump_no_trump() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -175,12 +149,7 @@ async fn test_update_trump_no_trump() -> Result<(), AppError> {
 /// Test: complete_round sets completed_at timestamp
 #[tokio::test]
 async fn test_complete_round() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -209,12 +178,7 @@ async fn test_complete_round() -> Result<(), AppError> {
 /// Test: unique constraint on (game_id, round_no)
 #[tokio::test]
 async fn test_unique_constraint_game_round() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

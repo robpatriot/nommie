@@ -7,7 +7,6 @@
 
 use actix_web::http::StatusCode;
 use actix_web::{test, HttpMessage};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
@@ -15,16 +14,12 @@ use backend::infra::state::build_state;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
+use crate::support::build_test_state;
 use crate::support::snapshot_helpers::{create_snapshot_game, SnapshotGameOptions};
 
 #[tokio::test]
 async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state)?;
     let shared = SharedTxn::open(db).await?;
@@ -86,12 +81,7 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_state().build().await?;
 
     let app = create_test_app(state).with_prod_routes().build().await?;
 
@@ -120,12 +110,7 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let app = create_test_app(state).with_prod_routes().build().await?;
 
@@ -155,12 +140,7 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_snapshot_phase_structure() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state)?;
     let shared = SharedTxn::open(db).await?;

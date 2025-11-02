@@ -4,24 +4,19 @@
 // that with_txn neither commits nor rolls back when a SharedTxn is used.
 
 use actix_web::test;
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::infra::state::build_state;
 use backend::SharedTxn;
 use sea_orm::{EntityTrait, Set};
 
+use crate::support::build_test_state;
+
 #[actix_web::test]
 async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with a real Test DB
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await?;
+    let state = build_test_state().await?;
 
-    // Open a shared transaction
+    // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
 

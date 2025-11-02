@@ -3,15 +3,14 @@
 // This test would have caught the bug in games.rs where turn_start was incorrectly
 // set to dealer_pos instead of (dealer_pos + 1) % 4.
 
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use backend::repos::rounds;
 use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
 
+use crate::support::build_test_state;
 use crate::support::game_phases::setup_game_in_trick_play_phase;
 use crate::support::trick_helpers::create_tricks_by_winner_counts;
 
@@ -28,12 +27,7 @@ use crate::support::trick_helpers::create_tricks_by_winner_counts;
 /// also rotates clockwise, always staying one position to the left of the dealer.
 #[tokio::test]
 async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -125,12 +119,7 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
 /// Test: Verify turn_start consistency between domain init and DB loading
 #[tokio::test]
 async fn test_turn_start_consistency_domain_vs_db() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

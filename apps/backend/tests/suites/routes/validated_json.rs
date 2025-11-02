@@ -1,21 +1,18 @@
 use actix_web::test;
-use backend::config::db::{DbKind, RuntimeEnv};
-use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
 use serde_json::json;
 
 use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
+use crate::support::test_state_builder;
 
 #[actix_web::test]
 async fn test_malformed_json_returns_400_with_rfc7807() -> Result<(), Box<dyn std::error::Error>> {
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config)
         .build()
         .await?;
@@ -45,9 +42,7 @@ async fn test_wrong_type_returns_400_with_rfc7807() -> Result<(), Box<dyn std::e
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config)
         .build()
         .await?;
@@ -87,9 +82,7 @@ async fn test_missing_required_field_returns_400_with_rfc7807(
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config)
         .build()
         .await?;
@@ -129,9 +122,7 @@ async fn test_valid_json_happy_path_unchanged() -> Result<(), Box<dyn std::error
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config.clone())
         .build()
         .await?;
@@ -181,9 +172,7 @@ async fn test_non_json_content_type_still_attempts_parse() -> Result<(), Box<dyn
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config)
         .build()
         .await?;
@@ -223,9 +212,7 @@ async fn test_empty_body_returns_400_with_rfc7807() -> Result<(), Box<dyn std::e
     // Build state with database and security config
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
+    let state = test_state_builder()?
         .with_security(security_config)
         .build()
         .await?;

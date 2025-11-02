@@ -1,22 +1,16 @@
 // Tests for AI memory degradation functionality.
 
 use backend::ai::memory::{get_round_card_plays, MemoryMode};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 
+use crate::support::build_test_state;
 use crate::support::test_utils::{test_seed, test_seed_u64};
 
 #[actix_web::test]
 async fn test_memory_degradation_determinism() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
@@ -86,12 +80,7 @@ async fn test_memory_degradation_determinism() -> Result<(), AppError> {
 
 #[actix_web::test]
 async fn test_memory_levels() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
@@ -141,12 +130,7 @@ async fn test_memory_levels() -> Result<(), AppError> {
 
 #[actix_web::test]
 async fn test_partial_memory_types() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();

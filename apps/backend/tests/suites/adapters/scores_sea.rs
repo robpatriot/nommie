@@ -1,20 +1,14 @@
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use backend::repos::{games, rounds, scores};
 
+use crate::support::build_test_state;
 use crate::support::test_utils::short_join_code;
 
 /// Test: create_score and find_by_round_and_seat
 #[tokio::test]
 async fn test_create_score_and_find() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -67,12 +61,7 @@ async fn test_create_score_and_find() -> Result<(), AppError> {
 /// Test: find_all_by_round returns scores ordered by seat
 #[tokio::test]
 async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -161,12 +150,7 @@ async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
 /// Test: get_current_totals retrieves latest round totals
 #[tokio::test]
 async fn test_get_current_totals() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -314,12 +298,7 @@ async fn test_get_current_totals() -> Result<(), AppError> {
 /// Test: get_current_totals returns zeros for new game
 #[tokio::test]
 async fn test_get_current_totals_no_rounds() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -341,12 +320,7 @@ async fn test_get_current_totals_no_rounds() -> Result<(), AppError> {
 /// Test: unique constraint on (round_id, player_seat)
 #[tokio::test]
 async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -408,12 +382,7 @@ async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
 /// Test: bid_met flag accuracy
 #[tokio::test]
 async fn test_bid_met_flag() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

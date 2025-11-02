@@ -3,7 +3,6 @@
 /// SQLite diagnostics and connection tracking
 pub mod sqlite_diagnostics {
     use std::process;
-    use std::time::Instant;
 
     use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
     use tracing::info;
@@ -90,43 +89,6 @@ pub mod sqlite_diagnostics {
         }
 
         Ok(())
-    }
-
-    /// Probe SQLite lock acquisition
-    pub async fn sqlite_lock_probe<C: ConnectionTrait>(
-        conn: &C,
-        pool_id: &str,
-    ) -> Result<(), AppError> {
-        let pid = current_pid();
-        let start = Instant::now();
-
-        let result = conn
-            .execute(Statement::from_string(
-                DatabaseBackend::Sqlite,
-                "BEGIN IMMEDIATE; ROLLBACK;".to_string(),
-            ))
-            .await;
-        let elapsed_ms = start.elapsed().as_millis();
-
-        match result {
-            Ok(_) => {
-                info!(
-                    pid = pid,
-                    pool_id = pool_id,
-                    elapsed_ms = elapsed_ms,
-                    acquired = true,
-                    "SQLite lock probe success"
-                );
-                Ok(())
-            }
-            Err(e) => {
-                info!(pid=pid, pool_id=pool_id, elapsed_ms=elapsed_ms, acquired=false, error=%e, "SQLite lock probe failed");
-                Err(crate::infra::db::core::config_error_with_context(
-                    "SQLite lock probe failed",
-                    e,
-                ))
-            }
-        }
     }
 
     /// Redact SQL statement for logging (replace values with ?)

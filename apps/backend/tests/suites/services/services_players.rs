@@ -1,21 +1,15 @@
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::errors::ErrorCode;
-use backend::infra::state::build_state;
 use backend::services::players::PlayerService;
 
+use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player;
 use crate::support::factory::{create_test_game, create_test_user};
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -39,12 +33,7 @@ async fn test_get_display_name_by_seat_success() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_invalid_seat() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -74,12 +63,7 @@ async fn test_get_display_name_by_seat_invalid_seat() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -114,12 +98,7 @@ async fn test_get_display_name_by_seat_player_not_found() -> Result<(), AppError
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -143,12 +122,7 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
 
 #[tokio::test]
 async fn test_get_display_name_by_seat_multiple_seats() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

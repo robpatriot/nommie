@@ -1,5 +1,8 @@
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::{env, process};
+
+use sea_orm::DatabaseBackend;
 
 use crate::error::AppError;
 
@@ -21,6 +24,34 @@ pub enum DbKind {
     SqliteFile,
     /// SQLite in-memory database
     SqliteMemory,
+}
+
+impl FromStr for DbKind {
+    type Err = AppError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let normalized = value.trim().to_ascii_lowercase();
+        match normalized.as_str() {
+            "postgres" | "pg" => Ok(DbKind::Postgres),
+            "sqlitefile" | "sqlite_file" | "sqlite-file" => Ok(DbKind::SqliteFile),
+            "sqlitememory" | "sqlite_memory" | "sqlite-memory" | "sqlite-mem" | "sqlite:memory" => {
+                Ok(DbKind::SqliteMemory)
+            }
+            other => Err(AppError::config_msg(
+                format!("unknown database kind: {other}"),
+                "invalid database kind",
+            )),
+        }
+    }
+}
+
+impl From<DbKind> for DatabaseBackend {
+    fn from(db_kind: DbKind) -> Self {
+        match db_kind {
+            DbKind::Postgres => DatabaseBackend::Postgres,
+            DbKind::SqliteFile | DbKind::SqliteMemory => DatabaseBackend::Sqlite,
+        }
+    }
 }
 
 /// Pool purpose enum

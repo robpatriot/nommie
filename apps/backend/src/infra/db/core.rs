@@ -135,10 +135,7 @@ async fn apply_db_settings(
     db_kind: DbKind,
 ) -> Result<(), AppError> {
     let statements = build_session_statements(db_kind, settings);
-    let backend = match db_kind {
-        DbKind::SqliteFile | DbKind::SqliteMemory => DatabaseBackend::Sqlite,
-        DbKind::Postgres => DatabaseBackend::Postgres,
-    };
+    let backend = DatabaseBackend::from(db_kind);
     for stmt in statements {
         pool.execute(Statement::from_string(backend, stmt)).await?;
     }

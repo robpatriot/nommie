@@ -3,24 +3,18 @@
 // These tests cover public information accessible to all players,
 // including game history for score tables.
 
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::domain::player_view::GameHistory;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 
+use crate::support::build_test_state;
 use crate::support::factory::create_fresh_lobby_game;
 use crate::support::test_utils::test_seed;
 
 #[actix_web::test]
 async fn test_game_history_empty_game() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
@@ -39,12 +33,7 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
 
 #[actix_web::test]
 async fn test_game_history_with_rounds() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
@@ -189,12 +178,7 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
 
 #[actix_web::test]
 async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("Failed to build test state");
+    let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();

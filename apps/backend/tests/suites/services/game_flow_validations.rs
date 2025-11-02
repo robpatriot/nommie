@@ -7,15 +7,14 @@
 // - Card play constraints
 
 use backend::adapters::games_sea;
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::{with_txn, SharedTxn};
 use backend::error::AppError;
 use backend::errors::ErrorCode;
-use backend::infra::state::build_state;
 use backend::repos::rounds;
 use backend::services::game_flow::GameFlowService;
 
+use crate::support::build_test_state;
 use crate::support::game_phases::{
     setup_game_in_bidding_phase, setup_game_in_trump_selection_phase,
 };
@@ -27,12 +26,7 @@ use crate::support::game_setup::setup_game_with_players;
 
 #[tokio::test]
 async fn test_submit_bid_rejects_wrong_phase() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -65,12 +59,7 @@ async fn test_submit_bid_rejects_wrong_phase() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_dealer_bid_restriction_rejects_exact_sum() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -105,12 +94,7 @@ async fn test_dealer_bid_restriction_rejects_exact_sum() -> Result<(), AppError>
 
 #[tokio::test]
 async fn test_dealer_bid_restriction_allows_non_exact_sum() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -139,12 +123,7 @@ async fn test_dealer_bid_restriction_allows_non_exact_sum() -> Result<(), AppErr
 
 #[tokio::test]
 async fn test_dealer_bid_restriction_only_applies_to_dealer() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -171,12 +150,7 @@ async fn test_dealer_bid_restriction_only_applies_to_dealer() -> Result<(), AppE
 
 #[tokio::test]
 async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -221,12 +195,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -286,12 +255,7 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -332,12 +296,7 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(db).await?;

@@ -312,11 +312,17 @@ impl MigrationTrait for Migration {
         match manager.get_database_backend() {
             sea_orm::DatabaseBackend::Postgres => {
                 // Helper function to check if enum exists
-                async fn enum_exists(manager: &SchemaManager<'_>, enum_name: &str) -> Result<bool, DbErr> {
-                    let result = manager.get_connection().query_one(sea_orm::Statement::from_string(
-                        sea_orm::DatabaseBackend::Postgres,
-                        format!("SELECT 1 FROM pg_type WHERE typname = '{}'", enum_name),
-                    )).await?;
+                async fn enum_exists(
+                    manager: &SchemaManager<'_>,
+                    enum_name: &str,
+                ) -> Result<bool, DbErr> {
+                    let result = manager
+                        .get_connection()
+                        .query_one(sea_orm::Statement::from_string(
+                            sea_orm::DatabaseBackend::Postgres,
+                            format!("SELECT 1 FROM pg_type WHERE typname = '{}'", enum_name),
+                        ))
+                        .await?;
                     Ok(result.is_some())
                 }
 
@@ -1404,19 +1410,39 @@ impl MigrationTrait for Migration {
         match manager.get_database_backend() {
             sea_orm::DatabaseBackend::Postgres => {
                 manager
-                    .drop_type(PgType::drop().name(CardTrumpEnum::Type).if_exists().to_owned())
+                    .drop_type(
+                        PgType::drop()
+                            .name(CardTrumpEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
                     .await?;
 
                 manager
-                    .drop_type(PgType::drop().name(CardSuitEnum::Type).if_exists().to_owned())
+                    .drop_type(
+                        PgType::drop()
+                            .name(CardSuitEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
                     .await?;
 
                 manager
-                    .drop_type(PgType::drop().name(GameVisibilityEnum::Type).if_exists().to_owned())
+                    .drop_type(
+                        PgType::drop()
+                            .name(GameVisibilityEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
                     .await?;
 
                 manager
-                    .drop_type(PgType::drop().name(GameStateEnum::Type).if_exists().to_owned())
+                    .drop_type(
+                        PgType::drop()
+                            .name(GameStateEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
                     .await?;
             }
             sea_orm::DatabaseBackend::Sqlite => {

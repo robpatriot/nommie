@@ -1,21 +1,15 @@
 use actix_web::http::StatusCode;
 use actix_web::{test, web, App, HttpMessage};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use backend::routes::games::configure_routes;
 
+use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player;
 use crate::support::factory::{create_test_game, create_test_user};
 
 #[tokio::test]
 async fn test_get_player_display_name_success() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");
@@ -58,12 +52,7 @@ async fn test_get_player_display_name_success() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");
@@ -107,12 +96,7 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");
@@ -158,12 +142,7 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");

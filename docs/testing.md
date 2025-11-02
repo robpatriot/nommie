@@ -10,6 +10,23 @@ This document describes the testing setup for the Nommie backend.
 - **Schema is automatically initialized** - `build_state()` handles empty databases
 - **The test runner automatically derives the test database URL** by appending `_test` to the existing `DATABASE_URL`
 
+### Selecting the Test Database Backend
+- **Default backend is PostgreSQL.** Tests fall back to Postgres when no override is provided.
+- **Override per run with `NOMMIE_TEST_DB_KIND`.** Supported values are:
+  - `postgres`
+  - `sqlite-file`
+  - `sqlite-memory`
+- **Helper usage:** `build_test_state()` and `test_state_builder()` consult the env var so suites automatically pick up the configured backend.
+- **Backend-specific suites:** Postgres-only tests (e.g. `regression/game_flow_ai_pg`, migration lock tests) detect the current backend and skip when it does not match, while SQLite-only suites (`services/sqlite_backend_file.rs`, `services/sqlite_backend_mem.rs`) remain active when appropriate.
+- **Example:**
+  ```bash
+  # Run backend tests against SQLite memory
+  NOMMIE_TEST_DB_KIND=sqlite-memory pnpm be:test
+
+  # Run regression suites that require Postgres
+  NOMMIE_TEST_DB_KIND=postgres pnpm be:test:full
+  ```
+
 ### Database Setup
 - Tests run against a database suffixed with `_test`
 - **Schema is automatically initialized by `build_state()`** - no manual preparation needed

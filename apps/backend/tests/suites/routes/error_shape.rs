@@ -1,11 +1,11 @@
 use actix_web::{test, web, HttpResponse};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::state::build_state;
 use backend::state::app_state::AppState;
 use backend::{AppError, ErrorCode};
 
 use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
+use crate::support::build_test_state;
 
 /// Test endpoint that returns a validation error (400)
 async fn test_validation_error() -> Result<HttpResponse, AppError> {
@@ -72,7 +72,7 @@ async fn test_db_unavailable_error() -> Result<HttpResponse, AppError> {
 /// This test consolidates all error type testing into a single, parameterized test
 #[actix_web::test]
 async fn test_all_error_responses_conform_to_problem_details() {
-    let state = build_state().build().await.expect("create test state");
+    let state = build_test_state().await.expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/validation", web::get().to(test_validation_error))
@@ -146,7 +146,7 @@ async fn test_successful_response_with_error_handling() {
         Ok(HttpResponse::Ok().body("Success"))
     }
 
-    let state = build_state().build().await.expect("create test state");
+    let state = build_test_state().await.expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/success", web::get().to(success_handler));
@@ -186,7 +186,7 @@ async fn test_error_with_trace_id_from_context() {
         ))
     }
 
-    let state = build_state().build().await.expect("create test state");
+    let state = build_test_state().await.expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/no_trace", web::get().to(error_with_trace));
@@ -225,7 +225,7 @@ async fn test_malformed_error_response_handling() {
         ))
     }
 
-    let state = build_state().build().await.expect("create test state");
+    let state = build_test_state().await.expect("create test state");
     let app = create_test_app(state)
         .with_routes(|cfg| {
             cfg.route("/_test/malformed", web::get().to(malformed_error));
@@ -261,7 +261,7 @@ async fn test_require_db_direct_without_database() {
     use backend::db::require_db;
 
     let state = build_state()
-        .build() // build with no DB
+        .build()
         .await
         .expect("create test state without DB");
 
@@ -280,7 +280,7 @@ async fn test_require_db_direct_without_database() {
 #[actix_web::test]
 async fn test_require_db_without_database() {
     let state = build_state()
-        .build() // build with no DB
+        .build()
         .await
         .expect("create test state without DB");
 
@@ -305,12 +305,7 @@ async fn test_require_db_without_database() {
 /// Test that require_db helper succeeds when DB is configured
 #[actix_web::test]
 async fn test_require_db_with_database() {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres) // build with Test DB
-        .build()
-        .await
-        .expect("create test state with DB");
+    let state = build_test_state().await.expect("create test state with DB");
 
     let app = create_test_app(state)
         .with_routes(|cfg| {

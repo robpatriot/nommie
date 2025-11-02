@@ -1,19 +1,13 @@
 use backend::adapters::memberships_sea::{MembershipCreate, MembershipSetReady};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 
+use crate::support::build_test_state;
 use crate::support::factory::{create_test_game_with_options, create_test_user_with_randomization};
 
 #[tokio::test]
 async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -55,12 +49,7 @@ async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_set_ready_updates_only_updated_at() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {

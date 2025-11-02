@@ -13,16 +13,15 @@ fn init_logging() {
     backend_test_support::logging::init();
 }
 
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, set_txn_policy, TxnPolicy};
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::error::AppError;
 use backend::errors::ErrorCode;
-use backend::infra::state::build_state;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use ulid::Ulid;
 
+use crate::support::build_test_state;
 use crate::support::db_games::{
     count_games_by_name_pool, delete_games_by_name, insert_minimal_game_for_test,
 };
@@ -58,11 +57,7 @@ async fn test_default_commit_policy_persists_then_cleans_up(
     assert_eq!(current(), TxnPolicy::CommitOnOk);
 
     // Build state with a real Test DB
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await?;
+    let state = build_test_state().await?;
 
     // Use unique marker for name
     let name = Ulid::new().to_string();
@@ -104,11 +99,7 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
     assert_eq!(current(), TxnPolicy::CommitOnOk);
 
     // Build state with a real Test DB
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await?;
+    let state = build_test_state().await?;
 
     // Use unique marker for name
     let name = Ulid::new().to_string();
@@ -141,11 +132,7 @@ async fn test_join_code_unique_constraint() -> Result<(), Box<dyn std::error::Er
     // Verify we're using the commit policy
     assert_eq!(current(), TxnPolicy::CommitOnOk);
 
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await?;
+    let state = build_test_state().await?;
 
     // Use a unique join code to avoid conflicts with other test runs (max 10 chars)
     let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();

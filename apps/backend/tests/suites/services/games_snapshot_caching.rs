@@ -8,24 +8,18 @@
 use actix_web::http::header::{HeaderValue, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
 use actix_web::{test, HttpMessage};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
-use backend::infra::state::build_state;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
+use crate::support::build_test_state;
 use crate::support::snapshot_helpers::{create_snapshot_game, SnapshotGameOptions};
 
 #[tokio::test]
 async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state)?;
     let shared = SharedTxn::open(db).await?;
@@ -79,12 +73,7 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state)?;
     let shared = SharedTxn::open(db).await?;
@@ -158,12 +147,7 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state)?;
     let shared = SharedTxn::open(db).await?;
@@ -222,12 +206,7 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state)?;
     let shared = SharedTxn::open(db).await?;
@@ -281,12 +260,7 @@ async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), A
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state)?;
     let shared = SharedTxn::open(db).await?;
@@ -331,12 +305,7 @@ async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await?;
 
     let db = require_db(&state)?;
     let shared = SharedTxn::open(db).await?;

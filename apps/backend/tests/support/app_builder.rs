@@ -73,7 +73,9 @@ impl TestAppBuilder {
 /// use backend::config::db::{RuntimeEnv, DbKind};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// let state = build_state().with_env(RuntimeEnv::Test).with_db(DbKind::Postgres).build().await?;
+/// use crate::support::test_state::build_test_state;
+///
+/// let state = build_test_state().await?;
 /// let app = create_test_app(state).with_prod_routes().build().await?;
 /// # Ok(())
 /// # }

@@ -7,22 +7,17 @@
 // All tests use transactions with automatic rollback via the test policy.
 
 use backend::adapters::games_sea::{self, GameCreate, GameUpdateState};
-use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::entities::games::GameState;
 use backend::error::AppError;
 use backend::errors::domain::{ConflictKind, DomainError, NotFoundKind};
-use backend::infra::state::build_state;
+
+use crate::support::build_test_state;
 
 /// Test that attempting to update a non-existent game returns NotFound.
 #[tokio::test]
 async fn test_update_nonexistent_game_returns_not_found() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     let result = with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -69,12 +64,7 @@ async fn test_update_nonexistent_game_returns_not_found() -> Result<(), AppError
 /// with the correct expected and actual version numbers.
 #[tokio::test]
 async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     let result = with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -163,12 +153,7 @@ async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(
 /// Additional test: verify that multiple concurrent stale updates all fail appropriately
 #[tokio::test]
 async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
-    let state = build_state()
-        .with_env(RuntimeEnv::Test)
-        .with_db(DbKind::Postgres)
-        .build()
-        .await
-        .expect("build test state with DB");
+    let state = build_test_state().await.expect("build test state with DB");
 
     let result = with_txn(None, &state, |txn| {
         Box::pin(async move {
