@@ -5,6 +5,7 @@
 //! - Proper cleanup after cancellation, errors, and timeouts
 //! - Works for both PostgreSQL advisory locks and SQLite file locks
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -18,6 +19,19 @@ use tokio::sync::Barrier;
 
 use crate::support::resolve_test_db_kind;
 
+/// Helper to skip tests that don't apply to SQLite memory databases.
+/// Migration locks require persistent storage (Postgres advisory locks or SQLite file locks).
+fn skip_if_sqlite_memory(test_name: &str) -> Option<DbKind> {
+    let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
+
+    if matches!(db_kind, DbKind::SqliteMemory) {
+        println!("Skipping {} for DbKind::{:?}", test_name, db_kind);
+        return None;
+    }
+
+    Some(db_kind)
+}
+
 #[allow(dead_code)]
 enum TestLock {
     Postgres {
@@ -26,7 +40,7 @@ enum TestLock {
     },
     SqliteFile {
         lock: SqliteFileLock,
-        temp_dir: TempDir,
+        lock_path: PathBuf, // Store path for cleanup
     },
 }
 
@@ -59,11 +73,16 @@ impl TestLock {
                 )
             }
             DbKind::SqliteFile => {
-                let temp_dir = TempDir::new().expect("Should create temp dir");
-                let lock_path = temp_dir.path().join("test.migrate.lock");
+                // Create deterministic lock path based on base_name
+                // All tasks in the same test will use the same lock file
+                let lock_path = std::env::temp_dir().join(format!(
+                    "{}-{}.migrate.lock",
+                    base_name,
+                    std::process::id()
+                ));
                 let lock = SqliteFileLock::new(&lock_path).expect("Should create lock");
 
-                (TestLock::SqliteFile { lock, temp_dir }, None)
+                (TestLock::SqliteFile { lock, lock_path }, None)
             }
             DbKind::SqliteMemory => {
                 panic!("SQLite memory does not support migration locks")
@@ -77,6 +96,16 @@ impl TestLock {
         match self {
             TestLock::Postgres { lock, .. } => BootstrapLock::try_acquire(lock).await,
             TestLock::SqliteFile { lock, .. } => BootstrapLock::try_acquire(lock).await,
+        }
+    }
+}
+
+// Clean up lock file when TestLock is dropped
+impl Drop for TestLock {
+    fn drop(&mut self) {
+        if let TestLock::SqliteFile { lock_path, .. } = self {
+            // Attempt to remove the lock file, ignore errors (file may already be removed)
+            let _ = std::fs::remove_file(lock_path);
         }
     }
 }
@@ -107,6 +136,10 @@ async fn slow_migration_task(
 async fn cancel_mid_migration_releases_lock() {
     // A acquires lock and starts a long "body".
     // Cancel A; assert A task aborted, then B acquires successfully (no timeout).
+
+    if skip_if_sqlite_memory("cancel_mid_migration_releases_lock").is_none() {
+        return;
+    }
 
     let barrier = Arc::new(Barrier::new(2));
     let a_started = Arc::new(AtomicBool::new(false));
@@ -217,6 +250,10 @@ async fn cancel_mid_migration_releases_lock() {
 async fn body_error_unlocks() {
     // A acquires; migration returns Err; assert unlock happened and B acquires.
 
+    if skip_if_sqlite_memory("body_error_unlocks").is_none() {
+        return;
+    }
+
     let barrier = Arc::new(Barrier::new(2));
     let a_completed = Arc::new(AtomicBool::new(false));
 
@@ -303,6 +340,10 @@ async fn body_error_unlocks() {
 async fn acquire_timeout_distinct() {
     // A holds lock beyond acquire timeout; B attempts and returns None (locked).
 
+    if skip_if_sqlite_memory("acquire_timeout_distinct").is_none() {
+        return;
+    }
+
     // Set very short acquire timeout for this test
     std::env::set_var("NOMMIE_MIGRATE_TIMEOUT_MS", "200");
 
@@ -381,6 +422,10 @@ async fn acquire_timeout_distinct() {
 async fn lock_contention() {
     // Two tasks target the same lock. First acquires and holds; second try_acquire() returns None.
     // After first releases, second acquires successfully.
+
+    if skip_if_sqlite_memory("lock_contention").is_none() {
+        return;
+    }
 
     let barrier = Arc::new(Barrier::new(2));
     let a_holding = Arc::new(AtomicBool::new(false));
@@ -466,6 +511,10 @@ async fn lock_contention() {
 async fn release_idempotence() {
     // Double release should be a no-op (guard already tracks released)
 
+    if skip_if_sqlite_memory("release_idempotence").is_none() {
+        return;
+    }
+
     let (mut lock, _admin_pool) = TestLock::create_shared("release_idempotence", "single").await;
     let guard = lock
         .try_acquire()
@@ -542,7 +591,11 @@ async fn body_timeout_aborts_and_unlocks() {
     // Set short body timeout for this test
     std::env::set_var("NOMMIE_MIGRATE_BODY_TIMEOUT_MS", "200");
 
-    let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
+    let db_kind = match skip_if_sqlite_memory("body_timeout_aborts_and_unlocks") {
+        None => return,
+        Some(kind) => kind,
+    };
+
     let is_postgres = matches!(db_kind, DbKind::Postgres);
 
     let barrier = Arc::new(Barrier::new(2));

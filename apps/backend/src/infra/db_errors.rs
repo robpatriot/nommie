@@ -13,6 +13,54 @@ fn mentions_sqlstate(msg: &str, code: &str) -> bool {
     msg.contains(code) || msg.contains(&format!("SQLSTATE({code})"))
 }
 
+/// Extract table.column from SQLite "UNIQUE constraint failed: table.column" error messages.
+fn extract_sqlite_table_column(error_msg: &str) -> Option<&str> {
+    // SQLite format: "UNIQUE constraint failed: table.column"
+    if let Some(prefix) = error_msg.find("UNIQUE constraint failed: ") {
+        let rest = &error_msg[prefix + "UNIQUE constraint failed: ".len()..];
+        // Take up to the end or first space/newline/quote
+        let table_column = rest
+            .split_whitespace()
+            .next()
+            .or_else(|| rest.split('\n').next())
+            .or_else(|| rest.split('"').next());
+        return table_column;
+    }
+    None
+}
+
+/// Map SQLite table.column format to domain-specific conflict errors.
+fn map_sqlite_table_column_to_conflict(table_column: &str) -> Option<(ConflictKind, &'static str)> {
+    match table_column {
+        "user_credentials.email" | "users.email" => {
+            Some((ConflictKind::UniqueEmail, "Email already registered"))
+        }
+        "user_credentials.google_sub" => Some((
+            ConflictKind::Other("UniqueGoogleSub".into()),
+            "Google account already linked to another user",
+        )),
+        "games.join_code" => Some((ConflictKind::JoinCodeConflict, "Join code already exists")),
+        _ => None,
+    }
+}
+
+/// Map PostgreSQL constraint names to domain-specific conflict errors.
+fn map_postgres_constraint_to_conflict(error_msg: &str) -> Option<(ConflictKind, &'static str)> {
+    if error_msg.contains("user_credentials_email_key") || error_msg.contains("users_email_key") {
+        return Some((ConflictKind::UniqueEmail, "Email already registered"));
+    }
+    if error_msg.contains("user_credentials_google_sub_key") {
+        return Some((
+            ConflictKind::Other("UniqueGoogleSub".into()),
+            "Google account already linked to another user",
+        ));
+    }
+    if error_msg.contains("games_join_code_key") {
+        return Some((ConflictKind::JoinCodeConflict, "Join code already exists"));
+    }
+    None
+}
+
 /// Translate a `DbErr` into a `DomainError` with sanitized, PII-safe detail.
 pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
     let error_msg = e.to_string();
@@ -69,27 +117,22 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
 
     if mentions_sqlstate(&error_msg, "23505")
         || error_msg.contains("duplicate key value violates unique constraint")
+        || error_msg.contains("UNIQUE constraint failed")
     {
         warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Unique constraint violation");
-        // Specific mapping for user_credentials.email
-        if error_msg.contains("user_credentials_email_key") || error_msg.contains("users_email_key")
-        {
-            return DomainError::conflict(ConflictKind::UniqueEmail, "Email already registered");
+
+        // Try to extract table.column from SQLite format errors first
+        if let Some(table_column) = extract_sqlite_table_column(&error_msg) {
+            if let Some((kind, detail)) = map_sqlite_table_column_to_conflict(table_column) {
+                return DomainError::conflict(kind, detail);
+            }
         }
-        // Specific mapping for user_credentials.google_sub
-        if error_msg.contains("user_credentials_google_sub_key") {
-            return DomainError::conflict(
-                ConflictKind::Other("UniqueGoogleSub".into()),
-                "Google account already linked to another user",
-            );
+
+        // Check for PostgreSQL constraint name patterns
+        if let Some((kind, detail)) = map_postgres_constraint_to_conflict(&error_msg) {
+            return DomainError::conflict(kind, detail);
         }
-        // Specific mapping for games.join_code
-        if error_msg.contains("games_join_code_key") {
-            return DomainError::conflict(
-                ConflictKind::JoinCodeConflict,
-                "Join code already exists",
-            );
-        }
+
         return DomainError::conflict(
             ConflictKind::Other("Unique".into()),
             "Unique constraint violation",

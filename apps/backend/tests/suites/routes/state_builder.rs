@@ -32,8 +32,9 @@ async fn builds_with_test_db() -> Result<(), AppError> {
 
             let stmt = Statement::from_string(backend, "SELECT 1 as test_value".to_owned());
 
-            let result = txn.execute(stmt).await?;
-            assert_eq!(result.rows_affected(), 1);
+            let row = txn.query_one(stmt).await?.expect("should get a row");
+            let value: i32 = row.try_get("", "test_value")?;
+            assert_eq!(value, 1);
 
             Ok::<_, AppError>(())
         })

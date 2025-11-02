@@ -15,6 +15,16 @@ async fn contention_burst_all_ok_and_single_migrator() {
 
     let env = RuntimeEnv::Test;
     let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
+
+    // SQLite memory creates separate database instances per connection type
+    // (shared pool vs admin pool), so migration counts won't match across connections
+    if matches!(db_kind, backend::config::db::DbKind::SqliteMemory) {
+        println!(
+            "Skipping contention_burst_all_ok_and_single_migrator for DbKind::{:?}",
+            db_kind
+        );
+        return;
+    }
     let burst_n = 6;
     let timeout_secs = 6;
 
