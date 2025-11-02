@@ -1,4 +1,4 @@
-// SQLite backend tests
+// SQLite backend performance tests
 //
 // Tests comparing SQLite in-memory vs file-based database performance.
 
