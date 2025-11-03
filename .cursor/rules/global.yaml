@@ -1,0 +1,25 @@
+version: 1
+rules:
+  - id: dev-workflow
+    scope: workspace
+    text: |
+      Before any pnpm commands, source `.env` once per shell session:
+      set -a; source .env; set +a
+      Do not source `.env` repeatedly in the same shell.
+      After completing backend code changes, run the linter: `pnpm be:lint`.
+      After completing backend development or when testing during development, run tests: `pnpm be:test`.
+      You may append additional arguments to run specific test subsets.
+  - id: coding-standards
+    scope: workspace
+    text: |
+      Follow these rules exactly. If a request would break them, stop and ask.
+      Never run any git commands other than diff.
+      No deprecated or legacy code: never use `#[deprecated]` or leave legacy/compatibility functions. Refactor callers instead.
+  - id: comments-policy
+    scope: workspace
+    text: |
+      No commentary in edits — implement directly.
+      Do not reference prompt artifacts in code comments. Implementation plans, step lists, or staged change descriptions provided by prompts should not appear in code comments.
+      Keep comments focused on code rationale, invariants, and non-obvious behavior only.
+
+
