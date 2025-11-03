@@ -28,23 +28,30 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
 ### Stage 1 — App shell and routing (web)
 - Learning goals: Next.js App Router, protected pages, basic navigation
 - Deliverables:
+  - Root route `/`: Welcome page (login button) for non-authenticated; redirect to `/lobby` for authenticated
   - Routes: `/lobby` and `/game/[gameId]` (skeletons)
-  - `Header` shows auth state; link to Lobby when signed in
+  - `Header` shows auth state; Google sign-in required; link to Lobby when signed in; "Resume last game" CTA (via backend `last-active`)
 - DoD: Navigate `/` → `/lobby` → `/game/[gameId]` with placeholder content
 
 ### Stage 2 — Read-only lobby
 - Learning goals: server data fetching, loading/empty/error states, manual refresh
 - Deliverables:
-  - List joinable games from backend
+  - Two lists:
+    - Joinable games (not started yet). If user is already in a game, hide/disable create/join.
+    - In‑progress games (others; view‑only, informational)
+  - "Resume last game" CTA at top (also exposed in Header)
+  - Client-side search/filter (MVP; can upgrade to backend later)
   - Empty state + loading skeleton + error banner + refresh button
 - DoD: Stable read-only game list, verifiable with backend data
 
 ### Stage 3 — Create and join game
 - Learning goals: server actions vs API calls; form handling; error surfacing
 - Deliverables:
-  - Create Game modal (minimal inputs)
+  - Create Game modal (minimal inputs):
+    - Name (optional; defaults to "{CreatorName} game" if blank; uniqueness not required)
+    - Starting dealer (optional; defaults to game creator)
   - Join action navigating to `/game/[gameId]`
-  - Toaster + error details (include `traceId` when present)
+  - Toaster + expandable error details; `traceId` hidden until expanded; log `traceId` in dev
 - DoD: Create → redirect to game page; join from lobby works
 
 ### Stage 4 — Read-only game room and table snapshot
@@ -52,15 +59,19 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
 - Deliverables:
   - Render phase, seats/players, hand snapshot (no interactions)
   - Trick area, bids/score panel placeholders; turn indicator
+  - Collapsible score table in sidebar (cumulative totals; always accessible)
   - Light polling (manual or timer), with room for ETag optimization later
+    - Cadence: 1s when it's your turn; 5s otherwise
+  - Subtle polling indicator near Phase/Turn (e.g., syncing dot with tooltip/`aria-live="off"`)
 - DoD: Page reflects backend state changes without interactions
 
 ### Stage 5 — Core interactions: ready, start, bid, play
 - Learning goals: pessimistic writes, legal moves gating, robust error handling
 - Deliverables:
-  - Ready/unready; host start
+  - Ready (no unready); AI auto-ready; auto-start when all players are ready
   - Bid panel; play a card from legal subset
   - Disable illegal moves, still handle server rejection
+  - Host-only: add/remove AI seats before start (clearly labeled), up to 4 total players
 - DoD: Two browser sessions can play through a round
 
 ### Stage 6 — UX fit and accessibility
@@ -70,6 +81,27 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
   - Focus management, labels, color contrast
   - Subtle animations for plays and trick wins
 - DoD: Fully keyboard-operable play; a11y checks pass basic audit
+
+Detailed UX spec (MVP)
+- Lobby
+  - Layout: Single column, centered, max-width ~1100px. Sticky header with app name (left) and auth/avatar (right).
+  - Toolbar: [Create Game] primary, [Refresh] secondary, search input, status chips filter.
+  - Table: Name | Players x/y | Status | Actions [Join/Full]. Semantic <table>, visible focus, 4.5:1 contrast.
+  - Empty state: “No games yet. Create one.” with inline [Create Game]. Optional row expand for metadata.
+  - Keyboard: Tab → toolbar → header → first row; Arrow Up/Down navigate rows; Enter joins; `r` refresh; `c` create; `f` focus search.
+  - Mobile: Stacked card rows; actions remain accessible on the right.
+- Game Room
+  - Layout: Center table with seats Bottom(You)/Left/Top/Right; collapsible right sidebar (scores/controls).
+  - Header: Game name/ID, Back to Lobby, auth/avatar; Copy Invite Link in overflow.
+  - Phase/Turn: Top row announces Phase (Bidding/Trump Selection/Trick/Scoring) and Turn badge.
+  - Trick area: Up to 4 cards placed by seat; subtle entry animation; last trick summary chip.
+  - Seats: Name, bid (during Bidding), tricks won; active turn ring.
+  - Hand: Fan/grid; illegal cards disabled and not focusable; legal cards navigable.
+  - Actions: Bidding (0..hand size selector + Submit). Trick (select card then Play, or Enter on focused card).
+  - Keyboard: `?` shortcuts; `g l` Lobby; `s` Sidebar; Hand (Arrows/Home/End/Enter/Esc); Bidding (number keys/Up/Down/Enter/Esc); Ready `y`; Start `Shift+S` (host confirm).
+  - A11y: Live region for phase/turn; dialogs trap focus; cards `aria-label` (e.g., “Seven of Hearts, legal”); honors `prefers-reduced-motion`.
+  - Motion: 150–200ms ease-out for play/trick-win; subtle elevation/pulse for active turn.
+  - Errors: Toast summary; details panel with server message and `traceId` link.
 
 ### Stage 7 — Mobile foundations (Expo)
 - Learning goals: React Native/Expo basics; shared types and API
@@ -92,17 +124,22 @@ Note: Align with backend routes; adjust names/paths as needed.
 - Auth/session: frontend uses NextAuth; backend JWT via `auth()` in server context
 - Games:
   - GET list joinable games
+  - GET list in-progress games (view-only, informational)
   - POST create game
   - POST join game
-  - POST ready/unready
-  - POST start game (host only)
+  - POST ready (MVP: no unready)
+  - POST start game (auto when all ready; explicit host action if needed for edge cases)
+  - POST add AI seat (host only)
+  - POST remove AI seat (host only)
+  - GET last-active game for current user (for Resume CTA)
 - In-game actions and views:
   - GET player view / game snapshot (phase, hands, legal actions, trick state)
   - POST bid
+  - POST select trump (highest bidder only, after all bids)
   - POST play
   - GET scores/history
 
-Error model: Use `BackendApiError` on the frontend; surface `traceId` when present.
+Error model: Use `BackendApiError` on the frontend; `traceId` available in details (hidden until expanded); log `traceId` in dev.
 
 ---
 
@@ -111,21 +148,44 @@ Error model: Use `BackendApiError` on the frontend; surface `traceId` when prese
 - Caching: Keep minimal at first; introduce TanStack Query only if complexity grows.
 - Optimism: Pessimistic writes for moves/bids; optimistic only for non-critical toggles.
 - Accessibility: Keyboard play is a first-class requirement, not a later add-on.
+ - Layout: Centered container with desktop max-width (~1100px); fluid below that; full-bleed only where it adds value.
+ - Lobby lists: Show joinable games separately from an In‑progress (view‑only) list.
+ - Player count: Exactly 4 players per game (min=max); cannot join once in progress.
+ - Spectators: Deferred (no spectator mode in MVP). In‑progress list is informational only.
+ - Rejoin: A player can always reclaim their seat for the duration of the game; resume from Lobby "Your games" list.
+ - Game creation (MVP): Only two options — optional name (with default) and starting dealer (defaults to creator). No other rule toggles.
+ - Active game limit (MVP UX): One active game per player; UI hides/disables create/join when already in a game.
+ - Resume CTA: Provide "Resume last game" both in Header (signed‑in) and on Lobby top.
+  - Resume source: Backend-driven `GET /games/last-active` with client fallback to local recent only if endpoint fails.
+ - Auth (MVP): Google via NextAuth is required; no guest/anonymous mode.
+ - Error UX: Friendly summary in toast; `traceId` shown only in expanded details; log `traceId` in dev console.
+ - AI seats (MVP): Included for manual testing; host-only add/remove; bots clearly labeled.
+ - Minimum humans to start: 1 (creator). Remaining seats can be filled with AI.
+ - Bid rules (MVP): Nil (0) bids allowed; maximum bid equals current hand size.
+ - Trump: Selected by highest bidder after all bids; choice visible to all immediately; supports No Trumps.
+ - Dealer/lead: Dealer rotates clockwise each round; player left of dealer leads first trick.
+ - Ready/start (MVP): Players can only ready (no unready); AI auto-ready; game auto-starts when all are ready.
+ - Game naming: Default to "{CreatorName} game"; names need not be unique (one active game per user UX).
+ - Invites (MVP): Copy invite link only (full URL for direct browser paste); no visible table ID/share code.
+ - Lobby sorting: Joinable list sorted by most players waiting (descending).
+ - Illegal move errors: Server rejection surfaced via toast only.
+ - Sync UX: No explicit "Sync now" in Game Room; show subtle polling indicator for confidence.
+ - Scoring UI: Collapsible score table always visible in sidebar (cumulative totals); no per-round summary needed.
+ - Lobby search/filter (MVP): Client-side only; can upgrade to backend query if needed.
+ - Root route (`/`): Welcome page with login for non-authenticated; redirect to `/lobby` for authenticated.
 
 ## Open Questions
-- Spectators supported?
-- AI seat controls (host-only?) and visibility rules
-- Rejoin semantics after disconnect
-- Game creation rule toggles for MVP
+- (All Stage 0 questions resolved — see Decisions section above)
 
 ---
 
 ## Progress Tracker
 Use checkboxes to mark completion. Add brief notes/dates.
 
-- [ ] Stage 0 — Align and prepare
-  - [ ] Wireframes committed (screenshots or links)  
-  - [ ] Endpoint shortlist verified with backend
+- [x] Stage 0 — Align and prepare
+  - [x] Wireframes committed (detailed UX spec in Stage 6)
+  - [x] Endpoint shortlist complete (pending backend verification)
+  - [x] Game phases and data requirements documented
 - [ ] Stage 1 — App shell and routing (web)
   - [ ] `/lobby` placeholder
   - [ ] `/game/[gameId]` placeholder
@@ -147,6 +207,7 @@ Use checkboxes to mark completion. Add brief notes/dates.
 ---
 
 ## Change Log (most recent first)
+- 2025-01-XX: Stage 0 complete — all MVP decisions documented, endpoints listed, wireframes integrated (detailed UX spec in Stage 6). Ready for Stage 1 implementation.
 - YYYY-MM-DD: Created initial roadmap with staged plan and tracker.
 
 
@@ -232,7 +293,19 @@ Pick only those that affect Stage 1–3 layout or API contracts, e.g.:
 - Max players per game? [affects seat layout]
 - Can non-host start the game? [affects visibility of Start control]
 
-### Step 6: Paste your text below (temporary)
-Paste your Lobby and Game Room descriptions here. We’ll integrate them above and delete this helper section afterwards.
+### Scratchpad — working area (temporary)
+Use this area to co-develop answers for upcoming steps. When an item is finalized, promote it to the appropriate Stage above and clear it here.
 
+Template
+- Context/Question:
+- Proposed answer (bullet points):
+- Open questions/risks:
+- Owner/next action:
+
+Stage 0 complete — all decisions moved to Decisions section and relevant Stages above.
+
+Remaining items for future stages:
+- Backend: Verify endpoint names/payloads match decisions above.
+- AI behavior: Confirm minimal acceptable AI for testing (random legal vs heuristic).
+- Validation: Name length/charset limits for game creation.
 
