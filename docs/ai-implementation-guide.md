@@ -71,6 +71,8 @@ Nommie mixes 1‑based and 0‑based concepts.
 `round_no=1 → 13 cards • round_no=13 → first 2‑card round • round_no=26 → 13 cards`.  
 Vector indices are always `round_no – 1`.
 
+**Arrays:** All multi-player arrays (`bids`, `scores`) index by seat 0–3.
+
 ---
 
 ## RNG & Determinism
@@ -85,8 +87,11 @@ A single **game seed** controls deterministic aspects of the engine.
 
 **Determinism notes:**
 - **Engine‑controlled:** Memory degradation is fully deterministic from `(game_seed, round_no, trick_no/seat/… salt)`.
+- **Seed functions:** `derive_dealing_seed` and `derive_memory_seed` are **engine‑internal** and not exposed to AIs.
 - **Stateless safety:** Salting avoids order‑of‑calls dependence and supports parallelism.
 - **Replays:** Same `game_seed` + same moves ⇒ identical memory and dealing.
+
+**AI RNG wiring:** See **Appendix A.2** for constructing AIs with optional seeds (e.g., `MyAI::new(Some(42))` for tests, `MyAI::new(None)` for production entropy).
 
 ---
 
@@ -107,15 +112,19 @@ Typical loop:
 Your AI implements three methods, each receiving **read‑only** views:
 
 - `choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError>`  
-  Use `state.legal_bids()`; engine enforces dealer restriction and zero‑bid streak rule.
+  Called during **Bidding** phase only. Use `state.legal_bids()`; engine enforces dealer restriction and zero‑bid streak rule.
 
 - `choose_trump(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Trump, AiError>`  
-  Only called for the **bid winner** by the orchestrator.
+  Called during **TrumpSelection** phase only, and **only for the bid winner**. Use `state.legal_trumps()`; all 5 options are valid.
 
 - `choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError>`  
-  Use `state.legal_plays()`; engine enforces follow‑suit.
+  Called during **TrickPlay** phase only. Use `state.legal_plays()`; engine enforces follow‑suit.
+
+**Phase guarantee:** The engine only calls methods during the correct phase. AIs are never invoked out-of-phase.
 
 **Thread safety:** your AI struct must be `Send + Sync`. If you keep RNG, wrap it in `Mutex<StdRng>`.
+
+**Lifecycle:** The engine creates a **new AI instance for each decision** (bid/trump/play). The same AI instance may be called from different games or concurrently. **Do not store per‑game state** in your AI struct; use only the provided `state` and `context`.
 
 ---
 
@@ -126,20 +135,22 @@ Your AI implements three methods, each receiving **read‑only** views:
 - `player_seat: i16` (0–3), `dealer_pos: i16` (0–3)  
 - `current_round: i16` (1–26), `hand_size: u8`, `game_state: GameState`
 - `hand: Vec<Card>` — remaining cards in your hand after removing plays already recorded
-- `bids: Vec<Option<u8>>`, `trump: Option<Trump>`
+- `bids: [Option<u8>; 4]`, `trump: Option<Trump>`
 - `trick_no: i16` (1..=hand_size)  
-- `current_trick_plays: Vec<(i16, Card)>`
+- `current_trick_plays: Vec<(i16, Card)>` — **in play order** (leader first), seats 0–3, empty if no one has played
 - `trick_leader: Option<i16>` → **left of dealer for trick 1; previous trick winner thereafter**  
-- `scores: [i16; 4]`
+- `scores: [i16; 4]` — **cumulative** scores from all completed rounds (current round not included)
 
 ### Helpers (always prefer these)
-- `legal_bids() -> Result<Vec<u8>, AppError>`
-- `legal_trumps() -> Vec<Trump>`
-- `legal_plays() -> Result<Vec<Card>, AppError>`
+- `legal_bids() -> Vec<u8>` — sorted 0..=hand_size; returns empty if not your turn
+- `legal_trumps() -> Vec<Trump>` — all 5 options (Clubs, Diamonds, Hearts, Spades, NoTrump)
+- `legal_plays() -> Vec<Card>` — arbitrary order; returns empty if not your turn
+
+**Note:** The engine calls AIs only when it's their turn, so `legal_*` should never be empty. If needed, advance with `(seat + 1) % 4`.
 
 ### `GameContext`
 - `game_history() -> Option<&GameHistory>` (available once game starts)
-- `round_memory() -> Option<&RoundMemory>` (**completed** tricks only; **not** the current trick)
+- `round_memory() -> Option<&RoundMemory>` (**completed** tricks only; updates after each completed trick; **not** during the current trick)
 
 **Memory determinism:** Outcomes are fully deterministic for a given `game_seed` and salts; see **RNG & Determinism** and **Appendix C**.
 
@@ -147,6 +158,29 @@ Your AI implements three methods, each receiving **read‑only** views:
 - `RoundHistory` includes `hand_size: u8` field for each round
 - **Use `r.hand_size` directly** instead of calculating from `round_no`
 - Prevents off-by-one errors when analyzing historical data
+- **See Appendix D.1** for full struct definitions
+
+### Memory Degradation Enums
+
+**MemoryMode** — Controls memory fidelity:  
+- `Full` — Perfect recall of all plays (memory level 100)  
+- `Partial { level }` — Degraded memory (levels 1-99)  
+- `None` — No historical card memory (level 0)
+
+**PlayMemory** — What you remember about a single card play:  
+- `Exact(Card)` — Perfect recall of suit and rank  
+- `Suit(Suit)` — Remember suit, forgot rank  
+- `RankCategory(RankCategory)` — Only vague memory (high/medium/low)  
+- `Forgotten` — No memory of this play
+
+**RankCategory** — Vague rank memory:  
+- `High` — Jack, Queen, King, Ace  
+- `Medium` — 7, 8, 9, 10  
+- `Low` — 2, 3, 4, 5, 6
+
+**Degradation order:** `Exact → Suit → RankCategory → Forgotten`. Higher-value cards (Ace, King) are more memorable than low cards (2, 3).
+
+**Helpers:** `is_exact()`, `is_forgotten()`, `exact_card()` → `Option<Card>`. See **Appendix D.2** for full struct definitions.
 
 ---
 
@@ -164,8 +198,10 @@ Your AI implements three methods, each receiving **read‑only** views:
 ## Error Handling
 
 - Wrap domain errors into `AiError::Internal`.
-- Use `AiError::InvalidMove` when you can’t produce a legal decision.
+- Use `AiError::InvalidMove` when you can't produce a legal decision.
 - **Never panic**. Prefer `Result` and validate preconditions (e.g., non‑empty legal lists).
+
+**Engine policy:** On illegal move or `AiError`, the engine retries up to 3 times. If all retries fail, the game aborts (no random fallback).
 
 ---
 
@@ -174,7 +210,7 @@ Your AI implements three methods, each receiving **read‑only** views:
 **Targets**
 - Always returns a **legal** bid/play/trump.
 - **Deterministic when seeded** (AI seed) and **replayable** via `game_seed`.
-- **Fast:** aim for **≤ 50 ms per decision**.
+- **Fast:** aim for **≤ 50 ms per decision** (guideline only; no engine timeout enforcement).
 
 **Examples & scaffolding:** see **Appendix B**.
 
@@ -201,11 +237,14 @@ Your AI implements three methods, each receiving **read‑only** views:
 ## Submission Requirements
 
 Submit a single Rust file containing:
+
 1. Your AI struct and `AiPlayer` impl
 2. Helper methods/types (if any)
 3. Optional unit tests
 
 Include a short **description** (strategy overview, parameters).
+
+**Compatibility:** This guide targets Nommie backend v0.1.0, Rust edition 2021. The `AiPlayer` trait API is stable; we'll document any breaking changes if we bump to v0.2.0+.
 
 ---
 
@@ -229,12 +268,12 @@ impl MyAI {
 
 impl AiPlayer for MyAI {
     fn choose_bid(&self, state: &CurrentRoundInfo, _cx: &GameContext) -> Result<u8, AiError> {
-        let legal = state.legal_bids().map_err(|e| AiError::Internal(format!("{e}")))?;
+        let legal = state.legal_bids();
         legal.first().copied().ok_or_else(|| AiError::InvalidMove("No legal bids".into()))
     }
 
     fn choose_play(&self, state: &CurrentRoundInfo, _cx: &GameContext) -> Result<Card, AiError> {
-        let legal = state.legal_plays().map_err(|e| AiError::Internal(format!("{e}")))?;
+        let legal = state.legal_plays();
         legal.first().copied().ok_or_else(|| AiError::InvalidMove("No legal plays".into()))
     }
 
@@ -267,14 +306,14 @@ impl RandomPlayer {
 
 impl AiPlayer for RandomPlayer {
     fn choose_bid(&self, state: &CurrentRoundInfo, _cx: &GameContext) -> Result<u8, AiError> {
-        let legal = state.legal_bids().map_err(|e| AiError::Internal(format!("get bids: {e}")))?;
+        let legal = state.legal_bids();
         if legal.is_empty() { return Err(AiError::InvalidMove("No legal bids".into())); }
         let mut rng = self.rng.lock().map_err(|e| AiError::Internal(format!("rng lock: {e}")))?;
         legal.choose(&mut *rng).copied().ok_or_else(|| AiError::Internal("rng choice".into()))
     }
 
     fn choose_play(&self, state: &CurrentRoundInfo, _cx: &GameContext) -> Result<Card, AiError> {
-        let legal = state.legal_plays().map_err(|e| AiError::Internal(format!("get plays: {e}")))?;
+        let legal = state.legal_plays();
         if legal.is_empty() { return Err(AiError::InvalidMove("No legal plays".into())); }
         let mut rng = self.rng.lock().map_err(|e| AiError::Internal(format!("rng lock: {e}")))?;
         legal.choose(&mut *rng).copied().ok_or_else(|| AiError::Internal("rng choice".into()))
@@ -330,7 +369,7 @@ mod tests {
 #### C.1 — Opponent Analysis using GameHistory
 ```rust
 fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, AiError> {
-    let legal = state.legal_bids().map_err(|e| AiError::Internal(format!("{e}")))?;
+    let legal = state.legal_bids();
 
     if let Some(hist) = cx.game_history() {
         let me = state.player_seat as usize;
@@ -411,7 +450,7 @@ fn count_highs_played(cx: &GameContext) -> usize {
 #### C.4 — Memory‑Aware Strategy Skeleton
 ```rust
 fn choose_play(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<Card, AiError> {
-    let legal = state.legal_plays().map_err(|e| AiError::Internal(format!("{e}")))?;
+    let legal = state.legal_plays();
     if let Some(mem) = cx.round_memory() {
         // Compute a simple memory quality score
         let (mut exact, mut total) = (0, 0);
@@ -452,7 +491,9 @@ pub struct RoundScoreDetail {
 pub struct RoundMemory { pub mode: MemoryMode, pub tricks: Vec<TrickMemory> }
 
 pub struct TrickMemory {
-    pub trick_no: i16, // 1..=hand_size (1-based, matches Indexing Reference) pub plays: Vec<(i16, PlayMemory)> }
+    pub trick_no: i16, // 1..=hand_size (1-based, matches Indexing Reference)
+    pub plays: Vec<(i16, PlayMemory)> 
+}
 
 pub enum PlayMemory {
     Exact(Card),
