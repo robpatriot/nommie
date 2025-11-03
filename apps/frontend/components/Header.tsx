@@ -1,5 +1,6 @@
 import { auth, signIn, signOut } from '@/auth'
 import Link from 'next/link'
+import ResumeGameButton from './ResumeGameButton'
 
 export default async function Header() {
   const session = await auth()
@@ -22,10 +23,7 @@ export default async function Header() {
       <div className="flex items-center gap-3">
         {session?.user ? (
           <>
-            {/* Resume last game CTA - will be wired up in Stage 2 */}
-            <span className="text-sm text-gray-500 italic">
-              Resume (coming soon)
-            </span>
+            <ResumeGameButton />
             <span className="text-sm text-gray-600">{session.user.email}</span>
             <form
               action={async () => {

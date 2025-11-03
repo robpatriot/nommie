@@ -186,10 +186,19 @@ Use checkboxes to mark completion. Add brief notes/dates.
   - [x] Wireframes committed (detailed UX spec in Stage 6)
   - [x] Endpoint shortlist complete (pending backend verification)
   - [x] Game phases and data requirements documented
-- [ ] Stage 1 — App shell and routing (web)
-  - [ ] `/lobby` placeholder
-  - [ ] `/game/[gameId]` placeholder
-- [ ] Stage 2 — Read-only lobby
+- [x] Stage 1 — App shell and routing (web)
+  - [x] Root route `/` redirects authenticated to `/lobby`, shows login for non-authenticated
+  - [x] `/lobby` placeholder
+  - [x] `/game/[gameId]` placeholder
+  - [x] Header updated with Lobby link and Resume CTA placeholder
+- [x] Stage 2 — Read-only lobby
+  - [x] TypeScript types for game data
+  - [x] API client functions with error handling
+  - [x] Two separate lists (joinable and in-progress)
+  - [x] Loading skeleton, empty states, error banner
+  - [x] Refresh button
+  - [x] Resume last game CTA (lobby and Header)
+  - [x] Client-side search/filter
 - [ ] Stage 3 — Create and join game
 - [ ] Stage 4 — Read-only game room and table snapshot
 - [ ] Stage 5 — Core interactions
@@ -207,6 +216,8 @@ Use checkboxes to mark completion. Add brief notes/dates.
 ---
 
 ## Change Log (most recent first)
+- 2025-01-XX: Stage 2 complete — read-only lobby implemented: TypeScript types, API client functions, game lists with loading/empty/error states, refresh button, Resume CTA in lobby and Header, client-side search/filter. Note: Backend endpoints not yet implemented, so API calls gracefully handle 404s. Ready for Stage 3 (create and join).
+- 2025-01-XX: Stage 1 complete — app shell and routing implemented: root route with auth redirect, `/lobby` and `/game/[gameId]` placeholder routes, Header updated with Lobby link and Resume CTA placeholder. Ready for Stage 2 (read-only lobby).
 - 2025-01-XX: Stage 0 complete — all MVP decisions documented, endpoints listed, wireframes integrated (detailed UX spec in Stage 6). Ready for Stage 1 implementation.
 - YYYY-MM-DD: Created initial roadmap with staged plan and tracker.
 

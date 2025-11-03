@@ -1,4 +1,5 @@
 import { auth } from '@/auth'
+import type { Game, GameListResponse, LastActiveGameResponse } from './types'
 
 export class BackendApiError extends Error {
   constructor(
@@ -75,4 +76,52 @@ export async function fetchWithAuth(
 export async function getMe<T = unknown>(): Promise<T> {
   const response = await fetchWithAuth('/api/private/me')
   return response.json()
+}
+
+// Game-related API functions
+
+export async function getJoinableGames(): Promise<Game[]> {
+  try {
+    const response = await fetchWithAuth('/api/games/joinable')
+    const data: GameListResponse = await response.json()
+    return data.games
+  } catch (error) {
+    // If endpoint doesn't exist yet, return empty array
+    // In production, you'd want to handle this differently
+    if (error instanceof BackendApiError && error.status === 404) {
+      console.warn('Joinable games endpoint not yet implemented')
+      return []
+    }
+    throw error
+  }
+}
+
+export async function getInProgressGames(): Promise<Game[]> {
+  try {
+    const response = await fetchWithAuth('/api/games/in-progress')
+    const data: GameListResponse = await response.json()
+    return data.games
+  } catch (error) {
+    // If endpoint doesn't exist yet, return empty array
+    if (error instanceof BackendApiError && error.status === 404) {
+      console.warn('In-progress games endpoint not yet implemented')
+      return []
+    }
+    throw error
+  }
+}
+
+export async function getLastActiveGame(): Promise<number | null> {
+  try {
+    const response = await fetchWithAuth('/api/games/last-active')
+    const data: LastActiveGameResponse = await response.json()
+    return data.game_id
+  } catch (error) {
+    // If endpoint doesn't exist yet, return null
+    if (error instanceof BackendApiError && error.status === 404) {
+      console.warn('Last active game endpoint not yet implemented')
+      return null
+    }
+    throw error
+  }
 }
