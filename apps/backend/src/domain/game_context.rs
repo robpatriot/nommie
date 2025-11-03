@@ -42,7 +42,7 @@ use crate::errors::domain::{DomainError, ValidationKind};
 ///     }
 ///     
 ///     // Make informed bid
-///     let legal_bids = state.legal_bids()?;
+///     let legal_bids = state.legal_bids();
 ///     Ok(legal_bids[0])
 /// }
 /// ```

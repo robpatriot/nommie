@@ -307,7 +307,7 @@ impl GameFlowService {
         }
 
         // Also validate it's a legal play (suit following rules)
-        let legal_plays = player_state.legal_plays()?;
+        let legal_plays = player_state.legal_plays();
         if !legal_plays.contains(&card) {
             return Err(DomainError::validation(
                 ValidationKind::MustFollowSuit,

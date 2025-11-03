@@ -65,8 +65,7 @@ pub fn determine_trick_leader(
 /// ```rust,ignore
 /// fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
 ///     // Get legal options
-///     let legal_bids = state.legal_bids()
-///         .map_err(|e| AiError::Internal(format!("{e}")))?;
+///     let legal_bids = state.legal_bids();
 ///     
 ///     // Analyze your hand
 ///     let high_cards = state.hand.iter()
@@ -113,7 +112,7 @@ pub struct CurrentRoundInfo {
     /// - `None` - player hasn't bid yet
     ///
     /// Example: `[Some(3), Some(2), None, None]` means seats 0 and 1 have bid.
-    pub bids: Vec<Option<u8>>,
+    pub bids: [Option<u8>; 4],
 
     /// Trump suit if determined, None during bidding
     ///
@@ -220,7 +219,7 @@ impl CurrentRoundInfo {
 
         // Load bids
         let bid_records = bids::find_all_by_round(conn, round.id).await?;
-        let mut bids = vec![None; 4];
+        let mut bids = [None; 4];
         for bid in bid_records {
             if bid.player_seat >= 0 && bid.player_seat < 4 {
                 bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
@@ -295,7 +294,7 @@ impl CurrentRoundInfo {
     ///
     /// # Returns
     ///
-    /// - `Ok(Vec<u8>)` - List of legal bid values
+    /// - `Vec<u8>` - List of legal bid values (sorted 0..=hand_size)
     ///   - Empty if not in Bidding phase or not your turn
     ///   - Non-empty list during your turn in bidding
     ///
@@ -307,23 +306,23 @@ impl CurrentRoundInfo {
     /// # Example
     ///
     /// ```rust,ignore
-    /// let legal_bids = state.legal_bids()?;
+    /// let legal_bids = state.legal_bids();
     /// if legal_bids.is_empty() {
     ///     return Err(AiError::InvalidMove("Not my turn to bid".into()));
     /// }
     /// // Choose from legal_bids
     /// let bid = legal_bids[0];
     /// ```
-    pub fn legal_bids(&self) -> Result<Vec<u8>, AppError> {
+    pub fn legal_bids(&self) -> Vec<u8> {
         if self.game_state != DbGameState::Bidding {
-            return Ok(Vec::new());
+            return Vec::new();
         }
 
         // Check if it's this player's turn
         let bid_count = self.bids.iter().filter(|b| b.is_some()).count();
         let expected_seat = (self.dealer_pos + 1 + bid_count as i16) % 4;
         if self.player_seat != expected_seat {
-            return Ok(Vec::new());
+            return Vec::new();
         }
 
         let mut legal = valid_bid_range(self.hand_size).collect::<Vec<_>>();
@@ -335,7 +334,7 @@ impl CurrentRoundInfo {
             legal.retain(|&b| b != forbidden);
         }
 
-        Ok(legal)
+        legal
     }
 
     /// Get legal plays for this player.
@@ -348,7 +347,7 @@ impl CurrentRoundInfo {
     ///
     /// # Returns
     ///
-    /// - `Ok(Vec<Card>)` - List of legal cards to play
+    /// - `Vec<Card>` - List of legal cards to play (arbitrary order)
     ///   - Empty if not in TrickPlay phase or not your turn
     ///   - Subset of your hand if you must follow suit
     ///   - Your entire hand if leading or can't follow suit
@@ -361,7 +360,7 @@ impl CurrentRoundInfo {
     /// # Example
     ///
     /// ```rust,ignore
-    /// let legal_plays = state.legal_plays()?;
+    /// let legal_plays = state.legal_plays();
     /// if legal_plays.is_empty() {
     ///     return Err(AiError::InvalidMove("Not my turn to play".into()));
     /// }
@@ -373,9 +372,9 @@ impl CurrentRoundInfo {
     ///     *legal_plays.iter().min().unwrap()
     /// };
     /// ```
-    pub fn legal_plays(&self) -> Result<Vec<Card>, AppError> {
+    pub fn legal_plays(&self) -> Vec<Card> {
         if self.game_state != DbGameState::TrickPlay {
-            return Ok(Vec::new());
+            return Vec::new();
         }
 
         // Determine whose turn it is
@@ -392,7 +391,7 @@ impl CurrentRoundInfo {
 
         if self.player_seat != leader_seat && play_count > 0 {
             // Not our turn
-            return Ok(Vec::new());
+            return Vec::new();
         }
 
         // Determine legal cards based on lead suit
@@ -421,7 +420,7 @@ impl CurrentRoundInfo {
             self.hand.clone()
         };
 
-        Ok(legal)
+        legal
     }
 
     /// Get legal trump choices (all suits + NoTrump).

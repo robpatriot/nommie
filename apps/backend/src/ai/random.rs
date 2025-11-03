@@ -93,9 +93,7 @@ impl AiPlayer for RandomPlayer {
     fn choose_bid(&self, state: &CurrentRoundInfo, _context: &GameContext) -> Result<u8, AiError> {
         // Pattern 1: Always get legal moves first
         // This handles dealer restriction and turn order automatically
-        let legal_bids = state
-            .legal_bids()
-            .map_err(|e| AiError::Internal(format!("Failed to get legal bids: {e}")))?;
+        let legal_bids = state.legal_bids();
 
         // Pattern 2: Validate preconditions before proceeding
         if legal_bids.is_empty() {
@@ -124,9 +122,7 @@ impl AiPlayer for RandomPlayer {
         _context: &GameContext,
     ) -> Result<Card, AiError> {
         // Pattern 1: Get legal plays (handles follow-suit rule automatically)
-        let legal_plays = state
-            .legal_plays()
-            .map_err(|e| AiError::Internal(format!("Failed to get legal plays: {e}")))?;
+        let legal_plays = state.legal_plays();
 
         // Pattern 2: Validate we have options
         if legal_plays.is_empty() {

@@ -46,14 +46,12 @@
 //!
 //! impl AiPlayer for SimpleAI {
 //!     fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
-//!         let legal_bids = state.legal_bids()
-//!             .map_err(|e| AiError::Internal(format!("{e}")))?;
+//!         let legal_bids = state.legal_bids();
 //!         Ok(legal_bids[0])  // Bid minimum
 //!     }
 //!
 //!     fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError> {
-//!         let legal_plays = state.legal_plays()
-//!             .map_err(|e| AiError::Internal(format!("{e}")))?;
+//!         let legal_plays = state.legal_plays();
 //!         Ok(legal_plays[0])  // Play first legal card
 //!     }
 //!

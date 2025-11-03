@@ -200,10 +200,10 @@ impl RoundCache {
                     fresh_bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
                 }
             }
-            fresh_bids.to_vec()
+            fresh_bids
         } else {
             // Use cached bids (bidding is complete)
-            self.bids.to_vec()
+            self.bids
         };
 
         // Load all tricks for this round to compute remaining cards

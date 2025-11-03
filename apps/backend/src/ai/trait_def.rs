@@ -27,15 +27,13 @@
 //!
 //! impl AiPlayer for MyAI {
 //!     fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
-//!         let legal_bids = state.legal_bids()
-//!             .map_err(|e| AiError::Internal(format!("{e}")))?;
+//!         let legal_bids = state.legal_bids();
 //!         // Your bidding logic here
 //!         Ok(legal_bids[0])
 //!     }
 //!
 //!     fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
-//!         let legal_plays = state.legal_plays()
-//!             .map_err(|e| AiError::Internal(format!("{e}")))?;
+//!         let legal_plays = state.legal_plays();
 //!         // Your card selection logic here
 //!         Ok(legal_plays[0])
 //!     }
@@ -130,14 +128,12 @@ impl From<AiError> for AppError {
 ///
 /// impl AiPlayer for SimpleAI {
 ///     fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
-///         let legal_bids = state.legal_bids()
-///             .map_err(|e| AiError::Internal(format!("{e}")))?;
+///         let legal_bids = state.legal_bids();
 ///         Ok(legal_bids[0])  // Bid the minimum legal value
 ///     }
 ///
 ///     fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
-///         let legal_plays = state.legal_plays()
-///             .map_err(|e| AiError::Internal(format!("{e}")))?;
+///         let legal_plays = state.legal_plays();
 ///         Ok(legal_plays[0])  // Play the first legal card
 ///     }
 ///
@@ -171,8 +167,7 @@ pub trait AiPlayer: Send + Sync {
     ///
     /// ```rust,ignore
     /// fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
-    ///     let legal_bids = state.legal_bids()
-    ///         .map_err(|e| AiError::Internal(format!("{e}")))?;
+    ///     let legal_bids = state.legal_bids();
     ///     
     ///     if legal_bids.is_empty() {
     ///         return Err(AiError::InvalidMove("No legal bids available".into()));
@@ -215,8 +210,7 @@ pub trait AiPlayer: Send + Sync {
     ///
     /// ```rust,ignore
     /// fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
-    ///     let legal_plays = state.legal_plays()
-    ///         .map_err(|e| AiError::Internal(format!("{e}")))?;
+    ///     let legal_plays = state.legal_plays();
     ///     
     ///     if legal_plays.is_empty() {
     ///         return Err(AiError::InvalidMove("No legal plays available".into()));
