@@ -1,7 +1,15 @@
 {
   "setup-worktree": [
-    "# fnm use",
-    "# npm install",
-    "# cp $ROOT_WORKTREE_PATH/.env .env"
+    "echo \"🧩 Setting up Nommie dev worktree at $WORKTREE_PATH for $WORKTREE_BRANCH\"",
+    "cd \"$WORKTREE_PATH\"",
+    "pnpm install",
+    "cp \"$ROOT_WORKTREE_PATH/apps/backend/.env\" apps/backend/.env || echo '⚠️ No backend .env found to copy'",
+    "cp \"$ROOT_WORKTREE_PATH/apps/frontend/.env.local\" apps/frontend/.env.local || echo '⚠️ No frontend .env.local found to copy'",
+    "cargo fetch --manifest-path apps/backend/Cargo.toml",
+    "cargo check --manifest-path apps/backend/Cargo.toml",
+    "pnpm --filter ./apps/frontend exec next telemetry disable || true"
+  ],
+  "switch-worktree": [
+    "echo \"🔄 Switched to $WORKTREE_BRANCH at $WORKTREE_PATH\""
   ]
 }
