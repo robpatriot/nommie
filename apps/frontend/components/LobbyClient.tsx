@@ -1,57 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import GameList from './GameList'
 import type { Game } from '@/lib/types'
-import {
-  getJoinableGames,
-  getInProgressGames,
-  getLastActiveGame,
-  BackendApiError,
-} from '@/lib/api'
 
-export default function LobbyClient() {
+type LobbyClientProps = {
+  joinableGames: Game[]
+  inProgressGames: Game[]
+  lastActiveGameId: number | null
+}
+
+export default function LobbyClient({
+  joinableGames: initialJoinable,
+  inProgressGames: initialInProgress,
+  lastActiveGameId,
+}: LobbyClientProps) {
   const router = useRouter()
-  const [joinableGames, setJoinableGames] = useState<Game[]>([])
-  const [inProgressGames, setInProgressGames] = useState<Game[]>([])
-  const [lastActiveGameId, setLastActiveGameId] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [joinableGames] = useState<Game[]>(initialJoinable)
+  const [inProgressGames] = useState<Game[]>(initialInProgress)
   const [refreshing, setRefreshing] = useState(false)
-
-  const loadGames = async () => {
-    try {
-      setError(null)
-      const [joinable, inProgress, lastActive] = await Promise.all([
-        getJoinableGames(),
-        getInProgressGames(),
-        getLastActiveGame(),
-      ])
-
-      setJoinableGames(joinable)
-      setInProgressGames(inProgress)
-      setLastActiveGameId(lastActive)
-    } catch (err) {
-      const message =
-        err instanceof BackendApiError
-          ? `Error loading games: ${err.message}`
-          : 'Failed to load games'
-      setError(message)
-      console.error('Error loading games:', err)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  useEffect(() => {
-    loadGames()
-  }, [])
 
   const handleRefresh = () => {
     setRefreshing(true)
-    loadGames()
+    router.refresh()
   }
 
   const handleJoin = (gameId: number) => {
@@ -62,26 +34,6 @@ export default function LobbyClient() {
     if (lastActiveGameId) {
       router.push(`/game/${lastActiveGameId}`)
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white shadow rounded-lg p-8">
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-              <div className="h-4 bg-gray-200 rounded w-2/3 mb-8"></div>
-              <div className="space-y-3">
-                <div className="h-4 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded"></div>
-                <div className="h-4 bg-gray-200 rounded"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -110,12 +62,6 @@ export default function LobbyClient() {
                 >
                   ▶ Resume Last Game
                 </button>
-              </div>
-            )}
-
-            {error && (
-              <div className="mb-4 bg-red-50 border border-red-200 rounded-md p-4">
-                <p className="text-sm text-red-800">{error}</p>
               </div>
             )}
           </div>

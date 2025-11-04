@@ -1,6 +1,11 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import LobbyClient from '@/components/LobbyClient'
+import {
+  getJoinableGames,
+  getInProgressGames,
+  getLastActiveGame,
+} from '@/lib/api'
 
 export default async function LobbyPage() {
   const session = await auth()
@@ -9,6 +14,17 @@ export default async function LobbyPage() {
   if (!session) {
     redirect('/')
   }
+  const [joinableGames, inProgressGames, lastActiveGameId] = await Promise.all([
+    getJoinableGames(),
+    getInProgressGames(),
+    getLastActiveGame(),
+  ])
 
-  return <LobbyClient />
+  return (
+    <LobbyClient
+      joinableGames={joinableGames}
+      inProgressGames={inProgressGames}
+      lastActiveGameId={lastActiveGameId}
+    />
+  )
 }

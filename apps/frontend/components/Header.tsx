@@ -1,10 +1,13 @@
-import { auth, signIn, signOut } from '@/auth'
+import { signIn, signOut } from '@/auth'
 import Link from 'next/link'
 import ResumeGameButton from './ResumeGameButton'
 
-export default async function Header() {
-  const session = await auth()
+type HeaderProps = {
+  session: { user?: { email?: string | null } } | null
+  lastActiveGameId?: number | null
+}
 
+export default function Header({ session, lastActiveGameId }: HeaderProps) {
   return (
     <header className="w-full flex items-center justify-between gap-3 p-4 bg-white border-b border-gray-200">
       <div className="flex items-center gap-4">
@@ -23,7 +26,7 @@ export default async function Header() {
       <div className="flex items-center gap-3">
         {session?.user ? (
           <>
-            <ResumeGameButton />
+            <ResumeGameButton lastActiveGameId={lastActiveGameId ?? null} />
             <span className="text-sm text-gray-600">{session.user.email}</span>
             <form
               action={async () => {

@@ -1,39 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getLastActiveGame, BackendApiError } from '@/lib/api'
 
 interface ResumeGameButtonProps {
   className?: string
+  lastActiveGameId: number | null
 }
 
-export default function ResumeGameButton({ className }: ResumeGameButtonProps) {
+export default function ResumeGameButton({
+  className,
+  lastActiveGameId,
+}: ResumeGameButtonProps) {
   const router = useRouter()
-  const [lastActiveGameId, setLastActiveGameId] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const loadLastActive = async () => {
-      try {
-        const gameId = await getLastActiveGame()
-        setLastActiveGameId(gameId)
-      } catch (err) {
-        // Silently fail - endpoint might not exist yet
-        if (err instanceof BackendApiError && err.status === 404) {
-          // Expected - endpoint not implemented yet
-        } else {
-          console.error('Error loading last active game:', err)
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadLastActive()
-  }, [])
-
-  if (loading || !lastActiveGameId) {
+  if (!lastActiveGameId) {
     return null
   }
 
