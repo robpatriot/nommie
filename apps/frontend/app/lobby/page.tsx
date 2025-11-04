@@ -20,11 +20,14 @@ export default async function LobbyPage() {
     getLastActiveGame(),
   ])
 
+  const creatorName = session.user?.name || 'You'
+
   return (
     <LobbyClient
       joinableGames={joinableGames}
       inProgressGames={inProgressGames}
       lastActiveGameId={lastActiveGameId}
+      creatorName={creatorName}
     />
   )
 }
