@@ -4,10 +4,9 @@ import Google from 'next-auth/providers/google'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   // NextAuth v5 will auto-infer secret from AUTH_SECRET if not provided.
-  // We set it explicitly to support both AUTH_SECRET and APP_JWT_SECRET.
-  // NextAuth checks this at init time, so we need to read it here.
+  // We set it explicitly to use AUTH_SECRET only on the frontend.
   // Note: Next.js loads .env.local before evaluating modules, so this should work.
-  secret: process.env.AUTH_SECRET ?? process.env.APP_JWT_SECRET,
+  secret: process.env.AUTH_SECRET,
 
   session: { strategy: 'jwt' },
   providers: [
@@ -18,9 +17,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, account, profile }) {
       // Validate required env vars here (lazy evaluation) after Next.js has loaded env vars
-      const authSecret = process.env.AUTH_SECRET ?? process.env.APP_JWT_SECRET
+      const authSecret = process.env.AUTH_SECRET
       if (!authSecret) {
-        throw new Error('Missing AUTH_SECRET or APP_JWT_SECRET')
+        throw new Error('Missing AUTH_SECRET')
       }
 
       if (account?.provider === 'google' && profile) {

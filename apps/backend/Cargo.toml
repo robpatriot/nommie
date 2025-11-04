@@ -32,6 +32,7 @@ log = "0.4"
 
 # Authentication and security
 jsonwebtoken = "9.0"
+dotenvy = "0.15"
 
 # Data types and utilities
 uuid = { version = "1.0", features = ["v4"] }

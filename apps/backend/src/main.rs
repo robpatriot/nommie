@@ -14,12 +14,16 @@ mod telemetry;
 async fn main() -> std::io::Result<()> {
     telemetry::init_tracing();
 
+    // Load environment variables from apps/backend/.env (when running from repo root)
+    // Fallback to .env in current working directory if present
+    let _ = dotenvy::from_filename("apps/backend/.env").or_else(|_| dotenvy::from_filename(".env"));
+
     println!("🚀 Starting Nommie Backend on http://127.0.0.1:3001");
 
-    let jwt = match std::env::var("APP_JWT_SECRET") {
+    let jwt = match std::env::var("BACKEND_JWT_SECRET") {
         Ok(jwt) => jwt,
         Err(_) => {
-            eprintln!("❌ APP_JWT_SECRET must be set");
+            eprintln!("❌ BACKEND_JWT_SECRET must be set");
             std::process::exit(1);
         }
     };
