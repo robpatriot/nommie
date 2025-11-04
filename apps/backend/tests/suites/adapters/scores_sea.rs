@@ -1,9 +1,10 @@
+use backend::adapters::games_sea::GameCreate;
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::repos::{games, rounds, scores};
+use backend::utils::join_code::generate_join_code;
 
 use crate::support::build_test_state;
-use crate::support::test_utils::short_join_code;
 
 /// Test: create_score and find_by_round_and_seat
 #[tokio::test]
@@ -12,8 +13,8 @@ async fn test_create_score_and_find() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
+            let join_code = generate_join_code();
+            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             // Create a score
@@ -65,8 +66,8 @@ async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
+            let join_code = generate_join_code();
+            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
 
             // Create scores out of order
@@ -154,8 +155,8 @@ async fn test_get_current_totals() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
+            let join_code = generate_join_code();
+            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
 
             // Round 1
             let round1 = rounds::create_round(txn, game.id, 1, 13, 0).await?;
@@ -302,8 +303,8 @@ async fn test_get_current_totals_no_rounds() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
+            let join_code = generate_join_code();
+            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
 
             // No rounds created yet
             let totals = scores::get_current_totals(txn, game.id).await?;
@@ -324,8 +325,8 @@ async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
+            let join_code = generate_join_code();
+            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
 
             // Create first score for seat 0
@@ -386,8 +387,8 @@ async fn test_bid_met_flag() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
+            let join_code = generate_join_code();
+            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
 
             // Met bid

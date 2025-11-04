@@ -1,16 +1,17 @@
+use backend::adapters::games_sea::GameCreate;
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;
 use backend::error::AppError;
 use backend::repos::{games, rounds, tricks};
 use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
+use backend::utils::join_code::generate_join_code;
 
 use crate::support::build_test_state;
 use crate::support::game_phases::{
     setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
     setup_game_in_trump_selection_phase,
 };
-use crate::support::test_utils::short_join_code;
 use crate::support::trick_helpers::create_tricks_by_winner_counts;
 
 /// Test: Load game state from database after dealing
@@ -233,8 +234,8 @@ async fn test_load_state_lobby() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = short_join_code();
-            let game = games::create_game(txn, &join_code).await?;
+            let join_code = generate_join_code();
+            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
 
             let game_service = GameService;
 

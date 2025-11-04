@@ -7,9 +7,9 @@ use backend::db::txn::with_txn;
 use backend::entities::games::{GameState, GameVisibility};
 use backend::error::AppError;
 use backend::errors::domain::{ConflictKind, DomainError, NotFoundKind};
+use backend::utils::join_code::generate_join_code;
 
 use crate::support::build_test_state;
-use crate::support::test_utils::short_join_code as unique_join_code;
 
 /// Test: create_game and find_by_id
 #[tokio::test]
@@ -18,7 +18,7 @@ async fn test_create_and_find_by_id() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let dto = GameCreate::new(&join_code)
                 .with_visibility(GameVisibility::Private)
                 .with_name("Test Game");
@@ -54,7 +54,7 @@ async fn test_find_by_join_code() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let dto = GameCreate::new(&join_code);
             let created = games_sea::create_game(txn, dto).await?;
 
@@ -117,7 +117,7 @@ async fn test_require_game_exists() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let created = games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
 
             // require_game should succeed
@@ -164,7 +164,7 @@ async fn test_duplicate_join_code_fails() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
 
             // Create first game
             games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
@@ -197,7 +197,7 @@ async fn test_update_metadata() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game = games_sea::create_game(
                 txn,
                 GameCreate::new(&join_code)
@@ -238,7 +238,7 @@ async fn test_update_round() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game = games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
 
             assert!(game.current_round.is_none());
@@ -273,7 +273,7 @@ async fn test_create_timestamps() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game = games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
 
             let now = time::OffsetDateTime::now_utc();
@@ -309,7 +309,7 @@ async fn test_update_timestamps() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game = games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
 
             let original_created_at = game.created_at;
@@ -349,7 +349,7 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game = games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
 
             assert_eq!(game.lock_version, 1, "initial lock_version should be 1");
@@ -396,7 +396,7 @@ async fn test_update_metadata_clear_name() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game =
                 games_sea::create_game(txn, GameCreate::new(&join_code).with_name("Has Name"))
                     .await?;
@@ -429,7 +429,7 @@ async fn test_update_round_partial() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game = games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
 
             // Update only current_round
@@ -464,7 +464,7 @@ async fn test_update_state_transitions() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game = games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
 
             assert_eq!(game.state, GameState::Lobby);
@@ -501,7 +501,7 @@ async fn test_create_game_defaults() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = unique_join_code();
+            let join_code = generate_join_code();
             let game = games_sea::create_game(txn, GameCreate::new(&join_code)).await?;
 
             // Check defaults

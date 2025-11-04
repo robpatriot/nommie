@@ -44,8 +44,13 @@ pub async fn setup_game_with_players<C: ConnectionTrait>(
 
 /// Create a test game with custom player configuration using test-specific unique seeds.
 ///
-/// Provides full control over player count, readiness, and visibility
-/// while generating unique user subs per test to avoid conflicts.
+/// **NOTE: This function bypasses the repository layer and uses ActiveModel directly.**
+/// This is intentional for:
+/// - Performance: Faster setup when creating games with multiple players
+/// - Convenience: Creates users and memberships in one function
+/// - Complex scenarios: Setting up complete game states (game + players + readiness)
+///
+/// For simple game creation, use `repos::games::create_game()` instead.
 ///
 /// # Arguments
 /// * `conn` - Database connection or transaction

@@ -33,8 +33,10 @@ pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
     Ok(game.map(Game::from))
 }
 
-pub async fn create_game(txn: &DatabaseTransaction, join_code: &str) -> Result<Game, DomainError> {
-    let dto = games_adapter::GameCreate::new(join_code);
+pub async fn create_game(
+    txn: &DatabaseTransaction,
+    dto: games_adapter::GameCreate,
+) -> Result<Game, DomainError> {
     let game = games_adapter::create_game(txn, dto).await?;
     Ok(Game::from(game))
 }

@@ -90,8 +90,14 @@ pub async fn create_test_user_with_randomization(
 
 /// Create a fresh game in Lobby state with test-specific unique seeds and user subs.
 ///
-/// This creates a truly fresh game with deterministic but unique seeds per test
-/// to avoid conflicts when running tests concurrently.
+/// **NOTE: This function bypasses the repository layer and uses ActiveModel directly.**
+/// This is intentional for:
+/// - Performance: Faster setup when creating many games in tests
+/// - Control: Full control over all fields including lock_version, state, etc.
+/// - Complex scenarios: Setting up games in non-standard states (e.g., already in BIDDING)
+///
+/// For simple game creation in integration/service tests, use `repos::games::create_game()`
+/// instead to test the full production code path.
 ///
 /// # Arguments
 /// * `conn` - Database connection or transaction
@@ -126,7 +132,7 @@ pub async fn create_fresh_lobby_game(
         starting_dealer_pos: Set(None),
         current_trick_no: Set(0),
         current_round_id: Set(None),
-        lock_version: Set(0),
+        lock_version: Set(1), // New games start at lock_version 1
     };
 
     let inserted = game.insert(conn).await?;

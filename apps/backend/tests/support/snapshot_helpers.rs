@@ -66,6 +66,14 @@ impl SnapshotGameOptions {
 ///     .with_lock_version(5);
 /// let game = create_snapshot_game(&shared, options).await?;
 /// ```
+///
+/// **NOTE: This function bypasses the repository layer and uses ActiveModel directly.**
+/// This is intentional for:
+/// - Performance: Faster setup for snapshot testing
+/// - Control: Full control over state, lock_version, and other fields for snapshot edge cases
+/// - Arbitrary states: Creating games in any state for snapshot validation
+///
+/// For simple game creation, use `repos::games::create_game()` instead.
 pub async fn create_snapshot_game(
     shared: &SharedTxn,
     options: SnapshotGameOptions,

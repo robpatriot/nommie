@@ -6,7 +6,6 @@ import type { Game } from '@/lib/types'
 
 export interface CreateGameRequest {
   name?: string
-  starting_dealer_pos?: number | null
 }
 
 export async function createGameAction(

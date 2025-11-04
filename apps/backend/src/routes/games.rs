@@ -6,9 +6,14 @@ use actix_web::{web, HttpRequest, HttpResponse, Result};
 
 use crate::adapters::games_sea;
 use crate::db::txn::with_txn;
+use crate::entities::games::{GameState, GameVisibility};
 use crate::error::AppError;
+use crate::errors::ErrorCode;
+use crate::extractors::current_user_db::CurrentUserRecord;
 use crate::extractors::game_id::GameId;
 use crate::http::etag::game_etag;
+use crate::repos::memberships::{self, GameRole};
+use crate::services::games::GameService;
 use crate::services::players::PlayerService;
 use crate::state::app_state::AppState;
 
@@ -110,7 +115,159 @@ struct PlayerDisplayNameResponse {
     display_name: String,
 }
 
+// Request/Response DTOs for create and join endpoints
+
+#[derive(serde::Deserialize)]
+struct CreateGameRequest {
+    name: Option<String>,
+}
+
+#[derive(serde::Serialize)]
+struct CreateGameResponse {
+    game: GameResponse,
+}
+
+#[derive(serde::Serialize)]
+struct JoinGameResponse {
+    game: GameResponse,
+}
+
+#[derive(serde::Serialize)]
+struct GameResponse {
+    id: i64,
+    name: String,
+    state: String,
+    visibility: String,
+    created_by: i64,
+    created_at: String,
+    updated_at: String,
+    started_at: Option<String>,
+    ended_at: Option<String>,
+    current_round: Option<i16>,
+    player_count: i32,
+    max_players: i32,
+}
+
+/// Helper function to convert GameState enum to frontend string format
+fn game_state_to_string(state: &GameState) -> String {
+    match state {
+        GameState::Lobby => "LOBBY".to_string(),
+        GameState::Dealing => "DEALING".to_string(),
+        GameState::Bidding => "BIDDING".to_string(),
+        GameState::TrumpSelection => "TRUMP_SELECTION".to_string(),
+        GameState::TrickPlay => "TRICK_PLAY".to_string(),
+        GameState::Scoring => "SCORING".to_string(),
+        GameState::BetweenRounds => "BETWEEN_ROUNDS".to_string(),
+        GameState::Completed => "COMPLETED".to_string(),
+        GameState::Abandoned => "ABANDONED".to_string(),
+    }
+}
+
+/// Helper function to convert GameVisibility enum to frontend string format
+fn game_visibility_to_string(visibility: &GameVisibility) -> String {
+    match visibility {
+        GameVisibility::Public => "PUBLIC".to_string(),
+        GameVisibility::Private => "PRIVATE".to_string(),
+    }
+}
+
+/// Helper function to convert game entity + memberships to frontend Game format
+fn game_to_response(
+    game_model: &crate::entities::games::Model,
+    memberships: &[memberships::GameMembership],
+) -> GameResponse {
+    // Count players (exclude spectators)
+    let player_count = memberships
+        .iter()
+        .filter(|m| m.role == GameRole::Player)
+        .count() as i32;
+
+    GameResponse {
+        id: game_model.id,
+        name: game_model
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("Game {}", game_model.id)),
+        state: game_state_to_string(&game_model.state),
+        visibility: game_visibility_to_string(&game_model.visibility),
+        created_by: game_model.created_by.unwrap_or(0),
+        created_at: game_model.created_at.to_string(),
+        updated_at: game_model.updated_at.to_string(),
+        started_at: game_model.started_at.map(|dt| dt.to_string()),
+        ended_at: game_model.ended_at.map(|dt| dt.to_string()),
+        current_round: game_model.current_round,
+        player_count,
+        max_players: 4,
+    }
+}
+
+/// POST /api/games
+///
+/// Creates a new game and adds the creator as the first member.
+async fn create_game(
+    http_req: HttpRequest,
+    current_user: CurrentUserRecord,
+    body: web::Json<CreateGameRequest>,
+    app_state: web::Data<AppState>,
+) -> Result<web::Json<CreateGameResponse>, AppError> {
+    let user_id = current_user.id;
+    let game_name = body.name.clone();
+
+    // Validate name length if provided (HTTP-level validation)
+    if let Some(ref name) = game_name {
+        if name.len() > 255 {
+            return Err(AppError::bad_request(
+                ErrorCode::ValidationError,
+                "Game name must be 255 characters or less".to_string(),
+            ));
+        }
+    }
+
+    // Create game using service layer (handles join code generation, game creation, membership)
+    let (game_model, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameService;
+            service
+                .create_game_with_creator(txn, user_id, game_name)
+                .await
+        })
+    })
+    .await?;
+
+    let response = game_to_response(&game_model, &memberships);
+
+    Ok(web::Json(CreateGameResponse { game: response }))
+}
+
+/// POST /api/games/{gameId}/join
+///
+/// Adds the current user as a member of the specified game.
+async fn join_game(
+    http_req: HttpRequest,
+    game_id: GameId,
+    current_user: CurrentUserRecord,
+    app_state: web::Data<AppState>,
+) -> Result<web::Json<JoinGameResponse>, AppError> {
+    let user_id = current_user.id;
+    let id = game_id.0;
+
+    // Join game using service layer (handles validation, seat assignment, membership creation)
+    let (game_model, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameService;
+            service.join_game(txn, id, user_id).await
+        })
+    })
+    .await?;
+
+    let response = game_to_response(&game_model, &memberships);
+
+    Ok(web::Json(JoinGameResponse { game: response }))
+}
+
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::resource("/api/games").route(web::post().to(create_game)));
+    cfg.service(web::resource("/api/games/{game_id}/join").route(web::post().to(join_game)));
     cfg.service(web::resource("/api/games/{game_id}/snapshot").route(web::get().to(get_snapshot)));
     cfg.service(
         web::resource("/api/games/{game_id}/players/{seat}/display_name")

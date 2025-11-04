@@ -49,13 +49,9 @@ export default function LobbyClient({
     })
   }
 
-  const handleCreateGame = async (
-    name: string,
-    startingDealerPos: number | null
-  ) => {
+  const handleCreateGame = async (name: string) => {
     const result = await createGameAction({
       name,
-      starting_dealer_pos: startingDealerPos,
     })
 
     if (result.error) {
