@@ -1,6 +1,5 @@
 'use server'
 
-import { auth } from '@/auth'
 import { fetchWithAuth, BackendApiError } from '@/lib/api'
 import type { Game } from '@/lib/types'
 
@@ -14,23 +13,24 @@ export async function createGameAction(
   { game: Game; error?: never } | { error: BackendApiError; game?: never }
 > {
   try {
-    // Verify auth
-    const session = await auth()
-    if (!session?.backendJwt) {
-      return {
-        error: new BackendApiError('Not authenticated', 401, 'UNAUTHORIZED'),
-      }
+    // Auth is enforced centrally in fetchWithAuth (with [AUTH_BYPASS])
+
+    // Only include name if it's non-empty (backend will use default if omitted)
+    const body: CreateGameRequest = {}
+    if (request.name && request.name.trim()) {
+      body.name = request.name.trim()
     }
 
     const response = await fetchWithAuth('/api/games', {
       method: 'POST',
-      body: JSON.stringify(request),
+      body: JSON.stringify(body),
     })
     const data: { game: Game } = await response.json()
     return { game: data.game }
   } catch (error) {
     // Re-throw BackendApiError to preserve traceId
     if (error instanceof BackendApiError) {
+      // TODO: Remove once backend endpoint is fully implemented
       // Provide a more user-friendly message for 404s (endpoint not implemented)
       if (error.status === 404) {
         return {
@@ -61,13 +61,7 @@ export async function joinGameAction(
   { game: Game; error?: never } | { error: BackendApiError; game?: never }
 > {
   try {
-    // Verify auth
-    const session = await auth()
-    if (!session?.backendJwt) {
-      return {
-        error: new BackendApiError('Not authenticated', 401, 'UNAUTHORIZED'),
-      }
-    }
+    // Auth is enforced centrally in fetchWithAuth (with [AUTH_BYPASS])
 
     const response = await fetchWithAuth(`/api/games/${gameId}/join`, {
       method: 'POST',
@@ -77,6 +71,7 @@ export async function joinGameAction(
   } catch (error) {
     // Re-throw BackendApiError to preserve traceId
     if (error instanceof BackendApiError) {
+      // TODO: Remove once backend endpoint is fully implemented
       // Provide a more user-friendly message for 404s (endpoint not implemented)
       if (error.status === 404) {
         return {

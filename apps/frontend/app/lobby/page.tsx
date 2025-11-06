@@ -10,17 +10,21 @@ import {
 export default async function LobbyPage() {
   const session = await auth()
 
-  // Protect route: redirect to home if not authenticated
-  if (!session) {
+  // [AUTH_BYPASS] START - Temporary debugging feature - remove when done
+  const disableAuth = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true'
+  // Protect route: redirect to home if not authenticated (unless bypass enabled)
+  if (!session && !disableAuth) {
     redirect('/')
   }
+  // [AUTH_BYPASS] END
   const [joinableGames, inProgressGames, lastActiveGameId] = await Promise.all([
     getJoinableGames(),
     getInProgressGames(),
     getLastActiveGame(),
   ])
 
-  const creatorName = session.user?.name || 'You'
+  // [AUTH_BYPASS] - Handle null session when auth disabled
+  const creatorName = session?.user?.name || 'You'
 
   return (
     <LobbyClient

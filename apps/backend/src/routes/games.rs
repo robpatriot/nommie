@@ -11,6 +11,7 @@ use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
 use crate::extractors::game_id::GameId;
+use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
 use crate::services::games::GameService;
@@ -207,7 +208,7 @@ fn game_to_response(
 async fn create_game(
     http_req: HttpRequest,
     current_user: CurrentUser,
-    body: web::Json<CreateGameRequest>,
+    body: ValidatedJson<CreateGameRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<web::Json<CreateGameResponse>, AppError> {
     let user_id = current_user.id;

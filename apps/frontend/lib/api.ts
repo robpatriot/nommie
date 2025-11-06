@@ -1,6 +1,16 @@
 import { auth } from '@/auth'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
 
+export interface ProblemDetails {
+  type: string
+  title: string
+  status: number
+  detail: string
+  code: string
+  trace_id: string
+  extensions?: unknown
+}
+
 export class BackendApiError extends Error {
   constructor(
     message: string,
@@ -13,27 +23,29 @@ export class BackendApiError extends Error {
   }
 }
 
-export async function api<T = unknown>(
-  input: RequestInfo | URL,
-  init?: RequestInit
-): Promise<T> {
-  const res = await fetch(input, init)
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status} ${res.statusText}`)
-  }
-  const data: unknown = await res.json()
-  return data as T
-}
+// Removed unused api<T>() helper – fetchWithAuth is the single entrypoint for backend calls
 
 export async function fetchWithAuth(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const session = await auth()
+  // [AUTH_BYPASS] START - Temporary debugging feature - remove when done
+  const disableAuth = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true'
 
-  if (!session?.backendJwt) {
-    throw new BackendApiError('No backend JWT available', 401, 'NO_JWT')
+  // Skip auth check if bypass is enabled
+  let authHeaders: Record<string, string> = {}
+  if (!disableAuth) {
+    const session = await auth()
+
+    if (!session?.backendJwt) {
+      throw new BackendApiError('No backend JWT available', 401, 'NO_JWT')
+    }
+
+    authHeaders = {
+      Authorization: `Bearer ${session.backendJwt}`,
+    }
   }
+  // [AUTH_BYPASS] END
 
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
   if (!baseUrl) {
@@ -45,38 +57,47 @@ export async function fetchWithAuth(
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.backendJwt}`,
+      ...authHeaders,
       ...options.headers,
     },
   })
 
-  if (response.status === 401) {
-    const traceId = response.headers.get('x-trace-id')
-    throw new BackendApiError(
-      'Unauthorized',
-      401,
-      'UNAUTHORIZED',
-      traceId || undefined
-    )
-  }
-
   if (!response.ok) {
-    const traceId = response.headers.get('x-trace-id')
-    throw new BackendApiError(
-      `Backend request failed: ${response.statusText}`,
-      response.status,
-      undefined,
-      traceId || undefined
-    )
+    // Try to parse Problem Details error response (RFC 7807)
+    const contentType = response.headers.get('content-type')
+    const isProblemDetails =
+      contentType?.includes('application/problem+json') ||
+      contentType?.includes('application/json')
+
+    let errorMessage = response.statusText
+    let errorCode: string | undefined
+    let traceId = response.headers.get('x-trace-id') || undefined
+
+    if (isProblemDetails) {
+      try {
+        const problemDetails: ProblemDetails = await response.clone().json()
+        errorMessage =
+          problemDetails.detail || problemDetails.title || errorMessage
+        errorCode = problemDetails.code
+        traceId = problemDetails.trace_id || traceId
+      } catch {
+        // If parsing fails, fall back to status text
+      }
+    }
+
+    // For 401, ensure we have a proper error code
+    if (response.status === 401) {
+      errorCode = errorCode || 'UNAUTHORIZED'
+      errorMessage = errorMessage || 'Unauthorized'
+    }
+
+    throw new BackendApiError(errorMessage, response.status, errorCode, traceId)
   }
 
   return response
 }
 
-export async function getMe<T = unknown>(): Promise<T> {
-  const response = await fetchWithAuth('/api/private/me')
-  return response.json()
-}
+// NOTE: /api/private/* endpoints have been removed in the backend. Do not use getMe().
 
 // Game-related API functions
 
@@ -86,6 +107,7 @@ export async function getJoinableGames(): Promise<Game[]> {
     const data: GameListResponse = await response.json()
     return data.games
   } catch (error) {
+    // TODO: Remove once backend endpoint is implemented
     // If endpoint doesn't exist yet, return empty array
     // In production, you'd want to handle this differently
     if (error instanceof BackendApiError && error.status === 404) {
@@ -102,6 +124,7 @@ export async function getInProgressGames(): Promise<Game[]> {
     const data: GameListResponse = await response.json()
     return data.games
   } catch (error) {
+    // TODO: Remove once backend endpoint is implemented
     // If endpoint doesn't exist yet, return empty array
     if (error instanceof BackendApiError && error.status === 404) {
       console.warn('In-progress games endpoint not yet implemented')
@@ -117,6 +140,7 @@ export async function getLastActiveGame(): Promise<number | null> {
     const data: LastActiveGameResponse = await response.json()
     return data.game_id
   } catch (error) {
+    // TODO: Remove once backend endpoint is implemented
     // If endpoint doesn't exist yet, return null
     if (error instanceof BackendApiError && error.status === 404) {
       console.warn('Last active game endpoint not yet implemented')
