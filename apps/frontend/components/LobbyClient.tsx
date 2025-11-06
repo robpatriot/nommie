@@ -6,7 +6,7 @@ import GameList from './GameList'
 import CreateGameModal from './CreateGameModal'
 import Toast, { type ToastMessage } from './Toast'
 import { createGameAction, joinGameAction } from '@/app/actions/game-actions'
-import { BackendApiError } from '@/lib/api'
+import { BackendApiError } from '@/lib/errors'
 import type { Game } from '@/lib/types'
 
 type LobbyClientProps = {

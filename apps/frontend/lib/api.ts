@@ -1,5 +1,10 @@
-import { auth } from '@/auth'
+// Server-only API functions - must not be imported from client components
+// This file uses server-only APIs (cookies, getBackendJwtServer)
+'use server'
+
+import { getBackendJwtServer } from '@/lib/server/get-backend-jwt'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
+import { BackendApiError } from './errors'
 
 export interface ProblemDetails {
   type: string
@@ -11,17 +16,8 @@ export interface ProblemDetails {
   extensions?: unknown
 }
 
-export class BackendApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public code?: string,
-    public traceId?: string
-  ) {
-    super(message)
-    this.name = 'BackendApiError'
-  }
-}
+// Re-export BackendApiError for convenience (it's also available from ./errors)
+export { BackendApiError }
 
 // Removed unused api<T>() helper – fetchWithAuth is the single entrypoint for backend calls
 
@@ -35,14 +31,14 @@ export async function fetchWithAuth(
   // Skip auth check if bypass is enabled
   let authHeaders: Record<string, string> = {}
   if (!disableAuth) {
-    const session = await auth()
+    const backendJwt = await getBackendJwtServer()
 
-    if (!session?.backendJwt) {
+    if (!backendJwt) {
       throw new BackendApiError('No backend JWT available', 401, 'NO_JWT')
     }
 
     authHeaders = {
-      Authorization: `Bearer ${session.backendJwt}`,
+      Authorization: `Bearer ${backendJwt}`,
     }
   }
   // [AUTH_BYPASS] END

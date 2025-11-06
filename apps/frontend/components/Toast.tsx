@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BackendApiError } from '@/lib/api'
+import { BackendApiError } from '@/lib/errors'
 
 export interface ToastMessage {
   id: string
