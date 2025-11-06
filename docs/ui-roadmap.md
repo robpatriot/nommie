@@ -199,7 +199,11 @@ Use checkboxes to mark completion. Add brief notes/dates.
   - [x] Refresh button
   - [x] Resume last game CTA (lobby and Header)
   - [x] Client-side search/filter
-- [ ] Stage 3 — Create and join game
+- [x] Stage 3 — Create and join game
+  - [x] Create Game modal with optional name (defaults to "{CreatorName} game")
+  - [x] Join action navigating to `/game/[gameId]`
+  - [x] Toaster with expandable error details; `traceId` hidden until expanded; log `traceId` in dev
+  - [ ] Starting dealer selection (optional; defaults to creator) - deferred to later
 - [ ] Stage 4 — Read-only game room and table snapshot
 - [ ] Stage 5 — Core interactions
 - [ ] Stage 6 — UX and accessibility
@@ -216,6 +220,7 @@ Use checkboxes to mark completion. Add brief notes/dates.
 ---
 
 ## Change Log (most recent first)
+- 2025-01-XX: Stage 3 complete — create and join game implemented: Create Game modal with optional name (backend applies default), join action with navigation, toaster with expandable error details and traceId logging. Backend: JWT authentication refactored (JwtExtract middleware, claims/JWT moved under auth module, current_user_db renamed to current_user). Backend: create_game endpoint uses ValidatedJson for request validation. Frontend: cleaned up dead code (api helper, getMe, dashboard), removed duplicate auth logic (centralized in fetchWithAuth), removed client-side default name logic. AUTH_BYPASS support added for debugging (marked for removal). Ready for Stage 4 (read-only game room).
 - 2025-01-XX: Stage 2 complete — read-only lobby implemented: TypeScript types, API client functions, game lists with loading/empty/error states, refresh button, Resume CTA in lobby and Header, client-side search/filter. Note: Backend endpoints not yet implemented, so API calls gracefully handle 404s. Ready for Stage 3 (create and join).
 - 2025-01-XX: Stage 1 complete — app shell and routing implemented: root route with auth redirect, `/lobby` and `/game/[gameId]` placeholder routes, Header updated with Lobby link and Resume CTA placeholder. Ready for Stage 2 (read-only lobby).
 - 2025-01-XX: Stage 0 complete — all MVP decisions documented, endpoints listed, wireframes integrated (detailed UX spec in Stage 6). Ready for Stage 1 implementation.
