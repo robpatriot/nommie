@@ -15,6 +15,12 @@ rules:
       Follow these rules exactly. If a request would break them, stop and ask.
       Never run any git commands other than diff.
       No deprecated or legacy code: never use `#[deprecated]` or leave legacy/compatibility functions. Refactor callers instead.
+  - id: file-operations
+    scope: workspace
+    text: |
+      When renaming or moving files, always use `git mv` (for tracked files) or `mv` (for untracked files).
+      Never manually recreate files when moving/renaming - this loses git history and makes it difficult to compare changes.
+      Example: `git mv apps/backend/src/extractors/old_name.rs apps/backend/src/extractors/new_name.rs`
   - id: comments-policy
     scope: workspace
     text: |

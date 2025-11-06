@@ -34,6 +34,11 @@ rules:
     text: |
       Allowed: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, `CachedGameContext`, `ValidatedJson<T>`.
       `ValidatedJson<T>` maps validation errors to `AppError` Problem Details.
+  - id: json-extractors
+    text: |
+      Always use `ValidatedJson<T>` for request body extraction in handlers, never `web::Json<T>`.
+      `ValidatedJson` provides standardized RFC7807 error handling for JSON parse/validation failures.
+      Example: `async fn handler(body: ValidatedJson<CreateRequest>) -> Result<web::Json<Response>, AppError>`
   - id: errors
     text: |
       Errors follow Problem Details: { type, title, status, detail, code, trace_id }.
