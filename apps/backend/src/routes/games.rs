@@ -9,7 +9,7 @@ use crate::db::txn::with_txn;
 use crate::entities::games::{GameState, GameVisibility};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
-use crate::extractors::current_user_db::CurrentUserRecord;
+use crate::extractors::current_user::CurrentUser;
 use crate::extractors::game_id::GameId;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
@@ -206,7 +206,7 @@ fn game_to_response(
 /// Creates a new game and adds the creator as the first member.
 async fn create_game(
     http_req: HttpRequest,
-    current_user: CurrentUserRecord,
+    current_user: CurrentUser,
     body: web::Json<CreateGameRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<web::Json<CreateGameResponse>, AppError> {
@@ -245,7 +245,7 @@ async fn create_game(
 async fn join_game(
     http_req: HttpRequest,
     game_id: GameId,
-    current_user: CurrentUserRecord,
+    current_user: CurrentUser,
     app_state: web::Data<AppState>,
 ) -> Result<web::Json<JoinGameResponse>, AppError> {
     let user_id = current_user.id;
@@ -266,11 +266,11 @@ async fn join_game(
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/api/games").route(web::post().to(create_game)));
-    cfg.service(web::resource("/api/games/{game_id}/join").route(web::post().to(join_game)));
-    cfg.service(web::resource("/api/games/{game_id}/snapshot").route(web::get().to(get_snapshot)));
+    cfg.service(web::resource("").route(web::post().to(create_game)));
+    cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
+    cfg.service(web::resource("/{game_id}/snapshot").route(web::get().to(get_snapshot)));
     cfg.service(
-        web::resource("/api/games/{game_id}/players/{seat}/display_name")
+        web::resource("/{game_id}/players/{seat}/display_name")
             .route(web::get().to(get_player_display_name)),
     );
 }

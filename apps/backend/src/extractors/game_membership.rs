@@ -1,8 +1,8 @@
 use actix_web::dev::Payload;
-use actix_web::{web, FromRequest, HttpRequest};
+use actix_web::{web, FromRequest, HttpMessage, HttpRequest};
 
-use super::current_user::CurrentUser;
 use super::game_id::GameId;
+use crate::auth::claims::BackendClaims;
 use crate::db::require_db;
 use crate::db::txn::SharedTxn;
 use crate::error::AppError;
@@ -70,8 +70,14 @@ impl FromRequest for GameMembership {
         let mut payload = payload.take();
 
         Box::pin(async move {
-            // Extract CurrentUser and GameId first
-            let current_user = CurrentUser::from_request(&req, &mut payload).await?;
+            // Read BackendClaims from request extensions (stored by JwtExtract middleware)
+            let claims = req
+                .extensions()
+                .get::<BackendClaims>()
+                .ok_or_else(AppError::unauthorized_missing_bearer)?
+                .clone();
+
+            // Extract GameId
             let game_id = GameId::from_request(&req, &mut payload).await?;
 
             // Get database connection from AppState
@@ -88,10 +94,10 @@ impl FromRequest for GameMembership {
 
             // Find user by sub to get user_id
             let user = if let Some(shared_txn) = SharedTxn::from_req(&req) {
-                users::find_user_by_sub(shared_txn.transaction(), &current_user.sub).await?
+                users::find_user_by_sub(shared_txn.transaction(), &claims.sub).await?
             } else {
                 let db = require_db(app_state)?;
-                users::find_user_by_sub(db, &current_user.sub).await?
+                users::find_user_by_sub(db, &claims.sub).await?
             };
 
             let user = user.ok_or_else(|| {

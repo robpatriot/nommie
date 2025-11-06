@@ -31,17 +31,16 @@ pub mod utils;
 pub mod web;
 
 // Re-exports for public API
-pub use auth::jwt::{mint_access_token, verify_access_token, Claims};
+pub use auth::claims::BackendClaims;
+pub use auth::jwt::{mint_access_token, verify_access_token, Claims, JwtClaims};
 pub use config::db::DbOwner;
 pub use db::txn::{with_txn, SharedTxn};
 pub use db::txn_policy::{set_txn_policy, TxnPolicy};
 pub use error::AppError;
 pub use errors::ErrorCode;
 pub use extractors::auth_token::AuthToken;
-pub use extractors::current_user::{BackendClaims, CurrentUser};
-pub use extractors::current_user_db::CurrentUserRecord;
+pub use extractors::current_user::CurrentUser;
 pub use extractors::game_id::GameId;
-pub use extractors::jwt::JwtClaims;
 pub use infra::db::bootstrap_db;
 pub use middleware::cors::cors_middleware;
 pub use middleware::request_trace::RequestTrace;

@@ -7,7 +7,7 @@ use actix_web::{test, web, FromRequest};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::extractors::current_user_db::CurrentUserRecord;
+use backend::extractors::current_user::CurrentUser;
 use backend::extractors::game_id::GameId;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
@@ -69,12 +69,12 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
 
     // Extract
     let mut payload = actix_web::dev::Payload::None;
-    let result = CurrentUserRecord::from_request(&req, &mut payload).await?;
+    let result = CurrentUser::from_request(&req, &mut payload).await?;
 
     // Verify
     assert_eq!(result.id, user.id);
     assert_eq!(result.sub, test_sub);
-    assert_eq!(result.email, None);
+    assert_eq!(result.email.as_deref(), Some(test_email.as_str()));
 
     // Roll back shared txn
     drop(req);

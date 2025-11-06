@@ -4,6 +4,7 @@ use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::auth::claims::BackendClaims;
 use crate::error::AppError;
 use crate::state::security_config::SecurityConfig;
 
@@ -82,6 +83,27 @@ pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Cla
         jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::unauthorized_invalid_jwt(),
         _ => AppError::unauthorized_invalid_jwt(),
     })
+}
+
+/// Wrapper structure to provide a compatible API for middleware that expects
+/// a `JwtClaims<C>` item with a `verify` method.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct JwtClaims<C> {
+    pub claims: C,
+}
+
+impl JwtClaims<BackendClaims> {
+    /// Verify a token and map the verified claims to `BackendClaims`.
+    pub fn verify(token: &str, security: &SecurityConfig) -> Result<Self, AppError> {
+        let verified = verify_access_token(token, security)?;
+        Ok(JwtClaims {
+            claims: BackendClaims {
+                sub: verified.sub,
+                email: verified.email,
+                exp: verified.exp as usize,
+            },
+        })
+    }
 }
 
 /// Extract the 'sub' claim from a JWT token for logging purposes.

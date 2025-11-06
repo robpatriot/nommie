@@ -2,6 +2,7 @@ use actix_web::{web, App, HttpServer};
 use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::state::build_state;
 use backend::middleware::cors::cors_middleware;
+use backend::middleware::jwt_extract::JwtExtract;
 use backend::middleware::request_trace::RequestTrace;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
@@ -56,6 +57,11 @@ async fn main() -> std::io::Result<()> {
             .wrap(RequestTrace)
             .wrap(TraceSpan)
             .app_data(data.clone())
+            .service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(routes::games::configure_routes),
+            )
             .configure(routes::configure)
     })
     .bind(("127.0.0.1", 3001))?
