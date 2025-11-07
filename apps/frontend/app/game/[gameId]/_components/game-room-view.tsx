@@ -1,0 +1,542 @@
+import Link from 'next/link'
+
+import type {
+  Card,
+  GameSnapshot,
+  PhaseSnapshot,
+  RoundPublic,
+  Seat,
+} from '@/lib/game-room/types'
+
+export interface GameRoomViewProps {
+  gameId: number
+  snapshot: GameSnapshot
+  playerNames: [string, string, string, string]
+  viewerSeat?: Seat
+  viewerHand?: Card[]
+  status: {
+    lastSyncedAt: string
+    isPolling: boolean
+  }
+  onRefresh?: () => void
+  isRefreshing?: boolean
+  error?: {
+    message: string
+    traceId?: string
+  } | null
+}
+
+export function GameRoomView(props: GameRoomViewProps) {
+  const {
+    snapshot,
+    playerNames,
+    viewerSeat = 0,
+    viewerHand = [],
+    status,
+    gameId,
+    onRefresh,
+    isRefreshing = false,
+    error,
+  } = props
+  const phase = snapshot.phase
+  const round = getRound(phase)
+  const activeSeat = getActiveSeat(phase)
+  const activeName =
+    typeof activeSeat === 'number' ? playerNames[activeSeat] : 'Waiting'
+  const syncLabel = new Date(status.lastSyncedAt).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  const trickMap = getCurrentTrickMap(phase)
+  const seatSummaries = buildSeatSummaries({
+    playerNames,
+    viewerSeat,
+    phase,
+    scores: snapshot.game.scores_total,
+    trickMap,
+    round,
+    activeSeat,
+  })
+
+  return (
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
+      <header className="border-b border-slate-800 bg-slate-900/70">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 sm:px-6 lg:px-10">
+          <div className="flex flex-1 flex-col gap-1">
+            <span className="text-sm font-medium text-slate-400">
+              Game #{gameId}
+            </span>
+            <h1 className="text-2xl font-semibold text-white">Nommie Table</h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {onRefresh ? (
+              <button
+                type="button"
+                onClick={onRefresh}
+                className="rounded-md border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
+                disabled={isRefreshing}
+              >
+                {isRefreshing ? 'Refreshing…' : 'Refresh'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="rounded-md border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
+            >
+              Copy Invite Link
+            </button>
+            <Link
+              href="/lobby"
+              className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-900 transition hover:bg-white"
+            >
+              Back to Lobby
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
+        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-lg shadow-slate-900/30">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-wide text-slate-400">
+                Phase
+              </p>
+              <div className="text-2xl font-semibold text-white">
+                {getPhaseLabel(phase)}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 text-sm text-slate-300">
+              <span className="flex items-center gap-2">
+                <span
+                  className={`inline-flex h-2.5 w-2.5 items-center justify-center rounded-full ${
+                    status.isPolling
+                      ? 'animate-pulse bg-emerald-400'
+                      : 'bg-slate-500'
+                  }`}
+                  aria-hidden
+                />
+                {status.isPolling ? 'Syncing…' : 'Idle'}
+              </span>
+              <span aria-live="off" className="text-slate-500">
+                Last synced {syncLabel}
+              </span>
+            </div>
+          </div>
+          {error ? (
+            <div className="rounded-lg border border-amber-400 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+              <p>{error.message}</p>
+              {error.traceId ? (
+                <p className="text-xs text-amber-300/80">
+                  traceId: {error.traceId}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {round ? (
+            <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-4">
+              <PhaseFact label="Round" value={`#${snapshot.game.round_no}`} />
+              <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
+              <PhaseFact
+                label="Dealer"
+                value={playerNames[snapshot.game.dealer]}
+              />
+              <PhaseFact label="Trump" value={formatTrump(round.trump)} />
+            </div>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-200">
+            <span className="rounded-full bg-slate-800 px-3 py-1 font-medium">
+              Turn: {activeName}
+            </span>
+            {phase.phase === 'Trick' ? (
+              <span className="text-slate-400">
+                Trick {phase.data.trick_no} of {round?.hand_size ?? '?'}
+              </span>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="flex flex-col gap-6">
+            <div className="relative mx-auto grid h-full w-full max-w-4xl grid-cols-3 grid-rows-3 gap-4">
+              {seatSummaries.map((summary) => (
+                <SeatCard key={summary.seat} summary={summary} />
+              ))}
+              <TrickArea
+                trickMap={trickMap}
+                playerNames={playerNames}
+                round={round}
+                phase={phase}
+                viewerSeat={viewerSeat}
+              />
+            </div>
+
+            <PlayerHand viewerHand={viewerHand} />
+          </div>
+
+          <ScoreSidebar
+            playerNames={playerNames}
+            scores={snapshot.game.scores_total}
+            round={round}
+          />
+        </section>
+      </main>
+    </div>
+  )
+}
+
+interface SeatSummary {
+  seat: Seat
+  orientation: 'top' | 'left' | 'right' | 'bottom'
+  name: string
+  score: number
+  isViewer: boolean
+  isActive: boolean
+  tricksWon?: number
+  currentCard?: Card
+  bid?: number | null
+}
+
+function buildSeatSummaries(params: {
+  playerNames: [string, string, string, string]
+  viewerSeat: Seat
+  phase: PhaseSnapshot
+  scores: [number, number, number, number]
+  trickMap: Map<Seat, Card>
+  round: RoundPublic | null
+  activeSeat: Seat | null
+}): SeatSummary[] {
+  const {
+    playerNames,
+    viewerSeat,
+    phase,
+    scores,
+    trickMap,
+    round,
+    activeSeat,
+  } = params
+
+  return [0, 1, 2, 3].map((seat) => {
+    const orientation = getOrientation(viewerSeat, seat as Seat)
+    const isViewer = seat === viewerSeat
+    const tricksWon = round?.tricks_won[seat as Seat]
+    const currentCard = trickMap.get(seat as Seat)
+    const bid = getBidForSeat(phase, seat as Seat)
+    const isActive = activeSeat === seat
+
+    return {
+      seat: seat as Seat,
+      orientation,
+      name: playerNames[seat as Seat],
+      score: scores[seat as Seat],
+      isViewer,
+      tricksWon,
+      currentCard,
+      bid,
+      isActive,
+    }
+  })
+}
+
+function SeatCard({ summary }: { summary: SeatSummary }) {
+  const {
+    orientation,
+    name,
+    score,
+    isViewer,
+    tricksWon,
+    currentCard,
+    bid,
+    isActive,
+  } = summary
+
+  const positionStyles: Record<SeatSummary['orientation'], string> = {
+    top: 'col-start-2 row-start-1 justify-self-center',
+    left: 'col-start-1 row-start-2 justify-self-start',
+    right: 'col-start-3 row-start-2 justify-self-end',
+    bottom: 'col-start-2 row-start-3 justify-self-center',
+  }
+
+  return (
+    <div
+      className={`flex w-full max-w-[220px] flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-center shadow-sm ${
+        isActive
+          ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950'
+          : ''
+      } ${positionStyles[orientation]}`}
+    >
+      <div className="flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-slate-500">
+          {orientation === 'bottom' ? 'You' : 'Player'}
+        </span>
+        <span className="text-lg font-semibold text-white">{name}</span>
+        <span className="text-xs text-slate-400">Score {score}</span>
+      </div>
+      <div className="flex items-center justify-center gap-3 text-xs text-slate-300">
+        {typeof tricksWon === 'number' ? (
+          <span className="rounded-full bg-slate-800 px-2 py-1 font-medium">
+            Tricks {tricksWon}
+          </span>
+        ) : null}
+        {bid !== undefined ? (
+          <span className="rounded-full border border-slate-800 px-2 py-1 font-medium">
+            Bid {bid ?? '—'}
+          </span>
+        ) : null}
+        {currentCard ? (
+          <span className="rounded-md bg-slate-800 px-2 py-1 font-semibold tracking-wide text-white">
+            {currentCard}
+          </span>
+        ) : null}
+      </div>
+      {isViewer ? (
+        <span className="self-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-300">
+          You
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+function TrickArea({
+  trickMap,
+  playerNames,
+  round,
+  phase,
+  viewerSeat,
+}: {
+  trickMap: Map<Seat, Card>
+  playerNames: [string, string, string, string]
+  round: RoundPublic | null
+  phase: PhaseSnapshot
+  viewerSeat: Seat
+}) {
+  const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
+    seat,
+    card,
+    label: playerNames[seat],
+    orientation: getOrientation(viewerSeat, seat),
+  }))
+
+  return (
+    <div className="col-start-2 row-start-2 flex h-64 flex-col items-center justify-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
+      <p className="text-sm uppercase tracking-wide text-slate-500">
+        Current Trick
+      </p>
+      <div className="flex flex-wrap items-center justify-center gap-6">
+        {cards.length === 0 ? (
+          <span className="text-sm text-slate-500">Waiting for lead…</span>
+        ) : (
+          cards.map(({ seat, card, label, orientation }) => (
+            <div key={seat} className="flex flex-col items-center gap-2">
+              <span className="text-xs uppercase tracking-wide text-slate-500">
+                {label}
+              </span>
+              <span className="rounded-xl bg-slate-800 px-3 py-2 text-lg font-semibold tracking-wider text-white">
+                {card}
+              </span>
+              <span className="text-[10px] uppercase text-slate-500">
+                {orientation}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+      {phase.phase === 'Trick' ? (
+        <p className="text-xs text-slate-400">
+          Leader: {playerNames[phase.data.leader]} — Trick {phase.data.trick_no}{' '}
+          of {round?.hand_size ?? '?'}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+function PlayerHand({ viewerHand }: { viewerHand: Card[] }) {
+  return (
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+      <header className="flex items-center justify-between">
+        <h2 className="text-sm uppercase tracking-wide text-slate-400">
+          Your Hand
+        </h2>
+        <span className="text-xs text-slate-500">Read-only preview</span>
+      </header>
+      <div className="flex flex-wrap justify-center gap-2">
+        {viewerHand.length === 0 ? (
+          <span className="text-sm text-slate-500">
+            Hand will appear once the game starts.
+          </span>
+        ) : (
+          viewerHand.map((card) => (
+            <span
+              key={card}
+              className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-lg font-semibold tracking-wide text-white"
+            >
+              {card}
+            </span>
+          ))
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ScoreSidebar({
+  playerNames,
+  scores,
+  round,
+}: {
+  playerNames: [string, string, string, string]
+  scores: [number, number, number, number]
+  round: RoundPublic | null
+}) {
+  return (
+    <aside className="flex h-full flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+      <header className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-white">Scores</h2>
+        <span className="text-xs text-slate-500">Updated each sync</span>
+      </header>
+
+      <details
+        className="rounded-xl border border-slate-800 bg-slate-900/40"
+        open
+      >
+        <summary className="cursor-pointer list-none rounded-xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-slate-800/80">
+          Cumulative Totals
+        </summary>
+        <div className="px-4 pb-3">
+          <ul className="flex flex-col gap-2 text-sm text-slate-300">
+            {scores.map((score, idx) => (
+              <li
+                key={playerNames[idx]}
+                className="flex items-center justify-between"
+              >
+                <span>{playerNames[idx]}</span>
+                <span className="font-semibold text-white">{score}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </details>
+
+      {round ? (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300">
+          <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
+            Round Snapshot
+          </div>
+          <p>Hand size: {round.hand_size}</p>
+          <p>Trump: {formatTrump(round.trump)}</p>
+          <p>Tricks won: {round.tricks_won.join(' / ')}</p>
+        </div>
+      ) : null}
+
+      <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-500">
+        Error log &amp; activity feed reserved for Stage 5
+      </div>
+    </aside>
+  )
+}
+
+function PhaseFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-sm font-medium text-slate-200">{value}</p>
+    </div>
+  )
+}
+
+function getOrientation(
+  viewerSeat: Seat,
+  seat: Seat
+): SeatSummary['orientation'] {
+  const relative = (seat - viewerSeat + 4) % 4
+  if (relative === 0) return 'bottom'
+  if (relative === 1) return 'left'
+  if (relative === 2) return 'top'
+  return 'right'
+}
+
+function getPhaseLabel(phase: PhaseSnapshot): string {
+  switch (phase.phase) {
+    case 'Init':
+      return 'Initializing'
+    case 'Bidding':
+      return 'Bidding Round'
+    case 'TrumpSelect':
+      return 'Select Trump'
+    case 'Trick':
+      return 'Trick Play'
+    case 'Scoring':
+      return 'Round Scoring'
+    case 'Complete':
+      return 'Round Complete'
+    case 'GameOver':
+      return 'Game Over'
+    default:
+      return phase.phase
+  }
+}
+
+function getRound(phase: PhaseSnapshot): RoundPublic | null {
+  switch (phase.phase) {
+    case 'Bidding':
+    case 'TrumpSelect':
+    case 'Trick':
+    case 'Scoring':
+    case 'Complete':
+      return phase.data.round
+    default:
+      return null
+  }
+}
+
+function getActiveSeat(phase: PhaseSnapshot): Seat | null {
+  switch (phase.phase) {
+    case 'Bidding':
+    case 'TrumpSelect':
+    case 'Trick':
+      return phase.data.to_act
+    default:
+      return null
+  }
+}
+
+function getCurrentTrickMap(phase: PhaseSnapshot): Map<Seat, Card> {
+  if (phase.phase !== 'Trick') {
+    return new Map()
+  }
+  return new Map(phase.data.current_trick)
+}
+
+function getBidForSeat(
+  phase: PhaseSnapshot,
+  seat: Seat
+): number | null | undefined {
+  if (phase.phase === 'Bidding') {
+    return phase.data.bids[seat]
+  }
+  return undefined
+}
+
+function formatTrump(trump: RoundPublic['trump']): string {
+  if (!trump) {
+    return 'Undeclared'
+  }
+
+  switch (trump) {
+    case 'CLUBS':
+      return 'Clubs'
+    case 'DIAMONDS':
+      return 'Diamonds'
+    case 'HEARTS':
+      return 'Hearts'
+    case 'SPADES':
+      return 'Spades'
+    case 'NO_TRUMP':
+      return 'No Trump'
+    default:
+      return trump
+  }
+}

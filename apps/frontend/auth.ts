@@ -30,7 +30,7 @@ function shouldRefreshBackendJwt(jwt?: string): boolean {
   }
 }
 
-const BACKEND_BASE_URL_ERROR_MSG =
+export const BACKEND_BASE_URL_ERROR_MSG =
   'BACKEND_BASE_URL must be set to an absolute URL when minting backend JWT'
 
 /**
@@ -38,7 +38,7 @@ const BACKEND_BASE_URL_ERROR_MSG =
  * Throws if missing or not an absolute http(s) URL.
  * Only throws when called (lazy evaluation).
  */
-function getBackendBaseUrlOrThrow(): string {
+export function getBackendBaseUrlOrThrow(): string {
   const url = process.env.BACKEND_BASE_URL
   if (!url) {
     throw new Error(BACKEND_BASE_URL_ERROR_MSG)
@@ -58,7 +58,7 @@ function getBackendBaseUrlOrThrow(): string {
   }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   // NextAuth v5 will auto-infer secret from AUTH_SECRET if not provided.
   // We set it explicitly to use AUTH_SECRET only on the frontend.
   // Note: Next.js loads .env.local before evaluating modules, so this should work.
