@@ -1,38 +1,69 @@
 // Server-only helper to get backend JWT from NextAuth token
 // This file must never be imported by client code
 
+import { auth } from '@/auth'
+import { getToken } from 'next-auth/jwt'
 import { cookies } from 'next/headers'
-import * as jose from 'jose'
+import { redirect } from 'next/navigation'
+import type { Session } from 'next-auth'
 
-/**
- * Get the backend JWT from the server-side NextAuth token.
- * This is server-only and should never be called from client code.
- *
- * @returns The backend JWT string, or undefined if not available
- */
-export async function getBackendJwtServer(): Promise<string | undefined> {
+export type BackendJwtResolution =
+  | { state: 'missing-session'; session: null }
+  | { state: 'missing-jwt'; session: Session }
+  | { state: 'ready'; session: Session; backendJwt: string }
+
+export function isAuthDisabled(): boolean {
+  return process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true'
+}
+
+export async function resolveBackendJwt(): Promise<BackendJwtResolution> {
+  const session = await auth()
+
+  if (!session) {
+    return { state: 'missing-session', session: null }
+  }
+
   const cookieStore = await cookies()
-  // NextAuth v5 uses 'authjs.session-token' or '__Secure-authjs.session-token' (in production)
-  const sessionToken =
-    cookieStore.get('authjs.session-token')?.value ||
-    cookieStore.get('__Secure-authjs.session-token')?.value
+  const cookieHeader = cookieStore
+    .getAll()
+    .map(({ name, value }) => `${name}=${value}`)
+    .join('; ')
 
-  if (!sessionToken) {
-    return undefined
+  if (!cookieHeader) {
+    return { state: 'missing-jwt', session }
   }
 
-  const secret = process.env.AUTH_SECRET
-  if (!secret) {
-    return undefined
-  }
+  const headers = new Headers({ cookie: cookieHeader })
+  const req: { headers: Headers } = { headers }
 
   try {
-    const secretKey = new TextEncoder().encode(secret)
-    const { payload } = await jose.jwtVerify(sessionToken, secretKey)
-    // payload is JWTPayload which has an index signature, so we can safely access backendJwt
-    const backendJwt = payload.backendJwt
-    return typeof backendJwt === 'string' ? backendJwt : undefined
+    const token = await getToken({ req, secret: process.env.AUTH_SECRET })
+    const backendJwt = token?.backendJwt
+    if (typeof backendJwt === 'string' && backendJwt.length > 0) {
+      return { state: 'ready', session, backendJwt }
+    }
   } catch {
-    return undefined
+    // If decoding fails, treat it as a missing JWT so callers can handle re-auth.
+  }
+
+  return { state: 'missing-jwt', session }
+}
+
+export async function requireBackendJwt(): Promise<string> {
+  if (isAuthDisabled()) {
+    throw new Error(
+      'requireBackendJwt should not be called when auth is disabled'
+    )
+  }
+
+  const resolution = await resolveBackendJwt()
+
+  switch (resolution.state) {
+    case 'ready':
+      return resolution.backendJwt
+    case 'missing-session':
+      redirect('/')
+    case 'missing-jwt':
+      redirect('/api/auth/signout?callbackUrl=%2F')
   }
 }

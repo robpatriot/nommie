@@ -74,7 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, account, profile, trigger }) {
+    async jwt({ token, account, profile, trigger, user }) {
       // Refresh backend JWT on 'update' trigger as well
       const shouldRefreshOnTrigger = trigger === 'update'
       // Validate required env vars here (lazy evaluation) after Next.js has loaded env vars
@@ -89,6 +89,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.email = profile.email || token.email
         token.googleSub = profile.sub || token.googleSub
         token.name = profile.name || token.name
+      }
+
+      // Also populate from user object if available (for existing sessions)
+      // This helps with old sessions that might not have user info in token
+      if (user?.email && !token.email) {
+        token.email = user.email
+      }
+
+      if (!token.googleSub && (user as { sub?: string } | undefined)?.sub) {
+        token.googleSub = (user as { sub?: string }).sub
+      }
+
+      if (!token.googleSub && typeof token.sub === 'string') {
+        token.googleSub = token.sub
       }
 
       // Proactive backend JWT refresh: refresh if missing or within 5 minutes of expiry

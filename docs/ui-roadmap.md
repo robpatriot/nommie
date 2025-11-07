@@ -4,7 +4,7 @@ This document is the canonical, living plan for building the Nommie UI on web (N
 
 ### Stack (confirmed)
 - **Web**: Next.js App Router (`apps/frontend`), server components + server actions, Tailwind CSS
-- **Auth**: NextAuth (Google) on web; backend issues JWT used via `fetchWithAuth`
+- **Auth**: NextAuth (Google) on web; backend JWT stored server-only in NextAuth JWT token (never exposed to client), resolved via `resolveBackendJwt()` and `requireBackendJwt()` helpers in server components/actions; proactive refresh within 5 minutes of expiry
 - **Backend**: Rust service with DB; REST endpoints consumed from web using `NEXT_PUBLIC_BACKEND_BASE_URL`
 
 ### Product scope (initial)
@@ -61,7 +61,7 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
   - Trick area, bids/score panel placeholders; turn indicator
   - Collapsible score table in sidebar (cumulative totals; always accessible)
   - Light polling (manual or timer), with room for ETag optimization later
-    - Cadence: 1s when it's your turn; 5s otherwise
+    - Cadence: Consistent 3-second polling regardless of turn/phase
   - Subtle polling indicator near Phase/Turn (e.g., syncing dot with tooltip/`aria-live="off"`)
 - DoD: Page reflects backend state changes without interactions
 
@@ -121,7 +121,7 @@ Detailed UX spec (MVP)
 
 ## Endpoints (initial target set)
 Note: Align with backend routes; adjust names/paths as needed.
-- Auth/session: frontend uses NextAuth; backend JWT via `auth()` in server context
+- Auth/session: frontend uses NextAuth; backend JWT stored server-only in NextAuth JWT token, resolved via `resolveBackendJwt()` and enforced with `requireBackendJwt()` in server components/actions; proactive refresh within 5 minutes of expiry
 - Games:
   - GET list joinable games
   - GET list in-progress games (view-only, informational)
@@ -169,7 +169,7 @@ Error model: Use `BackendApiError` on the frontend; `traceId` available in detai
  - Invites (MVP): Copy invite link only (full URL for direct browser paste); no visible table ID/share code.
  - Lobby sorting: Joinable list sorted by most players waiting (descending).
  - Illegal move errors: Server rejection surfaced via toast only.
- - Sync UX: No explicit "Sync now" in Game Room; show subtle polling indicator for confidence.
+ - Sync UX: No explicit "Sync now" in Game Room; show subtle polling indicator for confidence. Consistent 3-second polling in Stage 4 (read-only); can optimize cadence in Stage 5 based on interactions.
  - Scoring UI: Collapsible score table always visible in sidebar (cumulative totals); no per-round summary needed.
  - Lobby search/filter (MVP): Client-side only; can upgrade to backend query if needed.
  - Root route (`/`): Welcome page with login for non-authenticated; redirect to `/lobby` for authenticated.
@@ -220,6 +220,7 @@ Use checkboxes to mark completion. Add brief notes/dates.
 ---
 
 ## Change Log (most recent first)
+- 2025-11-06: NextAuth security and reliability improvements: Implemented proactive backend JWT refresh (refreshes when missing or within 5 minutes of expiry, including on 'update' trigger). Removed backendJwt from session object (server-only, stored only in JWT token). Added server-only helpers `resolveBackendJwt()` / `requireBackendJwt()` to safely access backend JWT from server components/actions and auto sign the user out when the token is missing or invalid. Env var hardening: `BACKEND_BASE_URL` validation with clear error messages, only throws when refresh is actually needed. Split `BackendApiError` into `lib/errors.ts` (client-safe) and marked `lib/api.ts` as server-only. Added type guards for JWT expiration and backend response validation. All server-only imports properly isolated; no client code can access backend JWT.
 - 2025-01-XX: Stage 3 complete — create and join game implemented: Create Game modal with optional name (backend applies default), join action with navigation, toaster with expandable error details and traceId logging. Backend: JWT authentication refactored (JwtExtract middleware, claims/JWT moved under auth module, current_user_db renamed to current_user). Backend: create_game endpoint uses ValidatedJson for request validation. Frontend: cleaned up dead code (api helper, getMe, dashboard), removed duplicate auth logic (centralized in fetchWithAuth), removed client-side default name logic. AUTH_BYPASS support added for debugging (marked for removal). Ready for Stage 4 (read-only game room).
 - 2025-01-XX: Stage 2 complete — read-only lobby implemented: TypeScript types, API client functions, game lists with loading/empty/error states, refresh button, Resume CTA in lobby and Header, client-side search/filter. Note: Backend endpoints not yet implemented, so API calls gracefully handle 404s. Ready for Stage 3 (create and join).
 - 2025-01-XX: Stage 1 complete — app shell and routing implemented: root route with auth redirect, `/lobby` and `/game/[gameId]` placeholder routes, Header updated with Lobby link and Resume CTA placeholder. Ready for Stage 2 (read-only lobby).

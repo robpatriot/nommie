@@ -6,7 +6,13 @@ import './globals.css'
 import Header from '@/components/Header'
 import { auth } from '@/auth'
 import { getLastActiveGame } from '@/lib/api'
-import { getBackendJwtServer } from '@/lib/server/get-backend-jwt'
+import {
+  isAuthDisabled,
+  resolveBackendJwt,
+  BackendJwtResolution,
+} from '@/lib/server/get-backend-jwt'
+import { redirect } from 'next/navigation'
+import type { Session } from 'next-auth'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -20,11 +26,31 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await auth()
+  const disableAuth = isAuthDisabled()
+
+  let session: Session | null = null
+  let backendJwt: string | undefined
+
+  if (disableAuth) {
+    session = await auth()
+  } else {
+    const resolution: BackendJwtResolution = await resolveBackendJwt()
+
+    if (resolution.state === 'missing-session') {
+      session = null
+    } else if (resolution.state === 'missing-jwt') {
+      const callbackUrl = encodeURIComponent('/')
+      redirect(`/api/auth/signout?callbackUrl=${callbackUrl}`)
+    } else {
+      session = resolution.session
+      backendJwt = resolution.backendJwt
+    }
+  }
+
   // Only try to get last active game if we have a backend JWT
   // This prevents 401 errors when the token is missing or expired
   let lastActiveGameId: number | null = null
-  const backendJwt = await getBackendJwtServer()
+
   if (backendJwt) {
     try {
       lastActiveGameId = await getLastActiveGame()

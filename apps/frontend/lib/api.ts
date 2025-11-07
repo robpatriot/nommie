@@ -1,8 +1,8 @@
 // Server-only API functions - must not be imported from client components
-// This file uses server-only APIs (cookies, getBackendJwtServer)
+// This file uses server-only APIs (cookies, backend JWT resolvers)
 'use server'
 
-import { getBackendJwtServer } from '@/lib/server/get-backend-jwt'
+import { isAuthDisabled, requireBackendJwt } from '@/lib/server/get-backend-jwt'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
 import { BackendApiError } from './errors'
 
@@ -26,16 +26,12 @@ export async function fetchWithAuth(
   options: RequestInit = {}
 ): Promise<Response> {
   // [AUTH_BYPASS] START - Temporary debugging feature - remove when done
-  const disableAuth = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true'
+  const disableAuth = isAuthDisabled()
 
   // Skip auth check if bypass is enabled
   let authHeaders: Record<string, string> = {}
   if (!disableAuth) {
-    const backendJwt = await getBackendJwtServer()
-
-    if (!backendJwt) {
-      throw new BackendApiError('No backend JWT available', 401, 'NO_JWT')
-    }
+    const backendJwt = await requireBackendJwt()
 
     authHeaders = {
       Authorization: `Bearer ${backendJwt}`,
