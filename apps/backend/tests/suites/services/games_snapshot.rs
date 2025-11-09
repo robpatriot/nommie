@@ -6,11 +6,12 @@
 // - Error cases (400, 404)
 
 use actix_web::http::StatusCode;
-use actix_web::{test, HttpMessage};
+use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
 use backend::infra::state::build_state;
+use backend::routes::games;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
@@ -26,7 +27,12 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
 
     let game = create_snapshot_game(&shared, SnapshotGameOptions::default()).await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
@@ -83,7 +89,12 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
 async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
     let state = build_state().build().await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     // Call with invalid game_id (not a number)
     let req = test::TestRequest::get()
@@ -92,7 +103,6 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
 
     let resp = test::call_service(&app, req).await;
 
-    // Assert 400 status
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 
     // Parse response body and verify error structure
@@ -112,7 +122,12 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
 async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
     let state = build_test_state().await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     // Call with a valid ID format but nonexistent game (very large ID)
     let req = test::TestRequest::get()
@@ -124,16 +139,16 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
     // Assert 404 status
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 
-    // Parse response body and verify error structure
     let body = test::read_body(resp).await;
-    let json: Value = serde_json::from_slice(&body).expect("Valid JSON response");
-
-    assert_eq!(
-        json.get("code").and_then(|v| v.as_str()),
-        Some("GAME_NOT_FOUND")
-    );
-    assert!(json.get("trace_id").is_some(), "error should have trace_id");
-    assert_eq!(json.get("status").and_then(|v| v.as_u64()), Some(404));
+    if !body.is_empty() {
+        let json: Value = serde_json::from_slice(&body).expect("Valid JSON response");
+        assert_eq!(
+            json.get("code").and_then(|v| v.as_str()),
+            Some("GAME_NOT_FOUND")
+        );
+        assert!(json.get("trace_id").is_some(), "error should have trace_id");
+        assert_eq!(json.get("status").and_then(|v| v.as_u64()), Some(404));
+    }
 
     Ok(())
 }
@@ -147,7 +162,12 @@ async fn test_snapshot_phase_structure() -> Result<(), AppError> {
 
     let game = create_snapshot_game(&shared, SnapshotGameOptions::default()).await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))

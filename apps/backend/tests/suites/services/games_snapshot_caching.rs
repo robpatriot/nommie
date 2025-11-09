@@ -7,10 +7,11 @@
 
 use actix_web::http::header::{HeaderValue, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
-use actix_web::{test, HttpMessage};
+use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
+use backend::routes::games;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
@@ -27,7 +28,12 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
     let game =
         create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(5)).await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
@@ -81,7 +87,12 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
     let game =
         create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(3)).await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     // First GET to capture ETag
     let req = test::TestRequest::get()
@@ -155,7 +166,12 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
     let game =
         create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(5)).await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     // GET with If-None-Match that doesn't match (stale version)
     let stale_etag = format!(r#""game-{}-v3""#, game.game_id); // Resource is at v5
@@ -214,7 +230,12 @@ async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), A
     let game =
         create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(7)).await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     // GET with If-None-Match: * (wildcard per RFC 9110)
     let req = test::TestRequest::get()
@@ -271,7 +292,12 @@ async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<
     )
     .await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     // GET with If-None-Match containing multiple ETags (one matches)
     let if_none_match_value = format!(
@@ -316,7 +342,12 @@ async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(
     )
     .await?;
 
-    let app = create_test_app(state).with_prod_routes().build().await?;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+        })
+        .build()
+        .await?;
 
     // GET with If-None-Match containing multiple ETags (none match)
     let if_none_match_value = format!(

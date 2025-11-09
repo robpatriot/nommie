@@ -3,7 +3,8 @@
 // These tests verify that DB-reading extractors can optionally use
 // injected SharedTxn when present, and fall back to pooled connections otherwise.
 
-use actix_web::{test, web, FromRequest};
+use actix_web::{test, web, FromRequest, HttpMessage};
+use backend::auth::claims::BackendClaims;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
@@ -66,6 +67,11 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
         .app_data(web::Data::new(state))
         .to_http_request();
     shared.inject(&mut req);
+    req.extensions_mut().insert(BackendClaims {
+        sub: test_sub.clone(),
+        email: test_email.clone(),
+        exp: usize::MAX,
+    });
 
     // Extract
     let mut payload = actix_web::dev::Payload::None;

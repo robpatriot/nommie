@@ -45,6 +45,26 @@ impl GameFlowService {
         let all_ready = all_memberships.iter().all(|m| m.is_ready);
 
         if all_ready && all_memberships.len() == 4 {
+            let game = games_sea::require_game(txn, game_id).await?;
+
+            // Only auto-start from the lobby; completed games (or other states) should not deal again.
+            if game.state == DbGameState::Completed {
+                info!(
+                    game_id,
+                    "All players ready but game already completed; skipping auto-start"
+                );
+                return Ok(());
+            }
+
+            if game.state != DbGameState::Lobby {
+                info!(
+                    game_id,
+                    state = ?game.state,
+                    "All players ready in non-lobby state; skipping auto-start"
+                );
+                return Ok(());
+            }
+
             info!(game_id, "All players ready, starting game");
             // Deal first round
             self.deal_round(txn, game_id).await?;

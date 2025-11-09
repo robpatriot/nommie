@@ -11,9 +11,11 @@ use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
 use crate::extractors::game_id::GameId;
+use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
+use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
 use crate::services::players::PlayerService;
 use crate::state::app_state::AppState;
@@ -266,9 +268,68 @@ async fn join_game(
     Ok(web::Json(JoinGameResponse { game: response }))
 }
 
+/// POST /api/games/{game_id}/ready
+///
+/// Marks the current player as ready. When all four seats are ready, the game
+/// automatically transitions into the first round.
+async fn mark_ready(
+    http_req: HttpRequest,
+    game_id: GameId,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+    let user_id = current_user.id;
+
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameFlowService;
+            service.mark_ready(txn, id, user_id).await?;
+            Ok(())
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+#[derive(serde::Deserialize)]
+struct SubmitBidRequest {
+    bid: u8,
+}
+
+/// POST /api/games/{game_id}/bid
+///
+/// Submits a bid for the current player. Bidding order and validation are enforced
+/// by the service layer.
+async fn submit_bid(
+    http_req: HttpRequest,
+    game_id: GameId,
+    membership: GameMembership,
+    body: ValidatedJson<SubmitBidRequest>,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+    let seat = membership.turn_order as i16;
+    let bid_value = body.bid;
+
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameFlowService;
+            service.submit_bid(txn, id, seat, bid_value).await?;
+            Ok(())
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("").route(web::post().to(create_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
+    cfg.service(web::resource("/{game_id}/ready").route(web::post().to(mark_ready)));
+    cfg.service(web::resource("/{game_id}/bid").route(web::post().to(submit_bid)));
     cfg.service(web::resource("/{game_id}/snapshot").route(web::get().to(get_snapshot)));
     cfg.service(
         web::resource("/{game_id}/players/{seat}/display_name")

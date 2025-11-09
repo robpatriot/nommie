@@ -1,8 +1,9 @@
 use actix_web::http::StatusCode;
-use actix_web::{test, web, App, HttpMessage};
+use actix_web::{test, web, HttpMessage};
 use backend::error::AppError;
 use backend::routes::games::configure_routes;
 
+use crate::support::app_builder::create_test_app;
 use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player;
 use crate::support::factory::{create_test_game, create_test_user};
@@ -21,19 +22,17 @@ async fn test_get_player_display_name_success() -> Result<(), AppError> {
     create_test_game_player(shared.transaction(), game_id, user_id, 0).await?;
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .configure(configure_routes),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(configure_routes));
+        })
+        .build()
+        .await?;
 
     // Test the endpoint
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{game_id}/players/0/display_name"))
         .to_request();
-
-    // Inject the shared transaction into the request
     req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
@@ -62,19 +61,17 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
     let game_id = create_test_game(shared.transaction()).await?;
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .configure(configure_routes),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(configure_routes));
+        })
+        .build()
+        .await?;
 
     // Test the endpoint
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{game_id}/players/0/display_name"))
         .to_request();
-
-    // Inject the shared transaction into the request
     req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
@@ -108,19 +105,17 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
     create_test_game_player(shared.transaction(), game_id, user_id, 0).await?;
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .configure(configure_routes),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(configure_routes));
+        })
+        .build()
+        .await?;
 
     // Test the endpoint with invalid seat
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{game_id}/players/5/display_name"))
         .to_request();
-
-    // Inject the shared transaction into the request
     req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
@@ -154,19 +149,17 @@ async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> 
     create_test_game_player(shared.transaction(), game_id, user_id, 1).await?;
 
     // Create test app
-    let app = test::init_service(
-        App::new()
-            .app_data(web::Data::new(state))
-            .configure(configure_routes),
-    )
-    .await;
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(configure_routes));
+        })
+        .build()
+        .await?;
 
     // Test the endpoint
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{game_id}/players/1/display_name"))
         .to_request();
-
-    // Inject the shared transaction into the request
     req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;

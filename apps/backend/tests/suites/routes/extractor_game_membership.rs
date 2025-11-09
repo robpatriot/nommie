@@ -11,6 +11,7 @@ use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::{CurrentUser, GameId, GameMembership};
+use backend::middleware::jwt_extract::JwtExtract;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, Set};
@@ -92,16 +93,17 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.route(
-                "/games/{game_id}/membership",
-                web::get().to(echo_membership),
+            cfg.service(
+                web::scope("/test-games")
+                    .wrap(JwtExtract)
+                    .route("/{game_id}/membership", web::get().to(echo_membership)),
             );
         })
         .build()
         .await?;
 
     let req = test::TestRequest::get()
-        .uri(&format!("/games/{}/membership", game.id))
+        .uri(&format!("/test-games/{}/membership", game.id))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -159,9 +161,10 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.route(
-                "/games/{game_id}/membership",
-                web::get().to(echo_membership),
+            cfg.service(
+                web::scope("/test-games")
+                    .wrap(JwtExtract)
+                    .route("/{game_id}/membership", web::get().to(echo_membership)),
             );
         })
         .build()
@@ -169,7 +172,7 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
 
     // Make request with valid token but no membership
     let req = test::TestRequest::get()
-        .uri(&format!("/games/{}/membership", game.id))
+        .uri(&format!("/test-games/{}/membership", game.id))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -228,9 +231,10 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
     // Build test app with echo route
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.route(
-                "/games/{game_id}/membership",
-                web::get().to(echo_membership),
+            cfg.service(
+                web::scope("/test-games")
+                    .wrap(JwtExtract)
+                    .route("/{game_id}/membership", web::get().to(echo_membership)),
             );
         })
         .build()
@@ -238,7 +242,7 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
 
     // Make request with invalid user ID
     let req = test::TestRequest::get()
-        .uri(&format!("/games/{}/membership", game.id))
+        .uri(&format!("/test-games/{}/membership", game.id))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -308,16 +312,17 @@ async fn test_membership_composition_with_current_user_and_game_id(
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.route(
-                "/games/{game_id}/membership",
-                web::get().to(echo_membership),
+            cfg.service(
+                web::scope("/test-games")
+                    .wrap(JwtExtract)
+                    .route("/{game_id}/membership", web::get().to(echo_membership)),
             );
         })
         .build()
         .await?;
 
     let req = test::TestRequest::get()
-        .uri(&format!("/games/{}/membership", game.id))
+        .uri(&format!("/test-games/{}/membership", game.id))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -356,12 +361,17 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
     let user_email = unique_email("test");
     let token = mint_test_token(&user_sub, &user_email, &security_config);
 
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(db).await?;
+    create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
+
     // Build test app with echo route
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.route(
-                "/games/{game_id}/membership",
-                web::get().to(echo_membership),
+            cfg.service(
+                web::scope("/test-games")
+                    .wrap(JwtExtract)
+                    .route("/{game_id}/membership", web::get().to(echo_membership)),
             );
         })
         .build()
@@ -369,9 +379,10 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
 
     // Make request with non-existent game ID
     let req = test::TestRequest::get()
-        .uri("/games/999999/membership")
+        .uri("/test-games/999999/membership")
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
+    req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
 
@@ -386,6 +397,8 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
         "Game not found with id: 999999",
     )
     .await;
+
+    shared.rollback().await?;
 
     Ok(())
 }

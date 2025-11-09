@@ -126,7 +126,7 @@ impl AiService {
             game_id,
             ai_user_id,
             seat,
-            false,
+            true,
             memberships::GameRole::Player,
         )
         .await?;

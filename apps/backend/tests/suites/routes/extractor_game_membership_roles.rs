@@ -11,6 +11,7 @@ use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::extractors::{CurrentUser, GameId, GameMembership};
+use backend::middleware::jwt_extract::JwtExtract;
 use backend::repos::memberships::GameRole;
 use backend::state::security_config::SecurityConfig;
 use backend::utils::unique::{unique_email, unique_str};
@@ -124,17 +125,17 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     // Build test app with player-only route
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.route(
-                "/games/{game_id}/player-action",
+            cfg.service(web::scope("/test-games").wrap(JwtExtract).route(
+                "/{game_id}/player-action",
                 web::post().to(player_only_action),
-            );
+            ));
         })
         .build()
         .await?;
 
     // Make request - should succeed because user is a Player
     let req = test::TestRequest::post()
-        .uri(&format!("/games/{}/player-action", game.id))
+        .uri(&format!("/test-games/{}/player-action", game.id))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -201,9 +202,10 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     // Build test app with spectator-allowed route
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.route(
-                "/games/{game_id}/view",
-                web::get().to(spectator_allowed_action),
+            cfg.service(
+                web::scope("/test-games")
+                    .wrap(JwtExtract)
+                    .route("/{game_id}/view", web::get().to(spectator_allowed_action)),
             );
         })
         .build()
@@ -211,7 +213,7 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
 
     // Make request - should succeed for any member
     let req = test::TestRequest::get()
-        .uri(&format!("/games/{}/view", game.id))
+        .uri(&format!("/test-games/{}/view", game.id))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
