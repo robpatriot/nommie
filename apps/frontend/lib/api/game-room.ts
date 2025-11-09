@@ -58,3 +58,10 @@ export async function markPlayerReady(gameId: number): Promise<void> {
     method: 'POST',
   })
 }
+
+export async function submitBid(gameId: number, bid: number): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}/bid`, {
+    method: 'POST',
+    body: JSON.stringify({ bid }),
+  })
+}

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
+import { fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import { GameRoomView } from '@/app/game/[gameId]/_components/game-room-view'
 import { biddingSnapshotFixture } from '../mocks/game-snapshot'
@@ -59,5 +61,37 @@ describe('GameRoomView', () => {
     expect(screen.getByText('Sync failed')).toBeInTheDocument()
     expect(screen.getByText(/traceId: abc123/)).toBeInTheDocument()
     expect(screen.getByText('Syncing…')).toBeInTheDocument()
+  })
+
+  it('renders bidding controls and submits bid for the active viewer', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <GameRoomView
+        gameId={42}
+        snapshot={biddingSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={1}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        biddingState={{
+          viewerSeat: 1,
+          isPending: false,
+          onSubmit,
+        }}
+      />
+    )
+
+    const bidInput = screen.getByLabelText('Your Bid') as HTMLInputElement
+    expect(bidInput.value).toBe('0')
+
+    fireEvent.change(bidInput, { target: { value: '4' } })
+    expect(bidInput.value).toBe('4')
+
+    const submitButton = screen.getByRole('button', { name: 'Submit Bid' })
+    expect(submitButton).toBeEnabled()
+
+    await userEvent.click(submitButton)
+    expect(onSubmit).toHaveBeenCalledWith(4)
   })
 })

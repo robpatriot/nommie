@@ -214,7 +214,7 @@ Use checkboxes to mark completion. Add brief notes/dates.
   - [x] Backend ready/bid/trump/play endpoints and services, including AI orchestration loop and full-game test
   - [x] Backend route/service tests upgraded to shared transaction harness (ready, bid, auth, membership)
   - [x] Frontend ready state wiring (mark ready action, sidebar UX, auto-refresh)
-  - [ ] Frontend bid submission UX and server action with pessimistic handling
+  - [x] Frontend bid submission UX and server action with pessimistic handling
   - [ ] Legal card gating + play action hookup with optimistic refresh
   - [ ] Host AI seat management controls in game room
   - [ ] Two-tab verification of ready→start→bid→play flow with automated coverage

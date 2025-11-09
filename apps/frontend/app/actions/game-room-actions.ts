@@ -5,6 +5,7 @@ import {
   fetchGameSnapshot,
   fetchSeatDisplayNames,
   markPlayerReady,
+  submitBid,
 } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
@@ -76,6 +77,41 @@ export async function markPlayerReadyAction(
 ): Promise<SimpleActionResult> {
   try {
     await markPlayerReady(gameId)
+    return { kind: 'ok' }
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      return {
+        kind: 'error',
+        message: error.message,
+        status: error.status,
+        traceId: error.traceId,
+      }
+    }
+
+    throw error
+  }
+}
+
+export interface SubmitBidRequest {
+  gameId: number
+  bid: number
+}
+
+export async function submitBidAction(
+  request: SubmitBidRequest
+): Promise<SimpleActionResult> {
+  const bidValue = Math.trunc(request.bid)
+
+  if (!Number.isFinite(bidValue) || bidValue < 0) {
+    return {
+      kind: 'error',
+      message: 'Invalid bid value',
+      status: 400,
+    }
+  }
+
+  try {
+    await submitBid(request.gameId, bidValue)
     return { kind: 'ok' }
   } catch (error) {
     if (error instanceof BackendApiError) {

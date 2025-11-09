@@ -1,7 +1,11 @@
+'use client'
+
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 
 import type {
   Card,
+  BiddingSnapshot,
   GameSnapshot,
   PhaseSnapshot,
   RoundPublic,
@@ -30,6 +34,11 @@ export interface GameRoomViewProps {
     hasMarked: boolean
     onReady: () => void
   }
+  biddingState?: {
+    viewerSeat: Seat
+    isPending: boolean
+    onSubmit: (bid: number) => Promise<void> | void
+  }
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
@@ -44,6 +53,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     isRefreshing = false,
     error,
     readyState,
+    biddingState,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -180,6 +190,13 @@ export function GameRoomView(props: GameRoomViewProps) {
             </div>
 
             <PlayerHand viewerHand={viewerHand} />
+
+            <PlayerActions
+              phase={phase}
+              viewerSeat={viewerSeat}
+              playerNames={playerNames}
+              bidding={biddingState}
+            />
           </div>
 
           <ScoreSidebar
@@ -385,6 +402,195 @@ function PlayerHand({ viewerHand }: { viewerHand: Card[] }) {
             </span>
           ))
         )}
+      </div>
+    </section>
+  )
+}
+
+function PlayerActions({
+  phase,
+  viewerSeat,
+  playerNames,
+  bidding,
+}: {
+  phase: PhaseSnapshot
+  viewerSeat: Seat
+  playerNames: [string, string, string, string]
+  bidding?: GameRoomViewProps['biddingState']
+}) {
+  if (phase.phase === 'Bidding' && bidding) {
+    return (
+      <BiddingPanel
+        phase={phase.data}
+        viewerSeat={bidding.viewerSeat}
+        layoutSeat={viewerSeat}
+        playerNames={playerNames}
+        bidding={bidding}
+      />
+    )
+  }
+
+  return (
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300">
+      <header className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          Table Actions
+        </h2>
+        <span className="text-xs text-slate-500">Interactive controls</span>
+      </header>
+      <p>
+        No interactive controls are available for the current phase. They will
+        appear here when required.
+      </p>
+    </section>
+  )
+}
+
+function BiddingPanel({
+  phase,
+  viewerSeat,
+  layoutSeat,
+  playerNames,
+  bidding,
+}: {
+  phase: BiddingSnapshot
+  viewerSeat: Seat
+  layoutSeat: Seat
+  playerNames: [string, string, string, string]
+  bidding: NonNullable<GameRoomViewProps['biddingState']>
+}) {
+  const minBid = phase.min_bid
+  const maxBid = phase.max_bid
+  const viewerBid = phase.bids[viewerSeat] ?? null
+  const isViewerTurn = phase.to_act === viewerSeat
+  const activeName = playerNames[phase.to_act]
+  const [selectedBid, setSelectedBid] = useState<number>(
+    () => viewerBid ?? minBid
+  )
+
+  useEffect(() => {
+    if (viewerBid !== null) {
+      setSelectedBid(viewerBid)
+      return
+    }
+
+    setSelectedBid((current) => {
+      if (current < minBid) return minBid
+      if (current > maxBid) return maxBid
+      return current
+    })
+  }, [maxBid, minBid, viewerBid])
+
+  const seatBids = useMemo(
+    () =>
+      ([0, 1, 2, 3] as const).map((seat) => ({
+        seat,
+        name: playerNames[seat],
+        bid: phase.bids[seat],
+        orientation: getOrientation(layoutSeat, seat),
+      })),
+    [layoutSeat, phase.bids, playerNames]
+  )
+
+  const isSubmitDisabled =
+    !isViewerTurn || viewerBid !== null || bidding.isPending
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (isSubmitDisabled) {
+      return
+    }
+
+    const normalizedBid = Math.min(Math.max(selectedBid, minBid), maxBid)
+    setSelectedBid(normalizedBid)
+    await bidding.onSubmit(normalizedBid)
+  }
+
+  return (
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-4">
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">
+            Bidding
+          </h2>
+          <p className="text-xs text-emerald-100/80">
+            Select your bid between {minBid} and {maxBid}. Once submitted, the
+            next player will be prompted automatically.
+          </p>
+        </div>
+        <div className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
+          Waiting on: {activeName}
+        </div>
+      </header>
+
+      <form
+        className="flex flex-col gap-3 rounded-lg border border-emerald-500/20 bg-slate-900/60 p-4 shadow-inner shadow-emerald-900/30"
+        onSubmit={handleSubmit}
+      >
+        <label
+          htmlFor="bid-value"
+          className="text-xs font-medium uppercase tracking-wide text-emerald-200"
+        >
+          Your Bid
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            id="bid-value"
+            type="number"
+            min={minBid}
+            max={maxBid}
+            step={1}
+            value={selectedBid}
+            onChange={(event) => setSelectedBid(Number(event.target.value))}
+            className="w-24 rounded-md border border-emerald-500/30 bg-slate-950 px-3 py-2 text-sm font-semibold text-emerald-100 outline-none transition focus:border-emerald-300 focus:ring focus:ring-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={viewerBid !== null || bidding.isPending || !isViewerTurn}
+            aria-describedby="bid-range-hint"
+          />
+          <button
+            type="submit"
+            className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-500/40 disabled:text-slate-700"
+            disabled={isSubmitDisabled}
+          >
+            {bidding.isPending ? 'Submitting…' : 'Submit Bid'}
+          </button>
+        </div>
+        <p id="bid-range-hint" className="text-xs text-emerald-100/80">
+          Allowed range: {minBid} – {maxBid}.{' '}
+          {isViewerTurn
+            ? viewerBid === null
+              ? 'Choose a value and submit before time runs out.'
+              : 'Bid submitted — waiting for other players.'
+            : `Waiting for ${activeName} to bid.`}
+        </p>
+      </form>
+
+      <div className="rounded-lg border border-emerald-500/10 bg-slate-900/60 p-4">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-emerald-200">
+          Bid Tracker
+        </h3>
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {seatBids.map(({ seat, name, bid, orientation }) => (
+            <li
+              key={seat}
+              className={`flex items-center justify-between rounded-md border border-slate-800/80 bg-slate-900/60 px-3 py-2 text-sm ${
+                seat === phase.to_act
+                  ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-100'
+                  : ''
+              }`}
+            >
+              <div className="flex flex-col">
+                <span className="font-medium text-white">{name}</span>
+                <span className="text-[10px] uppercase text-slate-500">
+                  {orientation}
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-slate-200">
+                {bid ?? '—'}
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   )

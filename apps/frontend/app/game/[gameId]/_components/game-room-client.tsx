@@ -6,7 +6,10 @@ import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import {
   getGameRoomSnapshotAction,
   markPlayerReadyAction,
+  submitBidAction,
 } from '@/app/actions/game-room-actions'
+import Toast, { type ToastMessage } from '@/components/Toast'
+import { BackendApiError } from '@/lib/errors'
 
 import { GameRoomView } from './game-room-view'
 
@@ -32,7 +35,9 @@ export function GameRoomClient({
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
   const [isReadyPending, setIsReadyPending] = useState(false)
+  const [isBidPending, setIsBidPending] = useState(false)
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
+  const [toast, setToast] = useState<ToastMessage | null>(null)
   const inflightRef = useRef(false)
 
   const performRefresh = useCallback(
@@ -108,6 +113,18 @@ export function GameRoomClient({
     }
   }, [canMarkReady, hasMarkedReady])
 
+  const showToast = useCallback(
+    (message: string, type: ToastMessage['type'], error?: BackendApiError) => {
+      setToast({
+        id: Date.now().toString(),
+        message,
+        type,
+        error,
+      })
+    },
+    []
+  )
+
   const markReady = useCallback(async () => {
     if (!canMarkReady || isReadyPending || hasMarkedReady) {
       return
@@ -135,25 +152,103 @@ export function GameRoomClient({
     }
   }, [canMarkReady, gameId, hasMarkedReady, isReadyPending, performRefresh])
 
+  const handleSubmitBid = useCallback(
+    async (bid: number) => {
+      if (isBidPending) {
+        return
+      }
+
+      setIsBidPending(true)
+
+      try {
+        const result = await submitBidAction({
+          gameId,
+          bid,
+        })
+
+        if (result.kind === 'error') {
+          const actionError = new BackendApiError(
+            result.message || 'Failed to submit bid',
+            result.status,
+            undefined,
+            result.traceId
+          )
+
+          showToast(actionError.message, 'error', actionError)
+
+          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
+            console.error('Submit bid error traceId:', actionError.traceId)
+          }
+
+          return
+        }
+
+        showToast('Bid submitted', 'success')
+        await performRefresh('manual')
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Unable to submit bid'
+        const wrappedError =
+          err instanceof BackendApiError
+            ? err
+            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+
+        showToast(wrappedError.message, 'error', wrappedError)
+
+        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
+          console.error('Submit bid error traceId:', wrappedError.traceId)
+        }
+      } finally {
+        setIsBidPending(false)
+      }
+    },
+    [gameId, isBidPending, performRefresh, showToast]
+  )
+
+  const viewerSeatForInteractions =
+    typeof snapshot.viewerSeat === 'number' ? snapshot.viewerSeat : null
+
+  const phase = snapshot.snapshot.phase
+
+  const biddingControls = useMemo(() => {
+    if (phase.phase !== 'Bidding') {
+      return undefined
+    }
+
+    if (viewerSeatForInteractions === null) {
+      return undefined
+    }
+
+    return {
+      viewerSeat: viewerSeatForInteractions,
+      isPending: isBidPending,
+      onSubmit: handleSubmitBid,
+    }
+  }, [handleSubmitBid, isBidPending, phase, viewerSeatForInteractions])
+
   return (
-    <GameRoomView
-      gameId={gameId}
-      snapshot={snapshot.snapshot}
-      playerNames={snapshot.playerNames}
-      viewerSeat={snapshot.viewerSeat ?? undefined}
-      viewerHand={snapshot.viewerHand}
-      status={status}
-      onRefresh={() => void performRefresh('manual')}
-      isRefreshing={isRefreshing}
-      error={error}
-      readyState={{
-        canReady: canMarkReady,
-        isPending: isReadyPending,
-        hasMarked: hasMarkedReady,
-        onReady: () => {
-          void markReady()
-        },
-      }}
-    />
+    <>
+      <GameRoomView
+        gameId={gameId}
+        snapshot={snapshot.snapshot}
+        playerNames={snapshot.playerNames}
+        viewerSeat={snapshot.viewerSeat ?? undefined}
+        viewerHand={snapshot.viewerHand}
+        status={status}
+        onRefresh={() => void performRefresh('manual')}
+        isRefreshing={isRefreshing}
+        error={error}
+        readyState={{
+          canReady: canMarkReady,
+          isPending: isReadyPending,
+          hasMarked: hasMarkedReady,
+          onReady: () => {
+            void markReady()
+          },
+        }}
+        biddingState={biddingControls}
+      />
+      <Toast toast={toast} onClose={() => setToast(null)} />
+    </>
   )
 }
