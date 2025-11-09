@@ -6,6 +6,7 @@ import {
   fetchSeatDisplayNames,
   markPlayerReady,
   submitBid,
+  submitPlay,
 } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
@@ -112,6 +113,41 @@ export async function submitBidAction(
 
   try {
     await submitBid(request.gameId, bidValue)
+    return { kind: 'ok' }
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      return {
+        kind: 'error',
+        message: error.message,
+        status: error.status,
+        traceId: error.traceId,
+      }
+    }
+
+    throw error
+  }
+}
+
+export interface SubmitPlayRequest {
+  gameId: number
+  card: string
+}
+
+export async function submitPlayAction(
+  request: SubmitPlayRequest
+): Promise<SimpleActionResult> {
+  const card = request.card.trim()
+
+  if (!card) {
+    return {
+      kind: 'error',
+      message: 'Card selection required',
+      status: 400,
+    }
+  }
+
+  try {
+    await submitPlay(request.gameId, card)
     return { kind: 'ok' }
   } catch (error) {
     if (error instanceof BackendApiError) {

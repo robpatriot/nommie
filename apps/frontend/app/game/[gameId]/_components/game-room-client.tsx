@@ -7,6 +7,7 @@ import {
   getGameRoomSnapshotAction,
   markPlayerReadyAction,
   submitBidAction,
+  submitPlayAction,
 } from '@/app/actions/game-room-actions'
 import Toast, { type ToastMessage } from '@/components/Toast'
 import { BackendApiError } from '@/lib/errors'
@@ -36,6 +37,7 @@ export function GameRoomClient({
   const [isPolling, setIsPolling] = useState(false)
   const [isReadyPending, setIsReadyPending] = useState(false)
   const [isBidPending, setIsBidPending] = useState(false)
+  const [isPlayPending, setIsPlayPending] = useState(false)
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const inflightRef = useRef(false)
@@ -205,6 +207,59 @@ export function GameRoomClient({
     [gameId, isBidPending, performRefresh, showToast]
   )
 
+  const handlePlayCard = useCallback(
+    async (card: string) => {
+      if (isPlayPending) {
+        return
+      }
+
+      setIsPlayPending(true)
+
+      try {
+        const result = await submitPlayAction({
+          gameId,
+          card,
+        })
+
+        if (result.kind === 'error') {
+          const actionError = new BackendApiError(
+            result.message || 'Failed to play card',
+            result.status,
+            undefined,
+            result.traceId
+          )
+
+          showToast(actionError.message, 'error', actionError)
+
+          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
+            console.error('Play card error traceId:', actionError.traceId)
+          }
+
+          return
+        }
+
+        showToast('Card played', 'success')
+        await performRefresh('manual')
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Unable to play card'
+        const wrappedError =
+          err instanceof BackendApiError
+            ? err
+            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+
+        showToast(wrappedError.message, 'error', wrappedError)
+
+        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
+          console.error('Play card error traceId:', wrappedError.traceId)
+        }
+      } finally {
+        setIsPlayPending(false)
+      }
+    },
+    [gameId, isPlayPending, performRefresh, showToast]
+  )
+
   const viewerSeatForInteractions =
     typeof snapshot.viewerSeat === 'number' ? snapshot.viewerSeat : null
 
@@ -225,6 +280,25 @@ export function GameRoomClient({
       onSubmit: handleSubmitBid,
     }
   }, [handleSubmitBid, isBidPending, phase, viewerSeatForInteractions])
+
+  const playControls = useMemo(() => {
+    if (phase.phase !== 'Trick') {
+      return undefined
+    }
+
+    if (viewerSeatForInteractions === null) {
+      return undefined
+    }
+
+    const playable = phase.data.playable
+
+    return {
+      viewerSeat: viewerSeatForInteractions,
+      playable,
+      isPending: isPlayPending,
+      onPlay: handlePlayCard,
+    }
+  }, [handlePlayCard, isPlayPending, phase, viewerSeatForInteractions])
 
   return (
     <>
@@ -247,6 +321,7 @@ export function GameRoomClient({
           },
         }}
         biddingState={biddingControls}
+        playState={playControls}
       />
       <Toast toast={toast} onClose={() => setToast(null)} />
     </>

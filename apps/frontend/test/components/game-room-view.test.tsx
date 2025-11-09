@@ -4,7 +4,10 @@ import { fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { GameRoomView } from '@/app/game/[gameId]/_components/game-room-view'
-import { biddingSnapshotFixture } from '../mocks/game-snapshot'
+import {
+  biddingSnapshotFixture,
+  trickSnapshotFixture,
+} from '../mocks/game-snapshot'
 import { render, screen } from '../utils'
 
 vi.mock('next/link', () => ({
@@ -93,5 +96,42 @@ describe('GameRoomView', () => {
 
     await userEvent.click(submitButton)
     expect(onSubmit).toHaveBeenCalledWith(4)
+  })
+
+  it('enforces legal card gating and triggers play submission', async () => {
+    const onPlay = vi.fn().mockResolvedValue(undefined)
+
+    render(
+      <GameRoomView
+        gameId={99}
+        snapshot={trickSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={['2H', 'KD', 'QC', 'AS']}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        playState={{
+          viewerSeat: 0,
+          playable: trickSnapshotFixture.phase.data.playable,
+          isPending: false,
+          onPlay,
+        }}
+      />
+    )
+
+    expect(screen.getByText('Legal cards: 2H, KD, QC')).toBeInTheDocument()
+
+    const legalCardButton = screen.getByRole('button', { name: '2H' })
+    expect(legalCardButton).toBeEnabled()
+
+    const illegalCardButton = screen.getByRole('button', { name: 'AS' })
+    expect(illegalCardButton).toBeDisabled()
+
+    await userEvent.click(legalCardButton)
+    const playButton = screen.getByRole('button', {
+      name: 'Play Selected Card',
+    })
+    await userEvent.click(playButton)
+
+    expect(onPlay).toHaveBeenCalledWith('2H')
   })
 })

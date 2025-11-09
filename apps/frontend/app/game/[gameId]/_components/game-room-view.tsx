@@ -1,6 +1,12 @@
 'use client'
 
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import Link from 'next/link'
 
 import type {
@@ -10,6 +16,7 @@ import type {
   PhaseSnapshot,
   RoundPublic,
   Seat,
+  TrickSnapshot,
 } from '@/lib/game-room/types'
 
 export interface GameRoomViewProps {
@@ -39,6 +46,12 @@ export interface GameRoomViewProps {
     isPending: boolean
     onSubmit: (bid: number) => Promise<void> | void
   }
+  playState?: {
+    viewerSeat: Seat
+    playable: Card[]
+    isPending: boolean
+    onPlay: (card: Card) => Promise<void> | void
+  }
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
@@ -54,6 +67,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     error,
     readyState,
     biddingState,
+    playState,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -75,6 +89,30 @@ export function GameRoomView(props: GameRoomViewProps) {
     round,
     activeSeat,
   })
+
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null)
+
+  useEffect(() => {
+    if (phase.phase !== 'Trick' || !playState) {
+      setSelectedCard(null)
+      return
+    }
+
+    if (selectedCard && !playState.playable.includes(selectedCard)) {
+      setSelectedCard(null)
+    }
+  }, [phase, playState, selectedCard])
+
+  const handlePlayCard = useCallback(
+    async (card: Card) => {
+      if (!playState) {
+        return
+      }
+      await playState.onPlay(card)
+      setSelectedCard(null)
+    },
+    [playState]
+  )
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
@@ -189,13 +227,23 @@ export function GameRoomView(props: GameRoomViewProps) {
               />
             </div>
 
-            <PlayerHand viewerHand={viewerHand} />
+            <PlayerHand
+              viewerHand={viewerHand}
+              phase={phase}
+              playerNames={playerNames}
+              playState={playState}
+              selectedCard={selectedCard}
+              onSelectCard={setSelectedCard}
+            />
 
             <PlayerActions
               phase={phase}
               viewerSeat={viewerSeat}
               playerNames={playerNames}
               bidding={biddingState}
+              play={playState}
+              selectedCard={selectedCard}
+              onPlayCard={handlePlayCard}
             />
           </div>
 
@@ -378,29 +426,110 @@ function TrickArea({
   )
 }
 
-function PlayerHand({ viewerHand }: { viewerHand: Card[] }) {
+function PlayerHand({
+  viewerHand,
+  phase,
+  playerNames,
+  playState,
+  selectedCard,
+  onSelectCard,
+}: {
+  viewerHand: Card[]
+  phase: PhaseSnapshot
+  playerNames: [string, string, string, string]
+  playState?: GameRoomViewProps['playState']
+  selectedCard: Card | null
+  onSelectCard: (card: Card | null) => void
+}) {
+  const isTrickPhase = phase.phase === 'Trick' && !!playState
+  const viewerTurn =
+    isTrickPhase &&
+    playState &&
+    phase.phase === 'Trick' &&
+    phase.data.to_act === playState.viewerSeat
+  const playableCards = useMemo(
+    () => new Set(playState?.playable ?? []),
+    [playState]
+  )
+  const waitingOnName =
+    phase.phase === 'Trick' ? playerNames[phase.data.to_act] : null
+
+  let handStatus = 'Read-only preview'
+
+  if (!viewerHand.length) {
+    handStatus = 'Hand will appear once the game starts.'
+  } else if (isTrickPhase) {
+    if (!viewerTurn) {
+      handStatus = `Waiting for ${waitingOnName} to play`
+    } else if (playState?.isPending) {
+      handStatus = 'Playing card…'
+    } else if (selectedCard) {
+      handStatus = `Selected ${selectedCard}`
+    } else {
+      handStatus = 'Select a card to play'
+    }
+  }
+
+  const handleCardClick = (card: Card) => {
+    if (!isTrickPhase || !playState) {
+      return
+    }
+
+    const isPlayable = playableCards.has(card)
+    if (!viewerTurn || !isPlayable || playState.isPending) {
+      return
+    }
+
+    onSelectCard(selectedCard === card ? null : card)
+  }
+
   return (
     <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
       <header className="flex items-center justify-between">
         <h2 className="text-sm uppercase tracking-wide text-slate-400">
           Your Hand
         </h2>
-        <span className="text-xs text-slate-500">Read-only preview</span>
+        <span className="text-xs text-slate-500">{handStatus}</span>
       </header>
       <div className="flex flex-wrap justify-center gap-2">
         {viewerHand.length === 0 ? (
           <span className="text-sm text-slate-500">
-            Hand will appear once the game starts.
+            Hand will appear once available.
           </span>
         ) : (
-          viewerHand.map((card) => (
-            <span
-              key={card}
-              className="rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-lg font-semibold tracking-wide text-white"
-            >
-              {card}
-            </span>
-          ))
+          viewerHand.map((card) => {
+            const isPlayable = playableCards.has(card)
+            const isSelected = selectedCard === card
+            const isDisabled =
+              !isTrickPhase ||
+              !playState ||
+              !isPlayable ||
+              !viewerTurn ||
+              playState.isPending
+
+            return (
+              <button
+                key={card}
+                type="button"
+                onClick={() => handleCardClick(card)}
+                disabled={isDisabled}
+                className={`rounded-xl border px-3 py-2 text-lg font-semibold tracking-wide transition ${
+                  isSelected
+                    ? 'border-emerald-400 bg-emerald-500/20 text-white shadow-lg shadow-emerald-500/30'
+                    : isPlayable && viewerTurn
+                      ? 'border-emerald-500/60 bg-slate-800 text-white hover:border-emerald-300 hover:bg-emerald-500/10'
+                      : 'border-slate-700 bg-slate-800 text-slate-400'
+                } ${
+                  isDisabled
+                    ? 'cursor-not-allowed opacity-60'
+                    : 'cursor-pointer'
+                }`}
+                aria-pressed={isSelected}
+              >
+                {card}
+              </button>
+            )
+          })
         )}
       </div>
     </section>
@@ -412,11 +541,17 @@ function PlayerActions({
   viewerSeat,
   playerNames,
   bidding,
+  play,
+  selectedCard,
+  onPlayCard,
 }: {
   phase: PhaseSnapshot
   viewerSeat: Seat
   playerNames: [string, string, string, string]
   bidding?: GameRoomViewProps['biddingState']
+  play?: GameRoomViewProps['playState']
+  selectedCard: Card | null
+  onPlayCard: (card: Card) => Promise<void> | void
 }) {
   if (phase.phase === 'Bidding' && bidding) {
     return (
@@ -426,6 +561,18 @@ function PlayerActions({
         layoutSeat={viewerSeat}
         playerNames={playerNames}
         bidding={bidding}
+      />
+    )
+  }
+
+  if (phase.phase === 'Trick' && play) {
+    return (
+      <PlayPanel
+        phase={phase.data}
+        playerNames={playerNames}
+        play={play}
+        selectedCard={selectedCard}
+        onPlayCard={onPlayCard}
       />
     )
   }
@@ -592,6 +739,81 @@ function BiddingPanel({
           ))}
         </ul>
       </div>
+    </section>
+  )
+}
+
+function PlayPanel({
+  phase,
+  playerNames,
+  play,
+  selectedCard,
+  onPlayCard,
+}: {
+  phase: TrickSnapshot
+  playerNames: [string, string, string, string]
+  play: NonNullable<GameRoomViewProps['playState']>
+  selectedCard: Card | null
+  onPlayCard: (card: Card) => Promise<void> | void
+}) {
+  const isViewerTurn = phase.to_act === play.viewerSeat
+  const activeName = playerNames[phase.to_act]
+  const isCardPlayable = !!selectedCard && play.playable.includes(selectedCard)
+  const isSubmitDisabled = !isViewerTurn || play.isPending || !isCardPlayable
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (isSubmitDisabled || !selectedCard) {
+      return
+    }
+
+    await onPlayCard(selectedCard)
+  }
+
+  return (
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-indigo-500/40 bg-indigo-500/10 p-4">
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-200">
+            Play Card
+          </h2>
+          <p className="text-xs text-indigo-100/80">
+            Choose a legal card from your hand. Only legal cards are enabled.
+          </p>
+        </div>
+        <div className="rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-200">
+          Waiting on: {activeName}
+        </div>
+      </header>
+
+      <form
+        className="flex flex-col gap-3 rounded-lg border border-indigo-500/20 bg-slate-900/60 p-4 shadow-inner shadow-indigo-900/30"
+        onSubmit={handleSubmit}
+      >
+        <div className="flex flex-wrap items-center gap-3 text-sm text-indigo-100">
+          <span className="text-xs uppercase tracking-wide text-indigo-300">
+            Selected Card
+          </span>
+          <span className="rounded-md border border-indigo-500/40 bg-slate-900/80 px-3 py-1 font-semibold text-white">
+            {selectedCard ?? '—'}
+          </span>
+        </div>
+        <button
+          type="submit"
+          className="w-full rounded-md bg-indigo-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-500/40 disabled:text-slate-600"
+          disabled={isSubmitDisabled}
+        >
+          {play.isPending
+            ? 'Playing…'
+            : isViewerTurn
+              ? 'Play Selected Card'
+              : `Waiting for ${activeName}`}
+        </button>
+        <p className="text-xs text-indigo-100/80">
+          Legal cards: {play.playable.length ? play.playable.join(', ') : '—'}
+        </p>
+      </form>
     </section>
   )
 }

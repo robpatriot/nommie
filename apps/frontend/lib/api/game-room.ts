@@ -65,3 +65,10 @@ export async function submitBid(gameId: number, bid: number): Promise<void> {
     body: JSON.stringify({ bid }),
   })
 }
+
+export async function submitPlay(gameId: number, card: string): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}/play`, {
+    method: 'POST',
+    body: JSON.stringify({ card }),
+  })
+}
