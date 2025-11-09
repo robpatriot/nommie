@@ -134,4 +134,72 @@ describe('GameRoomView', () => {
 
     expect(onPlay).toHaveBeenCalledWith('2H')
   })
+
+  it('renders AI management panel for host controls', async () => {
+    const onAdd = vi.fn()
+    const onRemove = vi.fn()
+
+    render(
+      <GameRoomView
+        gameId={77}
+        snapshot={biddingSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        aiSeatState={{
+          totalSeats: 4,
+          availableSeats: 1,
+          aiSeats: 2,
+          isPending: false,
+          canAdd: true,
+          canRemove: true,
+          onAdd,
+          onRemove,
+          seats: [
+            {
+              seat: 0,
+              name: 'Alex',
+              playerId: 101,
+              isOccupied: true,
+              isAi: false,
+            },
+            {
+              seat: 1,
+              name: 'Bot Bailey',
+              playerId: 202,
+              isOccupied: true,
+              isAi: true,
+            },
+            {
+              seat: 2,
+              name: 'Bot Casey',
+              playerId: 303,
+              isOccupied: true,
+              isAi: true,
+            },
+            {
+              seat: 3,
+              name: 'Open',
+              playerId: 0,
+              isOccupied: false,
+              isAi: false,
+            },
+          ],
+        }}
+      />
+    )
+
+    expect(screen.getByText('AI Seats')).toBeInTheDocument()
+    expect(screen.getByText(/2 bots · 3\/4 seats filled/)).toBeInTheDocument()
+
+    const addButton = screen.getByRole('button', { name: 'Add AI' })
+    const removeButton = screen.getByRole('button', { name: 'Remove AI' })
+
+    await userEvent.click(addButton)
+    await userEvent.click(removeButton)
+
+    expect(onAdd).toHaveBeenCalled()
+    expect(onRemove).toHaveBeenCalled()
+  })
 })

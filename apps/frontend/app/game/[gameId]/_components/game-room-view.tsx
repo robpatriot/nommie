@@ -52,6 +52,23 @@ export interface GameRoomViewProps {
     isPending: boolean
     onPlay: (card: Card) => Promise<void> | void
   }
+  aiSeatState?: {
+    totalSeats: number
+    availableSeats: number
+    aiSeats: number
+    isPending: boolean
+    canAdd: boolean
+    canRemove: boolean
+    onAdd: () => Promise<void> | void
+    onRemove: () => Promise<void> | void
+    seats: Array<{
+      seat: Seat
+      name: string
+      playerId: number
+      isOccupied: boolean
+      isAi: boolean
+    }>
+  }
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
@@ -68,6 +85,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     readyState,
     biddingState,
     playState,
+    aiSeatState,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -252,6 +270,7 @@ export function GameRoomView(props: GameRoomViewProps) {
             scores={snapshot.game.scores_total}
             round={round}
             readyState={readyState}
+            aiState={aiSeatState}
           />
         </section>
       </main>
@@ -823,11 +842,13 @@ function ScoreSidebar({
   scores,
   round,
   readyState,
+  aiState,
 }: {
   playerNames: [string, string, string, string]
   scores: [number, number, number, number]
   round: RoundPublic | null
   readyState?: GameRoomViewProps['readyState']
+  aiState?: GameRoomViewProps['aiSeatState']
 }) {
   return (
     <aside className="flex h-full flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -870,6 +891,7 @@ function ScoreSidebar({
       ) : null}
 
       <ReadyPanel readyState={readyState} />
+      <AiSeatManager aiState={aiState} />
     </aside>
   )
 }
@@ -914,6 +936,85 @@ function ReadyPanel({
             ? 'Ready — waiting for others'
             : 'I’m Ready'}
       </button>
+    </div>
+  )
+}
+
+function AiSeatManager({
+  aiState,
+}: {
+  aiState?: GameRoomViewProps['aiSeatState']
+}) {
+  if (!aiState) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-500">
+        AI seat controls appear here for the host before the game begins.
+      </div>
+    )
+  }
+
+  const { seats } = aiState
+
+  return (
+    <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/10 p-4 text-sm text-indigo-100">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-indigo-200">AI Seats</h3>
+          <p className="text-xs text-indigo-100/70">
+            Use bots to fill empty seats before the game starts.
+          </p>
+        </div>
+        <span className="rounded-full border border-indigo-400/40 bg-indigo-400/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-100">
+          {aiState.aiSeats} bots · {aiState.totalSeats - aiState.availableSeats}
+          /{aiState.totalSeats} seats filled
+        </span>
+      </header>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => aiState.onAdd()}
+            disabled={!aiState.canAdd || aiState.isPending}
+            className="flex-1 rounded-md bg-indigo-400 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-500/40 disabled:text-slate-600"
+          >
+            {aiState.isPending ? 'Working…' : 'Add AI'}
+          </button>
+          <button
+            type="button"
+            onClick={() => aiState.onRemove()}
+            disabled={!aiState.canRemove || aiState.isPending}
+            className="flex-1 rounded-md border border-indigo-300/60 px-3 py-2 text-sm font-semibold text-indigo-100 transition hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:border-indigo-500/20 disabled:text-indigo-300/60"
+          >
+            Remove AI
+          </button>
+        </div>
+
+        <ul className="mt-2 space-y-2 text-xs">
+          {seats.map((seat) => (
+            <li
+              key={seat.seat}
+              className="flex items-center justify-between rounded-lg border border-indigo-500/20 bg-slate-900/40 px-3 py-2"
+            >
+              <div className="flex flex-col">
+                <span className="font-semibold text-indigo-100">
+                  Seat {seat.seat + 1}
+                </span>
+                <span className="text-[11px] uppercase tracking-wide text-indigo-200/70">
+                  {seat.isOccupied
+                    ? seat.isAi
+                      ? 'AI-controlled'
+                      : 'Human player'
+                    : 'Open seat'}
+                </span>
+              </div>
+              <span className="text-sm font-medium text-white">
+                {seat.isOccupied ? seat.name : '—'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }

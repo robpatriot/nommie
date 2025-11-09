@@ -72,3 +72,20 @@ export async function submitPlay(gameId: number, card: string): Promise<void> {
     body: JSON.stringify({ card }),
   })
 }
+
+export async function addAiSeat(gameId: number, seat?: number): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}/ai/add`, {
+    method: 'POST',
+    body: seat === undefined ? undefined : JSON.stringify({ seat }),
+  })
+}
+
+export async function removeAiSeat(
+  gameId: number,
+  seat?: number
+): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}/ai/remove`, {
+    method: 'POST',
+    body: seat === undefined ? undefined : JSON.stringify({ seat }),
+  })
+}

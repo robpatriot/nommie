@@ -8,9 +8,12 @@ import {
   markPlayerReadyAction,
   submitBidAction,
   submitPlayAction,
+  addAiSeatAction,
+  removeAiSeatAction,
 } from '@/app/actions/game-room-actions'
 import Toast, { type ToastMessage } from '@/components/Toast'
 import { BackendApiError } from '@/lib/errors'
+import type { Seat } from '@/lib/game-room/types'
 
 import { GameRoomView } from './game-room-view'
 
@@ -38,6 +41,7 @@ export function GameRoomClient({
   const [isReadyPending, setIsReadyPending] = useState(false)
   const [isBidPending, setIsBidPending] = useState(false)
   const [isPlayPending, setIsPlayPending] = useState(false)
+  const [isAiPending, setIsAiPending] = useState(false)
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
   const inflightRef = useRef(false)
@@ -300,6 +304,164 @@ export function GameRoomClient({
     }
   }, [handlePlayCard, isPlayPending, phase, viewerSeatForInteractions])
 
+  const seatInfo = useMemo(() => {
+    const aiNameRegex = /\b(bot|ai)\b/i
+    return snapshot.playerNames.map((name, index) => {
+      const seat = index as Seat
+      const playerId = snapshot.snapshot.game.seating[index]
+      const isOccupied = playerId > 0
+      const isAi =
+        isOccupied && aiNameRegex.test(name) && !/^\s*you\s*$/i.test(name)
+
+      return {
+        seat,
+        name,
+        playerId,
+        isOccupied,
+        isAi,
+      }
+    })
+  }, [snapshot.playerNames, snapshot.snapshot.game.seating])
+
+  const totalSeats = seatInfo.length
+  const occupiedSeats = seatInfo.filter((seat) => seat.isOccupied).length
+  const aiSeats = seatInfo.filter((seat) => seat.isAi).length
+  const availableSeats = totalSeats - occupiedSeats
+
+  const hostSeat: Seat = (snapshot.hostSeat ?? 0) as Seat
+  const viewerIsHost = viewerSeatForInteractions === hostSeat
+  const canManageAi =
+    viewerIsHost && phase.phase === 'Init' && !isRefreshing && !isPolling
+
+  const handleAddAi = useCallback(async () => {
+    if (isAiPending || !canManageAi) {
+      return
+    }
+
+    setIsAiPending(true)
+
+    try {
+      const result = await addAiSeatAction({
+        gameId,
+      })
+
+      if (result.kind === 'error') {
+        const actionError = new BackendApiError(
+          result.message || 'Failed to add AI seat',
+          result.status,
+          undefined,
+          result.traceId
+        )
+
+        showToast(actionError.message, 'error', actionError)
+
+        if (process.env.NODE_ENV === 'development' && actionError.traceId) {
+          console.error('Add AI seat error traceId:', actionError.traceId)
+        }
+
+        return
+      }
+
+      showToast('AI seat added', 'success')
+      await performRefresh('manual')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Unable to add AI seat'
+      const wrappedError =
+        err instanceof BackendApiError
+          ? err
+          : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+
+      showToast(wrappedError.message, 'error', wrappedError)
+
+      if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
+        console.error('Add AI seat error traceId:', wrappedError.traceId)
+      }
+    } finally {
+      setIsAiPending(false)
+    }
+  }, [canManageAi, gameId, isAiPending, performRefresh, showToast])
+
+  const handleRemoveAi = useCallback(async () => {
+    if (isAiPending || !canManageAi) {
+      return
+    }
+
+    setIsAiPending(true)
+
+    try {
+      const result = await removeAiSeatAction({
+        gameId,
+      })
+
+      if (result.kind === 'error') {
+        const actionError = new BackendApiError(
+          result.message || 'Failed to remove AI seat',
+          result.status,
+          undefined,
+          result.traceId
+        )
+
+        showToast(actionError.message, 'error', actionError)
+
+        if (process.env.NODE_ENV === 'development' && actionError.traceId) {
+          console.error('Remove AI seat error traceId:', actionError.traceId)
+        }
+
+        return
+      }
+
+      showToast('AI seat removed', 'success')
+      await performRefresh('manual')
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Unable to remove AI seat'
+      const wrappedError =
+        err instanceof BackendApiError
+          ? err
+          : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+
+      showToast(wrappedError.message, 'error', wrappedError)
+
+      if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
+        console.error('Remove AI seat error traceId:', wrappedError.traceId)
+      }
+    } finally {
+      setIsAiPending(false)
+    }
+  }, [canManageAi, gameId, isAiPending, performRefresh, showToast])
+
+  const aiSeatState = useMemo(() => {
+    if (!canManageAi) {
+      return undefined
+    }
+
+    return {
+      totalSeats,
+      availableSeats,
+      aiSeats,
+      isPending: isAiPending,
+      canAdd: availableSeats > 0,
+      canRemove: aiSeats > 0,
+      onAdd: () => {
+        void handleAddAi()
+      },
+      onRemove: () => {
+        void handleRemoveAi()
+      },
+      seats: seatInfo,
+    }
+  }, [
+    aiSeats,
+    availableSeats,
+    canManageAi,
+    handleAddAi,
+    handleRemoveAi,
+    isAiPending,
+    seatInfo,
+    totalSeats,
+  ])
+
   return (
     <>
       <GameRoomView
@@ -322,6 +484,7 @@ export function GameRoomClient({
         }}
         biddingState={biddingControls}
         playState={playControls}
+        aiSeatState={aiSeatState}
       />
       <Toast toast={toast} onClose={() => setToast(null)} />
     </>

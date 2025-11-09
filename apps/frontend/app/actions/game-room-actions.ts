@@ -7,6 +7,8 @@ import {
   markPlayerReady,
   submitBid,
   submitPlay,
+  addAiSeat,
+  removeAiSeat,
 } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
@@ -28,6 +30,7 @@ export interface GameRoomSnapshotPayload {
   viewerSeat: Seat | null
   viewerHand: Card[]
   timestamp: string
+  hostSeat?: Seat | null
 }
 
 export async function getGameRoomSnapshotAction(
@@ -53,6 +56,7 @@ export async function getGameRoomSnapshotAction(
         viewerSeat: DEFAULT_VIEWER_SEAT,
         viewerHand: [],
         timestamp: new Date().toISOString(),
+        hostSeat: DEFAULT_VIEWER_SEAT,
       },
     }
   } catch (error) {
@@ -148,6 +152,73 @@ export async function submitPlayAction(
 
   try {
     await submitPlay(request.gameId, card)
+    return { kind: 'ok' }
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      return {
+        kind: 'error',
+        message: error.message,
+        status: error.status,
+        traceId: error.traceId,
+      }
+    }
+
+    throw error
+  }
+}
+
+export interface ManageAiSeatRequest {
+  gameId: number
+  seat?: Seat
+}
+
+export async function addAiSeatAction(
+  request: ManageAiSeatRequest
+): Promise<SimpleActionResult> {
+  if (
+    request.seat !== undefined &&
+    (request.seat < 0 || request.seat > 3 || Number.isNaN(request.seat))
+  ) {
+    return {
+      kind: 'error',
+      message: 'Seat must be between 0 and 3',
+      status: 400,
+    }
+  }
+
+  try {
+    await addAiSeat(request.gameId, request.seat)
+    return { kind: 'ok' }
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      return {
+        kind: 'error',
+        message: error.message,
+        status: error.status,
+        traceId: error.traceId,
+      }
+    }
+
+    throw error
+  }
+}
+
+export async function removeAiSeatAction(
+  request: ManageAiSeatRequest
+): Promise<SimpleActionResult> {
+  if (
+    request.seat !== undefined &&
+    (request.seat < 0 || request.seat > 3 || Number.isNaN(request.seat))
+  ) {
+    return {
+      kind: 'error',
+      message: 'Seat must be between 0 and 3',
+      status: 400,
+    }
+  }
+
+  try {
+    await removeAiSeat(request.gameId, request.seat)
     return { kind: 'ok' }
   } catch (error) {
     if (error instanceof BackendApiError) {

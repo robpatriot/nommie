@@ -40,6 +40,7 @@ export default async function GamePage({ params }: GamePageProps) {
         viewerSeat: DEFAULT_VIEWER_SEAT,
         viewerHand: [],
         timestamp: new Date().toISOString(),
+        hostSeat: DEFAULT_VIEWER_SEAT,
       }
     }
   } catch (error) {
@@ -64,6 +65,7 @@ export default async function GamePage({ params }: GamePageProps) {
       viewerSeat: mock.viewerSeat,
       viewerHand: mock.viewerHand,
       timestamp: mock.lastSyncedAt,
+      hostSeat: mock.viewerSeat,
     }
   }
 
