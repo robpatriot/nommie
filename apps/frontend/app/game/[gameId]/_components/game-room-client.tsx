@@ -305,30 +305,30 @@ export function GameRoomClient({
   }, [handlePlayCard, isPlayPending, phase, viewerSeatForInteractions])
 
   const seatInfo = useMemo(() => {
-    const aiNameRegex = /\b(bot|ai)\b/i
-    return snapshot.playerNames.map((name, index) => {
-      const seat = index as Seat
-      const playerId = snapshot.snapshot.game.seating[index]
-      const isOccupied = playerId > 0
-      const isAi =
-        isOccupied && aiNameRegex.test(name) && !/^\s*you\s*$/i.test(name)
+    return snapshot.snapshot.game.seating.map((seat) => {
+      const normalizedName = seat.display_name?.trim()
+      const name =
+        normalizedName && normalizedName.length > 0
+          ? normalizedName
+          : `Seat ${seat.seat + 1}`
 
       return {
-        seat,
+        seat: seat.seat,
         name,
-        playerId,
-        isOccupied,
-        isAi,
+        userId: seat.user_id,
+        isOccupied: Boolean(seat.user_id),
+        isAi: seat.is_ai,
+        isReady: seat.is_ready,
       }
     })
-  }, [snapshot.playerNames, snapshot.snapshot.game.seating])
+  }, [snapshot.snapshot.game.seating])
 
   const totalSeats = seatInfo.length
   const occupiedSeats = seatInfo.filter((seat) => seat.isOccupied).length
   const aiSeats = seatInfo.filter((seat) => seat.isAi).length
   const availableSeats = totalSeats - occupiedSeats
 
-  const hostSeat: Seat = (snapshot.hostSeat ?? 0) as Seat
+  const hostSeat: Seat = snapshot.hostSeat
   const viewerIsHost = viewerSeatForInteractions === hostSeat
   const canManageAi =
     viewerIsHost && phase.phase === 'Init' && !isRefreshing && !isPolling

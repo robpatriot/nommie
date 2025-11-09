@@ -64,9 +64,10 @@ export interface GameRoomViewProps {
     seats: Array<{
       seat: Seat
       name: string
-      playerId: number
+      userId: number | null
       isOccupied: boolean
       isAi: boolean
+      isReady: boolean
     }>
   }
 }
@@ -1002,9 +1003,10 @@ function AiSeatManager({
                 </span>
                 <span className="text-[11px] uppercase tracking-wide text-indigo-200/70">
                   {seat.isOccupied
-                    ? seat.isAi
-                      ? 'AI-controlled'
-                      : 'Human player'
+                    ? [
+                        seat.isAi ? 'AI-controlled' : 'Human player',
+                        seat.isReady ? 'Ready' : 'Not ready',
+                      ].join(' • ')
                     : 'Open seat'}
                 </span>
               </div>

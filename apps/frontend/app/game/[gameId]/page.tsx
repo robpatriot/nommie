@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 
 import { GameRoomClient } from './_components/game-room-client'
 import { getMockGameRoomData } from '@/lib/game-room/mock-data'
-import { fetchGameSnapshot, fetchSeatDisplayNames } from '@/lib/api/game-room'
+import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 
@@ -32,7 +32,18 @@ export default async function GamePage({ params }: GamePageProps) {
     const snapshotResult = await fetchGameSnapshot(resolvedGameId)
 
     if (snapshotResult.kind === 'ok') {
-      const playerNames = await fetchSeatDisplayNames(resolvedGameId)
+      const seating = snapshotResult.snapshot.game.seating
+      const playerNames = seating.map((seat, index) => {
+        const name = seat.display_name?.trim()
+        if (name && name.length > 0) {
+          return name
+        }
+        return `Seat ${index + 1}`
+      }) as [string, string, string, string]
+
+      const hostSeat = (snapshotResult.snapshot.game.host_seat ??
+        DEFAULT_VIEWER_SEAT) as typeof DEFAULT_VIEWER_SEAT
+
       initialPayload = {
         snapshot: snapshotResult.snapshot,
         etag: snapshotResult.etag,
@@ -40,7 +51,7 @@ export default async function GamePage({ params }: GamePageProps) {
         viewerSeat: DEFAULT_VIEWER_SEAT,
         viewerHand: [],
         timestamp: new Date().toISOString(),
-        hostSeat: DEFAULT_VIEWER_SEAT,
+        hostSeat,
       }
     }
   } catch (error) {
@@ -65,7 +76,7 @@ export default async function GamePage({ params }: GamePageProps) {
       viewerSeat: mock.viewerSeat,
       viewerHand: mock.viewerHand,
       timestamp: mock.lastSyncedAt,
-      hostSeat: mock.viewerSeat,
+      hostSeat: mock.hostSeat,
     }
   }
 

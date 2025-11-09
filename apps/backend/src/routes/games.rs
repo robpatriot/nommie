@@ -6,6 +6,8 @@ use actix_web::{web, HttpRequest, HttpResponse, Result};
 
 use crate::adapters::games_sea;
 use crate::db::txn::with_txn;
+use crate::domain::snapshot::SeatPublic;
+use crate::domain::state::Seat;
 use crate::entities::games::{GameState, GameVisibility};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -15,6 +17,7 @@ use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
+use crate::repos::users;
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
 use crate::services::players::PlayerService;
@@ -53,8 +56,61 @@ async fn get_snapshot(
             let game_service = crate::services::games::GameService;
             let state = game_service.load_game_state(txn, id).await?;
 
+            let memberships = memberships::find_all_by_game(txn, id)
+                .await
+                .map_err(AppError::from)?;
+
             // Produce the snapshot via the domain function
-            let snap = crate::domain::snapshot::snapshot(&state);
+            let mut snap = crate::domain::snapshot::snapshot(&state);
+
+            let mut seating = [
+                SeatPublic::empty(0),
+                SeatPublic::empty(1),
+                SeatPublic::empty(2),
+                SeatPublic::empty(3),
+            ];
+
+            let mut host_seat: Seat = 0;
+            let creator_user_id = game.created_by;
+
+            for membership in memberships {
+                let seat_idx = membership.turn_order;
+                if !(0..4).contains(&seat_idx) {
+                    continue;
+                }
+
+                let seat = seat_idx as u8;
+                let mut seat_public = SeatPublic::empty(seat);
+                seat_public.is_ready = membership.is_ready;
+                seat_public.user_id = Some(membership.user_id);
+
+                let user = users::find_user_by_id(txn, membership.user_id)
+                    .await
+                    .map_err(AppError::from)?;
+
+                if let Some(user) = user {
+                    seat_public.is_ai = user.is_ai;
+                    let display_name = user
+                        .username
+                        .as_ref()
+                        .map(|name| name.trim())
+                        .filter(|name| !name.is_empty())
+                        .map(str::to_owned)
+                        .unwrap_or_else(|| format!("Player {}", seat as usize + 1));
+                    seat_public.display_name = Some(display_name);
+                } else {
+                    seat_public.display_name = Some(format!("Player {}", seat as usize + 1));
+                }
+
+                seating[seat_idx as usize] = seat_public;
+
+                if creator_user_id == Some(membership.user_id) {
+                    host_seat = seat;
+                }
+            }
+
+            snap.game.seating = seating;
+            snap.game.host_seat = host_seat;
 
             Ok((snap, game.lock_version))
         })

@@ -3,6 +3,7 @@ import type {
   GameSnapshot,
   PhaseSnapshot,
   RoundPublic,
+  SeatPublic,
   TrickSnapshot,
 } from '@/lib/game-room/types'
 
@@ -14,12 +15,44 @@ const baseRound: RoundPublic = {
   tricks_won: [0, 0, 0, 0],
 }
 
+const seatingFixture: [SeatPublic, SeatPublic, SeatPublic, SeatPublic] = [
+  {
+    seat: 0,
+    user_id: 101,
+    display_name: 'Alex',
+    is_ai: false,
+    is_ready: false,
+  },
+  {
+    seat: 1,
+    user_id: 202,
+    display_name: 'Bailey Bot',
+    is_ai: true,
+    is_ready: false,
+  },
+  {
+    seat: 2,
+    user_id: 303,
+    display_name: 'Casey Bot',
+    is_ai: true,
+    is_ready: false,
+  },
+  {
+    seat: 3,
+    user_id: 404,
+    display_name: 'Dakota Bot',
+    is_ai: true,
+    is_ready: false,
+  },
+]
+
 export const biddingSnapshotFixture: GameSnapshot = {
   game: {
     round_no: 1,
     dealer: 0,
-    seating: [101, 202, 303, 404],
+    seating: seatingFixture,
     scores_total: [0, 0, 0, 0],
+    host_seat: 0,
   },
   phase: {
     phase: 'Bidding',
@@ -37,8 +70,9 @@ export const trickSnapshotFixture: GameSnapshot = {
   game: {
     round_no: 5,
     dealer: 0,
-    seating: [101, 202, 303, 404],
+    seating: seatingFixture,
     scores_total: [12, 8, 14, 16],
+    host_seat: 0,
   },
   phase: {
     phase: 'Trick',
@@ -65,8 +99,9 @@ export const scoringSnapshotFixture: GameSnapshot = {
   game: {
     round_no: 8,
     dealer: 3,
-    seating: [101, 202, 303, 404],
+    seating: seatingFixture,
     scores_total: [42, 35, 27, 48],
+    host_seat: 0,
   },
   phase: {
     phase: 'Scoring',

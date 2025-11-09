@@ -3,7 +3,7 @@
 use crate::domain::bidding::{place_bid, set_trump, Bid};
 use crate::domain::fixtures::CardFixtures;
 use crate::domain::rules::PLAYERS;
-use crate::domain::snapshot::{snapshot, PhaseSnapshot};
+use crate::domain::snapshot::{snapshot, PhaseSnapshot, SeatPublic};
 use crate::domain::state::{GameState, Phase, RoundState};
 use crate::domain::tricks::play_card;
 use crate::domain::{Card, Rank, Suit, Trump};
@@ -55,7 +55,15 @@ fn init_snapshot_smoke() {
 
     assert_eq!(snap.game.round_no, 0);
     assert_eq!(snap.game.dealer, 0);
-    assert_eq!(snap.game.seating, [0, 1, 2, 3]);
+    assert_eq!(
+        snap.game.seating,
+        [
+            SeatPublic::empty(0),
+            SeatPublic::empty(1),
+            SeatPublic::empty(2),
+            SeatPublic::empty(3)
+        ]
+    );
     assert_eq!(snap.game.scores_total, [0, 0, 0, 0]);
 
     match snap.phase {

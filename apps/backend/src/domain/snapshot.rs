@@ -3,17 +3,40 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::rules::{valid_bid_range, PLAYERS};
-use crate::domain::state::{GameState, Phase, PlayerId, Seat};
+use crate::domain::state::{GameState, Phase, Seat};
 use crate::domain::tricks::legal_moves;
 use crate::domain::{Card, Trump};
+
+/// Public info about a single seat in the game.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SeatPublic {
+    pub seat: Seat,
+    pub user_id: Option<i64>,
+    pub display_name: Option<String>,
+    pub is_ai: bool,
+    pub is_ready: bool,
+}
+
+impl SeatPublic {
+    pub const fn empty(seat: Seat) -> Self {
+        Self {
+            seat,
+            user_id: None,
+            display_name: None,
+            is_ai: false,
+            is_ready: false,
+        }
+    }
+}
 
 /// Game-level header present in all snapshots.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GameHeader {
     pub round_no: u8,
     pub dealer: Seat,
-    pub seating: [PlayerId; 4],
+    pub seating: [SeatPublic; 4],
     pub scores_total: [i16; 4],
+    pub host_seat: Seat,
 }
 
 /// Top-level snapshot combining header and phase-specific data.
@@ -94,8 +117,14 @@ pub fn snapshot(state: &GameState) -> GameSnapshot {
     let game = GameHeader {
         round_no: state.round_no,
         dealer: compute_dealer(state),
-        seating: [0, 1, 2, 3],
+        seating: [
+            SeatPublic::empty(0),
+            SeatPublic::empty(1),
+            SeatPublic::empty(2),
+            SeatPublic::empty(3),
+        ],
         scores_total: state.scores_total,
+        host_seat: 0,
     };
 
     let phase = match state.phase {

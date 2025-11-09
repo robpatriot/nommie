@@ -3,7 +3,6 @@
 import { BackendApiError } from '@/lib/api'
 import {
   fetchGameSnapshot,
-  fetchSeatDisplayNames,
   markPlayerReady,
   submitBid,
   submitPlay,
@@ -30,7 +29,7 @@ export interface GameRoomSnapshotPayload {
   viewerSeat: Seat | null
   viewerHand: Card[]
   timestamp: string
-  hostSeat?: Seat | null
+  hostSeat: Seat
 }
 
 export async function getGameRoomSnapshotAction(
@@ -45,7 +44,17 @@ export async function getGameRoomSnapshotAction(
       return { kind: 'not_modified' }
     }
 
-    const playerNames = await fetchSeatDisplayNames(request.gameId)
+    const seating = snapshotResult.snapshot.game.seating
+    const playerNames = seating.map((seat, index) => {
+      const name = seat.display_name?.trim()
+      if (name && name.length > 0) {
+        return name
+      }
+      return `Seat ${index + 1}`
+    }) as [string, string, string, string]
+
+    const hostSeat = (snapshotResult.snapshot.game.host_seat ??
+      DEFAULT_VIEWER_SEAT) as Seat
 
     return {
       kind: 'ok',
@@ -56,7 +65,7 @@ export async function getGameRoomSnapshotAction(
         viewerSeat: DEFAULT_VIEWER_SEAT,
         viewerHand: [],
         timestamp: new Date().toISOString(),
-        hostSeat: DEFAULT_VIEWER_SEAT,
+        hostSeat,
       },
     }
   } catch (error) {

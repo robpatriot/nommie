@@ -26,33 +26,6 @@ export async function fetchGameSnapshot(
   }
 }
 
-export async function fetchSeatDisplayNames(
-  gameId: number
-): Promise<[string, string, string, string]> {
-  const seats = (await Promise.all(
-    [0, 1, 2, 3].map(async (seat) => {
-      try {
-        const response = await fetchWithAuth(
-          `/api/games/${gameId}/players/${seat}/display_name`
-        )
-        const data: { display_name?: unknown } = await response.json()
-        if (typeof data.display_name === 'string' && data.display_name.trim()) {
-          return data.display_name.trim()
-        }
-      } catch (error) {
-        if (error instanceof BackendApiError && error.status === 404) {
-          // Endpoint may not exist yet – fall back to placeholder name
-          return `Player ${seat + 1}`
-        }
-        console.warn('Failed to load display name', { seat, error })
-      }
-      return `Player ${seat + 1}`
-    })
-  )) as [string, string, string, string]
-
-  return seats
-}
-
 export async function markPlayerReady(gameId: number): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ready`, {
     method: 'POST',

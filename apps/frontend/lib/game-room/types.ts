@@ -1,16 +1,23 @@
 export type Seat = 0 | 1 | 2 | 3
 
-export type PlayerId = number
-
 export type Trump = 'CLUBS' | 'DIAMONDS' | 'HEARTS' | 'SPADES' | 'NO_TRUMP'
 
 export type Card = string
 
+export interface SeatPublic {
+  seat: Seat
+  user_id: number | null
+  display_name: string | null
+  is_ai: boolean
+  is_ready: boolean
+}
+
 export interface GameHeader {
   round_no: number
   dealer: Seat
-  seating: [PlayerId, PlayerId, PlayerId, PlayerId]
+  seating: [SeatPublic, SeatPublic, SeatPublic, SeatPublic]
   scores_total: [number, number, number, number]
+  host_seat: Seat
 }
 
 export interface RoundPublic {
