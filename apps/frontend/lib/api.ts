@@ -2,7 +2,11 @@
 // This file uses server-only APIs (cookies, backend JWT resolvers)
 'use server'
 
-import { isAuthDisabled, requireBackendJwt } from '@/lib/server/get-backend-jwt'
+import {
+  BackendJwtMissingError,
+  isAuthDisabled,
+  requireBackendJwt,
+} from '@/lib/server/get-backend-jwt'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
 import { BackendApiError } from './errors'
 
@@ -31,10 +35,21 @@ export async function fetchWithAuth(
   // Skip auth check if bypass is enabled
   let authHeaders: Record<string, string> = {}
   if (!disableAuth) {
-    const backendJwt = await requireBackendJwt()
+    try {
+      const backendJwt = await requireBackendJwt()
 
-    authHeaders = {
-      Authorization: `Bearer ${backendJwt}`,
+      authHeaders = {
+        Authorization: `Bearer ${backendJwt}`,
+      }
+    } catch (error) {
+      if (error instanceof BackendJwtMissingError) {
+        throw new BackendApiError(
+          'Authentication required',
+          401,
+          'MISSING_BACKEND_JWT'
+        )
+      }
+      throw error
     }
   }
   // [AUTH_BYPASS] END

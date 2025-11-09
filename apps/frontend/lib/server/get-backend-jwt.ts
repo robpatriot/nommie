@@ -26,6 +26,13 @@ export function isAuthDisabled(): boolean {
   return process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true'
 }
 
+export class BackendJwtMissingError extends Error {
+  constructor(message = 'Backend JWT is missing') {
+    super(message)
+    this.name = 'BackendJwtMissingError'
+  }
+}
+
 export async function resolveBackendJwt(): Promise<BackendJwtResolution> {
   const session = await auth()
 
@@ -87,7 +94,7 @@ export async function requireBackendJwt(): Promise<string> {
     case 'missing-session':
       redirect('/')
     case 'missing-jwt':
-      redirect('/api/auth/signout?callbackUrl=%2F')
+      throw new BackendJwtMissingError()
   }
 }
 
