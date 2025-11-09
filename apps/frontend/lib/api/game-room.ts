@@ -52,3 +52,9 @@ export async function fetchSeatDisplayNames(
 
   return seats
 }
+
+export async function markPlayerReady(gameId: number): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}/ready`, {
+    method: 'POST',
+  })
+}

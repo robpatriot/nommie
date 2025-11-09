@@ -1,7 +1,11 @@
 'use server'
 
 import { BackendApiError } from '@/lib/api'
-import { fetchGameSnapshot, fetchSeatDisplayNames } from '@/lib/api/game-room'
+import {
+  fetchGameSnapshot,
+  fetchSeatDisplayNames,
+  markPlayerReady,
+} from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
 
@@ -49,6 +53,30 @@ export async function getGameRoomSnapshotAction(
         timestamp: new Date().toISOString(),
       },
     }
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      return {
+        kind: 'error',
+        message: error.message,
+        status: error.status,
+        traceId: error.traceId,
+      }
+    }
+
+    throw error
+  }
+}
+
+export type SimpleActionResult =
+  | { kind: 'ok' }
+  | { kind: 'error'; message: string; status: number; traceId?: string }
+
+export async function markPlayerReadyAction(
+  gameId: number
+): Promise<SimpleActionResult> {
+  try {
+    await markPlayerReady(gameId)
+    return { kind: 'ok' }
   } catch (error) {
     if (error instanceof BackendApiError) {
       return {

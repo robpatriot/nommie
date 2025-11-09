@@ -211,6 +211,13 @@ Use checkboxes to mark completion. Add brief notes/dates.
   - [x] Manual refresh button + subtle polling indicator and error surface in UI
   - [x] Storybook/Vitest coverage for snapshot parsing and view layout states
 - [ ] Stage 5 — Core interactions
+  - [x] Backend ready/bid/trump/play endpoints and services, including AI orchestration loop and full-game test
+  - [x] Backend route/service tests upgraded to shared transaction harness (ready, bid, auth, membership)
+  - [x] Frontend ready state wiring (mark ready action, sidebar UX, auto-refresh)
+  - [ ] Frontend bid submission UX and server action with pessimistic handling
+  - [ ] Legal card gating + play action hookup with optimistic refresh
+  - [ ] Host AI seat management controls in game room
+  - [ ] Two-tab verification of ready→start→bid→play flow with automated coverage
 - [ ] Stage 6 — UX and accessibility
 - [ ] Stage 7 — Mobile foundations (Expo)
 - [ ] Stage 8 — Mobile interactions
@@ -224,6 +231,8 @@ Use checkboxes to mark completion. Add brief notes/dates.
 
 ---
 
+- 2025-11-09: Stage 5 backend foundation — Implemented backend ready/bid/trump/play orchestration (auto-start guard, AI templates, shared transaction test harness) with comprehensive route/service coverage and full-game AI regression test passing.
+- 2025-11-09: Stage 5 frontend ready state — Added ready server action, sidebar UX, and pessimistic refresh handling for auto-start flow.
 - 2025-11-07: Stage 4 delivered — Read-only game room stitched end-to-end: new `GameRoomView` and client polling shell render snapshots from `/api/games/{id}/snapshot` with ETag awareness, manual refresh, and error surfacing; seat summaries, trick area, sidebar, and hand preview match UX spec; snapshot types mirrored in frontend with Vitest fixtures.
 - 2025-11-06: NextAuth security and reliability improvements: Implemented proactive backend JWT refresh (refreshes when missing or within 5 minutes of expiry, including on 'update' trigger). Removed backendJwt from session object (server-only, stored only in JWT token). Added server-only helpers `resolveBackendJwt()` / `requireBackendJwt()` to safely access backend JWT from server components/actions and auto sign the user out when the token is missing or invalid. Env var hardening: `BACKEND_BASE_URL` validation with clear error messages, only throws when refresh is actually needed. Split `BackendApiError` into `lib/errors.ts` (client-safe) and marked `lib/api.ts` as server-only. Added type guards for JWT expiration and backend response validation. All server-only imports properly isolated; no client code can access backend JWT.
 - 2025-01-XX: Stage 3 complete — create and join game implemented: Create Game modal with optional name (backend applies default), join action with navigation, toaster with expandable error details and traceId logging. Backend: JWT authentication refactored (JwtExtract middleware, claims/JWT moved under auth module, current_user_db renamed to current_user). Backend: create_game endpoint uses ValidatedJson for request validation. Frontend: cleaned up dead code (api helper, getMe, dashboard), removed duplicate auth logic (centralized in fetchWithAuth), removed client-side default name logic. AUTH_BYPASS support added for debugging (marked for removal). Ready for Stage 4 (read-only game room).

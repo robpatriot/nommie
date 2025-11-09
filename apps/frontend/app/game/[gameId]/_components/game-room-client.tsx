@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
-import { getGameRoomSnapshotAction } from '@/app/actions/game-room-actions'
+import {
+  getGameRoomSnapshotAction,
+  markPlayerReadyAction,
+} from '@/app/actions/game-room-actions'
 
 import { GameRoomView } from './game-room-view'
 
@@ -28,6 +31,8 @@ export function GameRoomClient({
   } | null>(initialError)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [isPolling, setIsPolling] = useState(false)
+  const [isReadyPending, setIsReadyPending] = useState(false)
+  const [hasMarkedReady, setHasMarkedReady] = useState(false)
   const inflightRef = useRef(false)
 
   const performRefresh = useCallback(
@@ -94,6 +99,42 @@ export function GameRoomClient({
     [snapshot.timestamp, isPolling, isRefreshing]
   )
 
+  const phaseName = snapshot.snapshot.phase.phase
+  const canMarkReady = phaseName === 'Init'
+
+  useEffect(() => {
+    if (!canMarkReady && hasMarkedReady) {
+      setHasMarkedReady(false)
+    }
+  }, [canMarkReady, hasMarkedReady])
+
+  const markReady = useCallback(async () => {
+    if (!canMarkReady || isReadyPending || hasMarkedReady) {
+      return
+    }
+
+    setIsReadyPending(true)
+
+    try {
+      const result = await markPlayerReadyAction(gameId)
+      if (result.kind === 'error') {
+        setError({ message: result.message, traceId: result.traceId })
+        return
+      }
+
+      setHasMarkedReady(true)
+      await performRefresh('manual')
+    } catch (err) {
+      if (err instanceof Error) {
+        setError({ message: err.message })
+      } else {
+        setError({ message: 'Unable to mark ready' })
+      }
+    } finally {
+      setIsReadyPending(false)
+    }
+  }, [canMarkReady, gameId, hasMarkedReady, isReadyPending, performRefresh])
+
   return (
     <GameRoomView
       gameId={gameId}
@@ -105,6 +146,14 @@ export function GameRoomClient({
       onRefresh={() => void performRefresh('manual')}
       isRefreshing={isRefreshing}
       error={error}
+      readyState={{
+        canReady: canMarkReady,
+        isPending: isReadyPending,
+        hasMarked: hasMarkedReady,
+        onReady: () => {
+          void markReady()
+        },
+      }}
     />
   )
 }

@@ -24,6 +24,12 @@ export interface GameRoomViewProps {
     message: string
     traceId?: string
   } | null
+  readyState?: {
+    canReady: boolean
+    isPending: boolean
+    hasMarked: boolean
+    onReady: () => void
+  }
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
@@ -37,6 +43,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     onRefresh,
     isRefreshing = false,
     error,
+    readyState,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -179,6 +186,7 @@ export function GameRoomView(props: GameRoomViewProps) {
             playerNames={playerNames}
             scores={snapshot.game.scores_total}
             round={round}
+            readyState={readyState}
           />
         </section>
       </main>
@@ -386,10 +394,12 @@ function ScoreSidebar({
   playerNames,
   scores,
   round,
+  readyState,
 }: {
   playerNames: [string, string, string, string]
   scores: [number, number, number, number]
   round: RoundPublic | null
+  readyState?: GameRoomViewProps['readyState']
 }) {
   return (
     <aside className="flex h-full flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
@@ -431,10 +441,52 @@ function ScoreSidebar({
         </div>
       ) : null}
 
-      <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-500">
-        Error log &amp; activity feed reserved for Stage 5
-      </div>
+      <ReadyPanel readyState={readyState} />
     </aside>
+  )
+}
+
+function ReadyPanel({
+  readyState,
+}: {
+  readyState?: GameRoomViewProps['readyState']
+}) {
+  if (!readyState) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-500">
+        Ready controls will appear once interactions are available.
+      </div>
+    )
+  }
+
+  if (!readyState.canReady) {
+    return (
+      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300">
+        <h3 className="mb-1 text-sm font-semibold text-white">Game in play</h3>
+        <p>The table is active. Actions will surface here when required.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+      <h3 className="mb-2 text-sm font-semibold text-emerald-200">Ready Up</h3>
+      <p className="mb-3 text-xs text-emerald-200/80">
+        Mark yourself ready. The game auto-starts when all four seats are ready.
+      </p>
+      <button
+        type="button"
+        onClick={() => readyState.onReady()}
+        className="w-full rounded-md bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-500/60 disabled:text-slate-800"
+        disabled={readyState.isPending || readyState.hasMarked}
+      >
+        {readyState.isPending
+          ? 'Marking…'
+          : readyState.hasMarked
+            ? 'Ready — waiting for others'
+            : 'I’m Ready'}
+      </button>
+    </div>
   )
 }
 
