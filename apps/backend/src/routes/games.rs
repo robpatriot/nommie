@@ -3,8 +3,12 @@
 use actix_web::http::header::{ETAG, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
+use rand::random;
+use serde::Deserialize;
+use serde_json::json;
+use uuid::Uuid;
 
-use crate::adapters::games_sea;
+use crate::adapters::games_sea::{self, GameUpdateRound};
 use crate::db::txn::with_txn;
 use crate::domain::snapshot::SeatPublic;
 use crate::domain::state::Seat;
@@ -17,7 +21,8 @@ use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
-use crate::repos::users;
+use crate::repos::{ai_overrides, users};
+use crate::services::ai::AiService;
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
 use crate::services::players::PlayerService;
@@ -34,12 +39,13 @@ use crate::state::app_state::AppState;
 async fn get_snapshot(
     http_req: HttpRequest,
     game_id: GameId,
+    current_user: CurrentUser,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
 
     // Load game state and produce snapshot within a transaction
-    let (snapshot, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
+    let (snapshot, lock_version, viewer_seat) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             // Fetch game from database to get lock_version
             let game = games_sea::find_by_id(txn, id)
@@ -60,6 +66,7 @@ async fn get_snapshot(
                 .await
                 .map_err(AppError::from)?;
 
+            let mut viewer_seat: Option<Seat> = None;
             // Produce the snapshot via the domain function
             let mut snap = crate::domain::snapshot::snapshot(&state);
 
@@ -107,12 +114,16 @@ async fn get_snapshot(
                 if creator_user_id == Some(membership.user_id) {
                     host_seat = seat;
                 }
+
+                if membership.user_id == current_user.id {
+                    viewer_seat = Some(seat);
+                }
             }
 
             snap.game.seating = seating;
             snap.game.host_seat = host_seat;
 
-            Ok((snap, game.lock_version))
+            Ok((snap, game.lock_version, viewer_seat))
         })
     })
     .await?;
@@ -133,17 +144,23 @@ async fn get_snapshot(
 
             if matches {
                 // Resource hasn't changed, return 304 Not Modified
-                return Ok(HttpResponse::build(StatusCode::NOT_MODIFIED)
-                    .insert_header((ETAG, etag_value))
-                    .finish());
+                let mut not_modified = HttpResponse::build(StatusCode::NOT_MODIFIED);
+                not_modified.insert_header((ETAG, etag_value));
+                if let Some(seat) = viewer_seat {
+                    not_modified.insert_header(("x-viewer-seat", seat.to_string()));
+                }
+                return Ok(not_modified.finish());
             }
         }
     }
 
     // Resource is new or modified, return full response
-    Ok(HttpResponse::Ok()
-        .insert_header((ETAG, etag_value))
-        .json(snapshot))
+    let mut response = HttpResponse::Ok();
+    response.insert_header((ETAG, etag_value));
+    if let Some(seat) = viewer_seat {
+        response.insert_header(("x-viewer-seat", seat.to_string()));
+    }
+    Ok(response.json(snapshot))
 }
 
 /// GET /api/games/{game_id}/players/{seat}/display_name
@@ -354,6 +371,279 @@ struct SubmitBidRequest {
     bid: u8,
 }
 
+#[derive(Debug, Default, Deserialize)]
+struct ManageAiSeatRequest {
+    seat: Option<u8>,
+}
+
+async fn add_ai_seat(
+    http_req: HttpRequest,
+    game_id: GameId,
+    membership: GameMembership,
+    body: Option<web::Json<ManageAiSeatRequest>>,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+    let request = body.map(|b| b.into_inner()).unwrap_or_default();
+    let requested_seat = request.seat;
+    let host_user_id = membership.user_id;
+    let host_turn_order = membership.turn_order;
+
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let game = games_sea::find_by_id(txn, id)
+                .await
+                .map_err(|e| AppError::db("failed to fetch game", e))?
+                .ok_or_else(|| {
+                    AppError::not_found(
+                        ErrorCode::GameNotFound,
+                        format!("Game with ID {id} not found"),
+                    )
+                })?;
+
+            let is_host = match game.created_by {
+                Some(created_by) => created_by == host_user_id,
+                None => host_turn_order == 0,
+            };
+
+            if !is_host {
+                return Err(AppError::forbidden_with_code(
+                    ErrorCode::Forbidden,
+                    "Only the host can manage AI seats",
+                ));
+            }
+
+            if game.state != GameState::Lobby {
+                return Err(AppError::bad_request(
+                    ErrorCode::PhaseMismatch,
+                    "AI seats can only be managed before the game starts",
+                ));
+            }
+
+            let existing_memberships = memberships::find_all_by_game(txn, id)
+                .await
+                .map_err(AppError::from)?;
+
+            if existing_memberships.len() >= 4 {
+                return Err(AppError::conflict(
+                    ErrorCode::SeatTaken,
+                    "All seats are already filled",
+                ));
+            }
+
+            let seat_to_fill = if let Some(seat_val) = requested_seat {
+                if seat_val > 3 {
+                    return Err(AppError::bad_request(
+                        ErrorCode::InvalidSeat,
+                        format!("Seat {seat_val} is out of range (0-3)"),
+                    ));
+                }
+                if existing_memberships
+                    .iter()
+                    .any(|m| m.turn_order == seat_val as i32)
+                {
+                    return Err(AppError::conflict(
+                        ErrorCode::SeatTaken,
+                        format!("Seat {seat_val} is already taken"),
+                    ));
+                }
+                seat_val as i32
+            } else {
+                let game_service = GameService;
+                game_service
+                    .find_next_available_seat(&existing_memberships)
+                    .ok_or_else(|| {
+                        AppError::conflict(ErrorCode::SeatTaken, "No available seats remaining")
+                    })?
+            };
+
+            let seat_index = seat_to_fill as u8;
+            let ai_service = AiService;
+            let suffix = &Uuid::new_v4().to_string()[..8];
+            let ai_display_name = format!("Bot {} {suffix}", seat_index + 1);
+            let ai_config = Some(json!({ "seed": random::<u64>() }));
+
+            let ai_user_id = ai_service
+                .create_ai_template_user(txn, ai_display_name, "random", ai_config, Some(100))
+                .await
+                .map_err(AppError::from)?;
+
+            ai_service
+                .add_ai_to_game(txn, id, ai_user_id, seat_to_fill, None)
+                .await
+                .map_err(AppError::from)?;
+
+            games_sea::update_round(txn, GameUpdateRound::new(id, game.lock_version))
+                .await
+                .map_err(AppError::from)?;
+
+            Ok(())
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+async fn remove_ai_seat(
+    http_req: HttpRequest,
+    game_id: GameId,
+    membership: GameMembership,
+    body: Option<web::Json<ManageAiSeatRequest>>,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+    let request = body.map(|b| b.into_inner()).unwrap_or_default();
+    let requested_seat = request.seat;
+    let host_user_id = membership.user_id;
+    let host_turn_order = membership.turn_order;
+
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let game = games_sea::find_by_id(txn, id)
+                .await
+                .map_err(|e| AppError::db("failed to fetch game", e))?
+                .ok_or_else(|| {
+                    AppError::not_found(
+                        ErrorCode::GameNotFound,
+                        format!("Game with ID {id} not found"),
+                    )
+                })?;
+
+            let is_host = match game.created_by {
+                Some(created_by) => created_by == host_user_id,
+                None => host_turn_order == 0,
+            };
+
+            if !is_host {
+                return Err(AppError::forbidden_with_code(
+                    ErrorCode::Forbidden,
+                    "Only the host can manage AI seats",
+                ));
+            }
+
+            if game.state != GameState::Lobby {
+                return Err(AppError::bad_request(
+                    ErrorCode::PhaseMismatch,
+                    "AI seats can only be managed before the game starts",
+                ));
+            }
+
+            let existing_memberships = memberships::find_all_by_game(txn, id)
+                .await
+                .map_err(AppError::from)?;
+
+            let candidate = if let Some(seat_val) = requested_seat {
+                if seat_val > 3 {
+                    return Err(AppError::bad_request(
+                        ErrorCode::InvalidSeat,
+                        format!("Seat {seat_val} is out of range (0-3)"),
+                    ));
+                }
+
+                let seat_i32 = seat_val as i32;
+                let membership = existing_memberships
+                    .iter()
+                    .find(|m| m.turn_order == seat_i32)
+                    .cloned()
+                    .ok_or_else(|| {
+                        AppError::bad_request(
+                            ErrorCode::ValidationError,
+                            format!("No player assigned to seat {seat_val}"),
+                        )
+                    })?;
+
+                let user = users::find_user_by_id(txn, membership.user_id)
+                    .await
+                    .map_err(AppError::from)?
+                    .ok_or_else(|| {
+                        AppError::not_found(
+                            ErrorCode::UserNotFound,
+                            format!("User {} not found", membership.user_id),
+                        )
+                    })?;
+
+                if !user.is_ai {
+                    return Err(AppError::bad_request(
+                        ErrorCode::ValidationError,
+                        "Specified seat is not occupied by an AI player",
+                    ));
+                }
+
+                membership
+            } else {
+                let mut ai_memberships = Vec::new();
+
+                for member in &existing_memberships {
+                    if member.user_id == host_user_id {
+                        continue;
+                    }
+
+                    if let Some(user) = users::find_user_by_id(txn, member.user_id)
+                        .await
+                        .map_err(AppError::from)?
+                    {
+                        if user.is_ai {
+                            ai_memberships.push(member.clone());
+                        }
+                    }
+                }
+
+                if ai_memberships.is_empty() {
+                    return Err(AppError::bad_request(
+                        ErrorCode::ValidationError,
+                        "There are no AI seats to remove",
+                    ));
+                }
+
+                ai_memberships
+                    .into_iter()
+                    .max_by_key(|m| m.turn_order)
+                    .ok_or_else(|| {
+                        AppError::internal(
+                            ErrorCode::InternalError,
+                            "Failed to select AI membership for removal",
+                            std::io::Error::other("No AI membership found"),
+                        )
+                    })?
+            };
+
+            let candidate_user = users::find_user_by_id(txn, candidate.user_id)
+                .await
+                .map_err(AppError::from)?
+                .ok_or_else(|| {
+                    AppError::not_found(
+                        ErrorCode::UserNotFound,
+                        format!("User {} not found", candidate.user_id),
+                    )
+                })?;
+
+            if !candidate_user.is_ai {
+                return Err(AppError::bad_request(
+                    ErrorCode::ValidationError,
+                    "Specified seat is not occupied by an AI player",
+                ));
+            }
+
+            ai_overrides::delete_by_game_player_id(txn, candidate.id)
+                .await
+                .map_err(AppError::from)?;
+            memberships::delete_membership(txn, candidate.id)
+                .await
+                .map_err(AppError::from)?;
+
+            games_sea::update_round(txn, GameUpdateRound::new(id, game.lock_version))
+                .await
+                .map_err(AppError::from)?;
+
+            Ok(())
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
 /// POST /api/games/{game_id}/bid
 ///
 /// Submits a bid for the current player. Bidding order and validation are enforced
@@ -385,6 +675,8 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("").route(web::post().to(create_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
     cfg.service(web::resource("/{game_id}/ready").route(web::post().to(mark_ready)));
+    cfg.service(web::resource("/{game_id}/ai/add").route(web::post().to(add_ai_seat)));
+    cfg.service(web::resource("/{game_id}/ai/remove").route(web::post().to(remove_ai_seat)));
     cfg.service(web::resource("/{game_id}/bid").route(web::post().to(submit_bid)));
     cfg.service(web::resource("/{game_id}/snapshot").route(web::get().to(get_snapshot)));
     cfg.service(

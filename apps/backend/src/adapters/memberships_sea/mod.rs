@@ -84,3 +84,11 @@ pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
         .all(conn)
         .await
 }
+
+pub async fn delete_membership(txn: &DatabaseTransaction, id: i64) -> Result<(), sea_orm::DbErr> {
+    game_players::Entity::delete_many()
+        .filter(game_players::Column::Id.eq(id))
+        .exec(txn)
+        .await?;
+    Ok(())
+}

@@ -4,6 +4,7 @@ pub mod extractor_current_user_db;
 pub mod extractor_game_id;
 pub mod extractor_game_membership;
 pub mod extractor_game_membership_roles;
+pub mod handler_games_ai;
 pub mod handler_games_bid;
 pub mod handler_games_ready;
 pub mod handler_players;

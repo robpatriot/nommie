@@ -100,6 +100,14 @@ pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
     Ok(memberships.into_iter().map(GameMembership::from).collect())
 }
 
+pub async fn delete_membership(
+    txn: &DatabaseTransaction,
+    membership_id: i64,
+) -> Result<(), DomainError> {
+    memberships_adapter::delete_membership(txn, membership_id).await?;
+    Ok(())
+}
+
 impl From<crate::entities::game_players::Model> for GameMembership {
     fn from(model: crate::entities::game_players::Model) -> Self {
         Self {
