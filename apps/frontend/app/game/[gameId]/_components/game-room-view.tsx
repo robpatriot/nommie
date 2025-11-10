@@ -992,9 +992,9 @@ function AiSeatManager({
         </div>
 
         <ul className="mt-2 space-y-2 text-xs">
-          {seats.map((seat) => (
+          {seats.map((seat, index) => (
             <li
-              key={seat.seat}
+              key={seat.userId ?? `${seat.seat}-${index}`}
               className="flex items-center justify-between rounded-lg border border-indigo-500/20 bg-slate-900/40 px-3 py-2"
             >
               <div className="flex flex-col">

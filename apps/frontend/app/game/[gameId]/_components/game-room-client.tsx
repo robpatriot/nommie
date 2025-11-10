@@ -305,15 +305,20 @@ export function GameRoomClient({
   }, [handlePlayCard, isPlayPending, phase, viewerSeatForInteractions])
 
   const seatInfo = useMemo(() => {
-    return snapshot.snapshot.game.seating.map((seat) => {
+    return snapshot.snapshot.game.seating.map((seat, index) => {
+      const seatIndex =
+        typeof seat.seat === 'number' && !Number.isNaN(seat.seat)
+          ? (seat.seat as Seat)
+          : (index as Seat)
+
       const normalizedName = seat.display_name?.trim()
       const name =
         normalizedName && normalizedName.length > 0
           ? normalizedName
-          : `Seat ${seat.seat + 1}`
+          : `Seat ${seatIndex + 1}`
 
       return {
-        seat: seat.seat,
+        seat: seatIndex,
         name,
         userId: seat.user_id,
         isOccupied: Boolean(seat.user_id),
