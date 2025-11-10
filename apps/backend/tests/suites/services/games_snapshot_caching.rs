@@ -11,32 +11,68 @@ use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
+use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games;
+use backend::state::app_state::AppState;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
+use crate::support::auth::bearer_header;
 use crate::support::build_test_state;
+use crate::support::factory::create_test_user;
 use crate::support::snapshot_helpers::{create_snapshot_game, SnapshotGameOptions};
+use crate::support::test_utils::test_user_sub;
+
+struct SnapshotTestContext {
+    state: AppState,
+    shared: SharedTxn,
+    bearer: String,
+}
+
+async fn setup_snapshot_test(test_name: &str) -> Result<SnapshotTestContext, AppError> {
+    let state = build_test_state().await?;
+    let security = state.security.clone();
+    let db = require_db(&state)?;
+    let shared = SharedTxn::open(db).await?;
+
+    let viewer_sub = test_user_sub(&format!("{test_name}_viewer"));
+    let viewer_email = format!("{viewer_sub}@example.com");
+    create_test_user(shared.transaction(), &viewer_sub, Some("Snapshot Viewer")).await?;
+
+    let bearer = bearer_header(&viewer_sub, &viewer_email, &security);
+
+    Ok(SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    })
+}
 
 #[tokio::test]
 async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
-    let state = build_test_state().await?;
-
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_returns_etag_header").await?;
 
     let game =
         create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(5)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -79,17 +115,22 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> {
-    let state = build_test_state().await?;
-
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_with_if_none_match_returns_304").await?;
 
     let game =
         create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(3)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
@@ -97,6 +138,7 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
     // First GET to capture ETag
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -119,6 +161,7 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
         .insert_header((IF_NONE_MATCH, HeaderValue::from_str(&etag).unwrap()))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -158,17 +201,22 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), AppError> {
-    let state = build_test_state().await?;
-
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_with_if_none_match_mismatch_returns_200").await?;
 
     let game =
         create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(5)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
@@ -178,6 +226,7 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
         .insert_header((IF_NONE_MATCH, HeaderValue::from_str(&stale_etag).unwrap()))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -222,17 +271,22 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), AppError> {
-    let state = build_test_state().await?;
-
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_with_if_none_match_wildcard_returns_304").await?;
 
     let game =
         create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(7)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
@@ -241,6 +295,7 @@ async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), A
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
         .insert_header((IF_NONE_MATCH, HeaderValue::from_static("*")))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -281,10 +336,11 @@ async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), A
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<(), AppError> {
-    let state = build_test_state().await?;
-
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_with_if_none_match_comma_separated_one_match").await?;
 
     let game = create_snapshot_game(
         &shared,
@@ -294,7 +350,11 @@ async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
@@ -310,6 +370,7 @@ async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<
             IF_NONE_MATCH,
             HeaderValue::from_str(&if_none_match_value).unwrap(),
         ))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -331,10 +392,11 @@ async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<
 
 #[tokio::test]
 async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(), AppError> {
-    let state = build_test_state().await?;
-
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_with_if_none_match_comma_separated_no_match").await?;
 
     let game = create_snapshot_game(
         &shared,
@@ -344,7 +406,11 @@ async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
@@ -360,6 +426,7 @@ async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(
             IF_NONE_MATCH,
             HeaderValue::from_str(&if_none_match_value).unwrap(),
         ))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 

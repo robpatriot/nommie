@@ -18,7 +18,6 @@ use crate::support::factory::{create_fresh_lobby_game, create_test_user};
 
 #[tokio::test]
 async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
-    std::env::set_var("NOMMIE_TEST_DB_KIND", "sqlite_memory");
     let state = build_test_state().await?;
     let security: SecurityConfig = state.security.clone();
     let db = require_db(&state).expect("DB required");
@@ -69,7 +68,6 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
-    std::env::set_var("NOMMIE_TEST_DB_KIND", "sqlite_memory");
     let state = build_test_state().await?;
     let security: SecurityConfig = state.security.clone();
     let db = require_db(&state).expect("DB required");

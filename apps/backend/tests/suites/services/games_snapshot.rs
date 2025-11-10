@@ -10,32 +10,67 @@ use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
-use backend::infra::state::build_state;
+use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games;
+use backend::state::app_state::AppState;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
+use crate::support::auth::bearer_header;
 use crate::support::build_test_state;
+use crate::support::factory::create_test_user;
 use crate::support::snapshot_helpers::{create_snapshot_game, SnapshotGameOptions};
+use crate::support::test_utils::test_user_sub;
+
+struct SnapshotTestContext {
+    state: AppState,
+    shared: SharedTxn,
+    bearer: String,
+}
+
+async fn setup_snapshot_test(test_name: &str) -> Result<SnapshotTestContext, AppError> {
+    let state = build_test_state().await?;
+    let security = state.security.clone();
+    let db = require_db(&state)?;
+    let shared = SharedTxn::open(db).await?;
+
+    let viewer_sub = test_user_sub(&format!("{test_name}_viewer"));
+    let viewer_email = format!("{viewer_sub}@example.com");
+    create_test_user(shared.transaction(), &viewer_sub, Some("Snapshot Viewer")).await?;
+
+    let bearer = bearer_header(&viewer_sub, &viewer_email, &security);
+
+    Ok(SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    })
+}
 
 #[tokio::test]
 async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
-    let state = build_test_state().await?;
-
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_returns_200_with_valid_json").await?;
 
     let game = create_snapshot_game(&shared, SnapshotGameOptions::default()).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -87,11 +122,19 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
-    let state = build_state().build().await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_invalid_game_id_returns_400").await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
@@ -99,7 +142,9 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
     // Call with invalid game_id (not a number)
     let req = test::TestRequest::get()
         .uri("/api/games/not-a-number/snapshot")
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
+    req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
 
@@ -115,16 +160,26 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
     );
     assert!(json.get("trace_id").is_some(), "error should have trace_id");
 
+    shared.rollback().await?;
+
     Ok(())
 }
 
 #[tokio::test]
 async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
-    let state = build_test_state().await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_nonexistent_game_returns_404").await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
@@ -132,7 +187,9 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
     // Call with a valid ID format but nonexistent game (very large ID)
     let req = test::TestRequest::get()
         .uri("/api/games/999999999/snapshot")
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
+    req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
 
@@ -150,27 +207,35 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
         assert_eq!(json.get("status").and_then(|v| v.as_u64()), Some(404));
     }
 
+    shared.rollback().await?;
+
     Ok(())
 }
 
 #[tokio::test]
 async fn test_snapshot_phase_structure() -> Result<(), AppError> {
-    let state = build_test_state().await?;
-
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let SnapshotTestContext {
+        state,
+        shared,
+        bearer,
+    } = setup_snapshot_test("snapshot_phase_structure").await?;
 
     let game = create_snapshot_game(&shared, SnapshotGameOptions::default()).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/api/games").configure(games::configure_routes));
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(games::configure_routes),
+            );
         })
         .build()
         .await?;
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
