@@ -43,12 +43,16 @@ export default async function GamePage({ params }: GamePageProps) {
 
       const hostSeat = (snapshotResult.snapshot.game.host_seat ??
         DEFAULT_VIEWER_SEAT) as typeof DEFAULT_VIEWER_SEAT
+      const viewerSeat =
+        typeof snapshotResult.viewerSeat === 'number'
+          ? (snapshotResult.viewerSeat as typeof DEFAULT_VIEWER_SEAT)
+          : DEFAULT_VIEWER_SEAT
 
       initialPayload = {
         snapshot: snapshotResult.snapshot,
         etag: snapshotResult.etag,
         playerNames,
-        viewerSeat: DEFAULT_VIEWER_SEAT,
+        viewerSeat,
         viewerHand: [],
         timestamp: new Date().toISOString(),
         hostSeat,

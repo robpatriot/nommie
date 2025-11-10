@@ -55,6 +55,10 @@ export async function getGameRoomSnapshotAction(
 
     const hostSeat = (snapshotResult.snapshot.game.host_seat ??
       DEFAULT_VIEWER_SEAT) as Seat
+    const viewerSeat: Seat | null =
+      typeof snapshotResult.viewerSeat === 'number'
+        ? (snapshotResult.viewerSeat as Seat)
+        : null
 
     return {
       kind: 'ok',
@@ -62,7 +66,7 @@ export async function getGameRoomSnapshotAction(
         snapshot: snapshotResult.snapshot,
         etag: snapshotResult.etag,
         playerNames,
-        viewerSeat: DEFAULT_VIEWER_SEAT,
+        viewerSeat,
         viewerHand: [],
         timestamp: new Date().toISOString(),
         hostSeat,

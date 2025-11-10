@@ -67,7 +67,13 @@ export function GameRoomClient({
         })
 
         if (result.kind === 'ok') {
-          setSnapshot(result.data)
+          setSnapshot((prev) => ({
+            ...result.data,
+            viewerSeat:
+              result.data.viewerSeat !== null
+                ? result.data.viewerSeat
+                : prev.viewerSeat,
+          }))
           setEtag(result.data.etag)
           setError(null)
         } else if (result.kind === 'not_modified') {
