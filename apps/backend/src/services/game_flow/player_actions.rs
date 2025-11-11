@@ -336,8 +336,8 @@ impl GameFlowService {
                 crate::domain::Suit::Spades => tricks::Suit::Spades,
             };
 
-            // Winner placeholder - will be determined by resolve_trick() after 4th play
-            tricks::create_trick(txn, round.id, current_trick_no, lead_suit, 0).await?
+            // Winner placeholder - use sentinel -1 until resolve_trick determines the winner
+            tricks::create_trick(txn, round.id, current_trick_no, lead_suit, -1).await?
         };
 
         // Determine play_order (how many plays already in this trick)

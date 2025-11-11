@@ -91,8 +91,12 @@ export function GameRoomView(props: GameRoomViewProps) {
   const phase = snapshot.phase
   const round = getRound(phase)
   const activeSeat = getActiveSeat(phase)
+  const seatDisplayName = useCallback(
+    (seat: Seat) => (seat === viewerSeat ? 'You' : playerNames[seat]),
+    [playerNames, viewerSeat]
+  )
   const activeName =
-    typeof activeSeat === 'number' ? playerNames[activeSeat] : 'Waiting'
+    typeof activeSeat === 'number' ? seatDisplayName(activeSeat) : 'Waiting'
   const syncLabel = new Date(status.lastSyncedAt).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
@@ -214,7 +218,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
               <PhaseFact
                 label="Dealer"
-                value={playerNames[snapshot.game.dealer]}
+                value={seatDisplayName(snapshot.game.dealer)}
               />
               <PhaseFact label="Trump" value={formatTrump(round.trump)} />
             </div>
@@ -239,7 +243,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               ))}
               <TrickArea
                 trickMap={trickMap}
-                playerNames={playerNames}
+                getSeatName={seatDisplayName}
                 round={round}
                 phase={phase}
                 viewerSeat={viewerSeat}
@@ -250,6 +254,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               viewerHand={viewerHand}
               phase={phase}
               playerNames={playerNames}
+              viewerSeat={viewerSeat}
               playState={playState}
               selectedCard={selectedCard}
               onSelectCard={setSelectedCard}
@@ -394,13 +399,13 @@ function SeatCard({ summary }: { summary: SeatSummary }) {
 
 function TrickArea({
   trickMap,
-  playerNames,
+  getSeatName,
   round,
   phase,
   viewerSeat,
 }: {
   trickMap: Map<Seat, Card>
-  playerNames: [string, string, string, string]
+  getSeatName: (seat: Seat) => string
   round: RoundPublic | null
   phase: PhaseSnapshot
   viewerSeat: Seat
@@ -408,7 +413,7 @@ function TrickArea({
   const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
     seat,
     card,
-    label: playerNames[seat],
+    label: getSeatName(seat),
     orientation: getOrientation(viewerSeat, seat),
   }))
 
@@ -438,7 +443,7 @@ function TrickArea({
       </div>
       {phase.phase === 'Trick' ? (
         <p className="text-xs text-slate-400">
-          Leader: {playerNames[phase.data.leader]} — Trick {phase.data.trick_no}{' '}
+          Leader: {getSeatName(phase.data.leader)} — Trick {phase.data.trick_no}{' '}
           of {round?.hand_size ?? '?'}
         </p>
       ) : null}
@@ -450,6 +455,7 @@ function PlayerHand({
   viewerHand,
   phase,
   playerNames,
+  viewerSeat,
   playState,
   selectedCard,
   onSelectCard,
@@ -457,6 +463,7 @@ function PlayerHand({
   viewerHand: Card[]
   phase: PhaseSnapshot
   playerNames: [string, string, string, string]
+  viewerSeat: Seat
   playState?: GameRoomViewProps['playState']
   selectedCard: Card | null
   onSelectCard: (card: Card | null) => void
@@ -471,8 +478,13 @@ function PlayerHand({
     () => new Set(playState?.playable ?? []),
     [playState]
   )
+  const waitingOnSeat = phase.phase === 'Trick' ? phase.data.to_act : null
   const waitingOnName =
-    phase.phase === 'Trick' ? playerNames[phase.data.to_act] : null
+    waitingOnSeat === null
+      ? null
+      : waitingOnSeat === viewerSeat
+        ? 'You'
+        : playerNames[waitingOnSeat]
 
   let handStatus = 'Read-only preview'
 
@@ -480,7 +492,7 @@ function PlayerHand({
     handStatus = 'Hand will appear once the game starts.'
   } else if (isTrickPhase) {
     if (!viewerTurn) {
-      handStatus = `Waiting for ${waitingOnName} to play`
+      handStatus = `Waiting for ${waitingOnName ?? 'next player'} to play`
     } else if (playState?.isPending) {
       handStatus = 'Playing card…'
     } else if (selectedCard) {
@@ -630,7 +642,8 @@ function BiddingPanel({
   const maxBid = phase.max_bid
   const viewerBid = phase.bids[viewerSeat] ?? null
   const isViewerTurn = phase.to_act === viewerSeat
-  const activeName = playerNames[phase.to_act]
+  const activeName =
+    phase.to_act === viewerSeat ? 'You' : playerNames[phase.to_act]
   const [selectedBid, setSelectedBid] = useState<number>(
     () => viewerBid ?? minBid
   )
@@ -652,11 +665,11 @@ function BiddingPanel({
     () =>
       ([0, 1, 2, 3] as const).map((seat) => ({
         seat,
-        name: playerNames[seat],
+        name: seat === viewerSeat ? 'You' : playerNames[seat],
         bid: phase.bids[seat],
         orientation: getOrientation(layoutSeat, seat),
       })),
-    [layoutSeat, phase.bids, playerNames]
+    [layoutSeat, phase.bids, playerNames, viewerSeat]
   )
 
   const isSubmitDisabled =
@@ -777,7 +790,8 @@ function PlayPanel({
   onPlayCard: (card: Card) => Promise<void> | void
 }) {
   const isViewerTurn = phase.to_act === play.viewerSeat
-  const activeName = playerNames[phase.to_act]
+  const activeName =
+    phase.to_act === play.viewerSeat ? 'You' : playerNames[phase.to_act]
   const isCardPlayable = !!selectedCard && play.playable.includes(selectedCard)
   const isSubmitDisabled = !isViewerTurn || play.isPending || !isCardPlayable
 
@@ -1058,7 +1072,7 @@ function getPhaseLabel(phase: PhaseSnapshot): string {
     case 'GameOver':
       return 'Game Over'
     default:
-      return phase.phase
+      return 'Unknown Phase'
   }
 }
 
