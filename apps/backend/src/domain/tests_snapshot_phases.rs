@@ -224,6 +224,96 @@ fn trick_snapshot_legals() {
 }
 
 #[test]
+fn trick_snapshot_second_trick_turn_rotation() {
+    // Hands configured so player 3 wins first trick with trump and leads the second trick
+    let hands = [
+        CardFixtures::parse_hardcoded(&["3D", "4C"]),
+        CardFixtures::parse_hardcoded(&["AD", "5C"]),
+        CardFixtures::parse_hardcoded(&["2D", "6C"]),
+        CardFixtures::parse_hardcoded(&["AS", "7C"]),
+    ];
+
+    let mut state = start_round(1, hands);
+
+    // Bidding: player 1 wins and selects Spades as trump
+    place_bid(&mut state, 1, Bid(2)).unwrap();
+    place_bid(&mut state, 2, Bid(0)).unwrap();
+    place_bid(&mut state, 3, Bid(0)).unwrap();
+    place_bid(&mut state, 0, Bid(0)).unwrap();
+    set_trump(&mut state, 1, Trump::Spades).unwrap();
+
+    // First trick: player 1 leads diamonds, player 3 wins with spade (trump)
+    play_card(
+        &mut state,
+        1,
+        Card {
+            suit: Suit::Diamonds,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        2,
+        Card {
+            suit: Suit::Diamonds,
+            rank: Rank::Two,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        3,
+        Card {
+            suit: Suit::Spades,
+            rank: Rank::Ace,
+        },
+    )
+    .unwrap();
+    play_card(
+        &mut state,
+        0,
+        Card {
+            suit: Suit::Diamonds,
+            rank: Rank::Three,
+        },
+    )
+    .unwrap();
+
+    // After trick resolution, player 3 should lead and be next to act
+    let snap = snapshot(&state);
+    match snap.phase {
+        PhaseSnapshot::Trick(t) => {
+            assert_eq!(t.current_trick.len(), 0);
+            assert_eq!(t.leader, 3);
+            assert_eq!(t.to_act, 3);
+        }
+        _ => panic!("Expected Trick phase after first trick resolution"),
+    }
+
+    // Player 3 leads the second trick
+    play_card(
+        &mut state,
+        3,
+        Card {
+            suit: Suit::Clubs,
+            rank: Rank::Seven,
+        },
+    )
+    .unwrap();
+
+    let snap = snapshot(&state);
+    match snap.phase {
+        PhaseSnapshot::Trick(t) => {
+            assert_eq!(t.current_trick.len(), 1);
+            assert_eq!(t.leader, 3);
+            assert_eq!(t.to_act, 0);
+        }
+        _ => panic!("Expected Trick phase during second trick"),
+    }
+}
+
+#[test]
 fn scoring_snapshot() {
     // Complete a full round with 2 cards per player
     let hands = [

@@ -1,4 +1,4 @@
-use backend::adapters::games_sea::GameCreate;
+use backend::adapters::games_sea::{self, GameCreate, GameUpdateRound};
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;
 use backend::error::AppError;
@@ -180,6 +180,124 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
             assert_eq!(
                 loaded_state.round.trick_plays[0].1.rank,
                 backend::domain::Rank::Ace
+            );
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+/// Test: After the first trick completes and the second trick begins, the loader
+/// should report the leader as the first player to act in the new trick and the
+/// turn should advance to the next seat.
+#[tokio::test]
+async fn test_load_state_second_trick_turn_advances() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            // Round 1 setup: dealer at seat 0, trump Hearts
+            let setup = setup_game_in_trick_play_phase(
+                txn,
+                "state_load_second_trick_turn",
+                [4, 5, 3, 0],
+                rounds::Trump::Hearts,
+            )
+            .await?;
+            let game_service = GameService;
+
+            // Create completed trick #1 with winner at seat 3
+            let round = rounds::find_by_id(txn, setup.round_id)
+                .await?
+                .expect("round should exist");
+
+            tricks::create_trick(txn, round.id, 1, tricks::Suit::Spades, 3).await?;
+
+            // Advance DB state to trick #2
+            let game = games_sea::require_game(txn, setup.game_id).await?;
+            let update_round =
+                GameUpdateRound::new(setup.game_id, game.lock_version).with_current_trick_no(2);
+            games_sea::update_round(txn, update_round).await?;
+
+            // Create trick #2 with first play by seat 3 (winner of trick #1)
+            let trick_two =
+                tricks::create_trick(txn, round.id, 2, tricks::Suit::Hearts, -1).await?;
+
+            use backend::repos::plays;
+            plays::create_play(
+                txn,
+                trick_two.id,
+                3,
+                plays::Card {
+                    suit: "HEARTS".into(),
+                    rank: "TEN".into(),
+                },
+                0,
+            )
+            .await?;
+
+            let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
+
+            assert_eq!(loaded_state.phase, Phase::Trick { trick_no: 2 });
+            assert_eq!(loaded_state.round.trick_plays.len(), 1);
+            assert_eq!(loaded_state.round.trick_plays[0].0, 3);
+            assert_eq!(
+                loaded_state.leader, 3,
+                "Second trick leader should be seat 3"
+            );
+            assert_eq!(
+                loaded_state.turn, 0,
+                "Turn should advance to seat 0 immediately after seat 3 plays"
+            );
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+/// Test: Played cards should be removed from hands when loading state.
+#[tokio::test]
+async fn test_load_state_removes_played_cards_from_hands() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let setup = setup_game_in_trick_play_phase(
+                txn,
+                "state_load_hand_trim",
+                [4, 5, 3, 0],
+                rounds::Trump::Hearts,
+            )
+            .await?;
+            let game_service = GameService;
+            let flow_service = GameFlowService;
+
+            let initial_state = game_service.load_game_state(txn, setup.game_id).await?;
+            let acting_seat = initial_state.turn;
+            let card_to_play = initial_state.hands[acting_seat as usize][0];
+
+            flow_service
+                .play_card(txn, setup.game_id, acting_seat as i16, card_to_play)
+                .await?;
+
+            let updated_state = game_service.load_game_state(txn, setup.game_id).await?;
+            assert!(
+                updated_state
+                    .round
+                    .trick_plays
+                    .iter()
+                    .any(|(seat, card)| { *seat == acting_seat && *card == card_to_play }),
+                "Played card should appear in trick plays"
+            );
+            assert!(
+                !updated_state.hands[acting_seat as usize].contains(&card_to_play),
+                "Played card should be removed from the player's hand"
             );
 
             Ok::<_, AppError>(())

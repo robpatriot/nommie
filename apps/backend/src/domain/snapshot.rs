@@ -198,7 +198,12 @@ fn snapshot_trick(state: &GameState, trick_no: u8) -> PhaseSnapshot {
     let round = build_round_public(state);
     let leader = state.leader;
     let current_trick: Vec<(Seat, Card)> = state.round.trick_plays.clone();
-    let to_act = state.turn;
+    let plays_count = current_trick.len() as u8;
+    let to_act = if plays_count >= PLAYERS as u8 {
+        leader
+    } else {
+        (leader + plays_count) % PLAYERS as u8
+    };
     let playable = legal_moves(state, to_act);
 
     PhaseSnapshot::Trick(TrickSnapshot {

@@ -133,6 +133,23 @@ impl GameService {
             tricks_won[winner as usize] += 1;
         }
 
+        // Remove all played cards from players' hands to reflect current state
+        for trick in &all_tricks {
+            let play_records = plays::find_all_by_trick(txn, trick.id).await?;
+            for play in play_records {
+                let seat = play.player_seat;
+                if !(0..=3).contains(&seat) {
+                    continue;
+                }
+                let card = from_stored_format(&play.card.suit, &play.card.rank)?;
+                if let Some(hand) = hands_array.get_mut(seat as usize) {
+                    if let Some(pos) = hand.iter().position(|c| *c == card) {
+                        hand.remove(pos);
+                    }
+                }
+            }
+        }
+
         // 9. Load current trick plays (if in TrickPlay)
         let current_trick_no = game.current_trick_no;
         let (trick_plays, trick_lead) = if let DbGameState::TrickPlay = game.state {
@@ -186,10 +203,24 @@ impl GameService {
         let dealer_pos = game.dealer_pos().unwrap_or(0) as u8;
         let turn_start = (dealer_pos + 1) % 4;
 
-        let leader = all_tricks
-            .last()
-            .and_then(|t| t.winner_seat.try_into().ok())
-            .unwrap_or(turn_start);
+        let last_completed_trick_winner: Option<u8> = all_tricks
+            .iter()
+            .rev()
+            .find(|t| (0..=3).contains(&t.winner_seat))
+            .map(|t| t.winner_seat as u8);
+
+        let leader = match phase {
+            Phase::Trick { .. } => {
+                if let Some((seat, _)) = trick_plays.first() {
+                    *seat
+                } else if let Some(winner) = last_completed_trick_winner {
+                    winner
+                } else {
+                    turn_start
+                }
+            }
+            _ => last_completed_trick_winner.unwrap_or(turn_start),
+        };
 
         let turn = match phase {
             Phase::Bidding => {
