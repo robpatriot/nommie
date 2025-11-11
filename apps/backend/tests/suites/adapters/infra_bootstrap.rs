@@ -17,7 +17,7 @@ async fn assert_runtime_is_app_pg(conn: &DatabaseConnection) {
 
 #[tokio::test]
 #[ignore]
-async fn pg_owner_split_permissions() {
+async fn owner_split_permissions_pg() {
     let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
 
     // This test only makes sense for Postgres (owner/app user split)

@@ -13,7 +13,7 @@ use tracing::info;
 
 #[tokio::test]
 #[ignore]
-async fn sqlite_memory_vs_file_performance() -> Result<(), Box<dyn std::error::Error>> {
+async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::Error>> {
     // build_state() now automatically handles schema migration
     let memory_state = build_state()
         .with_env(RuntimeEnv::Test)
