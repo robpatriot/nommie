@@ -10,14 +10,15 @@ This guide explains how to build AI players for **Nommie** (Nomination Whist). I
 2. [Indexing Reference](#indexing-reference)
 3. [RNG & Determinism](#rng--determinism)
 4. [Quick Start](#quick-start)
-5. [The AiPlayer Trait](#the-aiplayer-trait)
-6. [Available Game State](#available-game-state)
-7. [Core Data Types](#core-data-types)
-8. [Error Handling](#error-handling)
-9. [Testing Your AI](#testing-your-ai)
-10. [Best Practices](#best-practices)
-11. [Submission Requirements](#submission-requirements)
-12. [Appendices](#appendices)
+5. [AI Registry](#ai-registry)
+6. [The AiPlayer Trait](#the-aiplayer-trait)
+7. [Available Game State](#available-game-state)
+8. [Core Data Types](#core-data-types)
+9. [Error Handling](#error-handling)
+10. [Testing Your AI](#testing-your-ai)
+11. [Best Practices](#best-practices)
+12. [Submission Requirements](#submission-requirements)
+13. [Appendices](#appendices)
 
 ---
 
@@ -104,6 +105,21 @@ Typical loop:
 1. Call legal helpers in this order: `state.legal_bids()` → `state.legal_trumps()` → `state.legal_plays()`.
 2. Apply your strategy (bidding heuristics, trump selection, then card choice).
 3. Return a **legal** result. Never panic.
+
+---
+
+## AI Registry
+
+All production AIs are surfaced through a static, deterministic registry in `apps/backend/src/ai/registry.rs`. Every contributor must register their implementation manually:
+
+1. **Implement** `AiPlayer` for your type in your module.
+2. **Add** a new `AiFactory` entry to the `AI_FACTORIES` slice:
+   - Choose a stable `name` and semantic `version`.
+   - Provide a constructor function that returns `Box<dyn AiPlayer + Send + Sync>` and accepts the optional seed.
+3. **Preserve ordering** in the slice—treat it as append-only unless you have a breaking reason.
+4. Avoid side effects in the constructor. Respect the seed input so deterministic tests can reproduce decisions.
+
+Once registered, your AI becomes available via `crate::ai::registry::{registered_ais, by_name}` and is automatically covered by the conformance suite (see [Testing Your AI](#testing-your-ai)).
 
 ---
 
@@ -213,6 +229,20 @@ Your AI implements three methods, each receiving **read‑only** views:
 - **Fast:** aim for **≤ 50 ms per decision** (guideline only; no engine timeout enforcement).
 
 **Examples & scaffolding:** see **Appendix B**.
+
+### Conformance Suite
+
+The backend owns a deterministic conformance suite that exercises every AI registered in `crate::ai::registry`:
+
+- Command: `cargo test ai_conformance_suite`
+- Coverage:
+  - Dealer-restriction bidding scenario (last seat with forbidden total).
+  - Must-follow suit trick play.
+  - Trump selection legality.
+  - Seeded determinism checks for bid/play/trump.
+- Expectation: all registered AIs pass with no flaky behavior and complete in \< 1 second.
+
+You should run this suite after registering or changing an AI. It is complementary to any custom unit tests in your module.
 
 ---
 

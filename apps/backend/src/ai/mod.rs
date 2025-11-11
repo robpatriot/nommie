@@ -71,11 +71,14 @@
 //!     .expect("Unknown AI type");
 //! ```
 
+mod chatgpt_heuristic;
 mod config;
 pub mod memory;
 mod random;
+pub mod registry;
 mod trait_def;
 
+pub use chatgpt_heuristic::HeuristicV1;
 pub use config::AiConfig;
 pub use memory::{apply_memory_degradation, get_round_card_plays, MemoryMode, TrickPlays};
 pub use random::RandomPlayer;
