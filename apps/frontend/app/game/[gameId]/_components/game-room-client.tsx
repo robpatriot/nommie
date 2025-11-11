@@ -7,13 +7,14 @@ import {
   getGameRoomSnapshotAction,
   markPlayerReadyAction,
   submitBidAction,
+  selectTrumpAction,
   submitPlayAction,
   addAiSeatAction,
   removeAiSeatAction,
 } from '@/app/actions/game-room-actions'
 import Toast, { type ToastMessage } from '@/components/Toast'
 import { BackendApiError } from '@/lib/errors'
-import type { Seat } from '@/lib/game-room/types'
+import type { Seat, Trump } from '@/lib/game-room/types'
 
 import { GameRoomView } from './game-room-view'
 
@@ -40,6 +41,7 @@ export function GameRoomClient({
   const [isPolling, setIsPolling] = useState(false)
   const [isReadyPending, setIsReadyPending] = useState(false)
   const [isBidPending, setIsBidPending] = useState(false)
+  const [isTrumpPending, setIsTrumpPending] = useState(false)
   const [isPlayPending, setIsPlayPending] = useState(false)
   const [isAiPending, setIsAiPending] = useState(false)
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
@@ -268,6 +270,59 @@ export function GameRoomClient({
     [gameId, isBidPending, performRefresh, showToast]
   )
 
+  const handleSelectTrump = useCallback(
+    async (trump: Trump) => {
+      if (isTrumpPending) {
+        return
+      }
+
+      setIsTrumpPending(true)
+
+      try {
+        const result = await selectTrumpAction({
+          gameId,
+          trump,
+        })
+
+        if (result.kind === 'error') {
+          const actionError = new BackendApiError(
+            result.message || 'Failed to select trump',
+            result.status,
+            undefined,
+            result.traceId
+          )
+
+          showToast(actionError.message, 'error', actionError)
+
+          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
+            console.error('Select trump error traceId:', actionError.traceId)
+          }
+
+          return
+        }
+
+        showToast('Trump selected', 'success')
+        await performRefresh('manual')
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Unable to select trump'
+        const wrappedError =
+          err instanceof BackendApiError
+            ? err
+            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+
+        showToast(wrappedError.message, 'error', wrappedError)
+
+        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
+          console.error('Select trump error traceId:', wrappedError.traceId)
+        }
+      } finally {
+        setIsTrumpPending(false)
+      }
+    },
+    [gameId, isTrumpPending, performRefresh, showToast]
+  )
+
   const handlePlayCard = useCallback(
     async (card: string) => {
       if (isPlayPending) {
@@ -341,6 +396,33 @@ export function GameRoomClient({
       onSubmit: handleSubmitBid,
     }
   }, [handleSubmitBid, isBidPending, phase, viewerSeatForInteractions])
+
+  const trumpControls = useMemo(() => {
+    if (phase.phase !== 'TrumpSelect') {
+      return undefined
+    }
+
+    if (viewerSeatForInteractions === null) {
+      return undefined
+    }
+
+    const allowedTrumps = phase.data.allowed_trumps
+    const toAct = phase.data.to_act
+    const canSelect = toAct === viewerSeatForInteractions
+
+    return {
+      viewerSeat: viewerSeatForInteractions,
+      toAct,
+      allowedTrumps,
+      canSelect,
+      isPending: isTrumpPending,
+      onSelect: canSelect
+        ? (trump: Trump) => {
+            void handleSelectTrump(trump)
+          }
+        : undefined,
+    }
+  }, [handleSelectTrump, isTrumpPending, phase, viewerSeatForInteractions])
 
   const playControls = useMemo(() => {
     if (phase.phase !== 'Trick') {
@@ -545,6 +627,7 @@ export function GameRoomClient({
           },
         }}
         biddingState={biddingControls}
+        trumpState={trumpControls}
         playState={playControls}
         aiSeatState={aiSeatState}
       />

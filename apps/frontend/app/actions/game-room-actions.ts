@@ -5,12 +5,13 @@ import {
   fetchGameSnapshot,
   markPlayerReady,
   submitBid,
+  selectTrump,
   submitPlay,
   addAiSeat,
   removeAiSeat,
 } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
-import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
+import type { Card, GameSnapshot, Seat, Trump } from '@/lib/game-room/types'
 
 export interface GameRoomSnapshotRequest {
   gameId: number
@@ -130,6 +131,31 @@ export async function submitBidAction(
 
   try {
     await submitBid(request.gameId, bidValue)
+    return { kind: 'ok' }
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      return {
+        kind: 'error',
+        message: error.message,
+        status: error.status,
+        traceId: error.traceId,
+      }
+    }
+
+    throw error
+  }
+}
+
+export interface SelectTrumpRequest {
+  gameId: number
+  trump: Trump
+}
+
+export async function selectTrumpAction(
+  request: SelectTrumpRequest
+): Promise<SimpleActionResult> {
+  try {
+    await selectTrump(request.gameId, request.trump)
     return { kind: 'ok' }
   } catch (error) {
     if (error instanceof BackendApiError) {

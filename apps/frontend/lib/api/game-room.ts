@@ -1,7 +1,7 @@
 'use server'
 
 import { fetchWithAuth, BackendApiError } from '@/lib/api'
-import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
+import type { Card, GameSnapshot, Seat, Trump } from '@/lib/game-room/types'
 
 export type GameSnapshotResult =
   | {
@@ -69,6 +69,13 @@ export async function submitBid(gameId: number, bid: number): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/bid`, {
     method: 'POST',
     body: JSON.stringify({ bid }),
+  })
+}
+
+export async function selectTrump(gameId: number, trump: Trump): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}/trump`, {
+    method: 'POST',
+    body: JSON.stringify({ trump }),
   })
 }
 

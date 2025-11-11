@@ -24,7 +24,7 @@ use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
-use crate::repos::{ai_overrides, users};
+use crate::repos::{ai_overrides, rounds, users};
 use crate::services::ai::AiService;
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
@@ -440,6 +440,11 @@ struct SubmitBidRequest {
 }
 
 #[derive(serde::Deserialize)]
+struct SetTrumpRequest {
+    trump: String,
+}
+
+#[derive(serde::Deserialize)]
 struct PlayCardRequest {
     card: String,
 }
@@ -744,6 +749,44 @@ async fn submit_bid(
     Ok(HttpResponse::NoContent().finish())
 }
 
+async fn select_trump(
+    http_req: HttpRequest,
+    game_id: GameId,
+    membership: GameMembership,
+    body: ValidatedJson<SetTrumpRequest>,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+    let seat = membership.turn_order as i16;
+    let payload = body.into_inner();
+    let normalized = payload.trump.trim().to_uppercase();
+
+    let trump = match normalized.as_str() {
+        "CLUBS" => rounds::Trump::Clubs,
+        "DIAMONDS" => rounds::Trump::Diamonds,
+        "HEARTS" => rounds::Trump::Hearts,
+        "SPADES" => rounds::Trump::Spades,
+        "NO_TRUMP" => rounds::Trump::NoTrump,
+        _ => {
+            return Err(AppError::bad_request(
+                ErrorCode::ValidationError,
+                format!("Invalid trump value: {}", payload.trump),
+            ))
+        }
+    };
+
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameFlowService;
+            service.set_trump(txn, id, seat, trump).await?;
+            Ok(())
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
 async fn play_card(
     http_req: HttpRequest,
     game_id: GameId,
@@ -838,6 +881,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/{game_id}/ai/add").route(web::post().to(add_ai_seat)));
     cfg.service(web::resource("/{game_id}/ai/remove").route(web::post().to(remove_ai_seat)));
     cfg.service(web::resource("/{game_id}/bid").route(web::post().to(submit_bid)));
+    cfg.service(web::resource("/{game_id}/trump").route(web::post().to(select_trump)));
     cfg.service(web::resource("/{game_id}/play").route(web::post().to(play_card)));
     cfg.service(web::resource("/{game_id}/snapshot").route(web::get().to(get_snapshot)));
     cfg.service(
