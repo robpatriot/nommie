@@ -13,7 +13,6 @@ rules:
     scope: workspace
     text: |
       Follow these rules exactly. If a request would break them, stop and ask.
-      Never run any git commands other than diff.
       No deprecated or legacy code: never use `#[deprecated]` or leave legacy/compatibility functions. Refactor callers instead.
   - id: file-operations
     scope: workspace
