@@ -28,4 +28,3 @@ rules:
       Do not reference prompt artifacts in code comments. Implementation plans, step lists, or staged change descriptions provided by prompts should not appear in code comments.
       Keep comments focused on code rationale, invariants, and non-obvious behavior only.
 
-

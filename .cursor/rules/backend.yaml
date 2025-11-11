@@ -72,4 +72,3 @@ rules:
       Error assertions: use structured checks (error codes, variants), not string matching.
       Rely on the DB kind chosen by `build_test_state()`; only override it when a test must target a specific engine.
 
-
