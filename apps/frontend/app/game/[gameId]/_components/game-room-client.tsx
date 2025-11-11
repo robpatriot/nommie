@@ -10,13 +10,22 @@ import {
   selectTrumpAction,
   submitPlayAction,
   addAiSeatAction,
+  updateAiSeatAction,
   removeAiSeatAction,
+  fetchAiRegistryAction,
 } from '@/app/actions/game-room-actions'
 import Toast, { type ToastMessage } from '@/components/Toast'
 import { BackendApiError } from '@/lib/errors'
 import type { Seat, Trump } from '@/lib/game-room/types'
 
-import { GameRoomView } from './game-room-view'
+import { GameRoomView, type AiSeatSelection } from './game-room-view'
+
+const DEFAULT_AI_NAME = 'HeuristicV1'
+
+type AiRegistryEntryState = {
+  name: string
+  version: string
+}
 
 interface GameRoomClientProps {
   initialData: GameRoomSnapshotPayload
@@ -46,6 +55,9 @@ export function GameRoomClient({
   const [isAiPending, setIsAiPending] = useState(false)
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
+  const [aiRegistry, setAiRegistry] = useState<AiRegistryEntryState[]>([])
+  const [isAiRegistryLoading, setIsAiRegistryLoading] = useState(false)
+  const [aiRegistryError, setAiRegistryError] = useState<string | null>(null)
   const inflightRef = useRef(false)
 
   const performRefresh = useCallback(
@@ -463,6 +475,7 @@ export function GameRoomClient({
         isOccupied: Boolean(seat.user_id),
         isAi: seat.is_ai,
         isReady: seat.is_ready,
+        aiProfile: seat.ai_profile ?? null,
       }
     })
   }, [snapshot.snapshot.game.seating])
@@ -477,103 +490,221 @@ export function GameRoomClient({
   const canManageAi =
     viewerIsHost && phase.phase === 'Init' && !isRefreshing && !isPolling
 
-  const handleAddAi = useCallback(async () => {
-    if (isAiPending || !canManageAi) {
+  useEffect(() => {
+    if (!canManageAi) {
+      setAiRegistry([])
+      setAiRegistryError(null)
+      setIsAiRegistryLoading(false)
       return
     }
 
-    setIsAiPending(true)
+    let cancelled = false
+    setIsAiRegistryLoading(true)
+    setAiRegistryError(null)
 
-    try {
-      const result = await addAiSeatAction({
-        gameId,
-      })
-
-      if (result.kind === 'error') {
-        const actionError = new BackendApiError(
-          result.message || 'Failed to add AI seat',
-          result.status,
-          undefined,
-          result.traceId
-        )
-
-        showToast(actionError.message, 'error', actionError)
-
-        if (process.env.NODE_ENV === 'development' && actionError.traceId) {
-          console.error('Add AI seat error traceId:', actionError.traceId)
+    void fetchAiRegistryAction()
+      .then((result) => {
+        if (cancelled) {
+          return
         }
 
+        if (result.kind === 'ok') {
+          setAiRegistry(result.ais)
+        } else {
+          setAiRegistryError(result.message)
+        }
+      })
+      .catch((err) => {
+        if (cancelled) {
+          return
+        }
+
+        const message =
+          err instanceof Error ? err.message : 'Failed to load AI registry'
+        setAiRegistryError(message)
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsAiRegistryLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [canManageAi])
+
+  const handleAddAi = useCallback(
+    async (selection?: AiSeatSelection) => {
+      if (isAiPending || !canManageAi) {
         return
       }
 
-      showToast('AI seat added', 'success')
-      await performRefresh('manual')
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Unable to add AI seat'
-      const wrappedError =
-        err instanceof BackendApiError
-          ? err
-          : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+      setIsAiPending(true)
 
-      showToast(wrappedError.message, 'error', wrappedError)
+      try {
+        const registryName =
+          selection?.registryName ??
+          aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
+          DEFAULT_AI_NAME
+        const registryVersion =
+          selection?.registryVersion ??
+          aiRegistry.find((entry) => entry.name === registryName)?.version
 
-      if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
-        console.error('Add AI seat error traceId:', wrappedError.traceId)
-      }
-    } finally {
-      setIsAiPending(false)
-    }
-  }, [canManageAi, gameId, isAiPending, performRefresh, showToast])
+        const result = await addAiSeatAction({
+          gameId,
+          registryName,
+          registryVersion,
+          seed: selection?.seed,
+        })
 
-  const handleRemoveAi = useCallback(async () => {
-    if (isAiPending || !canManageAi) {
-      return
-    }
+        if (result.kind === 'error') {
+          const actionError = new BackendApiError(
+            result.message || 'Failed to add AI seat',
+            result.status,
+            undefined,
+            result.traceId
+          )
 
-    setIsAiPending(true)
+          showToast(actionError.message, 'error', actionError)
 
-    try {
-      const result = await removeAiSeatAction({
-        gameId,
-      })
+          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
+            console.error('Add AI seat error traceId:', actionError.traceId)
+          }
 
-      if (result.kind === 'error') {
-        const actionError = new BackendApiError(
-          result.message || 'Failed to remove AI seat',
-          result.status,
-          undefined,
-          result.traceId
-        )
-
-        showToast(actionError.message, 'error', actionError)
-
-        if (process.env.NODE_ENV === 'development' && actionError.traceId) {
-          console.error('Remove AI seat error traceId:', actionError.traceId)
+          return
         }
 
+        showToast('AI seat added', 'success')
+        await performRefresh('manual')
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Unable to add AI seat'
+        const wrappedError =
+          err instanceof BackendApiError
+            ? err
+            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+
+        showToast(wrappedError.message, 'error', wrappedError)
+
+        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
+          console.error('Add AI seat error traceId:', wrappedError.traceId)
+        }
+      } finally {
+        setIsAiPending(false)
+      }
+    },
+    [aiRegistry, canManageAi, gameId, isAiPending, performRefresh, showToast]
+  )
+
+  const handleRemoveAiSeat = useCallback(
+    async (seat: Seat) => {
+      if (isAiPending || !canManageAi) {
         return
       }
 
-      showToast('AI seat removed', 'success')
-      await performRefresh('manual')
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Unable to remove AI seat'
-      const wrappedError =
-        err instanceof BackendApiError
-          ? err
-          : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+      setIsAiPending(true)
 
-      showToast(wrappedError.message, 'error', wrappedError)
+      try {
+        const result = await removeAiSeatAction({
+          gameId,
+          seat,
+        })
 
-      if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
-        console.error('Remove AI seat error traceId:', wrappedError.traceId)
+        if (result.kind === 'error') {
+          const actionError = new BackendApiError(
+            result.message || 'Failed to remove AI seat',
+            result.status,
+            undefined,
+            result.traceId
+          )
+
+          showToast(actionError.message, 'error', actionError)
+
+          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
+            console.error('Remove AI seat error traceId:', actionError.traceId)
+          }
+
+          return
+        }
+
+        showToast('AI seat removed', 'success')
+        await performRefresh('manual')
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Unable to remove AI seat'
+        const wrappedError =
+          err instanceof BackendApiError
+            ? err
+            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+
+        showToast(wrappedError.message, 'error', wrappedError)
+
+        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
+          console.error('Remove AI seat error traceId:', wrappedError.traceId)
+        }
+      } finally {
+        setIsAiPending(false)
       }
-    } finally {
-      setIsAiPending(false)
-    }
-  }, [canManageAi, gameId, isAiPending, performRefresh, showToast])
+    },
+    [canManageAi, gameId, isAiPending, performRefresh, showToast]
+  )
+
+  const handleUpdateAiSeat = useCallback(
+    async (seat: Seat, selection: AiSeatSelection) => {
+      if (isAiPending || !canManageAi) {
+        return
+      }
+
+      setIsAiPending(true)
+
+      try {
+        const result = await updateAiSeatAction({
+          gameId,
+          seat,
+          registryName: selection.registryName,
+          registryVersion: selection.registryVersion,
+          seed: selection.seed,
+        })
+
+        if (result.kind === 'error') {
+          const actionError = new BackendApiError(
+            result.message || 'Failed to update AI seat',
+            result.status,
+            undefined,
+            result.traceId
+          )
+
+          showToast(actionError.message, 'error', actionError)
+
+          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
+            console.error('Update AI seat error traceId:', actionError.traceId)
+          }
+
+          return
+        }
+
+        showToast('AI seat updated', 'success')
+        await performRefresh('manual')
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : 'Unable to update AI seat'
+        const wrappedError =
+          err instanceof BackendApiError
+            ? err
+            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
+
+        showToast(wrappedError.message, 'error', wrappedError)
+
+        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
+          console.error('Update AI seat error traceId:', wrappedError.traceId)
+        }
+      } finally {
+        setIsAiPending(false)
+      }
+    },
+    [canManageAi, gameId, isAiPending, performRefresh, showToast]
+  )
 
   const aiSeatState = useMemo(() => {
     if (!canManageAi) {
@@ -585,23 +716,36 @@ export function GameRoomClient({
       availableSeats,
       aiSeats,
       isPending: isAiPending,
-      canAdd: availableSeats > 0,
+      canAdd: availableSeats > 0 && !isAiRegistryLoading,
       canRemove: aiSeats > 0,
-      onAdd: () => {
-        void handleAddAi()
+      onAdd: (selection?: AiSeatSelection) => {
+        void handleAddAi(selection)
       },
-      onRemove: () => {
-        void handleRemoveAi()
+      onRemoveSeat: (seat: Seat) => {
+        void handleRemoveAiSeat(seat)
+      },
+      onUpdateSeat: (seat: Seat, selection: AiSeatSelection) => {
+        void handleUpdateAiSeat(seat, selection)
+      },
+      registry: {
+        entries: aiRegistry,
+        isLoading: isAiRegistryLoading,
+        error: aiRegistryError,
+        defaultName: DEFAULT_AI_NAME,
       },
       seats: seatInfo,
     }
   }, [
+    aiRegistry,
+    aiRegistryError,
     aiSeats,
     availableSeats,
     canManageAi,
     handleAddAi,
-    handleRemoveAi,
+    handleRemoveAiSeat,
+    handleUpdateAiSeat,
     isAiPending,
+    isAiRegistryLoading,
     seatInfo,
     totalSeats,
   ])

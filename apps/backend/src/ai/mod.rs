@@ -67,7 +67,7 @@
 //!
 //! ```rust,ignore
 //! let config = AiConfig::from_json(Some(&serde_json::json!({"seed": 42})));
-//! let ai = create_ai("random", config)
+//! let ai = create_ai(RandomPlayer::NAME, config)
 //!     .expect("Unknown AI type");
 //! ```
 
@@ -102,14 +102,15 @@ pub enum AiFailureMode {
 ///
 /// ```rust,ignore
 /// let config = AiConfig::from_json(profile.config.as_ref());
-/// let ai = create_ai("random", config)
+/// let ai = create_ai(RandomPlayer::NAME, config)
 ///     .ok_or_else(|| AppError::internal("Unknown AI type"))?;
 /// ```
 ///
 /// Returns None if ai_type is unrecognized.
 pub fn create_ai(ai_type: &str, config: AiConfig) -> Option<Box<dyn AiPlayer>> {
-    match ai_type {
-        "random" => Some(Box::new(RandomPlayer::new(config.seed()))),
-        _ => None,
+    if let Some(factory) = registry::by_name(ai_type) {
+        return Some((factory.make)(config.seed()));
     }
+
+    None
 }

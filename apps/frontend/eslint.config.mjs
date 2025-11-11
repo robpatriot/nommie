@@ -56,6 +56,6 @@ const config = [
 
   // Keep Prettier last to disable conflicting rules
   eslintConfigPrettier,
-];
+]
 
-export default config;
+export default config

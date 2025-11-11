@@ -5,14 +5,14 @@ use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use rand::random;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::adapters::games_sea::{self, GameUpdateRound};
+use crate::ai::{registry, AiConfig, HeuristicV1, RandomPlayer};
 use crate::db::txn::with_txn;
 use crate::domain::player_view::CurrentRoundInfo;
-use crate::domain::snapshot::{GameSnapshot, SeatPublic};
+use crate::domain::snapshot::{GameSnapshot, SeatAiProfilePublic, SeatPublic};
 use crate::domain::state::Seat;
 use crate::domain::{Card, Rank, Suit};
 use crate::entities::games::{GameState, GameVisibility};
@@ -24,7 +24,7 @@ use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
-use crate::repos::{ai_overrides, rounds, users};
+use crate::repos::{ai_overrides, ai_profiles, rounds, users};
 use crate::services::ai::AiService;
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
@@ -35,6 +35,29 @@ use crate::state::app_state::AppState;
 struct GameSnapshotResponse {
     snapshot: GameSnapshot,
     viewer_hand: Option<Vec<String>>,
+}
+
+#[derive(Serialize)]
+struct AiRegistryEntryResponse {
+    name: &'static str,
+    version: &'static str,
+}
+
+#[derive(Serialize)]
+struct AiRegistryListResponse {
+    ais: Vec<AiRegistryEntryResponse>,
+}
+
+async fn list_registered_ais() -> Result<web::Json<AiRegistryListResponse>, AppError> {
+    let ais = registry::registered_ais()
+        .iter()
+        .map(|factory| AiRegistryEntryResponse {
+            name: factory.name,
+            version: factory.version,
+        })
+        .collect();
+
+    Ok(web::Json(AiRegistryListResponse { ais }))
 }
 
 /// GET /api/games/{game_id}/snapshot
@@ -107,6 +130,9 @@ async fn get_snapshot(
                     let ai_override = ai_overrides::find_by_game_player_id(txn, membership.id)
                         .await
                         .map_err(AppError::from)?;
+                    let ai_profile = ai_profiles::find_by_user_id(txn, membership.user_id)
+                        .await
+                        .map_err(AppError::from)?;
 
                     if let Some(user) = user.as_ref() {
                         seat_public.is_ai = user.is_ai;
@@ -133,6 +159,27 @@ async fn get_snapshot(
                                 if !trimmed.is_empty() && !looks_machine {
                                     display_name = Some(trimmed.to_owned());
                                 }
+                            }
+                        }
+                    }
+
+                    if seat_public.is_ai {
+                        if let Some(profile) = ai_profile {
+                            if let Some(ai_name) = profile.playstyle.clone() {
+                                let config = AiConfig::from_json(profile.config.as_ref());
+                                let version = config
+                                    .get_custom_str("registry_version")
+                                    .map(|v| v.to_owned())
+                                    .or_else(|| {
+                                        registry::by_name(&ai_name)
+                                            .map(|factory| factory.version.to_owned())
+                                    })
+                                    .unwrap_or_else(|| "unknown".to_string());
+
+                                seat_public.ai_profile = Some(SeatAiProfilePublic {
+                                    name: ai_name,
+                                    version,
+                                });
                             }
                         }
                     }
@@ -452,6 +499,74 @@ struct PlayCardRequest {
 #[derive(Debug, Default, Deserialize)]
 struct ManageAiSeatRequest {
     seat: Option<u8>,
+    registry_name: Option<String>,
+    registry_version: Option<String>,
+    seed: Option<u64>,
+}
+
+fn resolve_registry_selection(
+    request: &ManageAiSeatRequest,
+    default_name: Option<&'static str>,
+) -> Result<(&'static crate::ai::registry::AiFactory, String, Option<u64>), AppError> {
+    let name = match (request.registry_name.as_deref(), default_name) {
+        (Some(name), _) => name,
+        (None, Some(default)) => default,
+        (None, None) => {
+            return Err(AppError::bad_request(
+                ErrorCode::ValidationError,
+                "registry_name is required".to_string(),
+            ));
+        }
+    };
+
+    let factory = registry::by_name(name).ok_or_else(|| {
+        AppError::bad_request(
+            ErrorCode::ValidationError,
+            format!("Unknown AI registry entry '{name}'"),
+        )
+    })?;
+
+    if let Some(provided_version) = request.registry_version.as_deref() {
+        if provided_version != factory.version {
+            return Err(AppError::bad_request(
+                ErrorCode::ValidationError,
+                format!(
+                    "Registry version '{}' does not match server version '{}' for '{}'",
+                    provided_version, factory.version, factory.name
+                ),
+            ));
+        }
+    }
+
+    let version = request
+        .registry_version
+        .clone()
+        .unwrap_or_else(|| factory.version.to_string());
+
+    Ok((factory, version, request.seed))
+}
+
+fn build_ai_profile_config(
+    registry_name: &str,
+    registry_version: &str,
+    seed: Option<u64>,
+) -> serde_json::Value {
+    let mut obj = serde_json::Map::new();
+    obj.insert(
+        "registry_name".to_string(),
+        serde_json::Value::String(registry_name.to_string()),
+    );
+    obj.insert(
+        "registry_version".to_string(),
+        serde_json::Value::String(registry_version.to_string()),
+    );
+    if let Some(seed_value) = seed {
+        obj.insert(
+            "seed".to_string(),
+            serde_json::Value::Number(seed_value.into()),
+        );
+    }
+    serde_json::Value::Object(obj)
 }
 
 async fn add_ai_seat(
@@ -539,10 +654,26 @@ async fn add_ai_seat(
             let ai_service = AiService;
             let suffix = &Uuid::new_v4().to_string()[..8];
             let ai_display_name = format!("Bot {} {suffix}", seat_index + 1);
-            let ai_config = Some(json!({ "seed": random::<u64>() }));
+
+            let (factory, registry_version, resolved_seed) =
+                resolve_registry_selection(&request, Some(HeuristicV1::NAME))?;
+
+            let mut seed = resolved_seed;
+            if seed.is_none() && factory.name == RandomPlayer::NAME {
+                seed = Some(random::<u64>());
+            }
+
+            let ai_config = build_ai_profile_config(factory.name, &registry_version, seed);
 
             let ai_user_id = ai_service
-                .create_ai_template_user(txn, ai_display_name, "random", ai_config, Some(100))
+                .create_ai_template_user(
+                    txn,
+                    ai_display_name,
+                    factory.name,
+                    &registry_version,
+                    Some(ai_config),
+                    Some(100),
+                )
                 .await
                 .map_err(AppError::from)?;
 
@@ -722,6 +853,135 @@ async fn remove_ai_seat(
     Ok(HttpResponse::NoContent().finish())
 }
 
+async fn update_ai_seat(
+    http_req: HttpRequest,
+    game_id: GameId,
+    membership: GameMembership,
+    body: Option<web::Json<ManageAiSeatRequest>>,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+    let request = body.map(|b| b.into_inner()).unwrap_or_default();
+
+    let Some(seat_val) = request.seat else {
+        return Err(AppError::bad_request(
+            ErrorCode::ValidationError,
+            "seat is required".to_string(),
+        ));
+    };
+
+    if !(0..=3).contains(&seat_val) {
+        return Err(AppError::bad_request(
+            ErrorCode::InvalidSeat,
+            format!("Seat {seat_val} is out of range (0-3)"),
+        ));
+    }
+
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let game = games_sea::find_by_id(txn, id)
+                .await
+                .map_err(|e| AppError::db("failed to fetch game", e))?
+                .ok_or_else(|| {
+                    AppError::not_found(
+                        ErrorCode::GameNotFound,
+                        format!("Game with ID {id} not found"),
+                    )
+                })?;
+
+            let host_user_id = membership.user_id;
+            let host_turn_order = membership.turn_order;
+
+            let is_host = match game.created_by {
+                Some(created_by) => created_by == host_user_id,
+                None => host_turn_order == 0,
+            };
+
+            if !is_host {
+                return Err(AppError::forbidden_with_code(
+                    ErrorCode::Forbidden,
+                    "Only the host can manage AI seats",
+                ));
+            }
+
+            if game.state != GameState::Lobby {
+                return Err(AppError::bad_request(
+                    ErrorCode::PhaseMismatch,
+                    "AI seats can only be managed before the game starts",
+                ));
+            }
+
+            let existing_memberships = memberships::find_all_by_game(txn, id)
+                .await
+                .map_err(AppError::from)?;
+
+            let seat_i32 = seat_val as i32;
+            let membership = existing_memberships
+                .into_iter()
+                .find(|m| m.turn_order == seat_i32)
+                .ok_or_else(|| {
+                    AppError::bad_request(
+                        ErrorCode::ValidationError,
+                        format!("No player assigned to seat {seat_val}"),
+                    )
+                })?;
+
+            let user = users::find_user_by_id(txn, membership.user_id)
+                .await
+                .map_err(AppError::from)?
+                .ok_or_else(|| {
+                    AppError::not_found(
+                        ErrorCode::UserNotFound,
+                        format!("User {} not found", membership.user_id),
+                    )
+                })?;
+
+            if !user.is_ai {
+                return Err(AppError::bad_request(
+                    ErrorCode::ValidationError,
+                    "Cannot update AI profile for a human player",
+                ));
+            }
+
+            let mut profile = ai_profiles::find_by_user_id(txn, user.id)
+                .await
+                .map_err(AppError::from)?
+                .ok_or_else(|| {
+                    AppError::bad_request(
+                        ErrorCode::ValidationError,
+                        format!("AI profile not found for user {}", user.id),
+                    )
+                })?;
+
+            let (factory, registry_version, resolved_seed) =
+                resolve_registry_selection(&request, None)?;
+
+            let mut seed = resolved_seed;
+            if seed.is_none() && factory.name == RandomPlayer::NAME {
+                seed = Some(random::<u64>());
+            }
+
+            let config = build_ai_profile_config(factory.name, &registry_version, seed);
+
+            profile.playstyle = Some(factory.name.to_string());
+            profile.config = Some(config);
+
+            ai_profiles::update_profile(txn, profile)
+                .await
+                .map_err(AppError::from)?;
+
+            games_sea::update_round(txn, GameUpdateRound::new(id, game.lock_version))
+                .await
+                .map_err(AppError::from)?;
+
+            Ok(())
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
 /// POST /api/games/{game_id}/bid
 ///
 /// Submits a bid for the current player. Bidding order and validation are enforced
@@ -878,7 +1138,9 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("").route(web::post().to(create_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
     cfg.service(web::resource("/{game_id}/ready").route(web::post().to(mark_ready)));
+    cfg.service(web::resource("/ai/registry").route(web::get().to(list_registered_ais)));
     cfg.service(web::resource("/{game_id}/ai/add").route(web::post().to(add_ai_seat)));
+    cfg.service(web::resource("/{game_id}/ai/update").route(web::post().to(update_ai_seat)));
     cfg.service(web::resource("/{game_id}/ai/remove").route(web::post().to(remove_ai_seat)));
     cfg.service(web::resource("/{game_id}/bid").route(web::post().to(submit_bid)));
     cfg.service(web::resource("/{game_id}/trump").route(web::post().to(select_trump)));

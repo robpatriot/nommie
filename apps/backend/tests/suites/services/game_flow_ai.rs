@@ -1,3 +1,4 @@
+use backend::ai::RandomPlayer;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::GameState;
@@ -42,7 +43,8 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         .create_ai_template_user(
             txn,
             "Random Bot 1",
-            "random",
+            RandomPlayer::NAME,
+            RandomPlayer::VERSION,
             Some(json!({"seed": ai1_seed})),
             Some(100),
         )
@@ -52,7 +54,8 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         .create_ai_template_user(
             txn,
             "Random Bot 2",
-            "random",
+            RandomPlayer::NAME,
+            RandomPlayer::VERSION,
             Some(json!({"seed": ai2_seed})),
             Some(100),
         )
@@ -62,7 +65,8 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         .create_ai_template_user(
             txn,
             "Random Bot 3",
-            "random",
+            RandomPlayer::NAME,
+            RandomPlayer::VERSION,
             Some(json!({"seed": ai3_seed})),
             Some(100),
         )
@@ -72,7 +76,8 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         .create_ai_template_user(
             txn,
             "Random Bot 4",
-            "random",
+            RandomPlayer::NAME,
+            RandomPlayer::VERSION,
             Some(json!({"seed": ai4_seed})),
             Some(100),
         )

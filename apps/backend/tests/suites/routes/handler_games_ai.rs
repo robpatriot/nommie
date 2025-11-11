@@ -1,8 +1,9 @@
 use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
+use backend::ai::{HeuristicV1, RandomPlayer};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::entities::{game_players, games, users};
+use backend::entities::{ai_profiles, game_players, games, users};
 use backend::error::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
@@ -52,7 +53,9 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
         .insert_header(("Authorization", format!("Bearer {token}")))
-        .set_json(json!({}))
+        .set_json(json!({
+            "registry_name": HeuristicV1::NAME
+        }))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -77,6 +80,117 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
         .await?
         .expect("AI user exists");
     assert!(ai_user.is_ai);
+
+    let profile = ai_profiles::Entity::find()
+        .filter(ai_profiles::Column::UserId.eq(ai_user.id))
+        .one(shared.transaction())
+        .await?
+        .expect("AI profile exists");
+    assert_eq!(profile.playstyle.as_deref(), Some(HeuristicV1::NAME));
+    let config = profile.config.expect("AI config stored");
+    assert_eq!(
+        config.get("registry_name").and_then(|value| value.as_str()),
+        Some(HeuristicV1::NAME)
+    );
+    assert_eq!(
+        config
+            .get("registry_version")
+            .and_then(|value| value.as_str()),
+        Some(HeuristicV1::VERSION)
+    );
+
+    shared.rollback().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+    let security: SecurityConfig = state.security.clone();
+    let db = require_db(&state).expect("DB required");
+    let shared = SharedTxn::open(db).await?;
+
+    let test_name = "host_can_update_ai_seat_profile";
+    let game_id = create_fresh_lobby_game(shared.transaction(), test_name).await?;
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    let host_user_id = game.created_by.expect("game has creator");
+    create_test_game_player_with_ready(shared.transaction(), game_id, host_user_id, 0, false)
+        .await?;
+
+    let host_sub = test_user_sub(&format!("{test_name}_creator"));
+    let host_email = format!("{host_sub}@example.com");
+    let token = mint_test_token(&host_sub, &host_email, &security);
+
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(configure_routes),
+            );
+        })
+        .build()
+        .await?;
+
+    // Add initial AI seat (defaults to heuristic).
+    let add_req = test::TestRequest::post()
+        .uri(&format!("/api/games/{game_id}/ai/add"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .set_json(json!({
+            "registry_name": HeuristicV1::NAME
+        }))
+        .to_request();
+    add_req.extensions_mut().insert(shared.clone());
+    let add_resp = test::call_service(&app, add_req).await;
+    assert_eq!(add_resp.status(), StatusCode::NO_CONTENT);
+    drop(add_resp);
+
+    // Update the AI seat to RandomPlayer.
+    let update_req = test::TestRequest::post()
+        .uri(&format!("/api/games/{game_id}/ai/update"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .set_json(json!({
+            "seat": 1,
+            "registry_name": RandomPlayer::NAME
+        }))
+        .to_request();
+    update_req.extensions_mut().insert(shared.clone());
+    let update_resp = test::call_service(&app, update_req).await;
+    assert_eq!(update_resp.status(), StatusCode::NO_CONTENT);
+    drop(update_resp);
+
+    let ai_membership = game_players::Entity::find()
+        .filter(game_players::Column::GameId.eq(game_id))
+        .filter(game_players::Column::UserId.ne(host_user_id))
+        .one(shared.transaction())
+        .await?
+        .expect("AI membership exists");
+
+    let profile = ai_profiles::Entity::find()
+        .filter(ai_profiles::Column::UserId.eq(ai_membership.user_id))
+        .one(shared.transaction())
+        .await?
+        .expect("AI profile exists");
+
+    assert_eq!(profile.playstyle.as_deref(), Some(RandomPlayer::NAME));
+    let config = profile.config.expect("AI config present");
+    assert_eq!(
+        config.get("registry_name").and_then(|value| value.as_str()),
+        Some(RandomPlayer::NAME)
+    );
+    assert_eq!(
+        config
+            .get("registry_version")
+            .and_then(|value| value.as_str()),
+        Some(RandomPlayer::VERSION)
+    );
+    assert!(
+        config.get("seed").is_some(),
+        "Random player config should include a seed"
+    );
 
     shared.rollback().await?;
     Ok(())
@@ -196,6 +310,64 @@ async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
     drop(resp);
+
+    shared.rollback().await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn ai_registry_endpoint_lists_factories() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+    let security: SecurityConfig = state.security.clone();
+    let db = require_db(&state).expect("DB required");
+    let shared = SharedTxn::open(db).await?;
+
+    let host_sub = test_user_sub("ai_registry_host");
+    let host_email = format!("{host_sub}@example.com");
+    let token = mint_test_token(&host_sub, &host_email, &security);
+
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(configure_routes),
+            );
+        })
+        .build()
+        .await?;
+
+    let req = test::TestRequest::get()
+        .uri("/api/games/ai/registry")
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .to_request();
+    req.extensions_mut().insert(shared.clone());
+
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let body = test::read_body(resp).await;
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&body).expect("registry endpoint should return JSON");
+    let ais = parsed
+        .get("ais")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let names: Vec<&str> = ais
+        .iter()
+        .filter_map(|entry| entry.get("name").and_then(|value| value.as_str()))
+        .collect();
+
+    assert!(
+        names.contains(&HeuristicV1::NAME),
+        "registry should include HeuristicV1"
+    );
+    assert!(
+        names.contains(&RandomPlayer::NAME),
+        "registry should include RandomPlayer"
+    );
 
     shared.rollback().await?;
     Ok(())

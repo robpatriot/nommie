@@ -10,6 +10,10 @@ export interface SeatPublic {
   display_name: string | null
   is_ai: boolean
   is_ready: boolean
+  ai_profile?: {
+    name: string
+    version: string
+  } | null
 }
 
 export interface GameHeader {

@@ -142,6 +142,11 @@ impl AiConfig {
         self.custom.get(key)
     }
 
+    /// Get a custom configuration field as string.
+    pub fn get_custom_str(&self, key: &str) -> Option<&str> {
+        self.custom.get(key)?.as_str()
+    }
+
     /// Create an empty configuration (no seed, no custom fields).
     pub fn empty() -> Self {
         Self {

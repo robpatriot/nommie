@@ -8,7 +8,10 @@ import {
   selectTrump,
   submitPlay,
   addAiSeat,
+  updateAiSeat,
   removeAiSeat,
+  listRegisteredAis,
+  type AiRegistryEntry,
 } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import type { Card, GameSnapshot, Seat, Trump } from '@/lib/game-room/types'
@@ -209,6 +212,9 @@ export async function submitPlayAction(
 export interface ManageAiSeatRequest {
   gameId: number
   seat?: Seat
+  registryName?: string
+  registryVersion?: string
+  seed?: number
 }
 
 export async function addAiSeatAction(
@@ -226,7 +232,12 @@ export async function addAiSeatAction(
   }
 
   try {
-    await addAiSeat(request.gameId, request.seat)
+    await addAiSeat(request.gameId, {
+      seat: request.seat,
+      registryName: request.registryName,
+      registryVersion: request.registryVersion,
+      seed: request.seed,
+    })
     return { kind: 'ok' }
   } catch (error) {
     if (error instanceof BackendApiError) {
@@ -257,8 +268,70 @@ export async function removeAiSeatAction(
   }
 
   try {
-    await removeAiSeat(request.gameId, request.seat)
+    await removeAiSeat(request.gameId, {
+      seat: request.seat,
+    })
     return { kind: 'ok' }
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      return {
+        kind: 'error',
+        message: error.message,
+        status: error.status,
+        traceId: error.traceId,
+      }
+    }
+
+    throw error
+  }
+}
+
+export async function updateAiSeatAction(
+  request: ManageAiSeatRequest
+): Promise<SimpleActionResult> {
+  if (
+    request.seat === undefined ||
+    Number.isNaN(request.seat) ||
+    request.seat < 0 ||
+    request.seat > 3
+  ) {
+    return {
+      kind: 'error',
+      message: 'Seat must be provided between 0 and 3',
+      status: 400,
+    }
+  }
+
+  try {
+    await updateAiSeat(request.gameId, {
+      seat: request.seat,
+      registryName: request.registryName,
+      registryVersion: request.registryVersion,
+      seed: request.seed,
+    })
+    return { kind: 'ok' }
+  } catch (error) {
+    if (error instanceof BackendApiError) {
+      return {
+        kind: 'error',
+        message: error.message,
+        status: error.status,
+        traceId: error.traceId,
+      }
+    }
+
+    throw error
+  }
+}
+
+export type AiRegistryActionResult =
+  | { kind: 'ok'; ais: AiRegistryEntry[] }
+  | { kind: 'error'; message: string; status: number; traceId?: string }
+
+export async function fetchAiRegistryAction(): Promise<AiRegistryActionResult> {
+  try {
+    const ais = await listRegisteredAis()
+    return { kind: 'ok', ais }
   } catch (error) {
     if (error instanceof BackendApiError) {
       return {

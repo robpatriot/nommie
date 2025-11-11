@@ -137,7 +137,8 @@ describe('GameRoomView', () => {
 
   it('renders AI management panel for host controls', async () => {
     const onAdd = vi.fn()
-    const onRemove = vi.fn()
+    const onRemoveSeat = vi.fn()
+    const onUpdateSeat = vi.fn()
 
     render(
       <GameRoomView
@@ -155,7 +156,16 @@ describe('GameRoomView', () => {
           canAdd: true,
           canRemove: true,
           onAdd,
-          onRemove,
+          onRemoveSeat,
+          onUpdateSeat,
+          registry: {
+            entries: [
+              { name: 'HeuristicV1', version: '1.0.0' },
+              { name: 'RandomPlayer', version: '1.0.0' },
+            ],
+            isLoading: false,
+            defaultName: 'HeuristicV1',
+          },
           seats: [
             {
               seat: 0,
@@ -164,6 +174,7 @@ describe('GameRoomView', () => {
               isOccupied: true,
               isAi: false,
               isReady: true,
+              aiProfile: null,
             },
             {
               seat: 1,
@@ -172,6 +183,7 @@ describe('GameRoomView', () => {
               isOccupied: true,
               isAi: true,
               isReady: true,
+              aiProfile: { name: 'HeuristicV1', version: '1.0.0' },
             },
             {
               seat: 2,
@@ -180,6 +192,7 @@ describe('GameRoomView', () => {
               isOccupied: true,
               isAi: true,
               isReady: false,
+              aiProfile: { name: 'HeuristicV1', version: '1.0.0' },
             },
             {
               seat: 3,
@@ -188,6 +201,7 @@ describe('GameRoomView', () => {
               isOccupied: false,
               isAi: false,
               isReady: false,
+              aiProfile: null,
             },
           ],
         }}
@@ -198,12 +212,22 @@ describe('GameRoomView', () => {
     expect(screen.getByText(/2 bots · 3\/4 seats filled/)).toBeInTheDocument()
 
     const addButton = screen.getByRole('button', { name: 'Add AI' })
-    const removeButton = screen.getByRole('button', { name: 'Remove AI' })
+    const profileSelect = screen.getByLabelText(
+      'Select AI profile for seat 2'
+    ) as HTMLSelectElement
+    const removeSeatButton = screen.getByRole('button', {
+      name: 'Remove AI from seat 2',
+    })
 
     await userEvent.click(addButton)
-    await userEvent.click(removeButton)
+    await userEvent.selectOptions(profileSelect, 'RandomPlayer::1.0.0')
+    await userEvent.click(removeSeatButton)
 
-    expect(onAdd).toHaveBeenCalled()
-    expect(onRemove).toHaveBeenCalled()
+    expect(onAdd).toHaveBeenCalledWith({ registryName: 'HeuristicV1' })
+    expect(onUpdateSeat).toHaveBeenCalledWith(1, {
+      registryName: 'RandomPlayer',
+      registryVersion: '1.0.0',
+    })
+    expect(onRemoveSeat).toHaveBeenCalledWith(1)
   })
 })

@@ -21,6 +21,12 @@ import type {
   TrickSnapshot,
 } from '@/lib/game-room/types'
 
+export interface AiSeatSelection {
+  registryName: string
+  registryVersion?: string
+  seed?: number
+}
+
 export interface GameRoomViewProps {
   gameId: number
   snapshot: GameSnapshot
@@ -69,8 +75,22 @@ export interface GameRoomViewProps {
     isPending: boolean
     canAdd: boolean
     canRemove: boolean
-    onAdd: () => Promise<void> | void
-    onRemove: () => Promise<void> | void
+    onAdd: (selection?: AiSeatSelection) => Promise<void> | void
+    onRemove?: () => Promise<void> | void
+    onRemoveSeat?: (seat: Seat) => Promise<void> | void
+    onUpdateSeat?: (
+      seat: Seat,
+      selection: AiSeatSelection
+    ) => Promise<void> | void
+    registry?: {
+      entries: Array<{
+        name: string
+        version: string
+      }>
+      isLoading: boolean
+      error?: string | null
+      defaultName?: string
+    }
     seats: Array<{
       seat: Seat
       name: string
@@ -78,6 +98,10 @@ export interface GameRoomViewProps {
       isOccupied: boolean
       isAi: boolean
       isReady: boolean
+      aiProfile?: {
+        name: string
+        version: string
+      } | null
     }>
   }
 }
@@ -1114,6 +1138,19 @@ function AiSeatManager({
   }
 
   const { seats } = aiState
+  const registry = aiState.registry
+  const registryEntries = registry?.entries ?? []
+  const isRegistryLoading = registry?.isLoading ?? false
+  const registryError = registry?.error ?? null
+  const preferredDefaultName =
+    registry?.defaultName ??
+    registryEntries.find((entry) => entry.name === 'HeuristicV1')?.name ??
+    registryEntries[0]?.name ??
+    'HeuristicV1'
+  const addDisabled =
+    !aiState.canAdd ||
+    aiState.isPending ||
+    (aiState.registry?.isLoading ?? false)
 
   return (
     <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/10 p-4 text-sm text-indigo-100">
@@ -1130,48 +1167,151 @@ function AiSeatManager({
         </span>
       </header>
 
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => aiState.onAdd()}
-            disabled={!aiState.canAdd || aiState.isPending}
-            className="flex-1 rounded-md bg-indigo-400 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-500/40 disabled:text-slate-600"
+            onClick={() =>
+              aiState.onAdd({ registryName: preferredDefaultName })
+            }
+            disabled={addDisabled}
+            className="rounded-md bg-indigo-400 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-500/40 disabled:text-slate-600"
           >
             {aiState.isPending ? 'Working…' : 'Add AI'}
           </button>
-          <button
-            type="button"
-            onClick={() => aiState.onRemove()}
-            disabled={!aiState.canRemove || aiState.isPending}
-            className="flex-1 rounded-md border border-indigo-300/60 px-3 py-2 text-sm font-semibold text-indigo-100 transition hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:border-indigo-500/20 disabled:text-indigo-300/60"
-          >
-            Remove AI
-          </button>
+          <span className="text-[11px] text-indigo-100/70">
+            Defaults to&nbsp;
+            <span className="font-semibold text-indigo-50">
+              {preferredDefaultName}
+            </span>
+            {isRegistryLoading ? ' (loading registry…)' : ''}
+          </span>
         </div>
+
+        {registryError ? (
+          <div className="rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+            {registryError}
+          </div>
+        ) : null}
 
         <ul className="mt-2 space-y-2 text-xs">
           {seats.map((seat, index) => (
             <li
               key={seat.userId ?? `${seat.seat}-${index}`}
-              className="flex items-center justify-between rounded-lg border border-indigo-500/20 bg-slate-900/40 px-3 py-2"
+              className="rounded-lg border border-indigo-500/20 bg-slate-900/40 px-3 py-3"
             >
-              <div className="flex flex-col">
-                <span className="font-semibold text-indigo-100">
-                  Seat {seat.seat + 1}
-                </span>
-                <span className="text-[11px] uppercase tracking-wide text-indigo-200/70">
-                  {seat.isOccupied
-                    ? [
-                        seat.isAi ? 'AI-controlled' : 'Human player',
-                        seat.isReady ? 'Ready' : 'Not ready',
-                      ].join(' • ')
-                    : 'Open seat'}
-                </span>
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col">
+                  <span className="font-semibold text-indigo-100">
+                    Seat {seat.seat + 1}
+                  </span>
+                  <span className="text-[11px] uppercase tracking-wide text-indigo-200/70">
+                    {seat.isOccupied
+                      ? [
+                          seat.isAi ? 'AI-controlled' : 'Human player',
+                          seat.isReady ? 'Ready' : 'Not ready',
+                        ].join(' • ')
+                      : 'Open seat'}
+                  </span>
+                  {seat.isAi && seat.aiProfile ? (
+                    <span className="text-[11px] text-indigo-200/60">
+                      Profile:{' '}
+                      <span className="font-medium text-indigo-100">
+                        {seat.aiProfile.name}
+                      </span>{' '}
+                      · v{seat.aiProfile.version}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-2 flex items-center gap-2 sm:mt-0">
+                  {seat.isAi ? (
+                    <>
+                      <label
+                        htmlFor={`ai-seat-${seat.seat}`}
+                        className="sr-only"
+                      >
+                        Select AI profile for seat {seat.seat + 1}
+                      </label>
+                      <select
+                        id={`ai-seat-${seat.seat}`}
+                        className="rounded-md border border-indigo-500/40 bg-slate-900/70 px-2 py-1 text-xs text-indigo-100 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:cursor-not-allowed disabled:text-indigo-300/60"
+                        disabled={
+                          aiState.isPending ||
+                          isRegistryLoading ||
+                          registryEntries.length === 0 ||
+                          !aiState.onUpdateSeat
+                        }
+                        value={
+                          seat.aiProfile
+                            ? `${seat.aiProfile.name}::${seat.aiProfile.version}`
+                            : ''
+                        }
+                        onChange={(event) => {
+                          const value = event.target.value
+                          if (!value || !aiState.onUpdateSeat) {
+                            return
+                          }
+                          const [registryName, registryVersion] =
+                            value.split('::')
+                          aiState.onUpdateSeat(seat.seat, {
+                            registryName,
+                            registryVersion,
+                          })
+                        }}
+                      >
+                        {registryEntries.length === 0 ? (
+                          <option value="">
+                            {isRegistryLoading
+                              ? 'Loading profiles…'
+                              : 'No profiles available'}
+                          </option>
+                        ) : (
+                          registryEntries.map((entry) => {
+                            const key = `${entry.name}::${entry.version}`
+                            return (
+                              <option key={key} value={key}>
+                                {entry.name} · v{entry.version}
+                              </option>
+                            )
+                          })
+                        )}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          aiState.onRemoveSeat?.(seat.seat)
+                        }}
+                        disabled={aiState.isPending}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-indigo-500/40 text-indigo-100 transition hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:text-indigo-300/60"
+                      >
+                        <span className="sr-only">
+                          Remove AI from seat {seat.seat + 1}
+                        </span>
+                        <svg
+                          aria-hidden="true"
+                          className="h-4 w-4"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M4 7h16" />
+                          <path d="M9 7V4h6v3" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                          <path d="M6 7v12a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : (
+                    <span className="rounded-md border border-indigo-500/20 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-100/80">
+                      {seat.isOccupied ? 'Human player' : 'Awaiting player'}
+                    </span>
+                  )}
+                </div>
               </div>
-              <span className="text-sm font-medium text-white">
-                {seat.isOccupied ? seat.name : '—'}
-              </span>
             </li>
           ))}
         </ul>

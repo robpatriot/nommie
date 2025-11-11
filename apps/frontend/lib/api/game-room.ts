@@ -86,21 +86,83 @@ export async function submitPlay(gameId: number, card: string): Promise<void> {
   })
 }
 
-export async function addAiSeat(gameId: number, seat?: number): Promise<void> {
-  const payload = seat === undefined ? {} : { seat }
+export interface ManageAiSeatPayload {
+  seat?: number
+  registryName?: string
+  registryVersion?: string
+  seed?: number
+}
+
+function buildAiSeatBody(payload?: ManageAiSeatPayload) {
+  const body: Record<string, unknown> = {}
+  if (!payload) {
+    return body
+  }
+
+  if (payload.seat !== undefined) {
+    body.seat = payload.seat
+  }
+  if (payload.registryName) {
+    body.registry_name = payload.registryName
+  }
+  if (payload.registryVersion) {
+    body.registry_version = payload.registryVersion
+  }
+  if (typeof payload.seed === 'number') {
+    body.seed = payload.seed
+  }
+
+  return body
+}
+
+export async function addAiSeat(
+  gameId: number,
+  payload?: ManageAiSeatPayload
+): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ai/add`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(buildAiSeatBody(payload)),
+  })
+}
+
+export async function updateAiSeat(
+  gameId: number,
+  payload: ManageAiSeatPayload
+): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}/ai/update`, {
+    method: 'POST',
+    body: JSON.stringify(buildAiSeatBody(payload)),
   })
 }
 
 export async function removeAiSeat(
   gameId: number,
-  seat?: number
+  payload?: ManageAiSeatPayload
 ): Promise<void> {
-  const payload = seat === undefined ? {} : { seat }
   await fetchWithAuth(`/api/games/${gameId}/ai/remove`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(buildAiSeatBody(payload)),
   })
+}
+
+export interface AiRegistryEntry {
+  name: string
+  version: string
+}
+
+export async function listRegisteredAis(): Promise<AiRegistryEntry[]> {
+  const response = await fetchWithAuth('/api/games/ai/registry', {
+    method: 'GET',
+  })
+
+  if (!response.ok) {
+    throw new BackendApiError(
+      'Failed to load AI registry',
+      response.status,
+      'AI_REGISTRY_ERROR'
+    )
+  }
+
+  const data = await response.json()
+  return Array.isArray(data.ais) ? data.ais : []
 }

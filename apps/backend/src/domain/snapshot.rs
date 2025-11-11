@@ -15,6 +15,8 @@ pub struct SeatPublic {
     pub display_name: Option<String>,
     pub is_ai: bool,
     pub is_ready: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ai_profile: Option<SeatAiProfilePublic>,
 }
 
 impl SeatPublic {
@@ -25,8 +27,15 @@ impl SeatPublic {
             display_name: None,
             is_ai: false,
             is_ready: false,
+            ai_profile: None,
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SeatAiProfilePublic {
+    pub name: String,
+    pub version: String,
 }
 
 /// Game-level header present in all snapshots.

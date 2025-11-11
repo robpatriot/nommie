@@ -241,6 +241,7 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
+    use backend::ai::RandomPlayer;
     use backend::repos::{ai_profiles, users as users_repo};
 
     // Create a user
@@ -250,7 +251,7 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     let profile = ai_profiles::create_profile(
         txn,
         user.id,
-        Some("random".to_string()),
+        Some(RandomPlayer::NAME.to_string()),
         Some(5),
         None,
         Some(75),
@@ -294,6 +295,7 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
     let txn = shared.transaction();
 
     use backend::ai::memory::MemoryMode;
+    use backend::ai::RandomPlayer;
     use backend::repos::ai_profiles;
     use backend::services::ai::AiService;
     use serde_json::json;
@@ -305,7 +307,8 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
         .create_ai_template_user(
             txn,
             "Random Bot (Partial Memory)",
-            "random",
+            RandomPlayer::NAME,
+            RandomPlayer::VERSION,
             Some(json!({"seed": test_seed("ai_mem_prof_ai1")})),
             Some(60),
         )
@@ -327,7 +330,8 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
         .create_ai_template_user(
             txn,
             "Random Bot (Full Memory)",
-            "random",
+            RandomPlayer::NAME,
+            RandomPlayer::VERSION,
             Some(json!({"seed": test_seed("ai_mem_prof_ai2")})),
             None,
         )

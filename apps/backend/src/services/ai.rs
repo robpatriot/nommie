@@ -53,7 +53,8 @@ impl AiService {
     /// # Arguments
     /// * `txn` - Database transaction
     /// * `name` - Display name for the AI (e.g., "Random Bot Easy", "Aggressive Alice")
-    /// * `ai_type` - Type/playstyle of AI (e.g., "random", "aggressive", "defensive")
+    /// * `registry_name` - Registered AI name (e.g., `RandomPlayer`, `HeuristicV1`)
+    /// * `registry_version` - Registered AI version
     /// * `config` - Optional JSON config for the AI (e.g., seed, difficulty settings)
     /// * `memory_level` - Optional memory level (0-100, where 100 is perfect memory)
     ///
@@ -63,15 +64,16 @@ impl AiService {
         &self,
         txn: &DatabaseTransaction,
         name: impl Into<String>,
-        ai_type: &str,
+        registry_name: &str,
+        registry_version: &str,
         config: Option<serde_json::Value>,
         memory_level: Option<i32>,
     ) -> Result<i64, DomainError> {
         let name = name.into();
-        let sub = format!("ai:{}:{}", ai_type, uuid::Uuid::new_v4());
+        let sub = format!("ai:{}:{}", registry_name, uuid::Uuid::new_v4());
 
         debug!(
-            ai_type = %ai_type,
+            ai_type = %registry_name,
             name = %name,
             memory_level = ?memory_level,
             "Creating AI template user"
@@ -81,19 +83,35 @@ impl AiService {
         let user = users_repo::create_user(txn, &sub, &name, true).await?;
 
         // Create AI profile
+        let mut profile_config =
+            config.unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::new()));
+        if !profile_config.is_object() {
+            profile_config = serde_json::Value::Object(serde_json::Map::new());
+        }
+        if let Some(obj) = profile_config.as_object_mut() {
+            obj.insert(
+                "registry_name".to_string(),
+                serde_json::Value::String(registry_name.to_string()),
+            );
+            obj.insert(
+                "registry_version".to_string(),
+                serde_json::Value::String(registry_version.to_string()),
+            );
+        }
+
         ai_profiles::create_profile(
             txn,
             user.id,
-            Some(ai_type.to_string()),
+            Some(registry_name.to_string()),
             None,
-            config,
+            Some(profile_config),
             memory_level,
         )
         .await?;
 
         debug!(
             user_id = user.id,
-            ai_type = %ai_type,
+            ai_type = %registry_name,
             name = %name,
             "AI template user created successfully"
         );
