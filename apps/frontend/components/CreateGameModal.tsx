@@ -46,10 +46,10 @@ export default function CreateGameModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-surface-strong shadow-elevated">
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+          <h2 className="mb-4 text-2xl font-bold text-foreground">
             Create New Game
           </h2>
 
@@ -57,9 +57,9 @@ export default function CreateGameModal({
             <div className="mb-4">
               <label
                 htmlFor="game-name"
-                className="block text-sm font-medium text-gray-700 mb-1"
+                className="mb-1 block text-sm font-medium text-foreground"
               >
-                Game Name <span className="text-gray-500">(optional)</span>
+                Game Name <span className="text-muted">(optional)</span>
               </label>
               <input
                 type="text"
@@ -67,10 +67,10 @@ export default function CreateGameModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={defaultName}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-inner focus:outline-none focus:ring-2 focus:ring-primary"
                 disabled={isSubmitting}
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-subtle">
                 Default: &quot;{defaultName}&quot;
               </p>
             </div>
@@ -80,14 +80,14 @@ export default function CreateGameModal({
                 type="button"
                 onClick={handleCancel}
                 disabled={isSubmitting}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-md bg-surface px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? 'Creating...' : 'Create Game'}
               </button>

@@ -3,25 +3,90 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  color-scheme: light;
+  --color-bg: 248 250 252;
+  --color-bg-subtle: 255 255 255;
+  --color-surface: 241 245 249;
+  --color-surface-strong: 255 255 255;
+  --color-border: 203 213 225;
+  --color-ring: 99 102 241;
+  --color-text: 15 23 42;
+  --color-text-muted: 71 85 105;
+  --color-text-subtle: 100 116 139;
+  --color-primary: 59 130 246;
+  --color-primary-foreground: 255 255 255;
+  --color-accent: 14 165 233;
+  --color-accent-foreground: 15 23 42;
+  --color-danger: 239 68 68;
+  --color-danger-foreground: 255 255 255;
+  --color-success: 34 197 94;
+  --color-success-foreground: 22 101 52;
+  --color-warning: 250 204 21;
+  --color-warning-foreground: 113 63 18;
+  --shadow-elevated: 29 78 216 / 0.08;
+}
+
+.theme-light,
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+.theme-dark,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: 10 12 22;
+  --color-bg-subtle: 15 23 42;
+  --color-surface: 30 41 59;
+  --color-surface-strong: 15 23 42;
+  --color-border: 51 65 85;
+  --color-ring: 129 140 248;
+  --color-text: 226 232 240;
+  --color-text-muted: 148 163 184;
+  --color-text-subtle: 100 116 139;
+  --color-primary: 56 189 248;
+  --color-primary-foreground: 15 23 42;
+  --color-accent: 94 234 212;
+  --color-accent-foreground: 15 23 42;
+  --color-danger: 248 113 113;
+  --color-danger-foreground: 15 23 42;
+  --color-success: 74 222 128;
+  --color-success-foreground: 15 118 110;
+  --color-warning: 253 224 71;
+  --color-warning-foreground: 202 138 4;
+  --shadow-elevated: 15 23 42 / 0.55;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+  :root:not([data-user-theme]),
+  :root[data-user-theme='system'] {
+    color-scheme: dark;
+    --color-bg: 10 12 22;
+    --color-bg-subtle: 15 23 42;
+    --color-surface: 30 41 59;
+    --color-surface-strong: 15 23 42;
+    --color-border: 51 65 85;
+    --color-ring: 129 140 248;
+    --color-text: 226 232 240;
+    --color-text-muted: 148 163 184;
+    --color-text-subtle: 100 116 139;
+    --color-primary: 56 189 248;
+    --color-primary-foreground: 15 23 42;
+    --color-accent: 94 234 212;
+    --color-accent-foreground: 15 23 42;
+    --color-danger: 248 113 113;
+    --color-danger-foreground: 15 23 42;
+    --color-success: 74 222 128;
+    --color-success-foreground: 15 118 110;
+    --color-warning: 253 224 71;
+    --color-warning-foreground: 202 138 4;
+    --shadow-elevated: 15 23 42 / 0.55;
   }
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  @apply bg-background text-foreground;
+}
+
+body::backdrop {
+  background-color: rgb(var(--color-bg));
 }

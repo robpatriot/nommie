@@ -173,21 +173,23 @@ export function GameRoomView(props: GameRoomViewProps) {
   )
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/70">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="border-b border-border bg-surface/80 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 sm:px-6 lg:px-10">
           <div className="flex flex-1 flex-col gap-1">
-            <span className="text-sm font-medium text-slate-400">
+            <span className="text-sm font-medium text-subtle">
               Game #{gameId}
             </span>
-            <h1 className="text-2xl font-semibold text-white">Nommie Table</h1>
+            <h1 className="text-2xl font-semibold text-foreground">
+              Nommie Table
+            </h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {onRefresh ? (
               <button
                 type="button"
                 onClick={onRefresh}
-                className="rounded-md border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
+                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted transition hover:border-primary/40 hover:text-foreground"
                 disabled={isRefreshing}
               >
                 {isRefreshing ? 'Refreshing…' : 'Refresh'}
@@ -195,13 +197,13 @@ export function GameRoomView(props: GameRoomViewProps) {
             ) : null}
             <button
               type="button"
-              className="rounded-md border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:text-white"
+              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted transition hover:border-accent/50 hover:text-foreground"
             >
               Copy Invite Link
             </button>
             <Link
               href="/lobby"
-              className="rounded-md bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-900 transition hover:bg-white"
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
             >
               Back to Lobby
             </Link>
@@ -210,45 +212,43 @@ export function GameRoomView(props: GameRoomViewProps) {
       </header>
 
       <main className="flex flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
-        <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4 shadow-lg shadow-slate-900/30">
+        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/70 p-4 shadow-elevated">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="text-sm uppercase tracking-wide text-slate-400">
+              <p className="text-sm uppercase tracking-wide text-subtle">
                 Phase
               </p>
-              <div className="text-2xl font-semibold text-white">
+              <div className="text-2xl font-semibold text-foreground">
                 {getPhaseLabel(phase)}
               </div>
             </div>
-            <div className="flex items-center gap-3 text-sm text-slate-300">
+            <div className="flex items-center gap-3 text-sm text-muted">
               <span className="flex items-center gap-2">
                 <span
                   className={`inline-flex h-2.5 w-2.5 items-center justify-center rounded-full ${
-                    status.isPolling
-                      ? 'animate-pulse bg-emerald-400'
-                      : 'bg-slate-500'
+                    status.isPolling ? 'animate-pulse bg-success' : 'bg-subtle'
                   }`}
                   aria-hidden
                 />
                 {status.isPolling ? 'Syncing…' : 'Idle'}
               </span>
-              <span aria-live="off" className="text-slate-500">
+              <span aria-live="off" className="text-subtle">
                 Last synced {syncLabel}
               </span>
             </div>
           </div>
           {error ? (
-            <div className="rounded-lg border border-amber-400 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+            <div className="rounded-lg border border-warning/60 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
               <p>{error.message}</p>
               {error.traceId ? (
-                <p className="text-xs text-amber-300/80">
+                <p className="text-xs text-warning-foreground/80">
                   traceId: {error.traceId}
                 </p>
               ) : null}
             </div>
           ) : null}
           {round ? (
-            <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-4">
+            <div className="grid gap-3 text-sm text-muted sm:grid-cols-4">
               <PhaseFact label="Round" value={`#${snapshot.game.round_no}`} />
               <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
               <PhaseFact
@@ -258,12 +258,12 @@ export function GameRoomView(props: GameRoomViewProps) {
               <PhaseFact label="Trump" value={formatTrump(round.trump)} />
             </div>
           ) : null}
-          <div className="flex flex-wrap items-center gap-4 text-sm text-slate-200">
-            <span className="rounded-full bg-slate-800 px-3 py-1 font-medium">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted">
+            <span className="rounded-full bg-surface px-3 py-1 font-medium text-foreground">
               Turn: {activeName}
             </span>
             {phase.phase === 'Trick' ? (
-              <span className="text-slate-400">
+              <span className="text-subtle">
                 Trick {phase.data.trick_no} of {round?.hand_size ?? '?'}
               </span>
             ) : null}
@@ -394,38 +394,38 @@ function SeatCard({ summary }: { summary: SeatSummary }) {
 
   return (
     <div
-      className={`flex w-full max-w-[220px] flex-col gap-2 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-center shadow-sm ${
+      className={`flex w-full max-w-[220px] flex-col gap-2 rounded-xl border border-border bg-surface/70 p-3 text-center shadow-elevated ${
         isActive
-          ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-slate-950'
+          ? 'ring-2 ring-success ring-offset-2 ring-offset-background'
           : ''
       } ${positionStyles[orientation]}`}
     >
       <div className="flex flex-col gap-1">
-        <span className="text-xs uppercase tracking-wide text-slate-500">
+        <span className="text-xs uppercase tracking-wide text-subtle">
           {orientation === 'bottom' ? 'You' : 'Player'}
         </span>
-        <span className="text-lg font-semibold text-white">{name}</span>
-        <span className="text-xs text-slate-400">Score {score}</span>
+        <span className="text-lg font-semibold text-foreground">{name}</span>
+        <span className="text-xs text-subtle">Score {score}</span>
       </div>
-      <div className="flex items-center justify-center gap-3 text-xs text-slate-300">
+      <div className="flex items-center justify-center gap-3 text-xs text-muted">
         {typeof tricksWon === 'number' ? (
-          <span className="rounded-full bg-slate-800 px-2 py-1 font-medium">
+          <span className="rounded-full bg-surface px-2 py-1 font-medium text-foreground">
             Tricks {tricksWon}
           </span>
         ) : null}
         {bid !== undefined ? (
-          <span className="rounded-full border border-slate-800 px-2 py-1 font-medium">
+          <span className="rounded-full border border-border px-2 py-1 font-medium">
             Bid {bid ?? '—'}
           </span>
         ) : null}
         {currentCard ? (
-          <span className="rounded-md bg-slate-800 px-2 py-1 font-semibold tracking-wide text-white">
+          <span className="rounded-md bg-surface px-2 py-1 font-semibold tracking-wide text-foreground">
             {currentCard}
           </span>
         ) : null}
       </div>
       {isViewer ? (
-        <span className="self-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-300">
+        <span className="self-center rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success-foreground">
           You
         </span>
       ) : null}
@@ -454,23 +454,23 @@ function TrickArea({
   }))
 
   return (
-    <div className="col-start-2 row-start-2 flex h-64 flex-col items-center justify-center gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-6">
-      <p className="text-sm uppercase tracking-wide text-slate-500">
+    <div className="col-start-2 row-start-2 flex h-64 flex-col items-center justify-center gap-4 rounded-2xl border border-border bg-surface/70 p-6">
+      <p className="text-sm uppercase tracking-wide text-subtle">
         Current Trick
       </p>
       <div className="flex flex-wrap items-center justify-center gap-6">
         {cards.length === 0 ? (
-          <span className="text-sm text-slate-500">Waiting for lead…</span>
+          <span className="text-sm text-subtle">Waiting for lead…</span>
         ) : (
           cards.map(({ seat, card, label, orientation }) => (
             <div key={seat} className="flex flex-col items-center gap-2">
-              <span className="text-xs uppercase tracking-wide text-slate-500">
+              <span className="text-xs uppercase tracking-wide text-subtle">
                 {label}
               </span>
-              <span className="rounded-xl bg-slate-800 px-3 py-2 text-lg font-semibold tracking-wider text-white">
+              <span className="rounded-xl bg-surface px-3 py-2 text-lg font-semibold tracking-wider text-foreground">
                 {card}
               </span>
-              <span className="text-[10px] uppercase text-slate-500">
+              <span className="text-[10px] uppercase text-subtle">
                 {orientation}
               </span>
             </div>
@@ -478,7 +478,7 @@ function TrickArea({
         )}
       </div>
       {phase.phase === 'Trick' ? (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-subtle">
           Leader: {getSeatName(phase.data.leader)} — Trick {phase.data.trick_no}{' '}
           of {round?.hand_size ?? '?'}
         </p>
@@ -552,16 +552,16 @@ function PlayerHand({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-border bg-surface/70 p-4">
       <header className="flex items-center justify-between">
-        <h2 className="text-sm uppercase tracking-wide text-slate-400">
+        <h2 className="text-sm uppercase tracking-wide text-subtle">
           Your Hand
         </h2>
-        <span className="text-xs text-slate-500">{handStatus}</span>
+        <span className="text-xs text-muted">{handStatus}</span>
       </header>
       <div className="flex flex-wrap justify-center gap-2">
         {viewerHand.length === 0 ? (
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-subtle">
             Hand will appear once available.
           </span>
         ) : (
@@ -583,10 +583,10 @@ function PlayerHand({
                 disabled={isDisabled}
                 className={`rounded-xl border px-3 py-2 text-lg font-semibold tracking-wide transition ${
                   isSelected
-                    ? 'border-emerald-400 bg-emerald-500/20 text-white shadow-lg shadow-emerald-500/30'
+                    ? 'border-success bg-success/20 text-foreground shadow-md shadow-success/30'
                     : isPlayable && viewerTurn
-                      ? 'border-emerald-500/60 bg-slate-800 text-white hover:border-emerald-300 hover:bg-emerald-500/10'
-                      : 'border-slate-700 bg-slate-800 text-slate-400'
+                      ? 'border-success/60 bg-surface text-foreground hover:border-success hover:bg-success/10'
+                      : 'border-border bg-surface text-muted'
                 } ${
                   isDisabled
                     ? 'cursor-not-allowed opacity-60'
@@ -659,12 +659,12 @@ function PlayerActions({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-border bg-surface/60 p-4 text-sm text-muted">
       <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
           Table Actions
         </h2>
-        <span className="text-xs text-slate-500">Interactive controls</span>
+        <span className="text-xs text-subtle">Interactive controls</span>
       </header>
       <p>
         No interactive controls are available for the current phase. They will
@@ -737,29 +737,29 @@ function BiddingPanel({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-4">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-success/40 bg-success/10 p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-200">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-success-foreground">
             Bidding
           </h2>
-          <p className="text-xs text-emerald-100/80">
+          <p className="text-xs text-success-foreground/80">
             Select your bid between {minBid} and {maxBid}. Once submitted, the
             next player will be prompted automatically.
           </p>
         </div>
-        <div className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
+        <div className="rounded-full border border-success/40 bg-success/15 px-3 py-1 text-xs font-medium text-success-foreground">
           Waiting on: {activeName}
         </div>
       </header>
 
       <form
-        className="flex flex-col gap-3 rounded-lg border border-emerald-500/20 bg-slate-900/60 p-4 shadow-inner shadow-emerald-900/30"
+        className="flex flex-col gap-3 rounded-lg border border-success/30 bg-surface/60 p-4 shadow-inner shadow-success/20"
         onSubmit={handleSubmit}
       >
         <label
           htmlFor="bid-value"
-          className="text-xs font-medium uppercase tracking-wide text-emerald-200"
+          className="text-xs font-medium uppercase tracking-wide text-success-foreground"
         >
           Your Bid
         </label>
@@ -772,19 +772,19 @@ function BiddingPanel({
             step={1}
             value={selectedBid}
             onChange={(event) => setSelectedBid(Number(event.target.value))}
-            className="w-24 rounded-md border border-emerald-500/30 bg-slate-950 px-3 py-2 text-sm font-semibold text-emerald-100 outline-none transition focus:border-emerald-300 focus:ring focus:ring-emerald-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-24 rounded-md border border-success/40 bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-success focus:ring focus:ring-success/40 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={viewerBid !== null || bidding.isPending || !isViewerTurn}
             aria-describedby="bid-range-hint"
           />
           <button
             type="submit"
-            className="rounded-md bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-500/40 disabled:text-slate-700"
+            className="rounded-md bg-success px-4 py-2 text-sm font-semibold text-success-foreground transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70"
             disabled={isSubmitDisabled}
           >
             {bidding.isPending ? 'Submitting…' : 'Submit Bid'}
           </button>
         </div>
-        <p id="bid-range-hint" className="text-xs text-emerald-100/80">
+        <p id="bid-range-hint" className="text-xs text-success-foreground/80">
           Allowed range: {minBid} – {maxBid}.{' '}
           {isViewerTurn
             ? viewerBid === null
@@ -794,27 +794,27 @@ function BiddingPanel({
         </p>
       </form>
 
-      <div className="rounded-lg border border-emerald-500/10 bg-slate-900/60 p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-emerald-200">
+      <div className="rounded-lg border border-success/20 bg-surface/60 p-4">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-success-foreground">
           Bid Tracker
         </h3>
         <ul className="grid gap-2 sm:grid-cols-2">
           {seatBids.map(({ seat, name, bid, orientation }) => (
             <li
               key={seat}
-              className={`flex items-center justify-between rounded-md border border-slate-800/80 bg-slate-900/60 px-3 py-2 text-sm ${
+              className={`flex items-center justify-between rounded-md border border-border bg-surface/60 px-3 py-2 text-sm ${
                 seat === phase.to_act
-                  ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-100'
-                  : ''
+                  ? 'border-success bg-success/10 text-success-foreground'
+                  : 'text-muted'
               }`}
             >
               <div className="flex flex-col">
-                <span className="font-medium text-white">{name}</span>
-                <span className="text-[10px] uppercase text-slate-500">
+                <span className="font-medium text-foreground">{name}</span>
+                <span className="text-[10px] uppercase text-subtle">
                   {orientation}
                 </span>
               </div>
-              <span className="text-sm font-semibold text-slate-200">
+              <span className="text-sm font-semibold text-foreground">
                 {bid ?? '—'}
               </span>
             </li>
@@ -875,24 +875,24 @@ function TrumpSelectPanel({
       : `Waiting for ${activeName}`
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-purple-500/40 bg-purple-500/10 p-4">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-accent/40 bg-accent/10 p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-purple-200">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-accent-foreground">
             Select Trump
           </h2>
-          <p className="text-xs text-purple-100/80">
+          <p className="text-xs text-accent-foreground/80">
             Choose the trump suit for this round. Trump cards outrank all other
             suits.
           </p>
         </div>
-        <div className="rounded-full border border-purple-400/40 bg-purple-400/10 px-3 py-1 text-xs font-medium text-purple-100">
+        <div className="rounded-full border border-accent/40 bg-accent/15 px-3 py-1 text-xs font-medium text-accent-foreground">
           Waiting on: {activeName}
         </div>
       </header>
 
       <form
-        className="flex flex-col gap-3 rounded-lg border border-purple-400/20 bg-slate-900/60 p-4 shadow-inner shadow-purple-900/30"
+        className="flex flex-col gap-3 rounded-lg border border-accent/30 bg-surface/60 p-4 shadow-inner shadow-accent/20"
         onSubmit={handleSubmit}
       >
         <div className="flex flex-wrap gap-2">
@@ -912,10 +912,10 @@ function TrumpSelectPanel({
                 disabled={disabled}
                 className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
                   isSelected
-                    ? 'border-purple-300 bg-purple-500/30 text-white shadow-lg shadow-purple-500/30'
+                    ? 'border-accent bg-accent/30 text-accent-foreground shadow-md shadow-accent/30'
                     : canSelect
-                      ? 'border-purple-400/40 bg-slate-800 text-purple-100 hover:border-purple-300 hover:bg-purple-500/10'
-                      : 'border-slate-800 bg-slate-900 text-slate-400'
+                      ? 'border-accent/40 bg-surface text-accent-foreground hover:border-accent hover:bg-accent/15'
+                      : 'border-border bg-surface text-muted'
                 } ${
                   disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
                 }`}
@@ -929,13 +929,13 @@ function TrumpSelectPanel({
 
         <button
           type="submit"
-          className="w-full rounded-md bg-purple-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-purple-300 disabled:cursor-not-allowed disabled:bg-purple-500/40 disabled:text-slate-600"
+          className="w-full rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent/80 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-accent-foreground/70"
           disabled={!canSelect || isPending || !selectedTrump}
         >
           {submitLabel}
         </button>
 
-        <p className="text-xs text-purple-100/70">
+        <p className="text-xs text-accent-foreground/75">
           {canSelect
             ? 'Select a trump suit and confirm to continue to trick play.'
             : `Waiting for ${activeName} to choose the trump suit.`}
@@ -975,36 +975,36 @@ function PlayPanel({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-indigo-500/40 bg-indigo-500/10 p-4">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-primary/40 bg-primary/10 p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-200">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-primary-foreground">
             Play Card
           </h2>
-          <p className="text-xs text-indigo-100/80">
+          <p className="text-xs text-primary-foreground/80">
             Choose a legal card from your hand. Only legal cards are enabled.
           </p>
         </div>
-        <div className="rounded-full border border-indigo-500/40 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-200">
+        <div className="rounded-full border border-primary/40 bg-primary/15 px-3 py-1 text-xs font-medium text-primary-foreground">
           Waiting on: {activeName}
         </div>
       </header>
 
       <form
-        className="flex flex-col gap-3 rounded-lg border border-indigo-500/20 bg-slate-900/60 p-4 shadow-inner shadow-indigo-900/30"
+        className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-surface/60 p-4 shadow-inner shadow-primary/20"
         onSubmit={handleSubmit}
       >
-        <div className="flex flex-wrap items-center gap-3 text-sm text-indigo-100">
-          <span className="text-xs uppercase tracking-wide text-indigo-300">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-primary-foreground">
+          <span className="text-xs uppercase tracking-wide text-primary-foreground/80">
             Selected Card
           </span>
-          <span className="rounded-md border border-indigo-500/40 bg-slate-900/80 px-3 py-1 font-semibold text-white">
+          <span className="rounded-md border border-primary/40 bg-background px-3 py-1 font-semibold text-foreground">
             {selectedCard ?? '—'}
           </span>
         </div>
         <button
           type="submit"
-          className="w-full rounded-md bg-indigo-400 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-500/40 disabled:text-slate-600"
+          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/80 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
           disabled={isSubmitDisabled}
         >
           {play.isPending
@@ -1013,7 +1013,7 @@ function PlayPanel({
               ? 'Play Selected Card'
               : `Waiting for ${activeName}`}
         </button>
-        <p className="text-xs text-indigo-100/80">
+        <p className="text-xs text-primary-foreground/80">
           Legal cards: {play.playable.length ? play.playable.join(', ') : '—'}
         </p>
       </form>
@@ -1035,28 +1035,25 @@ function ScoreSidebar({
   aiState?: GameRoomViewProps['aiSeatState']
 }) {
   return (
-    <aside className="flex h-full flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+    <aside className="flex h-full flex-col gap-4 rounded-2xl border border-border bg-surface/70 p-4">
       <header className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-white">Scores</h2>
-        <span className="text-xs text-slate-500">Updated each sync</span>
+        <h2 className="text-base font-semibold text-foreground">Scores</h2>
+        <span className="text-xs text-subtle">Updated each sync</span>
       </header>
 
-      <details
-        className="rounded-xl border border-slate-800 bg-slate-900/40"
-        open
-      >
-        <summary className="cursor-pointer list-none rounded-xl px-4 py-3 text-sm font-medium text-slate-200 transition hover:bg-slate-800/80">
+      <details className="rounded-xl border border-border bg-surface/60" open>
+        <summary className="cursor-pointer list-none rounded-xl px-4 py-3 text-sm font-medium text-foreground transition hover:bg-surface">
           Cumulative Totals
         </summary>
         <div className="px-4 pb-3">
-          <ul className="flex flex-col gap-2 text-sm text-slate-300">
+          <ul className="flex flex-col gap-2 text-sm text-muted">
             {scores.map((score, idx) => (
               <li
                 key={playerNames[idx]}
                 className="flex items-center justify-between"
               >
                 <span>{playerNames[idx]}</span>
-                <span className="font-semibold text-white">{score}</span>
+                <span className="font-semibold text-foreground">{score}</span>
               </li>
             ))}
           </ul>
@@ -1064,8 +1061,8 @@ function ScoreSidebar({
       </details>
 
       {round ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300">
-          <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">
+        <div className="rounded-xl border border-border bg-surface/60 p-4 text-sm text-muted">
+          <div className="mb-2 text-xs uppercase tracking-wide text-subtle">
             Round Snapshot
           </div>
           <p>Hand size: {round.hand_size}</p>
@@ -1087,7 +1084,7 @@ function ReadyPanel({
 }) {
   if (!readyState) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-500">
+      <div className="rounded-xl border border-dashed border-border bg-surface/60 p-4 text-xs text-subtle">
         Ready controls will appear once interactions are available.
       </div>
     )
@@ -1095,23 +1092,27 @@ function ReadyPanel({
 
   if (!readyState.canReady) {
     return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300">
-        <h3 className="mb-1 text-sm font-semibold text-white">Game in play</h3>
+      <div className="rounded-xl border border-border bg-surface/60 p-4 text-sm text-muted">
+        <h3 className="mb-1 text-sm font-semibold text-foreground">
+          Game in play
+        </h3>
         <p>The table is active. Actions will surface here when required.</p>
       </div>
     )
   }
 
   return (
-    <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-      <h3 className="mb-2 text-sm font-semibold text-emerald-200">Ready Up</h3>
-      <p className="mb-3 text-xs text-emerald-200/80">
+    <div className="rounded-xl border border-success/40 bg-success/10 p-4 text-sm text-success-foreground">
+      <h3 className="mb-2 text-sm font-semibold text-success-foreground">
+        Ready Up
+      </h3>
+      <p className="mb-3 text-xs text-success-foreground/80">
         Mark yourself ready. The game auto-starts when all four seats are ready.
       </p>
       <button
         type="button"
         onClick={() => readyState.onReady()}
-        className="w-full rounded-md bg-emerald-500 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-500/60 disabled:text-slate-800"
+        className="w-full rounded-md bg-success px-3 py-2 text-sm font-semibold text-success-foreground transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70"
         disabled={readyState.isPending || readyState.hasMarked}
       >
         {readyState.isPending
@@ -1131,7 +1132,7 @@ function AiSeatManager({
 }) {
   if (!aiState) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/40 p-4 text-xs text-slate-500">
+      <div className="rounded-xl border border-dashed border-border bg-surface/60 p-4 text-xs text-subtle">
         AI seat controls appear here for the host before the game begins.
       </div>
     )
@@ -1153,15 +1154,17 @@ function AiSeatManager({
     (aiState.registry?.isLoading ?? false)
 
   return (
-    <div className="rounded-xl border border-indigo-500/40 bg-indigo-500/10 p-4 text-sm text-indigo-100">
+    <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-accent-foreground">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-indigo-200">AI Seats</h3>
-          <p className="text-xs text-indigo-100/70">
+          <h3 className="text-sm font-semibold text-accent-foreground">
+            AI Seats
+          </h3>
+          <p className="text-xs text-accent-foreground/80">
             Use bots to fill empty seats before the game starts.
           </p>
         </div>
-        <span className="rounded-full border border-indigo-400/40 bg-indigo-400/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-100">
+        <span className="rounded-full border border-accent/40 bg-accent/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent-foreground">
           {aiState.aiSeats} bots · {aiState.totalSeats - aiState.availableSeats}
           /{aiState.totalSeats} seats filled
         </span>
@@ -1175,21 +1178,19 @@ function AiSeatManager({
               aiState.onAdd({ registryName: preferredDefaultName })
             }
             disabled={addDisabled}
-            className="rounded-md bg-indigo-400 px-3 py-2 text-sm font-semibold text-slate-900 transition hover:bg-indigo-300 disabled:cursor-not-allowed disabled:bg-indigo-500/40 disabled:text-slate-600"
+            className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent/80 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-accent-foreground/70"
           >
             {aiState.isPending ? 'Working…' : 'Add AI'}
           </button>
-          <span className="text-[11px] text-indigo-100/70">
+          <span className="text-[11px] text-accent-foreground/75">
             Defaults to&nbsp;
-            <span className="font-semibold text-indigo-50">
-              {preferredDefaultName}
-            </span>
+            <span className="font-semibold">{preferredDefaultName}</span>
             {isRegistryLoading ? ' (loading registry…)' : ''}
           </span>
         </div>
 
         {registryError ? (
-          <div className="rounded-md border border-red-400/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+          <div className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger-foreground">
             {registryError}
           </div>
         ) : null}
@@ -1198,14 +1199,14 @@ function AiSeatManager({
           {seats.map((seat, index) => (
             <li
               key={seat.userId ?? `${seat.seat}-${index}`}
-              className="rounded-lg border border-indigo-500/20 bg-slate-900/40 px-3 py-3"
+              className="rounded-lg border border-accent/30 bg-surface/60 px-3 py-3"
             >
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-col">
-                  <span className="font-semibold text-indigo-100">
+                  <span className="font-semibold text-foreground">
                     Seat {seat.seat + 1}
                   </span>
-                  <span className="text-[11px] uppercase tracking-wide text-indigo-200/70">
+                  <span className="text-[11px] uppercase tracking-wide text-subtle">
                     {seat.isOccupied
                       ? [
                           seat.isAi ? 'AI-controlled' : 'Human player',
@@ -1214,9 +1215,9 @@ function AiSeatManager({
                       : 'Open seat'}
                   </span>
                   {seat.isAi && seat.aiProfile ? (
-                    <span className="text-[11px] text-indigo-200/60">
+                    <span className="text-[11px] text-accent-foreground/70">
                       Profile:{' '}
-                      <span className="font-medium text-indigo-100">
+                      <span className="font-medium text-foreground">
                         {seat.aiProfile.name}
                       </span>{' '}
                       · v{seat.aiProfile.version}
@@ -1234,7 +1235,7 @@ function AiSeatManager({
                       </label>
                       <select
                         id={`ai-seat-${seat.seat}`}
-                        className="rounded-md border border-indigo-500/40 bg-slate-900/70 px-2 py-1 text-xs text-indigo-100 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:cursor-not-allowed disabled:text-indigo-300/60"
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:cursor-not-allowed disabled:text-muted"
                         disabled={
                           aiState.isPending ||
                           isRegistryLoading ||
@@ -1282,7 +1283,7 @@ function AiSeatManager({
                           aiState.onRemoveSeat?.(seat.seat)
                         }}
                         disabled={aiState.isPending}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-indigo-500/40 text-indigo-100 transition hover:bg-indigo-500/20 disabled:cursor-not-allowed disabled:text-indigo-300/60"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-accent/40 text-accent-foreground transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:text-accent-foreground/60"
                       >
                         <span className="sr-only">
                           Remove AI from seat {seat.seat + 1}
@@ -1306,7 +1307,7 @@ function AiSeatManager({
                       </button>
                     </>
                   ) : (
-                    <span className="rounded-md border border-indigo-500/20 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-100/80">
+                    <span className="rounded-md border border-accent/40 bg-accent/15 px-2 py-1 text-[11px] text-accent-foreground/80">
                       {seat.isOccupied ? 'Human player' : 'Awaiting player'}
                     </span>
                   )}
@@ -1323,8 +1324,8 @@ function AiSeatManager({
 function PhaseFact({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="text-sm font-medium text-slate-200">{value}</p>
+      <p className="text-xs uppercase tracking-wide text-subtle">{label}</p>
+      <p className="text-sm font-medium text-foreground">{value}</p>
     </div>
   )
 }

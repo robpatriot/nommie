@@ -39,17 +39,17 @@ export default function Toast({ toast, onClose }: ToastProps) {
   return (
     <div className="fixed bottom-4 right-4 z-50 max-w-md">
       <div
-        className={`rounded-lg shadow-lg p-4 ${
+        className={`rounded-lg border p-4 shadow-elevated ${
           isError
-            ? 'bg-red-50 border border-red-200'
-            : 'bg-green-50 border border-green-200'
+            ? 'border-danger/40 bg-danger/10'
+            : 'border-success/40 bg-success/10'
         }`}
       >
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <p
               className={`text-sm font-medium ${
-                isError ? 'text-red-800' : 'text-green-800'
+                isError ? 'text-danger-foreground' : 'text-success-foreground'
               }`}
             >
               {toast.message}
@@ -57,7 +57,7 @@ export default function Toast({ toast, onClose }: ToastProps) {
             {isError && toast.error && (
               <div className="mt-2">
                 {expanded && (
-                  <div className="text-xs text-red-700 space-y-1">
+                  <div className="space-y-1 text-xs text-danger-foreground/80">
                     <p>
                       <span className="font-semibold">Status:</span>{' '}
                       {toast.error.status}
@@ -79,7 +79,7 @@ export default function Toast({ toast, onClose }: ToastProps) {
                 {hasTraceId && (
                   <button
                     onClick={() => setExpanded(!expanded)}
-                    className="mt-1 text-xs text-red-600 hover:text-red-800 underline"
+                    className="mt-1 text-xs text-danger hover:text-danger-foreground underline"
                   >
                     {expanded ? 'Hide' : 'Show'} details
                   </button>
@@ -89,10 +89,10 @@ export default function Toast({ toast, onClose }: ToastProps) {
           </div>
           <button
             onClick={onClose}
-            className={`ml-4 text-sm font-semibold ${
+            className={`ml-4 text-sm font-semibold transition-colors ${
               isError
-                ? 'text-red-600 hover:text-red-800'
-                : 'text-green-600 hover:text-green-800'
+                ? 'text-danger hover:text-danger-foreground'
+                : 'text-success hover:text-success-foreground'
             }`}
             aria-label="Close"
           >

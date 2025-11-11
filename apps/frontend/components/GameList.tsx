@@ -35,9 +35,9 @@ export default function GameList({
   if (games.length === 0) {
     return (
       <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">{title}</h2>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
-          <p className="text-gray-600">{emptyMessage}</p>
+        <h2 className="mb-4 text-xl font-semibold text-foreground">{title}</h2>
+        <div className="rounded-lg border border-border bg-surface p-6 text-center">
+          <p className="text-muted">{emptyMessage}</p>
         </div>
       </div>
     )
@@ -45,43 +45,43 @@ export default function GameList({
 
   return (
     <div className="mb-8">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold text-foreground">{title}</h2>
         <input
           type="text"
           placeholder="Search games..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-56 rounded border border-border bg-background px-3 py-1.5 text-sm text-foreground shadow-inner focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-hidden rounded-lg border border-border bg-surface-strong">
+        <table className="min-w-full divide-y divide-border">
+          <thead className="bg-surface">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-subtle">
                 Name
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-subtle">
                 Players
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-subtle">
                 Status
               </th>
               {showJoinButton && (
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-subtle">
                   Actions
                 </th>
               )}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-border bg-surface-strong">
             {filteredGames.length === 0 ? (
               <tr>
                 <td
                   colSpan={showJoinButton ? 4 : 3}
-                  className="px-4 py-8 text-center text-gray-500"
+                  className="px-4 py-8 text-center text-subtle"
                 >
                   No games match your search
                 </td>
@@ -90,16 +90,16 @@ export default function GameList({
               filteredGames.map((game) => (
                 <tr
                   key={game.id}
-                  className="hover:bg-gray-50 transition-colors"
+                  className="transition-colors hover:bg-surface"
                 >
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">
+                    <div className="text-sm font-medium text-foreground">
                       {game.name}
                     </div>
-                    <div className="text-xs text-gray-500">ID: {game.id}</div>
+                    <div className="text-xs text-subtle">ID: {game.id}</div>
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">
+                    <span className="text-sm text-foreground">
                       {game.player_count} / {game.max_players}
                     </span>
                   </td>
@@ -107,10 +107,10 @@ export default function GameList({
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         game.state === 'LOBBY'
-                          ? 'bg-green-100 text-green-800'
+                          ? 'bg-success/15 text-success-foreground'
                           : game.state === 'COMPLETED'
-                            ? 'bg-gray-100 text-gray-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                            ? 'bg-muted/10 text-subtle'
+                            : 'bg-warning/15 text-warning-foreground'
                       }`}
                     >
                       {game.state}
@@ -122,12 +122,12 @@ export default function GameList({
                       game.player_count < game.max_players ? (
                         <button
                           onClick={() => onJoin?.(game.id)}
-                          className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors"
+                          className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                         >
                           Join
                         </button>
                       ) : (
-                        <span className="text-sm text-gray-400">—</span>
+                        <span className="text-sm text-muted">—</span>
                       )}
                     </td>
                   )}

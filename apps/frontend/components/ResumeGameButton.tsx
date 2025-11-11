@@ -20,7 +20,7 @@ export default function ResumeGameButton({
   return (
     <button
       onClick={() => router.push(`/game/${lastActiveGameId}`)}
-      className={`text-sm bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors ${className || ''}`}
+      className={`rounded bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 ${className || ''}`}
     >
       ▶ Resume Game
     </button>

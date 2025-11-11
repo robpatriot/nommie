@@ -1,6 +1,12 @@
-import { signIn, signOut } from '@/auth'
+'use client'
+
 import Link from 'next/link'
 import ResumeGameButton from './ResumeGameButton'
+import { ThemeToggle } from './theme-toggle'
+import {
+  signInWithGoogleAction,
+  signOutAction,
+} from '@/app/actions/auth-actions'
 
 type HeaderProps = {
   session: { user?: { email?: string | null } } | null
@@ -13,15 +19,15 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
   const showLobbyLink = session?.user || disableAuth
 
   return (
-    <header className="w-full flex items-center justify-between gap-3 p-4 bg-white border-b border-gray-200">
+    <header className="flex w-full items-center justify-between gap-3 border-b border-border bg-surface-strong px-4 py-4">
       <div className="flex items-center gap-4">
-        <Link href="/" className="text-xl font-bold text-gray-900">
+        <Link href="/" className="text-xl font-bold text-foreground">
           🃏 Nommie
         </Link>
         {showLobbyLink && (
           <Link
             href="/lobby"
-            className="text-sm text-gray-700 hover:text-gray-900 hover:underline"
+            className="text-sm text-muted transition-colors hover:text-foreground hover:underline"
           >
             Lobby
           </Link>
@@ -30,36 +36,30 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
       <div className="flex items-center gap-3">
         {session?.user ? (
           <>
+            <ThemeToggle />
             <ResumeGameButton lastActiveGameId={lastActiveGameId ?? null} />
-            <span className="text-sm text-gray-600">{session.user.email}</span>
-            <form
-              action={async () => {
-                'use server'
-                await signOut()
-              }}
-            >
+            <span className="text-sm text-muted">{session.user.email}</span>
+            <form action={signOutAction}>
               <button
                 type="submit"
-                className="bg-gray-200 hover:bg-gray-300 px-3 py-1 rounded text-sm"
+                className="rounded bg-surface px-3 py-1 text-sm text-foreground transition-colors hover:bg-surface-strong"
               >
                 Sign out
               </button>
             </form>
           </>
         ) : (
-          <form
-            action={async () => {
-              'use server'
-              await signIn('google')
-            }}
-          >
-            <button
-              type="submit"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
-            >
-              Sign in with Google
-            </button>
-          </form>
+          <>
+            <ThemeToggle />
+            <form action={signInWithGoogleAction}>
+              <button
+                type="submit"
+                className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Sign in with Google
+              </button>
+            </form>
+          </>
         )}
       </div>
     </header>

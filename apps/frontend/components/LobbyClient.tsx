@@ -102,25 +102,25 @@ export default function LobbyClient({
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-background py-12">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <div className="mb-6">
-            <div className="bg-white shadow rounded-lg p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">
+            <div className="rounded-lg border border-border bg-surface-strong shadow-elevated p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h1 className="text-3xl font-bold text-foreground">
                   🎮 Game Lobby
                 </h1>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setIsCreateModalOpen(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+                    className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
                     Create Game
                   </button>
                   <button
                     onClick={handleRefresh}
                     disabled={refreshing}
-                    className="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="rounded bg-surface px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {refreshing ? 'Refreshing...' : 'Refresh'}
                   </button>
@@ -131,7 +131,7 @@ export default function LobbyClient({
                 <div className="mb-4">
                   <button
                     onClick={handleResume}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+                    className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
                     ▶ Resume Last Game
                   </button>
