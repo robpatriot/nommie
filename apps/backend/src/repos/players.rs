@@ -2,6 +2,7 @@
 
 use sea_orm::ConnectionTrait;
 
+use super::ai_profiles;
 use crate::adapters::players_sea as players_adapter;
 use crate::errors::domain::{DomainError, NotFoundKind};
 
@@ -26,6 +27,12 @@ pub async fn get_display_name_by_seat<C: ConnectionTrait + Send + Sync>(
 
     match game_player {
         Some((_game_player, user)) => {
+            if user.is_ai {
+                if let Some(profile) = ai_profiles::find_by_user_id(conn, user.id).await? {
+                    return Ok(profile.display_name);
+                }
+            }
+
             // Use username if available, otherwise fall back to sub
             let display_name = user.username.unwrap_or_else(|| user.sub.clone());
             Ok(display_name)

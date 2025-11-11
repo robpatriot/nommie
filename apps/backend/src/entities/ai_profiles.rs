@@ -9,6 +9,7 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_name = "user_id")]
     pub user_id: i64,
+    pub display_name: String,
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
     pub config: Option<Json>,

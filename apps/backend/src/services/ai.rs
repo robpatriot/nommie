@@ -102,6 +102,7 @@ impl AiService {
         ai_profiles::create_profile(
             txn,
             user.id,
+            name.clone(),
             Some(registry_name.to_string()),
             None,
             Some(profile_config),

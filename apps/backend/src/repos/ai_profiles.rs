@@ -11,6 +11,7 @@ use crate::errors::domain::DomainError;
 pub struct AiProfile {
     pub id: i64,
     pub user_id: i64,
+    pub display_name: String,
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
@@ -24,6 +25,7 @@ impl From<ai_profiles::Model> for AiProfile {
         Self {
             id: model.id,
             user_id: model.user_id,
+            display_name: model.display_name,
             playstyle: model.playstyle,
             difficulty: model.difficulty,
             config: model.config,
@@ -38,12 +40,13 @@ impl From<ai_profiles::Model> for AiProfile {
 pub async fn create_profile(
     txn: &DatabaseTransaction,
     user_id: i64,
+    display_name: impl Into<String>,
     playstyle: Option<String>,
     difficulty: Option<i32>,
     config: Option<serde_json::Value>,
     memory_level: Option<i32>,
 ) -> Result<AiProfile, DomainError> {
-    let mut dto = ai_profiles_adapter::AiProfileCreate::new(user_id);
+    let mut dto = ai_profiles_adapter::AiProfileCreate::new(user_id, display_name);
     if let Some(ps) = playstyle {
         dto = dto.with_playstyle(ps);
     }
@@ -91,6 +94,7 @@ pub async fn update_profile(
     profile: AiProfile,
 ) -> Result<AiProfile, DomainError> {
     let mut dto = ai_profiles_adapter::AiProfileUpdate::new(profile.id, profile.user_id);
+    dto = dto.with_display_name(profile.display_name);
     if let Some(ps) = profile.playstyle {
         dto = dto.with_playstyle(ps);
     }

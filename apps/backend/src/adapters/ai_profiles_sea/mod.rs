@@ -21,6 +21,7 @@ pub async fn create_profile(
     let profile_active = ai_profiles::ActiveModel {
         id: NotSet,
         user_id: Set(dto.user_id),
+        display_name: Set(dto.display_name),
         playstyle: Set(dto.playstyle),
         difficulty: Set(dto.difficulty),
         config: Set(dto.config),
@@ -46,9 +47,10 @@ pub async fn update_profile(
     txn: &DatabaseTransaction,
     dto: AiProfileUpdate,
 ) -> Result<ai_profiles::Model, sea_orm::DbErr> {
-    let profile = ai_profiles::ActiveModel {
+    let mut profile = ai_profiles::ActiveModel {
         id: Set(dto.id),
         user_id: Set(dto.user_id),
+        display_name: NotSet,
         playstyle: Set(dto.playstyle),
         difficulty: Set(dto.difficulty),
         config: Set(dto.config),
@@ -56,5 +58,10 @@ pub async fn update_profile(
         created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
+
+    if let Some(display_name) = dto.display_name {
+        profile.display_name = Set(display_name);
+    }
+
     profile.update(txn).await
 }

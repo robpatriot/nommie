@@ -93,6 +93,7 @@ enum AiProfiles {
     Table,
     Id,
     UserId,
+    DisplayName,
     Playstyle,
     Difficulty,
     Config,
@@ -602,6 +603,7 @@ impl MigrationTrait for Migration {
                             .auto_increment(),
                     )
                     .col(ColumnDef::new(AiProfiles::UserId).big_integer().not_null())
+                    .col(ColumnDef::new(AiProfiles::DisplayName).string().not_null())
                     .col(ColumnDef::new(AiProfiles::Playstyle).string().null())
                     .col(ColumnDef::new(AiProfiles::Difficulty).integer().null())
                     .col(ColumnDef::new(AiProfiles::Config).json_binary().null())

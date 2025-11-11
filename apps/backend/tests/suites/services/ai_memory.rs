@@ -251,6 +251,7 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     let profile = ai_profiles::create_profile(
         txn,
         user.id,
+        "Test AI".to_string(),
         Some(RandomPlayer::NAME.to_string()),
         Some(5),
         None,
@@ -258,6 +259,7 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     )
     .await?;
 
+    assert_eq!(profile.display_name, "Test AI");
     assert_eq!(profile.memory_level, Some(75));
 
     // Load it back
@@ -265,6 +267,7 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
         .await?
         .expect("Profile should exist");
 
+    assert_eq!(loaded.display_name, "Test AI");
     assert_eq!(loaded.memory_level, Some(75));
 
     // Update memory level to 100 (Full)
@@ -319,6 +322,7 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
         .await?
         .expect("AI profile should exist");
 
+    assert_eq!(profile.display_name, "Random Bot (Partial Memory)");
     assert_eq!(profile.memory_level, Some(60));
     assert_eq!(
         MemoryMode::from_db_value(profile.memory_level),
@@ -341,6 +345,7 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
         .await?
         .expect("AI profile should exist");
 
+    assert_eq!(profile2.display_name, "Random Bot (Full Memory)");
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;
 

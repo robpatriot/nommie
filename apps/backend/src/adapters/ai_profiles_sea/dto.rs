@@ -4,6 +4,7 @@
 #[derive(Debug, Clone)]
 pub struct AiProfileCreate {
     pub user_id: i64,
+    pub display_name: String,
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
@@ -11,14 +12,20 @@ pub struct AiProfileCreate {
 }
 
 impl AiProfileCreate {
-    pub fn new(user_id: i64) -> Self {
+    pub fn new(user_id: i64, display_name: impl Into<String>) -> Self {
         Self {
             user_id,
+            display_name: display_name.into(),
             playstyle: None,
             difficulty: None,
             config: None,
             memory_level: None,
         }
+    }
+
+    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
+        self.display_name = display_name.into();
+        self
     }
 
     pub fn with_playstyle(mut self, playstyle: impl Into<String>) -> Self {
@@ -47,6 +54,7 @@ impl AiProfileCreate {
 pub struct AiProfileUpdate {
     pub id: i64,
     pub user_id: i64,
+    pub display_name: Option<String>,
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
@@ -58,11 +66,17 @@ impl AiProfileUpdate {
         Self {
             id,
             user_id,
+            display_name: None,
             playstyle: None,
             difficulty: None,
             config: None,
             memory_level: None,
         }
+    }
+
+    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
+        self.display_name = Some(display_name.into());
+        self
     }
 
     pub fn with_playstyle(mut self, playstyle: impl Into<String>) -> Self {

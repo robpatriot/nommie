@@ -1,12 +1,13 @@
 //! Game-related HTTP routes.
 
+use std::collections::HashSet;
+
 use actix_web::http::header::{ETAG, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use rand::random;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
-use uuid::Uuid;
 
 use crate::adapters::games_sea::{self, GameUpdateRound};
 use crate::ai::{registry, AiConfig, HeuristicV1, RandomPlayer};
@@ -152,11 +153,16 @@ async fn get_snapshot(
 
                     if display_name.is_none() {
                         if let Some(user_ref) = user.as_ref() {
-                            if let Some(username) = &user_ref.username {
+                            if user_ref.is_ai {
+                                if let Some(profile) = ai_profile.as_ref() {
+                                    let trimmed = profile.display_name.trim();
+                                    if !trimmed.is_empty() {
+                                        display_name = Some(trimmed.to_owned());
+                                    }
+                                }
+                            } else if let Some(username) = &user_ref.username {
                                 let trimmed = username.trim();
-                                let looks_machine =
-                                    user_ref.is_ai && looks_like_machine_identifier(trimmed);
-                                if !trimmed.is_empty() && !looks_machine {
+                                if !trimmed.is_empty() {
                                     display_name = Some(trimmed.to_owned());
                                 }
                             }
@@ -164,7 +170,7 @@ async fn get_snapshot(
                     }
 
                     if seat_public.is_ai {
-                        if let Some(profile) = ai_profile {
+                        if let Some(profile) = ai_profile.as_ref() {
                             if let Some(ai_name) = profile.playstyle.clone() {
                                 let config = AiConfig::from_json(profile.config.as_ref());
                                 let version = config
@@ -651,10 +657,60 @@ async fn add_ai_seat(
             };
 
             let seat_index = seat_to_fill as u8;
-            let ai_service = AiService;
-            let suffix = &Uuid::new_v4().to_string()[..8];
-            let ai_display_name = format!("Bot {} {suffix}", seat_index + 1);
+            let mut existing_display_names: HashSet<String> = HashSet::new();
 
+            for membership in &existing_memberships {
+                if membership.turn_order == seat_to_fill {
+                    continue;
+                }
+
+                let user = users::find_user_by_id(txn, membership.user_id)
+                    .await
+                    .map_err(AppError::from)?;
+
+                if let Some(user) = user {
+                    if let Some(override_record) =
+                        ai_overrides::find_by_game_player_id(txn, membership.id)
+                            .await
+                            .map_err(AppError::from)?
+                    {
+                        if let Some(name) = override_record.name {
+                            let trimmed = name.trim();
+                            if !trimmed.is_empty() {
+                                existing_display_names.insert(trimmed.to_owned());
+                                continue;
+                            }
+                        }
+                    }
+
+                    if user.is_ai {
+                        if let Some(profile) = ai_profiles::find_by_user_id(txn, user.id)
+                            .await
+                            .map_err(AppError::from)?
+                        {
+                            let trimmed = profile.display_name.trim();
+                            if !trimmed.is_empty() {
+                                existing_display_names.insert(trimmed.to_owned());
+                            } else {
+                                existing_display_names.insert(friendly_ai_name(
+                                    user.id,
+                                    membership.turn_order as usize,
+                                ));
+                            }
+                        } else {
+                            existing_display_names
+                                .insert(friendly_ai_name(user.id, membership.turn_order as usize));
+                        }
+                    } else if let Some(username) = &user.username {
+                        let trimmed = username.trim();
+                        if !trimmed.is_empty() {
+                            existing_display_names.insert(trimmed.to_owned());
+                        }
+                    }
+                }
+            }
+
+            let ai_service = AiService;
             let (factory, registry_version, resolved_seed) =
                 resolve_registry_selection(&request, Some(HeuristicV1::NAME))?;
 
@@ -668,7 +724,7 @@ async fn add_ai_seat(
             let ai_user_id = ai_service
                 .create_ai_template_user(
                     txn,
-                    ai_display_name,
+                    format!("Bot {}", seat_index + 1),
                     factory.name,
                     &registry_version,
                     Some(ai_config),
@@ -676,6 +732,19 @@ async fn add_ai_seat(
                 )
                 .await
                 .map_err(AppError::from)?;
+
+            if let Some(mut profile) = ai_profiles::find_by_user_id(txn, ai_user_id)
+                .await
+                .map_err(AppError::from)?
+            {
+                let base_name = friendly_ai_name(ai_user_id, seat_index as usize);
+                let unique_name = unique_ai_display_name(&existing_display_names, &base_name);
+                existing_display_names.insert(unique_name.clone());
+                profile.display_name = unique_name;
+                ai_profiles::update_profile(txn, profile)
+                    .await
+                    .map_err(AppError::from)?;
+            }
 
             ai_service
                 .add_ai_to_game(txn, id, ai_user_id, seat_to_fill, None)
@@ -1081,23 +1150,7 @@ async fn play_card(
     Ok(HttpResponse::NoContent().finish())
 }
 
-fn looks_like_machine_identifier(name: &str) -> bool {
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-
-    if trimmed.starts_with("ai:") {
-        return true;
-    }
-
-    trimmed.len() >= 16
-        && trimmed
-            .chars()
-            .all(|ch| ch.is_ascii_hexdigit() || matches!(ch, '-' | ':'))
-}
-
-fn friendly_ai_name(user_id: i64, seat_index: usize) -> String {
+pub fn friendly_ai_name(user_id: i64, seat_index: usize) -> String {
     const AI_NAMES: [&str; 16] = [
         "Atlas", "Blaze", "Comet", "Dynamo", "Echo", "Flare", "Glyph", "Helix", "Ion", "Jet",
         "Kilo", "Lumen", "Nova", "Orion", "Pulse", "Quark",
@@ -1105,6 +1158,21 @@ fn friendly_ai_name(user_id: i64, seat_index: usize) -> String {
 
     let idx = ((user_id as usize) ^ seat_index) % AI_NAMES.len();
     AI_NAMES[idx].to_string()
+}
+
+fn unique_ai_display_name(existing: &HashSet<String>, base: &str) -> String {
+    if !existing.contains(base) {
+        return base.to_string();
+    }
+
+    let mut counter = 2;
+    loop {
+        let candidate = format!("{base} {counter}");
+        if !existing.contains(&candidate) {
+            return candidate;
+        }
+        counter += 1;
+    }
 }
 
 fn format_card(card: Card) -> String {
@@ -1150,4 +1218,22 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
         web::resource("/{game_id}/players/{seat}/display_name")
             .route(web::get().to(get_player_display_name)),
     );
+}
+
+#[cfg(test)]
+mod display_name_tests {
+    use std::collections::HashSet;
+
+    use super::unique_ai_display_name;
+
+    #[test]
+    fn unique_ai_names_append_suffixes() {
+        let mut existing = HashSet::new();
+        existing.insert("Atlas Bot".to_string());
+        let second = unique_ai_display_name(&existing, "Atlas Bot");
+        assert_eq!(second, "Atlas Bot 2");
+        existing.insert(second.clone());
+        let third = unique_ai_display_name(&existing, "Atlas Bot");
+        assert_eq!(third, "Atlas Bot 3");
+    }
 }

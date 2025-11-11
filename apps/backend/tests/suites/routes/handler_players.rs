@@ -1,7 +1,9 @@
 use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
+use backend::ai::RandomPlayer;
 use backend::error::AppError;
 use backend::routes::games::configure_routes;
+use backend::services::ai::AiService;
 
 use crate::support::app_builder::create_test_app;
 use crate::support::build_test_state;
@@ -44,6 +46,56 @@ async fn test_get_player_display_name_success() -> Result<(), AppError> {
 
     // Rollback the transaction after all assertions complete
     // (Reading the response body fully should have dropped request extensions)
+    shared.rollback().await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_player_display_name_ai_user() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+
+    // Get pooled DB and open a shared txn
+    let db = backend::db::require_db(&state).expect("DB required for this test");
+    let shared = backend::db::txn::SharedTxn::open(db).await?;
+
+    // Create test data with AI user
+    let game_id = create_test_game(shared.transaction()).await?;
+    let ai_service = AiService;
+    let ai_user_id = ai_service
+        .create_ai_template_user(
+            shared.transaction(),
+            "Test Bot Display",
+            RandomPlayer::NAME,
+            RandomPlayer::VERSION,
+            None,
+            Some(100),
+        )
+        .await?;
+    create_test_game_player(shared.transaction(), game_id, ai_user_id, 2).await?;
+
+    // Create test app
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(web::scope("/api/games").configure(configure_routes));
+        })
+        .build()
+        .await?;
+
+    // Test the endpoint
+    let req = test::TestRequest::get()
+        .uri(&format!("/api/games/{game_id}/players/2/display_name"))
+        .to_request();
+    req.extensions_mut().insert(shared.clone());
+
+    let resp = test::call_service(&app, req).await;
+
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let body: serde_json::Value = test::read_body_json(resp).await;
+    let expected_name = backend::routes::games::friendly_ai_name(ai_user_id, 2);
+    assert_eq!(body["display_name"], expected_name);
+
     shared.rollback().await?;
 
     Ok(())

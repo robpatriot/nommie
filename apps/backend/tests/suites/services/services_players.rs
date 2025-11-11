@@ -1,6 +1,8 @@
+use backend::ai::RandomPlayer;
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::errors::ErrorCode;
+use backend::services::ai::AiService;
 use backend::services::players::PlayerService;
 
 use crate::support::build_test_state;
@@ -112,6 +114,41 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
             let result = service.get_display_name_by_seat(txn, game_id, 1).await?;
 
             assert_eq!(result, "bob");
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_display_name_by_seat_ai_user() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let game_id = create_test_game(txn).await?;
+
+            let ai_service = AiService;
+            let ai_user_id = ai_service
+                .create_ai_template_user(
+                    txn,
+                    "Service Bot",
+                    RandomPlayer::NAME,
+                    RandomPlayer::VERSION,
+                    None,
+                    Some(100),
+                )
+                .await?;
+
+            create_test_game_player(txn, game_id, ai_user_id, 2).await?;
+
+            let service = PlayerService;
+            let display_name = service.get_display_name_by_seat(txn, game_id, 2).await?;
+
+            let expected = backend::routes::games::friendly_ai_name(ai_user_id, 2);
+            assert_eq!(display_name, expected);
             Ok::<_, AppError>(())
         })
     })

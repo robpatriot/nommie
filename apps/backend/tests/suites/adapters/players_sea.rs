@@ -1,7 +1,11 @@
 use backend::db::txn::with_txn;
+use backend::entities::users;
 use backend::error::AppError;
 use backend::errors::domain::DomainError;
-use backend::repos::players;
+use backend::repos::{ai_profiles as ai_profiles_repo, players};
+use rand::random;
+use sea_orm::{ActiveModelTrait, NotSet, Set};
+use time::OffsetDateTime;
 
 use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player;
@@ -46,6 +50,53 @@ async fn test_get_display_name_by_seat_fallback_to_sub() -> Result<(), AppError>
             let result = players::get_display_name_by_seat(txn, game_id, 1).await?;
 
             assert_eq!(result, "bob");
+
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_get_display_name_by_seat_ai_profile() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            // Create AI user
+            let now = OffsetDateTime::now_utc();
+            let ai_user = users::ActiveModel {
+                id: NotSet,
+                sub: Set(format!("ai-test-{}", random::<u32>())),
+                username: Set(None),
+                is_ai: Set(true),
+                created_at: Set(now),
+                updated_at: Set(now),
+            }
+            .insert(txn)
+            .await?;
+
+            // Create AI profile with display name
+            ai_profiles_repo::create_profile(
+                txn,
+                ai_user.id,
+                "Test Bot".to_string(),
+                Some("random".to_string()),
+                None,
+                None,
+                Some(100),
+            )
+            .await?;
+
+            let game_id = create_test_game(txn).await?;
+            let _ = create_test_game_player(txn, game_id, ai_user.id, 2).await?;
+
+            // Test the adapter
+            let result = players::get_display_name_by_seat(txn, game_id, 2).await?;
+
+            assert_eq!(result, "Test Bot");
 
             Ok::<_, AppError>(())
         })
