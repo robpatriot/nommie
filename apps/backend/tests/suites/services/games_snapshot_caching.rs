@@ -262,8 +262,11 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
 
     // Verify body is valid JSON with expected structure
     let json: Value = serde_json::from_slice(&body).expect("Body should be valid JSON");
-    assert!(json.get("game").is_some(), "Should have game field");
-    assert!(json.get("phase").is_some(), "Should have phase field");
+    let snapshot = json
+        .get("snapshot")
+        .expect("response should include snapshot payload");
+    assert!(snapshot.get("game").is_some(), "Should have game field");
+    assert!(snapshot.get("phase").is_some(), "Should have phase field");
 
     shared.rollback().await?;
     Ok(())
@@ -462,8 +465,11 @@ async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(
 
     // Verify body is valid JSON with expected structure
     let json: Value = serde_json::from_slice(&body).expect("Body should be valid JSON");
-    assert!(json.get("game").is_some(), "Should have game field");
-    assert!(json.get("phase").is_some(), "Should have phase field");
+    let snapshot = json
+        .get("snapshot")
+        .expect("response should include snapshot payload");
+    assert!(snapshot.get("game").is_some(), "Should have game field");
+    assert!(snapshot.get("phase").is_some(), "Should have phase field");
 
     shared.rollback().await?;
     Ok(())

@@ -4,14 +4,13 @@ import { Inter } from 'next/font/google'
 import { Suspense } from 'react'
 import './globals.css'
 import Header from '@/components/Header'
-import { auth } from '@/auth'
+import { auth, signOut } from '@/auth'
 import { getLastActiveGame } from '@/lib/api'
 import {
   isAuthDisabled,
   resolveBackendJwt,
   BackendJwtResolution,
 } from '@/lib/server/get-backend-jwt'
-import { redirect } from 'next/navigation'
 import type { Session } from 'next-auth'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -39,8 +38,7 @@ export default async function RootLayout({
     if (resolution.state === 'missing-session') {
       session = null
     } else if (resolution.state === 'missing-jwt') {
-      const callbackUrl = encodeURIComponent('/')
-      redirect(`/api/auth/signout?callbackUrl=${callbackUrl}`)
+      await signOut({ redirectTo: '/' })
     } else {
       session = resolution.session
       backendJwt = resolution.backendJwt

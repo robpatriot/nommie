@@ -84,17 +84,20 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
     let json: Value = serde_json::from_slice(&body).expect("Valid JSON response");
 
     // Verify top-level structure
+    let snapshot_obj = json
+        .get("snapshot")
+        .expect("response should include snapshot payload");
     assert!(
-        json.get("game").is_some(),
+        snapshot_obj.get("game").is_some(),
         "snapshot should have 'game' field"
     );
     assert!(
-        json.get("phase").is_some(),
+        snapshot_obj.get("phase").is_some(),
         "snapshot should have 'phase' field"
     );
 
     // Verify game header fields
-    let game_obj = json.get("game").unwrap();
+    let game_obj = snapshot_obj.get("game").unwrap();
     assert!(
         game_obj.get("round_no").is_some(),
         "game should have round_no"
@@ -110,7 +113,7 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
     );
 
     // Verify phase structure (should have a phase tag and data)
-    let phase = json.get("phase").unwrap();
+    let phase = snapshot_obj.get("phase").unwrap();
     assert!(
         phase.get("phase").is_some(),
         "phase should have discriminator tag"
@@ -245,9 +248,12 @@ async fn test_snapshot_phase_structure() -> Result<(), AppError> {
 
     let body = test::read_body(resp).await;
     let json: Value = serde_json::from_slice(&body).expect("Valid JSON response");
+    let snapshot = json
+        .get("snapshot")
+        .expect("response should include snapshot payload");
 
     // Verify phase is Bidding and contains expected fields
-    let phase_obj = json.get("phase").unwrap();
+    let phase_obj = snapshot.get("phase").unwrap();
     assert_eq!(
         phase_obj.get("phase").and_then(|v| v.as_str()),
         Some("Bidding")

@@ -117,9 +117,20 @@ impl GameService {
         let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
         let mut tricks_won = [0u8; 4];
         for trick in &all_tricks {
-            if trick.winner_seat >= 0 && trick.winner_seat < 4 {
-                tricks_won[trick.winner_seat as usize] += 1;
+            let winner = trick.winner_seat;
+            if !(0..=3).contains(&winner) {
+                continue;
             }
+
+            // Guard against placeholder winners for the in-progress trick (legacy data used 0)
+            if game.state == DbGameState::TrickPlay
+                && trick.trick_no == game.current_trick_no
+                && winner == 0
+            {
+                continue;
+            }
+
+            tricks_won[winner as usize] += 1;
         }
 
         // 9. Load current trick plays (if in TrickPlay)
@@ -177,7 +188,7 @@ impl GameService {
 
         let leader = all_tricks
             .last()
-            .map(|t| t.winner_seat as u8)
+            .and_then(|t| t.winner_seat.try_into().ok())
             .unwrap_or(turn_start);
 
         let turn = match phase {

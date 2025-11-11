@@ -4,14 +4,17 @@ use actix_web::http::header::{ETAG, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use rand::random;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::adapters::games_sea::{self, GameUpdateRound};
 use crate::db::txn::with_txn;
-use crate::domain::snapshot::SeatPublic;
+use crate::domain::player_view::CurrentRoundInfo;
+use crate::domain::snapshot::{GameSnapshot, SeatPublic};
 use crate::domain::state::Seat;
+use crate::domain::{Card, Rank, Suit};
 use crate::entities::games::{GameState, GameVisibility};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -27,6 +30,12 @@ use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
 use crate::services::players::PlayerService;
 use crate::state::app_state::AppState;
+
+#[derive(Serialize)]
+struct GameSnapshotResponse {
+    snapshot: GameSnapshot,
+    viewer_hand: Option<Vec<String>>,
+}
 
 /// GET /api/games/{game_id}/snapshot
 ///
@@ -45,88 +54,144 @@ async fn get_snapshot(
     let id = game_id.0;
 
     // Load game state and produce snapshot within a transaction
-    let (snapshot, lock_version, viewer_seat) = with_txn(Some(&http_req), &app_state, |txn| {
-        Box::pin(async move {
-            // Fetch game from database to get lock_version
-            let game = games_sea::find_by_id(txn, id)
-                .await
-                .map_err(|e| AppError::db("failed to fetch game", e))?
-                .ok_or_else(|| {
-                    AppError::not_found(
-                        crate::errors::ErrorCode::GameNotFound,
-                        format!("Game with ID {id} not found"),
-                    )
-                })?;
+    let (snapshot, lock_version, viewer_seat, viewer_hand) =
+        with_txn(Some(&http_req), &app_state, |txn| {
+            Box::pin(async move {
+                // Fetch game from database to get lock_version
+                let game = games_sea::find_by_id(txn, id)
+                    .await
+                    .map_err(|e| AppError::db("failed to fetch game", e))?
+                    .ok_or_else(|| {
+                        AppError::not_found(
+                            crate::errors::ErrorCode::GameNotFound,
+                            format!("Game with ID {id} not found"),
+                        )
+                    })?;
 
-            // Create game service and load game state
-            let game_service = crate::services::games::GameService;
-            let state = game_service.load_game_state(txn, id).await?;
+                // Create game service and load game state
+                let game_service = crate::services::games::GameService;
+                let state = game_service.load_game_state(txn, id).await?;
 
-            let memberships = memberships::find_all_by_game(txn, id)
-                .await
-                .map_err(AppError::from)?;
-
-            let mut viewer_seat: Option<Seat> = None;
-            // Produce the snapshot via the domain function
-            let mut snap = crate::domain::snapshot::snapshot(&state);
-
-            let mut seating = [
-                SeatPublic::empty(0),
-                SeatPublic::empty(1),
-                SeatPublic::empty(2),
-                SeatPublic::empty(3),
-            ];
-
-            let mut host_seat: Seat = 0;
-            let creator_user_id = game.created_by;
-
-            for membership in memberships {
-                let seat_idx = membership.turn_order;
-                if !(0..4).contains(&seat_idx) {
-                    continue;
-                }
-
-                let seat = seat_idx as u8;
-                let mut seat_public = SeatPublic::empty(seat);
-                seat_public.is_ready = membership.is_ready;
-                seat_public.user_id = Some(membership.user_id);
-
-                let user = users::find_user_by_id(txn, membership.user_id)
+                let memberships = memberships::find_all_by_game(txn, id)
                     .await
                     .map_err(AppError::from)?;
 
-                if let Some(user) = user {
-                    seat_public.is_ai = user.is_ai;
-                    let display_name = user
-                        .username
+                let mut viewer_seat: Option<Seat> = None;
+                // Produce the snapshot via the domain function
+                let mut snap = crate::domain::snapshot::snapshot(&state);
+
+                let mut seating = [
+                    SeatPublic::empty(0),
+                    SeatPublic::empty(1),
+                    SeatPublic::empty(2),
+                    SeatPublic::empty(3),
+                ];
+
+                let mut host_seat: Seat = 0;
+                let creator_user_id = game.created_by;
+
+                for membership in memberships {
+                    let seat_idx = membership.turn_order;
+                    if !(0..4).contains(&seat_idx) {
+                        continue;
+                    }
+
+                    let seat = seat_idx as u8;
+                    let mut seat_public = SeatPublic::empty(seat);
+                    seat_public.is_ready = membership.is_ready;
+                    seat_public.user_id = Some(membership.user_id);
+
+                    let user = users::find_user_by_id(txn, membership.user_id)
+                        .await
+                        .map_err(AppError::from)?;
+                    let ai_override = ai_overrides::find_by_game_player_id(txn, membership.id)
+                        .await
+                        .map_err(AppError::from)?;
+
+                    if let Some(user) = user.as_ref() {
+                        seat_public.is_ai = user.is_ai;
+                    }
+
+                    let mut display_name: Option<String> = ai_override
                         .as_ref()
-                        .map(|name| name.trim())
-                        .filter(|name| !name.is_empty())
-                        .map(str::to_owned)
-                        .unwrap_or_else(|| format!("Player {}", seat as usize + 1));
-                    seat_public.display_name = Some(display_name);
+                        .and_then(|ovr| ovr.name.as_ref())
+                        .and_then(|name| {
+                            let trimmed = name.trim();
+                            if trimmed.is_empty() {
+                                None
+                            } else {
+                                Some(trimmed.to_owned())
+                            }
+                        });
+
+                    if display_name.is_none() {
+                        if let Some(user_ref) = user.as_ref() {
+                            if let Some(username) = &user_ref.username {
+                                let trimmed = username.trim();
+                                let looks_machine =
+                                    user_ref.is_ai && looks_like_machine_identifier(trimmed);
+                                if !trimmed.is_empty() && !looks_machine {
+                                    display_name = Some(trimmed.to_owned());
+                                }
+                            }
+                        }
+                    }
+
+                    if display_name.is_none() {
+                        if let Some(user_ref) = user.as_ref() {
+                            if user_ref.is_ai {
+                                display_name = Some(friendly_ai_name(user_ref.id, seat as usize));
+                            }
+                        }
+                    }
+
+                    if display_name.is_none() {
+                        display_name = Some(format!("Player {}", seat as usize + 1));
+                    }
+
+                    seat_public.display_name = display_name;
+
+                    seating[seat_idx as usize] = seat_public;
+
+                    if creator_user_id == Some(membership.user_id) {
+                        host_seat = seat;
+                    }
+
+                    if membership.user_id == current_user.id {
+                        viewer_seat = Some(seat);
+                    }
+                }
+
+                snap.game.seating = seating;
+                snap.game.host_seat = host_seat;
+
+                let viewer_hand = if let Some(seat) = viewer_seat {
+                    if state.round_no == 0 {
+                        None
+                    } else {
+                        match CurrentRoundInfo::load(txn, id, seat as i16).await {
+                            Ok(info) => {
+                                Some(info.hand.into_iter().map(format_card).collect::<Vec<_>>())
+                            }
+                            Err(err) => {
+                                warn!(
+                                    game_id = id,
+                                    seat,
+                                    error = %err,
+                                    "Failed to load viewer hand"
+                                );
+                                None
+                            }
+                        }
+                    }
                 } else {
-                    seat_public.display_name = Some(format!("Player {}", seat as usize + 1));
-                }
+                    None
+                };
 
-                seating[seat_idx as usize] = seat_public;
-
-                if creator_user_id == Some(membership.user_id) {
-                    host_seat = seat;
-                }
-
-                if membership.user_id == current_user.id {
-                    viewer_seat = Some(seat);
-                }
-            }
-
-            snap.game.seating = seating;
-            snap.game.host_seat = host_seat;
-
-            Ok((snap, game.lock_version, viewer_seat))
+                Ok((snap, game.lock_version, viewer_seat, viewer_hand))
+            })
         })
-    })
-    .await?;
+        .await?;
 
     // Generate ETag from game ID and lock version
     let etag_value = game_etag(id, lock_version);
@@ -160,7 +225,10 @@ async fn get_snapshot(
     if let Some(seat) = viewer_seat {
         response.insert_header(("x-viewer-seat", seat.to_string()));
     }
-    Ok(response.json(snapshot))
+    Ok(response.json(GameSnapshotResponse {
+        snapshot,
+        viewer_hand,
+    }))
 }
 
 /// GET /api/games/{game_id}/players/{seat}/display_name
@@ -369,6 +437,11 @@ async fn mark_ready(
 #[derive(serde::Deserialize)]
 struct SubmitBidRequest {
     bid: u8,
+}
+
+#[derive(serde::Deserialize)]
+struct PlayCardRequest {
+    card: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -671,6 +744,93 @@ async fn submit_bid(
     Ok(HttpResponse::NoContent().finish())
 }
 
+async fn play_card(
+    http_req: HttpRequest,
+    game_id: GameId,
+    membership: GameMembership,
+    body: ValidatedJson<PlayCardRequest>,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+    let seat = membership.turn_order as i16;
+
+    let payload = body.into_inner();
+    let normalized = payload.card.trim().to_uppercase();
+
+    if normalized.is_empty() {
+        return Err(AppError::bad_request(
+            ErrorCode::ValidationError,
+            "Card value is required",
+        ));
+    }
+
+    let card = normalized.parse::<Card>().map_err(AppError::from)?;
+
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameFlowService;
+            service.play_card(txn, id, seat, card).await?;
+            Ok(())
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+fn looks_like_machine_identifier(name: &str) -> bool {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    if trimmed.starts_with("ai:") {
+        return true;
+    }
+
+    trimmed.len() >= 16
+        && trimmed
+            .chars()
+            .all(|ch| ch.is_ascii_hexdigit() || matches!(ch, '-' | ':'))
+}
+
+fn friendly_ai_name(user_id: i64, seat_index: usize) -> String {
+    const AI_NAMES: [&str; 16] = [
+        "Atlas", "Blaze", "Comet", "Dynamo", "Echo", "Flare", "Glyph", "Helix", "Ion", "Jet",
+        "Kilo", "Lumen", "Nova", "Orion", "Pulse", "Quark",
+    ];
+
+    let idx = ((user_id as usize) ^ seat_index) % AI_NAMES.len();
+    AI_NAMES[idx].to_string()
+}
+
+fn format_card(card: Card) -> String {
+    let rank_char = match card.rank {
+        Rank::Two => '2',
+        Rank::Three => '3',
+        Rank::Four => '4',
+        Rank::Five => '5',
+        Rank::Six => '6',
+        Rank::Seven => '7',
+        Rank::Eight => '8',
+        Rank::Nine => '9',
+        Rank::Ten => 'T',
+        Rank::Jack => 'J',
+        Rank::Queen => 'Q',
+        Rank::King => 'K',
+        Rank::Ace => 'A',
+    };
+
+    let suit_char = match card.suit {
+        Suit::Clubs => 'C',
+        Suit::Diamonds => 'D',
+        Suit::Hearts => 'H',
+        Suit::Spades => 'S',
+    };
+
+    format!("{rank_char}{suit_char}")
+}
+
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("").route(web::post().to(create_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
@@ -678,6 +838,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/{game_id}/ai/add").route(web::post().to(add_ai_seat)));
     cfg.service(web::resource("/{game_id}/ai/remove").route(web::post().to(remove_ai_seat)));
     cfg.service(web::resource("/{game_id}/bid").route(web::post().to(submit_bid)));
+    cfg.service(web::resource("/{game_id}/play").route(web::post().to(play_card)));
     cfg.service(web::resource("/{game_id}/snapshot").route(web::get().to(get_snapshot)));
     cfg.service(
         web::resource("/{game_id}/players/{seat}/display_name")

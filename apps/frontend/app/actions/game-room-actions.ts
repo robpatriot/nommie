@@ -67,7 +67,7 @@ export async function getGameRoomSnapshotAction(
         etag: snapshotResult.etag,
         playerNames,
         viewerSeat,
-        viewerHand: [],
+        viewerHand: snapshotResult.viewerHand ?? [],
         timestamp: new Date().toISOString(),
         hostSeat,
       },

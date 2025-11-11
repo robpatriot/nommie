@@ -86,10 +86,61 @@ export function GameRoomClient({
           setError({ message: result.message, traceId: result.traceId })
         }
       } catch (err) {
-        if (err instanceof Error) {
-          setError({ message: err.message })
+        const handleFailure = (failure: unknown) => {
+          if (failure instanceof Error) {
+            setError({ message: failure.message })
+          } else {
+            setError({ message: 'Unable to refresh game state' })
+          }
+        }
+
+        const shouldRetry =
+          err instanceof Error &&
+          (err.message === 'fetch failed' || err.message === 'network timeout')
+
+        if (shouldRetry) {
+          try {
+            const retryResult = await getGameRoomSnapshotAction({ gameId })
+
+            if (retryResult.kind === 'ok') {
+              setSnapshot((prev) => ({
+                ...retryResult.data,
+                viewerSeat:
+                  retryResult.data.viewerSeat !== null
+                    ? retryResult.data.viewerSeat
+                    : prev.viewerSeat,
+              }))
+              setEtag(retryResult.data.etag)
+              setError(null)
+              inflightRef.current = false
+              setIsPolling(false)
+              setIsRefreshing(false)
+              return
+            }
+
+            if (retryResult.kind === 'not_modified') {
+              setSnapshot((prev) => ({
+                ...prev,
+                timestamp: new Date().toISOString(),
+              }))
+              setError(null)
+              inflightRef.current = false
+              setIsPolling(false)
+              setIsRefreshing(false)
+              return
+            }
+
+            setError({
+              message: retryResult.message,
+              traceId: retryResult.traceId,
+            })
+          } catch (retryErr) {
+            console.error('Snapshot refresh retry failed', retryErr)
+            handleFailure(retryErr)
+          }
         } else {
-          setError({ message: 'Unable to refresh game state' })
+          console.error('Snapshot refresh failed', err)
+          handleFailure(err)
         }
       } finally {
         setIsPolling(false)
@@ -276,11 +327,11 @@ export function GameRoomClient({
   const phase = snapshot.snapshot.phase
 
   const biddingControls = useMemo(() => {
-    if (phase.phase !== 'Bidding') {
-      return undefined
-    }
-
-    if (viewerSeatForInteractions === null) {
+    if (
+      phase.phase !== 'Bidding' ||
+      viewerSeatForInteractions === null ||
+      phase.data.bids[viewerSeatForInteractions] !== null
+    ) {
       return undefined
     }
 

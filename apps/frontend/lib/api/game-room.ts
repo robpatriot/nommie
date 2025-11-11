@@ -1,7 +1,7 @@
 'use server'
 
 import { fetchWithAuth, BackendApiError } from '@/lib/api'
-import type { GameSnapshot, Seat } from '@/lib/game-room/types'
+import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
 
 export type GameSnapshotResult =
   | {
@@ -9,6 +9,7 @@ export type GameSnapshotResult =
       snapshot: GameSnapshot
       etag?: string
       viewerSeat?: Seat | null
+      viewerHand: Card[]
     }
   | { kind: 'not_modified' }
 
@@ -20,7 +21,12 @@ export async function fetchGameSnapshot(
     const response = await fetchWithAuth(`/api/games/${gameId}/snapshot`, {
       headers: options.etag ? { 'If-None-Match': options.etag } : undefined,
     })
-    const snapshot: GameSnapshot = await response.json()
+    interface SnapshotEnvelope {
+      snapshot: GameSnapshot
+      viewer_hand?: Card[] | null
+    }
+
+    const body = (await response.json()) as SnapshotEnvelope
     const etag = response.headers.get('etag') ?? undefined
     const viewerSeatHeader = response.headers.get('x-viewer-seat')
     const viewerSeat =
@@ -32,8 +38,19 @@ export async function fetchGameSnapshot(
       viewerSeat !== null && Number.isFinite(viewerSeat)
         ? (Math.max(0, Math.min(3, viewerSeat)) as Seat)
         : null
+    const viewerHand =
+      Array.isArray(body.viewer_hand) &&
+      body.viewer_hand.every((card) => typeof card === 'string')
+        ? (body.viewer_hand as Card[])
+        : []
 
-    return { kind: 'ok', snapshot, etag, viewerSeat: parsedViewerSeat }
+    return {
+      kind: 'ok',
+      snapshot: body.snapshot,
+      etag,
+      viewerSeat: parsedViewerSeat,
+      viewerHand,
+    }
   } catch (error) {
     if (error instanceof BackendApiError && error.status === 304) {
       return { kind: 'not_modified' }
