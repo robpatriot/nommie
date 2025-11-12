@@ -862,6 +862,13 @@ async fn add_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
+            // Check if all players are ready and start the game if so
+            // This handles the case where the host marks themselves ready before adding AI players
+            let game_flow_service = GameFlowService;
+            game_flow_service
+                .check_and_start_game_if_ready(txn, id)
+                .await?;
+
             Ok(())
         })
     })

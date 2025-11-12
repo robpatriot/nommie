@@ -392,6 +392,12 @@ This section captures identified improvements across four categories: functional
 - ✅ **COMPLETED**: Default name mismatch:
   - ✅ Fixed create game to always send default name (`{creatorName} game`) if user doesn't provide one
   - ✅ Frontend now matches backend behavior expectations
+- ✅ **COMPLETED**: Game auto-start when host marks ready before adding AI:
+  - ✅ Fixed issue where game didn't start when host marked themselves ready before there were 4 players and then added AI players
+  - ✅ Extracted game start logic into `check_and_start_game_if_ready()` helper function in `GameFlowService`
+  - ✅ Updated `mark_ready()` to use the helper function
+  - ✅ Updated `add_ai_seat()` route handler to check and start game after adding AI seat
+  - ✅ Game now starts automatically when the 4th player (AI or human) is added, regardless of order
 - Error handling inconsistencies:
   - `game-room-client.tsx` has retry logic for network failures (lines 111-158)
   - Other components don't have similar retry logic
@@ -427,32 +433,35 @@ This section captures identified improvements across four categories: functional
   - ✅ Extracted to `useApiAction()` hook
   - ✅ Refactored 6 handlers in `game-room-client.tsx`: `handleSubmitBid`, `handleSelectTrump`, `handlePlayCard`, `handleAddAi`, `handleRemoveAiSeat`, `handleUpdateAiSeat`
   - ✅ Centralized try/catch, `BackendApiError` wrapping, toast display, traceId logging
-- Toast message creation:
-  - `LobbyClient.tsx` line 82-93: `showToast` function
-  - `game-room-client.tsx` line 193-203: `showToast` function
-  - Nearly identical implementations
-- Player name normalization:
-  - `app/game/[gameId]/page.tsx` lines 36-42: Player name extraction logic
-  - `app/actions/game-room-actions.ts` lines 52-58: Same logic duplicated
-- Seat validation:
-  - `app/actions/game-room-actions.ts` lines 223-232, 259-268, 292-303: Seat validation repeated three times
-  - Should be a shared utility function
+- ✅ **COMPLETED**: Action completion and refresh logic:
+  - ✅ Extracted shared `completeActionAndRefresh()` helper to eliminate ~90 lines of duplication
+  - ✅ All action handlers (bid, trump, play, AI operations, markReady) now use consistent pattern
+  - ✅ Unified refresh approach across all actions
+- ✅ **COMPLETED**: Toast message creation:
+  - ✅ Extracted to `hooks/useToast.ts` hook
+  - ✅ Used consistently in `LobbyClient.tsx` and `game-room-client.tsx`
+- ✅ **COMPLETED**: Player name normalization:
+  - ✅ Extracted to `utils/player-names.ts` with `extractPlayerName()` and `extractPlayerNames()` functions
+  - ✅ Used in `app/game/[gameId]/page.tsx` and `app/actions/game-room-actions.ts`
+- ✅ **COMPLETED**: Seat validation:
+  - ✅ Extracted to `utils/seat-validation.ts` with `validateSeat()` function
+  - ✅ Used consistently in `app/actions/game-room-actions.ts` (eliminated 3 duplicate implementations)
 - ✅ **COMPLETED**: Auth bypass checks:
   - ✅ Removed all `NEXT_PUBLIC_DISABLE_AUTH` checks and `isAuthDisabled()` function
-- Date/time formatting:
-  - `game-room-view.tsx` line 136-139: Manual date formatting
-  - Could use a shared utility
+- ✅ **COMPLETED**: Date/time formatting:
+  - ✅ Extracted to `utils/date-formatting.ts` with `formatTime()` function
+  - ✅ Used in `game-room-view.tsx` for sync label formatting
 - API error response parsing:
   - `lib/api.ts` lines 72-101: Problem Details parsing
   - Similar error extraction logic in multiple action files
 
 **Recommendations:**
 - ✅ Extract error handling to a custom hook: `useApiAction()` — **COMPLETED**
-- Create shared utilities:
-  - `utils/player-names.ts` for name normalization
-  - `utils/seat-validation.ts` for seat validation
-  - `utils/date-formatting.ts` for date formatting
-- Create a shared `useToast()` hook
+- ✅ Create shared utilities:
+  - ✅ `utils/player-names.ts` for name normalization — **COMPLETED**
+  - ✅ `utils/seat-validation.ts` for seat validation — **COMPLETED**
+  - ✅ `utils/date-formatting.ts` for date formatting — **COMPLETED**
+- ✅ Create a shared `useToast()` hook — **COMPLETED**
 - ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
 
 ### 4. Efficiency and Quality
@@ -487,7 +496,8 @@ This section captures identified improvements across four categories: functional
   - Limited test files found (`AuthControl.test.tsx`, `game-room-view.test.tsx`)
   - No tests for critical paths like `game-room-client.tsx`, API functions, or error handling
 - Documentation:
-  - Missing JSDoc for complex functions
+  - ✅ **IMPROVED**: Added JSDoc comments for `executeRefresh` and `requestRefresh` functions
+  - ✅ **IMPROVED**: Added comprehensive inline documentation explaining state/ref duality and recursive call safety
   - No README explaining architecture
   - Complex logic (like JWT refresh) lacks inline comments
 - Accessibility:
@@ -521,6 +531,8 @@ This section captures identified improvements across four categories: functional
 3. ✅ Fix race conditions in polling/refresh logic — **COMPLETED** (unified activity state)
 4. ✅ Add Error Boundaries — **COMPLETED** (ErrorBoundary component)
 5. ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
+6. ✅ Extract shared action completion logic — **COMPLETED** (completeActionAndRefresh helper)
+7. ✅ Remove backwards compatibility code — **COMPLETED** (mock data, old session handling, graceful errors)
 
 **Completed:**
 - ✅ Removed outdated TODOs and 404 handling from all game endpoints (create, join, joinable, in-progress, last-active)
@@ -536,10 +548,14 @@ This section captures identified improvements across four categories: functional
 - ✅ Created `ErrorBoundary` component and wrapped major sections
 - ✅ Added user-friendly error recovery UI with ErrorBoundary
 - ✅ Fixed race conditions in polling/refresh logic: Implemented unified `ActivityState` type to track polling, refresh, and actions. Replaced all individual pending flags with single activity state. Added activity ref to avoid dependency issues. Added pending manual refresh queue to handle manual refresh requests during polling. Polling now respects activity state and only runs when idle. Actions block both polling and manual refresh. Manual refresh can queue when polling is in progress and executes after polling completes. Eliminated race conditions and concurrent action issues.
+- ✅ **Refactored concurrent action/refresh logic for maintainability**: Extracted shared `completeActionAndRefresh()` helper to eliminate ~90 lines of duplication across 6 action handlers (bid, trump, play, AI add/remove/update). Renamed functions for clarity (`doRefresh` → `executeRefresh`, `performRefresh` → `requestRefresh`). Added comprehensive documentation explaining state/ref duality, recursive call safety, and function purposes. Unified all actions (including `markReady`) to use consistent refresh pattern. Improved code quality and maintainability without functional changes.
+- ✅ **Removed backwards compatibility code**: Removed mock data fallback from game room page. Removed old session format handling from auth.ts. Removed graceful error handling from API functions (fail hard approach). Updated UI roadmap documentation. All code now follows "fail hard" approach with errors handled by ErrorBoundary.
+- ✅ **Extracted duplicated utilities**: Created shared utilities to eliminate duplication: `utils/player-names.ts` (extractPlayerName, extractPlayerNames), `utils/seat-validation.ts` (validateSeat), `utils/date-formatting.ts` (formatTime), and `hooks/useToast.ts` hook. All components now use these shared utilities consistently, eliminating duplicate implementations across the codebase.
+- ✅ **Fixed game auto-start bug**: Fixed issue where game didn't start when host marked themselves ready before there were 4 players and then added AI players to make up the remaining players. Extracted game start logic into `check_and_start_game_if_ready()` helper function in backend `GameFlowService`. Updated `mark_ready()` and `add_ai_seat()` route handler to use the helper. Game now starts automatically when the 4th player (AI or human) is added, regardless of whether the host marked ready first.
 
 **Medium Priority:**
 1. Split large components
-2. Extract duplicated utilities (player names, seat validation)
+2. ✅ Extract duplicated utilities (player names, seat validation, date formatting, toast) — **COMPLETED**
 3. Add loading states for initial page loads
 4. Implement adaptive polling
 5. Add comprehensive error retry logic

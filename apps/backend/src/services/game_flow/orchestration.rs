@@ -10,36 +10,15 @@ use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::{bids, memberships, plays, rounds, tricks};
 
 impl GameFlowService {
-    /// Mark a player as ready and check if game should start.
+    /// Check if all players are ready and start the game if conditions are met.
     ///
-    /// If all players are ready after this call, automatically deals the first round.
-    pub async fn mark_ready(
+    /// This is called after a player marks themselves ready or after an AI player is added.
+    /// If all 4 players are ready, automatically deals the first round.
+    pub async fn check_and_start_game_if_ready(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-        user_id: i64,
     ) -> Result<(), AppError> {
-        info!(game_id, user_id, "Marking player ready");
-
-        // Find membership
-        let membership = memberships::find_membership(txn, game_id, user_id)
-            .await?
-            .ok_or_else(|| {
-                DomainError::validation(
-                    ValidationKind::Other("NOT_IN_GAME".into()),
-                    "Player not in game",
-                )
-            })?;
-
-        // Mark ready
-        let dto = memberships_sea::MembershipSetReady {
-            id: membership.id,
-            is_ready: true,
-        };
-        memberships_sea::set_membership_ready(txn, dto).await?;
-
-        info!(game_id, user_id, "Player marked ready");
-
         // Check if all players are ready
         let all_memberships = memberships::find_all_by_game(txn, game_id).await?;
         let all_ready = all_memberships.iter().all(|m| m.is_ready);
@@ -71,6 +50,42 @@ impl GameFlowService {
             // Process game state to handle transitions and AI actions
             self.process_game_state(txn, game_id).await?;
         }
+
+        Ok(())
+    }
+
+    /// Mark a player as ready and check if game should start.
+    ///
+    /// If all players are ready after this call, automatically deals the first round.
+    pub async fn mark_ready(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        user_id: i64,
+    ) -> Result<(), AppError> {
+        info!(game_id, user_id, "Marking player ready");
+
+        // Find membership
+        let membership = memberships::find_membership(txn, game_id, user_id)
+            .await?
+            .ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("NOT_IN_GAME".into()),
+                    "Player not in game",
+                )
+            })?;
+
+        // Mark ready
+        let dto = memberships_sea::MembershipSetReady {
+            id: membership.id,
+            is_ready: true,
+        };
+        memberships_sea::set_membership_ready(txn, dto).await?;
+
+        info!(game_id, user_id, "Player marked ready");
+
+        // Check if all players are ready and start game if so
+        self.check_and_start_game_if_ready(txn, game_id).await?;
 
         Ok(())
     }
