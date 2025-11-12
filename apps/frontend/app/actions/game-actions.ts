@@ -13,7 +13,7 @@ export async function createGameAction(
   { game: Game; error?: never } | { error: BackendApiError; game?: never }
 > {
   try {
-    // Auth is enforced centrally in fetchWithAuth (with [AUTH_BYPASS])
+    // Auth is enforced centrally in fetchWithAuth
 
     // Frontend ensures a default name is provided if user doesn't enter one
     // Trim the name and send it to backend (backend will use its own default if name is omitted)
@@ -49,7 +49,7 @@ export async function joinGameAction(
   { game: Game; error?: never } | { error: BackendApiError; game?: never }
 > {
   try {
-    // Auth is enforced centrally in fetchWithAuth (with [AUTH_BYPASS])
+    // Auth is enforced centrally in fetchWithAuth
 
     const response = await fetchWithAuth(`/api/games/${gameId}/join`, {
       method: 'POST',

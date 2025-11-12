@@ -4,7 +4,6 @@
 
 import {
   BackendJwtMissingError,
-  isAuthDisabled,
   requireBackendJwt,
 } from '@/lib/server/get-backend-jwt'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
@@ -29,30 +28,24 @@ export async function fetchWithAuth(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  // [AUTH_BYPASS] START - Temporary debugging feature - remove when done
-  const disableAuth = isAuthDisabled()
-
-  // Skip auth check if bypass is enabled
+  // Always require backend JWT for authenticated requests
   let authHeaders: Record<string, string> = {}
-  if (!disableAuth) {
-    try {
-      const backendJwt = await requireBackendJwt()
+  try {
+    const backendJwt = await requireBackendJwt()
 
-      authHeaders = {
-        Authorization: `Bearer ${backendJwt}`,
-      }
-    } catch (error) {
-      if (error instanceof BackendJwtMissingError) {
-        throw new BackendApiError(
-          'Authentication required',
-          401,
-          'MISSING_BACKEND_JWT'
-        )
-      }
-      throw error
+    authHeaders = {
+      Authorization: `Bearer ${backendJwt}`,
     }
+  } catch (error) {
+    if (error instanceof BackendJwtMissingError) {
+      throw new BackendApiError(
+        'Authentication required',
+        401,
+        'MISSING_BACKEND_JWT'
+      )
+    }
+    throw error
   }
-  // [AUTH_BYPASS] END
 
   const baseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
   if (!baseUrl) {

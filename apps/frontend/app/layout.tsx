@@ -6,10 +6,9 @@ import Script from 'next/script'
 import { cookies } from 'next/headers'
 import './globals.css'
 import Header from '@/components/Header'
-import { auth, signOut } from '@/auth'
+import { signOut } from '@/auth'
 import { getLastActiveGame } from '@/lib/api'
 import {
-  isAuthDisabled,
   resolveBackendJwt,
   BackendJwtResolution,
 } from '@/lib/server/get-backend-jwt'
@@ -53,24 +52,18 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const disableAuth = isAuthDisabled()
-
   let session: Session | null = null
   let backendJwt: string | undefined
 
-  if (disableAuth) {
-    session = await auth()
-  } else {
-    const resolution: BackendJwtResolution = await resolveBackendJwt()
+  const resolution: BackendJwtResolution = await resolveBackendJwt()
 
-    if (resolution.state === 'missing-session') {
-      session = null
-    } else if (resolution.state === 'missing-jwt') {
-      await signOut({ redirectTo: '/' })
-    } else {
-      session = resolution.session
-      backendJwt = resolution.backendJwt
-    }
+  if (resolution.state === 'missing-session') {
+    session = null
+  } else if (resolution.state === 'missing-jwt') {
+    await signOut({ redirectTo: '/' })
+  } else {
+    session = resolution.session
+    backendJwt = resolution.backendJwt
   }
 
   // Only try to get last active game if we have a backend JWT
@@ -86,7 +79,7 @@ export default async function RootLayout({
     }
   }
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const themeCookie = cookieStore.get('nommie_theme')?.value ?? null
 
   let initialTheme: ThemeMode = 'system'

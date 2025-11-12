@@ -352,17 +352,20 @@ This section captures identified improvements across four categories: functional
 ### 1. Functional Completeness
 
 **Gaps/Incomplete Areas:**
-- Remove all `[AUTH_BYPASS]` temporary debugging code from:
-  - `app/page.tsx`
-  - `app/lobby/page.tsx`
-  - `lib/api.ts`
-  - `components/Header.tsx`
-- Complete or document backend endpoint integration for:
-  - `getJoinableGames()` — currently returns empty array on 404
-  - `getInProgressGames()` — currently returns empty array on 404
-  - `getLastActiveGame()` — currently returns null on 404
-  - `createGameAction()` — has 404 handling that should be removed once endpoint is implemented
-  - `joinGameAction()` — has 404 handling that should be removed once endpoint is implemented
+- ✅ **COMPLETED**: Remove all `[AUTH_BYPASS]` temporary debugging code:
+  - ✅ `app/page.tsx` — removed AUTH_BYPASS block, always requires session
+  - ✅ `app/lobby/page.tsx` — removed AUTH_BYPASS block, always requires session
+  - ✅ `lib/api.ts` — removed AUTH_BYPASS block, always requires backend JWT
+  - ✅ `components/Header.tsx` — removed disableAuth check
+  - ✅ `app/layout.tsx` — removed isAuthDisabled usage
+  - ✅ `lib/server/get-backend-jwt.ts` — removed isAuthDisabled() function
+  - ✅ `app/actions/game-actions.ts` — removed AUTH_BYPASS comment references
+- ✅ **COMPLETED**: Backend endpoint integration cleanup:
+  - ✅ `getJoinableGames()` — removed outdated TODO and 404 handling
+  - ✅ `getInProgressGames()` — removed outdated TODO and 404 handling
+  - ✅ `getLastActiveGame()` — implemented backend endpoint, removed outdated TODO and 404 handling
+  - ✅ `createGameAction()` — removed outdated TODO and 404 handling
+  - ✅ `joinGameAction()` — removed outdated TODO and 404 handling
 - Missing features:
   - Loading states for initial page loads (skeletons/spinners)
   - Offline detection and retry logic
@@ -374,7 +377,7 @@ This section captures identified improvements across four categories: functional
   - Pagination for game lists
 
 **Recommendations:**
-- Remove all `[AUTH_BYPASS]` code paths
+- ✅ Remove all `[AUTH_BYPASS]` code paths — **COMPLETED**
 - Complete backend endpoint integration or document as intentional fallback behavior
 - Add loading skeletons for initial data fetches
 - Consider WebSocket/SSE for real-time updates instead of polling only
@@ -382,11 +385,13 @@ This section captures identified improvements across four categories: functional
 ### 2. Functional Correctness
 
 **Issues Found:**
-- Auth bypass inconsistency:
-  - `app/page.tsx` and `app/lobby/page.tsx` check `NEXT_PUBLIC_DISABLE_AUTH` directly
-  - `lib/api.ts` uses `isAuthDisabled()` helper function
-  - `components/Header.tsx` checks `NEXT_PUBLIC_DISABLE_AUTH` directly
-  - Should standardize on using `isAuthDisabled()` helper everywhere
+- ✅ **COMPLETED**: Auth bypass inconsistency:
+  - ✅ Removed all `NEXT_PUBLIC_DISABLE_AUTH` checks and `isAuthDisabled()` function
+  - ✅ All routes now require authentication consistently
+  - ✅ All API calls require backend JWT without bypass option
+- ✅ **COMPLETED**: Default name mismatch:
+  - ✅ Fixed create game to always send default name (`{creatorName} game`) if user doesn't provide one
+  - ✅ Frontend now matches backend behavior expectations
 - Error handling inconsistencies:
   - `game-room-client.tsx` has retry logic for network failures (lines 111-158)
   - Other components don't have similar retry logic
@@ -402,9 +407,12 @@ This section captures identified improvements across four categories: functional
   - Multiple pending states (`isBidPending`, `isTrumpPending`, etc.) but no global "action in progress" guard
 - Data synchronization:
   - `game-room-client.tsx` lines 84-90: When updating snapshot, preserves `viewerSeat` from previous if new one is null — may cause stale data
+- ✅ **COMPLETED**: Joinable games UI membership check:
+  - ✅ Fixed joinable games to check `viewer_is_member` before showing "Join" button
+  - ✅ Shows "Go to game" if user is already a member, "Join" if not a member
 
 **Recommendations:**
-- Standardize auth bypass checks (use `isAuthDisabled()` everywhere)
+- ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
 - Add consistent retry logic across all API calls
 - Implement global action queue/mutex to prevent concurrent actions
 - Add validation for seat numbers before clamping
@@ -505,11 +513,21 @@ This section captures identified improvements across four categories: functional
 ### Priority Summary
 
 **High Priority:**
-1. Remove all `[AUTH_BYPASS]` code
+1. ✅ Remove all `[AUTH_BYPASS]` code — **COMPLETED**
 2. Extract duplicated error handling into shared hook
 3. Fix race conditions in polling/refresh logic
 4. Add Error Boundaries
-5. Standardize auth bypass checks
+5. ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
+
+**Completed:**
+- ✅ Removed outdated TODOs and 404 handling from all game endpoints (create, join, joinable, in-progress, last-active)
+- ✅ Fixed create game default name handling
+- ✅ Fixed joinable games UI to check membership status
+- ✅ Implemented last-active game endpoint (backend + frontend)
+- ✅ Updated button labels to "Most Recent Game"
+- ✅ Removed all `[AUTH_BYPASS]` code and `isAuthDisabled()` function
+- ✅ All routes and API calls now require authentication consistently
+- ✅ Removed `NEXT_PUBLIC_DISABLE_AUTH` environment variable usage
 
 **Medium Priority:**
 1. Split large components

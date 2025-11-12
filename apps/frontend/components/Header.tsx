@@ -14,17 +14,13 @@ type HeaderProps = {
 }
 
 export default function Header({ session, lastActiveGameId }: HeaderProps) {
-  // [AUTH_BYPASS] - Show lobby link when auth disabled
-  const disableAuth = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true'
-  const showLobbyLink = session?.user || disableAuth
-
   return (
     <header className="flex w-full items-center justify-between gap-3 border-b border-border bg-surface-strong px-4 py-4">
       <div className="flex items-center gap-4">
         <Link href="/" className="text-xl font-bold text-foreground">
           🃏 Nommie
         </Link>
-        {showLobbyLink && (
+        {session?.user && (
           <Link
             href="/lobby"
             className="text-sm text-muted transition-colors hover:text-foreground hover:underline"

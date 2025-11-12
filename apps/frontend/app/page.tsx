@@ -4,13 +4,10 @@ import { redirect } from 'next/navigation'
 export default async function Home() {
   const session = await auth()
 
-  // [AUTH_BYPASS] START - Temporary debugging feature - remove when done
-  const disableAuth = process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true'
-  // If authenticated, redirect to lobby (unless bypass enabled - then auto-redirect)
-  if (session || disableAuth) {
+  // If authenticated, redirect to lobby
+  if (session) {
     redirect('/lobby')
   }
-  // [AUTH_BYPASS] END
 
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Nommie'
 

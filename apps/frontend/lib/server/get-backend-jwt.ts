@@ -22,10 +22,6 @@ export type BackendJwtResolution =
   | { state: 'missing-jwt'; session: Session }
   | { state: 'ready'; session: Session; backendJwt: string }
 
-export function isAuthDisabled(): boolean {
-  return process.env.NEXT_PUBLIC_DISABLE_AUTH === 'true'
-}
-
 export class BackendJwtMissingError extends Error {
   constructor(message = 'Backend JWT is missing') {
     super(message)
@@ -80,12 +76,6 @@ export async function resolveBackendJwt(): Promise<BackendJwtResolution> {
 }
 
 export async function requireBackendJwt(): Promise<string> {
-  if (isAuthDisabled()) {
-    throw new Error(
-      'requireBackendJwt should not be called when auth is disabled'
-    )
-  }
-
   const resolution = await resolveBackendJwt()
 
   switch (resolution.state) {
