@@ -367,7 +367,7 @@ This section captures identified improvements across four categories: functional
   - ✅ `createGameAction()` — removed outdated TODO and 404 handling
   - ✅ `joinGameAction()` — removed outdated TODO and 404 handling
 - Missing features:
-  - Loading states for initial page loads (skeletons/spinners)
+  - ✅ **COMPLETED**: Loading states for initial page loads (skeletons/spinners) - added loading.tsx for lobby and game room
   - Offline detection and retry logic
   - Optimistic updates for game actions (bid, play, etc.)
   - Real-time updates (WebSocket/SSE) instead of polling only
@@ -379,7 +379,7 @@ This section captures identified improvements across four categories: functional
 **Recommendations:**
 - ✅ Remove all `[AUTH_BYPASS]` code paths — **COMPLETED**
 - Complete backend endpoint integration or document as intentional fallback behavior
-- Add loading skeletons for initial data fetches
+- ✅ Add loading skeletons for initial data fetches — **COMPLETED** (loading.tsx for lobby and game room)
 - Consider WebSocket/SSE for real-time updates instead of polling only
 
 ### 2. Functional Correctness
@@ -536,7 +536,7 @@ This section captures identified improvements across four categories: functional
 1. ✅ Extract duplicated utilities (player names, seat validation, date formatting, toast) — **COMPLETED**
 2. ✅ Fix functional correctness bugs — **COMPLETED**
 3. ✅ Split large components (`game-room-view.tsx` into: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, etc.) — **COMPLETED**
-4. Add loading states for initial page loads
+4. ✅ Add loading states for initial page loads — **COMPLETED** (loading.tsx skeletons for lobby and game room)
 5. ✅ Add comprehensive error retry logic — **COMPLETED** (retry logic in fetchWithAuth with exponential backoff)
 
 **Low Priority:**
