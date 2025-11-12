@@ -13,7 +13,7 @@ impl MigratorTrait for Migrator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MigrationCommand {
     Up,
     Down,

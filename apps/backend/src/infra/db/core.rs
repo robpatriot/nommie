@@ -719,7 +719,8 @@ async fn migrate_with_guard_controlled(
 
     // Spawn migration task for controlled execution
     let pool_clone = pool.clone();
-    let mut migration_task = tokio::spawn(async move { migrate(&pool_clone, command).await });
+    let command_clone = command.clone();
+    let mut migration_task = tokio::spawn(async move { migrate(&pool_clone, command_clone).await });
 
     // tokio::select! between task completion, timeout, and cancellation
     let migration_result = tokio::select! {
@@ -795,7 +796,7 @@ async fn migrate_with_guard_controlled(
     migration_counters::migrator_ran();
     info!(migrator = "ran", env = ?env, db_kind = ?db_kind, elapsed_ms = start.elapsed().as_millis());
 
-    // Post-check: Verify migrations were actually applied (still under lock)
+    // Post-check: Verify migrations match expected state based on command (still under lock)
     let expected_count = Migrator::migrations().len();
     let applied_count = count_applied_migrations(pool).await.unwrap_or(0);
     info!(
@@ -804,21 +805,57 @@ async fn migrate_with_guard_controlled(
         applied_count = applied_count
     );
 
-    // Verify migrations were actually applied
-    if applied_count != expected_count {
-        migration_counters::postcheck_mismatch();
-        let detail = format!(
-            "Migration verification failed: expected {} migrations, but {} were applied (env={:?}, db_kind={:?})",
-            expected_count, applied_count, env, db_kind
-        );
-        return Err((
-            guard,
-            AppError::internal(
-                ErrorCode::PostcheckMismatch,
-                detail,
-                crate::error::Sentinel("migration verification postcheck mismatch"),
-            ),
-        ));
+    // Verify migrations match expected state based on command type
+    match command {
+        MigrationCommand::Reset => {
+            // Reset should rollback all migrations, leaving 0 applied
+            if applied_count != 0 {
+                migration_counters::postcheck_mismatch();
+                let detail = format!(
+                    "Migration verification failed: reset should leave 0 migrations applied, but {} were found (env={:?}, db_kind={:?})",
+                    applied_count, env, db_kind
+                );
+                return Err((
+                    guard,
+                    AppError::internal(
+                        ErrorCode::PostcheckMismatch,
+                        detail,
+                        crate::error::Sentinel("migration verification postcheck mismatch"),
+                    ),
+                ));
+            }
+        }
+        MigrationCommand::Down => {
+            // Down rolls back migrations, so we can't verify exact count without knowing steps
+            // Just log the result - verification would require tracking before/after state
+            info!(
+                migrate = "down_complete",
+                applied_count = applied_count,
+                expected_count = expected_count
+            );
+        }
+        MigrationCommand::Up | MigrationCommand::Fresh | MigrationCommand::Refresh => {
+            // These commands should result in all migrations being applied
+            if applied_count != expected_count {
+                migration_counters::postcheck_mismatch();
+                let detail = format!(
+                    "Migration verification failed: expected {} migrations, but {} were applied (env={:?}, db_kind={:?})",
+                    expected_count, applied_count, env, db_kind
+                );
+                return Err((
+                    guard,
+                    AppError::internal(
+                        ErrorCode::PostcheckMismatch,
+                        detail,
+                        crate::error::Sentinel("migration verification postcheck mismatch"),
+                    ),
+                ));
+            }
+        }
+        MigrationCommand::Status => {
+            // Status doesn't change state, no verification needed
+            // (This shouldn't reach here as Status is short-circuited earlier, but included for completeness)
+        }
     }
 
     // Return guard for single release point
