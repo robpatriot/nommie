@@ -414,7 +414,7 @@ This section captures identified improvements across four categories: functional
 **Recommendations:**
 - ✅ Implement global action queue/mutex to prevent concurrent actions — **COMPLETED** (unified ActivityState)
 - ✅ Add consistent retry logic across all API calls — **COMPLETED** (retry logic in fetchWithAuth)
-- Add validation for seat numbers before clamping
+- ✅ **COMPLETED**: Add validation for seat numbers before clamping - now validates using `isValidSeat()` and logs warning for invalid values instead of silently clamping
 - Consider using React Query or SWR for better state synchronization
 
 ### 3. Duplication and Multiple Approaches

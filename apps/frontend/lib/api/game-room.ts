@@ -2,6 +2,7 @@
 
 import { fetchWithAuth, BackendApiError } from '@/lib/api'
 import type { Card, GameSnapshot, Seat, Trump } from '@/lib/game-room/types'
+import { isValidSeat } from '@/utils/seat-validation'
 
 export type GameSnapshotResult =
   | {
@@ -35,17 +36,20 @@ export async function fetchGameSnapshot(
         ? Number.parseInt(viewerSeatHeader, 10)
         : null
 
-    // Validate and clamp seat value to 0-3 range. Log warning if out of range to catch backend bugs.
+    // Validate seat value before using it. Invalid values indicate backend bugs.
     let parsedViewerSeat: Seat | null = null
-    if (viewerSeat !== null && Number.isFinite(viewerSeat)) {
-      const originalValue = viewerSeat
-      const clampedValue = Math.max(0, Math.min(3, viewerSeat))
-      if (originalValue !== clampedValue) {
+    if (viewerSeat !== null) {
+      if (isValidSeat(viewerSeat)) {
+        parsedViewerSeat = viewerSeat
+      } else {
+        // Log warning for invalid seat values to catch backend bugs
+        // Don't clamp - fail hard to surface the issue
         console.warn(
-          `Seat value out of range: ${originalValue} (clamped to ${clampedValue})`
+          `Invalid seat value from backend: ${viewerSeat} (expected 0-3, got ${viewerSeat})`
         )
+        // Still set to null to indicate invalid seat
+        parsedViewerSeat = null
       }
-      parsedViewerSeat = clampedValue as Seat
     }
     const viewerHand =
       Array.isArray(body.viewer_hand) &&
