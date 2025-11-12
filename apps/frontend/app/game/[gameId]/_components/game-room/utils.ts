@@ -119,6 +119,7 @@ export function buildSeatSummaries(params: {
   trickMap: Map<Seat, Card>
   round: RoundPublic | null
   activeSeat: Seat | null
+  actualViewerSeat?: Seat | null
 }): SeatSummary[] {
   const {
     playerNames,
@@ -128,11 +129,16 @@ export function buildSeatSummaries(params: {
     trickMap,
     round,
     activeSeat,
+    actualViewerSeat,
   } = params
+
+  // Use actualViewerSeat if provided (for isViewer check), otherwise use viewerSeat (for orientation)
+  const viewerSeatForCheck =
+    actualViewerSeat !== undefined ? actualViewerSeat : viewerSeat
 
   return [0, 1, 2, 3].map((seat) => {
     const orientation = getOrientation(viewerSeat, seat as Seat)
-    const isViewer = seat === viewerSeat
+    const isViewer = viewerSeatForCheck !== null && seat === viewerSeatForCheck
     const tricksWon = round?.tricks_won[seat as Seat]
     const currentCard = trickMap.get(seat as Seat)
     const bid = getBidForSeat(phase, seat as Seat)

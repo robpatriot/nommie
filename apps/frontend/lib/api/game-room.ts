@@ -34,10 +34,18 @@ export async function fetchGameSnapshot(
         ? Number.parseInt(viewerSeatHeader, 10)
         : null
 
-    const parsedViewerSeat =
-      viewerSeat !== null && Number.isFinite(viewerSeat)
-        ? (Math.max(0, Math.min(3, viewerSeat)) as Seat)
-        : null
+    // Validate and clamp seat value to 0-3 range. Log warning if out of range to catch backend bugs.
+    let parsedViewerSeat: Seat | null = null
+    if (viewerSeat !== null && Number.isFinite(viewerSeat)) {
+      const originalValue = viewerSeat
+      const clampedValue = Math.max(0, Math.min(3, viewerSeat))
+      if (originalValue !== clampedValue) {
+        console.warn(
+          `Seat value out of range: ${originalValue} (clamped to ${clampedValue})`
+        )
+      }
+      parsedViewerSeat = clampedValue as Seat
+    }
     const viewerHand =
       Array.isArray(body.viewer_hand) &&
       body.viewer_hand.every((card) => typeof card === 'string')

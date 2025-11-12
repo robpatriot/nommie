@@ -111,7 +111,7 @@ export function GameRoomView(props: GameRoomViewProps) {
   const {
     snapshot,
     playerNames,
-    viewerSeat = 0,
+    viewerSeat,
     viewerHand = [],
     status,
     gameId,
@@ -128,9 +128,17 @@ export function GameRoomView(props: GameRoomViewProps) {
   const round = getRound(phase)
   const isPreGame = phase.phase === 'Init'
   const activeSeat = getActiveSeat(phase)
+
+  // Handle viewerSeat explicitly - don't default to 0 to avoid masking missing data.
+  // If viewerSeat is undefined/null, no seat will be marked as "viewer".
+  const effectiveViewerSeat: Seat | null = viewerSeat ?? null
+
   const seatDisplayName = useCallback(
-    (seat: Seat) => (seat === viewerSeat ? 'You' : playerNames[seat]),
-    [playerNames, viewerSeat]
+    (seat: Seat) =>
+      effectiveViewerSeat !== null && seat === effectiveViewerSeat
+        ? 'You'
+        : playerNames[seat],
+    [playerNames, effectiveViewerSeat]
   )
   const activeName =
     typeof activeSeat === 'number' ? seatDisplayName(activeSeat) : 'Waiting'
@@ -142,12 +150,13 @@ export function GameRoomView(props: GameRoomViewProps) {
   const trickMap = getCurrentTrickMap(phase)
   const seatSummaries = buildSeatSummaries({
     playerNames,
-    viewerSeat,
+    viewerSeat: effectiveViewerSeat ?? 0, // Use 0 as fallback for orientation calculation only
     phase,
     scores: snapshot.game.scores_total,
     trickMap,
     round,
     activeSeat,
+    actualViewerSeat: effectiveViewerSeat, // Pass actual viewer seat separately for isViewer check
   })
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
@@ -283,7 +292,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 getSeatName={seatDisplayName}
                 round={round}
                 phase={phase}
-                viewerSeat={viewerSeat}
+                viewerSeat={effectiveViewerSeat ?? 0}
               />
             </div>
 
@@ -291,7 +300,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               viewerHand={viewerHand}
               phase={phase}
               playerNames={playerNames}
-              viewerSeat={viewerSeat}
+              viewerSeat={effectiveViewerSeat ?? 0}
               playState={playState}
               selectedCard={selectedCard}
               onSelectCard={setSelectedCard}
@@ -299,7 +308,7 @@ export function GameRoomView(props: GameRoomViewProps) {
 
             <PlayerActions
               phase={phase}
-              viewerSeat={viewerSeat}
+              viewerSeat={effectiveViewerSeat ?? 0}
               playerNames={playerNames}
               bidding={biddingState}
               trump={trumpState}

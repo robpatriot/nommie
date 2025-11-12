@@ -115,13 +115,10 @@ export function GameRoomClient({
         })
 
         if (result.kind === 'ok') {
-          setSnapshot((prev) => ({
-            ...result.data,
-            viewerSeat:
-              result.data.viewerSeat !== null
-                ? result.data.viewerSeat
-                : prev.viewerSeat,
-          }))
+          // Don't preserve viewerSeat from previous snapshot - if API returns null,
+          // accept it (fail hard approach). This prevents stale data when viewer's
+          // seat changes or API response is missing this field.
+          setSnapshot(result.data)
           setEtag(result.data.etag)
           setError(null)
         } else if (result.kind === 'not_modified') {
@@ -151,13 +148,8 @@ export function GameRoomClient({
             const retryResult = await getGameRoomSnapshotAction({ gameId })
 
             if (retryResult.kind === 'ok') {
-              setSnapshot((prev) => ({
-                ...retryResult.data,
-                viewerSeat:
-                  retryResult.data.viewerSeat !== null
-                    ? retryResult.data.viewerSeat
-                    : prev.viewerSeat,
-              }))
+              // Don't preserve viewerSeat from previous snapshot - fail hard approach
+              setSnapshot(retryResult.data)
               setEtag(retryResult.data.etag)
               setError(null)
             } else if (retryResult.kind === 'not_modified') {
@@ -275,14 +267,17 @@ export function GameRoomClient({
     [snapshot.timestamp, isActive]
   )
 
-  const phaseName = snapshot.snapshot.phase.phase
+  const phase = snapshot.snapshot.phase
+  const phaseName = phase.phase
   const canMarkReady = phaseName === 'Init'
 
+  // Reset hasMarkedReady when phase changes away from Init.
+  // Use phase directly (not canMarkReady) to avoid race conditions on rapid phase changes.
   useEffect(() => {
-    if (!canMarkReady && hasMarkedReady) {
+    if (phaseName !== 'Init' && hasMarkedReady) {
       setHasMarkedReady(false)
     }
-  }, [canMarkReady, hasMarkedReady])
+  }, [phaseName, hasMarkedReady])
 
   const executeApiAction = useApiAction({
     showToast,
@@ -418,8 +413,6 @@ export function GameRoomClient({
 
   const viewerSeatForInteractions =
     typeof snapshot.viewerSeat === 'number' ? snapshot.viewerSeat : null
-
-  const phase = snapshot.snapshot.phase
 
   const biddingControls = useMemo(() => {
     if (
