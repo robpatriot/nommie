@@ -421,10 +421,10 @@ This section captures identified improvements across four categories: functional
 ### 3. Duplication and Multiple Approaches
 
 **Duplication Found:**
-- Error handling patterns:
-  - `game-room-client.tsx` has repeated error handling in `handleSubmitBid`, `handleSelectTrump`, `handlePlayCard`, `handleAddAi`, `handleRemoveAiSeat`, `handleUpdateAiSeat` (lines 232-715)
-  - Same pattern: try/catch, `BackendApiError` wrapping, toast display, traceId logging
-  - Should be extracted to a shared error handler
+- ✅ **COMPLETED**: Error handling patterns:
+  - ✅ Extracted to `useApiAction()` hook
+  - ✅ Refactored 6 handlers in `game-room-client.tsx`: `handleSubmitBid`, `handleSelectTrump`, `handlePlayCard`, `handleAddAi`, `handleRemoveAiSeat`, `handleUpdateAiSeat`
+  - ✅ Centralized try/catch, `BackendApiError` wrapping, toast display, traceId logging
 - Toast message creation:
   - `LobbyClient.tsx` line 82-93: `showToast` function
   - `game-room-client.tsx` line 193-203: `showToast` function
@@ -435,8 +435,8 @@ This section captures identified improvements across four categories: functional
 - Seat validation:
   - `app/actions/game-room-actions.ts` lines 223-232, 259-268, 292-303: Seat validation repeated three times
   - Should be a shared utility function
-- Auth bypass checks:
-  - Multiple files check `NEXT_PUBLIC_DISABLE_AUTH` directly instead of using `isAuthDisabled()`
+- ✅ **COMPLETED**: Auth bypass checks:
+  - ✅ Removed all `NEXT_PUBLIC_DISABLE_AUTH` checks and `isAuthDisabled()` function
 - Date/time formatting:
   - `game-room-view.tsx` line 136-139: Manual date formatting
   - Could use a shared utility
@@ -445,13 +445,13 @@ This section captures identified improvements across four categories: functional
   - Similar error extraction logic in multiple action files
 
 **Recommendations:**
-- Extract error handling to a custom hook: `useApiAction()`
+- ✅ Extract error handling to a custom hook: `useApiAction()` — **COMPLETED**
 - Create shared utilities:
   - `utils/player-names.ts` for name normalization
   - `utils/seat-validation.ts` for seat validation
   - `utils/date-formatting.ts` for date formatting
 - Create a shared `useToast()` hook
-- Standardize on `isAuthDisabled()` helper everywhere
+- ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
 
 ### 4. Efficiency and Quality
 
@@ -492,9 +492,10 @@ This section captures identified improvements across four categories: functional
   - Some buttons missing `aria-label` attributes
   - Toast component has good accessibility
   - Form inputs may need better labeling
-- Error boundaries:
-  - No React Error Boundaries found
-  - Unhandled errors could crash entire app
+- ✅ **COMPLETED**: Error boundaries:
+  - ✅ Created `ErrorBoundary` component
+  - ✅ Wrapped `LobbyClient` and `GameRoomClient` with ErrorBoundary
+  - ✅ Provides user-friendly error messages and recovery options
 - Code organization:
   - Good separation of concerns (server actions, client components, lib utilities)
   - But some files are too large and do too much
@@ -504,7 +505,7 @@ This section captures identified improvements across four categories: functional
 - Split large components (`game-room-view.tsx` into: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, etc.)
 - Add React Query or SWR for better caching and request deduplication
 - Extract shared utilities and hooks
-- Add Error Boundaries around major sections
+- ✅ Add Error Boundaries around major sections — **COMPLETED**
 - Increase test coverage (especially for error paths)
 - Add code splitting for game room route
 - Use `useMemo` and `useCallback` more strategically to prevent unnecessary re-renders
@@ -514,9 +515,9 @@ This section captures identified improvements across four categories: functional
 
 **High Priority:**
 1. ✅ Remove all `[AUTH_BYPASS]` code — **COMPLETED**
-2. Extract duplicated error handling into shared hook
+2. ✅ Extract duplicated error handling into shared hook — **COMPLETED** (useApiAction hook)
 3. Fix race conditions in polling/refresh logic
-4. Add Error Boundaries
+4. ✅ Add Error Boundaries — **COMPLETED** (ErrorBoundary component)
 5. ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
 
 **Completed:**
@@ -528,6 +529,10 @@ This section captures identified improvements across four categories: functional
 - ✅ Removed all `[AUTH_BYPASS]` code and `isAuthDisabled()` function
 - ✅ All routes and API calls now require authentication consistently
 - ✅ Removed `NEXT_PUBLIC_DISABLE_AUTH` environment variable usage
+- ✅ Extracted duplicated error handling into `useApiAction()` hook
+- ✅ Refactored 6 handlers in game-room-client to use centralized error handling
+- ✅ Created `ErrorBoundary` component and wrapped major sections
+- ✅ Added user-friendly error recovery UI with ErrorBoundary
 
 **Medium Priority:**
 1. Split large components
