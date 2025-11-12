@@ -397,14 +397,16 @@ This section captures identified improvements across four categories: functional
   - Other components don't have similar retry logic
   - Some actions wrap errors in `BackendApiError`, others don't
 - State management issues:
-  - `game-room-client.tsx` line 61: `inflightRef` prevents concurrent refreshes, but polling can still overlap with manual refresh
+  - ✅ **COMPLETED**: Fixed polling/refresh overlap via unified ActivityState
   - `hasMarkedReady` state (line 56) may not reset correctly if phase changes rapidly
 - Type safety concerns:
   - `game-room-view.tsx` line 113: `viewerSeat = 0` default may mask missing data
   - `lib/api/game-room.ts` lines 37-40: Seat parsing clamps to 0-3 but doesn't validate the original value
-- Race conditions:
-  - `game-room-client.tsx` lines 168-174: Polling interval doesn't account for ongoing manual refresh
-  - Multiple pending states (`isBidPending`, `isTrumpPending`, etc.) but no global "action in progress" guard
+- ✅ **COMPLETED**: Race conditions:
+  - ✅ Fixed polling interval to respect activity state (only polls when idle)
+  - ✅ Implemented unified activity state to replace all individual pending flags
+  - ✅ Added global "action in progress" guard via ActivityState type
+  - ✅ Manual refresh can queue when polling is in progress and executes after completion
 - Data synchronization:
   - `game-room-client.tsx` lines 84-90: When updating snapshot, preserves `viewerSeat` from previous if new one is null — may cause stale data
 - ✅ **COMPLETED**: Joinable games UI membership check:
@@ -413,8 +415,8 @@ This section captures identified improvements across four categories: functional
 
 **Recommendations:**
 - ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
+- ✅ Implement global action queue/mutex to prevent concurrent actions — **COMPLETED** (unified ActivityState)
 - Add consistent retry logic across all API calls
-- Implement global action queue/mutex to prevent concurrent actions
 - Add validation for seat numbers before clamping
 - Consider using React Query or SWR for better state synchronization
 
@@ -516,7 +518,7 @@ This section captures identified improvements across four categories: functional
 **High Priority:**
 1. ✅ Remove all `[AUTH_BYPASS]` code — **COMPLETED**
 2. ✅ Extract duplicated error handling into shared hook — **COMPLETED** (useApiAction hook)
-3. Fix race conditions in polling/refresh logic
+3. ✅ Fix race conditions in polling/refresh logic — **COMPLETED** (unified activity state)
 4. ✅ Add Error Boundaries — **COMPLETED** (ErrorBoundary component)
 5. ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
 
@@ -533,6 +535,7 @@ This section captures identified improvements across four categories: functional
 - ✅ Refactored 6 handlers in game-room-client to use centralized error handling
 - ✅ Created `ErrorBoundary` component and wrapped major sections
 - ✅ Added user-friendly error recovery UI with ErrorBoundary
+- ✅ Fixed race conditions in polling/refresh logic: Implemented unified `ActivityState` type to track polling, refresh, and actions. Replaced all individual pending flags with single activity state. Added activity ref to avoid dependency issues. Added pending manual refresh queue to handle manual refresh requests during polling. Polling now respects activity state and only runs when idle. Actions block both polling and manual refresh. Manual refresh can queue when polling is in progress and executes after polling completes. Eliminated race conditions and concurrent action issues.
 
 **Medium Priority:**
 1. Split large components

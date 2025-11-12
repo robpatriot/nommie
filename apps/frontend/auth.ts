@@ -74,7 +74,7 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     }),
   ],
   callbacks: {
-    async jwt({ token, account, profile, trigger, user }) {
+    async jwt({ token, account, profile, trigger }) {
       // Refresh backend JWT on 'update' trigger as well
       const shouldRefreshOnTrigger = trigger === 'update'
       // Validate required env vars here (lazy evaluation) after Next.js has loaded env vars
@@ -84,25 +84,17 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       }
 
       // Store user info in token for refreshing backend JWT
-      // Preserve existing values if they're already set
+      // Require proper data from the initial login
       if (account?.provider === 'google' && profile) {
-        token.email = profile.email || token.email
-        token.googleSub = profile.sub || token.googleSub
+        if (!profile.email) {
+          throw new Error('Google profile missing email')
+        }
+        if (!profile.sub) {
+          throw new Error('Google profile missing sub')
+        }
+        token.email = profile.email
+        token.googleSub = profile.sub
         token.name = profile.name || token.name
-      }
-
-      // Also populate from user object if available (for existing sessions)
-      // This helps with old sessions that might not have user info in token
-      if (user?.email && !token.email) {
-        token.email = user.email
-      }
-
-      if (!token.googleSub && (user as { sub?: string } | undefined)?.sub) {
-        token.googleSub = (user as { sub?: string }).sub
-      }
-
-      if (!token.googleSub && typeof token.sub === 'string') {
-        token.googleSub = token.sub
       }
 
       // Proactive backend JWT refresh: refresh if missing or within 5 minutes of expiry

@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation'
 
 import { GameRoomClient } from './_components/game-room-client'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { getMockGameRoomData } from '@/lib/game-room/mock-data'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
@@ -27,66 +26,36 @@ export default async function GamePage({ params }: GamePageProps) {
   const numericGameId = Number(gameId)
   const resolvedGameId = Number.isNaN(numericGameId) ? 0 : numericGameId
 
-  let initialPayload: GameRoomSnapshotPayload | null = null
-  let initialError: { message: string; traceId?: string } | null = null
+  const snapshotResult = await fetchGameSnapshot(resolvedGameId)
 
-  try {
-    const snapshotResult = await fetchGameSnapshot(resolvedGameId)
-
-    if (snapshotResult.kind === 'ok') {
-      const seating = snapshotResult.snapshot.game.seating
-      const playerNames = extractPlayerNames(seating)
-
-      const hostSeat = (snapshotResult.snapshot.game.host_seat ??
-        DEFAULT_VIEWER_SEAT) as typeof DEFAULT_VIEWER_SEAT
-      const viewerSeat =
-        typeof snapshotResult.viewerSeat === 'number'
-          ? (snapshotResult.viewerSeat as typeof DEFAULT_VIEWER_SEAT)
-          : DEFAULT_VIEWER_SEAT
-
-      initialPayload = {
-        snapshot: snapshotResult.snapshot,
-        etag: snapshotResult.etag,
-        playerNames,
-        viewerSeat,
-        viewerHand: snapshotResult.viewerHand ?? [],
-        timestamp: new Date().toISOString(),
-        hostSeat,
-      }
-    }
-  } catch (error) {
-    console.warn(
-      'Failed to load game snapshot, falling back to mock data',
-      error
-    )
-    initialError = {
-      message:
-        error instanceof Error
-          ? error.message
-          : 'Unable to load live game snapshot. Showing demo view instead.',
-    }
+  if (snapshotResult.kind !== 'ok') {
+    // 'not_modified' should not occur on initial page load without an ETag
+    throw new Error('Failed to load game snapshot: unexpected response')
   }
 
-  if (!initialPayload) {
-    const mock = getMockGameRoomData(resolvedGameId)
-    initialPayload = {
-      snapshot: mock.snapshot,
-      etag: undefined,
-      playerNames: mock.playerNames,
-      viewerSeat: mock.viewerSeat,
-      viewerHand: mock.viewerHand,
-      timestamp: mock.lastSyncedAt,
-      hostSeat: mock.hostSeat,
-    }
+  const seating = snapshotResult.snapshot.game.seating
+  const playerNames = extractPlayerNames(seating)
+
+  const hostSeat = (snapshotResult.snapshot.game.host_seat ??
+    DEFAULT_VIEWER_SEAT) as typeof DEFAULT_VIEWER_SEAT
+  const viewerSeat =
+    typeof snapshotResult.viewerSeat === 'number'
+      ? (snapshotResult.viewerSeat as typeof DEFAULT_VIEWER_SEAT)
+      : DEFAULT_VIEWER_SEAT
+
+  const initialPayload: GameRoomSnapshotPayload = {
+    snapshot: snapshotResult.snapshot,
+    etag: snapshotResult.etag,
+    playerNames,
+    viewerSeat,
+    viewerHand: snapshotResult.viewerHand ?? [],
+    timestamp: new Date().toISOString(),
+    hostSeat,
   }
 
   return (
     <ErrorBoundary>
-      <GameRoomClient
-        initialData={initialPayload}
-        initialError={initialError}
-        gameId={resolvedGameId}
-      />
+      <GameRoomClient initialData={initialPayload} gameId={resolvedGameId} />
     </ErrorBoundary>
   )
 }

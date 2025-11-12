@@ -102,66 +102,19 @@ export async function fetchWithAuth(
 // Game-related API functions
 
 export async function getJoinableGames(): Promise<Game[]> {
-  try {
-    const response = await fetchWithAuth('/api/games/joinable')
-    const data: GameListResponse = await response.json()
-    return data.games
-  } catch (error) {
-    // Handle missing JWT gracefully (user not authenticated)
-    if (error instanceof BackendApiError) {
-      if (error.status === 401 && error.code === 'MISSING_BACKEND_JWT') {
-        console.warn('Skipping joinable games fetch: backend JWT unavailable')
-        return []
-      }
-    } else if (error instanceof TypeError) {
-      // Network errors - return empty array to allow page to render
-      console.warn('Joinable games fetch failed (network issue)', error)
-      return []
-    }
-    throw error
-  }
+  const response = await fetchWithAuth('/api/games/joinable')
+  const data: GameListResponse = await response.json()
+  return data.games
 }
 
 export async function getInProgressGames(): Promise<Game[]> {
-  try {
-    const response = await fetchWithAuth('/api/games/in-progress')
-    const data: GameListResponse = await response.json()
-    return data.games
-  } catch (error) {
-    // Handle missing JWT gracefully (user not authenticated)
-    if (error instanceof BackendApiError) {
-      if (error.status === 401 && error.code === 'MISSING_BACKEND_JWT') {
-        console.warn(
-          'Skipping in-progress games fetch: backend JWT unavailable'
-        )
-        return []
-      }
-    } else if (error instanceof TypeError) {
-      // Network errors - return empty array to allow page to render
-      console.warn('In-progress games fetch failed (network issue)', error)
-      return []
-    }
-    throw error
-  }
+  const response = await fetchWithAuth('/api/games/in-progress')
+  const data: GameListResponse = await response.json()
+  return data.games
 }
 
 export async function getLastActiveGame(): Promise<number | null> {
-  try {
-    const response = await fetchWithAuth('/api/games/last-active')
-    const data: LastActiveGameResponse = await response.json()
-    return data.game_id ?? null
-  } catch (error) {
-    // Handle missing JWT gracefully (user not authenticated)
-    if (error instanceof BackendApiError) {
-      if (error.status === 401 && error.code === 'MISSING_BACKEND_JWT') {
-        console.warn('Skipping last-active fetch: backend JWT unavailable')
-        return null
-      }
-    } else if (error instanceof TypeError) {
-      // Network errors - return null to allow page to render
-      console.warn('Last active game fetch failed (network issue)', error)
-      return null
-    }
-    throw error
-  }
+  const response = await fetchWithAuth('/api/games/last-active')
+  const data: LastActiveGameResponse = await response.json()
+  return data.game_id ?? null
 }
