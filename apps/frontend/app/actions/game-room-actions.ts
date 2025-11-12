@@ -89,7 +89,19 @@ export async function getGameRoomSnapshotAction(
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to fetch game snapshot',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }
 
@@ -120,7 +132,19 @@ export async function markPlayerReadyAction(
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to mark player ready',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }
 
@@ -156,7 +180,19 @@ export async function submitBidAction(
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to submit bid',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }
 
@@ -182,7 +218,19 @@ export async function selectTrumpAction(
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to select trump',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }
 
@@ -219,7 +267,19 @@ export async function submitPlayAction(
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to play card',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }
 
@@ -263,7 +323,19 @@ export async function addAiSeatAction(
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to add AI seat',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }
 
@@ -296,7 +368,19 @@ export async function removeAiSeatAction(
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to remove AI seat',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }
 
@@ -332,7 +416,19 @@ export async function updateAiSeatAction(
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to update AI seat',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }
 
@@ -361,6 +457,18 @@ export async function fetchAiRegistryAction(): Promise<AiRegistryActionResult> {
       }
     }
 
-    throw error
+    // Wrap unexpected errors in BackendApiError for consistent error handling
+    const wrappedError = new BackendApiError(
+      error instanceof Error ? error.message : 'Failed to fetch AI registry',
+      500,
+      'UNKNOWN_ERROR'
+    )
+    return {
+      kind: 'error',
+      message: wrappedError.message,
+      status: wrappedError.status,
+      code: wrappedError.code,
+      traceId: wrappedError.traceId,
+    }
   }
 }

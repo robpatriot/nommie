@@ -370,11 +370,6 @@ This section captures identified improvements across four categories: functional
   - ✅ **COMPLETED**: Loading states for initial page loads (skeletons/spinners) - added loading.tsx for lobby and game room
   - Offline detection and retry logic
   - Optimistic updates for game actions (bid, play, etc.)
-  - Real-time updates (WebSocket/SSE) instead of polling only
-  - Game history/replay functionality
-  - User profile/settings page
-  - Enhanced game search/filtering (beyond basic text search)
-  - Pagination for game lists
 
 **Recommendations:**
 - ✅ Remove all `[AUTH_BYPASS]` code paths — **COMPLETED**
@@ -399,7 +394,7 @@ This section captures identified improvements across four categories: functional
   - ✅ **COMPLETED**: Created shared retry utility (`lib/retry.ts`) with exponential backoff
   - ✅ **COMPLETED**: All API calls now automatically retry network errors (1 retry with 500ms-2000ms backoff)
   - ✅ **COMPLETED**: Removed redundant retry logic from `game-room-client.tsx`
-  - Some actions wrap errors in `BackendApiError`, others don't
+  - ✅ **COMPLETED**: Standardized error handling in `game-room-actions.ts` - all actions now wrap unexpected errors in `BackendApiError` and return error result format consistently
 - State management issues:
   - ✅ **COMPLETED**: Fixed polling/refresh overlap via unified ActivityState
   - ✅ **COMPLETED**: Fixed `hasMarkedReady` reset to use phase directly instead of `canMarkReady` to avoid race conditions on rapid phase changes
