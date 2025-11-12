@@ -86,13 +86,16 @@ describe('GameRoomView', () => {
       />
     )
 
-    const bidInput = screen.getByLabelText('Your Bid') as HTMLInputElement
+    const bidInput = screen.getByLabelText('Bid value') as HTMLInputElement
     expect(bidInput.value).toBe('0')
 
     fireEvent.change(bidInput, { target: { value: '4' } })
     expect(bidInput.value).toBe('4')
 
-    const submitButton = screen.getByRole('button', { name: 'Submit Bid' })
+    // aria-label is dynamic: "Submit bid of ${selectedBid}"
+    const submitButton = screen.getByRole('button', {
+      name: /Submit bid of 4/i,
+    })
     expect(submitButton).toBeEnabled()
 
     await userEvent.click(submitButton)
@@ -121,15 +124,16 @@ describe('GameRoomView', () => {
 
     expect(screen.getByText('Legal cards: 2H, KD, QC')).toBeInTheDocument()
 
-    const legalCardButton = screen.getByRole('button', { name: '2H' })
+    // aria-label format: "${card}, ${isSelected ? 'selected' : 'playable'}" or "${card}, not playable"
+    const legalCardButton = screen.getByRole('button', { name: /^2H,/i })
     expect(legalCardButton).toBeEnabled()
 
-    const illegalCardButton = screen.getByRole('button', { name: 'AS' })
+    const illegalCardButton = screen.getByRole('button', { name: /^AS,/i })
     expect(illegalCardButton).toBeDisabled()
 
     await userEvent.click(legalCardButton)
     const playButton = screen.getByRole('button', {
-      name: 'Play Selected Card',
+      name: /Play selected card/i,
     })
     await userEvent.click(playButton)
 
@@ -212,10 +216,17 @@ describe('GameRoomView', () => {
     expect(screen.getByText('AI Seats')).toBeInTheDocument()
     expect(screen.getByText(/2 bots · 3\/4 seats filled/)).toBeInTheDocument()
 
-    const addButton = screen.getByRole('button', { name: 'Add AI' })
+    // aria-label format: "Add AI player with profile ${preferredDefaultName}"
+    const addButton = screen.getByRole('button', {
+      name: /Add AI player with profile/i,
+    })
+    // Seat 1 (index 1, Bot Bailey) is displayed as "seat 2" in UI (seat + 1)
+    // Seat 2 (index 2, Bot Casey) is displayed as "seat 3" in UI (seat + 1)
+    // The test updates seat 1 (Bot Bailey), which is displayed as "seat 2"
     const profileSelect = screen.getByLabelText(
       'Select AI profile for seat 2'
     ) as HTMLSelectElement
+    // Remove button for seat 1 (index 1, displayed as "seat 2")
     const removeSeatButton = screen.getByRole('button', {
       name: 'Remove AI from seat 2',
     })
