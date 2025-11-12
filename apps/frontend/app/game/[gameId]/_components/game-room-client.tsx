@@ -16,6 +16,7 @@ import {
 } from '@/app/actions/game-room-actions'
 import Toast, { type ToastMessage } from '@/components/Toast'
 import { BackendApiError } from '@/lib/errors'
+import { useApiAction } from '@/hooks/useApiAction'
 import type { Seat, Trump } from '@/lib/game-room/types'
 
 import { GameRoomView, type AiSeatSelection } from './game-room-view'
@@ -202,6 +203,11 @@ export function GameRoomClient({
     []
   )
 
+  const executeApiAction = useApiAction({
+    showToast,
+    onSuccess: () => performRefresh('manual'),
+  })
+
   const markReady = useCallback(async () => {
     if (!canMarkReady || isReadyPending || hasMarkedReady) {
       return
@@ -237,49 +243,14 @@ export function GameRoomClient({
 
       setIsBidPending(true)
 
-      try {
-        const result = await submitBidAction({
-          gameId,
-          bid,
-        })
+      await executeApiAction(() => submitBidAction({ gameId, bid }), {
+        successMessage: 'Bid submitted',
+        errorMessage: 'Failed to submit bid',
+      })
 
-        if (result.kind === 'error') {
-          const actionError = new BackendApiError(
-            result.message || 'Failed to submit bid',
-            result.status,
-            undefined,
-            result.traceId
-          )
-
-          showToast(actionError.message, 'error', actionError)
-
-          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
-            console.error('Submit bid error traceId:', actionError.traceId)
-          }
-
-          return
-        }
-
-        showToast('Bid submitted', 'success')
-        await performRefresh('manual')
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Unable to submit bid'
-        const wrappedError =
-          err instanceof BackendApiError
-            ? err
-            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
-
-        showToast(wrappedError.message, 'error', wrappedError)
-
-        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
-          console.error('Submit bid error traceId:', wrappedError.traceId)
-        }
-      } finally {
-        setIsBidPending(false)
-      }
+      setIsBidPending(false)
     },
-    [gameId, isBidPending, performRefresh, showToast]
+    [gameId, isBidPending, executeApiAction]
   )
 
   const handleSelectTrump = useCallback(
@@ -290,49 +261,14 @@ export function GameRoomClient({
 
       setIsTrumpPending(true)
 
-      try {
-        const result = await selectTrumpAction({
-          gameId,
-          trump,
-        })
+      await executeApiAction(() => selectTrumpAction({ gameId, trump }), {
+        successMessage: 'Trump selected',
+        errorMessage: 'Failed to select trump',
+      })
 
-        if (result.kind === 'error') {
-          const actionError = new BackendApiError(
-            result.message || 'Failed to select trump',
-            result.status,
-            undefined,
-            result.traceId
-          )
-
-          showToast(actionError.message, 'error', actionError)
-
-          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
-            console.error('Select trump error traceId:', actionError.traceId)
-          }
-
-          return
-        }
-
-        showToast('Trump selected', 'success')
-        await performRefresh('manual')
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Unable to select trump'
-        const wrappedError =
-          err instanceof BackendApiError
-            ? err
-            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
-
-        showToast(wrappedError.message, 'error', wrappedError)
-
-        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
-          console.error('Select trump error traceId:', wrappedError.traceId)
-        }
-      } finally {
-        setIsTrumpPending(false)
-      }
+      setIsTrumpPending(false)
     },
-    [gameId, isTrumpPending, performRefresh, showToast]
+    [gameId, isTrumpPending, executeApiAction]
   )
 
   const handlePlayCard = useCallback(
@@ -343,49 +279,14 @@ export function GameRoomClient({
 
       setIsPlayPending(true)
 
-      try {
-        const result = await submitPlayAction({
-          gameId,
-          card,
-        })
+      await executeApiAction(() => submitPlayAction({ gameId, card }), {
+        successMessage: 'Card played',
+        errorMessage: 'Failed to play card',
+      })
 
-        if (result.kind === 'error') {
-          const actionError = new BackendApiError(
-            result.message || 'Failed to play card',
-            result.status,
-            undefined,
-            result.traceId
-          )
-
-          showToast(actionError.message, 'error', actionError)
-
-          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
-            console.error('Play card error traceId:', actionError.traceId)
-          }
-
-          return
-        }
-
-        showToast('Card played', 'success')
-        await performRefresh('manual')
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Unable to play card'
-        const wrappedError =
-          err instanceof BackendApiError
-            ? err
-            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
-
-        showToast(wrappedError.message, 'error', wrappedError)
-
-        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
-          console.error('Play card error traceId:', wrappedError.traceId)
-        }
-      } finally {
-        setIsPlayPending(false)
-      }
+      setIsPlayPending(false)
     },
-    [gameId, isPlayPending, performRefresh, showToast]
+    [gameId, isPlayPending, executeApiAction]
   )
 
   const viewerSeatForInteractions =
@@ -543,66 +444,31 @@ export function GameRoomClient({
 
       setIsAiPending(true)
 
-      try {
-        const registryName =
-          selection?.registryName ??
-          aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
-          DEFAULT_AI_NAME
-        const registryVersion =
-          selection?.registryVersion ??
-          aiRegistry.find((entry) => entry.name === registryName)?.version
+      const registryName =
+        selection?.registryName ??
+        aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
+        DEFAULT_AI_NAME
+      const registryVersion =
+        selection?.registryVersion ??
+        aiRegistry.find((entry) => entry.name === registryName)?.version
 
-        const result = await addAiSeatAction({
-          gameId,
-          registryName,
-          registryVersion,
-          seed: selection?.seed,
-        })
-
-        if (result.kind === 'error') {
-          const actionError = new BackendApiError(
-            result.message || 'Failed to add AI seat',
-            result.status,
-            undefined,
-            result.traceId
-          )
-
-          showToast(actionError.message, 'error', actionError)
-
-          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
-            console.error('Add AI seat error traceId:', actionError.traceId)
-          }
-
-          return
+      await executeApiAction(
+        () =>
+          addAiSeatAction({
+            gameId,
+            registryName,
+            registryVersion,
+            seed: selection?.seed,
+          }),
+        {
+          successMessage: 'AI seat added',
+          errorMessage: 'Failed to add AI seat',
         }
+      )
 
-        showToast('AI seat added', 'success')
-        await performRefresh('manual')
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Unable to add AI seat'
-        const wrappedError =
-          err instanceof BackendApiError
-            ? err
-            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
-
-        showToast(wrappedError.message, 'error', wrappedError)
-
-        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
-          console.error('Add AI seat error traceId:', wrappedError.traceId)
-        }
-      } finally {
-        setIsAiPending(false)
-      }
+      setIsAiPending(false)
     },
-    [
-      aiRegistry,
-      aiControlsEnabled,
-      gameId,
-      isAiPending,
-      performRefresh,
-      showToast,
-    ]
+    [aiRegistry, aiControlsEnabled, gameId, isAiPending, executeApiAction]
   )
 
   const handleRemoveAiSeat = useCallback(
@@ -613,49 +479,14 @@ export function GameRoomClient({
 
       setIsAiPending(true)
 
-      try {
-        const result = await removeAiSeatAction({
-          gameId,
-          seat,
-        })
+      await executeApiAction(() => removeAiSeatAction({ gameId, seat }), {
+        successMessage: 'AI seat removed',
+        errorMessage: 'Failed to remove AI seat',
+      })
 
-        if (result.kind === 'error') {
-          const actionError = new BackendApiError(
-            result.message || 'Failed to remove AI seat',
-            result.status,
-            undefined,
-            result.traceId
-          )
-
-          showToast(actionError.message, 'error', actionError)
-
-          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
-            console.error('Remove AI seat error traceId:', actionError.traceId)
-          }
-
-          return
-        }
-
-        showToast('AI seat removed', 'success')
-        await performRefresh('manual')
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Unable to remove AI seat'
-        const wrappedError =
-          err instanceof BackendApiError
-            ? err
-            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
-
-        showToast(wrappedError.message, 'error', wrappedError)
-
-        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
-          console.error('Remove AI seat error traceId:', wrappedError.traceId)
-        }
-      } finally {
-        setIsAiPending(false)
-      }
+      setIsAiPending(false)
     },
-    [aiControlsEnabled, gameId, isAiPending, performRefresh, showToast]
+    [aiControlsEnabled, gameId, isAiPending, executeApiAction]
   )
 
   const handleUpdateAiSeat = useCallback(
@@ -666,52 +497,24 @@ export function GameRoomClient({
 
       setIsAiPending(true)
 
-      try {
-        const result = await updateAiSeatAction({
-          gameId,
-          seat,
-          registryName: selection.registryName,
-          registryVersion: selection.registryVersion,
-          seed: selection.seed,
-        })
-
-        if (result.kind === 'error') {
-          const actionError = new BackendApiError(
-            result.message || 'Failed to update AI seat',
-            result.status,
-            undefined,
-            result.traceId
-          )
-
-          showToast(actionError.message, 'error', actionError)
-
-          if (process.env.NODE_ENV === 'development' && actionError.traceId) {
-            console.error('Update AI seat error traceId:', actionError.traceId)
-          }
-
-          return
+      await executeApiAction(
+        () =>
+          updateAiSeatAction({
+            gameId,
+            seat,
+            registryName: selection.registryName,
+            registryVersion: selection.registryVersion,
+            seed: selection.seed,
+          }),
+        {
+          successMessage: 'AI seat updated',
+          errorMessage: 'Failed to update AI seat',
         }
+      )
 
-        showToast('AI seat updated', 'success')
-        await performRefresh('manual')
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Unable to update AI seat'
-        const wrappedError =
-          err instanceof BackendApiError
-            ? err
-            : new BackendApiError(message, 500, 'UNKNOWN_ERROR')
-
-        showToast(wrappedError.message, 'error', wrappedError)
-
-        if (process.env.NODE_ENV === 'development' && wrappedError.traceId) {
-          console.error('Update AI seat error traceId:', wrappedError.traceId)
-        }
-      } finally {
-        setIsAiPending(false)
-      }
+      setIsAiPending(false)
     },
-    [aiControlsEnabled, gameId, isAiPending, performRefresh, showToast]
+    [aiControlsEnabled, gameId, isAiPending, executeApiAction]
   )
 
   const aiSeatState = useMemo(() => {

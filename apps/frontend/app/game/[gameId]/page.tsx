@@ -2,6 +2,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 
 import { GameRoomClient } from './_components/game-room-client'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import { getMockGameRoomData } from '@/lib/game-room/mock-data'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
@@ -85,10 +86,12 @@ export default async function GamePage({ params }: GamePageProps) {
   }
 
   return (
-    <GameRoomClient
-      initialData={initialPayload}
-      initialError={initialError}
-      gameId={resolvedGameId}
-    />
+    <ErrorBoundary>
+      <GameRoomClient
+        initialData={initialPayload}
+        initialError={initialError}
+        gameId={resolvedGameId}
+      />
+    </ErrorBoundary>
   )
 }

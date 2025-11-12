@@ -1,6 +1,7 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import LobbyClient from '@/components/LobbyClient'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import {
   getJoinableGames,
   getInProgressGames,
@@ -24,11 +25,13 @@ export default async function LobbyPage() {
   const creatorName = session.user?.name || 'You'
 
   return (
-    <LobbyClient
-      joinableGames={joinableGames}
-      inProgressGames={inProgressGames}
-      lastActiveGameId={lastActiveGameId}
-      creatorName={creatorName}
-    />
+    <ErrorBoundary>
+      <LobbyClient
+        joinableGames={joinableGames}
+        inProgressGames={inProgressGames}
+        lastActiveGameId={lastActiveGameId}
+        creatorName={creatorName}
+      />
+    </ErrorBoundary>
   )
 }
