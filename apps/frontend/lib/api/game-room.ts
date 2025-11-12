@@ -13,6 +13,11 @@ export type GameSnapshotResult =
     }
   | { kind: 'not_modified' }
 
+export interface SnapshotEnvelope {
+  snapshot: GameSnapshot
+  viewer_hand?: Card[] | null
+}
+
 export async function fetchGameSnapshot(
   gameId: number,
   options: { etag?: string } = {}
@@ -21,10 +26,6 @@ export async function fetchGameSnapshot(
     const response = await fetchWithAuth(`/api/games/${gameId}/snapshot`, {
       headers: options.etag ? { 'If-None-Match': options.etag } : undefined,
     })
-    interface SnapshotEnvelope {
-      snapshot: GameSnapshot
-      viewer_hand?: Card[] | null
-    }
 
     const body = (await response.json()) as SnapshotEnvelope
     const etag = response.headers.get('etag') ?? undefined
