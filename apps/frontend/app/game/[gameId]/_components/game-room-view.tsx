@@ -1178,9 +1178,35 @@ function AiSeatManager({
               aiState.onAdd({ registryName: preferredDefaultName })
             }
             disabled={addDisabled}
-            className="rounded-md bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent/80 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-accent-foreground/70"
+            className="relative inline-flex items-center justify-start rounded-md bg-accent pl-3 pr-8 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent/80 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-accent-foreground/70"
           >
-            {aiState.isPending ? 'Working…' : 'Add AI'}
+            <span className="whitespace-nowrap">Add AI</span>
+            {aiState.isPending ? (
+              <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
+                <svg
+                  aria-hidden="true"
+                  className="h-4 w-4 animate-spin text-accent-foreground"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    d="M4 12a8 8 0 0 1 8-8"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </span>
+            ) : null}
           </button>
           <span className="text-[11px] text-accent-foreground/75">
             Defaults to&nbsp;

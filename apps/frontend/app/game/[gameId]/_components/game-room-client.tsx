@@ -487,11 +487,12 @@ export function GameRoomClient({
 
   const hostSeat: Seat = snapshot.hostSeat
   const viewerIsHost = viewerSeatForInteractions === hostSeat
-  const canManageAi =
-    viewerIsHost && phase.phase === 'Init' && !isRefreshing && !isPolling
+  const canViewAiManager = viewerIsHost && phase.phase === 'Init'
+  const aiControlsEnabled =
+    canViewAiManager && !isRefreshing && !isPolling && !isAiPending
 
   useEffect(() => {
-    if (!canManageAi) {
+    if (!canViewAiManager) {
       setAiRegistry([])
       setAiRegistryError(null)
       setIsAiRegistryLoading(false)
@@ -532,11 +533,11 @@ export function GameRoomClient({
     return () => {
       cancelled = true
     }
-  }, [canManageAi])
+  }, [canViewAiManager])
 
   const handleAddAi = useCallback(
     async (selection?: AiSeatSelection) => {
-      if (isAiPending || !canManageAi) {
+      if (isAiPending || !aiControlsEnabled) {
         return
       }
 
@@ -594,12 +595,19 @@ export function GameRoomClient({
         setIsAiPending(false)
       }
     },
-    [aiRegistry, canManageAi, gameId, isAiPending, performRefresh, showToast]
+    [
+      aiRegistry,
+      aiControlsEnabled,
+      gameId,
+      isAiPending,
+      performRefresh,
+      showToast,
+    ]
   )
 
   const handleRemoveAiSeat = useCallback(
     async (seat: Seat) => {
-      if (isAiPending || !canManageAi) {
+      if (isAiPending || !aiControlsEnabled) {
         return
       }
 
@@ -647,12 +655,12 @@ export function GameRoomClient({
         setIsAiPending(false)
       }
     },
-    [canManageAi, gameId, isAiPending, performRefresh, showToast]
+    [aiControlsEnabled, gameId, isAiPending, performRefresh, showToast]
   )
 
   const handleUpdateAiSeat = useCallback(
     async (seat: Seat, selection: AiSeatSelection) => {
-      if (isAiPending || !canManageAi) {
+      if (isAiPending || !aiControlsEnabled) {
         return
       }
 
@@ -703,11 +711,11 @@ export function GameRoomClient({
         setIsAiPending(false)
       }
     },
-    [canManageAi, gameId, isAiPending, performRefresh, showToast]
+    [aiControlsEnabled, gameId, isAiPending, performRefresh, showToast]
   )
 
   const aiSeatState = useMemo(() => {
-    if (!canManageAi) {
+    if (!canViewAiManager) {
       return undefined
     }
 
@@ -715,9 +723,9 @@ export function GameRoomClient({
       totalSeats,
       availableSeats,
       aiSeats,
-      isPending: isAiPending,
-      canAdd: availableSeats > 0 && !isAiRegistryLoading,
-      canRemove: aiSeats > 0,
+      isPending: isAiPending || !aiControlsEnabled,
+      canAdd: availableSeats > 0 && !isAiRegistryLoading && aiControlsEnabled,
+      canRemove: aiSeats > 0 && aiControlsEnabled,
       onAdd: (selection?: AiSeatSelection) => {
         void handleAddAi(selection)
       },
@@ -740,7 +748,8 @@ export function GameRoomClient({
     aiRegistryError,
     aiSeats,
     availableSeats,
-    canManageAi,
+    aiControlsEnabled,
+    canViewAiManager,
     handleAddAi,
     handleRemoveAiSeat,
     handleUpdateAiSeat,
