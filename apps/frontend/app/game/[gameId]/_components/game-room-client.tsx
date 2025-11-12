@@ -215,13 +215,17 @@ export function GameRoomClient({
   )
 
   // Polling effect: periodically requests refresh when idle
+  // Cleanup: Clear interval on unmount or when dependencies change to prevent memory leaks
   useEffect(() => {
     const timer = setInterval(() => {
       // requestRefresh will check activity state internally and only poll when idle
       void requestRefresh('poll')
     }, pollingMs)
 
-    return () => clearInterval(timer)
+    // Cleanup: Always clear interval to prevent memory leaks
+    return () => {
+      clearInterval(timer)
+    }
   }, [requestRefresh, pollingMs])
 
   // Status derived from activity state
@@ -480,6 +484,8 @@ export function GameRoomClient({
   const canViewAiManager = viewerIsHost && phase.phase === 'Init'
   const aiControlsEnabled = canViewAiManager && isIdle
 
+  // AI registry fetch effect: Loads AI registry when AI manager is visible
+  // Cleanup: Cancels pending fetch on unmount or when canViewAiManager changes to prevent memory leaks
   useEffect(() => {
     if (!canViewAiManager) {
       setAiRegistry([])
@@ -494,6 +500,7 @@ export function GameRoomClient({
 
     void fetchAiRegistryAction()
       .then((result) => {
+        // Check cancelled flag before updating state to prevent state updates on unmounted component
         if (cancelled) {
           return
         }
@@ -505,6 +512,7 @@ export function GameRoomClient({
         }
       })
       .catch((err) => {
+        // Check cancelled flag before updating state to prevent state updates on unmounted component
         if (cancelled) {
           return
         }
@@ -514,11 +522,13 @@ export function GameRoomClient({
         setAiRegistryError(message)
       })
       .finally(() => {
+        // Only update loading state if not cancelled to prevent state updates on unmounted component
         if (!cancelled) {
           setIsAiRegistryLoading(false)
         }
       })
 
+    // Cleanup: Set cancelled flag to prevent state updates after component unmounts
     return () => {
       cancelled = true
     }

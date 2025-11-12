@@ -23,6 +23,8 @@ export function TrumpSelectPanel({
     () => allowedTrumps[0] ?? null
   )
 
+  // Sync selected trump with allowed trumps
+  // No cleanup needed: This effect only updates state, which doesn't require cleanup
   useEffect(() => {
     if (allowedTrumps.length === 0) {
       setSelectedTrump(null)

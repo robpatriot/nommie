@@ -30,6 +30,8 @@ export function BiddingPanel({
     () => viewerBid ?? minBid
   )
 
+  // Sync selected bid with viewer bid or clamp to valid range
+  // No cleanup needed: This effect only updates state, which doesn't require cleanup
   useEffect(() => {
     if (viewerBid !== null) {
       setSelectedBid(viewerBid)

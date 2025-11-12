@@ -103,6 +103,8 @@ export function GameRoomView(props: GameRoomViewProps) {
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
 
+  // Reset selected card when phase changes or card becomes unplayable
+  // No cleanup needed: This effect only updates state, which doesn't require cleanup
   useEffect(() => {
     if (phase.phase !== 'Trick' || !playState) {
       setSelectedCard(null)

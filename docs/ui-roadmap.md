@@ -466,8 +466,12 @@ This section captures identified improvements across four categories: functional
   - ✅ Split `game-room-view.tsx` into smaller components: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, `TrumpSelectPanel`, `PlayPanel`, `ReadyPanel`, `PlayerActions`, `PhaseFact`, `ScoreSidebar`, `AiSeatManager`
   - `game-room-client.tsx`: 791 lines — complex state management could benefit from reducer pattern (future improvement)
 - Memory leaks potential:
-  - `game-room-client.tsx` lines 494-536: AI registry fetch effect cleanup is good, but similar patterns elsewhere may not have cleanup
-  - Polling interval cleanup (line 173) is correct
+  - ✅ **COMPLETED**: Verified all useEffect hooks have proper cleanup
+  - ✅ **COMPLETED**: Polling interval cleanup is correct (clearInterval on unmount)
+  - ✅ **COMPLETED**: AI registry fetch effect cleanup is correct (cancelled flag prevents state updates on unmount)
+  - ✅ **COMPLETED**: Added cleanup comments to document cleanup patterns
+  - ✅ **COMPLETED**: Verified all effects that need cleanup have it (intervals, async operations)
+  - ✅ **COMPLETED**: Verified effects that don't need cleanup (state updates only) are properly documented
 - Bundle size concerns:
   - No code splitting visible for game room components
   - Large components loaded upfront
