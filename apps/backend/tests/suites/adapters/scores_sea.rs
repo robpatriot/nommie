@@ -220,6 +220,8 @@ async fn test_get_current_totals() -> Result<(), AppError> {
                 },
             )
             .await?;
+            // Mark round 1 as complete (scores can only exist for completed rounds)
+            rounds::complete_round(txn, round1.id).await?;
 
             // Round 2 (cumulative totals)
             let round2 = rounds::create_round(txn, game.id, 2, 12, 1).await?;
@@ -283,6 +285,8 @@ async fn test_get_current_totals() -> Result<(), AppError> {
                 },
             )
             .await?;
+            // Mark round 2 as complete (scores can only exist for completed rounds)
+            rounds::complete_round(txn, round2.id).await?;
 
             // Get current totals should return round 2 totals
             let totals = scores::get_current_totals(txn, game.id).await?;

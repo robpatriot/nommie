@@ -61,20 +61,25 @@ pub async fn create_score(
 }
 
 /// Get current total scores for all players in a game
-/// Returns [seat0, seat1, seat2, seat3] by finding latest round scores
+/// Returns [seat0, seat1, seat2, seat3] by finding the latest completed round
+/// Scores can only exist for completed rounds, so we query for the latest round
+/// that has been completed (completed_at IS NOT NULL)
 pub async fn get_current_totals(
     txn: &DatabaseTransaction,
     game_id: i64,
 ) -> Result<[i16; 4], sea_orm::DbErr> {
-    // Find the latest round for this game
-    let latest_round = game_rounds::Entity::find()
+    // Find the latest completed round for this game
+    // Scores can only exist for completed rounds, so we only look at completed rounds
+    let latest_completed_round = game_rounds::Entity::find()
         .filter(game_rounds::Column::GameId.eq(game_id))
+        .filter(game_rounds::Column::CompletedAt.is_not_null())
         .order_by(game_rounds::Column::RoundNo, Order::Desc)
         .one(txn)
         .await?;
 
-    if let Some(round) = latest_round {
-        // Get all scores for this round
+    if let Some(round) = latest_completed_round {
+        // Get all scores for this completed round
+        // A completed round should have scores for all 4 players
         let scores = find_all_by_round(txn, round.id).await?;
 
         // Build array (initialize to 0)
@@ -86,7 +91,7 @@ pub async fn get_current_totals(
         }
         Ok(totals)
     } else {
-        // No rounds yet, all scores are 0
+        // No completed rounds yet, all scores are 0
         Ok([0, 0, 0, 0])
     }
 }
