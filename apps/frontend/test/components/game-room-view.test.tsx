@@ -105,6 +105,12 @@ describe('GameRoomView', () => {
   it('enforces legal card gating and triggers play submission', async () => {
     const onPlay = vi.fn().mockResolvedValue(undefined)
 
+    // Extract playable cards from trick snapshot (type-safe)
+    const playableCards =
+      trickSnapshotFixture.phase.phase === 'Trick'
+        ? trickSnapshotFixture.phase.data.playable
+        : []
+
     render(
       <GameRoomView
         gameId={99}
@@ -115,7 +121,7 @@ describe('GameRoomView', () => {
         status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
         playState={{
           viewerSeat: 0,
-          playable: trickSnapshotFixture.phase.data.playable,
+          playable: playableCards,
           isPending: false,
           onPlay,
         }}
