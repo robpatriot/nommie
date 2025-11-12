@@ -463,11 +463,11 @@ This section captures identified improvements across four categories: functional
 **Efficiency Issues:**
 - Polling strategy:
   - `game-room-client.tsx` line 169: Fixed 3-second polling regardless of activity
-  - Should use exponential backoff or pause when tab is inactive
-  - No consideration for battery/network usage
+  - **Note**: Will be replaced with WebSockets/SSE for real-time updates (see Missing features below)
+  - Current polling is acceptable for MVP; WebSockets will provide better efficiency
 - Unnecessary re-renders:
-  - `game-room-client.tsx` line 176-182: `status` memo depends on `isPolling || isRefreshing`, but both can change frequently
-  - `game-room-view.tsx` line 130-133: `seatDisplayName` callback recreated on every render (should be stable)
+  - ✅ **COMPLETED**: Fixed `status` memo in `game-room-client.tsx` to depend only on `isPolling` directly from activity state instead of `isActive` (which changes for all activities)
+  - ✅ **COMPLETED**: `seatDisplayName` callback already uses `useCallback` with correct dependencies - no change needed
 - ✅ **COMPLETED**: Large component files:
   - ✅ Split `game-room-view.tsx` into smaller components: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, `TrumpSelectPanel`, `PlayPanel`, `ReadyPanel`, `PlayerActions`, `PhaseFact`, `ScoreSidebar`, `AiSeatManager`
   - `game-room-client.tsx`: 791 lines — complex state management could benefit from reducer pattern (future improvement)
@@ -507,7 +507,6 @@ This section captures identified improvements across four categories: functional
   - But some files are too large and do too much
 
 **Recommendations:**
-- Implement adaptive polling (pause when inactive, backoff on errors)
 - Add React Query or SWR for better caching and request deduplication
 - Increase test coverage (especially for error paths)
 - Add code splitting for game room route
@@ -536,8 +535,7 @@ This section captures identified improvements across four categories: functional
 2. ✅ Fix functional correctness bugs — **COMPLETED**
 3. ✅ Split large components (`game-room-view.tsx` into: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, etc.) — **COMPLETED**
 4. Add loading states for initial page loads
-5. Implement adaptive polling
-6. ✅ Add comprehensive error retry logic — **COMPLETED** (retry logic in fetchWithAuth with exponential backoff)
+5. ✅ Add comprehensive error retry logic — **COMPLETED** (retry logic in fetchWithAuth with exponential backoff)
 
 **Low Priority:**
 1. Add code splitting

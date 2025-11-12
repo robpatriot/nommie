@@ -87,7 +87,6 @@ export function GameRoomClient({
     activity.type === 'action' && activity.action === 'trump'
   const isPlayPending = activity.type === 'action' && activity.action === 'play'
   const isAiPending = activity.type === 'action' && activity.action === 'ai'
-  const isActive = !isIdle
 
   /**
    * Executes the actual API call to refresh the game snapshot.
@@ -226,12 +225,15 @@ export function GameRoomClient({
   }, [requestRefresh, pollingMs])
 
   // Status derived from activity state
+  // Only recompute when timestamp or polling state changes (not all activities)
+  // This prevents unnecessary re-renders when other activities (refresh, actions) occur
+  const isPolling = activity.type === 'polling'
   const status = useMemo(
     () => ({
       lastSyncedAt: snapshot.timestamp,
-      isPolling: isActive, // Show active indicator for any activity
+      isPolling,
     }),
-    [snapshot.timestamp, isActive]
+    [snapshot.timestamp, isPolling]
   )
 
   const phase = snapshot.snapshot.phase
