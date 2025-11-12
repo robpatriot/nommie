@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { GameRoomView } from '@/app/game/[gameId]/_components/game-room-view'
 import {
   biddingSnapshotFixture,
+  initSnapshotFixture,
   trickSnapshotFixture,
 } from '../mocks/game-snapshot'
 import { render, screen } from '../utils'
@@ -135,7 +136,7 @@ describe('GameRoomView', () => {
     expect(onPlay).toHaveBeenCalledWith('2H')
   })
 
-  it('renders AI management panel for host controls', async () => {
+  it('renders AI management panel for host controls before the game starts', async () => {
     const onAdd = vi.fn()
     const onRemoveSeat = vi.fn()
     const onUpdateSeat = vi.fn()
@@ -143,7 +144,7 @@ describe('GameRoomView', () => {
     render(
       <GameRoomView
         gameId={77}
-        snapshot={biddingSnapshotFixture}
+        snapshot={initSnapshotFixture}
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={[]}
@@ -229,5 +230,63 @@ describe('GameRoomView', () => {
       registryVersion: '1.0.0',
     })
     expect(onRemoveSeat).toHaveBeenCalledWith(1)
+  })
+
+  it('shows guidance for non-host players before the game starts', () => {
+    render(
+      <GameRoomView
+        gameId={55}
+        snapshot={initSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={2}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+      />
+    )
+
+    expect(
+      screen.getByText(
+        /The host is configuring AI players for this game\. Seating updates will appear once the match begins\./
+      )
+    ).toBeInTheDocument()
+  })
+
+  it('hides AI management once the game has started', () => {
+    const onAdd = vi.fn()
+    const onRemoveSeat = vi.fn()
+    const onUpdateSeat = vi.fn()
+
+    render(
+      <GameRoomView
+        gameId={88}
+        snapshot={biddingSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        aiSeatState={{
+          totalSeats: 4,
+          availableSeats: 1,
+          aiSeats: 2,
+          isPending: false,
+          canAdd: true,
+          canRemove: true,
+          onAdd,
+          onRemoveSeat,
+          onUpdateSeat,
+          registry: {
+            entries: [{ name: 'HeuristicV1', version: '1.0.0' }],
+            isLoading: false,
+            defaultName: 'HeuristicV1',
+          },
+          seats: [],
+        }}
+      />
+    )
+
+    expect(screen.queryByText('AI Seats')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/The host is configuring AI players/)
+    ).not.toBeInTheDocument()
   })
 })

@@ -125,6 +125,7 @@ export function GameRoomView(props: GameRoomViewProps) {
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
+  const isPreGame = phase.phase === 'Init'
   const activeSeat = getActiveSeat(phase)
   const seatDisplayName = useCallback(
     (seat: Seat) => (seat === viewerSeat ? 'You' : playerNames[seat]),
@@ -313,6 +314,7 @@ export function GameRoomView(props: GameRoomViewProps) {
             round={round}
             readyState={readyState}
             aiState={aiSeatState}
+            isPreGame={isPreGame}
           />
         </section>
       </main>
@@ -1027,12 +1029,14 @@ function ScoreSidebar({
   round,
   readyState,
   aiState,
+  isPreGame,
 }: {
   playerNames: [string, string, string, string]
   scores: [number, number, number, number]
   round: RoundPublic | null
   readyState?: GameRoomViewProps['readyState']
   aiState?: GameRoomViewProps['aiSeatState']
+  isPreGame: boolean
 }) {
   return (
     <aside className="flex h-full flex-col gap-4 rounded-2xl border border-border bg-surface/70 p-4">
@@ -1072,7 +1076,7 @@ function ScoreSidebar({
       ) : null}
 
       <ReadyPanel readyState={readyState} />
-      <AiSeatManager aiState={aiState} />
+      {isPreGame ? <AiSeatManager aiState={aiState} /> : null}
     </aside>
   )
 }
@@ -1132,8 +1136,9 @@ function AiSeatManager({
 }) {
   if (!aiState) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-surface/60 p-4 text-xs text-subtle">
-        AI seat controls appear here for the host before the game begins.
+      <div className="rounded-xl border border-dashed border-border bg-surface/60 p-4 text-sm text-subtle">
+        The host is configuring AI players for this game. Seating updates will
+        appear once the match begins.
       </div>
     )
   }

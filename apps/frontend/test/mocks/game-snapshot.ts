@@ -66,6 +66,19 @@ export const biddingSnapshotFixture: GameSnapshot = {
   },
 }
 
+export const initSnapshotFixture: GameSnapshot = {
+  game: {
+    round_no: 0,
+    dealer: 0,
+    seating: seatingFixture,
+    scores_total: [0, 0, 0, 0],
+    host_seat: 0,
+  },
+  phase: {
+    phase: 'Init',
+  },
+}
+
 export const trickSnapshotFixture: GameSnapshot = {
   game: {
     round_no: 5,
