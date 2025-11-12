@@ -489,8 +489,13 @@ This section captures identified improvements across four categories: functional
   - ✅ **COMPLETED**: Exported `SnapshotEnvelope` interface in `lib/api/game-room.ts` instead of inline interface
   - ✅ **COMPLETED**: Extracted inline types from `game-room-view.tsx` to `game-room-view.types.ts` (GameRoomStatus, GameRoomError, ReadyState, BiddingState, TrumpState, PlayState, AiSeatState, and nested types)
 - Testing:
-  - Limited test files found (`AuthControl.test.tsx`, `game-room-view.test.tsx`)
-  - No tests for critical paths like `game-room-client.tsx`, API functions, or error handling
+  - ✅ **IMPROVED**: Added comprehensive tests for critical utility functions:
+    - ✅ `lib/api/error-parsing.test.ts` - Tests for Problem Details parsing (10 tests)
+    - ✅ `lib/api/action-helpers.test.ts` - Tests for error-to-result conversion (11 tests)
+    - ✅ `lib/retry.test.ts` - Tests for network error retry logic with exponential backoff (29 tests)
+    - ✅ `components/ErrorBoundary.test.tsx` - Tests for error boundary component (9 tests)
+  - Limited test files for complex components (`game-room-client.tsx` still needs tests)
+  - Existing tests: `AuthControl.test.tsx`, `game-room-view.test.tsx`, `game-snapshot.test.ts`
 - Documentation:
   - ✅ **IMPROVED**: Added JSDoc comments for `executeRefresh` and `requestRefresh` functions
   - ✅ **IMPROVED**: Added comprehensive inline documentation explaining state/ref duality and recursive call safety
@@ -512,10 +517,11 @@ This section captures identified improvements across four categories: functional
 
 **Recommendations:**
 - Add React Query or SWR for better caching and request deduplication
-- Increase test coverage (especially for error paths)
+- ✅ **IMPROVED**: Increase test coverage (especially for error paths) — Added 59 tests for API error parsing, action helpers, retry logic, and ErrorBoundary
 - ✅ Code splitting for game room route — **COMPLETED** (Next.js App Router handles route-level code splitting automatically)
 - Use `useMemo` and `useCallback` more strategically to prevent unnecessary re-renders
 - Consider using a reducer for `game-room-client.tsx` state management
+- Add tests for `game-room-client.tsx` complex state management and polling logic
 
 ### Priority Summary
 
@@ -543,8 +549,9 @@ This section captures identified improvements across four categories: functional
 
 **Low Priority:**
 1. ✅ Add code splitting — **COMPLETED** (Next.js App Router handles route-level code splitting automatically)
-2. Improve test coverage
+2. ✅ **IMPROVED**: Improve test coverage — Added 59 tests for critical utility functions (API error parsing, action helpers, retry logic, ErrorBoundary)
 3. Add JSDoc documentation
 4. Enhance accessibility
 5. Consider state management library (Redux/Zustand) for complex game state
+6. Add tests for `game-room-client.tsx` complex state management
 
