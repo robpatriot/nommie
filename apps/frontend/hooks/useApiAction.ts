@@ -6,7 +6,13 @@ import type { ToastMessage } from '@/components/Toast'
 
 type ActionResult<T = void> =
   | { kind: 'ok'; data?: T }
-  | { kind: 'error'; message: string; status: number; traceId?: string }
+  | {
+      kind: 'error'
+      message: string
+      status: number
+      code?: string
+      traceId?: string
+    }
 
 type UseApiActionOptions = {
   showToast: (
@@ -44,12 +50,16 @@ export function useApiAction(options: UseApiActionOptions) {
           const actionError = new BackendApiError(
             result.message || errorMessage || 'Action failed',
             result.status,
-            undefined,
+            result.code,
             result.traceId
           )
 
+          // Prefer the actual error message from the backend, fallback to provided error message
           const finalErrorMessage =
-            options?.errorMessage || errorMessage || actionError.message
+            actionError.message ||
+            options?.errorMessage ||
+            errorMessage ||
+            'Action failed'
           showToast(finalErrorMessage, 'error', actionError)
 
           if (process.env.NODE_ENV === 'development' && actionError.traceId) {
