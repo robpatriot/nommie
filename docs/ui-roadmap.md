@@ -375,7 +375,6 @@ This section captures identified improvements across four categories: functional
 - ✅ Remove all `[AUTH_BYPASS]` code paths — **COMPLETED**
 - Complete backend endpoint integration or document as intentional fallback behavior
 - ✅ Add loading skeletons for initial data fetches — **COMPLETED** (loading.tsx for lobby and game room)
-- Consider WebSocket/SSE for real-time updates instead of polling only
 
 ### 2. Functional Correctness
 
@@ -480,7 +479,7 @@ This section captures identified improvements across four categories: functional
 **Quality Issues:**
 - Type safety:
   - ✅ **COMPLETED**: Exported `SnapshotEnvelope` interface in `lib/api/game-room.ts` instead of inline interface
-  - `game-room-view.tsx`: Many inline types that could be extracted
+  - ✅ **COMPLETED**: Extracted inline types from `game-room-view.tsx` to `game-room-view.types.ts` (GameRoomStatus, GameRoomError, ReadyState, BiddingState, TrumpState, PlayState, AiSeatState, and nested types)
 - Testing:
   - Limited test files found (`AuthControl.test.tsx`, `game-room-view.test.tsx`)
   - No tests for critical paths like `game-room-client.tsx`, API functions, or error handling

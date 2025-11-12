@@ -19,12 +19,18 @@ import { TrickArea } from './game-room/TrickArea'
 import { PlayerHand } from './game-room/PlayerHand'
 import { PlayerActions } from './game-room/PlayerActions'
 import { ScoreSidebar } from './game-room/ScoreSidebar'
+import type {
+  AiSeatState,
+  BiddingState,
+  GameRoomError,
+  GameRoomStatus,
+  PlayState,
+  ReadyState,
+  TrumpState,
+} from './game-room-view.types'
 
-export interface AiSeatSelection {
-  registryName: string
-  registryVersion?: string
-  seed?: number
-}
+// Re-export types for use in other components (e.g., game-room-client.tsx)
+export type { AiSeatSelection, AiSeatState } from './game-room-view.types'
 
 export interface GameRoomViewProps {
   gameId: number
@@ -32,79 +38,15 @@ export interface GameRoomViewProps {
   playerNames: [string, string, string, string]
   viewerSeat?: Seat
   viewerHand?: Card[]
-  status: {
-    lastSyncedAt: string
-    isPolling: boolean
-  }
+  status: GameRoomStatus
   onRefresh?: () => void
   isRefreshing?: boolean
-  error?: {
-    message: string
-    traceId?: string
-  } | null
-  readyState?: {
-    canReady: boolean
-    isPending: boolean
-    hasMarked: boolean
-    onReady: () => void
-  }
-  biddingState?: {
-    viewerSeat: Seat
-    isPending: boolean
-    onSubmit: (bid: number) => Promise<void> | void
-  }
-  trumpState?: {
-    viewerSeat: Seat
-    toAct: Seat
-    allowedTrumps: import('@/lib/game-room/types').Trump[]
-    canSelect: boolean
-    isPending: boolean
-    onSelect?: (
-      trump: import('@/lib/game-room/types').Trump
-    ) => Promise<void> | void
-  }
-  playState?: {
-    viewerSeat: Seat
-    playable: Card[]
-    isPending: boolean
-    onPlay: (card: Card) => Promise<void> | void
-  }
-  aiSeatState?: {
-    totalSeats: number
-    availableSeats: number
-    aiSeats: number
-    isPending: boolean
-    canAdd: boolean
-    canRemove: boolean
-    onAdd: (selection?: AiSeatSelection) => Promise<void> | void
-    onRemove?: () => Promise<void> | void
-    onRemoveSeat?: (seat: Seat) => Promise<void> | void
-    onUpdateSeat?: (
-      seat: Seat,
-      selection: AiSeatSelection
-    ) => Promise<void> | void
-    registry?: {
-      entries: Array<{
-        name: string
-        version: string
-      }>
-      isLoading: boolean
-      error?: string | null
-      defaultName?: string
-    }
-    seats: Array<{
-      seat: Seat
-      name: string
-      userId: number | null
-      isOccupied: boolean
-      isAi: boolean
-      isReady: boolean
-      aiProfile?: {
-        name: string
-        version: string
-      } | null
-    }>
-  }
+  error?: GameRoomError | null
+  readyState?: ReadyState
+  biddingState?: BiddingState
+  trumpState?: TrumpState
+  playState?: PlayState
+  aiSeatState?: AiSeatState
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
