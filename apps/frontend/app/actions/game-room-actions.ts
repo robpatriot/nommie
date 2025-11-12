@@ -13,6 +13,7 @@ import {
   listRegisteredAis,
   type AiRegistryEntry,
 } from '@/lib/api/game-room'
+import { toErrorResult } from '@/lib/api/action-helpers'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
 import { validateSeat } from '@/utils/seat-validation'
@@ -79,29 +80,11 @@ export async function getGameRoomSnapshotAction(
       },
     }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
+    // Handle not_modified case (304 status)
+    if (error instanceof BackendApiError && error.status === 304) {
+      return { kind: 'not_modified' }
     }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to fetch game snapshot',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to fetch game snapshot')
   }
 }
 
@@ -122,29 +105,7 @@ export async function markPlayerReadyAction(
     await markPlayerReady(gameId)
     return { kind: 'ok' }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
-    }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to mark player ready',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to mark player ready')
   }
 }
 
@@ -170,29 +131,7 @@ export async function submitBidAction(
     await submitBid(request.gameId, bidValue)
     return { kind: 'ok' }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
-    }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to submit bid',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to submit bid')
   }
 }
 
@@ -208,29 +147,7 @@ export async function selectTrumpAction(
     await selectTrump(request.gameId, request.trump)
     return { kind: 'ok' }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
-    }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to select trump',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to select trump')
   }
 }
 
@@ -257,29 +174,7 @@ export async function submitPlayAction(
     await submitPlay(request.gameId, card)
     return { kind: 'ok' }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
-    }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to play card',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to play card')
   }
 }
 
@@ -313,29 +208,7 @@ export async function addAiSeatAction(
     })
     return { kind: 'ok' }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
-    }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to add AI seat',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to add AI seat')
   }
 }
 
@@ -358,29 +231,7 @@ export async function removeAiSeatAction(
     })
     return { kind: 'ok' }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
-    }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to remove AI seat',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to remove AI seat')
   }
 }
 
@@ -406,29 +257,7 @@ export async function updateAiSeatAction(
     })
     return { kind: 'ok' }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
-    }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to update AI seat',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to update AI seat')
   }
 }
 
@@ -447,28 +276,6 @@ export async function fetchAiRegistryAction(): Promise<AiRegistryActionResult> {
     const ais = await listRegisteredAis()
     return { kind: 'ok', ais }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return {
-        kind: 'error',
-        message: error.message,
-        status: error.status,
-        code: error.code,
-        traceId: error.traceId,
-      }
-    }
-
-    // Wrap unexpected errors in BackendApiError for consistent error handling
-    const wrappedError = new BackendApiError(
-      error instanceof Error ? error.message : 'Failed to fetch AI registry',
-      500,
-      'UNKNOWN_ERROR'
-    )
-    return {
-      kind: 'error',
-      message: wrappedError.message,
-      status: wrappedError.status,
-      code: wrappedError.code,
-      traceId: wrappedError.traceId,
-    }
+    return toErrorResult(error, 'Failed to fetch AI registry')
   }
 }

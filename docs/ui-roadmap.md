@@ -440,9 +440,12 @@ This section captures identified improvements across four categories: functional
 - ✅ **COMPLETED**: Date/time formatting:
   - ✅ Extracted to `utils/date-formatting.ts` with `formatTime()` function
   - ✅ Used in `game-room-view.tsx` for sync label formatting
-- API error response parsing:
-  - `lib/api.ts` lines 72-101: Problem Details parsing
-  - Similar error extraction logic in multiple action files
+- ✅ **COMPLETED**: API error response parsing:
+  - ✅ Extracted Problem Details parsing logic to `lib/api/error-parsing.ts` with `parseErrorResponse()` function
+  - ✅ Created `lib/api/action-helpers.ts` with `toErrorResult()` helper for consistent error-to-result conversion
+  - ✅ Updated `lib/api.ts` to use extracted `parseErrorResponse()` function
+  - ✅ Updated all action functions in `game-room-actions.ts` to use `toErrorResult()` helper (eliminated ~200 lines of duplicate error handling code)
+  - ✅ Centralized error parsing and result conversion across all action files
 
 **Recommendations:**
 - ✅ Extract error handling to a custom hook: `useApiAction()` — **COMPLETED**
@@ -451,6 +454,7 @@ This section captures identified improvements across four categories: functional
   - ✅ `utils/seat-validation.ts` for seat validation — **COMPLETED**
   - ✅ `utils/date-formatting.ts` for date formatting — **COMPLETED**
 - ✅ Create a shared `useToast()` hook — **COMPLETED**
+- ✅ Centralize API error response parsing — **COMPLETED** (extracted to `lib/api/error-parsing.ts` and `lib/api/action-helpers.ts`)
 
 ### 4. Efficiency and Quality
 
@@ -473,8 +477,8 @@ This section captures identified improvements across four categories: functional
   - ✅ **COMPLETED**: Verified all effects that need cleanup have it (intervals, async operations)
   - ✅ **COMPLETED**: Verified effects that don't need cleanup (state updates only) are properly documented
 - Bundle size concerns:
-  - No code splitting visible for game room components
-  - Large components loaded upfront
+  - ✅ **COMPLETED**: Route-level code splitting is handled automatically by Next.js App Router (each route gets its own bundle)
+  - Large components loaded upfront (component-level lazy loading could be added as optimization, but not required)
 - Network efficiency:
   - ETag support is good (line 22 in `lib/api/game-room.ts`)
   - But polling still makes requests even when nothing changed
@@ -509,7 +513,7 @@ This section captures identified improvements across four categories: functional
 **Recommendations:**
 - Add React Query or SWR for better caching and request deduplication
 - Increase test coverage (especially for error paths)
-- Add code splitting for game room route
+- ✅ Code splitting for game room route — **COMPLETED** (Next.js App Router handles route-level code splitting automatically)
 - Use `useMemo` and `useCallback` more strategically to prevent unnecessary re-renders
 - Consider using a reducer for `game-room-client.tsx` state management
 
@@ -538,7 +542,7 @@ This section captures identified improvements across four categories: functional
 5. ✅ Add comprehensive error retry logic — **COMPLETED** (retry logic in fetchWithAuth with exponential backoff)
 
 **Low Priority:**
-1. Add code splitting
+1. ✅ Add code splitting — **COMPLETED** (Next.js App Router handles route-level code splitting automatically)
 2. Improve test coverage
 3. Add JSDoc documentation
 4. Enhance accessibility
