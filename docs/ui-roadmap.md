@@ -385,10 +385,6 @@ This section captures identified improvements across four categories: functional
 ### 2. Functional Correctness
 
 **Issues Found:**
-- ✅ **COMPLETED**: Auth bypass inconsistency:
-  - ✅ Removed all `NEXT_PUBLIC_DISABLE_AUTH` checks and `isAuthDisabled()` function
-  - ✅ All routes now require authentication consistently
-  - ✅ All API calls require backend JWT without bypass option
 - ✅ **COMPLETED**: Default name mismatch:
   - ✅ Fixed create game to always send default name (`{creatorName} game`) if user doesn't provide one
   - ✅ Frontend now matches backend behavior expectations
@@ -404,23 +400,22 @@ This section captures identified improvements across four categories: functional
   - Some actions wrap errors in `BackendApiError`, others don't
 - State management issues:
   - ✅ **COMPLETED**: Fixed polling/refresh overlap via unified ActivityState
-  - `hasMarkedReady` state (line 56) may not reset correctly if phase changes rapidly
+  - ✅ **COMPLETED**: Fixed `hasMarkedReady` reset to use phase directly instead of `canMarkReady` to avoid race conditions on rapid phase changes
 - Type safety concerns:
-  - `game-room-view.tsx` line 113: `viewerSeat = 0` default may mask missing data
-  - `lib/api/game-room.ts` lines 37-40: Seat parsing clamps to 0-3 but doesn't validate the original value
+  - ✅ **COMPLETED**: Fixed `game-room-view.tsx` to handle `viewerSeat` null/undefined explicitly instead of defaulting to 0
+  - ✅ **COMPLETED**: Added seat validation logging in `lib/api/game-room.ts` to log warning if value is out of expected range
 - ✅ **COMPLETED**: Race conditions:
   - ✅ Fixed polling interval to respect activity state (only polls when idle)
   - ✅ Implemented unified activity state to replace all individual pending flags
   - ✅ Added global "action in progress" guard via ActivityState type
   - ✅ Manual refresh can queue when polling is in progress and executes after completion
 - Data synchronization:
-  - `game-room-client.tsx` lines 84-90: When updating snapshot, preserves `viewerSeat` from previous if new one is null — may cause stale data
+  - ✅ **COMPLETED**: Fixed `game-room-client.tsx` to not preserve `viewerSeat` from previous snapshot when API returns null - now fails hard instead of preserving stale data
 - ✅ **COMPLETED**: Joinable games UI membership check:
   - ✅ Fixed joinable games to check `viewer_is_member` before showing "Join" button
   - ✅ Shows "Go to game" if user is already a member, "Join" if not a member
 
 **Recommendations:**
-- ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
 - ✅ Implement global action queue/mutex to prevent concurrent actions — **COMPLETED** (unified ActivityState)
 - Add consistent retry logic across all API calls
 - Add validation for seat numbers before clamping
@@ -446,8 +441,6 @@ This section captures identified improvements across four categories: functional
 - ✅ **COMPLETED**: Seat validation:
   - ✅ Extracted to `utils/seat-validation.ts` with `validateSeat()` function
   - ✅ Used consistently in `app/actions/game-room-actions.ts` (eliminated 3 duplicate implementations)
-- ✅ **COMPLETED**: Auth bypass checks:
-  - ✅ Removed all `NEXT_PUBLIC_DISABLE_AUTH` checks and `isAuthDisabled()` function
 - ✅ **COMPLETED**: Date/time formatting:
   - ✅ Extracted to `utils/date-formatting.ts` with `formatTime()` function
   - ✅ Used in `game-room-view.tsx` for sync label formatting
@@ -462,7 +455,6 @@ This section captures identified improvements across four categories: functional
   - ✅ `utils/seat-validation.ts` for seat validation — **COMPLETED**
   - ✅ `utils/date-formatting.ts` for date formatting — **COMPLETED**
 - ✅ Create a shared `useToast()` hook — **COMPLETED**
-- ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
 
 ### 4. Efficiency and Quality
 
@@ -474,9 +466,9 @@ This section captures identified improvements across four categories: functional
 - Unnecessary re-renders:
   - `game-room-client.tsx` line 176-182: `status` memo depends on `isPolling || isRefreshing`, but both can change frequently
   - `game-room-view.tsx` line 130-133: `seatDisplayName` callback recreated on every render (should be stable)
-- Large component files:
-  - `game-room-view.tsx`: 1457 lines — should be split into smaller components
-  - `game-room-client.tsx`: 791 lines — complex state management could benefit from reducer pattern
+- ✅ **COMPLETED**: Large component files:
+  - ✅ Split `game-room-view.tsx` into smaller components: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, `TrumpSelectPanel`, `PlayPanel`, `ReadyPanel`, `PlayerActions`, `PhaseFact`, `ScoreSidebar`, `AiSeatManager`
+  - `game-room-client.tsx`: 791 lines — complex state management could benefit from reducer pattern (future improvement)
 - Memory leaks potential:
   - `game-room-client.tsx` lines 494-536: AI registry fetch effect cleanup is good, but similar patterns elsewhere may not have cleanup
   - Polling interval cleanup (line 173) is correct
@@ -514,10 +506,7 @@ This section captures identified improvements across four categories: functional
 
 **Recommendations:**
 - Implement adaptive polling (pause when inactive, backoff on errors)
-- Split large components (`game-room-view.tsx` into: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, etc.)
 - Add React Query or SWR for better caching and request deduplication
-- Extract shared utilities and hooks
-- ✅ Add Error Boundaries around major sections — **COMPLETED**
 - Increase test coverage (especially for error paths)
 - Add code splitting for game room route
 - Use `useMemo` and `useCallback` more strategically to prevent unnecessary re-renders
@@ -530,9 +519,8 @@ This section captures identified improvements across four categories: functional
 2. ✅ Extract duplicated error handling into shared hook — **COMPLETED** (useApiAction hook)
 3. ✅ Fix race conditions in polling/refresh logic — **COMPLETED** (unified activity state)
 4. ✅ Add Error Boundaries — **COMPLETED** (ErrorBoundary component)
-5. ✅ Standardize auth bypass checks — **COMPLETED** (removed all auth bypass code)
-6. ✅ Extract shared action completion logic — **COMPLETED** (completeActionAndRefresh helper)
-7. ✅ Remove backwards compatibility code — **COMPLETED** (mock data, old session handling, graceful errors)
+5. ✅ Extract shared action completion logic — **COMPLETED** (completeActionAndRefresh helper)
+6. ✅ Remove backwards compatibility code — **COMPLETED** (mock data, old session handling, graceful errors)
 
 **Completed:**
 - ✅ Removed outdated TODOs and 404 handling from all game endpoints (create, join, joinable, in-progress, last-active)
@@ -540,25 +528,14 @@ This section captures identified improvements across four categories: functional
 - ✅ Fixed joinable games UI to check membership status
 - ✅ Implemented last-active game endpoint (backend + frontend)
 - ✅ Updated button labels to "Most Recent Game"
-- ✅ Removed all `[AUTH_BYPASS]` code and `isAuthDisabled()` function
-- ✅ All routes and API calls now require authentication consistently
-- ✅ Removed `NEXT_PUBLIC_DISABLE_AUTH` environment variable usage
-- ✅ Extracted duplicated error handling into `useApiAction()` hook
-- ✅ Refactored 6 handlers in game-room-client to use centralized error handling
-- ✅ Created `ErrorBoundary` component and wrapped major sections
-- ✅ Added user-friendly error recovery UI with ErrorBoundary
-- ✅ Fixed race conditions in polling/refresh logic: Implemented unified `ActivityState` type to track polling, refresh, and actions. Replaced all individual pending flags with single activity state. Added activity ref to avoid dependency issues. Added pending manual refresh queue to handle manual refresh requests during polling. Polling now respects activity state and only runs when idle. Actions block both polling and manual refresh. Manual refresh can queue when polling is in progress and executes after polling completes. Eliminated race conditions and concurrent action issues.
-- ✅ **Refactored concurrent action/refresh logic for maintainability**: Extracted shared `completeActionAndRefresh()` helper to eliminate ~90 lines of duplication across 6 action handlers (bid, trump, play, AI add/remove/update). Renamed functions for clarity (`doRefresh` → `executeRefresh`, `performRefresh` → `requestRefresh`). Added comprehensive documentation explaining state/ref duality, recursive call safety, and function purposes. Unified all actions (including `markReady`) to use consistent refresh pattern. Improved code quality and maintainability without functional changes.
-- ✅ **Removed backwards compatibility code**: Removed mock data fallback from game room page. Removed old session format handling from auth.ts. Removed graceful error handling from API functions (fail hard approach). Updated UI roadmap documentation. All code now follows "fail hard" approach with errors handled by ErrorBoundary.
-- ✅ **Extracted duplicated utilities**: Created shared utilities to eliminate duplication: `utils/player-names.ts` (extractPlayerName, extractPlayerNames), `utils/seat-validation.ts` (validateSeat), `utils/date-formatting.ts` (formatTime), and `hooks/useToast.ts` hook. All components now use these shared utilities consistently, eliminating duplicate implementations across the codebase.
-- ✅ **Fixed game auto-start bug**: Fixed issue where game didn't start when host marked themselves ready before there were 4 players and then added AI players to make up the remaining players. Extracted game start logic into `check_and_start_game_if_ready()` helper function in backend `GameFlowService`. Updated `mark_ready()` and `add_ai_seat()` route handler to use the helper. Game now starts automatically when the 4th player (AI or human) is added, regardless of whether the host marked ready first.
 
 **Medium Priority:**
-1. Split large components
-2. ✅ Extract duplicated utilities (player names, seat validation, date formatting, toast) — **COMPLETED**
-3. Add loading states for initial page loads
-4. Implement adaptive polling
-5. Add comprehensive error retry logic
+1. ✅ Extract duplicated utilities (player names, seat validation, date formatting, toast) — **COMPLETED**
+2. ✅ Fix functional correctness bugs — **COMPLETED**
+3. ✅ Split large components (`game-room-view.tsx` into: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, etc.) — **COMPLETED**
+4. Add loading states for initial page loads
+5. Implement adaptive polling
+6. Add comprehensive error retry logic
 
 **Low Priority:**
 1. Add code splitting
