@@ -1,0 +1,153 @@
+import type {
+  Card,
+  PhaseSnapshot,
+  RoundPublic,
+  Seat,
+} from '@/lib/game-room/types'
+
+export interface SeatSummary {
+  seat: Seat
+  orientation: 'top' | 'left' | 'right' | 'bottom'
+  name: string
+  score: number
+  isViewer: boolean
+  isActive: boolean
+  tricksWon?: number
+  currentCard?: Card
+  bid?: number | null
+}
+
+export function getOrientation(
+  viewerSeat: Seat,
+  seat: Seat
+): SeatSummary['orientation'] {
+  const relative = (seat - viewerSeat + 4) % 4
+  if (relative === 0) return 'bottom'
+  if (relative === 1) return 'left'
+  if (relative === 2) return 'top'
+  return 'right'
+}
+
+export function getPhaseLabel(phase: PhaseSnapshot): string {
+  switch (phase.phase) {
+    case 'Init':
+      return 'Initializing'
+    case 'Bidding':
+      return 'Bidding Round'
+    case 'TrumpSelect':
+      return 'Select Trump'
+    case 'Trick':
+      return 'Trick Play'
+    case 'Scoring':
+      return 'Round Scoring'
+    case 'Complete':
+      return 'Round Complete'
+    case 'GameOver':
+      return 'Game Over'
+    default:
+      return 'Unknown Phase'
+  }
+}
+
+export function getRound(phase: PhaseSnapshot): RoundPublic | null {
+  switch (phase.phase) {
+    case 'Bidding':
+    case 'TrumpSelect':
+    case 'Trick':
+    case 'Scoring':
+    case 'Complete':
+      return phase.data.round
+    default:
+      return null
+  }
+}
+
+export function getActiveSeat(phase: PhaseSnapshot): Seat | null {
+  switch (phase.phase) {
+    case 'Bidding':
+    case 'TrumpSelect':
+    case 'Trick':
+      return phase.data.to_act
+    default:
+      return null
+  }
+}
+
+export function getCurrentTrickMap(phase: PhaseSnapshot): Map<Seat, Card> {
+  if (phase.phase !== 'Trick') {
+    return new Map()
+  }
+  return new Map(phase.data.current_trick)
+}
+
+export function getBidForSeat(
+  phase: PhaseSnapshot,
+  seat: Seat
+): number | null | undefined {
+  if (phase.phase === 'Bidding') {
+    return phase.data.bids[seat]
+  }
+  return undefined
+}
+
+export function formatTrump(trump: RoundPublic['trump']): string {
+  if (!trump) {
+    return 'Undeclared'
+  }
+
+  switch (trump) {
+    case 'CLUBS':
+      return 'Clubs'
+    case 'DIAMONDS':
+      return 'Diamonds'
+    case 'HEARTS':
+      return 'Hearts'
+    case 'SPADES':
+      return 'Spades'
+    case 'NO_TRUMP':
+      return 'No Trump'
+    default:
+      return trump
+  }
+}
+
+export function buildSeatSummaries(params: {
+  playerNames: [string, string, string, string]
+  viewerSeat: Seat
+  phase: PhaseSnapshot
+  scores: [number, number, number, number]
+  trickMap: Map<Seat, Card>
+  round: RoundPublic | null
+  activeSeat: Seat | null
+}): SeatSummary[] {
+  const {
+    playerNames,
+    viewerSeat,
+    phase,
+    scores,
+    trickMap,
+    round,
+    activeSeat,
+  } = params
+
+  return [0, 1, 2, 3].map((seat) => {
+    const orientation = getOrientation(viewerSeat, seat as Seat)
+    const isViewer = seat === viewerSeat
+    const tricksWon = round?.tricks_won[seat as Seat]
+    const currentCard = trickMap.get(seat as Seat)
+    const bid = getBidForSeat(phase, seat as Seat)
+    const isActive = activeSeat === seat
+
+    return {
+      seat: seat as Seat,
+      orientation,
+      name: playerNames[seat as Seat],
+      score: scores[seat as Seat],
+      isViewer,
+      tricksWon,
+      currentCard,
+      bid,
+      isActive,
+    }
+  })
+}
