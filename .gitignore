@@ -26,6 +26,9 @@ out/
 build/
 dist/
 
+# TypeScript
+*.tsbuildinfo
+
 # Rust
 target/
 **/*.rs.bk
