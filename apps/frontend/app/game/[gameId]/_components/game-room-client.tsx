@@ -14,9 +14,9 @@ import {
   removeAiSeatAction,
   fetchAiRegistryAction,
 } from '@/app/actions/game-room-actions'
-import Toast, { type ToastMessage } from '@/components/Toast'
-import { BackendApiError } from '@/lib/errors'
+import Toast from '@/components/Toast'
 import { useApiAction } from '@/hooks/useApiAction'
+import { useToast } from '@/hooks/useToast'
 import type { Seat, Trump } from '@/lib/game-room/types'
 
 import { GameRoomView, type AiSeatSelection } from './game-room-view'
@@ -55,7 +55,7 @@ export function GameRoomClient({
   const [isPlayPending, setIsPlayPending] = useState(false)
   const [isAiPending, setIsAiPending] = useState(false)
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
-  const [toast, setToast] = useState<ToastMessage | null>(null)
+  const { toast, showToast, hideToast } = useToast()
   const [aiRegistry, setAiRegistry] = useState<AiRegistryEntryState[]>([])
   const [isAiRegistryLoading, setIsAiRegistryLoading] = useState(false)
   const [aiRegistryError, setAiRegistryError] = useState<string | null>(null)
@@ -191,18 +191,6 @@ export function GameRoomClient({
     }
   }, [canMarkReady, hasMarkedReady])
 
-  const showToast = useCallback(
-    (message: string, type: ToastMessage['type'], error?: BackendApiError) => {
-      setToast({
-        id: Date.now().toString(),
-        message,
-        type,
-        error,
-      })
-    },
-    []
-  )
-
   const executeApiAction = useApiAction({
     showToast,
     onSuccess: () => performRefresh('manual'),
@@ -245,7 +233,6 @@ export function GameRoomClient({
 
       await executeApiAction(() => submitBidAction({ gameId, bid }), {
         successMessage: 'Bid submitted',
-        errorMessage: 'Failed to submit bid',
       })
 
       setIsBidPending(false)
@@ -263,7 +250,6 @@ export function GameRoomClient({
 
       await executeApiAction(() => selectTrumpAction({ gameId, trump }), {
         successMessage: 'Trump selected',
-        errorMessage: 'Failed to select trump',
       })
 
       setIsTrumpPending(false)
@@ -281,7 +267,6 @@ export function GameRoomClient({
 
       await executeApiAction(() => submitPlayAction({ gameId, card }), {
         successMessage: 'Card played',
-        errorMessage: 'Failed to play card',
       })
 
       setIsPlayPending(false)
@@ -587,7 +572,7 @@ export function GameRoomClient({
         playState={playControls}
         aiSeatState={aiSeatState}
       />
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast toast={toast} onClose={hideToast} />
     </>
   )
 }

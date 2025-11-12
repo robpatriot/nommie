@@ -4,9 +4,9 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import GameList from './GameList'
 import CreateGameModal from './CreateGameModal'
-import Toast, { type ToastMessage } from './Toast'
+import Toast from './Toast'
+import { useToast } from '@/hooks/useToast'
 import { createGameAction, joinGameAction } from '@/app/actions/game-actions'
-import { BackendApiError } from '@/lib/errors'
 import type { Game } from '@/lib/types'
 
 const sortByUpdatedAtDesc = (a: Game, b: Game) => {
@@ -39,9 +39,9 @@ export default function LobbyClient({
   creatorName,
 }: LobbyClientProps) {
   const router = useRouter()
+  const { toast, showToast, hideToast } = useToast()
   const [refreshing, setRefreshing] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [toast, setToast] = useState<ToastMessage | null>(null)
 
   const joinableGames = initialJoinable
   const inProgressGames = initialInProgress
@@ -76,19 +76,6 @@ export default function LobbyClient({
     router.refresh()
     // Reset refreshing state after a short delay
     setTimeout(() => setRefreshing(false), 500)
-  }
-
-  const showToast = (
-    message: string,
-    type: 'success' | 'error',
-    error?: BackendApiError
-  ) => {
-    setToast({
-      id: Date.now().toString(),
-      message,
-      type,
-      error,
-    })
   }
 
   const handleCreateGame = async (name: string) => {
@@ -262,7 +249,7 @@ export default function LobbyClient({
         creatorName={creatorName}
       />
 
-      <Toast toast={toast} onClose={() => setToast(null)} />
+      <Toast toast={toast} onClose={hideToast} />
     </>
   )
 }

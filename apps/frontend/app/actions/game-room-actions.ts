@@ -14,6 +14,8 @@ import {
   type AiRegistryEntry,
 } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
+import { extractPlayerNames } from '@/utils/player-names'
+import { validateSeat } from '@/utils/seat-validation'
 import type { Card, GameSnapshot, Seat, Trump } from '@/lib/game-room/types'
 
 export interface GameRoomSnapshotRequest {
@@ -24,7 +26,13 @@ export interface GameRoomSnapshotRequest {
 export type GameRoomSnapshotActionResult =
   | { kind: 'ok'; data: GameRoomSnapshotPayload }
   | { kind: 'not_modified' }
-  | { kind: 'error'; message: string; status: number; traceId?: string }
+  | {
+      kind: 'error'
+      message: string
+      status: number
+      code?: string
+      traceId?: string
+    }
 
 export interface GameRoomSnapshotPayload {
   snapshot: GameSnapshot
@@ -49,13 +57,7 @@ export async function getGameRoomSnapshotAction(
     }
 
     const seating = snapshotResult.snapshot.game.seating
-    const playerNames = seating.map((seat, index) => {
-      const name = seat.display_name?.trim()
-      if (name && name.length > 0) {
-        return name
-      }
-      return `Seat ${index + 1}`
-    }) as [string, string, string, string]
+    const playerNames = extractPlayerNames(seating)
 
     const hostSeat = (snapshotResult.snapshot.game.host_seat ??
       DEFAULT_VIEWER_SEAT) as Seat
@@ -82,6 +84,7 @@ export async function getGameRoomSnapshotAction(
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }
@@ -92,7 +95,13 @@ export async function getGameRoomSnapshotAction(
 
 export type SimpleActionResult =
   | { kind: 'ok' }
-  | { kind: 'error'; message: string; status: number; traceId?: string }
+  | {
+      kind: 'error'
+      message: string
+      status: number
+      code?: string
+      traceId?: string
+    }
 
 export async function markPlayerReadyAction(
   gameId: number
@@ -106,6 +115,7 @@ export async function markPlayerReadyAction(
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }
@@ -141,6 +151,7 @@ export async function submitBidAction(
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }
@@ -166,6 +177,7 @@ export async function selectTrumpAction(
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }
@@ -189,6 +201,7 @@ export async function submitPlayAction(
       kind: 'error',
       message: 'Card selection required',
       status: 400,
+      code: 'VALIDATION_ERROR',
     }
   }
 
@@ -201,6 +214,7 @@ export async function submitPlayAction(
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }
@@ -220,14 +234,13 @@ export interface ManageAiSeatRequest {
 export async function addAiSeatAction(
   request: ManageAiSeatRequest
 ): Promise<SimpleActionResult> {
-  if (
-    request.seat !== undefined &&
-    (request.seat < 0 || request.seat > 3 || Number.isNaN(request.seat))
-  ) {
+  const seatError = validateSeat(request.seat, false)
+  if (seatError) {
     return {
       kind: 'error',
-      message: 'Seat must be between 0 and 3',
+      message: seatError,
       status: 400,
+      code: 'VALIDATION_ERROR',
     }
   }
 
@@ -245,6 +258,7 @@ export async function addAiSeatAction(
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }
@@ -256,14 +270,13 @@ export async function addAiSeatAction(
 export async function removeAiSeatAction(
   request: ManageAiSeatRequest
 ): Promise<SimpleActionResult> {
-  if (
-    request.seat !== undefined &&
-    (request.seat < 0 || request.seat > 3 || Number.isNaN(request.seat))
-  ) {
+  const seatError = validateSeat(request.seat, false)
+  if (seatError) {
     return {
       kind: 'error',
-      message: 'Seat must be between 0 and 3',
+      message: seatError,
       status: 400,
+      code: 'VALIDATION_ERROR',
     }
   }
 
@@ -278,6 +291,7 @@ export async function removeAiSeatAction(
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }
@@ -289,16 +303,13 @@ export async function removeAiSeatAction(
 export async function updateAiSeatAction(
   request: ManageAiSeatRequest
 ): Promise<SimpleActionResult> {
-  if (
-    request.seat === undefined ||
-    Number.isNaN(request.seat) ||
-    request.seat < 0 ||
-    request.seat > 3
-  ) {
+  const seatError = validateSeat(request.seat, true)
+  if (seatError) {
     return {
       kind: 'error',
-      message: 'Seat must be provided between 0 and 3',
+      message: seatError,
       status: 400,
+      code: 'VALIDATION_ERROR',
     }
   }
 
@@ -316,6 +327,7 @@ export async function updateAiSeatAction(
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }
@@ -326,7 +338,13 @@ export async function updateAiSeatAction(
 
 export type AiRegistryActionResult =
   | { kind: 'ok'; ais: AiRegistryEntry[] }
-  | { kind: 'error'; message: string; status: number; traceId?: string }
+  | {
+      kind: 'error'
+      message: string
+      status: number
+      code?: string
+      traceId?: string
+    }
 
 export async function fetchAiRegistryAction(): Promise<AiRegistryActionResult> {
   try {
@@ -338,6 +356,7 @@ export async function fetchAiRegistryAction(): Promise<AiRegistryActionResult> {
         kind: 'error',
         message: error.message,
         status: error.status,
+        code: error.code,
         traceId: error.traceId,
       }
     }

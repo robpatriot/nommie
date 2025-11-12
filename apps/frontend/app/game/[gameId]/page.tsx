@@ -6,6 +6,7 @@ import ErrorBoundary from '@/components/ErrorBoundary'
 import { getMockGameRoomData } from '@/lib/game-room/mock-data'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
+import { extractPlayerNames } from '@/utils/player-names'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 
 interface GamePageProps {
@@ -34,13 +35,7 @@ export default async function GamePage({ params }: GamePageProps) {
 
     if (snapshotResult.kind === 'ok') {
       const seating = snapshotResult.snapshot.game.seating
-      const playerNames = seating.map((seat, index) => {
-        const name = seat.display_name?.trim()
-        if (name && name.length > 0) {
-          return name
-        }
-        return `Seat ${index + 1}`
-      }) as [string, string, string, string]
+      const playerNames = extractPlayerNames(seating)
 
       const hostSeat = (snapshotResult.snapshot.game.host_seat ??
         DEFAULT_VIEWER_SEAT) as typeof DEFAULT_VIEWER_SEAT

@@ -20,6 +20,7 @@ import type {
   TrumpSelectSnapshot,
   TrickSnapshot,
 } from '@/lib/game-room/types'
+import { formatTime } from '@/utils/date-formatting'
 
 export interface AiSeatSelection {
   registryName: string
@@ -133,7 +134,7 @@ export function GameRoomView(props: GameRoomViewProps) {
   )
   const activeName =
     typeof activeSeat === 'number' ? seatDisplayName(activeSeat) : 'Waiting'
-  const syncLabel = new Date(status.lastSyncedAt).toLocaleTimeString([], {
+  const syncLabel = formatTime(status.lastSyncedAt, {
     hour: '2-digit',
     minute: '2-digit',
   })
