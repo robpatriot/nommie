@@ -495,9 +495,11 @@ This section captures identified improvements across four categories: functional
   - No README explaining architecture
   - Complex logic (like JWT refresh) lacks inline comments
 - Accessibility:
-  - Some buttons missing `aria-label` attributes
+  - ✅ **COMPLETED**: Added `aria-label` attributes to all buttons (Create Game, Refresh, Resume, Copy Invite Link, Ready, Bid Submit, Play Card, Trump Select, Card buttons, AI management)
+  - ✅ **COMPLETED**: Added `aria-label` to form inputs (bid value input, AI profile select)
+  - ✅ **COMPLETED**: Added contextual aria-labels that describe button state (pending, disabled, selected)
+  - ✅ **COMPLETED**: Implemented Copy Invite Link functionality
   - Toast component has good accessibility
-  - Form inputs may need better labeling
 - ✅ **COMPLETED**: Error boundaries:
   - ✅ Created `ErrorBoundary` component
   - ✅ Wrapped `LobbyClient` and `GameRoomClient` with ErrorBoundary

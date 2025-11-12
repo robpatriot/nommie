@@ -157,6 +157,7 @@ export default function LobbyClient({
                   <button
                     onClick={() => setIsCreateModalOpen(true)}
                     className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    aria-label="Create a new game"
                   >
                     Create Game
                   </button>
@@ -164,6 +165,9 @@ export default function LobbyClient({
                     onClick={handleRefresh}
                     disabled={refreshing}
                     className="rounded bg-surface px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={
+                      refreshing ? 'Refreshing game list' : 'Refresh game list'
+                    }
                   >
                     {refreshing ? 'Refreshing...' : 'Refresh'}
                   </button>
@@ -175,6 +179,7 @@ export default function LobbyClient({
                   <button
                     onClick={handleResume}
                     className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    aria-label="Resume most recent game"
                   >
                     ▶ Most Recent Game
                   </button>

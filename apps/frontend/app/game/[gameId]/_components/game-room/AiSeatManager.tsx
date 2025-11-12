@@ -55,6 +55,11 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
             }
             disabled={addDisabled}
             className="relative inline-flex items-center justify-start rounded-md bg-accent pl-3 pr-8 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent/80 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-accent-foreground/70"
+            aria-label={
+              aiState.isPending
+                ? 'Adding AI player'
+                : `Add AI player with profile ${preferredDefaultName}`
+            }
           >
             <span className="whitespace-nowrap">Add AI</span>
             {aiState.isPending ? (
@@ -137,6 +142,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                       </label>
                       <select
                         id={`ai-seat-${seat.seat}`}
+                        aria-label={`Select AI profile for seat ${seat.seat + 1}`}
                         className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:cursor-not-allowed disabled:text-muted"
                         disabled={
                           aiState.isPending ||
@@ -186,6 +192,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                         }}
                         disabled={aiState.isPending}
                         className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-accent/40 text-accent-foreground transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:text-accent-foreground/60"
+                        aria-label={`Remove AI from seat ${seat.seat + 1}`}
                       >
                         <span className="sr-only">
                           Remove AI from seat {seat.seat + 1}

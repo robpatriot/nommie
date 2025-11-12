@@ -202,13 +202,21 @@ export function GameRoomView(props: GameRoomViewProps) {
                 onClick={onRefresh}
                 className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted transition hover:border-primary/40 hover:text-foreground"
                 disabled={isRefreshing}
+                aria-label={
+                  isRefreshing ? 'Refreshing game state' : 'Refresh game state'
+                }
               >
                 {isRefreshing ? 'Refreshing…' : 'Refresh'}
               </button>
             ) : null}
             <button
               type="button"
+              onClick={() => {
+                const url = window.location.href
+                void navigator.clipboard.writeText(url)
+              }}
               className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted transition hover:border-accent/50 hover:text-foreground"
+              aria-label="Copy invite link to clipboard"
             >
               Copy Invite Link
             </button>

@@ -37,6 +37,13 @@ export function ReadyPanel({ readyState }: ReadyPanelProps) {
         onClick={() => readyState.onReady()}
         className="w-full rounded-md bg-success px-3 py-2 text-sm font-semibold text-success-foreground transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70"
         disabled={readyState.isPending || readyState.hasMarked}
+        aria-label={
+          readyState.isPending
+            ? 'Marking as ready'
+            : readyState.hasMarked
+              ? 'Ready, waiting for other players'
+              : 'Mark yourself as ready'
+        }
       >
         {readyState.isPending
           ? 'Marking…'

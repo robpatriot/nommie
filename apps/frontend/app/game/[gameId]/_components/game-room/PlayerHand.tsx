@@ -94,6 +94,9 @@ export function PlayerHand({
               !viewerTurn ||
               playState.isPending
 
+            const cardLabel = isPlayable
+              ? `${card}, ${isSelected ? 'selected' : 'playable'}`
+              : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
             return (
               <button
                 key={card}
@@ -111,6 +114,7 @@ export function PlayerHand({
                     ? 'cursor-not-allowed opacity-60'
                     : 'cursor-pointer'
                 }`}
+                aria-label={cardLabel}
                 aria-pressed={isSelected}
               >
                 {card}

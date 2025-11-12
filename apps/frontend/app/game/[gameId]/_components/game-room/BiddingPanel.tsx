@@ -107,12 +107,18 @@ export function BiddingPanel({
             onChange={(event) => setSelectedBid(Number(event.target.value))}
             className="w-24 rounded-md border border-success/40 bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-success focus:ring focus:ring-success/40 disabled:cursor-not-allowed disabled:opacity-60"
             disabled={viewerBid !== null || bidding.isPending || !isViewerTurn}
+            aria-label="Bid value"
             aria-describedby="bid-range-hint"
           />
           <button
             type="submit"
             className="rounded-md bg-success px-4 py-2 text-sm font-semibold text-success-foreground transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70"
             disabled={isSubmitDisabled}
+            aria-label={
+              bidding.isPending
+                ? 'Submitting bid'
+                : `Submit bid of ${selectedBid}`
+            }
           >
             {bidding.isPending ? 'Submitting…' : 'Submit Bid'}
           </button>

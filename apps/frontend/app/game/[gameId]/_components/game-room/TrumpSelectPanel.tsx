@@ -101,6 +101,7 @@ export function TrumpSelectPanel({
                 } ${
                   disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
                 }`}
+                aria-label={`Select ${formatTrump(option)} as trump suit${isSelected ? ', currently selected' : ''}`}
                 aria-pressed={isSelected}
               >
                 {formatTrump(option)}
@@ -113,6 +114,13 @@ export function TrumpSelectPanel({
           type="submit"
           className="w-full rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent/80 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-accent-foreground/70"
           disabled={!canSelect || isPending || !selectedTrump}
+          aria-label={
+            isPending
+              ? 'Selecting trump suit'
+              : selectedTrump
+                ? `Confirm ${formatTrump(selectedTrump)} as trump suit`
+                : 'Select trump suit'
+          }
         >
           {submitLabel}
         </button>

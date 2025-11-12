@@ -67,6 +67,15 @@ export function PlayPanel({
           type="submit"
           className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/80 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
           disabled={isSubmitDisabled}
+          aria-label={
+            play.isPending
+              ? 'Playing card'
+              : isViewerTurn && selectedCard
+                ? `Play selected card: ${selectedCard}`
+                : isViewerTurn
+                  ? 'Play selected card'
+                  : `Waiting for ${activeName} to play`
+          }
         >
           {play.isPending
             ? 'Playing…'
