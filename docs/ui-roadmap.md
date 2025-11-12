@@ -395,8 +395,10 @@ This section captures identified improvements across four categories: functional
   - ✅ Updated `add_ai_seat()` route handler to check and start game after adding AI seat
   - ✅ Game now starts automatically when the 4th player (AI or human) is added, regardless of order
 - Error handling inconsistencies:
-  - `game-room-client.tsx` has retry logic for network failures (lines 111-158)
-  - Other components don't have similar retry logic
+  - ✅ **COMPLETED**: Added consistent retry logic for network errors in `fetchWithAuth`
+  - ✅ **COMPLETED**: Created shared retry utility (`lib/retry.ts`) with exponential backoff
+  - ✅ **COMPLETED**: All API calls now automatically retry network errors (1 retry with 500ms-2000ms backoff)
+  - ✅ **COMPLETED**: Removed redundant retry logic from `game-room-client.tsx`
   - Some actions wrap errors in `BackendApiError`, others don't
 - State management issues:
   - ✅ **COMPLETED**: Fixed polling/refresh overlap via unified ActivityState
@@ -417,7 +419,7 @@ This section captures identified improvements across four categories: functional
 
 **Recommendations:**
 - ✅ Implement global action queue/mutex to prevent concurrent actions — **COMPLETED** (unified ActivityState)
-- Add consistent retry logic across all API calls
+- ✅ Add consistent retry logic across all API calls — **COMPLETED** (retry logic in fetchWithAuth)
 - Add validation for seat numbers before clamping
 - Consider using React Query or SWR for better state synchronization
 
@@ -535,7 +537,7 @@ This section captures identified improvements across four categories: functional
 3. ✅ Split large components (`game-room-view.tsx` into: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, etc.) — **COMPLETED**
 4. Add loading states for initial page loads
 5. Implement adaptive polling
-6. Add comprehensive error retry logic
+6. ✅ Add comprehensive error retry logic — **COMPLETED** (retry logic in fetchWithAuth with exponential backoff)
 
 **Low Priority:**
 1. Add code splitting

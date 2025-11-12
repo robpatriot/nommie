@@ -8,6 +8,7 @@ import {
 } from '@/lib/server/get-backend-jwt'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
 import { BackendApiError } from './errors'
+import { retryOnNetworkError } from './retry'
 
 export interface ProblemDetails {
   type: string
@@ -53,14 +54,26 @@ export async function fetchWithAuth(
   }
 
   const url = `${baseUrl}${endpoint}`
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders,
-      ...options.headers,
+
+  // Retry network errors with exponential backoff (1 retry by default)
+  // Application errors (4xx, 5xx) are not retried
+  const response = await retryOnNetworkError(
+    async () => {
+      return await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+          ...options.headers,
+        },
+      })
     },
-  })
+    {
+      maxRetries: 1,
+      baseDelayMs: 500,
+      maxDelayMs: 2000,
+    }
+  )
 
   if (!response.ok) {
     // Try to parse Problem Details error response (RFC 7807)

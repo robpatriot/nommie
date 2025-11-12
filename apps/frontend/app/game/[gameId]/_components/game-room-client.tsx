@@ -131,46 +131,13 @@ export function GameRoomClient({
           setError({ message: result.message, traceId: result.traceId })
         }
       } catch (err) {
-        const handleFailure = (failure: unknown) => {
-          if (failure instanceof Error) {
-            setError({ message: failure.message })
-          } else {
-            setError({ message: 'Unable to refresh game state' })
-          }
-        }
-
-        const shouldRetry =
-          err instanceof Error &&
-          (err.message === 'fetch failed' || err.message === 'network timeout')
-
-        if (shouldRetry) {
-          try {
-            const retryResult = await getGameRoomSnapshotAction({ gameId })
-
-            if (retryResult.kind === 'ok') {
-              // Don't preserve viewerSeat from previous snapshot - fail hard approach
-              setSnapshot(retryResult.data)
-              setEtag(retryResult.data.etag)
-              setError(null)
-            } else if (retryResult.kind === 'not_modified') {
-              setSnapshot((prev) => ({
-                ...prev,
-                timestamp: new Date().toISOString(),
-              }))
-              setError(null)
-            } else {
-              setError({
-                message: retryResult.message,
-                traceId: retryResult.traceId,
-              })
-            }
-          } catch (retryErr) {
-            console.error('Snapshot refresh retry failed', retryErr)
-            handleFailure(retryErr)
-          }
+        // Network errors are now handled by retry logic in fetchWithAuth.
+        // If we reach here, either retries were exhausted or it's a non-network error.
+        console.error('Snapshot refresh failed', err)
+        if (err instanceof Error) {
+          setError({ message: err.message })
         } else {
-          console.error('Snapshot refresh failed', err)
-          handleFailure(err)
+          setError({ message: 'Unable to refresh game state' })
         }
       } finally {
         inflightRef.current = false
