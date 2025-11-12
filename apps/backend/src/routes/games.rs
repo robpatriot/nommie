@@ -330,6 +330,16 @@ struct JoinGameResponse {
 }
 
 #[derive(serde::Serialize)]
+struct GameListResponse {
+    games: Vec<GameResponse>,
+}
+
+#[derive(serde::Serialize)]
+struct LastActiveGameResponse {
+    game_id: Option<i64>,
+}
+
+#[derive(serde::Serialize)]
 struct GameResponse {
     id: i64,
     name: String,
@@ -343,6 +353,7 @@ struct GameResponse {
     current_round: Option<i16>,
     player_count: i32,
     max_players: i32,
+    viewer_is_member: bool,
 }
 
 /// Helper function to convert GameState enum to frontend string format
@@ -372,12 +383,21 @@ fn game_visibility_to_string(visibility: &GameVisibility) -> String {
 fn game_to_response(
     game_model: &crate::entities::games::Model,
     memberships: &[memberships::GameMembership],
+    viewer_user_id: Option<i64>,
 ) -> GameResponse {
     // Count players (exclude spectators)
     let player_count = memberships
         .iter()
         .filter(|m| m.role == GameRole::Player)
         .count() as i32;
+
+    let viewer_is_member = viewer_user_id
+        .and_then(|id| {
+            memberships
+                .iter()
+                .find(|m| m.user_id == id && m.role == GameRole::Player)
+        })
+        .is_some();
 
     GameResponse {
         id: game_model.id,
@@ -395,6 +415,7 @@ fn game_to_response(
         current_round: game_model.current_round,
         player_count,
         max_players: 4,
+        viewer_is_member,
     }
 }
 
@@ -431,7 +452,7 @@ async fn create_game(
     })
     .await?;
 
-    let response = game_to_response(&game_model, &memberships);
+    let response = game_to_response(&game_model, &memberships, Some(user_id));
 
     Ok(web::Json(CreateGameResponse { game: response }))
 }
@@ -457,9 +478,95 @@ async fn join_game(
     })
     .await?;
 
-    let response = game_to_response(&game_model, &memberships);
+    let response = game_to_response(&game_model, &memberships, Some(user_id));
 
     Ok(web::Json(JoinGameResponse { game: response }))
+}
+
+/// GET /api/games/joinable
+///
+/// Returns a list of public lobby games that still have open seats.
+async fn list_joinable_games(
+    http_req: HttpRequest,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
+) -> Result<web::Json<GameListResponse>, AppError> {
+    let viewer_id = current_user.id;
+
+    let games = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameService;
+            service.list_joinable_games(txn).await
+        })
+    })
+    .await?;
+
+    let response_games = games
+        .into_iter()
+        .map(|(game_model, memberships)| {
+            game_to_response(&game_model, &memberships, Some(viewer_id))
+        })
+        .collect();
+
+    Ok(web::Json(GameListResponse {
+        games: response_games,
+    }))
+}
+
+/// GET /api/games/in-progress
+///
+/// Returns a list of games that are currently active (non-lobby, non-finished).
+async fn list_in_progress_games(
+    http_req: HttpRequest,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
+) -> Result<web::Json<GameListResponse>, AppError> {
+    let viewer_id = current_user.id;
+
+    let games = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameService;
+            service.list_active_games(txn).await
+        })
+    })
+    .await?;
+
+    let mut visible_games = Vec::new();
+
+    for (game_model, memberships) in games {
+        let viewer_is_member = memberships.iter().any(|m| m.user_id == viewer_id);
+
+        if game_model.visibility == GameVisibility::Public || viewer_is_member {
+            visible_games.push(game_to_response(&game_model, &memberships, Some(viewer_id)));
+        }
+    }
+
+    Ok(web::Json(GameListResponse {
+        games: visible_games,
+    }))
+}
+
+/// GET /api/games/last-active
+///
+/// Returns the game ID of the most recently active game for the current user.
+/// "Most recently active" means the game with the highest updated_at timestamp
+/// among all games where the user is a member.
+async fn get_last_active_game(
+    http_req: HttpRequest,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
+) -> Result<web::Json<LastActiveGameResponse>, AppError> {
+    let user_id = current_user.id;
+
+    let game_id = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameService;
+            service.find_last_active_game(txn, user_id).await
+        })
+    })
+    .await?;
+
+    Ok(web::Json(LastActiveGameResponse { game_id }))
 }
 
 /// POST /api/games/{game_id}/ready
@@ -1204,6 +1311,9 @@ fn format_card(card: Card) -> String {
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("").route(web::post().to(create_game)));
+    cfg.service(web::resource("/joinable").route(web::get().to(list_joinable_games)));
+    cfg.service(web::resource("/in-progress").route(web::get().to(list_in_progress_games)));
+    cfg.service(web::resource("/last-active").route(web::get().to(get_last_active_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
     cfg.service(web::resource("/{game_id}/ready").route(web::post().to(mark_ready)));
     cfg.service(web::resource("/ai/registry").route(web::get().to(list_registered_ais)));

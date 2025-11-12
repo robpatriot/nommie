@@ -169,7 +169,7 @@ async function refreshBackendJwt({
       return data.token
     }
   } catch (error) {
-    console.error('Error refreshing backend JWT', error)
+    console.warn('Error refreshing backend JWT', error)
   }
 
   return null

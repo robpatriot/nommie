@@ -3,6 +3,7 @@ use backend::entities::users;
 use backend::error::AppError;
 use backend::errors::domain::DomainError;
 use backend::repos::{ai_profiles as ai_profiles_repo, players};
+use backend::routes::games::friendly_ai_name;
 use rand::random;
 use sea_orm::{ActiveModelTrait, NotSet, Set};
 use time::OffsetDateTime;
@@ -93,10 +94,11 @@ async fn test_get_display_name_by_seat_ai_profile() -> Result<(), AppError> {
             let game_id = create_test_game(txn).await?;
             let _ = create_test_game_player(txn, game_id, ai_user.id, 2).await?;
 
-            // Test the adapter
+            // Test the adapter - should return friendly_ai_name, not profile.display_name
             let result = players::get_display_name_by_seat(txn, game_id, 2).await?;
 
-            assert_eq!(result, "Test Bot");
+            let expected = friendly_ai_name(ai_user.id, 2);
+            assert_eq!(result, expected);
 
             Ok::<_, AppError>(())
         })

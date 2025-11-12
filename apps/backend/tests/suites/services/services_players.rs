@@ -2,6 +2,7 @@ use backend::ai::RandomPlayer;
 use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::errors::ErrorCode;
+use backend::repos::ai_profiles;
 use backend::services::ai::AiService;
 use backend::services::players::PlayerService;
 
@@ -141,6 +142,14 @@ async fn test_get_display_name_by_seat_ai_user() -> Result<(), AppError> {
                     Some(100),
                 )
                 .await?;
+
+            // Update profile.display_name to match what add_ai_seat would set
+            // (simulating the production flow where profile.display_name is set from friendly_ai_name)
+            if let Some(mut profile) = ai_profiles::find_by_user_id(txn, ai_user_id).await? {
+                let expected = backend::routes::games::friendly_ai_name(ai_user_id, 2);
+                profile.display_name = expected.clone();
+                ai_profiles::update_profile(txn, profile).await?;
+            }
 
             create_test_game_player(txn, game_id, ai_user_id, 2).await?;
 

@@ -15,10 +15,10 @@ export async function createGameAction(
   try {
     // Auth is enforced centrally in fetchWithAuth (with [AUTH_BYPASS])
 
-    // Only include name if it's non-empty (backend will use default if omitted)
-    const body: CreateGameRequest = {}
-    if (request.name && request.name.trim()) {
-      body.name = request.name.trim()
+    // Frontend ensures a default name is provided if user doesn't enter one
+    // Trim the name and send it to backend (backend will use its own default if name is omitted)
+    const body: CreateGameRequest = {
+      name: request.name?.trim() || undefined,
     }
 
     const response = await fetchWithAuth('/api/games', {
@@ -30,18 +30,6 @@ export async function createGameAction(
   } catch (error) {
     // Re-throw BackendApiError to preserve traceId
     if (error instanceof BackendApiError) {
-      // TODO: Remove once backend endpoint is fully implemented
-      // Provide a more user-friendly message for 404s (endpoint not implemented)
-      if (error.status === 404) {
-        return {
-          error: new BackendApiError(
-            'Create game endpoint not yet implemented on the backend',
-            error.status,
-            error.code,
-            error.traceId
-          ),
-        }
-      }
       return { error }
     }
     // Wrap other errors
@@ -71,18 +59,6 @@ export async function joinGameAction(
   } catch (error) {
     // Re-throw BackendApiError to preserve traceId
     if (error instanceof BackendApiError) {
-      // TODO: Remove once backend endpoint is fully implemented
-      // Provide a more user-friendly message for 404s (endpoint not implemented)
-      if (error.status === 404) {
-        return {
-          error: new BackendApiError(
-            'Join game endpoint not yet implemented on the backend',
-            error.status,
-            error.code,
-            error.traceId
-          ),
-        }
-      }
       return { error }
     }
     // Wrap other errors

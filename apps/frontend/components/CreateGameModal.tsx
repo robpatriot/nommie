@@ -27,7 +27,7 @@ export default function CreateGameModal({
     setIsSubmitting(true)
 
     try {
-      // Send raw trimmed name; backend applies default when omitted
+      // Send trimmed name (empty string will be handled by parent to use default)
       await onCreateGame(name.trim())
       // Reset form
       setName('')

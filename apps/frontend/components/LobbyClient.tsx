@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import GameList from './GameList'
 import CreateGameModal from './CreateGameModal'
@@ -8,6 +8,22 @@ import Toast, { type ToastMessage } from './Toast'
 import { createGameAction, joinGameAction } from '@/app/actions/game-actions'
 import { BackendApiError } from '@/lib/errors'
 import type { Game } from '@/lib/types'
+
+const sortByUpdatedAtDesc = (a: Game, b: Game) => {
+  const aTime = Date.parse(a.updated_at)
+  const bTime = Date.parse(b.updated_at)
+
+  if (Number.isNaN(aTime) && Number.isNaN(bTime)) {
+    return 0
+  }
+  if (Number.isNaN(aTime)) {
+    return 1
+  }
+  if (Number.isNaN(bTime)) {
+    return -1
+  }
+  return bTime - aTime
+}
 
 type LobbyClientProps = {
   joinableGames: Game[]
@@ -23,11 +39,37 @@ export default function LobbyClient({
   creatorName,
 }: LobbyClientProps) {
   const router = useRouter()
-  const [joinableGames] = useState<Game[]>(initialJoinable)
-  const [inProgressGames] = useState<Game[]>(initialInProgress)
   const [refreshing, setRefreshing] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [toast, setToast] = useState<ToastMessage | null>(null)
+
+  const joinableGames = initialJoinable
+  const inProgressGames = initialInProgress
+
+  const filteredJoinableGames = useMemo(() => {
+    const openGames = joinableGames.filter(
+      (game) => game.state === 'LOBBY' && game.player_count < game.max_players
+    )
+    return openGames.slice().sort(sortByUpdatedAtDesc)
+  }, [joinableGames])
+
+  const sortedInProgressGames = useMemo(() => {
+    const memberGames: Game[] = []
+    const otherGames: Game[] = []
+
+    for (const game of inProgressGames) {
+      if (game.viewer_is_member) {
+        memberGames.push(game)
+      } else {
+        otherGames.push(game)
+      }
+    }
+
+    const sortedMember = memberGames.slice().sort(sortByUpdatedAtDesc)
+    const sortedOthers = otherGames.slice().sort(sortByUpdatedAtDesc)
+
+    return [...sortedMember, ...sortedOthers]
+  }, [inProgressGames])
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -50,8 +92,12 @@ export default function LobbyClient({
   }
 
   const handleCreateGame = async (name: string) => {
+    // Use default name if provided name is empty
+    const defaultName = `${creatorName} game`
+    const gameName = name.trim() || defaultName
+
     const result = await createGameAction({
-      name,
+      name: gameName,
     })
 
     if (result.error) {
@@ -78,11 +124,17 @@ export default function LobbyClient({
     const result = await joinGameAction(gameId)
 
     if (result.error) {
-      showToast(
-        result.error.message || 'Failed to join game',
-        'error',
-        result.error
-      )
+      let message = result.error.message || 'Failed to join game'
+
+      if (
+        result.error.status === 400 &&
+        result.error.code === 'VALIDATION_ERROR'
+      ) {
+        message = 'That game just filled up. Please choose another one.'
+        router.refresh()
+      }
+
+      showToast(message, 'error', result.error)
       // Log traceId in dev
       if (process.env.NODE_ENV === 'development' && result.error.traceId) {
         console.error('Join game error traceId:', result.error.traceId)
@@ -91,6 +143,10 @@ export default function LobbyClient({
     }
 
     showToast('Joined game successfully!', 'success')
+    router.push(`/game/${gameId}`)
+  }
+
+  const handleRejoin = (gameId: number) => {
     router.push(`/game/${gameId}`)
   }
 
@@ -133,7 +189,7 @@ export default function LobbyClient({
                     onClick={handleResume}
                     className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                   >
-                    ▶ Resume Last Game
+                    ▶ Most Recent Game
                   </button>
                 </div>
               )}
@@ -142,18 +198,58 @@ export default function LobbyClient({
 
           <div className="space-y-6">
             <GameList
-              games={joinableGames}
+              games={filteredJoinableGames}
               title="Joinable Games"
               emptyMessage="No games available to join. Create one to get started!"
-              onJoin={handleJoin}
-              showJoinButton={true}
+              actionsLabel="Actions"
+              renderActions={(game) => {
+                // If user is already a member, show "Go to game" button
+                if (game.viewer_is_member) {
+                  return (
+                    <button
+                      onClick={() => handleRejoin(game.id)}
+                      className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      Go to game
+                    </button>
+                  )
+                }
+
+                // If game is joinable and user is not a member, show "Join" button
+                if (
+                  game.state === 'LOBBY' &&
+                  game.player_count < game.max_players
+                ) {
+                  return (
+                    <button
+                      onClick={() => handleJoin(game.id)}
+                      className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      Join
+                    </button>
+                  )
+                }
+
+                // Game is full
+                return <span className="text-sm text-muted">Game is full</span>
+              }}
             />
 
             <GameList
-              games={inProgressGames}
-              title="In Progress (View Only)"
+              games={sortedInProgressGames}
+              title="In Progress Games"
               emptyMessage="No games currently in progress."
-              showJoinButton={false}
+              actionsLabel="Resume"
+              renderActions={(game) =>
+                game.viewer_is_member ? (
+                  <button
+                    onClick={() => handleRejoin(game.id)}
+                    className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    Rejoin
+                  </button>
+                ) : null
+              }
             />
           </div>
         </div>

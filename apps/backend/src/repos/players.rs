@@ -2,9 +2,9 @@
 
 use sea_orm::ConnectionTrait;
 
-use super::ai_profiles;
 use crate::adapters::players_sea as players_adapter;
 use crate::errors::domain::{DomainError, NotFoundKind};
+use crate::routes::games::friendly_ai_name;
 
 // Free functions (generic) mirroring the previous trait methods
 
@@ -28,9 +28,7 @@ pub async fn get_display_name_by_seat<C: ConnectionTrait + Send + Sync>(
     match game_player {
         Some((_game_player, user)) => {
             if user.is_ai {
-                if let Some(profile) = ai_profiles::find_by_user_id(conn, user.id).await? {
-                    return Ok(profile.display_name);
-                }
+                return Ok(friendly_ai_name(user.id, seat as usize));
             }
 
             // Use username if available, otherwise fall back to sub

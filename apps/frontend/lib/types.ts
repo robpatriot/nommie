@@ -26,6 +26,7 @@ export interface Game {
   current_round: number | null
   player_count: number
   max_players: number
+  viewer_is_member?: boolean
 }
 
 export interface GameListResponse {

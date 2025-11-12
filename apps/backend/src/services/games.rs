@@ -1,11 +1,12 @@
 //! Game state loading and construction services.
 
-use sea_orm::DatabaseTransaction;
+use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::adapters::games_sea::{self, GameCreate};
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::state::{GameState, Phase, RoundState};
 use crate::domain::{Card, Suit, Trump};
+use crate::entities::game_players;
 use crate::entities::games::{self, GameState as DbGameState, GameVisibility};
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
@@ -366,6 +367,118 @@ impl GameService {
             "Failed to create game: maximum retries exceeded".to_string(),
             std::io::Error::other("join code generation retry limit exceeded"),
         ))
+    }
+
+    /// List all public games in the lobby that still have open seats.
+    ///
+    /// Returns games along with their memberships so the caller can compute
+    /// player counts and viewer-specific flags.
+    pub async fn list_joinable_games(
+        &self,
+        txn: &DatabaseTransaction,
+    ) -> Result<Vec<(games::Model, Vec<memberships::GameMembership>)>, AppError> {
+        let lobby_games = games::Entity::find()
+            .filter(games::Column::State.eq(DbGameState::Lobby))
+            .order_by_desc(games::Column::UpdatedAt)
+            .all(txn)
+            .await
+            .map_err(AppError::from)?;
+
+        let mut results = Vec::new();
+        for game in lobby_games {
+            let memberships = memberships::find_all_by_game(txn, game.id)
+                .await
+                .map_err(AppError::from)?;
+
+            let player_count = memberships
+                .iter()
+                .filter(|m| m.role == GameRole::Player)
+                .count();
+
+            // Limit joinable list to public games with open seats
+            if player_count < 4 && game.visibility == GameVisibility::Public {
+                results.push((game, memberships));
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// List all games that are actively in progress (non-lobby, non-finished states).
+    ///
+    /// Includes memberships so the caller can determine viewer participation.
+    pub async fn list_active_games(
+        &self,
+        txn: &DatabaseTransaction,
+    ) -> Result<Vec<(games::Model, Vec<memberships::GameMembership>)>, AppError> {
+        let active_states = [
+            DbGameState::Dealing,
+            DbGameState::Bidding,
+            DbGameState::TrumpSelection,
+            DbGameState::TrickPlay,
+            DbGameState::Scoring,
+            DbGameState::BetweenRounds,
+        ];
+
+        let active_games = games::Entity::find()
+            .filter(games::Column::State.is_in(active_states))
+            .order_by_desc(games::Column::UpdatedAt)
+            .all(txn)
+            .await
+            .map_err(AppError::from)?;
+
+        let mut results = Vec::with_capacity(active_games.len());
+        for game in active_games {
+            let memberships = memberships::find_all_by_game(txn, game.id)
+                .await
+                .map_err(AppError::from)?;
+            results.push((game, memberships));
+        }
+
+        Ok(results)
+    }
+
+    /// Find the most recently active game for a user (based on game.updated_at).
+    ///
+    /// Returns the game ID of the game where the user is a member that has the most
+    /// recent activity (highest updated_at timestamp).
+    ///
+    /// # Arguments
+    /// * `txn` - Database transaction
+    /// * `user_id` - ID of the user
+    ///
+    /// # Returns
+    /// Option<i64> - Game ID if found, None if user has no games
+    pub async fn find_last_active_game(
+        &self,
+        txn: &DatabaseTransaction,
+        user_id: i64,
+    ) -> Result<Option<i64>, AppError> {
+        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+
+        // Find all games where user is a member, ordered by updated_at DESC
+        let memberships = game_players::Entity::find()
+            .filter(game_players::Column::UserId.eq(user_id))
+            .all(txn)
+            .await
+            .map_err(AppError::from)?;
+
+        if memberships.is_empty() {
+            return Ok(None);
+        }
+
+        // Get game IDs from memberships
+        let game_ids: Vec<i64> = memberships.iter().map(|m| m.game_id).collect();
+
+        // Find the game with the most recent updated_at
+        let last_active_game = games::Entity::find()
+            .filter(games::Column::Id.is_in(game_ids))
+            .order_by_desc(games::Column::UpdatedAt)
+            .one(txn)
+            .await
+            .map_err(AppError::from)?;
+
+        Ok(last_active_game.map(|game| game.id))
     }
 
     /// Find the next available turn_order (0-3) for a game.

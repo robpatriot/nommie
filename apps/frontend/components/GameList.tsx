@@ -1,22 +1,22 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { Game } from '@/lib/types'
 
 interface GameListProps {
   games: Game[]
   title: string
   emptyMessage: string
-  onJoin?: (gameId: number) => void
-  showJoinButton?: boolean
+  actionsLabel?: string
+  renderActions?: (game: Game) => ReactNode
 }
 
 export default function GameList({
   games,
   title,
   emptyMessage,
-  onJoin,
-  showJoinButton = true,
+  actionsLabel = 'Actions',
+  renderActions,
 }: GameListProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -42,6 +42,8 @@ export default function GameList({
       </div>
     )
   }
+
+  const showActions = typeof renderActions === 'function'
 
   return (
     <div className="mb-8">
@@ -69,9 +71,9 @@ export default function GameList({
               <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-subtle">
                 Status
               </th>
-              {showJoinButton && (
+              {showActions && (
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-subtle">
-                  Actions
+                  {actionsLabel}
                 </th>
               )}
             </tr>
@@ -80,7 +82,7 @@ export default function GameList({
             {filteredGames.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showJoinButton ? 4 : 3}
+                  colSpan={showActions ? 4 : 3}
                   className="px-4 py-8 text-center text-subtle"
                 >
                   No games match your search
@@ -116,19 +118,16 @@ export default function GameList({
                       {game.state}
                     </span>
                   </td>
-                  {showJoinButton && (
+                  {showActions && (
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {game.state === 'LOBBY' &&
-                      game.player_count < game.max_players ? (
-                        <button
-                          onClick={() => onJoin?.(game.id)}
-                          className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                        >
-                          Join
-                        </button>
-                      ) : (
-                        <span className="text-sm text-muted">—</span>
-                      )}
+                      {(() => {
+                        const content = renderActions?.(game)
+                        return (
+                          content ?? (
+                            <span className="text-sm text-muted">—</span>
+                          )
+                        )
+                      })()}
                     </td>
                   )}
                 </tr>

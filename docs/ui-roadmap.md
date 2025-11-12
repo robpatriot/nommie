@@ -343,3 +343,185 @@ Remaining items for future stages:
 - AI behavior: Confirm minimal acceptable AI for testing (random legal vs heuristic).
 - Validation: Name length/charset limits for game creation.
 
+---
+
+## Improvements
+
+This section captures identified improvements across four categories: functional completeness, functional correctness, duplication/multiple approaches, and efficiency/quality.
+
+### 1. Functional Completeness
+
+**Gaps/Incomplete Areas:**
+- Remove all `[AUTH_BYPASS]` temporary debugging code from:
+  - `app/page.tsx`
+  - `app/lobby/page.tsx`
+  - `lib/api.ts`
+  - `components/Header.tsx`
+- Complete or document backend endpoint integration for:
+  - `getJoinableGames()` — currently returns empty array on 404
+  - `getInProgressGames()` — currently returns empty array on 404
+  - `getLastActiveGame()` — currently returns null on 404
+  - `createGameAction()` — has 404 handling that should be removed once endpoint is implemented
+  - `joinGameAction()` — has 404 handling that should be removed once endpoint is implemented
+- Missing features:
+  - Loading states for initial page loads (skeletons/spinners)
+  - Offline detection and retry logic
+  - Optimistic updates for game actions (bid, play, etc.)
+  - Real-time updates (WebSocket/SSE) instead of polling only
+  - Game history/replay functionality
+  - User profile/settings page
+  - Enhanced game search/filtering (beyond basic text search)
+  - Pagination for game lists
+
+**Recommendations:**
+- Remove all `[AUTH_BYPASS]` code paths
+- Complete backend endpoint integration or document as intentional fallback behavior
+- Add loading skeletons for initial data fetches
+- Consider WebSocket/SSE for real-time updates instead of polling only
+
+### 2. Functional Correctness
+
+**Issues Found:**
+- Auth bypass inconsistency:
+  - `app/page.tsx` and `app/lobby/page.tsx` check `NEXT_PUBLIC_DISABLE_AUTH` directly
+  - `lib/api.ts` uses `isAuthDisabled()` helper function
+  - `components/Header.tsx` checks `NEXT_PUBLIC_DISABLE_AUTH` directly
+  - Should standardize on using `isAuthDisabled()` helper everywhere
+- Error handling inconsistencies:
+  - `game-room-client.tsx` has retry logic for network failures (lines 111-158)
+  - Other components don't have similar retry logic
+  - Some actions wrap errors in `BackendApiError`, others don't
+- State management issues:
+  - `game-room-client.tsx` line 61: `inflightRef` prevents concurrent refreshes, but polling can still overlap with manual refresh
+  - `hasMarkedReady` state (line 56) may not reset correctly if phase changes rapidly
+- Type safety concerns:
+  - `game-room-view.tsx` line 113: `viewerSeat = 0` default may mask missing data
+  - `lib/api/game-room.ts` lines 37-40: Seat parsing clamps to 0-3 but doesn't validate the original value
+- Race conditions:
+  - `game-room-client.tsx` lines 168-174: Polling interval doesn't account for ongoing manual refresh
+  - Multiple pending states (`isBidPending`, `isTrumpPending`, etc.) but no global "action in progress" guard
+- Data synchronization:
+  - `game-room-client.tsx` lines 84-90: When updating snapshot, preserves `viewerSeat` from previous if new one is null — may cause stale data
+
+**Recommendations:**
+- Standardize auth bypass checks (use `isAuthDisabled()` everywhere)
+- Add consistent retry logic across all API calls
+- Implement global action queue/mutex to prevent concurrent actions
+- Add validation for seat numbers before clamping
+- Consider using React Query or SWR for better state synchronization
+
+### 3. Duplication and Multiple Approaches
+
+**Duplication Found:**
+- Error handling patterns:
+  - `game-room-client.tsx` has repeated error handling in `handleSubmitBid`, `handleSelectTrump`, `handlePlayCard`, `handleAddAi`, `handleRemoveAiSeat`, `handleUpdateAiSeat` (lines 232-715)
+  - Same pattern: try/catch, `BackendApiError` wrapping, toast display, traceId logging
+  - Should be extracted to a shared error handler
+- Toast message creation:
+  - `LobbyClient.tsx` line 82-93: `showToast` function
+  - `game-room-client.tsx` line 193-203: `showToast` function
+  - Nearly identical implementations
+- Player name normalization:
+  - `app/game/[gameId]/page.tsx` lines 36-42: Player name extraction logic
+  - `app/actions/game-room-actions.ts` lines 52-58: Same logic duplicated
+- Seat validation:
+  - `app/actions/game-room-actions.ts` lines 223-232, 259-268, 292-303: Seat validation repeated three times
+  - Should be a shared utility function
+- Auth bypass checks:
+  - Multiple files check `NEXT_PUBLIC_DISABLE_AUTH` directly instead of using `isAuthDisabled()`
+- Date/time formatting:
+  - `game-room-view.tsx` line 136-139: Manual date formatting
+  - Could use a shared utility
+- API error response parsing:
+  - `lib/api.ts` lines 72-101: Problem Details parsing
+  - Similar error extraction logic in multiple action files
+
+**Recommendations:**
+- Extract error handling to a custom hook: `useApiAction()`
+- Create shared utilities:
+  - `utils/player-names.ts` for name normalization
+  - `utils/seat-validation.ts` for seat validation
+  - `utils/date-formatting.ts` for date formatting
+- Create a shared `useToast()` hook
+- Standardize on `isAuthDisabled()` helper everywhere
+
+### 4. Efficiency and Quality
+
+**Efficiency Issues:**
+- Polling strategy:
+  - `game-room-client.tsx` line 169: Fixed 3-second polling regardless of activity
+  - Should use exponential backoff or pause when tab is inactive
+  - No consideration for battery/network usage
+- Unnecessary re-renders:
+  - `game-room-client.tsx` line 176-182: `status` memo depends on `isPolling || isRefreshing`, but both can change frequently
+  - `game-room-view.tsx` line 130-133: `seatDisplayName` callback recreated on every render (should be stable)
+- Large component files:
+  - `game-room-view.tsx`: 1457 lines — should be split into smaller components
+  - `game-room-client.tsx`: 791 lines — complex state management could benefit from reducer pattern
+- Memory leaks potential:
+  - `game-room-client.tsx` lines 494-536: AI registry fetch effect cleanup is good, but similar patterns elsewhere may not have cleanup
+  - Polling interval cleanup (line 173) is correct
+- Bundle size concerns:
+  - No code splitting visible for game room components
+  - Large components loaded upfront
+- Network efficiency:
+  - ETag support is good (line 22 in `lib/api/game-room.ts`)
+  - But polling still makes requests even when nothing changed
+  - No request deduplication
+
+**Quality Issues:**
+- Type safety:
+  - `lib/api/game-room.ts` line 24: Inline interface `SnapshotEnvelope` should be exported type
+  - `game-room-view.tsx`: Many inline types that could be extracted
+- Testing:
+  - Limited test files found (`AuthControl.test.tsx`, `game-room-view.test.tsx`)
+  - No tests for critical paths like `game-room-client.tsx`, API functions, or error handling
+- Documentation:
+  - Missing JSDoc for complex functions
+  - No README explaining architecture
+  - Complex logic (like JWT refresh) lacks inline comments
+- Accessibility:
+  - Some buttons missing `aria-label` attributes
+  - Toast component has good accessibility
+  - Form inputs may need better labeling
+- Error boundaries:
+  - No React Error Boundaries found
+  - Unhandled errors could crash entire app
+- Code organization:
+  - Good separation of concerns (server actions, client components, lib utilities)
+  - But some files are too large and do too much
+
+**Recommendations:**
+- Implement adaptive polling (pause when inactive, backoff on errors)
+- Split large components (`game-room-view.tsx` into: `SeatCard`, `TrickArea`, `PlayerHand`, `BiddingPanel`, etc.)
+- Add React Query or SWR for better caching and request deduplication
+- Extract shared utilities and hooks
+- Add Error Boundaries around major sections
+- Increase test coverage (especially for error paths)
+- Add code splitting for game room route
+- Use `useMemo` and `useCallback` more strategically to prevent unnecessary re-renders
+- Consider using a reducer for `game-room-client.tsx` state management
+
+### Priority Summary
+
+**High Priority:**
+1. Remove all `[AUTH_BYPASS]` code
+2. Extract duplicated error handling into shared hook
+3. Fix race conditions in polling/refresh logic
+4. Add Error Boundaries
+5. Standardize auth bypass checks
+
+**Medium Priority:**
+1. Split large components
+2. Extract duplicated utilities (player names, seat validation)
+3. Add loading states for initial page loads
+4. Implement adaptive polling
+5. Add comprehensive error retry logic
+
+**Low Priority:**
+1. Add code splitting
+2. Improve test coverage
+3. Add JSDoc documentation
+4. Enhance accessibility
+5. Consider state management library (Redux/Zustand) for complex game state
+

@@ -2,6 +2,7 @@ use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::ai::RandomPlayer;
 use backend::error::AppError;
+use backend::repos::ai_profiles;
 use backend::routes::games::configure_routes;
 use backend::services::ai::AiService;
 
@@ -72,6 +73,17 @@ async fn test_get_player_display_name_ai_user() -> Result<(), AppError> {
             Some(100),
         )
         .await?;
+
+    // Update profile.display_name to match what add_ai_seat would set
+    // (simulating the production flow where profile.display_name is set from friendly_ai_name)
+    if let Some(mut profile) =
+        ai_profiles::find_by_user_id(shared.transaction(), ai_user_id).await?
+    {
+        let expected_name = backend::routes::games::friendly_ai_name(ai_user_id, 2);
+        profile.display_name = expected_name;
+        ai_profiles::update_profile(shared.transaction(), profile).await?;
+    }
+
     create_test_game_player(shared.transaction(), game_id, ai_user_id, 2).await?;
 
     // Create test app
