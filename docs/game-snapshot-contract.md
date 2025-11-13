@@ -1,5 +1,11 @@
 # Game Snapshot (Wire Contract)
 
+## Document Scope
+
+Defines the serialized shape delivered to clients for rendering active games.
+Pair this with `frontend-ui-roadmap.md` for UX expectations and
+`architecture-game-context.md` for the backend assembly pipeline.
+
 **Purpose:**
 Canonical, read-only view of a game for the frontend. This is the single source of truth for rendering and client-side logic.
 

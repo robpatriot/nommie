@@ -1,5 +1,12 @@
 # Nommie AI Player Implementation Guide
 
+## Document Scope
+
+Step-by-step guide for integrating AI players with the production backend. It
+focuses on the `AiPlayer` trait, deterministic tooling, and submission
+requirements. For the canonical ruleset see `game-rules.md`; for high-throughput
+offline simulation refer to `backend-in-memory-game-engine.md`.
+
 This guide explains how to build AI players for **Nommie** (Nomination Whist). It’s designed for fast onboarding and reliable implementation, with full code listings moved to **numbered appendices** for readability.
 
 ---
@@ -24,7 +31,9 @@ This guide explains how to build AI players for **Nommie** (Nomination Whist). I
 
 ## Game Rules
 
-Nommie is a 4-player trick‑taking game with bidding.
+Nommie is a 4-player trick‑taking game with bidding. This section summarises the
+critical rules the AI must honour; the full canonical source lives in
+`game-rules.md`.
 
 ### Players & Setup
 - **4 players** in fixed clockwise order (seats 0–3)

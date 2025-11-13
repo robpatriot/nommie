@@ -1,5 +1,11 @@
 # 🗺️ Nommie — Milestone & Enhancement Roadmap
 
+## Document Scope
+
+Tracks delivery milestones, optional enhancements, and outstanding work items.
+Use this alongside `frontend-ui-roadmap.md` for UI sequencing and
+`architecture-overview.md` for the technical baseline each milestone builds on.
+
 This document outlines Nommie’s development path:
 Core milestones first, then optional and enhancement tracks that can be implemented at any time.
 

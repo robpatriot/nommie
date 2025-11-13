@@ -1,5 +1,11 @@
 # Frontend Theme System
 
+## Document Scope
+
+This note documents how the shared Tailwind theme tokens are defined,
+consumed, and extended. UI layout sequencing and broader UX priorities are
+tracked separately in `frontend-ui-roadmap.md`.
+
 This document describes how the centralized Tailwind theme is wired up in the
 Next.js frontend and how to extend it responsibly.
 

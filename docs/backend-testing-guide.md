@@ -1,4 +1,11 @@
-# Testing Guide
+# Backend Testing Guide
+
+## Document Scope
+
+Explains how automated tests interact with the database layer, the guard rails
+that prevent accidental prod access, and the available harness helpers.
+Complementary docs: `backend-error-handling.md` for error assertions and
+`project-milestones.md` for when new suites are expected.
 
 This document describes the testing setup for the Nommie backend.
 

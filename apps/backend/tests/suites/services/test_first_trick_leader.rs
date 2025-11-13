@@ -16,7 +16,7 @@ use crate::support::trick_helpers::create_tricks_by_winner_counts;
 
 /// Test: Verify the first trick leader rotates with dealer position across rounds.
 ///
-/// This tests the critical rule from docs/rules.md:
+/// This tests the critical rule from docs/game-rules.md:
 /// "The player to the left of the dealer leads the first trick of each round."
 ///
 /// The test progresses through 2 complete rounds to verify:

@@ -1,5 +1,11 @@
 # In-Memory Game Engine - Implementation Guide
 
+## Document Scope
+
+Blueprint for the high-throughput simulation engine used in AI training. For the
+runtime AI integration used in production games, see
+`ai-player-implementation-guide.md` and `architecture-game-context.md`.
+
 ## Purpose
 
 Fast in-memory game simulation for AI training, bypassing database persistence entirely.

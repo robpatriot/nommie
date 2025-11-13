@@ -1,6 +1,6 @@
 //! Tests for consecutive zero bids validation rule.
 //!
-//! According to game rules (docs/rules.md):
+//! According to game rules (docs/game-rules.md):
 //! - A player may bid 0, but cannot do so more than three rounds in a row
 //! - After three consecutive 0-bids, that player must bid at least 1 in the next round
 

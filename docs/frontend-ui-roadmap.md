@@ -1,5 +1,11 @@
 ## Nommie UI Roadmap
 
+### Document Scope
+
+Sequenced plan for the web (and later mobile) experience. Pairs with
+`frontend-theme-system.md` for styling constraints, `game-snapshot-contract.md`
+for data requirements, and `project-milestones.md` for cross-team alignment.
+
 This document is the canonical, living plan for building the Nommie UI on web (Next.js) and, later, a mobile client. It captures stages, decisions, endpoints, and a lightweight progress log so work can continue seamlessly across machines.
 
 ### Stack (confirmed)

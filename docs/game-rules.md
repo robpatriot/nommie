@@ -1,5 +1,11 @@
 # 🎲 Nommie Game Rules
 
+## Document Scope
+
+Authoritative rule reference for gameplay logic. The AI guide repeats key
+excerpts for convenience; this document is the canonical source for future rule
+changes and validation logic.
+
 This project implements *Nomination Whist* with the following fixed ruleset.
 These rules are **locked** — all game logic, extractors, tests, and UI must conform.
 

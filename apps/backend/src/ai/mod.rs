@@ -10,7 +10,7 @@
 //! # For AI Developers
 //!
 //! If you're building a custom AI player, start with the comprehensive
-//! [AI Implementation Guide](../../../../../docs/ai-implementation-guide.md).
+//! [AI Implementation Guide](../../../../../docs/ai-player-implementation-guide.md).
 //!
 //! ## Quick Overview
 //!

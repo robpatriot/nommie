@@ -1,8 +1,17 @@
 # 🏗️ Nommie — Architecture & Tech Stack
 
+## Document Scope
+
+This overview orients new contributors to the high-level shape of the system:
+frontend, backend, data, and the primary engineering principles that keep those
+layers aligned. Deep-dives for specific subsystems live in separate documents
+and are linked under **Related Documents**.
+
 ## 🌐 Overview
-Nommie is a web-based, multiplayer version of **Nomination Whist** (with our house rules).
-The system is **full-stack** and **Docker-first**, with a clean split between frontend, backend, and database.
+
+Nommie is a web-based, multiplayer version of **Nomination Whist** (with our
+house rules). The system is **full-stack** and **Docker-first**, with a clean
+split between frontend, backend, and database.
 
 ---
 
@@ -68,3 +77,13 @@ The system is **full-stack** and **Docker-first**, with a clean split between fr
 - **Right-sized files** — if a file grows unwieldy, split it for clarity & testability
 
 ---
+
+## Related Documents
+
+- `architecture-game-context.md` — detailed design of the `GameContext`
+  extractor and cache model.
+- `backend-error-handling.md` — layered error strategy and RFC 7807 mapping.
+- `backend-testing-guide.md` — database harness, safety rails, and test layout.
+- `backend-in-memory-game-engine.md` — simulation design for high-volume AI play.
+- `frontend-theme-system.md` & `frontend-ui-roadmap.md` — client experience
+  strategy and roadmap.

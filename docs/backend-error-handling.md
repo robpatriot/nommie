@@ -1,5 +1,12 @@
 # Error Handling Architecture
 
+## Document Scope
+
+This guide covers the backend error model: how database, domain, and HTTP layers
+map errors to RFC 7807 responses while staying free of PII. Architectural
+context lives in `architecture-overview.md`; testing guidance for these patterns
+is captured in `backend-testing-guide.md`.
+
 **Version:** 1.2  
 **Last Updated:** 2025-10-10  
 **Status:** Active
@@ -451,7 +458,7 @@ Potential improvements for consideration:
 
 ## Related Documentation
 
-- [Architecture Overview](./architecture.md)
-- [Testing Guidelines](./testing.md)
+- [Architecture Overview](./architecture-overview.md)
+- [Backend Testing Guide](./backend-testing-guide.md)
 - [RFC 7807 - Problem Details for HTTP APIs](https://tools.ietf.org/html/rfc7807)
 

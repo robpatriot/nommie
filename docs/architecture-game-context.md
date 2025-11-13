@@ -1,5 +1,13 @@
 # GameContext Architecture
 
+## Document Scope
+
+This document dives into the `GameContext` concept: how we assemble and cache
+it in HTTP handlers, how AI orchestration consumes it, and why services treat it
+as read-only input. For a system-wide overview, start with
+`architecture-overview.md`. Error propagation patterns are covered in
+`backend-error-handling.md`.
+
 ## Overview
 
 This document describes the unified `GameContext` architecture that consolidates game-wide and player-specific state into a single cohesive structure used by both HTTP handlers and AI systems.
