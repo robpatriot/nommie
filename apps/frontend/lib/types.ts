@@ -27,6 +27,7 @@ export interface Game {
   player_count: number
   max_players: number
   viewer_is_member?: boolean
+  viewer_is_host?: boolean
 }
 
 export interface GameListResponse {

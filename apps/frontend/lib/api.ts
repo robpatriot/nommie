@@ -104,3 +104,9 @@ export async function getLastActiveGame(): Promise<number | null> {
   const data: LastActiveGameResponse = await response.json()
   return data.game_id ?? null
 }
+
+export async function deleteGame(gameId: number): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}`, {
+    method: 'DELETE',
+  })
+}

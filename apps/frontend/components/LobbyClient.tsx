@@ -6,7 +6,11 @@ import GameList from './GameList'
 import CreateGameModal from './CreateGameModal'
 import Toast from './Toast'
 import { useToast } from '@/hooks/useToast'
-import { createGameAction, joinGameAction } from '@/app/actions/game-actions'
+import {
+  createGameAction,
+  deleteGameAction,
+  joinGameAction,
+} from '@/app/actions/game-actions'
 import type { Game } from '@/lib/types'
 
 const sortByUpdatedAtDesc = (a: Game, b: Game) => {
@@ -137,6 +141,35 @@ export default function LobbyClient({
     router.push(`/game/${gameId}`)
   }
 
+  const handleDelete = async (gameId: number) => {
+    if (
+      !confirm(
+        'Are you sure you want to delete this game? This action cannot be undone.'
+      )
+    ) {
+      return
+    }
+
+    const result = await deleteGameAction(gameId)
+
+    if (result.error) {
+      showToast(
+        result.error.message || 'Failed to delete game',
+        'error',
+        result.error
+      )
+      // Log traceId in dev
+      if (process.env.NODE_ENV === 'development' && result.error.traceId) {
+        console.error('Delete game error traceId:', result.error.traceId)
+      }
+      return
+    }
+
+    showToast('Game deleted successfully', 'success')
+    // Refresh the page to remove the deleted game from the list
+    router.refresh()
+  }
+
   const handleResume = () => {
     if (lastActiveGameId) {
       router.push(`/game/${lastActiveGameId}`)
@@ -195,35 +228,58 @@ export default function LobbyClient({
               emptyMessage="No games available to join. Create one to get started!"
               actionsLabel="Actions"
               renderActions={(game) => {
+                const actions = []
+
+                // If user is the host, show delete button
+                if (game.viewer_is_host) {
+                  actions.push(
+                    <button
+                      key="delete"
+                      onClick={() => handleDelete(game.id)}
+                      className="rounded bg-red-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-red-700 mr-2"
+                    >
+                      Delete
+                    </button>
+                  )
+                }
+
                 // If user is already a member, show "Go to game" button
                 if (game.viewer_is_member) {
-                  return (
+                  actions.push(
                     <button
+                      key="rejoin"
                       onClick={() => handleRejoin(game.id)}
                       className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                       Go to game
                     </button>
                   )
-                }
-
-                // If game is joinable and user is not a member, show "Join" button
-                if (
+                } else if (
                   game.state === 'LOBBY' &&
                   game.player_count < game.max_players
                 ) {
-                  return (
+                  // If game is joinable and user is not a member, show "Join" button
+                  actions.push(
                     <button
+                      key="join"
                       onClick={() => handleJoin(game.id)}
                       className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                       Join
                     </button>
                   )
+                } else if (game.player_count >= game.max_players) {
+                  // Game is full
+                  actions.push(
+                    <span key="full" className="text-sm text-muted">
+                      Game is full
+                    </span>
+                  )
                 }
 
-                // Game is full
-                return <span className="text-sm text-muted">Game is full</span>
+                return actions.length > 0 ? (
+                  <div className="flex items-center gap-2">{actions}</div>
+                ) : null
               }}
             />
 
@@ -231,17 +287,40 @@ export default function LobbyClient({
               games={sortedInProgressGames}
               title="In Progress Games"
               emptyMessage="No games currently in progress."
-              actionsLabel="Resume"
-              renderActions={(game) =>
-                game.viewer_is_member ? (
-                  <button
-                    onClick={() => handleRejoin(game.id)}
-                    className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                  >
-                    Rejoin
-                  </button>
+              actionsLabel="Actions"
+              renderActions={(game) => {
+                const actions = []
+
+                // If user is the host, show delete button
+                if (game.viewer_is_host) {
+                  actions.push(
+                    <button
+                      key="delete"
+                      onClick={() => handleDelete(game.id)}
+                      className="rounded bg-red-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-red-700 mr-2"
+                    >
+                      Delete
+                    </button>
+                  )
+                }
+
+                // If user is a member, show "Rejoin" button
+                if (game.viewer_is_member) {
+                  actions.push(
+                    <button
+                      key="rejoin"
+                      onClick={() => handleRejoin(game.id)}
+                      className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                      Rejoin
+                    </button>
+                  )
+                }
+
+                return actions.length > 0 ? (
+                  <div className="flex items-center gap-2">{actions}</div>
                 ) : null
-              }
+              }}
             />
           </div>
         </div>

@@ -16,7 +16,7 @@ use crate::domain::player_view::CurrentRoundInfo;
 use crate::domain::snapshot::{GameSnapshot, SeatAiProfilePublic, SeatPublic};
 use crate::domain::state::Seat;
 use crate::domain::{Card, Rank, Suit};
-use crate::entities::games::{GameState, GameVisibility};
+use crate::entities::games::{self, GameState, GameVisibility};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
@@ -354,6 +354,7 @@ struct GameResponse {
     player_count: i32,
     max_players: i32,
     viewer_is_member: bool,
+    viewer_is_host: bool,
 }
 
 /// Helper function to convert GameState enum to frontend string format
@@ -399,6 +400,11 @@ fn game_to_response(
         })
         .is_some();
 
+    // Check if viewer is the host (creator of the game)
+    let viewer_is_host = viewer_user_id
+        .and_then(|id| game_model.created_by.map(|created_by| created_by == id))
+        .unwrap_or(false);
+
     GameResponse {
         id: game_model.id,
         name: game_model
@@ -416,6 +422,7 @@ fn game_to_response(
         player_count,
         max_players: 4,
         viewer_is_member,
+        viewer_is_host,
     }
 }
 
@@ -1287,6 +1294,64 @@ async fn play_card(
         .finish())
 }
 
+/// DELETE /api/games/{game_id}
+///
+/// Deletes a game. Only the host can delete a game.
+async fn delete_game(
+    http_req: HttpRequest,
+    game_id: GameId,
+    membership: GameMembership,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+    let host_user_id = membership.user_id;
+    let host_turn_order = membership.turn_order;
+
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            // Load game to verify it exists and check host authorization
+            let game = games_sea::require_game(txn, id).await?;
+
+            // Check host authorization
+            let is_host = match game.created_by {
+                Some(created_by) => created_by == host_user_id,
+                None => host_turn_order == 0,
+            };
+
+            if !is_host {
+                return Err(AppError::forbidden_with_code(
+                    ErrorCode::Forbidden,
+                    "Only the host can delete a game",
+                ));
+            }
+
+            // Delete the game (cascade delete will handle related records)
+            // Note: The game was already loaded above, so it exists
+            // But we check rows_affected anyway to be defensive
+            use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+            let delete_result = games::Entity::delete_many()
+                .filter(games::Column::Id.eq(id))
+                .exec(txn)
+                .await
+                .map_err(|e| AppError::db("failed to delete game", e))?;
+
+            if delete_result.rows_affected == 0 {
+                // This should not happen since we loaded the game above
+                // But handle it gracefully anyway
+                return Err(AppError::not_found(
+                    ErrorCode::GameNotFound,
+                    format!("Game with ID {id} not found"),
+                ));
+            }
+
+            Ok(())
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
 pub fn friendly_ai_name(user_id: i64, seat_index: usize) -> String {
     const AI_NAMES: [&str; 16] = [
         "Atlas", "Blaze", "Comet", "Dynamo", "Echo", "Flare", "Glyph", "Helix", "Ion", "Jet",
@@ -1358,6 +1423,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
         web::resource("/{game_id}/players/{seat}/display_name")
             .route(web::get().to(get_player_display_name)),
     );
+    cfg.service(web::resource("/{game_id}").route(web::delete().to(delete_game)));
 }
 
 #[cfg(test)]

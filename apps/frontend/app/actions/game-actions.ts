@@ -1,6 +1,6 @@
 'use server'
 
-import { fetchWithAuth, BackendApiError } from '@/lib/api'
+import { deleteGame, fetchWithAuth, BackendApiError } from '@/lib/api'
 import type { Game } from '@/lib/types'
 
 export interface CreateGameRequest {
@@ -65,6 +65,34 @@ export async function joinGameAction(
     return {
       error: new BackendApiError(
         error instanceof Error ? error.message : 'Failed to join game',
+        500,
+        'UNKNOWN_ERROR'
+      ),
+    }
+  }
+}
+
+export type DeleteGameResult =
+  | { success: true; error?: never }
+  | { error: BackendApiError; success?: never }
+
+export async function deleteGameAction(
+  gameId: number
+): Promise<DeleteGameResult> {
+  try {
+    // Auth is enforced centrally in fetchWithAuth
+
+    await deleteGame(gameId)
+    return { success: true }
+  } catch (error) {
+    // Re-throw BackendApiError to preserve traceId
+    if (error instanceof BackendApiError) {
+      return { error }
+    }
+    // Wrap other errors
+    return {
+      error: new BackendApiError(
+        error instanceof Error ? error.message : 'Failed to delete game',
         500,
         'UNKNOWN_ERROR'
       ),
