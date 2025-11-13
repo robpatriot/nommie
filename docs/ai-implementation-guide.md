@@ -4,6 +4,10 @@ This guide explains how to build AI players for **Nommie** (Nomination Whist). I
 
 ---
 
+> **Note:** This is a **standalone document** that intentionally duplicates some content from other docs (especially game rules) so AI implementers have everything they need in one place. For the canonical game rules reference, see [game-rules.md](./game-rules.md).
+
+---
+
 ## Table of Contents
 
 1. [Game Rules](#game-rules)

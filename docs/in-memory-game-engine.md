@@ -598,3 +598,11 @@ This document contains everything needed to implement the in-memory game engine 
 5. Benchmark performance
 6. Iterate based on results
 
+---
+
+## Related Documentation
+
+- [Testing Guide](./testing-guide.md) - Backend testing patterns and setup
+- [AI Implementation Guide](./ai-implementation-guide.md) - AI player implementation reference
+- [Backend Milestones](./backend-milestones.md) - Project roadmap
+

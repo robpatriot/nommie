@@ -167,7 +167,7 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 - **Database:** PostgreSQL 16 (Docker Compose, schema via SeaORM migrator)  
 - **Workflow:** pnpm workspaces, Docker-first, structured logs with trace IDs  
 
-👉 See [Architecture & Tech Stack](docs/architecture.md) for details.
+👉 See [Architecture Overview](docs/architecture-overview.md) for details.
 
 ---
 
@@ -266,15 +266,26 @@ Use these logs to:
 
 ---
 
-## 🗺️ Roadmap
-Milestone-driven: setup → core game loop → AI → polish.  
-👉 See [Milestones](docs/milestones.md).
+## 📚 Documentation
 
----
+### Core Concepts
+- **[Game Rules](docs/game-rules.md)** - Nomination Whist rules and scoring
+- **[Architecture Overview](docs/architecture-overview.md)** - System architecture and tech stack
+- **[Error Handling](docs/error-handling.md)** - Error handling patterns and Problem Details
 
-## 🎲 Game Rules
-Gameplay house rules.  
-👉 See [Game Rules](docs/game-rules.md).
+### Development Guides
+- **[Testing Guide](docs/testing-guide.md)** - Backend testing setup and practices
+- **[Frontend Theme](docs/frontend-theme.md)** - Theme system and styling patterns
+- **[Game Context Architecture](docs/game-context-architecture.md)** - GameContext design and usage
+
+### Planning & Roadmaps
+- **[Backend Milestones](docs/backend-milestones.md)** - Backend development roadmap
+- **[UI Roadmap](docs/ui-roadmap.md)** - Frontend development plan and stages
+
+### Specialized Topics
+- **[AI Implementation Guide](docs/ai-implementation-guide.md)** - Complete guide for building AI players (standalone)
+- **[Game Snapshot Contract](docs/game-snapshot-contract.md)** - Wire format for game state
+- **[In-Memory Game Engine](docs/in-memory-game-engine.md)** - Fast simulation for AI training
 
 ---
 

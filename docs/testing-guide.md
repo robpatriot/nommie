@@ -88,3 +88,12 @@ DATABASE_URL=postgresql://user:password@localhost:5432/nommie_test
 - Integration tests use `actix_web::test` for in-process service testing
 - The `_test` suffix guard ensures tests never run against production databases
 - Schema validation is automatic - both prod and test startup validate schema readiness
+
+---
+
+## Related Documentation
+
+- [Architecture Overview](./architecture-overview.md) - System architecture and tech stack
+- [Error Handling](./error-handling.md) - Error handling patterns and testing
+- [In-Memory Game Engine](./in-memory-game-engine.md) - Fast simulation for AI training
+- [Backend Milestones](./backend-milestones.md) - Testing-related milestones

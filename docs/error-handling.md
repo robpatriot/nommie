@@ -451,7 +451,7 @@ Potential improvements for consideration:
 
 ## Related Documentation
 
-- [Architecture Overview](./architecture.md)
-- [Testing Guidelines](./testing.md)
+- [Architecture Overview](./architecture-overview.md)
+- [Testing Guide](./testing-guide.md)
 - [RFC 7807 - Problem Details for HTTP APIs](https://tools.ietf.org/html/rfc7807)
 

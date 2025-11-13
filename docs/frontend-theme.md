@@ -74,3 +74,10 @@ re-implementing preference storage or DOM updates.
 - When adding new components, audit for stray palette colors (`gray-*`,
   `slate-*`, etc.) and swap them to semantic tokens.
 
+---
+
+## Related Documentation
+
+- [UI Roadmap](./ui-roadmap.md) - Frontend development stages and UX decisions
+- [Architecture Overview](./architecture-overview.md) - System architecture
+

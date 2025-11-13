@@ -68,3 +68,12 @@ The system is **full-stack** and **Docker-first**, with a clean split between fr
 - **Right-sized files** — if a file grows unwieldy, split it for clarity & testability
 
 ---
+
+## Related Documentation
+
+- [Game Context Architecture](./game-context-architecture.md) - Detailed GameContext design
+- [Error Handling](./error-handling.md) - Error handling patterns
+- [Testing Guide](./testing-guide.md) - Testing setup and practices
+- [Backend Milestones](./backend-milestones.md) - Development roadmap
+
+---

@@ -3,6 +3,11 @@
 This document outlines Nommie’s development path:
 Core milestones first, then optional and enhancement tracks that can be implemented at any time.
 
+**Status Legend:**
+- ✅ Complete - Fully implemented and tested
+- 🟨 In Progress - Partially implemented, work ongoing
+- 🕓 Pending - Not yet started
+
 ---
 
 ## Core Milestones

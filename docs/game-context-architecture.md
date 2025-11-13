@@ -4,6 +4,20 @@
 
 This document describes the unified `GameContext` architecture that consolidates game-wide and player-specific state into a single cohesive structure used by both HTTP handlers and AI systems.
 
+## Table of Contents
+
+1. [Core Design Principles](#core-design-principles)
+2. [The GameContext Structure](#the-gamecontext-structure)
+3. [HTTP Layer: CachedGameContext Extractor](#http-layer-cachedgamecontext-extractor)
+4. [Service Layer Integration](#service-layer-integration)
+5. [AI Orchestration Path](#ai-orchestration-path)
+6. [Request Flow Comparison](#request-flow-comparison)
+7. [Consecutive Zero Bids Rule](#consecutive-zero-bids-rule)
+8. [Benefits](#benefits)
+9. [Migration Path](#migration-path)
+10. [Future Extensions](#future-extensions)
+11. [Summary](#summary)
+
 ---
 
 ## Core Design Principles
