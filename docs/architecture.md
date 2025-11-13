@@ -25,6 +25,8 @@ The system is **full-stack** and **Docker-first**, with a clean split between fr
   - **Orchestration** → DB + domain wiring, per-feature modules (`orchestration::bidding`, etc.)
   - **Routes** → thin adapters that call orchestration
 
+👉 See [GameContext Architecture](architecture-game-context.md) for detailed information about the unified state management system.
+
 ---
 
 ## 🗄️ Database & Infrastructure

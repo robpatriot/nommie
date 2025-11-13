@@ -4,6 +4,8 @@
 
 This document describes the unified `GameContext` architecture that consolidates game-wide and player-specific state into a single cohesive structure used by both HTTP handlers and AI systems.
 
+> **Related:** See [Architecture Overview](architecture.md) for high-level system architecture and tech stack.
+
 ---
 
 ## Core Design Principles

@@ -26,6 +26,8 @@ This guide explains how to build AI players for **Nommie** (Nomination Whist). I
 
 Nommie is a 4-player trick‑taking game with bidding.
 
+> **Reference:** The complete ruleset is documented in [Game Rules](rules.md). This section provides a summary for AI implementers.
+
 ### Players & Setup
 - **4 players** in fixed clockwise order (seats 0–3)
 - **26 rounds** with varying hand sizes

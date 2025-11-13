@@ -171,6 +171,29 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 
 ---
 
+## 📚 Documentation
+
+The project documentation is organized into focused guides covering different aspects of the system:
+
+### Core Documentation
+- **[Architecture](docs/architecture.md)** - High-level system architecture and tech stack overview
+- **[Architecture: GameContext](docs/architecture-game-context.md)** - Deep dive into the unified GameContext architecture for HTTP handlers and AI systems
+- **[Game Rules](docs/rules.md)** - Complete ruleset for Nomination Whist (locked ruleset)
+- **[Error Handling](docs/error-handling.md)** - Backend error handling architecture following RFC 7807 Problem Details
+
+### Development Guides
+- **[Testing Guide](docs/testing.md)** - Testing setup, database policies, and test structure
+- **[Milestones & Roadmap](docs/milestones.md)** - Development milestones and enhancement roadmap
+- **[UI Roadmap](docs/ui-roadmap.md)** - Frontend development stages, decisions, and progress tracker
+
+### Implementation Guides
+- **[AI Implementation Guide](docs/ai-implementation-guide.md)** - Comprehensive guide for building AI players (standalone document)
+- **[In-Memory Game Engine](docs/in-memory-game-engine.md)** - Fast in-memory simulation engine for AI training
+- **[Game Snapshot Contract](docs/game-snapshot-contract.md)** - API contract for frontend game state representation
+- **[Frontend Theme System](docs/frontend-theme.md)** - Tailwind theme configuration and usage
+
+---
+
 ## 🔒 Backend: Optimistic Concurrency
 
 The backend uses optimistic locking with HTTP-native ETag/If-Match headers for safe concurrent updates.
@@ -274,7 +297,7 @@ Milestone-driven: setup → core game loop → AI → polish.
 
 ## 🎲 Game Rules
 Gameplay house rules.  
-👉 See [Game Rules](docs/game-rules.md).
+👉 See [Game Rules](docs/rules.md).
 
 ---
 

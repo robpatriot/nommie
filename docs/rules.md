@@ -3,6 +3,8 @@
 This project implements *Nomination Whist* with the following fixed ruleset.
 These rules are **locked** — all game logic, extractors, tests, and UI must conform.
 
+> **Note:** These rules are also included in the [AI Implementation Guide](ai-implementation-guide.md) for standalone reference when building AI players.
+
 ---
 
 ## Players
