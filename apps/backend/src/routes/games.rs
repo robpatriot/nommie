@@ -23,7 +23,7 @@ use crate::extractors::current_user::CurrentUser;
 use crate::extractors::game_id::GameId;
 use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
-use crate::http::etag::game_etag;
+use crate::http::etag::{game_etag, ExpectedVersion};
 use crate::repos::memberships::{self, GameRole};
 use crate::repos::{ai_overrides, ai_profiles, rounds, users};
 use crate::services::ai::AiService;
@@ -1169,34 +1169,45 @@ async fn update_ai_seat(
 ///
 /// Submits a bid for the current player. Bidding order and validation are enforced
 /// by the service layer.
+///
+/// Requires If-Match header with the current game ETag for optimistic locking.
 async fn submit_bid(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
     body: ValidatedJson<SubmitBidRequest>,
+    expected_version: ExpectedVersion,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
     let seat = membership.turn_order as i16;
     let bid_value = body.bid;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_game = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
-            service.submit_bid(txn, id, seat, bid_value).await?;
-            Ok(())
+            service
+                .submit_bid(txn, id, seat, bid_value, Some(expected_version.0))
+                .await
         })
     })
     .await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    let etag = game_etag(updated_game.id, updated_game.lock_version);
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
+/// Sets the trump suit for the current round. Only the winning bidder can set trump.
+///
+/// Requires If-Match header with the current game ETag for optimistic locking.
 async fn select_trump(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
     body: ValidatedJson<SetTrumpRequest>,
+    expected_version: ExpectedVersion,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
@@ -1218,23 +1229,31 @@ async fn select_trump(
         }
     };
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_game = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
-            service.set_trump(txn, id, seat, trump).await?;
-            Ok(())
+            service
+                .set_trump(txn, id, seat, trump, Some(expected_version.0))
+                .await
         })
     })
     .await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    let etag = game_etag(updated_game.id, updated_game.lock_version);
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
+/// Plays a card for the current player in the current trick.
+///
+/// Requires If-Match header with the current game ETag for optimistic locking.
 async fn play_card(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
     body: ValidatedJson<PlayCardRequest>,
+    expected_version: ExpectedVersion,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
@@ -1252,16 +1271,20 @@ async fn play_card(
 
     let card = normalized.parse::<Card>().map_err(AppError::from)?;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_game = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
-            service.play_card(txn, id, seat, card).await?;
-            Ok(())
+            service
+                .play_card(txn, id, seat, card, Some(expected_version.0))
+                .await
         })
     })
     .await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    let etag = game_etag(updated_game.id, updated_game.lock_version);
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
 pub fn friendly_ai_name(user_id: i64, seat_index: usize) -> String {

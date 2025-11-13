@@ -92,7 +92,7 @@ async fn test_submit_bid_succeeds_after_deal() -> Result<(), AppError> {
             let service = GameFlowService;
             service.deal_round(txn, game_id).await?;
 
-            let result = service.submit_bid(txn, game_id, 1, 5).await;
+            let result = service.submit_bid(txn, game_id, 1, 5, None).await;
 
             assert!(result.is_ok());
 
@@ -120,10 +120,10 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
 
             // Submit bids: Round 1, dealer at seat 0, bidding starts at seat 1
             // Bids: 4 + 3 + 0 + 5 = 12 (not 13, so dealer rule OK)
-            service.submit_bid(txn, setup.game_id, 1, 4).await?;
-            service.submit_bid(txn, setup.game_id, 2, 3).await?;
-            service.submit_bid(txn, setup.game_id, 3, 0).await?;
-            service.submit_bid(txn, setup.game_id, 0, 5).await?;
+            service.submit_bid(txn, setup.game_id, 1, 4, None).await?;
+            service.submit_bid(txn, setup.game_id, 2, 3, None).await?;
+            service.submit_bid(txn, setup.game_id, 3, 0, None).await?;
+            service.submit_bid(txn, setup.game_id, 0, 5, None).await?;
 
             let all_bids = bids::find_all_by_round(txn, setup.round_id).await?;
             assert_eq!(all_bids.len(), 4);
@@ -193,10 +193,10 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
 
             // Round 1: dealer at seat 0, bidding starts at seat 1
             // Bids: 3 + 2 + 0 + 7 = 12 (not 13, dealer rule OK)
-            service.submit_bid(txn, setup.game_id, 1, 3).await?;
-            service.submit_bid(txn, setup.game_id, 2, 2).await?;
-            service.submit_bid(txn, setup.game_id, 3, 0).await?;
-            service.submit_bid(txn, setup.game_id, 0, 7).await?;
+            service.submit_bid(txn, setup.game_id, 1, 3, None).await?;
+            service.submit_bid(txn, setup.game_id, 2, 2, None).await?;
+            service.submit_bid(txn, setup.game_id, 3, 0, None).await?;
+            service.submit_bid(txn, setup.game_id, 0, 7, None).await?;
 
             create_tricks_by_winner_counts(txn, setup.round_id, [7, 3, 2, 1]).await?;
 
@@ -217,10 +217,10 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
 
             // Round 2: dealer at seat 1, bidding starts at seat 2
             // Bids: 2 + 0 + 5 + 4 = 11 (not 12, dealer rule OK)
-            service.submit_bid(txn, setup.game_id, 2, 2).await?;
-            service.submit_bid(txn, setup.game_id, 3, 0).await?;
-            service.submit_bid(txn, setup.game_id, 0, 5).await?;
-            service.submit_bid(txn, setup.game_id, 1, 4).await?;
+            service.submit_bid(txn, setup.game_id, 2, 2, None).await?;
+            service.submit_bid(txn, setup.game_id, 3, 0, None).await?;
+            service.submit_bid(txn, setup.game_id, 0, 5, None).await?;
+            service.submit_bid(txn, setup.game_id, 1, 4, None).await?;
 
             create_tricks_by_winner_counts(txn, round2.id, [5, 4, 2, 1]).await?;
 
@@ -382,16 +382,16 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
 
             // Submit bids: Round 26, dealer at seat 1, bidding starts at seat 2
             // Bids: 3 + 3 + 4 + 2 = 12 (not 13, dealer rule OK)
-            service.submit_bid(txn, setup.game_id, 2, 3).await?;
-            service.submit_bid(txn, setup.game_id, 3, 3).await?;
-            service.submit_bid(txn, setup.game_id, 0, 4).await?;
-            service.submit_bid(txn, setup.game_id, 1, 2).await?;
+            service.submit_bid(txn, setup.game_id, 2, 3, None).await?;
+            service.submit_bid(txn, setup.game_id, 3, 3, None).await?;
+            service.submit_bid(txn, setup.game_id, 0, 4, None).await?;
+            service.submit_bid(txn, setup.game_id, 1, 2, None).await?;
 
             let all_bids = bids::find_all_by_round(txn, round.id).await?;
             assert_eq!(all_bids.len(), 4);
 
             service
-                .set_trump(txn, setup.game_id, 0, rounds::Trump::Hearts)
+                .set_trump(txn, setup.game_id, 0, rounds::Trump::Hearts, None)
                 .await?;
 
             // Simulate 13 tricks: P0 wins 4, P1 wins 2, P2 wins 3, P3 wins 4

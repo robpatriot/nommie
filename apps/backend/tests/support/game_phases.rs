@@ -34,7 +34,7 @@ pub struct PhaseSetup {
 /// ```
 /// let setup = setup_game_in_bidding_phase(txn, "my_bidding_test").await?;
 /// // Now submit bids...
-/// service.submit_bid(txn, setup.game_id, 1, 5).await?;
+/// service.submit_bid(txn, setup.game_id, 1, 5, None).await?;
 /// ```
 pub async fn setup_game_in_bidding_phase(
     txn: &DatabaseTransaction,
@@ -80,7 +80,7 @@ pub async fn setup_game_in_bidding_phase(
 /// ```
 /// let setup = setup_game_in_trump_selection_phase(txn, "my_trump_test", [3, 4, 2, 5]).await?;
 /// // Now set trump...
-/// service.set_trump(txn, setup.game_id, winning_bidder, Trump::Hearts).await?;
+/// service.set_trump(txn, setup.game_id, winning_bidder, Trump::Hearts, None).await?;
 /// ```
 pub async fn setup_game_in_trump_selection_phase(
     txn: &DatabaseTransaction,
@@ -96,7 +96,7 @@ pub async fn setup_game_in_trump_selection_phase(
     for i in 0..4 {
         let seat = (first_bidder + i) % 4;
         service
-            .submit_bid(txn, phase_setup.game_id, seat as i16, bids[seat])
+            .submit_bid(txn, phase_setup.game_id, seat as i16, bids[seat], None)
             .await?;
     }
 
@@ -121,7 +121,7 @@ pub async fn setup_game_in_trump_selection_phase(
 /// ```
 /// let setup = setup_game_in_trick_play_phase(txn, "my_trick_test", [3, 4, 2, 5], Trump::Hearts).await?;
 /// // Now play cards...
-/// service.play_card(txn, setup.game_id, 0, card).await?;
+/// service.play_card(txn, setup.game_id, 0, card, None).await?;
 /// ```
 pub async fn setup_game_in_trick_play_phase(
     txn: &DatabaseTransaction,
@@ -137,7 +137,7 @@ pub async fn setup_game_in_trick_play_phase(
 
     // Set trump
     service
-        .set_trump(txn, phase_setup.game_id, winning_bidder as i16, trump)
+        .set_trump(txn, phase_setup.game_id, winning_bidder as i16, trump, None)
         .await?;
 
     Ok(phase_setup)

@@ -27,7 +27,7 @@ async fn submit_bid_success() -> Result<(), AppError> {
 
     let service = GameFlowService;
     service
-        .submit_bid(shared.transaction(), setup.game_id, actor_seat, 1)
+        .submit_bid(shared.transaction(), setup.game_id, actor_seat, 1, None)
         .await?;
 
     let stored_bid = round_bids::Entity::find()
@@ -65,7 +65,7 @@ async fn submit_bid_out_of_turn_rejected() -> Result<(), AppError> {
 
     let service = GameFlowService;
     let result = service
-        .submit_bid(shared.transaction(), setup.game_id, actor_seat, 1)
+        .submit_bid(shared.transaction(), setup.game_id, actor_seat, 1, None)
         .await;
 
     let err = result.expect_err("expected out-of-turn error");

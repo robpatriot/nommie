@@ -80,7 +80,7 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
 
             // Step 2: Submit a bid
             let lock_before_bid = game_after_deal.lock_version;
-            service.submit_bid(txn, game_id, 1, 5).await?;
+            service.submit_bid(txn, game_id, 1, 5, None).await?;
 
             let game_after_bid = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
             assert!(
@@ -158,10 +158,10 @@ async fn test_deterministic_first_trick() -> Result<(), AppError> {
 
             // Submit bids for all 4 players in turn order (dealer=0, so turn order is 1,2,3,0)
             // Valid bids for hand_size=13
-            service.submit_bid(txn, game_id, 1, 6).await?;
-            service.submit_bid(txn, game_id, 2, 3).await?;
-            service.submit_bid(txn, game_id, 3, 4).await?;
-            service.submit_bid(txn, game_id, 0, 5).await?; // Dealer bids last
+            service.submit_bid(txn, game_id, 1, 6, None).await?;
+            service.submit_bid(txn, game_id, 2, 3, None).await?;
+            service.submit_bid(txn, game_id, 3, 4, None).await?;
+            service.submit_bid(txn, game_id, 0, 5, None).await?; // Dealer bids last
 
             // After bidding, should be in TrumpSelection phase
             let game = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
@@ -208,10 +208,10 @@ async fn test_granular_round_progression() -> Result<(), AppError> {
             state_history.push(game.state);
 
             // Submit bids in turn order (dealer=0, so turn order is 1,2,3,0)
-            service.submit_bid(txn, game_id, 1, 5).await?;
-            service.submit_bid(txn, game_id, 2, 3).await?;
-            service.submit_bid(txn, game_id, 3, 2).await?;
-            service.submit_bid(txn, game_id, 0, 4).await?; // Dealer bids last
+            service.submit_bid(txn, game_id, 1, 5, None).await?;
+            service.submit_bid(txn, game_id, 2, 3, None).await?;
+            service.submit_bid(txn, game_id, 3, 2, None).await?;
+            service.submit_bid(txn, game_id, 0, 4, None).await?; // Dealer bids last
 
             let game = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
             state_history.push(game.state);
@@ -317,7 +317,7 @@ async fn test_invalid_bid_fails() -> Result<(), AppError> {
             service.deal_round(txn, game_id).await?;
 
             // Try to submit an invalid bid (> hand_size)
-            let result = service.submit_bid(txn, game_id, 1, 100).await;
+            let result = service.submit_bid(txn, game_id, 1, 100, None).await;
 
             assert!(result.is_err(), "Invalid bid should fail");
 
@@ -356,7 +356,7 @@ async fn test_out_of_turn_bid_fails() -> Result<(), AppError> {
 
             // Try to submit a bid for player 2 when it's player 0's turn
             // (Assuming turn starts at player 0 or dealer+1)
-            let result = service.submit_bid(txn, game_id, 2, 5).await;
+            let result = service.submit_bid(txn, game_id, 2, 5, None).await;
 
             // This should fail (assuming turn order enforcement is implemented)
             // If not yet implemented, this test will fail and guide implementation
@@ -393,7 +393,7 @@ async fn test_bid_in_wrong_phase_fails() -> Result<(), AppError> {
             let service = GameFlowService;
 
             // Try to bid without dealing first (still in Lobby)
-            let result = service.submit_bid(txn, game_id, 1, 5).await;
+            let result = service.submit_bid(txn, game_id, 1, 5, None).await;
 
             assert!(result.is_err(), "Bid in Lobby phase should fail");
 

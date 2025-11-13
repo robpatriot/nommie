@@ -6,26 +6,37 @@ use crate::adapters::games_sea::{self, GameUpdateRound, GameUpdateState};
 use crate::domain::bidding::{validate_consecutive_zero_bids, Bid};
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::{card_beats, Card, Suit};
+use crate::entities::games;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
-use crate::errors::domain::{DomainError, ValidationKind};
+use crate::errors::domain::{ConflictKind, DomainError, ValidationKind};
 use crate::repos::{bids, plays, rounds, tricks};
 
 impl GameFlowService {
     /// Submit a bid for a player in the current round.
     ///
     /// Public method that records the bid and processes game state (transitions + AI).
+    ///
+    /// # Parameters
+    /// - `expected_lock_version`: If provided, validates that the game's current lock_version matches
+    ///   this value. If not provided, uses the lock_version from the database (backward compatibility).
+    ///
+    /// # Returns
+    /// Returns the updated game model with the new lock_version after the mutation.
     pub async fn submit_bid(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: i16,
         bid_value: u8,
-    ) -> Result<(), AppError> {
-        self.submit_bid_internal(txn, game_id, player_seat, bid_value)
+        expected_lock_version: Option<i32>,
+    ) -> Result<games::Model, AppError> {
+        self.submit_bid_internal(txn, game_id, player_seat, bid_value, expected_lock_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
-        Ok(())
+        // Reload game after state processing to get final lock_version
+        let final_game = games_sea::require_game(txn, game_id).await?;
+        Ok(final_game)
     }
 
     /// Internal bid submission - just records the bid without processing.
@@ -43,11 +54,26 @@ impl GameFlowService {
         game_id: i64,
         player_seat: i16,
         bid_value: u8,
-    ) -> Result<(), AppError> {
+        expected_lock_version: Option<i32>,
+    ) -> Result<games::Model, AppError> {
         debug!(game_id, player_seat, bid_value, "Submitting bid");
 
         // Load game
         let game = games_sea::require_game(txn, game_id).await?;
+
+        // Validate lock version if provided (optimistic locking)
+        if let Some(expected_version) = expected_lock_version {
+            if game.lock_version != expected_version {
+                return Err(DomainError::conflict(
+                    ConflictKind::OptimisticLock,
+                    format!(
+                        "Resource was modified concurrently (expected version {}, actual version {}). Please refresh and retry.",
+                        expected_version, game.lock_version
+                    ),
+                )
+                .into());
+            }
+        }
 
         if game.state != DbGameState::Bidding {
             return Err(DomainError::validation(
@@ -143,27 +169,38 @@ impl GameFlowService {
 
         // Bump lock_version on game to reflect bid state change
         // This ensures each bid increments the version, not just state transitions
-        let updated_game = games_sea::require_game(txn, game_id).await?;
-        let lock_bump = GameUpdateRound::new(game_id, updated_game.lock_version);
-        games_sea::update_round(txn, lock_bump).await?;
+        // Use expected_lock_version if provided, otherwise use the current lock_version from the game
+        let lock_version_to_use = expected_lock_version.unwrap_or(game.lock_version);
+        let lock_bump = GameUpdateRound::new(game_id, lock_version_to_use);
+        let updated_game = games_sea::update_round(txn, lock_bump).await?;
 
-        Ok(())
+        Ok(updated_game)
     }
 
     /// Set trump for the current round.
     ///
     /// Public method that sets trump and processes game state (transitions + AI).
+    ///
+    /// # Parameters
+    /// - `expected_lock_version`: If provided, validates that the game's current lock_version matches
+    ///   this value. If not provided, uses the lock_version from the database (backward compatibility).
+    ///
+    /// # Returns
+    /// Returns the updated game model with the new lock_version after the mutation and state transitions.
     pub async fn set_trump(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: i16,
         trump: rounds::Trump,
-    ) -> Result<(), AppError> {
-        self.set_trump_internal(txn, game_id, player_seat, trump)
+        expected_lock_version: Option<i32>,
+    ) -> Result<games::Model, AppError> {
+        self.set_trump_internal(txn, game_id, player_seat, trump, expected_lock_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
-        Ok(())
+        // Reload game after state processing to get final lock_version
+        let final_game = games_sea::require_game(txn, game_id).await?;
+        Ok(final_game)
     }
 
     /// Internal trump setting - just sets trump without processing.
@@ -175,11 +212,26 @@ impl GameFlowService {
         game_id: i64,
         player_seat: i16,
         trump: rounds::Trump,
-    ) -> Result<(), AppError> {
+        expected_lock_version: Option<i32>,
+    ) -> Result<games::Model, AppError> {
         info!(game_id, player_seat, trump = ?trump, "Setting trump");
 
         // Load game
         let game = games_sea::require_game(txn, game_id).await?;
+
+        // Validate lock version if provided (optimistic locking)
+        if let Some(expected_version) = expected_lock_version {
+            if game.lock_version != expected_version {
+                return Err(DomainError::conflict(
+                    ConflictKind::OptimisticLock,
+                    format!(
+                        "Resource was modified concurrently (expected version {}, actual version {}). Please refresh and retry.",
+                        expected_version, game.lock_version
+                    ),
+                )
+                .into());
+            }
+        }
 
         if game.state != DbGameState::TrumpSelection {
             return Err(DomainError::validation(
@@ -234,23 +286,35 @@ impl GameFlowService {
             "Trump set by winning bidder"
         );
 
-        Ok(())
+        // Return the game (lock_version may be updated by state transition)
+        let updated_game = games_sea::require_game(txn, game_id).await?;
+        Ok(updated_game)
     }
 
     /// Play a card for a player in the current trick.
     ///
     /// Public method that records the card play and processes game state (transitions + AI).
+    ///
+    /// # Parameters
+    /// - `expected_lock_version`: If provided, validates that the game's current lock_version matches
+    ///   this value. If not provided, uses the lock_version from the database (backward compatibility).
+    ///
+    /// # Returns
+    /// Returns the updated game model with the new lock_version after the mutation.
     pub async fn play_card(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: i16,
         card: Card,
-    ) -> Result<(), AppError> {
-        self.play_card_internal(txn, game_id, player_seat, card)
+        expected_lock_version: Option<i32>,
+    ) -> Result<games::Model, AppError> {
+        self.play_card_internal(txn, game_id, player_seat, card, expected_lock_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
-        Ok(())
+        // Reload game after state processing to get final lock_version
+        let final_game = games_sea::require_game(txn, game_id).await?;
+        Ok(final_game)
     }
 
     /// Internal card play - just records the play without processing.
@@ -262,11 +326,26 @@ impl GameFlowService {
         game_id: i64,
         player_seat: i16,
         card: Card,
-    ) -> Result<(), AppError> {
+        expected_lock_version: Option<i32>,
+    ) -> Result<games::Model, AppError> {
         debug!(game_id, player_seat, "Playing card");
 
         // Load game
         let game = games_sea::require_game(txn, game_id).await?;
+
+        // Validate lock version if provided (optimistic locking)
+        if let Some(expected_version) = expected_lock_version {
+            if game.lock_version != expected_version {
+                return Err(DomainError::conflict(
+                    ConflictKind::OptimisticLock,
+                    format!(
+                        "Resource was modified concurrently (expected version {}, actual version {}). Please refresh and retry.",
+                        expected_version, game.lock_version
+                    ),
+                )
+                .into());
+            }
+        }
 
         if game.state != DbGameState::TrickPlay {
             return Err(DomainError::validation(
@@ -362,11 +441,12 @@ impl GameFlowService {
 
         // Bump lock_version on game to reflect card play state change
         // This ensures each card play increments the version (consistent with bid behavior)
-        let updated_game = games_sea::require_game(txn, game_id).await?;
-        let lock_bump = GameUpdateRound::new(game_id, updated_game.lock_version);
-        games_sea::update_round(txn, lock_bump).await?;
+        // Use expected_lock_version if provided, otherwise use the current lock_version from the game
+        let lock_version_to_use = expected_lock_version.unwrap_or(game.lock_version);
+        let lock_bump = GameUpdateRound::new(game_id, lock_version_to_use);
+        let updated_game = games_sea::update_round(txn, lock_bump).await?;
 
-        Ok(())
+        Ok(updated_game)
     }
 
     /// Resolve a completed trick: determine winner and advance to next trick.

@@ -74,14 +74,22 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
             // Submit bids in turn order (starting at dealer+1 = seat 2)
             // Bids: seat 2→3, seat 3→4, seat 0→2, seat 1(dealer)→2
             // Winner: seat 3 with bid=4
-            flow_service.submit_bid(txn, setup.game_id, 2, 3).await?;
-            flow_service.submit_bid(txn, setup.game_id, 3, 4).await?;
-            flow_service.submit_bid(txn, setup.game_id, 0, 2).await?;
-            flow_service.submit_bid(txn, setup.game_id, 1, 2).await?;
+            flow_service
+                .submit_bid(txn, setup.game_id, 2, 3, None)
+                .await?;
+            flow_service
+                .submit_bid(txn, setup.game_id, 3, 4, None)
+                .await?;
+            flow_service
+                .submit_bid(txn, setup.game_id, 0, 2, None)
+                .await?;
+            flow_service
+                .submit_bid(txn, setup.game_id, 1, 2, None)
+                .await?;
 
             // Set trump (winning bidder is seat 3)
             flow_service
-                .set_trump(txn, setup.game_id, 3, rounds::Trump::Spades)
+                .set_trump(txn, setup.game_id, 3, rounds::Trump::Spades, None)
                 .await?;
 
             // === ROUND 2: Verify dealer=1, first player=2 ===

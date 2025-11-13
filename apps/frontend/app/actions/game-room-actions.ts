@@ -112,6 +112,7 @@ export async function markPlayerReadyAction(
 export interface SubmitBidRequest {
   gameId: number
   bid: number
+  etag?: string
 }
 
 export async function submitBidAction(
@@ -128,7 +129,7 @@ export async function submitBidAction(
   }
 
   try {
-    await submitBid(request.gameId, bidValue)
+    await submitBid(request.gameId, bidValue, request.etag)
     return { kind: 'ok' }
   } catch (error) {
     return toErrorResult(error, 'Failed to submit bid')
@@ -138,13 +139,14 @@ export async function submitBidAction(
 export interface SelectTrumpRequest {
   gameId: number
   trump: Trump
+  etag?: string
 }
 
 export async function selectTrumpAction(
   request: SelectTrumpRequest
 ): Promise<SimpleActionResult> {
   try {
-    await selectTrump(request.gameId, request.trump)
+    await selectTrump(request.gameId, request.trump, request.etag)
     return { kind: 'ok' }
   } catch (error) {
     return toErrorResult(error, 'Failed to select trump')
@@ -154,6 +156,7 @@ export async function selectTrumpAction(
 export interface SubmitPlayRequest {
   gameId: number
   card: string
+  etag?: string
 }
 
 export async function submitPlayAction(
@@ -171,7 +174,7 @@ export async function submitPlayAction(
   }
 
   try {
-    await submitPlay(request.gameId, card)
+    await submitPlay(request.gameId, card, request.etag)
     return { kind: 'ok' }
   } catch (error) {
     return toErrorResult(error, 'Failed to play card')

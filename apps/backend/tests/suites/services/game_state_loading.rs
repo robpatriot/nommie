@@ -283,7 +283,7 @@ async fn test_load_state_removes_played_cards_from_hands() -> Result<(), AppErro
             let card_to_play = initial_state.hands[acting_seat as usize][0];
 
             flow_service
-                .play_card(txn, setup.game_id, acting_seat as i16, card_to_play)
+                .play_card(txn, setup.game_id, acting_seat as i16, card_to_play, None)
                 .await?;
 
             let updated_state = game_service.load_game_state(txn, setup.game_id).await?;
@@ -320,10 +320,18 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
             let game_service = GameService;
 
             // Complete one full round (Round 1: dealer at seat 0, bidding starts at seat 1)
-            flow_service.submit_bid(txn, setup.game_id, 1, 3).await?;
-            flow_service.submit_bid(txn, setup.game_id, 2, 2).await?;
-            flow_service.submit_bid(txn, setup.game_id, 3, 0).await?;
-            flow_service.submit_bid(txn, setup.game_id, 0, 7).await?; // Dealer
+            flow_service
+                .submit_bid(txn, setup.game_id, 1, 3, None)
+                .await?;
+            flow_service
+                .submit_bid(txn, setup.game_id, 2, 2, None)
+                .await?;
+            flow_service
+                .submit_bid(txn, setup.game_id, 3, 0, None)
+                .await?;
+            flow_service
+                .submit_bid(txn, setup.game_id, 0, 7, None)
+                .await?; // Dealer
 
             // Tricks: P0 wins 7, P1 wins 3, P2 wins 2, P3 wins 1
             create_tricks_by_winner_counts(txn, setup.round_id, [7, 3, 2, 1]).await?;

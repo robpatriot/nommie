@@ -336,14 +336,21 @@ export function GameRoomClient({
       setActivity({ type: 'action', action: 'bid' })
 
       try {
-        await executeApiAction(() => submitBidAction({ gameId, bid }), {
+        await executeApiAction(() => submitBidAction({ gameId, bid, etag }), {
           successMessage: 'Bid submitted',
         })
       } finally {
         await completeActionAndRefresh()
       }
     },
-    [gameId, isBidPending, isIdle, executeApiAction, completeActionAndRefresh]
+    [
+      gameId,
+      etag,
+      isBidPending,
+      isIdle,
+      executeApiAction,
+      completeActionAndRefresh,
+    ]
   )
 
   const handleSelectTrump = useCallback(
@@ -355,14 +362,24 @@ export function GameRoomClient({
       setActivity({ type: 'action', action: 'trump' })
 
       try {
-        await executeApiAction(() => selectTrumpAction({ gameId, trump }), {
-          successMessage: 'Trump selected',
-        })
+        await executeApiAction(
+          () => selectTrumpAction({ gameId, trump, etag }),
+          {
+            successMessage: 'Trump selected',
+          }
+        )
       } finally {
         await completeActionAndRefresh()
       }
     },
-    [gameId, isTrumpPending, isIdle, executeApiAction, completeActionAndRefresh]
+    [
+      gameId,
+      etag,
+      isTrumpPending,
+      isIdle,
+      executeApiAction,
+      completeActionAndRefresh,
+    ]
   )
 
   const handlePlayCard = useCallback(
@@ -374,14 +391,21 @@ export function GameRoomClient({
       setActivity({ type: 'action', action: 'play' })
 
       try {
-        await executeApiAction(() => submitPlayAction({ gameId, card }), {
+        await executeApiAction(() => submitPlayAction({ gameId, card, etag }), {
           successMessage: 'Card played',
         })
       } finally {
         await completeActionAndRefresh()
       }
     },
-    [gameId, isPlayPending, isIdle, executeApiAction, completeActionAndRefresh]
+    [
+      gameId,
+      etag,
+      isPlayPending,
+      isIdle,
+      executeApiAction,
+      completeActionAndRefresh,
+    ]
   )
 
   const viewerSeatForInteractions =

@@ -35,7 +35,7 @@ async fn test_submit_bid_rejects_wrong_phase() -> Result<(), AppError> {
                 .game_id;
 
             let service = GameFlowService;
-            let result = service.submit_bid(txn, game_id, 1, 5).await;
+            let result = service.submit_bid(txn, game_id, 1, 5, None).await;
 
             assert!(result.is_err());
             let err = result.unwrap_err();
@@ -68,12 +68,12 @@ async fn test_dealer_bid_restriction_rejects_exact_sum() -> Result<(), AppError>
 
             // Bidding starts at dealer + 1 = seat 1
             // First 3 non-dealer players bid: 5 + 4 + 3 = 12
-            service.submit_bid(txn, setup.game_id, 1, 5).await?;
-            service.submit_bid(txn, setup.game_id, 2, 4).await?;
-            service.submit_bid(txn, setup.game_id, 3, 3).await?;
+            service.submit_bid(txn, setup.game_id, 1, 5, None).await?;
+            service.submit_bid(txn, setup.game_id, 2, 4, None).await?;
+            service.submit_bid(txn, setup.game_id, 3, 3, None).await?;
 
             // Dealer (seat 0) tries to bid 1, which would make sum = 13 (not allowed)
-            let result = service.submit_bid(txn, setup.game_id, 0, 1).await;
+            let result = service.submit_bid(txn, setup.game_id, 0, 1, None).await;
 
             assert!(result.is_err(), "Dealer bid creating exact sum should fail");
 
@@ -102,12 +102,12 @@ async fn test_dealer_bid_restriction_allows_non_exact_sum() -> Result<(), AppErr
             let service = GameFlowService;
 
             // First 3 non-dealer players bid: 5 + 4 + 3 = 12
-            service.submit_bid(txn, setup.game_id, 1, 5).await?;
-            service.submit_bid(txn, setup.game_id, 2, 4).await?;
-            service.submit_bid(txn, setup.game_id, 3, 3).await?;
+            service.submit_bid(txn, setup.game_id, 1, 5, None).await?;
+            service.submit_bid(txn, setup.game_id, 2, 4, None).await?;
+            service.submit_bid(txn, setup.game_id, 3, 3, None).await?;
 
             // Dealer (seat 0) bids 0 (sum = 12, OK)
-            let result = service.submit_bid(txn, setup.game_id, 0, 0).await;
+            let result = service.submit_bid(txn, setup.game_id, 0, 0, None).await;
             assert!(
                 result.is_ok(),
                 "Dealer bid with sum < hand_size should succeed"
@@ -131,13 +131,13 @@ async fn test_dealer_bid_restriction_only_applies_to_dealer() -> Result<(), AppE
             let service = GameFlowService;
 
             // Non-dealer players can bid any valid value
-            service.submit_bid(txn, setup.game_id, 1, 13).await?; // Max bid OK for non-dealer
-            service.submit_bid(txn, setup.game_id, 2, 0).await?;
-            service.submit_bid(txn, setup.game_id, 3, 0).await?;
+            service.submit_bid(txn, setup.game_id, 1, 13, None).await?; // Max bid OK for non-dealer
+            service.submit_bid(txn, setup.game_id, 2, 0, None).await?;
+            service.submit_bid(txn, setup.game_id, 3, 0, None).await?;
 
             // Dealer (seat 0) must avoid bid that sums to 13
             // sum = 13 + 0 + 0 + X, so dealer cannot bid 0
-            let result = service.submit_bid(txn, setup.game_id, 0, 0).await;
+            let result = service.submit_bid(txn, setup.game_id, 0, 0, None).await;
             assert!(result.is_err(), "Dealer bid with exact sum should fail");
 
             Ok::<_, AppError>(())
@@ -174,11 +174,19 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
             let service = GameFlowService;
 
             // Bids: 0 + 1 + 0 = 1, dealer cannot bid 1 (sum would be 2)
-            service.submit_bid(txn, game_setup.game_id, 1, 0).await?;
-            service.submit_bid(txn, game_setup.game_id, 2, 1).await?;
-            service.submit_bid(txn, game_setup.game_id, 3, 0).await?;
+            service
+                .submit_bid(txn, game_setup.game_id, 1, 0, None)
+                .await?;
+            service
+                .submit_bid(txn, game_setup.game_id, 2, 1, None)
+                .await?;
+            service
+                .submit_bid(txn, game_setup.game_id, 3, 0, None)
+                .await?;
 
-            let result = service.submit_bid(txn, game_setup.game_id, 0, 1).await;
+            let result = service
+                .submit_bid(txn, game_setup.game_id, 0, 1, None)
+                .await;
             assert!(result.is_err(), "Dealer bid creating sum=2 should fail");
 
             Ok::<_, AppError>(())
@@ -212,7 +220,7 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
             );
 
             let result = service
-                .set_trump(txn, setup.game_id, 0, rounds::Trump::Hearts)
+                .set_trump(txn, setup.game_id, 0, rounds::Trump::Hearts, None)
                 .await;
 
             assert!(result.is_err());
@@ -225,12 +233,12 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
             );
 
             let result = service
-                .set_trump(txn, setup.game_id, 1, rounds::Trump::Spades)
+                .set_trump(txn, setup.game_id, 1, rounds::Trump::Spades, None)
                 .await;
             assert!(result.is_err());
 
             let result = service
-                .set_trump(txn, setup.game_id, 2, rounds::Trump::Diamonds)
+                .set_trump(txn, setup.game_id, 2, rounds::Trump::Diamonds, None)
                 .await;
             assert!(result.is_ok(), "Winning bidder should be able to set trump");
 
@@ -267,7 +275,7 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
             let service = GameFlowService;
 
             let result = service
-                .set_trump(txn, setup.game_id, 3, rounds::Trump::Hearts)
+                .set_trump(txn, setup.game_id, 3, rounds::Trump::Hearts, None)
                 .await;
             assert!(
                 result.is_err(),
@@ -275,7 +283,7 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
             );
 
             let result = service
-                .set_trump(txn, setup.game_id, 1, rounds::Trump::Clubs)
+                .set_trump(txn, setup.game_id, 1, rounds::Trump::Clubs, None)
                 .await;
             assert!(
                 result.is_ok(),
@@ -340,15 +348,17 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     for i in 0..4 {
         let seat = (dealer + 1 + i) % 4;
         let bid_value = if i < 3 { 1 } else { 0 };
-        service.submit_bid(txn, game_id, seat, bid_value).await?;
+        service
+            .submit_bid(txn, game_id, seat, bid_value, None)
+            .await?;
     }
 
     let trump_selector = (dealer + 1) % 4;
     service
-        .set_trump(txn, game_id, trump_selector, rounds::Trump::Hearts)
+        .set_trump(txn, game_id, trump_selector, rounds::Trump::Hearts, None)
         .await?;
 
-    service.play_card(txn, game_id, 0, first_card).await?;
+    service.play_card(txn, game_id, 0, first_card, None).await?;
 
     for seat in 1..4 {
         let hand = backend::repos::hands::find_by_round_and_seat(txn, round.id, seat)
@@ -358,10 +368,10 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
             &hand.cards[0].suit,
             &hand.cards[0].rank,
         )?;
-        service.play_card(txn, game_id, seat, card).await?;
+        service.play_card(txn, game_id, seat, card, None).await?;
     }
 
-    let result = service.play_card(txn, game_id, 0, first_card).await;
+    let result = service.play_card(txn, game_id, 0, first_card, None).await;
 
     match result {
         Err(AppError::Validation {

@@ -78,23 +78,50 @@ export async function markPlayerReady(gameId: number): Promise<void> {
   })
 }
 
-export async function submitBid(gameId: number, bid: number): Promise<void> {
+export async function submitBid(
+  gameId: number,
+  bid: number,
+  etag?: string
+): Promise<void> {
+  const headers: Record<string, string> = {}
+  if (etag) {
+    headers['If-Match'] = etag
+  }
   await fetchWithAuth(`/api/games/${gameId}/bid`, {
     method: 'POST',
+    headers,
     body: JSON.stringify({ bid }),
   })
 }
 
-export async function selectTrump(gameId: number, trump: Trump): Promise<void> {
+export async function selectTrump(
+  gameId: number,
+  trump: Trump,
+  etag?: string
+): Promise<void> {
+  const headers: Record<string, string> = {}
+  if (etag) {
+    headers['If-Match'] = etag
+  }
   await fetchWithAuth(`/api/games/${gameId}/trump`, {
     method: 'POST',
+    headers,
     body: JSON.stringify({ trump }),
   })
 }
 
-export async function submitPlay(gameId: number, card: string): Promise<void> {
+export async function submitPlay(
+  gameId: number,
+  card: string,
+  etag?: string
+): Promise<void> {
+  const headers: Record<string, string> = {}
+  if (etag) {
+    headers['If-Match'] = etag
+  }
   await fetchWithAuth(`/api/games/${gameId}/play`, {
     method: 'POST',
+    headers,
     body: JSON.stringify({ card }),
   })
 }

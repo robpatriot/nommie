@@ -292,7 +292,7 @@ impl GameFlowService {
                     let bid = ai.choose_bid(&state, &game_context)?;
                     // Use internal version to avoid recursion (loop handles processing)
                     // Service loads its own validation data (trust boundary)
-                    self.submit_bid_internal(txn, game.id, player_seat, bid)
+                    self.submit_bid_internal(txn, game.id, player_seat, bid, None)
                         .await
                 }
                 ActionType::Trump => {
@@ -306,19 +306,19 @@ impl GameFlowService {
                         crate::domain::Trump::NoTrump => rounds::Trump::NoTrump,
                     };
                     // Use internal version to avoid recursion (loop handles processing)
-                    self.set_trump_internal(txn, game.id, player_seat, trump)
+                    self.set_trump_internal(txn, game.id, player_seat, trump, None)
                         .await
                 }
                 ActionType::Play => {
                     let card = ai.choose_play(&state, &game_context)?;
                     // Use internal version to avoid recursion (loop handles processing)
-                    self.play_card_internal(txn, game.id, player_seat, card)
+                    self.play_card_internal(txn, game.id, player_seat, card, None)
                         .await
                 }
             };
 
             match result {
-                Ok(()) => {
+                Ok(_) => {
                     info!(
                         game.id,
                         player_seat,
