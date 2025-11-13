@@ -4,6 +4,16 @@
 Nommie is a web-based, multiplayer version of **Nomination Whist** (with our house rules).
 The system is **full-stack** and **Docker-first**, with a clean split between frontend, backend, and database.
 
+### Scope & Audience
+- **Use this document** when you need the high-level architecture, core technologies, and guiding principles.
+- **See specialised deep dives** for implementation details:
+  - `docs/game-context-architecture.md` — end-to-end `GameContext` flow and caching.
+  - `docs/error-handling.md` — error taxonomy and Problem Details responses.
+  - `docs/in-memory-game-engine.md` — simulation architecture for AI training.
+  - `docs/testing.md` — backend harness, DB guardrails, and execution patterns.
+
+These references keep deeper topics self-contained and avoid repeating the same guidance in multiple places.
+
 ---
 
 ## 🎨 Frontend

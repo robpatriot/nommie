@@ -24,6 +24,24 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 
 > Tip: If a shell is new, re-source env: `set -a; . ./.env; set +a`
 
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [`docs/architecture.md`](docs/architecture.md) | High-level walkthrough of the full stack, environments, and guiding principles. |
+| [`docs/game-context-architecture.md`](docs/game-context-architecture.md) | Deep dive on `GameContext`, request caching, and service trust boundaries. |
+| [`docs/ai-implementation-guide.md`](docs/ai-implementation-guide.md) | End-to-end onboarding for AI authors, including data access patterns and best practices. |
+| [`docs/error-handling.md`](docs/error-handling.md) | RFC 7807 error model, domain ↔ HTTP mapping, and repository conventions. |
+| [`docs/game-snapshot-contract.md`](docs/game-snapshot-contract.md) | Canonical wire contract for the frontend game snapshot API. |
+| [`docs/in-memory-game-engine.md`](docs/in-memory-game-engine.md) | Blueprint for the high-speed simulation engine used in AI training. |
+| [`docs/testing.md`](docs/testing.md) | Backend test harness, database guardrails, and execution commands. |
+| [`docs/frontend-theme.md`](docs/frontend-theme.md) | Tailwind token architecture, theme switching, and extension guidelines. |
+| [`docs/milestones.md`](docs/milestones.md) | Cross-team roadmap covering backend, infrastructure, and delivery milestones. |
+| [`docs/ui-roadmap.md`](docs/ui-roadmap.md) | Detailed product and UX plan for the web (and future mobile) clients. |
+| [`docs/rules.md`](docs/rules.md) | Authoritative ruleset for the Nommie (Nomination Whist) implementation. |
+
+All documents use lowercase kebab-case filenames for consistency.
+
 ## Environment
 
 We don't store `DATABASE_URL`. We store **parts** in `.env` and construct URLs in code.
@@ -269,12 +287,6 @@ Use these logs to:
 ## 🗺️ Roadmap
 Milestone-driven: setup → core game loop → AI → polish.  
 👉 See [Milestones](docs/milestones.md).
-
----
-
-## 🎲 Game Rules
-Gameplay house rules.  
-👉 See [Game Rules](docs/game-rules.md).
 
 ---
 

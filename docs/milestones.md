@@ -3,6 +3,12 @@
 This document outlines Nommie’s development path:
 Core milestones first, then optional and enhancement tracks that can be implemented at any time.
 
+## Scope
+
+- **Audience:** Cross-functional planning across backend, infrastructure, and gameplay.
+- **Frontend detail:** For UX- and UI-specific sequencing, refer to `docs/ui-roadmap.md`.
+- **Status tracking:** Progress indicators here complement (but do not replace) the detailed progress log maintained in the UI roadmap.
+
 ---
 
 ## Core Milestones

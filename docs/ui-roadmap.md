@@ -2,6 +2,12 @@
 
 This document is the canonical, living plan for building the Nommie UI on web (Next.js) and, later, a mobile client. It captures stages, decisions, endpoints, and a lightweight progress log so work can continue seamlessly across machines.
 
+### Scope
+
+- **Audience:** Product, design, and frontend engineers working on the user experience.
+- **Relation to milestones:** Use together with `docs/milestones.md`, which covers cross-team delivery and infrastructure sequencing.
+- **Out of scope:** Backend architecture decisions (see `docs/architecture.md`) and AI training plans (see `docs/in-memory-game-engine.md`).
+
 ### Stack (confirmed)
 - **Web**: Next.js App Router (`apps/frontend`), server components + server actions, Tailwind CSS
 - **Auth**: NextAuth (Google) on web; backend JWT stored server-only in NextAuth JWT token (never exposed to client), resolved via `resolveBackendJwt()` and `requireBackendJwt()` helpers in server components/actions; proactive refresh within 5 minutes of expiry

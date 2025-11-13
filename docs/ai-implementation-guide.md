@@ -24,6 +24,8 @@ This guide explains how to build AI players for **Nommie** (Nomination Whist). I
 
 ## Game Rules
 
+> For the full canonical ruleset, read `docs/rules.md`. The summary below highlights the enforcement points that most often impact AI implementations.
+
 Nommie is a 4-player trick‑taking game with bidding.
 
 ### Players & Setup

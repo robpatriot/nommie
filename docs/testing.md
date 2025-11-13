@@ -2,6 +2,12 @@
 
 This document describes the testing setup for the Nommie backend.
 
+## Scope
+
+- **Focus:** Backend test harness, database policy, and execution tooling.
+- **Complementary docs:** See `docs/error-handling.md` for the error taxonomy exercised in tests and `docs/milestones.md` for roadmap-driven testing milestones.
+- **Frontend testing:** Covered separately in the UI roadmap and frontend repository docs.
+
 ## Database Environment Policy
 
 ### Code Requirements

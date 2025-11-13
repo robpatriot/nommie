@@ -3,6 +3,12 @@
 **Purpose:**
 Canonical, read-only view of a game for the frontend. This is the single source of truth for rendering and client-side logic.
 
+## Scope
+
+- **Audience:** Frontend and API engineers consuming or shaping the snapshot response.
+- **Related specs:** Pair with `docs/ui-roadmap.md` for UX expectations and `docs/architecture.md` for backend layering context.
+- **Out of scope:** AI-facing state (`docs/ai-implementation-guide.md`) and persistence flow (`docs/game-context-architecture.md`).
+
 ---
 
 ## Root Shape

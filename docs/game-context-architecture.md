@@ -1,5 +1,11 @@
 # GameContext Architecture
 
+## Scope
+
+- **Purpose:** Explain how `GameContext` is constructed, cached, and consumed across HTTP handlers, services, and AI orchestration.
+- **Read first:** `docs/architecture.md` for the platform overview and technology stack.
+- **Adjacent documents:** `docs/error-handling.md` covers error propagation, while `docs/ai-implementation-guide.md` shows how AI code consumes the context.
+
 ## Overview
 
 This document describes the unified `GameContext` architecture that consolidates game-wide and player-specific state into a single cohesive structure used by both HTTP handlers and AI systems.

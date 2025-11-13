@@ -4,6 +4,9 @@
 
 Fast in-memory game simulation for AI training, bypassing database persistence entirely.
 
+- Complements the runtime AI API described in `docs/ai-implementation-guide.md`.
+- Shares domain primitives with the production architecture outlined in `docs/game-context-architecture.md`.
+
 **Target Performance:** 10-30ms per game (vs 9.15s with DB = **300-900x speedup**)
 
 **Use Case:** AI training requiring 10k-100k game simulations
