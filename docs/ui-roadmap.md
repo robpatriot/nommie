@@ -495,8 +495,8 @@ This section captures identified improvements across four categories: functional
     - ✅ `lib/retry.test.ts` - Tests for network error retry logic with exponential backoff (29 tests)
     - ✅ `components/ErrorBoundary.test.tsx` - Tests for error boundary component (9 tests)
   - ✅ **COMPLETED**: Fixed existing tests (`game-room-view.test.tsx`) to match updated aria-labels and accessibility attributes
-  - ✅ **COMPLETED**: All 77 tests passing (7 test files covering critical paths, error handling, retry logic, and components)
-  - Limited test files for complex components (`game-room-client.tsx` still needs tests)
+  - ✅ **COMPLETED**: Added comprehensive tests for `game-room-client.tsx` (22 tests covering state management, polling, refresh logic, actions, and error handling)
+  - ✅ **COMPLETED**: All 99 tests passing (8 test files covering critical paths, error handling, retry logic, components, and complex state management)
   - Existing tests: `AuthControl.test.tsx`, `game-room-view.test.tsx`, `game-snapshot.test.ts`
 - Documentation:
   - ✅ **IMPROVED**: Added JSDoc comments for `executeRefresh` and `requestRefresh` functions
@@ -519,11 +519,11 @@ This section captures identified improvements across four categories: functional
 
 **Recommendations:**
 - Add React Query or SWR for better caching and request deduplication
-- ✅ **COMPLETED**: Increase test coverage (especially for error paths) — Added 59 tests for API error parsing, action helpers, retry logic, and ErrorBoundary. Fixed existing tests to match updated aria-labels. All 77 tests passing.
+- ✅ **COMPLETED**: Increase test coverage (especially for error paths) — Added 81 tests total: 59 for API error parsing, action helpers, retry logic, and ErrorBoundary; 22 for game-room-client state management. Fixed existing tests to match updated aria-labels. All 99 tests passing.
 - ✅ Code splitting for game room route — **COMPLETED** (Next.js App Router handles route-level code splitting automatically)
 - Use `useMemo` and `useCallback` more strategically to prevent unnecessary re-renders
 - Consider using a reducer for `game-room-client.tsx` state management
-- Add tests for `game-room-client.tsx` complex state management and polling logic
+- ✅ **COMPLETED**: Add tests for `game-room-client.tsx` complex state management and polling logic — Added 22 comprehensive tests covering activity state, polling behavior, refresh logic, action handlers, error handling, and edge cases
 
 ### Priority Summary
 
@@ -551,7 +551,7 @@ This section captures identified improvements across four categories: functional
 
 **Low Priority:**
 1. ✅ Add code splitting — **COMPLETED** (Next.js App Router handles route-level code splitting automatically)
-2. ✅ **COMPLETED**: Improve test coverage — Added 59 tests for critical utility functions (API error parsing, action helpers, retry logic, ErrorBoundary). Fixed existing tests to match updated aria-labels. All 77 tests passing (7 test files).
+2. ✅ **COMPLETED**: Improve test coverage — Added 81 tests total: 59 for critical utility functions (API error parsing, action helpers, retry logic, ErrorBoundary); 22 for game-room-client state management, polling, and actions. Fixed existing tests to match updated aria-labels. All 99 tests passing (8 test files).
 3. Add JSDoc documentation
 4. Enhance accessibility
 5. Consider state management library (Redux/Zustand) for complex game state
