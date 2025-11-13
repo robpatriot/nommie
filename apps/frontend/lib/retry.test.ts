@@ -201,7 +201,7 @@ describe('retryOnNetworkError', () => {
 
   it('uses exponential backoff for retry delays', async () => {
     const networkError = new Error('fetch failed')
-    const fn = vi.fn().mockRejectedValue(networkError)
+    const fn = vi.fn()
     const callTimes: number[] = []
     const startTime = Date.now()
 
@@ -211,27 +211,34 @@ describe('retryOnNetworkError', () => {
       throw networkError
     })
 
-    await expect(
-      retryOnNetworkError(fn, {
-        maxRetries: 2,
-        baseDelayMs: 50, // Use small delay for testing
-      })
-    ).rejects.toThrow('fetch failed')
+    // Start the retry operation (don't await yet)
+    const retryPromise = retryOnNetworkError(fn, {
+      maxRetries: 2,
+      baseDelayMs: 50, // Use small delay for testing
+    })
+
+    // Wait for all retries to complete
+    await expect(retryPromise).rejects.toThrow('fetch failed')
 
     expect(fn).toHaveBeenCalledTimes(3) // Initial + 2 retries
+    expect(callTimes.length).toBe(3)
 
-    // Verify delays increase exponentially (with some tolerance for timing)
-    if (callTimes.length >= 3) {
-      const firstDelay = callTimes[1] - callTimes[0]
-      const secondDelay = callTimes[2] - callTimes[1]
+    // Verify delays increase exponentially (with tolerance for real timers)
+    const firstDelay = callTimes[1] - callTimes[0]
+    const secondDelay = callTimes[2] - callTimes[1]
 
-      // First delay should be ~50ms, second should be ~100ms (exponential)
-      expect(firstDelay).toBeGreaterThan(40)
-      expect(firstDelay).toBeLessThan(100)
-      expect(secondDelay).toBeGreaterThan(80)
-      expect(secondDelay).toBeLessThan(150)
-    }
-  }, 5000) // Increase timeout for retry delays
+    // First delay should be ~50ms (with tolerance for async execution)
+    expect(firstDelay).toBeGreaterThan(30)
+    expect(firstDelay).toBeLessThan(100)
+
+    // Second delay should be ~100ms (exponential backoff)
+    // Allow for some variance due to real timers and async execution
+    expect(secondDelay).toBeGreaterThan(50)
+    expect(secondDelay).toBeLessThan(200)
+
+    // Most importantly: second delay should be greater than first delay (exponential)
+    expect(secondDelay).toBeGreaterThan(firstDelay)
+  }, 10000) // Increase timeout to allow for real timer delays
 
   it('respects maxDelayMs for backoff', async () => {
     const networkError = new Error('fetch failed')

@@ -79,7 +79,8 @@ function createInitialData(
 describe('GameRoomClient', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    // Use real timers by default - fake timers break waitFor
+    // Use real timers by default - userEvent and waitFor need real timers
+    // Individual tests can switch to fake timers for timing-specific tests
     vi.useRealTimers()
 
     // Default mock implementations
@@ -112,6 +113,7 @@ describe('GameRoomClient', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.clearAllTimers()
   })
 
   describe('Initialization', () => {
@@ -148,33 +150,35 @@ describe('GameRoomClient', () => {
   describe('Polling behavior', () => {
     it('polls at configured interval when idle', async () => {
       vi.useFakeTimers()
-      const initialData = createInitialData()
-      const pollingMs = 1000
+      try {
+        const initialData = createInitialData()
+        const pollingMs = 1000
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={pollingMs}
-        />
-      )
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={pollingMs}
+          />
+        )
 
-      // Initial render should not trigger poll immediately
-      expect(mockGetGameRoomSnapshotAction).not.toHaveBeenCalled()
+        // Initial render should not trigger poll immediately
+        expect(mockGetGameRoomSnapshotAction).not.toHaveBeenCalled()
 
-      // Advance timer by polling interval
-      await vi.advanceTimersByTimeAsync(pollingMs)
+        // Advance timer by polling interval
+        await vi.advanceTimersByTimeAsync(pollingMs)
 
-      // Should have polled once
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
+        // Should have polled once
+        expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
 
-      // Advance timer again
-      await vi.advanceTimersByTimeAsync(pollingMs)
+        // Advance timer again
+        await vi.advanceTimersByTimeAsync(pollingMs)
 
-      // Should have polled again
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(2)
-
-      vi.useRealTimers()
+        // Should have polled again
+        expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(2)
+      } finally {
+        vi.useRealTimers()
+      }
     })
 
     it('skips polling when activity is not idle', async () => {
@@ -218,32 +222,34 @@ describe('GameRoomClient', () => {
 
     it('cleans up polling interval on unmount', async () => {
       vi.useFakeTimers()
-      const initialData = createInitialData()
-      const pollingMs = 1000
+      try {
+        const initialData = createInitialData()
+        const pollingMs = 1000
 
-      const { unmount } = render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={pollingMs}
-        />
-      )
+        const { unmount } = render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={pollingMs}
+          />
+        )
 
-      // Advance timer once
-      await vi.advanceTimersByTimeAsync(pollingMs)
+        // Advance timer once
+        await vi.advanceTimersByTimeAsync(pollingMs)
 
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
+        expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
 
-      // Unmount component
-      unmount()
+        // Unmount component
+        unmount()
 
-      // Advance timer again - should not poll after unmount
-      await vi.advanceTimersByTimeAsync(pollingMs)
+        // Advance timer again - should not poll after unmount
+        await vi.advanceTimersByTimeAsync(pollingMs)
 
-      // Should still be only 1 call
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
-
-      vi.useRealTimers()
+        // Should still be only 1 call
+        expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 
