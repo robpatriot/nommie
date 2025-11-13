@@ -173,7 +173,8 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 - Architecture & Context: `docs/architecture-overview.md` (stack baseline), `docs/architecture-game-context.md` (request-scoped context model)
 - Backend Operations: `docs/backend-error-handling.md` (RFC 7807 layers), `docs/backend-testing-guide.md` (DB harness & safeguards), `docs/backend-in-memory-game-engine.md` (AI simulation loop)
 - Gameplay & AI: `docs/game-rules.md` (canonical rules), `docs/ai-player-implementation-guide.md` (production AI contract), `docs/game-snapshot-contract.md` (client payload shape)
-- Frontend Experience: `docs/frontend-ui-roadmap.md` (UI delivery stages), `docs/frontend-theme-system.md` (semantic theme tokens)
+- Frontend Experience: `docs/frontend-theme-system.md` (semantic theme tokens)
+- WIP Scratchpad: `dev-roadmap.md` (UI roadmap & improvement log)
 - Delivery & Planning: `docs/project-milestones.md` (milestone tracking & optional enhancements)
 
 ---

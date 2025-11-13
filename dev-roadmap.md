@@ -1,29 +1,27 @@
-## Nommie UI Roadmap
+# Dev Roadmap (WIP)
 
-### Document Scope
+## UI Roadmap
 
-Sequenced plan for the web (and later mobile) experience. Pairs with
-`frontend-theme-system.md` for styling constraints, `game-snapshot-contract.md`
-for data requirements, and `project-milestones.md` for cross-team alignment.
+### Nommie UI Roadmap
 
 This document is the canonical, living plan for building the Nommie UI on web (Next.js) and, later, a mobile client. It captures stages, decisions, endpoints, and a lightweight progress log so work can continue seamlessly across machines.
 
-### Stack (confirmed)
+#### Stack (confirmed)
 - **Web**: Next.js App Router (`apps/frontend`), server components + server actions, Tailwind CSS
 - **Auth**: NextAuth (Google) on web; backend JWT stored server-only in NextAuth JWT token (never exposed to client), resolved via `resolveBackendJwt()` and `requireBackendJwt()` helpers in server components/actions; proactive refresh within 5 minutes of expiry
 - **Backend**: Rust service with DB; REST endpoints consumed from web using `NEXT_PUBLIC_BACKEND_BASE_URL`
 
-### Product scope (initial)
+#### Product scope (initial)
 - Multiplayer Nomination Whist ("Nommie")
 - Flows: landing → auth → lobby → game room → in-game table (bidding, trick play, scoring) → summary
 
 ---
 
-## Staged Plan
+### Staged Plan
 
 Each stage has learning goals, deliverables, and a concise definition of done (DoD).
 
-### Stage 0 — Align and prepare
+#### Stage 0 — Align and prepare
 - Learning goals: how web talks to backend; server vs client components
 - Deliverables:
   - Simple wireframes for Lobby and Game Room
@@ -31,7 +29,7 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
   - Endpoint shortlist for MVP
 - DoD: one-page sketch + endpoint list committed alongside this doc
 
-### Stage 1 — App shell and routing (web)
+#### Stage 1 — App shell and routing (web)
 - Learning goals: Next.js App Router, protected pages, basic navigation
 - Deliverables:
   - Root route `/`: Welcome page (login button) for non-authenticated; redirect to `/lobby` for authenticated
@@ -39,7 +37,7 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
   - `Header` shows auth state; Google sign-in required; link to Lobby when signed in; "Resume last game" CTA (via backend `last-active`)
 - DoD: Navigate `/` → `/lobby` → `/game/[gameId]` with placeholder content
 
-### Stage 2 — Read-only lobby
+#### Stage 2 — Read-only lobby
 - Learning goals: server data fetching, loading/empty/error states, manual refresh
 - Deliverables:
   - Two lists:
@@ -50,7 +48,7 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
   - Empty state + loading skeleton + error banner + refresh button
 - DoD: Stable read-only game list, verifiable with backend data
 
-### Stage 3 — Create and join game
+#### Stage 3 — Create and join game
 - Learning goals: server actions vs API calls; form handling; error surfacing
 - Deliverables:
   - Create Game modal (minimal inputs):
@@ -60,7 +58,7 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
   - Toaster + expandable error details; `traceId` hidden until expanded; log `traceId` in dev
 - DoD: Create → redirect to game page; join from lobby works
 
-### Stage 4 — Read-only game room and table snapshot
+#### Stage 4 — Read-only game room and table snapshot
 - Learning goals: map domain to UI components; phased rendering
 - Deliverables:
   - Render phase, seats/players, hand snapshot (no interactions)
@@ -71,7 +69,7 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
   - Subtle polling indicator near Phase/Turn (e.g., syncing dot with tooltip/`aria-live="off"`)
 - DoD: Page reflects backend state changes without interactions
 
-### Stage 5 — Core interactions: ready, start, bid, play
+#### Stage 5 — Core interactions: ready, start, bid, play
 - Learning goals: pessimistic writes, legal moves gating, robust error handling
 - Deliverables:
   - Ready (no unready); AI auto-ready; auto-start when all players are ready
@@ -80,7 +78,7 @@ Each stage has learning goals, deliverables, and a concise definition of done (D
   - Host-only: add/remove AI seats before start (clearly labeled), up to 4 total players
 - DoD: Two browser sessions can play through a round
 
-### Stage 6 — UX fit and accessibility
+#### Stage 6 — UX fit and accessibility
 - Learning goals: keyboard-first play, ARIA, motion for feedback
 - Deliverables:
   - Keyboard selection/submit for cards
@@ -109,7 +107,7 @@ Detailed UX spec (MVP)
   - Motion: 150–200ms ease-out for play/trick-win; subtle elevation/pulse for active turn.
   - Errors: Toast summary; details panel with server message and `traceId` link.
 
-### Stage 7 — Mobile foundations (Expo)
+#### Stage 7 — Mobile foundations (Expo)
 - Learning goals: React Native/Expo basics; shared types and API
 - Deliverables:
   - `apps/mobile` (Expo) scaffold
@@ -117,7 +115,7 @@ Detailed UX spec (MVP)
   - Read-only lobby list screen
 - DoD: Lobby list works on emulator/device against same backend
 
-### Stage 8 — Mobile game: read-only then interactions
+#### Stage 8 — Mobile game: read-only then interactions
 - Learning goals: mobile layouts/gestures; simplified table UI
 - Deliverables:
   - Render simplified game snapshot; then bid/play with pessimistic writes
@@ -125,7 +123,7 @@ Detailed UX spec (MVP)
 
 ---
 
-## Endpoints (initial target set)
+### Endpoints (initial target set)
 Note: Align with backend routes; adjust names/paths as needed.
 - Auth/session: frontend uses NextAuth; backend JWT stored server-only in NextAuth JWT token, resolved via `resolveBackendJwt()` and enforced with `requireBackendJwt()` in server components/actions; proactive refresh within 5 minutes of expiry
 - Games:
@@ -149,7 +147,7 @@ Error model: Use `BackendApiError` on the frontend; `traceId` available in detai
 
 ---
 
-## Decisions
+### Decisions
 - Transport: Start with polling (manual → simple interval). Keep update orchestration isolated to swap in SSE/WS later.
 - Caching: Keep minimal at first; introduce TanStack Query only if complexity grows.
 - Optimism: Pessimistic writes for moves/bids; optimistic only for non-critical toggles.
@@ -180,12 +178,12 @@ Error model: Use `BackendApiError` on the frontend; `traceId` available in detai
  - Lobby search/filter (MVP): Client-side only; can upgrade to backend query if needed.
  - Root route (`/`): Welcome page with login for non-authenticated; redirect to `/lobby` for authenticated.
 
-## Open Questions
+### Open Questions
 - (All Stage 0 questions resolved — see Decisions section above)
 
 ---
 
-## Progress Tracker
+### Progress Tracker
 Use checkboxes to mark completion. Add brief notes/dates.
 
 - [x] Stage 0 — Align and prepare
@@ -230,7 +228,7 @@ Use checkboxes to mark completion. Add brief notes/dates.
 
 ---
 
-## Working Notes
+### Working Notes
 - Environment: ensure `NEXT_PUBLIC_BACKEND_BASE_URL` is set locally; keep `.env` out of git; maintain `.env.example` with placeholders.
 - Data sync: Prefer manual refresh initially; add interval polling with conservative cadence (lobby slower, active turn faster).
 - Testing: Start with a pair of browser tabs; later, add a small E2E for create→join→bid→play→score.
@@ -253,16 +251,16 @@ Use checkboxes to mark completion. Add brief notes/dates.
 
 ---
 
-## Stage 0 – Wireframing Guide (temporary scaffolding)
+### Stage 0 – Wireframing Guide (temporary scaffolding)
 
 This section is a step-by-step helper to create first wireframes. We will replace it with your own notes once you draft them.
 
-### Step 1: Pick your tool (1–2 minutes)
+#### Step 1: Pick your tool (1–2 minutes)
 - Pen and paper, or
 - Text-only description to paste below, or
 - Simple box tool (Excalidraw/FigJam), optional.
 
-### Step 2: Wireframe the Lobby (5–10 minutes)
+#### Step 2: Wireframe the Lobby (5–10 minutes)
 Describe sections top-to-bottom and fill the template.
 
 - Header:
@@ -291,7 +289,7 @@ Example (editable):
 - Status chips: Open (green), In‑progress (yellow), Full (gray).
 - Assumptions: Max players 4. Only open games listed. No pagination yet.
 
-### Step 3: Wireframe the Game Room (10–15 minutes)
+#### Step 3: Wireframe the Game Room (10–15 minutes)
 Sections:
 
 - Header: Game name/ID, Back to Lobby, your auth status
@@ -323,17 +321,17 @@ Example (editable):
 - Actions: Bid dropdown 0–8; Submit; Ready/Unready in sidebar.
 - Assumptions: Host can start; no spectators for MVP.
 
-### Step 4: Annotate assumptions directly
+#### Step 4: Annotate assumptions directly
 - Add an “Assumptions” list under each screen.
 - Mark any that change layout or API with [BLOCKING].
 
-### Step 5: Extract 3–5 blocking questions
+#### Step 5: Extract 3–5 blocking questions
 Pick only those that affect Stage 1–3 layout or API contracts, e.g.:
 - Do we list in‑progress games in Lobby? [affects columns/actions]
 - Max players per game? [affects seat layout]
 - Can non-host start the game? [affects visibility of Start control]
 
-### Scratchpad — working area (temporary)
+#### Scratchpad — working area (temporary)
 Use this area to co-develop answers for upcoming steps. When an item is finalized, promote it to the appropriate Stage above and clear it here.
 
 Template
@@ -351,11 +349,11 @@ Remaining items for future stages:
 
 ---
 
-## Improvements
+### Improvements
 
 This section captures identified improvements across four categories: functional completeness, functional correctness, duplication/multiple approaches, and efficiency/quality.
 
-### 1. Functional Completeness
+#### 1. Functional Completeness
 
 **Gaps/Incomplete Areas:**
 - ✅ **COMPLETED**: Remove all `[AUTH_BYPASS]` temporary debugging code:
@@ -382,7 +380,7 @@ This section captures identified improvements across four categories: functional
 - Complete backend endpoint integration or document as intentional fallback behavior
 - ✅ Add loading skeletons for initial data fetches — **COMPLETED** (loading.tsx for lobby and game room)
 
-### 2. Functional Correctness
+#### 2. Functional Correctness
 
 **Issues Found:**
 - ✅ **COMPLETED**: Default name mismatch:
@@ -423,7 +421,7 @@ This section captures identified improvements across four categories: functional
 - ✅ **COMPLETED**: Add validation for seat numbers before clamping - now validates using `isValidSeat()` and logs warning for invalid values instead of silently clamping
 - Consider using React Query or SWR for better state synchronization
 
-### 3. Duplication and Multiple Approaches
+#### 3. Duplication and Multiple Approaches
 
 **Duplication Found:**
 - ✅ **COMPLETED**: Error handling patterns:
@@ -462,7 +460,7 @@ This section captures identified improvements across four categories: functional
 - ✅ Create a shared `useToast()` hook — **COMPLETED**
 - ✅ Centralize API error response parsing — **COMPLETED** (extracted to `lib/api/error-parsing.ts` and `lib/api/action-helpers.ts`)
 
-### 4. Efficiency and Quality
+#### 4. Efficiency and Quality
 
 **Efficiency Issues:**
 - Polling strategy:
@@ -531,7 +529,7 @@ This section captures identified improvements across four categories: functional
 - Consider using a reducer for `game-room-client.tsx` state management
 - ✅ **COMPLETED**: Add tests for `game-room-client.tsx` complex state management and polling logic — Added 22 comprehensive tests covering activity state, polling behavior, refresh logic, action handlers, error handling, and edge cases
 
-### Priority Summary
+#### Priority Summary
 
 **High Priority:**
 1. ✅ Remove all `[AUTH_BYPASS]` code — **COMPLETED**
