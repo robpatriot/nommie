@@ -452,6 +452,7 @@ Potential improvements for consideration:
 ## Related Documentation
 
 - [Architecture Overview](./architecture.md)
+- [Architecture: GameContext](./architecture-game-context.md)
 - [Testing Guidelines](./testing.md)
 - [RFC 7807 - Problem Details for HTTP APIs](https://tools.ietf.org/html/rfc7807)
 
