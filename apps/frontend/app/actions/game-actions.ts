@@ -1,6 +1,7 @@
 'use server'
 
 import { deleteGame, fetchWithAuth, BackendApiError } from '@/lib/api'
+import { fetchGameSnapshot } from '@/lib/api/game-room'
 import type { Game } from '@/lib/types'
 
 export interface CreateGameRequest {
@@ -77,12 +78,28 @@ export type DeleteGameResult =
   | { error: BackendApiError; success?: never }
 
 export async function deleteGameAction(
-  gameId: number
+  gameId: number,
+  etag?: string
 ): Promise<DeleteGameResult> {
   try {
     // Auth is enforced centrally in fetchWithAuth
 
-    await deleteGame(gameId)
+    // If no ETag is provided, fetch the game snapshot to get it
+    let finalEtag = etag
+    if (!finalEtag) {
+      try {
+        const snapshotResult = await fetchGameSnapshot(gameId)
+        if (snapshotResult.kind === 'ok' && snapshotResult.etag) {
+          finalEtag = snapshotResult.etag
+        }
+      } catch (error) {
+        // If fetching the snapshot fails, still try to delete
+        // The backend will return 428 Precondition Required if ETag is required
+        console.warn('Failed to fetch game snapshot for ETag:', error)
+      }
+    }
+
+    await deleteGame(gameId, finalEtag)
     return { success: true }
   } catch (error) {
     // Re-throw BackendApiError to preserve traceId

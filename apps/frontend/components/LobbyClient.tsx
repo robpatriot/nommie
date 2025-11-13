@@ -150,14 +150,30 @@ export default function LobbyClient({
       return
     }
 
+    // deleteGameAction will fetch the ETag automatically if not provided
     const result = await deleteGameAction(gameId)
 
     if (result.error) {
-      showToast(
-        result.error.message || 'Failed to delete game',
-        'error',
-        result.error
-      )
+      // Handle 428 Precondition Required (missing If-Match) or 409 Conflict (stale ETag)
+      if (result.error.status === 428) {
+        showToast(
+          'Cannot delete game: missing version information. Please try again.',
+          'error',
+          result.error
+        )
+      } else if (result.error.status === 409) {
+        showToast(
+          'Cannot delete game: game was modified. Please refresh and try again.',
+          'error',
+          result.error
+        )
+      } else {
+        showToast(
+          result.error.message || 'Failed to delete game',
+          'error',
+          result.error
+        )
+      }
       // Log traceId in dev
       if (process.env.NODE_ENV === 'development' && result.error.traceId) {
         console.error('Delete game error traceId:', result.error.traceId)

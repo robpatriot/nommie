@@ -105,8 +105,13 @@ export async function getLastActiveGame(): Promise<number | null> {
   return data.game_id ?? null
 }
 
-export async function deleteGame(gameId: number): Promise<void> {
+export async function deleteGame(gameId: number, etag?: string): Promise<void> {
+  const headers: Record<string, string> = {}
+  if (etag) {
+    headers['If-Match'] = etag
+  }
   await fetchWithAuth(`/api/games/${gameId}`, {
     method: 'DELETE',
+    headers,
   })
 }

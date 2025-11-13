@@ -1297,10 +1297,13 @@ async fn play_card(
 /// DELETE /api/games/{game_id}
 ///
 /// Deletes a game. Only the host can delete a game.
+///
+/// Requires If-Match header with the current game ETag for optimistic locking.
 async fn delete_game(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
+    expected_version: ExpectedVersion,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
@@ -1309,7 +1312,7 @@ async fn delete_game(
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            // Load game to verify it exists and check host authorization
+            // Load game to verify it exists, check host authorization, and validate lock version
             let game = games_sea::require_game(txn, id).await?;
 
             // Check host authorization
@@ -1325,22 +1328,37 @@ async fn delete_game(
                 ));
             }
 
-            // Delete the game (cascade delete will handle related records)
-            // Note: The game was already loaded above, so it exists
-            // But we check rows_affected anyway to be defensive
+            // Validate optimistic lock version
+            if game.lock_version != expected_version.0 {
+                return Err(AppError::conflict(
+                    ErrorCode::OptimisticLock,
+                    format!(
+                        "Game lock version mismatch: expected {}, but game has version {}",
+                        expected_version.0, game.lock_version
+                    ),
+                ));
+            }
+
+            // Delete the game with optimistic locking (filter by lock_version)
+            // Cascade delete will handle related records automatically
             use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
             let delete_result = games::Entity::delete_many()
                 .filter(games::Column::Id.eq(id))
+                .filter(games::Column::LockVersion.eq(expected_version.0))
                 .exec(txn)
                 .await
                 .map_err(|e| AppError::db("failed to delete game", e))?;
 
             if delete_result.rows_affected == 0 {
-                // This should not happen since we loaded the game above
-                // But handle it gracefully anyway
-                return Err(AppError::not_found(
-                    ErrorCode::GameNotFound,
-                    format!("Game with ID {id} not found"),
+                // This should not happen if lock version matched, but handle it gracefully
+                // It could happen if the game was deleted by another transaction between
+                // the load above and the delete here
+                return Err(AppError::conflict(
+                    ErrorCode::OptimisticLock,
+                    format!(
+                        "Game lock version mismatch: expected version {}, but game was modified or deleted",
+                        expected_version.0
+                    ),
                 ));
             }
 
