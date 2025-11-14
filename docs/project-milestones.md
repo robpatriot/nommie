@@ -259,3 +259,31 @@ Independent improvements that enhance robustness, performance, and developer exp
 - **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus for full observability.  
   *Acceptance:* Metrics, logs, and traces visible in dashboards.  
 - **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id`.
+
+---
+
+### **6. Frontend Experience Enhancements**
+- **React Query Adoption:** Introduce React Query for client data fetching (lobby lists, game snapshots) while keeping room for future caching/state patterns.  
+  *Acceptance:* Critical frontend requests flow through React Query with documented fetch policies.
+- **Implement Design v1:** Apply the first-endorsed product design across Nommie (typography, spacing, components).  
+  *Acceptance:* Core screens match design reference with sign-off from design owner.
+- **Separate Game Config vs Play UI:** Split the game experience into a configuration surface (seating, AI seats, options) and an in-game surface focused on play.  
+  *Acceptance:* Users transition smoothly between dedicated config and play areas without losing context.
+- **Last Trick UI:** Persist the most recent trick as a compact card row so play can continue immediately after the final card.  
+  *Acceptance:* Players can review the previous trick while starting the next without modal blockers.
+- **User Options:** Add per-account settings (e.g., theme, gameplay preferences) surfaced via a profile/options view.  
+  *Acceptance:* Authenticated users can update and persist account-level preferences.
+- **Card Play Confirmation Toggle:** Provide a per-account option for confirming card plays before submission.  
+  *Acceptance:* Confirmation can be enabled/disabled per user and respected by the play interaction flow.
+
+---
+
+### **7. AI & Simulation Initiatives**
+- **AI Profile Discovery & Registry Alignment:** Audit current AI profile usage, enable discovery, and either sync profiles into the existing registry or replace the registry with profile-driven loading.  
+  *Acceptance:* Contributors can register/discover AIs via a single authoritative source with clear onboarding steps.
+- **Multi-Engine AI Implementation Drive:** Coordinate all simulation/production engines to deliver best-possible AI implementations aligned with the AI Player guide.  
+  *Acceptance:* Each engine exposes at least one production-ready AI with documented characteristics.
+- **In-Memory AI Comparison Harness:** Extend the in-memory engine with a lightweight benchmarking mode focused on head-to-head performance (minimal correctness checks).  
+  *Acceptance:* Developers can pit AIs against each other rapidly and capture comparative metrics.
+- **Internationalisation Foundations:** Define and implement the initial i18n strategy (framework choice, locale loading, placeholder translations) with scope finalised before execution.  
+  *Acceptance:* Core tooling and process for multiple locales is in place, even if only one language ships initially.
