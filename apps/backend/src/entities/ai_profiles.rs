@@ -7,8 +7,11 @@ use time::OffsetDateTime;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    #[sea_orm(column_name = "user_id")]
-    pub user_id: i64,
+    #[sea_orm(column_name = "registry_name")]
+    pub registry_name: String,
+    #[sea_orm(column_name = "registry_version")]
+    pub registry_version: String,
+    pub variant: String,
     pub display_name: String,
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
@@ -23,17 +26,13 @@ pub struct Model {
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::users::Entity",
-        from = "Column::UserId",
-        to = "super::users::Column::Id"
-    )]
-    User,
+    #[sea_orm(has_many = "super::game_players::Entity")]
+    GamePlayers,
 }
 
-impl Related<super::users::Entity> for Entity {
+impl Related<super::game_players::Entity> for Entity {
     fn to() -> RelationDef {
-        Relation::User.def()
+        Relation::GamePlayers.def()
     }
 }
 

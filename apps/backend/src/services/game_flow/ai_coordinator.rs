@@ -1,4 +1,4 @@
-use sea_orm::{DatabaseTransaction, EntityTrait, JoinType, QuerySelect, RelationTrait};
+use sea_orm::{DatabaseTransaction, EntityTrait};
 use tracing::{debug, info};
 
 use super::GameFlowService;
@@ -40,7 +40,7 @@ impl GameFlowService {
         };
 
         // Check if this player is an AI (use cache if available)
-        let (user_id, game_player_id, profile) = if let Some(ctx) = round_cache {
+        let (ai_profile_id, game_player_id, profile) = if let Some(ctx) = round_cache {
             // Fast path: Use cached player data
             // If no players exist (test scenario), fall through to slow path
             if ctx.players.is_empty() {
@@ -63,17 +63,30 @@ impl GameFlowService {
                 return Ok(false);
             };
 
-            let profile = ctx.get_ai_profile(player.user_id);
-
-            if profile.is_none() {
+            if player.player_kind != crate::entities::game_players::PlayerKind::Ai {
                 debug!(
                     game.id,
                     player_seat, "Human player's turn, stopping AI processing"
                 );
                 return Ok(false);
             }
+            let profile_id = player.ai_profile_id.ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::Other("AI_PROFILE_NOT_SET".into()),
+                    format!("AI player at seat {player_seat} missing profile"),
+                )
+            })?;
+            let profile = ctx.get_ai_profile(profile_id);
 
-            (player.user_id, player.id, profile.cloned())
+            if profile.is_none() {
+                debug!(
+                    game.id,
+                    player_seat, "AI profile missing from cache, stopping AI processing"
+                );
+                return Ok(false);
+            }
+
+            (profile_id, player.id, profile.cloned())
         } else {
             // Slow path: Load from database (used for Lobby, Dealing, etc.)
             let memberships = memberships::find_all_by_game(txn, game.id).await?;
@@ -88,24 +101,7 @@ impl GameFlowService {
                 return Ok(false);
             };
 
-            let ai_info = crate::entities::users::Entity::find_by_id(player.user_id)
-                .join(
-                    JoinType::LeftJoin,
-                    crate::entities::users::Relation::AiProfiles.def(),
-                )
-                .select_also(ai_profiles::Entity)
-                .one(txn)
-                .await?;
-
-            let Some((user, maybe_profile)) = ai_info else {
-                return Err(DomainError::validation(
-                    ValidationKind::Other("USER_NOT_FOUND".into()),
-                    "User not found",
-                )
-                .into());
-            };
-
-            if !user.is_ai {
+            if player.player_kind != crate::entities::game_players::PlayerKind::Ai {
                 debug!(
                     game.id,
                     player_seat, "Human player's turn, stopping AI processing"
@@ -113,21 +109,31 @@ impl GameFlowService {
                 return Ok(false);
             }
 
-            let profile = maybe_profile.ok_or_else(|| {
+            let profile_id = player.ai_profile_id.ok_or_else(|| {
                 DomainError::validation(
                     ValidationKind::Other("AI_PROFILE_NOT_FOUND".into()),
-                    format!("AI profile not found for user {}", user.id),
+                    format!("AI profile not linked for player {}", player.id),
                 )
             })?;
 
-            (user.id, player.id, Some(profile))
+            let profile = ai_profiles::Entity::find_by_id(profile_id)
+                .one(txn)
+                .await?
+                .ok_or_else(|| {
+                    DomainError::validation(
+                        ValidationKind::Other("AI_PROFILE_NOT_FOUND".into()),
+                        format!("AI profile {profile_id} not found"),
+                    )
+                })?;
+
+            (profile_id, player.id, Some(profile))
         };
 
         let profile = profile.ok_or_else(|| {
             AppError::internal(
                 crate::errors::ErrorCode::InternalError,
                 "AI profile not available",
-                std::io::Error::other(format!("AI profile missing for user {user_id}")),
+                std::io::Error::other(format!("AI profile missing for id {ai_profile_id}")),
             )
         })?;
 
@@ -159,7 +165,7 @@ impl GameFlowService {
         };
 
         // Create AI player with effective config
-        let ai_type = profile.playstyle.as_deref().unwrap_or("random");
+        let ai_type = profile.registry_name.as_str();
         let config = AiConfig::from_json(effective_config.as_ref());
         let use_memory_recency = config.memory_recency();
         let ai = create_ai(ai_type, config).ok_or_else(|| {

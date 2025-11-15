@@ -10,7 +10,9 @@ use crate::errors::domain::DomainError;
 #[derive(Debug, Clone, PartialEq)]
 pub struct AiProfile {
     pub id: i64,
-    pub user_id: i64,
+    pub registry_name: String,
+    pub registry_version: String,
+    pub variant: String,
     pub display_name: String,
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
@@ -24,7 +26,9 @@ impl From<ai_profiles::Model> for AiProfile {
     fn from(model: ai_profiles::Model) -> Self {
         Self {
             id: model.id,
-            user_id: model.user_id,
+            registry_name: model.registry_name,
+            registry_version: model.registry_version,
+            variant: model.variant,
             display_name: model.display_name,
             playstyle: model.playstyle,
             difficulty: model.difficulty,
@@ -36,17 +40,24 @@ impl From<ai_profiles::Model> for AiProfile {
     }
 }
 
-/// Create a new AI profile for a user.
+/// Create a new AI profile in the catalog.
 pub async fn create_profile(
     txn: &DatabaseTransaction,
-    user_id: i64,
+    registry_name: impl Into<String>,
+    registry_version: impl Into<String>,
+    variant: impl Into<String>,
     display_name: impl Into<String>,
     playstyle: Option<String>,
     difficulty: Option<i32>,
     config: Option<serde_json::Value>,
     memory_level: Option<i32>,
 ) -> Result<AiProfile, DomainError> {
-    let mut dto = ai_profiles_adapter::AiProfileCreate::new(user_id, display_name);
+    let mut dto = ai_profiles_adapter::AiProfileCreate::new(
+        registry_name,
+        registry_version,
+        variant,
+        display_name,
+    );
     if let Some(ps) = playstyle {
         dto = dto.with_playstyle(ps);
     }
@@ -63,24 +74,48 @@ pub async fn create_profile(
     Ok(AiProfile::from(profile))
 }
 
-/// Find an AI profile by user ID.
-pub async fn find_by_user_id<C: ConnectionTrait + Send + Sync>(
+/// Find an AI profile by ID.
+pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    user_id: i64,
+    id: i64,
 ) -> Result<Option<AiProfile>, DomainError> {
-    let profile = ai_profiles_adapter::find_by_user_id(conn, user_id).await?;
+    let profile = ai_profiles_adapter::find_by_id(conn, id).await?;
     Ok(profile.map(AiProfile::from))
 }
 
-/// Find AI profiles for multiple user IDs (batch query for optimization).
-pub async fn find_batch_by_user_ids<C: ConnectionTrait + Send + Sync>(
+/// Find a profile by registry signature.
+pub async fn find_by_registry_variant<C: ConnectionTrait + Send + Sync>(
     conn: &C,
-    user_ids: &[i64],
+    registry_name: &str,
+    registry_version: &str,
+    variant: &str,
+) -> Result<Option<AiProfile>, DomainError> {
+    let profile = ai_profiles_adapter::find_by_registry_variant(
+        conn,
+        registry_name,
+        registry_version,
+        variant,
+    )
+    .await?;
+    Ok(profile.map(AiProfile::from))
+}
+
+pub async fn list_all<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+) -> Result<Vec<AiProfile>, DomainError> {
+    let profiles = ai_profiles_adapter::list_all(conn).await?;
+    Ok(profiles.into_iter().map(AiProfile::from).collect())
+}
+
+/// Find AI profiles for multiple IDs (batch query for optimization).
+pub async fn find_batch_by_ids<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    profile_ids: &[i64],
 ) -> Result<Vec<ai_profiles::Model>, DomainError> {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
     let profiles = ai_profiles::Entity::find()
-        .filter(ai_profiles::Column::UserId.is_in(user_ids.iter().copied()))
+        .filter(ai_profiles::Column::Id.is_in(profile_ids.iter().copied()))
         .all(conn)
         .await
         .map_err(crate::infra::db_errors::map_db_err)?;
@@ -93,8 +128,12 @@ pub async fn update_profile(
     txn: &DatabaseTransaction,
     profile: AiProfile,
 ) -> Result<AiProfile, DomainError> {
-    let mut dto = ai_profiles_adapter::AiProfileUpdate::new(profile.id, profile.user_id);
-    dto = dto.with_display_name(profile.display_name);
+    let mut dto = ai_profiles_adapter::AiProfileUpdate::new(profile.id);
+    dto = dto
+        .with_registry_name(profile.registry_name.clone())
+        .with_registry_version(profile.registry_version.clone())
+        .with_variant(profile.variant.clone())
+        .with_display_name(profile.display_name);
     if let Some(ps) = profile.playstyle {
         dto = dto.with_playstyle(ps);
     }

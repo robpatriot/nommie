@@ -4,6 +4,7 @@ use backend::ai::memory::{get_round_card_plays, MemoryMode};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::error::AppError;
+use uuid::Uuid;
 
 use crate::support::build_test_state;
 use crate::support::test_utils::test_seed;
@@ -242,17 +243,17 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     let txn = shared.transaction();
 
     use backend::ai::RandomPlayer;
-    use backend::repos::{ai_profiles, users as users_repo};
+    use backend::repos::ai_profiles;
 
-    // Create a user
-    let user = users_repo::create_user(txn, "ai_test_123", "Test AI", true).await?;
-
-    // Create AI profile with memory level 75
+    // Create AI profile variant with memory level 75
+    let variant = format!("test-{}", Uuid::new_v4());
     let profile = ai_profiles::create_profile(
         txn,
-        user.id,
+        RandomPlayer::NAME,
+        RandomPlayer::VERSION,
+        &variant,
         "Test AI".to_string(),
-        Some(RandomPlayer::NAME.to_string()),
+        Some("random".to_string()),
         Some(5),
         None,
         Some(75),
@@ -263,7 +264,7 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     assert_eq!(profile.memory_level, Some(75));
 
     // Load it back
-    let loaded = ai_profiles::find_by_user_id(txn, user.id)
+    let loaded = ai_profiles::find_by_id(txn, profile.id)
         .await?
         .expect("Profile should exist");
 
@@ -300,60 +301,37 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
     use backend::ai::memory::MemoryMode;
     use backend::ai::RandomPlayer;
     use backend::repos::ai_profiles;
-    use backend::services::ai::AiService;
-    use serde_json::json;
 
-    let ai_service = AiService;
-
-    // Create AI template user with Partial memory (level 60)
-    let user_id = ai_service
-        .create_ai_template_user(
-            txn,
-            "Random Bot (Partial Memory)",
-            RandomPlayer::NAME,
-            RandomPlayer::VERSION,
-            Some(json!({"seed": test_seed("ai_mem_prof_ai1")})),
-            Some(60),
-        )
-        .await?;
-
-    // Load the profile
-    let profile = ai_profiles::find_by_user_id(txn, user_id)
-        .await?
-        .expect("AI profile should exist");
-
-    assert_eq!(profile.display_name, "Random Bot (Partial Memory)");
-    assert_eq!(profile.memory_level, Some(60));
+    // Validate seeded catalog memory levels
+    let random_profile = ai_profiles::find_by_registry_variant(
+        txn,
+        RandomPlayer::NAME,
+        RandomPlayer::VERSION,
+        "default",
+    )
+    .await?
+    .expect("RandomPlayer profile missing");
+    assert_eq!(random_profile.memory_level, Some(50));
     assert_eq!(
-        MemoryMode::from_db_value(profile.memory_level),
-        MemoryMode::Partial { level: 60 }
+        MemoryMode::from_db_value(random_profile.memory_level),
+        MemoryMode::Partial { level: 50 }
     );
 
-    // Create AI template user with Full memory (None -> defaults to Full)
-    let user_id2 = ai_service
-        .create_ai_template_user(
-            txn,
-            "Random Bot (Full Memory)",
-            RandomPlayer::NAME,
-            RandomPlayer::VERSION,
-            Some(json!({"seed": test_seed("ai_mem_prof_ai2")})),
-            None,
-        )
-        .await?;
+    let heuristic_profile = ai_profiles::find_by_registry_variant(
+        txn,
+        backend::ai::HeuristicV1::NAME,
+        backend::ai::HeuristicV1::VERSION,
+        "default",
+    )
+    .await?
+    .expect("Heuristic profile missing");
+    assert_eq!(heuristic_profile.memory_level, Some(80));
+    assert_eq!(
+        MemoryMode::from_db_value(heuristic_profile.memory_level),
+        MemoryMode::Partial { level: 80 }
+    );
 
-    let profile2 = ai_profiles::find_by_user_id(txn, user_id2)
-        .await?
-        .expect("AI profile should exist");
-
-    assert_eq!(profile2.display_name, "Random Bot (Full Memory)");
-    // Rollback the transaction immediately after last DB access
     shared.rollback().await?;
-
-    assert_eq!(profile2.memory_level, None);
-    assert_eq!(
-        MemoryMode::from_db_value(profile2.memory_level),
-        MemoryMode::Full
-    );
 
     Ok(())
 }

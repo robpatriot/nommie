@@ -3,11 +3,10 @@ use backend::db::txn::with_txn;
 use backend::error::AppError;
 use backend::errors::ErrorCode;
 use backend::repos::ai_profiles;
-use backend::services::ai::AiService;
 use backend::services::players::PlayerService;
 
 use crate::support::build_test_state;
-use crate::support::db_memberships::create_test_game_player;
+use crate::support::db_memberships::{create_test_ai_game_player, create_test_game_player};
 use crate::support::factory::{create_test_game, create_test_user};
 
 #[tokio::test]
@@ -131,33 +130,21 @@ async fn test_get_display_name_by_seat_ai_user() -> Result<(), AppError> {
         Box::pin(async move {
             let game_id = create_test_game(txn).await?;
 
-            let ai_service = AiService;
-            let ai_user_id = ai_service
-                .create_ai_template_user(
-                    txn,
-                    "Service Bot",
-                    RandomPlayer::NAME,
-                    RandomPlayer::VERSION,
-                    None,
-                    Some(100),
-                )
-                .await?;
+            let ai_profile = ai_profiles::find_by_registry_variant(
+                txn,
+                RandomPlayer::NAME,
+                RandomPlayer::VERSION,
+                "default",
+            )
+            .await?
+            .expect("catalog profile not seeded");
 
-            // Update profile.display_name to match what add_ai_seat would set
-            // (simulating the production flow where profile.display_name is set from friendly_ai_name)
-            if let Some(mut profile) = ai_profiles::find_by_user_id(txn, ai_user_id).await? {
-                let expected = backend::routes::games::friendly_ai_name(ai_user_id, 2);
-                profile.display_name = expected.clone();
-                ai_profiles::update_profile(txn, profile).await?;
-            }
-
-            create_test_game_player(txn, game_id, ai_user_id, 2).await?;
+            create_test_ai_game_player(txn, game_id, ai_profile.id, 2, false).await?;
 
             let service = PlayerService;
             let display_name = service.get_display_name_by_seat(txn, game_id, 2).await?;
 
-            let expected = backend::routes::games::friendly_ai_name(ai_user_id, 2);
-            assert_eq!(display_name, expected);
+            assert_eq!(display_name, ai_profile.display_name);
             Ok::<_, AppError>(())
         })
     })

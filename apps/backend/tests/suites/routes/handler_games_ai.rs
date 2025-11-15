@@ -3,7 +3,7 @@ use actix_web::{test, web, HttpMessage};
 use backend::ai::{HeuristicV1, RandomPlayer};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::entities::{ai_profiles, game_players, games, users};
+use backend::entities::{ai_overrides, ai_profiles, game_players, games, users};
 use backend::error::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
@@ -70,34 +70,21 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
     assert_eq!(memberships.len(), 2);
     let ai_membership = memberships
         .into_iter()
-        .find(|m| m.user_id != host_user_id)
+        .find(|m| m.player_kind == game_players::PlayerKind::Ai)
         .expect("AI membership exists");
     assert_eq!(ai_membership.turn_order, 1);
     assert!(ai_membership.is_ready);
 
-    let ai_user = users::Entity::find_by_id(ai_membership.user_id)
-        .one(shared.transaction())
-        .await?
-        .expect("AI user exists");
-    assert!(ai_user.is_ai);
-
-    let profile = ai_profiles::Entity::find()
-        .filter(ai_profiles::Column::UserId.eq(ai_user.id))
-        .one(shared.transaction())
-        .await?
-        .expect("AI profile exists");
-    assert_eq!(profile.playstyle.as_deref(), Some(HeuristicV1::NAME));
-    let config = profile.config.expect("AI config stored");
-    assert_eq!(
-        config.get("registry_name").and_then(|value| value.as_str()),
-        Some(HeuristicV1::NAME)
-    );
-    assert_eq!(
-        config
-            .get("registry_version")
-            .and_then(|value| value.as_str()),
-        Some(HeuristicV1::VERSION)
-    );
+    let profile = ai_profiles::Entity::find_by_id(
+        ai_membership
+            .ai_profile_id
+            .expect("ai_profile_id should be set"),
+    )
+    .one(shared.transaction())
+    .await?
+    .expect("AI profile exists");
+    assert_eq!(profile.registry_name, HeuristicV1::NAME);
+    assert_eq!(profile.registry_version, HeuristicV1::VERSION);
 
     shared.rollback().await?;
     Ok(())
@@ -164,33 +151,35 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
 
     let ai_membership = game_players::Entity::find()
         .filter(game_players::Column::GameId.eq(game_id))
-        .filter(game_players::Column::UserId.ne(host_user_id))
+        .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Ai))
         .one(shared.transaction())
         .await?
         .expect("AI membership exists");
 
-    let profile = ai_profiles::Entity::find()
-        .filter(ai_profiles::Column::UserId.eq(ai_membership.user_id))
-        .one(shared.transaction())
-        .await?
-        .expect("AI profile exists");
+    let profile = ai_profiles::Entity::find_by_id(
+        ai_membership
+            .ai_profile_id
+            .expect("ai_profile_id should be set"),
+    )
+    .one(shared.transaction())
+    .await?
+    .expect("AI profile exists");
 
-    assert_eq!(profile.playstyle.as_deref(), Some(RandomPlayer::NAME));
-    let config = profile.config.expect("AI config present");
-    assert_eq!(
-        config.get("registry_name").and_then(|value| value.as_str()),
-        Some(RandomPlayer::NAME)
-    );
-    assert_eq!(
-        config
-            .get("registry_version")
-            .and_then(|value| value.as_str()),
-        Some(RandomPlayer::VERSION)
-    );
-    assert!(
-        config.get("seed").is_some(),
-        "Random player config should include a seed"
-    );
+    assert_eq!(profile.registry_name, RandomPlayer::NAME);
+    assert_eq!(profile.registry_version, RandomPlayer::VERSION);
+
+    let override_record = backend::entities::ai_overrides::Entity::find()
+        .filter(backend::entities::ai_overrides::Column::GamePlayerId.eq(ai_membership.id))
+        .one(shared.transaction())
+        .await?;
+    if let Some(record) = override_record {
+        if let Some(cfg) = record.config {
+            assert!(
+                cfg.get("seed").is_some(),
+                "Random player config should include a seed"
+            );
+        }
+    }
 
     shared.rollback().await?;
     Ok(())

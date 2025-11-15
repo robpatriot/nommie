@@ -5,17 +5,30 @@
 pub struct MembershipUpdate {
     pub id: i64,
     pub game_id: i64,
-    pub user_id: i64,
+    pub player_kind: crate::entities::game_players::PlayerKind,
+    pub human_user_id: Option<i64>,
+    pub ai_profile_id: Option<i64>,
     pub turn_order: i32,
     pub is_ready: bool,
 }
 
 impl MembershipUpdate {
-    pub fn new(id: i64, game_id: i64, user_id: i64, turn_order: i32, is_ready: bool) -> Self {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        id: i64,
+        game_id: i64,
+        player_kind: crate::entities::game_players::PlayerKind,
+        human_user_id: Option<i64>,
+        ai_profile_id: Option<i64>,
+        turn_order: i32,
+        is_ready: bool,
+    ) -> Self {
         Self {
             id,
             game_id,
-            user_id,
+            player_kind,
+            human_user_id,
+            ai_profile_id,
             turn_order,
             is_ready,
         }
@@ -26,16 +39,28 @@ impl MembershipUpdate {
 #[derive(Debug, Clone)]
 pub struct MembershipCreate {
     pub game_id: i64,
-    pub user_id: i64,
+    pub player_kind: crate::entities::game_players::PlayerKind,
+    pub human_user_id: Option<i64>,
+    pub ai_profile_id: Option<i64>,
     pub turn_order: i32,
     pub is_ready: bool,
 }
 
 impl MembershipCreate {
-    pub fn new(game_id: i64, user_id: i64, turn_order: i32, is_ready: bool) -> Self {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        game_id: i64,
+        player_kind: crate::entities::game_players::PlayerKind,
+        human_user_id: Option<i64>,
+        ai_profile_id: Option<i64>,
+        turn_order: i32,
+        is_ready: bool,
+    ) -> Self {
         Self {
             game_id,
-            user_id,
+            player_kind,
+            human_user_id,
+            ai_profile_id,
             turn_order,
             is_ready,
         }

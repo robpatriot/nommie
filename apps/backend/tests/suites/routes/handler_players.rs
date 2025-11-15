@@ -4,11 +4,10 @@ use backend::ai::RandomPlayer;
 use backend::error::AppError;
 use backend::repos::ai_profiles;
 use backend::routes::games::configure_routes;
-use backend::services::ai::AiService;
 
 use crate::support::app_builder::create_test_app;
 use crate::support::build_test_state;
-use crate::support::db_memberships::create_test_game_player;
+use crate::support::db_memberships::{create_test_ai_game_player, create_test_game_player};
 use crate::support::factory::{create_test_game, create_test_user};
 
 #[tokio::test]
@@ -62,29 +61,16 @@ async fn test_get_player_display_name_ai_user() -> Result<(), AppError> {
 
     // Create test data with AI user
     let game_id = create_test_game(shared.transaction()).await?;
-    let ai_service = AiService;
-    let ai_user_id = ai_service
-        .create_ai_template_user(
-            shared.transaction(),
-            "Test Bot Display",
-            RandomPlayer::NAME,
-            RandomPlayer::VERSION,
-            None,
-            Some(100),
-        )
-        .await?;
+    let ai_profile = ai_profiles::find_by_registry_variant(
+        shared.transaction(),
+        RandomPlayer::NAME,
+        RandomPlayer::VERSION,
+        "default",
+    )
+    .await?
+    .expect("catalog profile missing");
 
-    // Update profile.display_name to match what add_ai_seat would set
-    // (simulating the production flow where profile.display_name is set from friendly_ai_name)
-    if let Some(mut profile) =
-        ai_profiles::find_by_user_id(shared.transaction(), ai_user_id).await?
-    {
-        let expected_name = backend::routes::games::friendly_ai_name(ai_user_id, 2);
-        profile.display_name = expected_name;
-        ai_profiles::update_profile(shared.transaction(), profile).await?;
-    }
-
-    create_test_game_player(shared.transaction(), game_id, ai_user_id, 2).await?;
+    create_test_ai_game_player(shared.transaction(), game_id, ai_profile.id, 2, false).await?;
 
     // Create test app
     let app = create_test_app(state)
@@ -105,8 +91,7 @@ async fn test_get_player_display_name_ai_user() -> Result<(), AppError> {
     assert_eq!(resp.status(), StatusCode::OK);
 
     let body: serde_json::Value = test::read_body_json(resp).await;
-    let expected_name = backend::routes::games::friendly_ai_name(ai_user_id, 2);
-    assert_eq!(body["display_name"], expected_name);
+    assert_eq!(body["display_name"], ai_profile.display_name);
 
     shared.rollback().await?;
 
