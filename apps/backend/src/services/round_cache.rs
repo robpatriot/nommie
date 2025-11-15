@@ -39,7 +39,7 @@ pub struct RoundCache {
     /// Player roster (game memberships)
     pub players: Vec<crate::repos::memberships::GameMembership>,
 
-    /// AI profiles by user_id
+    /// AI profiles keyed by profile ID
     pub ai_profiles: HashMap<i64, ai_profiles::Model>,
 }
 
@@ -113,19 +113,24 @@ impl RoundCache {
         // Load players (may be empty in test scenarios)
         let players = crate::repos::memberships::find_all_by_game(txn, game_id).await?;
 
-        // Load AI profiles (batch query) - only if players exist
-        let ai_profiles = if !players.is_empty() {
-            let user_ids: Vec<i64> = players.iter().map(|p| p.user_id).collect();
-            let ai_profile_vec =
-                crate::repos::ai_profiles::find_batch_by_user_ids(txn, &user_ids).await?;
+        let ai_profiles = {
+            let profile_ids: Vec<i64> = players
+                .iter()
+                .filter(|p| p.player_kind == crate::entities::game_players::PlayerKind::Ai)
+                .filter_map(|p| p.ai_profile_id)
+                .collect();
 
-            let mut profiles = HashMap::new();
-            for profile in ai_profile_vec {
-                profiles.insert(profile.user_id, profile);
+            if profile_ids.is_empty() {
+                HashMap::new()
+            } else {
+                let models =
+                    crate::repos::ai_profiles::find_batch_by_ids(txn, &profile_ids).await?;
+                let mut profiles = HashMap::new();
+                for profile in models {
+                    profiles.insert(profile.id, profile);
+                }
+                profiles
             }
-            profiles
-        } else {
-            HashMap::new()
         };
 
         Ok(Self {
@@ -157,9 +162,9 @@ impl RoundCache {
         Ok(&self.hands[seat as usize])
     }
 
-    /// Get AI profile for a user.
-    pub fn get_ai_profile(&self, user_id: i64) -> Option<&ai_profiles::Model> {
-        self.ai_profiles.get(&user_id)
+    /// Get AI profile for an AI membership.
+    pub fn get_ai_profile(&self, ai_profile_id: i64) -> Option<&ai_profiles::Model> {
+        self.ai_profiles.get(&ai_profile_id)
     }
 
     /// Check if a player is AI.
@@ -171,8 +176,8 @@ impl RoundCache {
         self.players
             .iter()
             .find(|p| p.turn_order == seat as i32)
-            .and_then(|p| self.ai_profiles.get(&p.user_id))
-            .is_some()
+            .map(|p| p.player_kind == crate::entities::game_players::PlayerKind::Ai)
+            .unwrap_or(false)
     }
 
     /// Build CurrentRoundInfo for a player using cached data.

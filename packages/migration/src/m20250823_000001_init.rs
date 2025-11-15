@@ -1,3 +1,4 @@
+use sea_orm::Statement;
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_query::extension::postgres::Type as PgType;
 use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction, Index, Table};
@@ -81,7 +82,9 @@ enum GamePlayers {
     Table,
     Id,
     GameId,
-    UserId,
+    PlayerKind,
+    HumanUserId,
+    AiProfileId,
     TurnOrder,
     IsReady,
     CreatedAt,
@@ -92,7 +95,9 @@ enum GamePlayers {
 enum AiProfiles {
     Table,
     Id,
-    UserId,
+    RegistryName,
+    RegistryVersion,
+    Variant,
     DisplayName,
     Playstyle,
     Difficulty,
@@ -319,7 +324,7 @@ impl MigrationTrait for Migration {
                 ) -> Result<bool, DbErr> {
                     let result = manager
                         .get_connection()
-                        .query_one(sea_orm::Statement::from_string(
+                        .query_one(Statement::from_string(
                             sea_orm::DatabaseBackend::Postgres,
                             format!("SELECT 1 FROM pg_type WHERE typname = '{}'", enum_name),
                         ))
@@ -514,6 +519,76 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
+        // ai_profiles catalog
+        manager
+            .create_table(
+                Table::create()
+                    .table(AiProfiles::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(AiProfiles::Id)
+                            .big_integer()
+                            .not_null()
+                            .primary_key()
+                            .auto_increment(),
+                    )
+                    .col(ColumnDef::new(AiProfiles::RegistryName).string().not_null())
+                    .col(
+                        ColumnDef::new(AiProfiles::RegistryVersion)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiProfiles::Variant)
+                            .string()
+                            .not_null()
+                            .default("default"),
+                    )
+                    .col(ColumnDef::new(AiProfiles::DisplayName).string().not_null())
+                    .col(ColumnDef::new(AiProfiles::Playstyle).string().null())
+                    .col(ColumnDef::new(AiProfiles::Difficulty).integer().null())
+                    .col(ColumnDef::new(AiProfiles::Config).json_binary().null())
+                    .col(ColumnDef::new(AiProfiles::MemoryLevel).integer().null())
+                    .col(
+                        ColumnDef::new(AiProfiles::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AiProfiles::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("ux_ai_profiles_registry_variant")
+                    .table(AiProfiles::Table)
+                    .col(AiProfiles::RegistryName)
+                    .col(AiProfiles::RegistryVersion)
+                    .col(AiProfiles::Variant)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        // Seed default AI catalog
+        let backend = manager.get_database_backend();
+        manager
+            .exec_stmt(Statement::from_string(
+                backend,
+                "INSERT INTO ai_profiles \
+                 (registry_name, registry_version, variant, display_name, playstyle, difficulty, config, memory_level, created_at, updated_at) VALUES \
+                 ('RandomPlayer','1.0.0','default','Random Player','random',NULL,'{}'::jsonb,50,now(),now()), \
+                 ('HeuristicV1','1.0.0','default','Heuristic V1','heuristic',NULL,'{}'::jsonb,80,now(),now()) \
+                 ON CONFLICT (registry_name, registry_version, variant) DO NOTHING;",
+            ))
+            .await?;
+
         // game_players
         manager
             .create_table(
@@ -528,7 +603,22 @@ impl MigrationTrait for Migration {
                             .auto_increment(),
                     )
                     .col(ColumnDef::new(GamePlayers::GameId).big_integer().not_null())
-                    .col(ColumnDef::new(GamePlayers::UserId).big_integer().not_null())
+                    .col(
+                        ColumnDef::new(GamePlayers::PlayerKind)
+                            .string()
+                            .not_null()
+                            .default("human"),
+                    )
+                    .col(
+                        ColumnDef::new(GamePlayers::HumanUserId)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(GamePlayers::AiProfileId)
+                            .big_integer()
+                            .null(),
+                    )
                     .col(ColumnDef::new(GamePlayers::TurnOrder).integer().not_null())
                     .col(
                         ColumnDef::new(GamePlayers::IsReady)
@@ -548,16 +638,23 @@ impl MigrationTrait for Migration {
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_game_players_user_id")
-                            .from(GamePlayers::Table, GamePlayers::UserId)
+                            .name("fk_game_players_game_id")
+                            .from(GamePlayers::Table, GamePlayers::GameId)
+                            .to(Games::Table, Games::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_game_players_human_user_id")
+                            .from(GamePlayers::Table, GamePlayers::HumanUserId)
                             .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_game_players_game_id")
-                            .from(GamePlayers::Table, GamePlayers::GameId)
-                            .to(Games::Table, Games::Id)
+                            .name("fk_game_players_ai_profile_id")
+                            .from(GamePlayers::Table, GamePlayers::AiProfileId)
+                            .to(AiProfiles::Table, AiProfiles::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
                     .to_owned(),
@@ -568,10 +665,10 @@ impl MigrationTrait for Migration {
         manager
             .create_index(
                 Index::create()
-                    .name("ux_game_players_game_user")
+                    .name("ux_game_players_game_human")
                     .table(GamePlayers::Table)
                     .col(GamePlayers::GameId)
-                    .col(GamePlayers::UserId)
+                    .col(GamePlayers::HumanUserId)
                     .unique()
                     .to_owned(),
             )
@@ -585,46 +682,6 @@ impl MigrationTrait for Migration {
                     .col(GamePlayers::GameId)
                     .col(GamePlayers::TurnOrder)
                     .unique()
-                    .to_owned(),
-            )
-            .await?;
-
-        // ai_profiles
-        manager
-            .create_table(
-                Table::create()
-                    .table(AiProfiles::Table)
-                    .if_not_exists()
-                    .col(
-                        ColumnDef::new(AiProfiles::Id)
-                            .big_integer()
-                            .not_null()
-                            .primary_key()
-                            .auto_increment(),
-                    )
-                    .col(ColumnDef::new(AiProfiles::UserId).big_integer().not_null())
-                    .col(ColumnDef::new(AiProfiles::DisplayName).string().not_null())
-                    .col(ColumnDef::new(AiProfiles::Playstyle).string().null())
-                    .col(ColumnDef::new(AiProfiles::Difficulty).integer().null())
-                    .col(ColumnDef::new(AiProfiles::Config).json_binary().null())
-                    .col(ColumnDef::new(AiProfiles::MemoryLevel).integer().null())
-                    .col(
-                        ColumnDef::new(AiProfiles::CreatedAt)
-                            .timestamp_with_time_zone()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(AiProfiles::UpdatedAt)
-                            .timestamp_with_time_zone()
-                            .not_null(),
-                    )
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("fk_ai_profiles_user_id")
-                            .from(AiProfiles::Table, AiProfiles::UserId)
-                            .to(Users::Table, Users::Id)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
                     .to_owned(),
             )
             .await?;
@@ -1336,6 +1393,15 @@ impl MigrationTrait for Migration {
             .await?;
 
         manager
+            .drop_index(
+                Index::drop()
+                    .name("ux_ai_profiles_registry_variant")
+                    .table(AiProfiles::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
             .drop_table(Table::drop().table(AiProfiles::Table).to_owned())
             .await?;
 
@@ -1366,7 +1432,7 @@ impl MigrationTrait for Migration {
         manager
             .drop_index(
                 Index::drop()
-                    .name("ux_game_players_game_user")
+                    .name("ux_game_players_game_human")
                     .table(GamePlayers::Table)
                     .to_owned(),
             )

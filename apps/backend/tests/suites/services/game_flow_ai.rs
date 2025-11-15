@@ -3,8 +3,7 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::GameState;
 use backend::error::AppError;
-use backend::services::ai::AiService;
-use backend::services::game_flow::GameFlowService;
+use backend::services::ai::{AiInstanceOverrides, AiService};
 use serde_json::json;
 use tracing::info;
 
@@ -14,9 +13,9 @@ use crate::support::test_utils::test_seed;
 /// Test that a full game with 4 AI players completes successfully.
 ///
 /// This test demonstrates the NEW reusable AI pattern:
-/// 1. Creates reusable AI template users (only once)
-/// 2. Uses the same AI templates in a game with per-instance overrides
-/// 3. Marks all AI players ready (triggers auto-start and AI orchestration)
+/// 1. Uses catalogued AI profiles for each seat
+/// 2. Applies per-instance overrides (name/seed/memory) where needed
+/// 3. AIs join the lobby already marked ready, triggering auto-start
 /// 4. Verifies the game completes all 26 rounds
 #[tokio::test]
 #[ignore]
@@ -29,7 +28,6 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     let shared = SharedTxn::open(db).await?;
     let txn = shared.transaction();
 
-    // Create reusable AI template users with test-specific seeds
     let ai_service = AiService;
 
     // Generate unique seeds for each AI
@@ -38,59 +36,31 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     let ai3_seed = test_seed("full_game_ai_ai3");
     let ai4_seed = test_seed("full_game_ai_ai4");
 
-    // Create 4 distinct AI template users
-    let ai1 = ai_service
-        .create_ai_template_user(
-            txn,
-            "Random Bot 1",
-            RandomPlayer::NAME,
-            RandomPlayer::VERSION,
-            Some(json!({"seed": ai1_seed})),
-            Some(100),
-        )
-        .await?;
-
-    let ai2 = ai_service
-        .create_ai_template_user(
-            txn,
-            "Random Bot 2",
-            RandomPlayer::NAME,
-            RandomPlayer::VERSION,
-            Some(json!({"seed": ai2_seed})),
-            Some(100),
-        )
-        .await?;
-
-    let ai3 = ai_service
-        .create_ai_template_user(
-            txn,
-            "Random Bot 3",
-            RandomPlayer::NAME,
-            RandomPlayer::VERSION,
-            Some(json!({"seed": ai3_seed})),
-            Some(100),
-        )
-        .await?;
-
-    let ai4 = ai_service
-        .create_ai_template_user(
-            txn,
-            "Random Bot 4",
-            RandomPlayer::NAME,
-            RandomPlayer::VERSION,
-            Some(json!({"seed": ai4_seed})),
-            Some(100),
-        )
-        .await?;
+    let ai_profile = backend::repos::ai_profiles::find_by_registry_variant(
+        txn,
+        RandomPlayer::NAME,
+        RandomPlayer::VERSION,
+        "default",
+    )
+    .await?
+    .expect("catalog profile missing");
 
     let game_id = crate::support::factory::create_fresh_lobby_game(txn, "full_game_ai").await?;
 
     // Add AIs to game
-    use backend::services::ai::AiInstanceOverrides;
-
     // Seat 0: Default config
     ai_service
-        .add_ai_to_game(txn, game_id, ai1, 0, None)
+        .add_ai_to_game(
+            txn,
+            game_id,
+            ai_profile.id,
+            0,
+            Some(AiInstanceOverrides {
+                name: Some("Random Bot 1".into()),
+                memory_level: None,
+                config: Some(json!({"seed": ai1_seed})),
+            }),
+        )
         .await?;
 
     // Seat 1: Override name
@@ -98,19 +68,29 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         .add_ai_to_game(
             txn,
             game_id,
-            ai2,
+            ai_profile.id,
             1,
             Some(AiInstanceOverrides {
                 name: Some("Custom Name Bot".to_string()),
                 memory_level: None,
-                config: None,
+                config: Some(json!({"seed": ai2_seed})),
             }),
         )
         .await?;
 
     // Seat 2: Default config
     ai_service
-        .add_ai_to_game(txn, game_id, ai3, 2, None)
+        .add_ai_to_game(
+            txn,
+            game_id,
+            ai_profile.id,
+            2,
+            Some(AiInstanceOverrides {
+                name: Some("Random Bot 3".into()),
+                memory_level: None,
+                config: Some(json!({"seed": ai3_seed})),
+            }),
+        )
         .await?;
 
     // Seat 3: Override config and memory
@@ -119,7 +99,7 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         .add_ai_to_game(
             txn,
             game_id,
-            ai4,
+            ai_profile.id,
             3,
             Some(AiInstanceOverrides {
                 name: Some("Hard Mode Bot".to_string()),
@@ -129,14 +109,7 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         )
         .await?;
 
-    // Create gameflow service
-    let service = GameFlowService;
-
-    // Mark all AI players ready - this should trigger auto-start and AI orchestration
-    service.mark_ready(txn, game_id, ai1).await?;
-    service.mark_ready(txn, game_id, ai2).await?;
-    service.mark_ready(txn, game_id, ai3).await?;
-    service.mark_ready(txn, game_id, ai4).await?;
+    // AI seats are auto-ready; no manual mark_ready needed
 
     // Load game and verify it completed
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;

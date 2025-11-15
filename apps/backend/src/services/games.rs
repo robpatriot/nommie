@@ -458,7 +458,8 @@ impl GameService {
 
         // Find all games where user is a member, ordered by updated_at DESC
         let memberships = game_players::Entity::find()
-            .filter(game_players::Column::UserId.eq(user_id))
+            .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
+            .filter(game_players::Column::HumanUserId.eq(user_id))
             .all(txn)
             .await
             .map_err(AppError::from)?;

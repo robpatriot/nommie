@@ -27,7 +27,7 @@ use crate::extractors::ValidatedJson;
 use crate::http::etag::{game_etag, ExpectedVersion};
 use crate::repos::memberships::{self, GameRole};
 use crate::repos::{ai_overrides, ai_profiles, rounds, users};
-use crate::services::ai::AiService;
+use crate::services::ai::{AiInstanceOverrides, AiService};
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
 use crate::services::players::PlayerService;
@@ -131,21 +131,10 @@ async fn get_snapshot(
                     let seat = seat_idx as u8;
                     let mut seat_public = SeatPublic::empty(seat);
                     seat_public.is_ready = membership.is_ready;
-                    seat_public.user_id = Some(membership.user_id);
 
-                    let user = users::find_user_by_id(txn, membership.user_id)
-                        .await
-                        .map_err(AppError::from)?;
                     let ai_override = ai_overrides::find_by_game_player_id(txn, membership.id)
                         .await
                         .map_err(AppError::from)?;
-                    let ai_profile = ai_profiles::find_by_user_id(txn, membership.user_id)
-                        .await
-                        .map_err(AppError::from)?;
-
-                    if let Some(user) = user.as_ref() {
-                        seat_public.is_ai = user.is_ai;
-                    }
 
                     let mut display_name: Option<String> = ai_override
                         .as_ref()
@@ -159,49 +148,69 @@ async fn get_snapshot(
                             }
                         });
 
-                    if display_name.is_none() {
-                        if let Some(user_ref) = user.as_ref() {
-                            if user_ref.is_ai {
-                                if let Some(profile) = ai_profile.as_ref() {
-                                    let trimmed = profile.display_name.trim();
-                                    if !trimmed.is_empty() {
-                                        display_name = Some(trimmed.to_owned());
+                    match membership.player_kind {
+                        crate::entities::game_players::PlayerKind::Human => {
+                            if let Some(user_id) = membership.user_id {
+                                seat_public.user_id = Some(user_id);
+                                let user = users::find_user_by_id(txn, user_id)
+                                    .await
+                                    .map_err(AppError::from)?
+                                    .ok_or_else(|| {
+                                        AppError::not_found(
+                                            ErrorCode::UserNotFound,
+                                            format!("User {user_id} not found"),
+                                        )
+                                    })?;
+
+                                seat_public.is_ai = user.is_ai;
+
+                                if display_name.is_none() {
+                                    if let Some(username) = &user.username {
+                                        let trimmed = username.trim();
+                                        if !trimmed.is_empty() {
+                                            display_name = Some(trimmed.to_owned());
+                                        }
                                     }
                                 }
-                            } else if let Some(username) = &user_ref.username {
-                                let trimmed = username.trim();
-                                if !trimmed.is_empty() {
-                                    display_name = Some(trimmed.to_owned());
+
+                                if display_name.is_none() {
+                                    display_name = Some(user.sub.clone());
+                                }
+
+                                if creator_user_id == Some(user_id) {
+                                    host_seat = seat;
+                                }
+
+                                if user_id == current_user.id {
+                                    viewer_seat = Some(seat);
                                 }
                             }
                         }
-                    }
+                        crate::entities::game_players::PlayerKind::Ai => {
+                            seat_public.is_ai = true;
+                            if let Some(profile_id) = membership.ai_profile_id {
+                                let profile = ai_profiles::find_by_id(txn, profile_id)
+                                    .await
+                                    .map_err(AppError::from)?;
 
-                    if seat_public.is_ai {
-                        if let Some(profile) = ai_profile.as_ref() {
-                            if let Some(ai_name) = profile.playstyle.clone() {
-                                let config = AiConfig::from_json(profile.config.as_ref());
-                                let version = config
-                                    .get_custom_str("registry_version")
-                                    .map(|v| v.to_owned())
-                                    .or_else(|| {
-                                        registry::by_name(&ai_name)
-                                            .map(|factory| factory.version.to_owned())
-                                    })
-                                    .unwrap_or_else(|| "unknown".to_string());
+                                if let Some(profile) = profile.as_ref() {
+                                    let trimmed = profile.display_name.trim();
+                                    if display_name.is_none() && !trimmed.is_empty() {
+                                        display_name = Some(trimmed.to_owned());
+                                    }
 
-                                seat_public.ai_profile = Some(SeatAiProfilePublic {
-                                    name: ai_name,
-                                    version,
-                                });
-                            }
-                        }
-                    }
+                                    seat_public.ai_profile = Some(SeatAiProfilePublic {
+                                        name: profile.registry_name.clone(),
+                                        version: profile.registry_version.clone(),
+                                    });
+                                }
 
-                    if display_name.is_none() {
-                        if let Some(user_ref) = user.as_ref() {
-                            if user_ref.is_ai {
-                                display_name = Some(friendly_ai_name(user_ref.id, seat as usize));
+                                if display_name.is_none() {
+                                    display_name =
+                                        Some(friendly_ai_name(profile_id, seat as usize));
+                                }
+                            } else if display_name.is_none() {
+                                display_name = Some(friendly_ai_name(membership.id, seat as usize));
                             }
                         }
                     }
@@ -211,16 +220,7 @@ async fn get_snapshot(
                     }
 
                     seat_public.display_name = display_name;
-
                     seating[seat_idx as usize] = seat_public;
-
-                    if creator_user_id == Some(membership.user_id) {
-                        host_seat = seat;
-                    }
-
-                    if membership.user_id == current_user.id {
-                        viewer_seat = Some(seat);
-                    }
                 }
 
                 snap.game.seating = seating;
@@ -700,29 +700,6 @@ fn resolve_registry_selection(
     Ok((factory, version, request.seed))
 }
 
-fn build_ai_profile_config(
-    registry_name: &str,
-    registry_version: &str,
-    seed: Option<u64>,
-) -> serde_json::Value {
-    let mut obj = serde_json::Map::new();
-    obj.insert(
-        "registry_name".to_string(),
-        serde_json::Value::String(registry_name.to_string()),
-    );
-    obj.insert(
-        "registry_version".to_string(),
-        serde_json::Value::String(registry_version.to_string()),
-    );
-    if let Some(seed_value) = seed {
-        obj.insert(
-            "seed".to_string(),
-            serde_json::Value::Number(seed_value.into()),
-        );
-    }
-    serde_json::Value::Object(obj)
-}
-
 async fn add_ai_seat(
     http_req: HttpRequest,
     game_id: GameId,
@@ -748,9 +725,10 @@ async fn add_ai_seat(
                     )
                 })?;
 
-            let is_host = match game.created_by {
-                Some(created_by) => created_by == host_user_id,
-                None => host_turn_order == 0,
+            let is_host = match (game.created_by, host_user_id) {
+                (Some(created_by), Some(host_id)) => created_by == host_id,
+                (None, _) => host_turn_order == 0,
+                _ => false,
             };
 
             if !is_host {
@@ -812,47 +790,54 @@ async fn add_ai_seat(
                     continue;
                 }
 
-                let user = users::find_user_by_id(txn, membership.user_id)
-                    .await
-                    .map_err(AppError::from)?;
+                if let Some(override_record) =
+                    ai_overrides::find_by_game_player_id(txn, membership.id)
+                        .await
+                        .map_err(AppError::from)?
+                {
+                    if let Some(name) = override_record.name {
+                        let trimmed = name.trim();
+                        if !trimmed.is_empty() {
+                            existing_display_names.insert(trimmed.to_owned());
+                            continue;
+                        }
+                    }
+                }
 
-                if let Some(user) = user {
-                    if let Some(override_record) =
-                        ai_overrides::find_by_game_player_id(txn, membership.id)
-                            .await
-                            .map_err(AppError::from)?
-                    {
-                        if let Some(name) = override_record.name {
-                            let trimmed = name.trim();
-                            if !trimmed.is_empty() {
-                                existing_display_names.insert(trimmed.to_owned());
-                                continue;
+                match membership.player_kind {
+                    crate::entities::game_players::PlayerKind::Human => {
+                        if let Some(user_id) = membership.user_id {
+                            if let Some(user) = users::find_user_by_id(txn, user_id)
+                                .await
+                                .map_err(AppError::from)?
+                            {
+                                if let Some(username) = &user.username {
+                                    let trimmed = username.trim();
+                                    if !trimmed.is_empty() {
+                                        existing_display_names.insert(trimmed.to_owned());
+                                        continue;
+                                    }
+                                }
+                                existing_display_names.insert(user.sub);
                             }
                         }
                     }
-
-                    if user.is_ai {
-                        if let Some(profile) = ai_profiles::find_by_user_id(txn, user.id)
-                            .await
-                            .map_err(AppError::from)?
-                        {
-                            let trimmed = profile.display_name.trim();
-                            if !trimmed.is_empty() {
-                                existing_display_names.insert(trimmed.to_owned());
-                            } else {
-                                existing_display_names.insert(friendly_ai_name(
-                                    user.id,
-                                    membership.turn_order as usize,
-                                ));
+                    crate::entities::game_players::PlayerKind::Ai => {
+                        if let Some(profile_id) = membership.ai_profile_id {
+                            if let Some(profile) = ai_profiles::find_by_id(txn, profile_id)
+                                .await
+                                .map_err(AppError::from)?
+                            {
+                                let trimmed = profile.display_name.trim();
+                                if !trimmed.is_empty() {
+                                    existing_display_names.insert(trimmed.to_owned());
+                                    continue;
+                                }
                             }
-                        } else {
-                            existing_display_names
-                                .insert(friendly_ai_name(user.id, membership.turn_order as usize));
-                        }
-                    } else if let Some(username) = &user.username {
-                        let trimmed = username.trim();
-                        if !trimmed.is_empty() {
-                            existing_display_names.insert(trimmed.to_owned());
+                            existing_display_names.insert(friendly_ai_name(
+                                profile_id,
+                                membership.turn_order as usize,
+                            ));
                         }
                     }
                 }
@@ -867,35 +852,49 @@ async fn add_ai_seat(
                 seed = Some(random::<u64>());
             }
 
-            let ai_config = build_ai_profile_config(factory.name, &registry_version, seed);
-
-            let ai_user_id = ai_service
-                .create_ai_template_user(
-                    txn,
-                    format!("Bot {}", seat_index + 1),
-                    factory.name,
-                    &registry_version,
-                    Some(ai_config),
-                    Some(100),
+            let ai_profile = ai_profiles::find_by_registry_variant(
+                txn,
+                factory.name,
+                &registry_version,
+                "default",
+            )
+            .await
+            .map_err(AppError::from)?
+            .ok_or_else(|| {
+                AppError::bad_request(
+                    ErrorCode::ValidationError,
+                    format!(
+                        "AI profile for {} v{} not found",
+                        factory.name, registry_version
+                    ),
                 )
-                .await
-                .map_err(AppError::from)?;
+            })?;
 
-            if let Some(mut profile) = ai_profiles::find_by_user_id(txn, ai_user_id)
-                .await
-                .map_err(AppError::from)?
-            {
-                let base_name = friendly_ai_name(ai_user_id, seat_index as usize);
-                let unique_name = unique_ai_display_name(&existing_display_names, &base_name);
-                existing_display_names.insert(unique_name.clone());
-                profile.display_name = unique_name;
-                ai_profiles::update_profile(txn, profile)
-                    .await
-                    .map_err(AppError::from)?;
+            let base_name = friendly_ai_name(ai_profile.id, seat_index as usize);
+            let unique_name = unique_ai_display_name(&existing_display_names, &base_name);
+            existing_display_names.insert(unique_name.clone());
+
+            let mut override_config = serde_json::Map::new();
+            if let Some(seed_value) = seed {
+                override_config.insert(
+                    "seed".to_string(),
+                    serde_json::Value::Number(seed_value.into()),
+                );
             }
+            let override_config = if override_config.is_empty() {
+                None
+            } else {
+                Some(serde_json::Value::Object(override_config))
+            };
+
+            let overrides = AiInstanceOverrides {
+                name: Some(unique_name),
+                memory_level: None,
+                config: override_config,
+            };
 
             ai_service
-                .add_ai_to_game(txn, id, ai_user_id, seat_to_fill, None)
+                .add_ai_to_game(txn, id, ai_profile.id, Some(overrides))
                 .await
                 .map_err(AppError::from)?;
 
@@ -943,9 +942,10 @@ async fn remove_ai_seat(
                     )
                 })?;
 
-            let is_host = match game.created_by {
-                Some(created_by) => created_by == host_user_id,
-                None => host_turn_order == 0,
+            let is_host = match (game.created_by, host_user_id) {
+                (Some(created_by), Some(host_id)) => created_by == host_id,
+                (None, _) => host_turn_order == 0,
+                _ => false,
             };
 
             if !is_host {
@@ -986,17 +986,7 @@ async fn remove_ai_seat(
                         )
                     })?;
 
-                let user = users::find_user_by_id(txn, membership.user_id)
-                    .await
-                    .map_err(AppError::from)?
-                    .ok_or_else(|| {
-                        AppError::not_found(
-                            ErrorCode::UserNotFound,
-                            format!("User {} not found", membership.user_id),
-                        )
-                    })?;
-
-                if !user.is_ai {
+                if membership.player_kind != crate::entities::game_players::PlayerKind::Ai {
                     return Err(AppError::bad_request(
                         ErrorCode::ValidationError,
                         "Specified seat is not occupied by an AI player",
@@ -1008,17 +998,8 @@ async fn remove_ai_seat(
                 let mut ai_memberships = Vec::new();
 
                 for member in &existing_memberships {
-                    if member.user_id == host_user_id {
-                        continue;
-                    }
-
-                    if let Some(user) = users::find_user_by_id(txn, member.user_id)
-                        .await
-                        .map_err(AppError::from)?
-                    {
-                        if user.is_ai {
-                            ai_memberships.push(member.clone());
-                        }
+                    if member.player_kind == crate::entities::game_players::PlayerKind::Ai {
+                        ai_memberships.push(member.clone());
                     }
                 }
 
@@ -1041,17 +1022,7 @@ async fn remove_ai_seat(
                     })?
             };
 
-            let candidate_user = users::find_user_by_id(txn, candidate.user_id)
-                .await
-                .map_err(AppError::from)?
-                .ok_or_else(|| {
-                    AppError::not_found(
-                        ErrorCode::UserNotFound,
-                        format!("User {} not found", candidate.user_id),
-                    )
-                })?;
-
-            if !candidate_user.is_ai {
+            if candidate.player_kind != crate::entities::game_players::PlayerKind::Ai {
                 return Err(AppError::bad_request(
                     ErrorCode::ValidationError,
                     "Specified seat is not occupied by an AI player",
@@ -1116,9 +1087,10 @@ async fn update_ai_seat(
             let host_user_id = membership.user_id;
             let host_turn_order = membership.turn_order;
 
-            let is_host = match game.created_by {
-                Some(created_by) => created_by == host_user_id,
-                None => host_turn_order == 0,
+            let is_host = match (game.created_by, host_user_id) {
+                (Some(created_by), Some(host_id)) => created_by == host_id,
+                (None, _) => host_turn_order == 0,
+                _ => false,
             };
 
             if !is_host {
@@ -1150,32 +1122,12 @@ async fn update_ai_seat(
                     )
                 })?;
 
-            let user = users::find_user_by_id(txn, membership.user_id)
-                .await
-                .map_err(AppError::from)?
-                .ok_or_else(|| {
-                    AppError::not_found(
-                        ErrorCode::UserNotFound,
-                        format!("User {} not found", membership.user_id),
-                    )
-                })?;
-
-            if !user.is_ai {
+            if membership.player_kind != crate::entities::game_players::PlayerKind::Ai {
                 return Err(AppError::bad_request(
                     ErrorCode::ValidationError,
                     "Cannot update AI profile for a human player",
                 ));
             }
-
-            let mut profile = ai_profiles::find_by_user_id(txn, user.id)
-                .await
-                .map_err(AppError::from)?
-                .ok_or_else(|| {
-                    AppError::bad_request(
-                        ErrorCode::ValidationError,
-                        format!("AI profile not found for user {}", user.id),
-                    )
-                })?;
 
             let (factory, registry_version, resolved_seed) =
                 resolve_registry_selection(&request, None)?;
@@ -1185,14 +1137,52 @@ async fn update_ai_seat(
                 seed = Some(random::<u64>());
             }
 
-            let config = build_ai_profile_config(factory.name, &registry_version, seed);
+            let new_profile = ai_profiles::find_by_registry_variant(
+                txn,
+                factory.name,
+                &registry_version,
+                "default",
+            )
+            .await
+            .map_err(AppError::from)?
+            .ok_or_else(|| {
+                AppError::bad_request(
+                    ErrorCode::ValidationError,
+                    format!(
+                        "AI profile for {} v{} not found",
+                        factory.name, registry_version
+                    ),
+                )
+            })?;
 
-            profile.playstyle = Some(factory.name.to_string());
-            profile.config = Some(config);
-
-            ai_profiles::update_profile(txn, profile)
+            let mut updated_membership = membership.clone();
+            updated_membership.ai_profile_id = Some(new_profile.id);
+            memberships::update_membership(txn, updated_membership)
                 .await
                 .map_err(AppError::from)?;
+
+            if let Some(seed_value) = seed {
+                let mut cfg = serde_json::Map::new();
+                cfg.insert(
+                    "seed".to_string(),
+                    serde_json::Value::Number(seed_value.into()),
+                );
+                let cfg_value = serde_json::Value::Object(cfg);
+                if let Some(mut existing_override) =
+                    ai_overrides::find_by_game_player_id(txn, membership.id)
+                        .await
+                        .map_err(AppError::from)?
+                {
+                    existing_override.config = Some(cfg_value);
+                    ai_overrides::update_override(txn, existing_override)
+                        .await
+                        .map_err(AppError::from)?;
+                } else {
+                    ai_overrides::create_override(txn, membership.id, None, None, Some(cfg_value))
+                        .await
+                        .map_err(AppError::from)?;
+                }
+            }
 
             games_sea::update_round(txn, GameUpdateRound::new(id, game.lock_version))
                 .await
@@ -1404,13 +1394,13 @@ async fn delete_game(
     Ok(HttpResponse::NoContent().finish())
 }
 
-pub fn friendly_ai_name(user_id: i64, seat_index: usize) -> String {
+pub fn friendly_ai_name(seed: i64, seat_index: usize) -> String {
     const AI_NAMES: [&str; 16] = [
         "Atlas", "Blaze", "Comet", "Dynamo", "Echo", "Flare", "Glyph", "Helix", "Ion", "Jet",
         "Kilo", "Lumen", "Nova", "Orion", "Pulse", "Quark",
     ];
 
-    let idx = ((user_id as usize) ^ seat_index) % AI_NAMES.len();
+    let idx = ((seed as usize) ^ seat_index) % AI_NAMES.len();
     AI_NAMES[idx].to_string()
 }
 

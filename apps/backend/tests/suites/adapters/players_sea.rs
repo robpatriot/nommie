@@ -2,8 +2,7 @@ use backend::db::txn::with_txn;
 use backend::entities::users;
 use backend::error::AppError;
 use backend::errors::domain::DomainError;
-use backend::repos::{ai_profiles as ai_profiles_repo, players};
-use backend::routes::games::friendly_ai_name;
+use backend::repos::{ai_profiles, players};
 use rand::random;
 use sea_orm::{ActiveModelTrait, NotSet, Set};
 use time::OffsetDateTime;
@@ -66,39 +65,27 @@ async fn test_get_display_name_by_seat_ai_profile() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            // Create AI user
-            let now = OffsetDateTime::now_utc();
-            let ai_user = users::ActiveModel {
-                id: NotSet,
-                sub: Set(format!("ai-test-{}", random::<u32>())),
-                username: Set(None),
-                is_ai: Set(true),
-                created_at: Set(now),
-                updated_at: Set(now),
-            }
-            .insert(txn)
-            .await?;
-
-            // Create AI profile with display name
-            ai_profiles_repo::create_profile(
+            let ai_profile = ai_profiles::find_by_registry_variant(
                 txn,
-                ai_user.id,
-                "Test Bot".to_string(),
-                Some("random".to_string()),
-                None,
-                None,
-                Some(100),
+                backend::ai::RandomPlayer::NAME,
+                backend::ai::RandomPlayer::VERSION,
+                "default",
+            )
+            .await?
+            .expect("catalog profile missing");
+
+            let game_id = create_test_game(txn).await?;
+            let _ = crate::support::db_memberships::create_test_ai_game_player(
+                txn,
+                game_id,
+                ai_profile.id,
+                2,
+                false,
             )
             .await?;
 
-            let game_id = create_test_game(txn).await?;
-            let _ = create_test_game_player(txn, game_id, ai_user.id, 2).await?;
-
-            // Test the adapter - should return friendly_ai_name, not profile.display_name
             let result = players::get_display_name_by_seat(txn, game_id, 2).await?;
-
-            let expected = friendly_ai_name(ai_user.id, 2);
-            assert_eq!(result, expected);
+            assert_eq!(result, ai_profile.display_name);
 
             Ok::<_, AppError>(())
         })

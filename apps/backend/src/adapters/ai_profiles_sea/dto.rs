@@ -3,7 +3,9 @@
 /// DTO for creating an AI profile.
 #[derive(Debug, Clone)]
 pub struct AiProfileCreate {
-    pub user_id: i64,
+    pub registry_name: String,
+    pub registry_version: String,
+    pub variant: String,
     pub display_name: String,
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
@@ -12,15 +14,27 @@ pub struct AiProfileCreate {
 }
 
 impl AiProfileCreate {
-    pub fn new(user_id: i64, display_name: impl Into<String>) -> Self {
+    pub fn new(
+        registry_name: impl Into<String>,
+        registry_version: impl Into<String>,
+        variant: impl Into<String>,
+        display_name: impl Into<String>,
+    ) -> Self {
         Self {
-            user_id,
+            registry_name: registry_name.into(),
+            registry_version: registry_version.into(),
+            variant: variant.into(),
             display_name: display_name.into(),
             playstyle: None,
             difficulty: None,
             config: None,
             memory_level: None,
         }
+    }
+
+    pub fn with_variant(mut self, variant: impl Into<String>) -> Self {
+        self.variant = variant.into();
+        self
     }
 
     pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
@@ -53,7 +67,9 @@ impl AiProfileCreate {
 #[derive(Debug, Clone)]
 pub struct AiProfileUpdate {
     pub id: i64,
-    pub user_id: i64,
+    pub registry_name: Option<String>,
+    pub registry_version: Option<String>,
+    pub variant: Option<String>,
     pub display_name: Option<String>,
     pub playstyle: Option<String>,
     pub difficulty: Option<i32>,
@@ -62,16 +78,33 @@ pub struct AiProfileUpdate {
 }
 
 impl AiProfileUpdate {
-    pub fn new(id: i64, user_id: i64) -> Self {
+    pub fn new(id: i64) -> Self {
         Self {
             id,
-            user_id,
+            registry_name: None,
+            registry_version: None,
+            variant: None,
             display_name: None,
             playstyle: None,
             difficulty: None,
             config: None,
             memory_level: None,
         }
+    }
+
+    pub fn with_registry_name(mut self, registry_name: impl Into<String>) -> Self {
+        self.registry_name = Some(registry_name.into());
+        self
+    }
+
+    pub fn with_registry_version(mut self, registry_version: impl Into<String>) -> Self {
+        self.registry_version = Some(registry_version.into());
+        self
+    }
+
+    pub fn with_variant(mut self, variant: impl Into<String>) -> Self {
+        self.variant = Some(variant.into());
+        self
     }
 
     pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {

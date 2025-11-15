@@ -3,6 +3,7 @@
 use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::memberships_sea as memberships_adapter;
+use crate::entities::game_players::PlayerKind;
 use crate::errors::domain::DomainError;
 
 /// Game membership domain model
@@ -10,7 +11,9 @@ use crate::errors::domain::DomainError;
 pub struct GameMembership {
     pub id: i64,
     pub game_id: i64,
-    pub user_id: i64,
+    pub player_kind: PlayerKind,
+    pub user_id: Option<i64>,
+    pub ai_profile_id: Option<i64>,
     pub turn_order: i32,
     pub is_ready: bool,
     pub role: GameRole,
@@ -56,12 +59,50 @@ pub async fn create_membership(
     is_ready: bool,
     role: GameRole,
 ) -> Result<GameMembership, DomainError> {
-    let dto = memberships_adapter::MembershipCreate::new(game_id, user_id, turn_order, is_ready);
+    let dto = memberships_adapter::MembershipCreate::new(
+        game_id,
+        PlayerKind::Human,
+        Some(user_id),
+        None,
+        turn_order,
+        is_ready,
+    );
     let membership = memberships_adapter::create_membership(txn, dto).await?;
     Ok(GameMembership {
         id: membership.id,
         game_id: membership.game_id,
-        user_id: membership.user_id,
+        player_kind: PlayerKind::Human,
+        user_id: membership.human_user_id,
+        ai_profile_id: membership.ai_profile_id,
+        turn_order: membership.turn_order,
+        is_ready: membership.is_ready,
+        role,
+    })
+}
+
+pub async fn create_ai_membership(
+    txn: &DatabaseTransaction,
+    game_id: i64,
+    ai_profile_id: i64,
+    turn_order: i32,
+    is_ready: bool,
+    role: GameRole,
+) -> Result<GameMembership, DomainError> {
+    let dto = memberships_adapter::MembershipCreate::new(
+        game_id,
+        PlayerKind::Ai,
+        None,
+        Some(ai_profile_id),
+        turn_order,
+        is_ready,
+    );
+    let membership = memberships_adapter::create_membership(txn, dto).await?;
+    Ok(GameMembership {
+        id: membership.id,
+        game_id: membership.game_id,
+        player_kind: PlayerKind::Ai,
+        user_id: membership.human_user_id,
+        ai_profile_id: membership.ai_profile_id,
         turn_order: membership.turn_order,
         is_ready: membership.is_ready,
         role,
@@ -75,7 +116,9 @@ pub async fn update_membership(
     let dto = memberships_adapter::MembershipUpdate::new(
         membership.id,
         membership.game_id,
+        membership.player_kind.clone(),
         membership.user_id,
+        membership.ai_profile_id,
         membership.turn_order,
         membership.is_ready,
     );
@@ -83,7 +126,9 @@ pub async fn update_membership(
     Ok(GameMembership {
         id: updated.id,
         game_id: updated.game_id,
-        user_id: updated.user_id,
+        player_kind: updated.player_kind,
+        user_id: updated.human_user_id,
+        ai_profile_id: updated.ai_profile_id,
         turn_order: updated.turn_order,
         is_ready: updated.is_ready,
         role: GameRole::Player, // For now, all members are players
@@ -113,7 +158,9 @@ impl From<crate::entities::game_players::Model> for GameMembership {
         Self {
             id: model.id,
             game_id: model.game_id,
-            user_id: model.user_id,
+            player_kind: model.player_kind,
+            user_id: model.human_user_id,
+            ai_profile_id: model.ai_profile_id,
             turn_order: model.turn_order,
             is_ready: model.is_ready,
             role: GameRole::Player, // For now, all members are players

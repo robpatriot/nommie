@@ -20,7 +20,8 @@ pub async fn find_membership<C: ConnectionTrait + Send + Sync>(
 ) -> Result<Option<game_players::Model>, sea_orm::DbErr> {
     game_players::Entity::find()
         .filter(game_players::Column::GameId.eq(game_id))
-        .filter(game_players::Column::UserId.eq(user_id))
+        .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
+        .filter(game_players::Column::HumanUserId.eq(user_id))
         .one(conn)
         .await
 }
@@ -33,7 +34,9 @@ pub async fn create_membership(
     let membership_active = game_players::ActiveModel {
         id: NotSet,
         game_id: Set(dto.game_id),
-        user_id: Set(dto.user_id),
+        player_kind: Set(dto.player_kind),
+        human_user_id: Set(dto.human_user_id),
+        ai_profile_id: Set(dto.ai_profile_id),
         turn_order: Set(dto.turn_order),
         is_ready: Set(dto.is_ready),
         created_at: Set(now),
@@ -50,7 +53,9 @@ pub async fn update_membership(
     let membership = game_players::ActiveModel {
         id: Set(dto.id),
         game_id: Set(dto.game_id),
-        user_id: Set(dto.user_id),
+        player_kind: Set(dto.player_kind),
+        human_user_id: Set(dto.human_user_id),
+        ai_profile_id: Set(dto.ai_profile_id),
         turn_order: Set(dto.turn_order),
         is_ready: Set(dto.is_ready),
         created_at: NotSet,
@@ -66,7 +71,9 @@ pub async fn set_membership_ready(
     let membership = game_players::ActiveModel {
         id: Set(dto.id),
         game_id: NotSet,
-        user_id: NotSet,
+        player_kind: NotSet,
+        human_user_id: NotSet,
+        ai_profile_id: NotSet,
         turn_order: NotSet,
         is_ready: Set(dto.is_ready),
         created_at: NotSet,

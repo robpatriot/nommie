@@ -56,7 +56,8 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
 
     let membership = game_players::Entity::find()
         .filter(game_players::Column::GameId.eq(game_id))
-        .filter(game_players::Column::UserId.eq(user_id))
+        .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
+        .filter(game_players::Column::HumanUserId.eq(user_id))
         .one(shared.transaction())
         .await?
         .expect("membership should exist");
@@ -114,7 +115,8 @@ async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
     // Membership for the acting user should now be ready.
     let actor_membership = game_players::Entity::find()
         .filter(game_players::Column::GameId.eq(game_id))
-        .filter(game_players::Column::UserId.eq(actor_id))
+        .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
+        .filter(game_players::Column::HumanUserId.eq(actor_id))
         .one(shared.transaction())
         .await?
         .expect("actor membership should exist");
