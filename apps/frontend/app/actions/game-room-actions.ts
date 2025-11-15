@@ -17,7 +17,13 @@ import { toErrorResult } from '@/lib/api/action-helpers'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
 import { validateSeat } from '@/utils/seat-validation'
-import type { Card, GameSnapshot, Seat, Trump } from '@/lib/game-room/types'
+import type {
+  BidConstraints,
+  Card,
+  GameSnapshot,
+  Seat,
+  Trump,
+} from '@/lib/game-room/types'
 
 export interface GameRoomSnapshotRequest {
   gameId: number
@@ -43,6 +49,7 @@ export interface GameRoomSnapshotPayload {
   viewerHand: Card[]
   timestamp: string
   hostSeat: Seat
+  bidConstraints?: BidConstraints | null
 }
 
 export async function getGameRoomSnapshotAction(
@@ -77,6 +84,7 @@ export async function getGameRoomSnapshotAction(
         viewerHand: snapshotResult.viewerHand ?? [],
         timestamp: new Date().toISOString(),
         hostSeat,
+        bidConstraints: snapshotResult.bidConstraints ?? null,
       },
     }
   } catch (error) {

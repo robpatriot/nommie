@@ -12,7 +12,8 @@ use tracing::warn;
 use crate::adapters::games_sea::{self, GameUpdateRound};
 use crate::ai::{registry, AiConfig, HeuristicV1, RandomPlayer};
 use crate::db::txn::with_txn;
-use crate::domain::player_view::CurrentRoundInfo;
+use crate::domain::bidding::validate_consecutive_zero_bids;
+use crate::domain::player_view::{CurrentRoundInfo, GameHistory};
 use crate::domain::snapshot::{GameSnapshot, SeatAiProfilePublic, SeatPublic};
 use crate::domain::state::Seat;
 use crate::domain::{Card, Rank, Suit};
@@ -36,6 +37,13 @@ use crate::state::app_state::AppState;
 struct GameSnapshotResponse {
     snapshot: GameSnapshot,
     viewer_hand: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bid_constraints: Option<BidConstraintsResponse>,
+}
+
+#[derive(Serialize)]
+struct BidConstraintsResponse {
+    zero_bid_locked: [bool; 4],
 }
 
 #[derive(Serialize)]
@@ -78,7 +86,7 @@ async fn get_snapshot(
     let id = game_id.0;
 
     // Load game state and produce snapshot within a transaction
-    let (snapshot, lock_version, viewer_seat, viewer_hand) =
+    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
         with_txn(Some(&http_req), &app_state, |txn| {
             Box::pin(async move {
                 // Fetch game from database to get lock_version
@@ -241,7 +249,36 @@ async fn get_snapshot(
                     None
                 };
 
-                Ok((snap, game.lock_version, viewer_seat, viewer_hand))
+                let mut bid_constraints: Option<BidConstraintsResponse> = None;
+                if matches!(
+                    &snap.phase,
+                    crate::domain::snapshot::PhaseSnapshot::Bidding(_)
+                ) {
+                    if let Some(current_round_no) = game.current_round {
+                        let history = GameHistory::load(txn, id).await?;
+                        let mut zero_bid_locked = [false; 4];
+                        for seat in 0..4 {
+                            if validate_consecutive_zero_bids(
+                                &history,
+                                seat as i16,
+                                current_round_no,
+                            )
+                            .is_err()
+                            {
+                                zero_bid_locked[seat as usize] = true;
+                            }
+                        }
+                        bid_constraints = Some(BidConstraintsResponse { zero_bid_locked });
+                    }
+                }
+
+                Ok((
+                    snap,
+                    game.lock_version,
+                    viewer_seat,
+                    viewer_hand,
+                    bid_constraints,
+                ))
             })
         })
         .await?;
@@ -281,6 +318,7 @@ async fn get_snapshot(
     Ok(response.json(GameSnapshotResponse {
         snapshot,
         viewer_hand,
+        bid_constraints,
     }))
 }
 

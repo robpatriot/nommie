@@ -423,9 +423,18 @@ export function GameRoomClient({
     return {
       viewerSeat: viewerSeatForInteractions,
       isPending: isBidPending,
+      zeroBidLocked:
+        snapshot.bidConstraints?.zeroBidLocked?.[viewerSeatForInteractions] ??
+        false,
       onSubmit: handleSubmitBid,
     }
-  }, [handleSubmitBid, isBidPending, phase, viewerSeatForInteractions])
+  }, [
+    handleSubmitBid,
+    isBidPending,
+    phase,
+    viewerSeatForInteractions,
+    snapshot.bidConstraints,
+  ])
 
   const trumpControls = useMemo(() => {
     if (phase.phase !== 'TrumpSelect') {
