@@ -51,6 +51,7 @@ export default async function GamePage({ params }: GamePageProps) {
     viewerHand: snapshotResult.viewerHand ?? [],
     timestamp: new Date().toISOString(),
     hostSeat,
+    bidConstraints: snapshotResult.bidConstraints ?? null,
   }
 
   return (

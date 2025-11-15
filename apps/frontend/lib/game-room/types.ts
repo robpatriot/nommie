@@ -77,3 +77,7 @@ export interface GameSnapshot {
   game: GameHeader
   phase: PhaseSnapshot
 }
+
+export interface BidConstraints {
+  zeroBidLocked: [boolean, boolean, boolean, boolean]
+}

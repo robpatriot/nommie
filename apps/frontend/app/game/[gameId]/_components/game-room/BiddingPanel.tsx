@@ -1,6 +1,12 @@
 'use client'
 
-import { type FormEvent, useEffect, useMemo, useState } from 'react'
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import type { BiddingSnapshot, Seat } from '@/lib/game-room/types'
 import { getOrientation } from './utils'
 import type { GameRoomViewProps } from '../game-room-view'
@@ -22,26 +28,47 @@ export function BiddingPanel({
 }: BiddingPanelProps) {
   const minBid = phase.min_bid
   const maxBid = phase.max_bid
+  const handSize = phase.round.hand_size
   const viewerBid = phase.bids[viewerSeat] ?? null
+  const zeroBidLocked = bidding.zeroBidLocked ?? false
   const isViewerTurn = phase.to_act === viewerSeat
   const activeName =
     phase.to_act === viewerSeat ? 'You' : playerNames[phase.to_act]
-  const [selectedBid, setSelectedBid] = useState<number>(
-    () => viewerBid ?? minBid
+  const [bidInput, setBidInput] = useState<string>(
+    () => (viewerBid ?? minBid).toString()
   )
+  const [flashValidation, setFlashValidation] = useState(false)
 
   useEffect(() => {
     if (viewerBid !== null) {
-      setSelectedBid(viewerBid)
+      setBidInput(viewerBid.toString())
       return
     }
 
-    setSelectedBid((current) => {
-      if (current < minBid) return minBid
-      if (current > maxBid) return maxBid
+    setBidInput((current) => {
+      if (current.trim() === '') {
+        return current
+      }
+
+      const parsed = Number(current)
+      if (!Number.isFinite(parsed)) {
+        return ''
+      }
+
+      if (parsed < minBid) return String(minBid)
+      if (parsed > maxBid) return String(maxBid)
       return current
     })
   }, [maxBid, minBid, viewerBid])
+
+  useEffect(() => {
+    if (!flashValidation) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => setFlashValidation(false), 600)
+    return () => window.clearTimeout(timeout)
+  }, [flashValidation])
 
   const seatBids = useMemo(
     () =>
@@ -54,8 +81,58 @@ export function BiddingPanel({
     [layoutSeat, phase.bids, playerNames, viewerSeat]
   )
 
+  const remainingNullBids = phase.bids.filter((bid) => bid === null).length
+  const isFinalBid = remainingNullBids === 1
+  const sumOfOtherBids = phase.bids.reduce((total, bid, seatIndex) => {
+    if (seatIndex === viewerSeat) {
+      return total
+    }
+    return total + (bid ?? 0)
+  }, 0)
+
+  const parsedBid =
+    bidInput.trim() === '' ? null : Number.parseInt(bidInput, 10)
+  const hitsHandSize =
+    isFinalBid &&
+    parsedBid !== null &&
+    sumOfOtherBids + parsedBid === handSize
+
+  const validationMessages: string[] = []
+
+  if (parsedBid === null) {
+    validationMessages.push('Enter a bid before submitting.')
+  } else {
+    if (parsedBid < minBid) {
+      validationMessages.push(`Bid must be at least ${minBid}.`)
+    }
+    if (parsedBid > maxBid) {
+      validationMessages.push(`Bid cannot exceed ${maxBid}.`)
+    }
+    if (parsedBid === 0 && zeroBidLocked) {
+      validationMessages.push('You cannot bid 0 again right now.')
+    }
+    if (hitsHandSize) {
+      validationMessages.push(
+        `Total bids cannot equal ${handSize}. Choose another number.`
+      )
+    }
+  }
+
+  const warningMessage = validationMessages[0] ?? null
+  const hasValidationIssue = warningMessage !== null
+  const describedByIds = warningMessage
+    ? 'bid-range-hint bid-validation-warning'
+    : 'bid-range-hint'
+
   const isSubmitDisabled =
     !isViewerTurn || viewerBid !== null || bidding.isPending
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value
+    if (value === '' || /^\d+$/.test(value)) {
+      setBidInput(value)
+    }
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -64,8 +141,13 @@ export function BiddingPanel({
       return
     }
 
-    const normalizedBid = Math.min(Math.max(selectedBid, minBid), maxBid)
-    setSelectedBid(normalizedBid)
+    if (parsedBid === null || hasValidationIssue) {
+      setFlashValidation(true)
+      return
+    }
+
+    const normalizedBid = Math.min(Math.max(parsedBid, minBid), maxBid)
+    setBidInput(normalizedBid.toString())
     await bidding.onSubmit(normalizedBid)
   }
 
@@ -99,16 +181,20 @@ export function BiddingPanel({
         <div className="flex flex-wrap items-center gap-3">
           <input
             id="bid-value"
-            type="number"
-            min={minBid}
-            max={maxBid}
-            step={1}
-            value={selectedBid}
-            onChange={(event) => setSelectedBid(Number(event.target.value))}
-            className="w-24 rounded-md border border-success/40 bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-success focus:ring focus:ring-success/40 disabled:cursor-not-allowed disabled:opacity-60"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={bidInput}
+            onChange={handleInputChange}
+            className={`w-24 rounded-md border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              hasValidationIssue
+                ? 'border-warning/70 focus:border-warning focus:ring focus:ring-warning/30'
+                : 'border-success/40 focus:border-success focus:ring focus:ring-success/40'
+            } ${flashValidation && hasValidationIssue ? 'animate-pulse' : ''}`}
             disabled={viewerBid !== null || bidding.isPending || !isViewerTurn}
             aria-label="Bid value"
-            aria-describedby="bid-range-hint"
+            aria-describedby={describedByIds}
+            aria-invalid={hasValidationIssue}
           />
           <button
             type="submit"
@@ -117,7 +203,9 @@ export function BiddingPanel({
             aria-label={
               bidding.isPending
                 ? 'Submitting bid'
-                : `Submit bid of ${selectedBid}`
+                : parsedBid !== null
+                  ? `Submit bid of ${parsedBid}`
+                  : 'Submit bid'
             }
           >
             {bidding.isPending ? 'Submitting…' : 'Submit Bid'}
@@ -127,10 +215,21 @@ export function BiddingPanel({
           Allowed range: {minBid} – {maxBid}.{' '}
           {isViewerTurn
             ? viewerBid === null
-              ? 'Choose a value and submit before time runs out.'
+              ? "Choose a value and submit when you're ready."
               : 'Bid submitted — waiting for other players.'
             : `Waiting for ${activeName} to bid.`}
         </p>
+        {warningMessage ? (
+          <p
+            id="bid-validation-warning"
+            className={`text-xs font-semibold text-warning-foreground ${
+              flashValidation ? 'animate-pulse' : ''
+            }`}
+            role="alert"
+          >
+            {warningMessage}
+          </p>
+        ) : null}
       </form>
 
       <div className="rounded-lg border border-success/20 bg-surface/60 p-4">

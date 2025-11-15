@@ -27,6 +27,7 @@ export interface BiddingState {
   viewerSeat: Seat
   isPending: boolean
   onSubmit: (bid: number) => Promise<void> | void
+  zeroBidLocked?: boolean
 }
 
 export interface TrumpState {
