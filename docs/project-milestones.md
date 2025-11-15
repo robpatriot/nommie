@@ -110,48 +110,48 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - Pure logic modules: `rules`, `bidding`, `tricks`, `scoring`, `state`.
 - No SeaORM in domain modules.
-**Progress:** ORM isolation and adapter layer complete; foundation ready for domain logic.  
+**Progress:** Core domain modules shipped, but `domain::player_view` still depends on `sea_orm::ConnectionTrait`; data-loading split into adapters remains TODO.  
 **Acceptance:** `grep` shows no ORM usage in domain code.
 
 ---
 
-### 🟨 **11. Frontend App Router Seed**
+### ✅ **11. Frontend App Router Seed**
 **Dependencies:** 5, 7  
 **Details:**
-- Next.js App Router + Turbopack.
-- Login page working.
-- Lobby and Game skeleton pages pending.
-**Acceptance:** Users can sign in and access placeholder lobby/game views.
+- Next.js App Router with server components/actions, guarded by backend JWT resolution.
+- Authenticated layout with shared header, theme provider, and suspense-loading states.
+- Lobby and Game routes backed by live data fetching (ETag-aware snapshot polling) and server mutations.
+**Acceptance:** Users can authenticate and reach lobby/game views with real data and actions wired end-to-end.
 
 ---
 
-### 🟨 **12. Game Lifecycle (Happy Path)**
+### ✅ **12. Game Lifecycle (Happy Path)**
 **Dependencies:** 9, 7, 10, 11  
 **Details:**
 - Complete flow: `create → join → ready → deal → bid → trump → tricks → scoring → next round`.
 - Integration test covers minimal end-to-end loop.
-**Progress:** Adapters, services, and transactional sentinel in place; game orchestration logic pending.  
-**Acceptance:** A full happy-path game completes successfully.
+**Progress:** `services::game_flow` exercises full round progression with scoring, and `tests/suites/services/game_flow_happy_paths.rs` verifies deal→bid→play→score transitions.  
+**Acceptance:** A full happy-path game completes successfully with deterministic tests guarding regressions.
 
 ---
 
-### 🕓 **13. AI Orchestration**
+### ✅ **13. AI Orchestration**
 **Dependencies:** 11  
 **Details:**
 - AI performs bidding and legal plays.
 - Game advances automatically until human input is required.
-**Progress:** Infrastructure and deterministic test harness ready; logic pending.  
-**Acceptance:** Full AI-only games complete successfully.
+**Progress:** `GameFlowService::process_game_state` drives automatic turns with retry logic, `round_cache` eliminates redundant reads, and per-instance AI overrides merge profile + game config.  
+**Acceptance:** Full AI-only games complete successfully; orchestration tests cover bidding, trump selection, trick play, and auto-start flows.
 
 ---
 
-### 🕓 **14. Validation, Edge Cases, and Property Tests**
+### ✅ **14. Validation, Edge Cases, and Property Tests**
 **Dependencies:** 11  
 **Details:**
 - Invalid bids/plays return proper Problem Details.
 - Property tests confirm trick/scoring invariants.
-**Progress:** Core correctness and timestamp tests complete; property-based testing pending.  
-**Acceptance:** Error cases handled consistently; all properties hold.
+**Progress:** Service suites assert Problem Details codes for invalid bids/plays, while `domain/tests_props_*.rs` proptest suites lock in trick legality, scoring, and consistency invariants (with regression seeds tracked).  
+**Acceptance:** Error cases handled consistently; all properties hold across generated games.
 
 ---
 
