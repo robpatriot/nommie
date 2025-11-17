@@ -35,58 +35,58 @@ export function PlayPanel({
     await onPlayCard(selectedCard)
   }
 
-  return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-2xl border border-primary/40 bg-primary/10 p-4">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-primary-foreground">
-            Play Card
-          </h2>
-          <p className="text-xs text-primary-foreground/80">
-            Choose a legal card from your hand. Only legal cards are enabled.
-          </p>
-        </div>
-        <div className="rounded-full border border-primary/40 bg-primary/15 px-3 py-1 text-xs font-medium text-primary-foreground">
-          Waiting on: {activeName}
-        </div>
-      </header>
+    return (
+      <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-3xl border border-primary/40 bg-primary/15 p-5 shadow-[0_30px_90px_rgba(239,149,74,0.25)]">
+        <header className="flex flex-wrap items-center justify-between gap-2 text-primary-foreground">
+          <div>
+            <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
+              Play card
+            </h2>
+            <p className="text-xs text-primary-foreground/80">
+              Choose a legal card from your hand. Only allowed cards stay enabled.
+            </p>
+          </div>
+          <div className="rounded-full border border-primary/50 bg-primary/25 px-3 py-1 text-xs font-semibold">
+            Waiting on: {activeName}
+          </div>
+        </header>
 
-      <form
-        className="flex flex-col gap-3 rounded-lg border border-primary/30 bg-surface/60 p-4 shadow-inner shadow-primary/20"
-        onSubmit={handleSubmit}
-      >
-        <div className="flex flex-wrap items-center gap-3 text-sm text-primary-foreground">
-          <span className="text-xs uppercase tracking-wide text-primary-foreground/80">
-            Selected Card
-          </span>
-          <span className="rounded-md border border-primary/40 bg-background px-3 py-1 font-semibold text-foreground">
-            {selectedCard ?? '—'}
-          </span>
-        </div>
-        <button
-          type="submit"
-          className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:bg-primary/80 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
-          disabled={isSubmitDisabled}
-          aria-label={
-            play.isPending
-              ? 'Playing card'
-              : isViewerTurn && selectedCard
-                ? `Play selected card: ${selectedCard}`
-                : isViewerTurn
-                  ? 'Play selected card'
-                  : `Waiting for ${activeName} to play`
-          }
+        <form
+          className="flex flex-col gap-4 rounded-2xl border border-primary/30 bg-surface/85 p-4 shadow-inner shadow-primary/20"
+          onSubmit={handleSubmit}
         >
-          {play.isPending
-            ? 'Playing…'
-            : isViewerTurn
-              ? 'Play Selected Card'
-              : `Waiting for ${activeName}`}
-        </button>
-        <p className="text-xs text-primary-foreground/80">
-          Legal cards: {play.playable.length ? play.playable.join(', ') : '—'}
-        </p>
-      </form>
-    </section>
-  )
+          <div className="flex flex-wrap items-center gap-3 text-sm text-primary-foreground">
+            <span className="text-xs uppercase tracking-wide text-primary-foreground/70">
+              Selected card
+            </span>
+            <span className="rounded-xl border border-primary/40 bg-background px-4 py-2 text-base font-semibold text-foreground">
+              {selectedCard ?? '—'}
+            </span>
+          </div>
+          <button
+            type="submit"
+            className="w-full rounded-2xl bg-primary px-4 py-3 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
+            disabled={isSubmitDisabled}
+            aria-label={
+              play.isPending
+                ? 'Playing card'
+                : isViewerTurn && selectedCard
+                  ? `Play selected card: ${selectedCard}`
+                  : isViewerTurn
+                    ? 'Play selected card'
+                    : `Waiting for ${activeName} to play`
+            }
+          >
+            {play.isPending
+              ? 'Playing…'
+              : isViewerTurn
+                ? 'Play selected card'
+                : `Waiting for ${activeName}`}
+          </button>
+          <p className="text-xs text-primary-foreground/70">
+            Legal cards: {play.playable.length ? play.playable.join(', ') : '—'}
+          </p>
+        </form>
+      </section>
+    )
 }

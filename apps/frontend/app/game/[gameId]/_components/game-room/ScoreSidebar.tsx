@@ -11,6 +11,7 @@ interface ScoreSidebarProps {
   readyState?: GameRoomViewProps['readyState']
   aiState?: GameRoomViewProps['aiSeatState']
   isPreGame: boolean
+  className?: string
 }
 
 export function ScoreSidebar({
@@ -20,27 +21,46 @@ export function ScoreSidebar({
   readyState,
   aiState,
   isPreGame,
+  className = '',
 }: ScoreSidebarProps) {
   return (
-    <aside className="flex h-full flex-col gap-4 rounded-2xl border border-border bg-surface/70 p-4">
-      <header className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-foreground">Scores</h2>
-        <span className="text-xs text-subtle">Updated each sync</span>
+    <aside
+      className={`flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur ${className}`}
+    >
+      <header className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+            Scoreboard
+          </p>
+          <h2 className="text-lg font-semibold text-foreground">
+            Tracking the trick race
+          </h2>
+        </div>
+        <span className="rounded-full border border-border/60 px-3 py-1 text-xs text-subtle">
+          Updates each sync
+        </span>
       </header>
 
-      <details className="rounded-xl border border-border bg-surface/60" open>
-        <summary className="cursor-pointer list-none rounded-xl px-4 py-3 text-sm font-medium text-foreground transition hover:bg-surface">
-          Cumulative Totals
+      <details
+        className="rounded-2xl border border-border/60 bg-surface/70"
+        open
+      >
+        <summary className="cursor-pointer list-none rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-surface">
+          Cumulative totals
         </summary>
-        <div className="px-4 pb-3">
-          <ul className="flex flex-col gap-2 text-sm text-muted">
+        <div className="px-4 pb-4">
+          <ul className="flex flex-col gap-3 text-sm text-muted">
             {scores.map((score, idx) => (
               <li
                 key={playerNames[idx]}
-                className="flex items-center justify-between"
+                className="flex items-center justify-between rounded-xl border border-border/40 bg-surface/60 px-3 py-2"
               >
-                <span>{playerNames[idx]}</span>
-                <span className="font-semibold text-foreground">{score}</span>
+                <span className="font-medium text-foreground">
+                  {playerNames[idx]}
+                </span>
+                <span className="text-base font-semibold text-foreground">
+                  {score}
+                </span>
               </li>
             ))}
           </ul>
@@ -48,9 +68,9 @@ export function ScoreSidebar({
       </details>
 
       {round ? (
-        <div className="rounded-xl border border-border bg-surface/60 p-4 text-sm text-muted">
+        <div className="rounded-2xl border border-border/60 bg-surface/70 p-4 text-sm text-muted">
           <div className="mb-2 text-xs uppercase tracking-wide text-subtle">
-            Round Snapshot
+            Round snapshot
           </div>
           <p>Hand size: {round.hand_size}</p>
           <p>Trump: {formatTrump(round.trump)}</p>

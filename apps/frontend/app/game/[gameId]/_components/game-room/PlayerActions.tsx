@@ -61,16 +61,18 @@ export function PlayerActions({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-border bg-surface/60 p-4 text-sm text-muted">
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl border border-white/10 bg-surface/80 p-5 text-sm text-muted shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur">
       <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-subtle">
-          Table Actions
+        <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
+          Table actions
         </h2>
-        <span className="text-xs text-subtle">Interactive controls</span>
+        <span className="rounded-full bg-surface px-3 py-1 text-xs text-muted">
+          Waiting for next phase
+        </span>
       </header>
       <p>
-        No interactive controls are available for the current phase. They will
-        appear here when required.
+        Interactive controls will surface here as soon as the current phase
+        requires your input.
       </p>
     </section>
   )

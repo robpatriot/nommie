@@ -13,6 +13,7 @@ import {
   getPhaseLabel,
   getRound,
 } from './game-room/utils'
+import type { SeatSummary } from './game-room/utils'
 import { PhaseFact } from './game-room/PhaseFact'
 import { SeatCard } from './game-room/SeatCard'
 import { TrickArea } from './game-room/TrickArea'
@@ -89,17 +90,30 @@ export function GameRoomView(props: GameRoomViewProps) {
     minute: '2-digit',
   })
 
-  const trickMap = getCurrentTrickMap(phase)
-  const seatSummaries = buildSeatSummaries({
-    playerNames,
-    viewerSeat: effectiveViewerSeat ?? 0, // Use 0 as fallback for orientation calculation only
-    phase,
-    scores: snapshot.game.scores_total,
-    trickMap,
-    round,
-    activeSeat,
-    actualViewerSeat: effectiveViewerSeat, // Pass actual viewer seat separately for isViewer check
-  })
+    const trickMap = getCurrentTrickMap(phase)
+    const seatSummaries = buildSeatSummaries({
+      playerNames,
+      viewerSeat: effectiveViewerSeat ?? 0, // Use 0 as fallback for orientation calculation only
+      phase,
+      scores: snapshot.game.scores_total,
+      trickMap,
+      round,
+      activeSeat,
+      actualViewerSeat: effectiveViewerSeat, // Pass actual viewer seat separately for isViewer check
+    })
+    const orientationOrder: SeatSummary['orientation'][] = [
+      'bottom',
+      'right',
+      'top',
+      'left',
+    ]
+    const mobileSeatSummaries = seatSummaries
+      .slice()
+      .sort(
+        (a, b) =>
+          orientationOrder.indexOf(a.orientation) -
+          orientationOrder.indexOf(b.orientation)
+      )
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
 
@@ -125,79 +139,75 @@ export function GameRoomView(props: GameRoomViewProps) {
     [playState]
   )
 
-  return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <header className="border-b border-border bg-surface/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 sm:px-6 lg:px-10">
-          <div className="flex flex-1 flex-col gap-1">
-            <span className="text-sm font-medium text-subtle">
-              Game #{gameId}
-            </span>
-            <h1 className="text-2xl font-semibold text-foreground">
-              Nommie Table
-            </h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {onRefresh ? (
+    return (
+      <div className="flex min-h-screen flex-col text-foreground">
+        <header className="border-b border-white/10 bg-surface-strong/70 px-3 py-4 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur-lg">
+          <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+                Game #{gameId}
+              </span>
+              <h1 className="text-2xl font-semibold">Nommie Table</h1>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {onRefresh ? (
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground"
+                  disabled={isRefreshing}
+                  aria-label={
+                    isRefreshing ? 'Refreshing game state' : 'Refresh game state'
+                  }
+                >
+                  {isRefreshing ? 'Refreshing…' : 'Refresh'}
+                </button>
+              ) : null}
               <button
                 type="button"
-                onClick={onRefresh}
-                className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted transition hover:border-primary/40 hover:text-foreground"
-                disabled={isRefreshing}
-                aria-label={
-                  isRefreshing ? 'Refreshing game state' : 'Refresh game state'
-                }
+                onClick={() => {
+                  const url = window.location.href
+                  void navigator.clipboard.writeText(url)
+                }}
+                className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted transition hover:text-foreground"
+                aria-label="Copy invite link to clipboard"
               >
-                {isRefreshing ? 'Refreshing…' : 'Refresh'}
+                Copy invite
               </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                const url = window.location.href
-                void navigator.clipboard.writeText(url)
-              }}
-              className="rounded-md border border-border px-3 py-1.5 text-sm font-medium text-muted transition hover:border-accent/50 hover:text-foreground"
-              aria-label="Copy invite link to clipboard"
-            >
-              Copy Invite Link
-            </button>
-            <Link
-              href="/lobby"
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90"
-            >
-              Back to Lobby
-            </Link>
+              <Link
+                href="/lobby"
+                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary/90"
+              >
+                Back to lobby
+              </Link>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="flex flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
-        <section className="flex flex-col gap-4 rounded-xl border border-border bg-surface/70 p-4 shadow-elevated">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm uppercase tracking-wide text-subtle">
-                Phase
-              </p>
-              <div className="text-2xl font-semibold text-foreground">
-                {getPhaseLabel(phase)}
+        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
+          <section className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-surface/80 p-5 shadow-[0_45px_120px_rgba(0,0,0,0.35)] backdrop-blur">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+                  Phase
+                </p>
+                <div className="text-3xl font-semibold">{getPhaseLabel(phase)}</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span className="flex items-center gap-2 rounded-full bg-surface px-3 py-1 font-semibold text-foreground">
+                  Turn: {activeName}
+                </span>
+                <span className="flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
+                  <span
+                    className={`inline-flex h-2.5 w-2.5 items-center justify-center rounded-full ${
+                      status.isPolling ? 'animate-pulse bg-success' : 'bg-subtle'
+                    }`}
+                    aria-hidden
+                  />
+                  {status.isPolling ? 'Syncing' : 'Idle'} • {syncLabel}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-3 text-sm text-muted">
-              <span className="flex items-center gap-2">
-                <span
-                  className={`inline-flex h-2.5 w-2.5 items-center justify-center rounded-full ${
-                    status.isPolling ? 'animate-pulse bg-success' : 'bg-subtle'
-                  }`}
-                  aria-hidden
-                />
-                {status.isPolling ? 'Syncing…' : 'Idle'}
-              </span>
-              <span aria-live="off" className="text-subtle">
-                Last synced {syncLabel}
-              </span>
-            </div>
-          </div>
           {error ? (
             <div className="rounded-lg border border-warning/60 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
               <p>{error.message}</p>
@@ -219,32 +229,49 @@ export function GameRoomView(props: GameRoomViewProps) {
               <PhaseFact label="Trump" value={formatTrump(round.trump)} />
             </div>
           ) : null}
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted">
-            <span className="rounded-full bg-surface px-3 py-1 font-medium text-foreground">
-              Turn: {activeName}
-            </span>
             {phase.phase === 'Trick' ? (
-              <span className="text-subtle">
+              <span className="text-xs text-subtle">
                 Trick {phase.data.trick_no} of {round?.hand_size ?? '?'}
               </span>
             ) : null}
-          </div>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="flex flex-col gap-6">
-            <div className="relative mx-auto grid h-full w-full max-w-4xl grid-cols-3 grid-rows-3 gap-4">
-              {seatSummaries.map((summary) => (
-                <SeatCard key={summary.seat} summary={summary} />
-              ))}
-              <TrickArea
-                trickMap={trickMap}
-                getSeatName={seatDisplayName}
-                round={round}
-                phase={phase}
-                viewerSeat={effectiveViewerSeat ?? 0}
-              />
-            </div>
+            <div className="flex flex-col gap-6">
+              <div className="rounded-[40px] border border-white/10 bg-gradient-to-b from-[#1a5a46]/90 via-[#0c3025]/90 to-[#041a12]/95 p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
+                <div className="hidden grid-cols-3 grid-rows-3 gap-4 lg:grid">
+                  {seatSummaries.map((summary) => (
+                    <SeatCard key={summary.seat} summary={summary} />
+                  ))}
+                  <TrickArea
+                    trickMap={trickMap}
+                    getSeatName={seatDisplayName}
+                    round={round}
+                    phase={phase}
+                    viewerSeat={effectiveViewerSeat ?? 0}
+                    className="hidden lg:flex col-start-2 row-start-2 h-64"
+                  />
+                </div>
+                <div className="flex flex-col gap-3 lg:hidden">
+                  {mobileSeatSummaries.map((summary) => (
+                    <SeatCard
+                      key={`mobile-${summary.seat}`}
+                      summary={summary}
+                      variant="list"
+                    />
+                  ))}
+                </div>
+                <div className="mt-4 lg:hidden">
+                  <TrickArea
+                    trickMap={trickMap}
+                    getSeatName={seatDisplayName}
+                    round={round}
+                    phase={phase}
+                    viewerSeat={effectiveViewerSeat ?? 0}
+                    className="lg:hidden"
+                  />
+                </div>
+              </div>
 
             <PlayerHand
               viewerHand={viewerHand}
@@ -268,14 +295,15 @@ export function GameRoomView(props: GameRoomViewProps) {
             />
           </div>
 
-          <ScoreSidebar
-            playerNames={playerNames}
-            scores={snapshot.game.scores_total}
-            round={round}
-            readyState={readyState}
-            aiState={aiSeatState}
-            isPreGame={isPreGame}
-          />
+            <ScoreSidebar
+              playerNames={playerNames}
+              scores={snapshot.game.scores_total}
+              round={round}
+              readyState={readyState}
+              aiState={aiSeatState}
+              isPreGame={isPreGame}
+              className="lg:sticky lg:top-6"
+            />
         </section>
       </main>
     </div>

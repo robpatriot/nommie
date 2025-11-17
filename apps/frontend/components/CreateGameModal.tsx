@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, useCallback, FormEvent } from 'react'
 
 interface CreateGameModalProps {
   isOpen: boolean
@@ -17,83 +17,119 @@ export default function CreateGameModal({
 }: CreateGameModalProps) {
   const [name, setName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const defaultName = `${creatorName} game`
+
+  const handleCancel = useCallback(() => {
+    setName('')
+    onClose()
+  }, [onClose])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const listener = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        handleCancel()
+      }
+    }
+    window.addEventListener('keydown', listener)
+    return () => window.removeEventListener('keydown', listener)
+  }, [isOpen, handleCancel])
 
   if (!isOpen) return null
-
-  const defaultName = `${creatorName} game`
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
 
     try {
-      // Send trimmed name (empty string will be handled by parent to use default)
       await onCreateGame(name.trim())
-      // Reset form
       setName('')
       onClose()
     } catch (error) {
-      // Error handling is done in parent component via toast
       console.error('Failed to create game:', error)
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleCancel = () => {
-    setName('')
-    onClose()
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm">
-      <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-surface-strong shadow-elevated">
-        <div className="p-6">
-          <h2 className="mb-4 text-2xl font-bold text-foreground">
-            Create New Game
-          </h2>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-game-title"
+    >
+      <div
+        className="absolute inset-0 bg-black/50 backdrop-blur-md"
+        onClick={handleCancel}
+        aria-hidden
+      />
+      <div className="relative z-10 w-full max-w-lg rounded-[32px] border border-white/20 bg-surface/90 p-6 shadow-[0_30px_120px_rgba(0,0,0,0.4)]">
+        <header className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+              New Table
+            </p>
+            <h2
+              id="create-game-title"
+              className="mt-2 text-2xl font-semibold text-foreground"
+            >
+              Name your game
+            </h2>
+            <p className="text-sm text-muted">
+              Keep it casual. We will fall back to &quot;{defaultName}&quot; if
+              you leave it blank.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="rounded-full border border-border/60 bg-surface px-3 py-1 text-sm font-medium text-subtle transition hover:text-foreground"
+            aria-label="Close create game modal"
+          >
+            ✕
+          </button>
+        </header>
 
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <label
-                htmlFor="game-name"
-                className="mb-1 block text-sm font-medium text-foreground"
-              >
-                Game Name <span className="text-muted">(optional)</span>
-              </label>
-              <input
-                type="text"
-                id="game-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder={defaultName}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-inner focus:outline-none focus:ring-2 focus:ring-primary"
-                disabled={isSubmitting}
-              />
-              <p className="mt-1 text-xs text-subtle">
-                Default: &quot;{defaultName}&quot;
-              </p>
-            </div>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+            Game name <span className="text-muted">(optional)</span>
+            <input
+              type="text"
+              id="game-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={defaultName}
+              className="rounded-2xl border border-border/70 bg-background px-4 py-3 text-base text-foreground shadow-inner focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+              disabled={isSubmitting}
+              autoFocus
+            />
+          </label>
 
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={handleCancel}
-                disabled={isSubmitting}
-                className="rounded-md bg-surface px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSubmitting ? 'Creating...' : 'Create Game'}
-              </button>
-            </div>
-          </form>
-        </div>
+          <p className="text-xs text-subtle">
+            Seats become touch-friendly on phones, and desktop keeps the full
+            table visible.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+              className="rounded-2xl border border-border/70 bg-surface px-4 py-3 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isSubmitting ? 'Creating…' : 'Create game'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

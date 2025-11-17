@@ -96,29 +96,29 @@ export default async function RootLayout({
     }
   }
 
-  return (
-    <html
-      lang="en"
-      data-theme={initialResolved}
-      data-user-theme={initialTheme}
-      suppressHydrationWarning
-    >
-      <body
-        className={`${inter.className} min-h-screen bg-background text-foreground antialiased`}
+    return (
+      <html
+        lang="en"
+        data-theme={initialResolved}
+        data-user-theme={initialTheme}
+        suppressHydrationWarning
       >
-        <Script id="theme-sync" strategy="beforeInteractive">
-          {themeScript}
-        </Script>
-        <ThemeProvider
-          initialTheme={initialTheme}
-          initialResolved={initialResolved}
-        >
-          <Suspense fallback={null}>
-            <Header session={session} lastActiveGameId={lastActiveGameId} />
-          </Suspense>
-          {children}
-        </ThemeProvider>
-      </body>
-    </html>
-  )
+        <body className={`${inter.className} tabletop-shell`}>
+          <Script id="theme-sync" strategy="beforeInteractive">
+            {themeScript}
+          </Script>
+          <ThemeProvider
+            initialTheme={initialTheme}
+            initialResolved={initialResolved}
+          >
+            <div className="tabletop-content">
+              <Suspense fallback={null}>
+                <Header session={session} lastActiveGameId={lastActiveGameId} />
+              </Suspense>
+              {children}
+            </div>
+          </ThemeProvider>
+        </body>
+      </html>
+    )
 }

@@ -192,155 +192,197 @@ export default function LobbyClient({
     }
   }
 
+  const openSeatCount = filteredJoinableGames.reduce((total, game) => {
+    return total + Math.max(game.max_players - game.player_count, 0)
+  }, 0)
+
   return (
     <>
-      <div className="min-h-screen bg-background py-12">
-        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-6">
-            <div className="rounded-lg border border-border bg-surface-strong shadow-elevated p-6">
-              <div className="mb-4 flex items-center justify-between">
-                <h1 className="text-3xl font-bold text-foreground">
-                  🎮 Game Lobby
-                </h1>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setIsCreateModalOpen(true)}
-                    className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    aria-label="Create a new game"
-                  >
-                    Create Game
-                  </button>
-                  <button
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="rounded bg-surface px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-strong hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label={
-                      refreshing ? 'Refreshing game list' : 'Refresh game list'
-                    }
-                  >
-                    {refreshing ? 'Refreshing...' : 'Refresh'}
-                  </button>
-                </div>
-              </div>
-
-              {lastActiveGameId && (
-                <div className="mb-4">
-                  <button
-                    onClick={handleResume}
-                    className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    aria-label="Resume most recent game"
-                  >
-                    ▶ Most Recent Game
-                  </button>
-                </div>
-              )}
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-16 pt-8 text-foreground sm:pt-12">
+        <section className="rounded-3xl border border-white/15 bg-surface/80 p-6 shadow-[0_45px_120px_rgba(0,0,0,0.35)] backdrop-blur">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+                Game Lobby
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                Set the table and invite friends with ease.
+              </h1>
+              <p className="mt-3 text-sm text-muted sm:text-base">
+                Desktop keeps the table layout visible, while phones switch to a
+                focused list for quick thumb taps.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
+                aria-label="Create a new game"
+              >
+                <span role="img" aria-hidden>
+                  ➕
+                </span>
+                <span className="ml-2">Create game</span>
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center justify-center rounded-2xl border border-border/60 bg-surface px-5 py-3 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                aria-live="polite"
+              >
+                {refreshing ? 'Refreshing…' : 'Refresh'}
+              </button>
             </div>
           </div>
 
-          <div className="space-y-6">
-            <GameList
-              games={filteredJoinableGames}
-              title="Joinable Games"
-              emptyMessage="No games available to join. Create one to get started!"
-              actionsLabel="Actions"
-              renderActions={(game) => {
-                const actions = []
+          {lastActiveGameId ? (
+            <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm text-primary-foreground sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.4em] text-primary-foreground/70">
+                  Resume
+                </p>
+                <p className="text-base font-semibold">
+                  Jump back to Game #{lastActiveGameId}
+                </p>
+              </div>
+              <button
+                onClick={handleResume}
+                className="inline-flex items-center justify-center rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
+                aria-label="Resume most recent game"
+              >
+                ▶ Continue
+              </button>
+            </div>
+          ) : null}
 
-                // If user is the host, show delete button
-                if (game.viewer_is_host) {
-                  actions.push(
-                    <button
-                      key="delete"
-                      onClick={() => handleDelete(game.id)}
-                      className="rounded bg-red-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-red-700 mr-2"
-                    >
-                      Delete
-                    </button>
-                  )
-                }
+          <dl className="mt-6 grid gap-3 text-sm text-muted sm:grid-cols-3">
+            <div className="rounded-2xl border border-border/50 bg-surface px-4 py-3">
+              <dt className="text-xs uppercase tracking-wide text-subtle">
+                Joinable tables
+              </dt>
+              <dd className="mt-1 text-2xl font-semibold text-foreground">
+                {filteredJoinableGames.length}
+              </dd>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-surface px-4 py-3">
+              <dt className="text-xs uppercase tracking-wide text-subtle">
+                Seats available
+              </dt>
+              <dd className="mt-1 text-2xl font-semibold text-foreground">
+                {openSeatCount}
+              </dd>
+            </div>
+            <div className="rounded-2xl border border-border/50 bg-surface px-4 py-3">
+              <dt className="text-xs uppercase tracking-wide text-subtle">
+                In progress
+              </dt>
+              <dd className="mt-1 text-2xl font-semibold text-foreground">
+                {sortedInProgressGames.length}
+              </dd>
+            </div>
+          </dl>
+        </section>
 
-                // If user is already a member, show "Go to game" button
-                if (game.viewer_is_member) {
-                  actions.push(
-                    <button
-                      key="rejoin"
-                      onClick={() => handleRejoin(game.id)}
-                      className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    >
-                      Go to game
-                    </button>
-                  )
-                } else if (
-                  game.state === 'LOBBY' &&
-                  game.player_count < game.max_players
-                ) {
-                  // If game is joinable and user is not a member, show "Join" button
-                  actions.push(
-                    <button
-                      key="join"
-                      onClick={() => handleJoin(game.id)}
-                      className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    >
-                      Join
-                    </button>
-                  )
-                } else if (game.player_count >= game.max_players) {
-                  // Game is full
-                  actions.push(
-                    <span key="full" className="text-sm text-muted">
-                      Game is full
-                    </span>
-                  )
-                }
+        <div className="grid gap-6 lg:grid-cols-2">
+          <GameList
+            games={filteredJoinableGames}
+            title="Joinable games"
+            emptyMessage="No games available to join. Create one to get started!"
+            actionsLabel="Actions"
+            renderActions={(game) => {
+              const actions = []
 
-                return actions.length > 0 ? (
-                  <div className="flex items-center gap-2">{actions}</div>
-                ) : null
-              }}
-            />
+              if (game.viewer_is_host) {
+                actions.push(
+                  <button
+                    key="delete"
+                    onClick={() => handleDelete(game.id)}
+                    className="rounded-full border border-danger/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-danger transition hover:bg-danger hover:text-danger-foreground"
+                  >
+                    Delete
+                  </button>
+                )
+              }
 
-            <GameList
-              games={sortedInProgressGames}
-              title="In Progress Games"
-              emptyMessage="No games currently in progress."
-              actionsLabel="Actions"
-              renderActions={(game) => {
-                const actions = []
+              if (game.viewer_is_member) {
+                actions.push(
+                  <button
+                    key="rejoin"
+                    onClick={() => handleRejoin(game.id)}
+                    className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
+                  >
+                    Go to game
+                  </button>
+                )
+              } else if (
+                game.state === 'LOBBY' &&
+                game.player_count < game.max_players
+              ) {
+                actions.push(
+                  <button
+                    key="join"
+                    onClick={() => handleJoin(game.id)}
+                    className="rounded-full bg-accent/90 px-4 py-2 text-sm font-semibold text-accent-foreground shadow shadow-accent/30 transition hover:bg-accent"
+                  >
+                    Join
+                  </button>
+                )
+              } else if (game.player_count >= game.max_players) {
+                actions.push(
+                  <span
+                    key="full"
+                    className="rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-subtle"
+                  >
+                    Full table
+                  </span>
+                )
+              }
 
-                // If user is the host, show delete button
-                if (game.viewer_is_host) {
-                  actions.push(
-                    <button
-                      key="delete"
-                      onClick={() => handleDelete(game.id)}
-                      className="rounded bg-red-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-red-700 mr-2"
-                    >
-                      Delete
-                    </button>
-                  )
-                }
+              return actions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">{actions}</div>
+              ) : null
+            }}
+          />
 
-                // If user is a member, show "Rejoin" button
-                if (game.viewer_is_member) {
-                  actions.push(
-                    <button
-                      key="rejoin"
-                      onClick={() => handleRejoin(game.id)}
-                      className="rounded bg-primary px-3 py-1 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-                    >
-                      Rejoin
-                    </button>
-                  )
-                }
+          <GameList
+            games={sortedInProgressGames}
+            title="In progress"
+            emptyMessage="No games currently in progress."
+            actionsLabel="Actions"
+            renderActions={(game) => {
+              const actions = []
 
-                return actions.length > 0 ? (
-                  <div className="flex items-center gap-2">{actions}</div>
-                ) : null
-              }}
-            />
-          </div>
+              if (game.viewer_is_host) {
+                actions.push(
+                  <button
+                    key="delete"
+                    onClick={() => handleDelete(game.id)}
+                    className="rounded-full border border-danger/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-danger transition hover:bg-danger hover:text-danger-foreground"
+                  >
+                    Delete
+                  </button>
+                )
+              }
+
+              if (game.viewer_is_member) {
+                actions.push(
+                  <button
+                    key="rejoin"
+                    onClick={() => handleRejoin(game.id)}
+                    className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
+                  >
+                    Rejoin
+                  </button>
+                )
+              }
+
+              return actions.length > 0 ? (
+                <div className="flex flex-wrap gap-2">{actions}</div>
+              ) : null
+            }}
+          />
         </div>
-      </div>
+      </main>
 
       <CreateGameModal
         isOpen={isCreateModalOpen}

@@ -70,59 +70,64 @@ export function PlayerHand({
     onSelectCard(selectedCard === card ? null : card)
   }
 
-  return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-2xl border border-border bg-surface/70 p-4">
-      <header className="flex items-center justify-between">
-        <h2 className="text-sm uppercase tracking-wide text-subtle">
-          Your Hand
-        </h2>
-        <span className="text-xs text-muted">{handStatus}</span>
-      </header>
-      <div className="flex flex-wrap justify-center gap-2">
-        {viewerHand.length === 0 ? (
-          <span className="text-sm text-subtle">
-            Hand will appear once available.
+    return (
+      <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur">
+        <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
+            Your hand
+          </h2>
+          <span
+            className="rounded-full bg-surface px-3 py-1 text-xs text-muted"
+            aria-live="polite"
+          >
+            {handStatus}
           </span>
-        ) : (
-          viewerHand.map((card) => {
-            const isPlayable = playableCards.has(card)
-            const isSelected = selectedCard === card
-            const isDisabled =
-              !isTrickPhase ||
-              !playState ||
-              !isPlayable ||
-              !viewerTurn ||
-              playState.isPending
+        </header>
+        <div className="flex gap-3 overflow-x-auto pb-2 pt-1 sm:flex-wrap sm:justify-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {viewerHand.length === 0 ? (
+            <span className="text-sm text-subtle">
+              Hand will appear once available.
+            </span>
+          ) : (
+            viewerHand.map((card) => {
+              const isPlayable = playableCards.has(card)
+              const isSelected = selectedCard === card
+              const isDisabled =
+                !isTrickPhase ||
+                !playState ||
+                !isPlayable ||
+                !viewerTurn ||
+                playState.isPending
 
-            const cardLabel = isPlayable
-              ? `${card}, ${isSelected ? 'selected' : 'playable'}`
-              : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
-            return (
-              <button
-                key={card}
-                type="button"
-                onClick={() => handleCardClick(card)}
-                disabled={isDisabled}
-                className={`rounded-xl border px-3 py-2 text-lg font-semibold tracking-wide transition ${
-                  isSelected
-                    ? 'border-success bg-success/20 text-foreground shadow-md shadow-success/30'
-                    : isPlayable && viewerTurn
-                      ? 'border-success/60 bg-surface text-foreground hover:border-success hover:bg-success/10'
-                      : 'border-border bg-surface text-muted'
-                } ${
-                  isDisabled
-                    ? 'cursor-not-allowed opacity-60'
-                    : 'cursor-pointer'
-                }`}
-                aria-label={cardLabel}
-                aria-pressed={isSelected}
-              >
-                {card}
-              </button>
-            )
-          })
-        )}
-      </div>
-    </section>
-  )
+              const cardLabel = isPlayable
+                ? `${card}, ${isSelected ? 'selected' : 'playable'}`
+                : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
+              return (
+                <button
+                  key={card}
+                  type="button"
+                  onClick={() => handleCardClick(card)}
+                  disabled={isDisabled}
+                  className={`min-w-[4rem] rounded-2xl border px-4 py-3 text-2xl font-semibold tracking-wide transition sm:min-w-0 sm:text-xl ${
+                    isSelected
+                      ? 'border-success bg-success/20 text-foreground shadow-lg shadow-success/30'
+                      : isPlayable && viewerTurn
+                        ? 'border-success/60 bg-surface text-foreground hover:border-success hover:bg-success/10'
+                        : 'border-border bg-surface text-muted'
+                  } ${
+                    isDisabled
+                      ? 'cursor-not-allowed opacity-60'
+                      : 'cursor-pointer'
+                  }`}
+                  aria-label={cardLabel}
+                  aria-pressed={isSelected}
+                >
+                  {card}
+                </button>
+              )
+            })
+          )}
+        </div>
+      </section>
+    )
 }

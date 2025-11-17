@@ -4,26 +4,30 @@
 
 :root {
   color-scheme: light;
-  --color-bg: 248 250 252;
-  --color-bg-subtle: 255 255 255;
-  --color-surface: 241 245 249;
-  --color-surface-strong: 255 255 255;
-  --color-border: 203 213 225;
-  --color-ring: 99 102 241;
-  --color-text: 15 23 42;
-  --color-text-muted: 71 85 105;
-  --color-text-subtle: 100 116 139;
-  --color-primary: 59 130 246;
-  --color-primary-foreground: 255 255 255;
-  --color-accent: 14 165 233;
-  --color-accent-foreground: 15 23 42;
-  --color-danger: 239 68 68;
-  --color-danger-foreground: 255 255 255;
-  --color-success: 34 197 94;
-  --color-success-foreground: 22 101 52;
-  --color-warning: 250 204 21;
-  --color-warning-foreground: 113 63 18;
-  --shadow-elevated: 29 78 216 / 0.08;
+  --color-bg: 233 242 240;
+  --color-bg-subtle: 223 236 231;
+  --color-surface: 250 252 250;
+  --color-surface-strong: 244 248 245;
+  --color-border: 190 206 198;
+  --color-ring: 255 176 111;
+  --color-text: 18 35 30;
+  --color-text-muted: 53 78 70;
+  --color-text-subtle: 109 132 123;
+  --color-primary: 239 149 74;
+  --color-primary-foreground: 255 252 248;
+  --color-accent: 47 178 148;
+  --color-accent-foreground: 12 45 37;
+  --color-danger: 220 82 82;
+  --color-danger-foreground: 255 245 244;
+  --color-success: 71 181 117;
+  --color-success-foreground: 10 53 36;
+  --color-warning: 246 193 75;
+  --color-warning-foreground: 95 60 5;
+  --shadow-elevated: 8 32 22 / 0.35;
+  --felt-base: 14 67 53;
+  --felt-highlight: 42 112 92;
+  --felt-shadow: 5 27 20;
+  --card-cream: 255 252 245;
 }
 
 .theme-light,
@@ -34,59 +38,175 @@
 .theme-dark,
 [data-theme='dark'] {
   color-scheme: dark;
-  --color-bg: 10 12 22;
-  --color-bg-subtle: 15 23 42;
-  --color-surface: 30 41 59;
-  --color-surface-strong: 15 23 42;
-  --color-border: 51 65 85;
-  --color-ring: 129 140 248;
-  --color-text: 226 232 240;
-  --color-text-muted: 148 163 184;
-  --color-text-subtle: 100 116 139;
-  --color-primary: 56 189 248;
-  --color-primary-foreground: 15 23 42;
-  --color-accent: 94 234 212;
-  --color-accent-foreground: 15 23 42;
+  --color-bg: 10 18 16;
+  --color-bg-subtle: 14 28 24;
+  --color-surface: 17 38 32;
+  --color-surface-strong: 11 26 22;
+  --color-border: 38 68 57;
+  --color-ring: 251 188 98;
+  --color-text: 229 244 237;
+  --color-text-muted: 183 205 198;
+  --color-text-subtle: 132 156 149;
+  --color-primary: 255 176 111;
+  --color-primary-foreground: 46 26 12;
+  --color-accent: 98 220 189;
+  --color-accent-foreground: 11 30 24;
   --color-danger: 248 113 113;
-  --color-danger-foreground: 15 23 42;
-  --color-success: 74 222 128;
-  --color-success-foreground: 15 118 110;
-  --color-warning: 253 224 71;
-  --color-warning-foreground: 202 138 4;
-  --shadow-elevated: 15 23 42 / 0.55;
+  --color-danger-foreground: 48 8 8;
+  --color-success: 120 229 171;
+  --color-success-foreground: 9 36 24;
+  --color-warning: 253 224 130;
+  --color-warning-foreground: 60 42 9;
+  --shadow-elevated: 0 0 0 / 0.45;
+  --felt-base: 6 37 30;
+  --felt-highlight: 26 76 64;
+  --felt-shadow: 2 16 12;
+  --card-cream: 25 31 32;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-user-theme]),
   :root[data-user-theme='system'] {
     color-scheme: dark;
-    --color-bg: 10 12 22;
-    --color-bg-subtle: 15 23 42;
-    --color-surface: 30 41 59;
-    --color-surface-strong: 15 23 42;
-    --color-border: 51 65 85;
-    --color-ring: 129 140 248;
-    --color-text: 226 232 240;
-    --color-text-muted: 148 163 184;
-    --color-text-subtle: 100 116 139;
-    --color-primary: 56 189 248;
-    --color-primary-foreground: 15 23 42;
-    --color-accent: 94 234 212;
-    --color-accent-foreground: 15 23 42;
+    --color-bg: 10 18 16;
+    --color-bg-subtle: 14 28 24;
+    --color-surface: 17 38 32;
+    --color-surface-strong: 11 26 22;
+    --color-border: 38 68 57;
+    --color-ring: 251 188 98;
+    --color-text: 229 244 237;
+    --color-text-muted: 183 205 198;
+    --color-text-subtle: 132 156 149;
+    --color-primary: 255 176 111;
+    --color-primary-foreground: 46 26 12;
+    --color-accent: 98 220 189;
+    --color-accent-foreground: 11 30 24;
     --color-danger: 248 113 113;
-    --color-danger-foreground: 15 23 42;
-    --color-success: 74 222 128;
-    --color-success-foreground: 15 118 110;
-    --color-warning: 253 224 71;
-    --color-warning-foreground: 202 138 4;
-    --shadow-elevated: 15 23 42 / 0.55;
+    --color-danger-foreground: 48 8 8;
+    --color-success: 120 229 171;
+    --color-success-foreground: 9 36 24;
+    --color-warning: 253 224 130;
+    --color-warning-foreground: 60 42 9;
+    --shadow-elevated: 0 0 0 / 0.45;
+    --felt-base: 6 37 30;
+    --felt-highlight: 26 76 64;
+    --felt-shadow: 2 16 12;
+    --card-cream: 25 31 32;
   }
 }
 
-body {
-  @apply bg-background text-foreground;
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: rgb(var(--color-border) / 0.6);
+  }
+
+  ::selection {
+    background-color: rgb(var(--color-accent) / 0.3);
+    color: rgb(var(--color-text));
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    min-height: 100vh;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'liga', 'kern';
+    background-color: rgb(var(--color-bg));
+  }
+
+  body::backdrop {
+    background-color: rgb(var(--color-bg));
+  }
+
+  a,
+  button {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/70 focus-visible:ring-offset-surface-strong;
+  }
 }
 
-body::backdrop {
-  background-color: rgb(var(--color-bg));
+@layer components {
+  .tabletop-shell {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    background: radial-gradient(
+        circle at 20% 20%,
+        rgba(var(--felt-highlight), 0.4),
+        transparent 45%
+      ),
+      radial-gradient(
+        circle at 80% 0%,
+        rgba(var(--felt-highlight), 0.25),
+        transparent 50%
+      ),
+      linear-gradient(
+        135deg,
+        rgba(var(--felt-base), 0.9),
+        rgba(var(--felt-shadow), 0.85)
+      );
+  }
+
+  .tabletop-shell::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(
+      circle at center,
+      rgba(var(--felt-highlight), 0.18),
+      transparent 65%
+    );
+    opacity: 0.9;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .tabletop-shell::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(
+        rgba(255, 255, 255, 0.04) 1px,
+        transparent 0
+      ),
+      radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 0);
+    background-size: 120px 120px, 200px 200px;
+    background-position: 0 0, 60px 60px;
+    opacity: 0.35;
+    mix-blend-mode: soft-light;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .tabletop-content {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  @media (max-width: 768px) {
+    .tabletop-shell {
+      background: linear-gradient(
+        180deg,
+        rgba(var(--color-bg-subtle), 1) 0%,
+        rgba(var(--color-bg), 1) 100%
+      );
+    }
+
+    .tabletop-shell::before,
+    .tabletop-shell::after {
+      opacity: 0.08;
+    }
+  }
+}
+
+@layer utilities {
+  .text-card-cream {
+    color: rgb(var(--card-cream));
+  }
+
+  .bg-card-cream {
+    background-color: rgb(var(--card-cream));
+  }
 }
