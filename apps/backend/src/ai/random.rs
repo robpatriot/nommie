@@ -50,7 +50,7 @@ use crate::domain::{Card, GameContext, Trump};
 /// 3. **Error Handling**: Wrap errors, check preconditions, never panic
 /// 4. **Determinism**: Support optional seeding for testing
 ///
-/// See the [AI Implementation Guide](../../../../../../docs/ai-player-implementation-guide.md) for details.
+/// See the [AI Implementation Guide](docs/ai-player-implementation-guide.md) for details.
 pub struct RandomPlayer {
     /// Thread-safe random number generator.
     ///

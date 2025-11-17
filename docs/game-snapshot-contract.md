@@ -3,7 +3,7 @@
 ## Document Scope
 
 Defines the serialized shape delivered to clients for rendering active games.
-Pair this with `../dev-roadmap.md` for UX expectations and
+Pair this with `dev-roadmap.md` for UX expectations and
 `architecture-game-context.md` for the backend assembly pipeline.
 
 **Purpose:**
@@ -23,6 +23,7 @@ Canonical, read-only view of a game for the frontend. This is the single source 
   - `Trick`
   - `Scoring`
   - `Complete`
+  - `GameOver`
 
 - **`RoundPublic`**: Public round facts
   (round number, hand size, leader seat, trick number, etc.).
@@ -48,7 +49,7 @@ Canonical, read-only view of a game for the frontend. This is the single source 
   - If a player can follow the lead suit, they must.
   - FE should **not** replicate legality checks; treat snapshot as truth.
 - **Player seats:**
-  - Seats are stable identifiers (e.g., N/E/S/W or indexed).
+  - Seats are numeric identifiers (0, 1, 2, 3) representing the four player positions.
   - Rotation/next-to-play is derivable from snapshot data.
   - Future helpers may be provided server-side.
 - **Public vs private info:**
@@ -97,65 +98,93 @@ Canonical, read-only view of a game for the frontend. This is the single source 
 ## High-Level Examples
 
 ### `GameHeader`
-{
-  "game_id": "uuid-here",
-  "players": [
-    { "seat": "N", "user_id": "u1", "display_name": "Alice" },
-    { "seat": "E", "user_id": "u2", "display_name": "Bob" }
-  ],
-  "dealer": "W"
-}
-
-### `RoundPublic`
+```json
 {
   "round_no": 3,
-  "hand_size": 11,
-  "leader_seat": "S",
-  "trick_no": 2
+  "dealer": 0,
+  "seating": [
+    { "seat": 0, "user_id": 1, "display_name": "Alice", "is_ai": false, "is_ready": true },
+    { "seat": 1, "user_id": 2, "display_name": "Bob", "is_ai": false, "is_ready": true }
+  ],
+  "scores_total": [10, 8, 12, 9],
+  "host_seat": 0
 }
+```
+
+### `RoundPublic`
+```json
+{
+  "hand_size": 11,
+  "leader": 2,
+  "bid_winner": 0,
+  "trump": "Spades",
+  "tricks_won": [3, 2, 4, 2]
+}
+```
 
 ### `PhaseSnapshot` Examples
 
 - **Bidding**
+```json
 {
   "phase": "Bidding",
-  "bids": [{ "seat": "N", "tricks": 4 }],
-  "current_seat": "E"
+  "data": {
+    "round": { "hand_size": 11, "leader": 0, "bid_winner": null, "trump": null, "tricks_won": [0, 0, 0, 0] },
+    "to_act": 1,
+    "bids": [4, null, null, null],
+    "min_bid": 0,
+    "max_bid": 11
+  }
 }
+```
 
 - **TrumpSelect**
+```json
 {
   "phase": "TrumpSelect",
-  "winner_seat": "N",
-  "trump": "NO_TRUMP"
+  "data": {
+    "round": { "hand_size": 11, "leader": 0, "bid_winner": 0, "trump": null, "tricks_won": [0, 0, 0, 0] },
+    "to_act": 0,
+    "allowed_trumps": ["Clubs", "Diamonds", "Hearts", "Spades", "NO_TRUMP"]
+  }
 }
+```
 
 - **Trick**
+```json
 {
   "phase": "Trick",
-  "plays": [
-    { "seat": "N", "card": "AS" },
-    { "seat": "E", "card": "KH" }
-  ],
-  "lead_suit": "Spades",
-  "to_play": "S"
+  "data": {
+    "round": { "hand_size": 11, "leader": 0, "bid_winner": 0, "trump": "Spades", "tricks_won": [3, 2, 2, 2] },
+    "trick_no": 2,
+    "leader": 1,
+    "current_trick": [
+      [0, "AS"],
+      [1, "KH"]
+    ],
+    "to_act": 2,
+    "playable": ["2C", "3C", "5C"]
+  }
 }
+```
 
 - **Scoring**
+```json
 {
   "phase": "Scoring",
-  "tally": [
-    { "seat": "N", "tricks": 4, "bonus": true },
-    { "seat": "E", "tricks": 3, "bonus": false }
-  ]
+  "data": {
+    "round": { "hand_size": 11, "leader": 0, "bid_winner": 0, "trump": "Spades", "tricks_won": [4, 3, 2, 2] },
+    "round_scores": [14, 3, 2, 2]
+  }
 }
+```
 
 - **Complete**
+```json
 {
   "phase": "Complete",
-  "final_scores": [
-    { "seat": "N", "points": 42 },
-    { "seat": "E", "points": 35 }
-  ]
+  "data": {
+    "round": { "hand_size": 1, "leader": 0, "bid_winner": 0, "trump": "Spades", "tricks_won": [1, 0, 0, 0] }
+  }
 }
-
+```

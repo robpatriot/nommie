@@ -25,24 +25,7 @@ This document describes the unified `GameContext` architecture that consolidates
 
 ## The GameContext Structure
 
-```rust
-pub struct GameContext {
-    /// Game ID
-    pub game_id: i64,
-
-    /// Complete game history (all rounds, bids, scores)
-    /// Available once game has started (round 1+)
-    history: Option<GameHistory>,
-
-    /// Current round state from a specific player's perspective
-    /// Only available when context is loaded for a specific player
-    round_info: Option<CurrentRoundInfo>,
-
-    /// AI's memory of completed tricks in the current round
-    /// Only present for AI players
-    round_memory: Option<RoundMemory>,
-}
-```
+`GameContext` combines game identification, historical data, and optional player-specific round information. See `apps/backend/src/domain/game_context.rs` for the complete definition.
 
 ### Progressive Enhancement States
 
@@ -58,25 +41,7 @@ pub struct GameContext {
 ## HTTP Layer: CachedGameContext Extractor
 
 ### Purpose
-Automatically loads and caches GameContext for authenticated users in HTTP requests.
-
-### Implementation
-
-```rust
-#[derive(Clone)]
-pub struct CachedGameContext(pub Arc<GameContext>);
-
-impl FromRequest for CachedGameContext {
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        // 1. Check request extensions cache
-        // 2. Extract GameId and GameMembership
-        // 3. Load game from DB
-        // 4. If game started: load GameHistory + CurrentRoundInfo
-        // 5. Cache in request extensions
-        // 6. Return
-    }
-}
-```
+Automatically loads and caches GameContext for authenticated users in HTTP requests. The context is cached in request extensions, so multiple consumers within the same request get the same instance without additional database queries.
 
 ### Usage in Handlers
 
@@ -110,9 +75,13 @@ async fn submit_bid(
 
 **Key principle**: Services do NOT accept `GameContext` for validation. They load their own data from the database.
 
-```rust
-// services/game_flow/player_actions.rs
+This is a security boundary: if services accepted pre-built context, callers could manipulate validation data. Services must control their own validation data by loading from the authoritative source (database).
 
+### Service Implementation Pattern
+
+Services accept only IDs and load their own data:
+
+```rust
 pub async fn submit_bid_internal(
     &self,
     txn: &DatabaseTransaction,
@@ -120,36 +89,6 @@ pub async fn submit_bid_internal(
     player_seat: i16,
     bid_value: u8,
 ) -> Result<(), AppError>
-```
-
-### Why Not Accept Context?
-
-**Security**: If services accepted pre-built context, callers could manipulate validation data:
-
-```rust
-// BAD: Service accepts context (trust issue)
-pub async fn submit_bid(context: &GameContext, ...) {
-    validate_consecutive_zero_bids(context.game_history(), ...)?;
-    // ← What if context.game_history() was manipulated by caller?
-}
-
-// GOOD: Service loads its own data (secure)
-pub async fn submit_bid(game_id: i64, ...) {
-    let history = GameHistory::load(txn, game_id).await?;
-    validate_consecutive_zero_bids(&history, ...)?;
-    // ← Service controls validation data
-}
-```
-
-### Service Implementation
-
-```rust
-// Service loads and validates using its own data
-if bid_value == 0 {
-    // Load fresh from DB (service owns validation data)
-    let history = GameHistory::load(txn, game_id).await?;
-    validate_consecutive_zero_bids(&history, player_seat, current_round)?;
-}
 ```
 
 ### Performance Note
@@ -164,41 +103,13 @@ Yes, this means loading `GameHistory` even when it might be cached elsewhere. Th
 
 ## AI Orchestration Path
 
-### Local Cache Strategy
+AI orchestration maintains its own local cache within the orchestration loop:
 
-AI orchestration maintains its own local cache:
+- Game history is loaded once and reused across all AI decisions in the loop
+- Per-player state (`CurrentRoundInfo`, `RoundMemory`) is loaded fresh per iteration
+- Services still load their own validation data (trust boundary)
 
-```rust
-// orchestration.rs
-
-pub async fn process_game_state(
-    txn: &DatabaseTransaction,
-    game_id: i64,
-) -> Result<(), AppError> {
-    // Local cache for orchestration loop
-    let game_history = GameHistory::load(txn, game_id).await?;
-    
-    for _iteration in 0..MAX_ITERATIONS {
-        // Load per-player state
-        let round_info = CurrentRoundInfo::load(txn, game_id, player_seat).await?;
-        
-        // Load AI memory (filtered by memory_level)
-        let memory = RoundMemory::load(txn, game_id, player_seat, memory_level).await?;
-        
-        // Build complete context for AI
-        let game_context = GameContext::new(game_id)
-            .with_history(game_history.clone())    // ← Reused from cache
-            .with_round_info(round_info)           // ← Fresh per iteration
-            .with_round_memory(Some(memory));      // ← Fresh per iteration
-            
-        // AI methods accept GameContext for strategy
-        let bid = ai.choose_bid(&round_info, &game_context)?;
-        
-        // Service loads its own validation data (trust boundary)
-        self.submit_bid_internal(txn, game_id, player_seat, bid).await?;
-    }
-}
-```
+See `apps/backend/src/services/game_flow/ai_coordinator.rs` for the implementation.
 
 ---
 
@@ -248,96 +159,10 @@ Note: Within same transaction, DB may cache query results
 
 ---
 
-## Consecutive Zero Bids Rule
-
-### Implementation
-
-```rust
-// domain/bidding.rs
-
-pub fn validate_consecutive_zero_bids(
-    history: &GameHistory,
-    player_seat: i16,
-    current_round: i16,
-) -> Result<(), DomainError> {
-    // Need at least 3 previous rounds
-    if current_round < 4 {
-        return Ok(());
-    }
-
-    // Get last 3 completed rounds
-    let recent_rounds: Vec<_> = history.rounds
-        .iter()
-        .filter(|r| r.round_no < current_round)
-        .rev()
-        .take(3)
-        .collect();
-
-    // Check if all 3 have zero bids
-    let all_zeros = recent_rounds.iter()
-        .all(|round| round.bids[player_seat as usize] == Some(0));
-
-    if all_zeros {
-        Err(DomainError::validation(
-            ValidationKind::InvalidBid,
-            "Cannot bid 0 four times in a row"
-        ))
-    } else {
-        Ok(())
-    }
-}
-```
-
-### Where It's Called
-
-```rust
-// services/game_flow/player_actions.rs
-
-pub async fn submit_bid_internal(..., context: Option<&GameContext>, ...) {
-    if bid_value == 0 {
-        // Get history from context or load
-        let history = /* get from context or load fresh */;
-        
-        // Validate
-        validate_consecutive_zero_bids(history, player_seat, current_round)?;
-    }
-}
-```
-
-### Test Coverage
-
-Comprehensive tests in `domain/tests_consecutive_zeros.rs`:
-- ✅ Allow 0 bid in first 3 rounds
-- ✅ Allow third consecutive 0 bid
-- ✅ Reject fourth consecutive 0 bid
-- ✅ Allow 0 after non-zero breaks streak
-- ✅ Track players independently
-- ✅ Reset after non-zero bid
-- ✅ Late game enforcement
-- ✅ Only look at last 3 rounds
-- ✅ Handle incomplete history
-
----
-
 ## Benefits
 
 ### 1. Single Cohesive Concept
-Instead of passing 3-4 separate parameters:
-```rust
-// Before
-fn submit_bid(
-    game_id: i64,
-    player_seat: i16,
-    bid_value: u8,
-    game_history: Option<&GameHistory>,
-)
-
-// After
-fn submit_bid(
-    context: &GameContext,  // ← Everything in one place
-    bid_value: u8,
-)
-```
+Instead of passing 3-4 separate parameters, everything is unified in one `GameContext` structure.
 
 ### 2. Request-Scoped Caching
 - HTTP requests: Load once, use many times within request
@@ -357,75 +182,7 @@ fn submit_bid(
 - Each layer has clear responsibilities
 
 ### 5. Clean Service Signatures
-```rust
-// Clean and focused
-pub async fn submit_bid(
-    txn: &DatabaseTransaction,
-    context: &GameContext,
-    bid_value: u8,
-) -> Result<(), AppError>
-```
-
----
-
-## Migration Path
-
-Services have simple, clean signatures - no context parameter needed:
-
-### AI Orchestration
-```rust
-// AI coordinator
-let game_context = build_context_for_ai(...);
-let bid = ai.choose_bid(&state, &game_context)?;
-
-// Service loads its own validation data
-service.submit_bid_internal(txn, game_id, player_seat, bid).await?;
-```
-
-### HTTP Handlers (future)
-```rust
-async fn submit_bid(
-    context: CachedGameContext,  // ← For UI rendering
-    body: ValidatedJson<BidRequest>,
-) -> Result<HttpResponse, AppError> {
-    // Use context for response building
-    let game_id = context.game_id();
-    
-    // Service loads its own validation data (trust boundary)
-    service.submit_bid_internal(txn, game_id, player_seat, body.bid_value).await?;
-    
-    // Use context for response
-    Ok(HttpResponse::Ok().json(context.game_history()))
-}
-```
-
----
-
-## Future Extensions
-
-The `GameContext` structure can naturally grow to support:
-
-1. **Opponent Models** (AI)
-   ```rust
-   context.opponent_models: Option<HashMap<PlayerId, OpponentModel>>
-   ```
-
-2. **Game Statistics**
-   ```rust
-   context.stats: Option<GameStatistics>
-   ```
-
-3. **Undo/Replay State**
-   ```rust
-   context.replay_state: Option<ReplayState>
-   ```
-
-4. **Spectator View**
-   ```rust
-   context.spectator_view: Option<SpectatorInfo>
-   ```
-
-All additions are backward compatible (Option fields).
+Services have simple, focused signatures that accept only what they need (IDs, not full context).
 
 ---
 
@@ -442,4 +199,3 @@ The `GameContext` architecture provides:
 ✅ **Scalable** - Stateless server design  
 
 This design provides efficient caching for UI and AI strategy while maintaining proper security boundaries: services are authoritative about validation data and never trust caller-provided context.
-

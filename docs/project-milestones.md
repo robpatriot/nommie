@@ -164,7 +164,44 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **16. CI Pipeline**
+### 🟨 **16. Frontend UX Pass (Round 2)**
+**Dependencies:** 15  
+**Details:**
+- **Implement Design v1:** Apply the first-endorsed product design across Nommie (typography, spacing, components).  
+- **Separate Game Config vs Play UI:** Split the game experience into a configuration surface (seating, AI seats, options) and an in-game surface focused on play.  
+- **Last Trick UI:** Persist the most recent trick as a compact card row so play can continue immediately after the final card.  
+- **User Options:** Add per-account settings (e.g., theme, gameplay preferences) surfaced via a profile/options view.  
+- **Card Play Confirmation Toggle:** Provide a per-account option for confirming card plays before submission.  
+**Acceptance:** Core screens match design reference; users transition smoothly between config and play areas; previous trick reviewable; account preferences persist; card confirmation toggle works.
+
+---
+
+### 🟨 **17. PATCH Endpoints with ETag Support**
+**Dependencies:** 5, 9, 12  
+**Details:**
+- Implement PATCH endpoints for **game configuration only** (not gameplay actions) with conditional request support via ETags.
+- **Context:** Gameplay actions (bidding, playing cards, selecting trump) already use ETags via POST endpoints with `If-Match` headers (implemented in earlier milestones). This milestone adds PATCH endpoints for configuration changes.
+- **Scope:** PATCH is used for game configuration changes such as:
+  - Adding/removing AI seats
+  - Updating game settings/options
+  - Modifying game metadata (name, visibility, etc.)
+- **Not in scope:** Gameplay actions (bidding, playing cards, selecting trump, marking ready) already use POST endpoints with ETag/If-Match support and remain unchanged.
+- **ETag generation:** Generate strong ETags from resource version/state (e.g., using `lock_version` or content hash), consistent with existing POST gameplay endpoints.
+- **If-Match header handling:** Require `If-Match` header for PATCH requests; validate ETag matches current resource version (same pattern as POST gameplay endpoints).
+- **Error responses:**
+  - `409 Conflict` with `OptimisticLock` error code when `If-Match` ETag is stale (resource modified concurrently).
+  - `428 Precondition Required` when `If-Match` header is missing (required for PATCH operations, consistent with POST gameplay endpoints).
+  - Include version information in error extensions for client retry logic.
+- **Success behavior:** PATCH with matching ETag succeeds and increments resource version/ETag (returns new ETag in response header).
+- **Test coverage:**
+  - `patch_with_matching_if_match_succeeds_and_bumps_etag` - Valid PATCH updates resource and returns new ETag.
+  - `patch_with_stale_if_match_returns_409_with_extensions` - Stale ETag returns 409 with version details in extensions.
+  - `patch_missing_if_match_returns_428` - Missing `If-Match` header returns 428 Precondition Required (consistent with POST gameplay endpoints).
+**Acceptance:** PATCH endpoints enforce ETag validation for configuration changes; gameplay actions continue using POST with existing ETag support; concurrent modification conflicts return structured 409 responses; all test cases pass.
+
+---
+
+### 🟨 **18. CI Pipeline**
 **Dependencies:** 4, 5, 6, 7, 9, 14, 15  
 **Details:**
 - Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.
@@ -174,7 +211,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **17. Documentation & Decision Log**
+### 🟨 **19. Documentation & Decision Log**
 **Dependencies:** 11  
 **Details:**
 - README: setup and reset flow.
@@ -185,7 +222,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🕓 **18. Observability & Stability**
+### 🕓 **20. Observability & Stability**
 **Dependencies:** 5, 11  
 **Details:**
 - Logs include `user_id` and `game_id` when relevant.
@@ -196,8 +233,8 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🕓 **19. Open Source Observability Stack**
-**Dependencies:** 16, 10  
+### 🕓 **21. Open Source Observability Stack**
+**Dependencies:** 18, 10  
 **Details:**
 - Grafana, Tempo, Loki, and Prometheus in Docker Compose.
 **Progress:** Docker baseline complete; observability stack not yet deployed.  
@@ -265,16 +302,6 @@ Independent improvements that enhance robustness, performance, and developer exp
 ### **6. Frontend Experience Enhancements**
 - **React Query Adoption:** Introduce React Query for client data fetching (lobby lists, game snapshots) while keeping room for future caching/state patterns.  
   *Acceptance:* Critical frontend requests flow through React Query with documented fetch policies.
-- **Implement Design v1:** Apply the first-endorsed product design across Nommie (typography, spacing, components).  
-  *Acceptance:* Core screens match design reference with sign-off from design owner.
-- **Separate Game Config vs Play UI:** Split the game experience into a configuration surface (seating, AI seats, options) and an in-game surface focused on play.  
-  *Acceptance:* Users transition smoothly between dedicated config and play areas without losing context.
-- **Last Trick UI:** Persist the most recent trick as a compact card row so play can continue immediately after the final card.  
-  *Acceptance:* Players can review the previous trick while starting the next without modal blockers.
-- **User Options:** Add per-account settings (e.g., theme, gameplay preferences) surfaced via a profile/options view.  
-  *Acceptance:* Authenticated users can update and persist account-level preferences.
-- **Card Play Confirmation Toggle:** Provide a per-account option for confirming card plays before submission.  
-  *Acceptance:* Confirmation can be enabled/disabled per user and respected by the play interaction flow.
 
 ---
 
@@ -285,5 +312,9 @@ Independent improvements that enhance robustness, performance, and developer exp
   *Acceptance:* Each engine exposes at least one production-ready AI with documented characteristics.
 - **In-Memory AI Comparison Harness:** Extend the in-memory engine with a lightweight benchmarking mode focused on head-to-head performance (minimal correctness checks).  
   *Acceptance:* Developers can pit AIs against each other rapidly and capture comparative metrics.
+
+---
+
+### **8. Internationalisation Foundations**
 - **Internationalisation Foundations:** Define and implement the initial i18n strategy (framework choice, locale loading, placeholder translations) with scope finalised before execution.  
   *Acceptance:* Core tooling and process for multiple locales is in place, even if only one language ships initially.

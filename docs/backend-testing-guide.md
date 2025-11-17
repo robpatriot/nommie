@@ -7,8 +7,6 @@ that prevent accidental prod access, and the available harness helpers.
 Complementary docs: `backend-error-handling.md` for error assertions and
 `project-milestones.md` for when new suites are expected.
 
-This document describes the testing setup for the Nommie backend.
-
 ## Database Environment Policy
 
 ### Code Requirements
@@ -24,7 +22,7 @@ This document describes the testing setup for the Nommie backend.
   - `sqlite-file`
   - `sqlite-memory`
 - **Helper usage:** `build_test_state()` and `test_state_builder()` consult the env var so suites automatically pick up the configured backend.
-- **Backend-specific suites:** Postgres-only tests (e.g. `regression/game_flow_ai_pg`, migration lock tests) detect the current backend and skip when it does not match, while SQLite-only suites (`services/sqlite_backend_file.rs`, `services/sqlite_backend_mem.rs`) remain active when appropriate.
+- **Backend-specific suites:** Postgres-only tests detect the current backend and skip when it does not match, while SQLite-only suites remain active when appropriate.
 - **Example:**
   ```bash
   # Run backend tests against SQLite memory
@@ -40,27 +38,22 @@ This document describes the testing setup for the Nommie backend.
 - Tests connect to the database and schema is auto-migrated if empty
 - **Fresh databases are automatically migrated on first connection**
 
-## Test Structure
+## Test Support Functions
 
-### Test Support Module (`src/test_support/`)
-- `assert_test_db_url(url: &str)` - Validates database URL ends with `_test`
-- `load_test_env()` - Loads `.env.test` configuration
-- `get_test_db_url()` - Retrieves database URL from environment
-- `ensure_schema_ready(db)` - Ensures schema is ready, auto-migrates empty databases (automatically called by `build_state`)
+**Location:** `apps/backend/tests/support/test_state.rs`
 
-### Health Endpoint (`src/health.rs`)
-- Simple `GET /health` endpoint returning `200` with body `"ok"`
-- `configure()` function returns a closure that configures the Actix Web App
-- Avoids generic type issues with `actix_web::App`
+- `build_test_state()` - Builds a complete `AppState` with test database configured
+- `test_state_builder()` - Returns a `StateBuilder` for custom configuration
+- `resolve_test_db_kind()` - Resolves the database backend from `NOMMIE_TEST_DB_KIND` env var
 
-### Integration Tests (`tests/`)
-- `healthcheck.rs` - Tests the health endpoint with full service setup
-- Uses in-process Actix Web testing with the configurator closure
-- **Connects to database with auto-migration support**
+These functions automatically:
+- Set `RuntimeEnv::Test`
+- Respect `NOMMIE_TEST_DB_KIND` environment variable
+- Default to PostgreSQL if no override is provided
 
 ## Safety Features
 
-- **Database Guard**: Tests panic if `DATABASE_URL` doesn't end with `_test`
+- **Database Guard**: Tests panic if `DATABASE_URL` doesn't end with `_test` (enforced in `apps/backend/src/config/db.rs`)
 - **Auto-Migration**: Empty databases are automatically migrated on connection
 - **Environment Isolation**: Test-specific environment via `.env.test`
 - **Automatic Schema Migration**: `build_state()` automatically migrates empty databases for both prod and test

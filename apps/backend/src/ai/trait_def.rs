@@ -5,7 +5,7 @@
 //!
 //! # For AI Developers
 //!
-//! See the comprehensive [AI Implementation Guide](../../../../../../docs/ai-player-implementation-guide.md)
+//! See the comprehensive [AI Implementation Guide](docs/ai-player-implementation-guide.md)
 //! for complete documentation including:
 //! - Game rules
 //! - Available game state and helper methods

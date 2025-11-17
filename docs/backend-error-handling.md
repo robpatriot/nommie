@@ -49,14 +49,6 @@ The canonical application error type that implements `ResponseError` for Actix-w
 - **Auth errors:** `Unauthorized`, `Forbidden` (+ specific variants for JWT/Bearer issues)
 - **Infrastructure errors:** `Db`, `DbUnavailable`, `Timeout`, `Internal`, `Config`
 
-**Representative example:**
-```rust
-AppError::Conflict { 
-    code: ErrorCode::OptimisticLock, 
-    detail: String 
-}
-```
-
 **Key characteristics:**
 - Most variants carry an `ErrorCode` for machine-readable identification
 - Status codes determined by variant type
@@ -77,16 +69,7 @@ All codes map to SCREAMING_SNAKE_CASE strings via `as_str()` for HTTP responses 
 
 #### DomainError (HTTP/DB-Agnostic)
 
-Domain-level errors used by services and repositories:
-
-```rust
-pub enum DomainError {
-    Validation(ValidationKind, String),
-    Conflict(ConflictKind, String),
-    NotFound(NotFoundKind, String),
-    Infra(InfraErrorKind, String),
-}
-```
+Domain-level errors used by services and repositories. See `src/errors/domain.rs` for the complete definition.
 
 **Conversion:** `impl From<DomainError> for AppError` provides automatic mapping.
 
@@ -98,58 +81,17 @@ pub enum DomainError {
 
 #### Repository Functions
 
-Repositories are **stateless** and **generic** over `ConnectionTrait`. They return `DomainError`:
-
-```rust
-// Repos return DomainError directly
-pub async fn find_by_id<C: ConnectionTrait>(
-    conn: &C, game_id: i64
-) -> Result<Option<Game>, DomainError>
-
-pub async fn create_game<C: ConnectionTrait>(
-    conn: &C, join_code: &str
-) -> Result<Game, DomainError>
-```
+Repositories are **stateless** and **generic** over `ConnectionTrait`. They return `DomainError`.
 
 #### SeaORM Adapters
 
-Adapters handle ORM-specific concerns and return `sea_orm::DbErr`:
-
-```rust
-// Adapters return sea_orm::DbErr
-pub async fn find_by_id<C: ConnectionTrait>(
-    conn: &C, game_id: i64
-) -> Result<Option<games::Model>, sea_orm::DbErr>
-
-pub async fn update_state<C: ConnectionTrait>(
-    conn: &C, dto: GameUpdateState
-) -> Result<games::Model, sea_orm::DbErr>
-```
+Adapters handle ORM-specific concerns and return `sea_orm::DbErr`.
 
 #### Automatic Error Conversion
 
 **Location:** `apps/backend/src/infra/db_errors.rs`
 
-Central `map_db_err` function translates SeaORM errors to domain errors:
-
-```rust
-// Adapter DbErr → DomainError (automatic via From)
-impl From<sea_orm::DbErr> for DomainError {
-    fn from(e: sea_orm::DbErr) -> Self {
-        crate::infra::db_errors::map_db_err(e)
-    }
-}
-
-// DomainError → AppError (automatic via From)
-impl From<sea_orm::DbErr> for AppError {
-    fn from(e: sea_orm::DbErr) -> Self {
-        let de = crate::infra::db_errors::map_db_err(e);
-        AppError::from(de)
-    }
-}
-```
-
-This enables seamless error propagation with `?` operator across all layers.
+Central `map_db_err` function translates SeaORM errors to domain errors. This enables seamless error propagation with `?` operator across all layers.
 
 #### Helper Constructors
 
@@ -160,7 +102,6 @@ Both error types provide convenience constructors:
 AppError::not_found(ErrorCode::GameNotFound, "Game not found")
 AppError::conflict(ErrorCode::OptimisticLock, "Resource modified; retry")
 AppError::bad_request(ErrorCode::InvalidGameId, "Invalid ID")
-AppError::invalid(ErrorCode::MustFollowSuit, detail)
 
 // DomainError helpers
 DomainError::not_found(NotFoundKind::Game, "Game not found")
@@ -172,20 +113,11 @@ DomainError::validation(ValidationKind::PhaseMismatch, detail)
 
 ### Layer 3: HTTP Mapping
 
-**Location:** `apps/backend/src/error.rs:375-451`
+**Location:** `apps/backend/src/error.rs`
 
 #### ResponseError Implementation
 
-```rust
-impl ResponseError for AppError {
-    fn status_code(&self) -> StatusCode {
-        self.status()
-    }
-    fn error_response(&self) -> HttpResponse {
-        // ... builds Problem+JSON response
-    }
-}
-```
+`AppError` implements `ResponseError` for Actix-web, automatically converting to HTTP responses.
 
 #### HTTP Status Code Mapping
 
@@ -203,22 +135,7 @@ Status codes are determined by the `AppError` variant. See `src/error.rs` for co
 
 #### Problem Details Response Format (RFC 7807)
 
-All error responses follow this structure:
-
-```rust
-#[derive(Serialize)]
-pub struct ProblemDetails {
-    #[serde(rename = "type")]
-    pub type_: String,        // https://nommie.app/errors/OPTIMISTIC_LOCK
-    pub title: String,        // humanized: "Optimistic Lock"
-    pub status: u16,          // 409
-    pub detail: String,       // human detail message
-    pub code: String,         // machine code: "OPTIMISTIC_LOCK"
-    pub trace_id: String,     // request trace ID
-}
-```
-
-**Example response:**
+All error responses follow RFC 7807 Problem Details format:
 
 ```json
 {
@@ -249,33 +166,7 @@ Optimistic locking is implemented using a `lock_version` column (i32) that incre
 
 #### Detection Pattern
 
-```rust
-async fn optimistic_update_then_fetch<C, F>(
-    conn: &C, id: i64, current_lock_version: i32, ...
-) -> Result<games::Model, sea_orm::DbErr> {
-    // SQL: UPDATE ... WHERE id = ? AND lock_version = ? ...
-    let result = configure_update(games::Entity::update_many())
-        .col_expr(games::Column::LockVersion, Expr::col(...).add(1))
-        .filter(games::Column::Id.eq(id))
-        .filter(games::Column::LockVersion.eq(current_lock_version))
-        .exec(conn).await?;
-
-    if result.rows_affected == 0 {
-        let game = games::Entity::find_by_id(id).one(conn).await?;
-        if let Some(game) = game {
-            // Lock version mismatch - return structured error
-            let payload = format!(
-                "OPTIMISTIC_LOCK:{{\"expected\":{},\"actual\":{}}}",
-                current_lock_version, game.lock_version
-            );
-            return Err(DbErr::Custom(payload));
-        } else {
-            return Err(DbErr::RecordNotFound("Game not found".to_string()));
-        }
-    }
-    // ... refetch updated game
-}
-```
+When an update affects zero rows due to a lock version mismatch, the adapter returns a structured error payload that includes both expected and actual version numbers.
 
 #### Structured Error Payload
 
@@ -283,36 +174,6 @@ Optimistic lock errors include version information:
 - **Adapter:** Returns `DbErr::Custom("OPTIMISTIC_LOCK:{"expected":12,"actual":13}")`
 - **Mapper:** Parses JSON and creates detailed error message
 - **HTTP:** Returns 409 with human-readable detail including version numbers
-
-**Mapping in `infra/db_errors.rs`:**
-
-```rust
-DbErr::Custom(msg) if msg.starts_with("OPTIMISTIC_LOCK:") => {
-    warn!(trace_id = %trace_id, "Optimistic lock conflict detected");
-    
-    // Parse structured version info
-    if let Some(json_str) = msg.strip_prefix("OPTIMISTIC_LOCK:") {
-        #[derive(serde::Deserialize)]
-        struct LockInfo { expected: i32, actual: i32 }
-        
-        if let Ok(info) = serde_json::from_str::<LockInfo>(json_str) {
-            return DomainError::conflict(
-                ConflictKind::OptimisticLock,
-                format!(
-                    "Resource was modified concurrently (expected version {}, actual version {}). Please refresh and retry.",
-                    info.expected, info.actual
-                ),
-            );
-        }
-    }
-    
-    // Fallback for back-compat
-    return DomainError::conflict(
-        ConflictKind::OptimisticLock,
-        "Resource was modified by another transaction; please retry",
-    );
-}
-```
 
 **Error flow:**
 ```
@@ -347,57 +208,6 @@ Database errors are sanitized and mapped based on error type and SQLSTATE codes.
   - Specific constraint name inspection for detailed error codes (e.g., `user_credentials_email_key` → `UniqueEmail`)
 - **23503** (Foreign key violation) → `Validation` (400)
 - **23514** (Check constraint violation) → `Validation` (400)
-
----
-
-## Schema Details
-
-### Lock Version Column
-
-**Rust model:**
-```rust
-#[sea_orm(column_name = "lock_version")]
-pub lock_version: i32,
-```
-
-**Migration SQL:**
-```rust
-ColumnDef::new(Games::LockVersion)
-    .integer()        // Postgres: INTEGER (i32)
-    .not_null()
-    .default(0)
-```
-
-**Update pattern:**
-```sql
-UPDATE games 
-SET 
-    lock_version = lock_version + 1,
-    updated_at = NOW(),
-    ... other columns ...
-WHERE id = ? AND lock_version = ?
-```
-
-### Database Enums
-
-The schema uses Postgres enums for type-safe state management. See `src/entities/games.rs` and `migration/src/m20250823_000001_init.rs` for complete definitions.
-
-**Enum types:**
-- `game_state` (9 values): Game lifecycle states from LOBBY through COMPLETED/ABANDONED
-- `game_visibility` (2 values): PUBLIC or PRIVATE
-
-**SeaORM mapping pattern:**
-```rust
-#[derive(DeriveActiveEnum)]
-#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "game_state")]
-pub enum GameState {
-    #[sea_orm(string_value = "LOBBY")]
-    Lobby,
-    // ... additional variants
-}
-```
-
-When updating enum columns, use `.cast_as(Alias::new("enum_name"))` to ensure proper type casting in SQL expressions.
 
 ---
 
@@ -461,4 +271,3 @@ Potential improvements for consideration:
 - [Architecture Overview](./architecture-overview.md)
 - [Backend Testing Guide](./backend-testing-guide.md)
 - [RFC 7807 - Problem Details for HTTP APIs](https://tools.ietf.org/html/rfc7807)
-
