@@ -41,7 +41,7 @@ impl GameFlowService {
             .into());
         }
 
-        let hand_size = hand_size_for_round(next_round as u8).ok_or_else(|| {
+        let hand_size = hand_size_for_round(next_round).ok_or_else(|| {
             DomainError::validation(ValidationKind::InvalidHandSize, "Invalid round number")
         })?;
 
@@ -90,7 +90,7 @@ impl GameFlowService {
         .await?;
 
         // Persist dealt hands to DB
-        let hands_to_store: Vec<(i16, Vec<hands::Card>)> = dealt_hands
+        let hands_to_store: Vec<(u8, Vec<hands::Card>)> = dealt_hands
             .iter()
             .enumerate()
             .map(|(idx, hand)| {
@@ -101,7 +101,7 @@ impl GameFlowService {
                         rank: format!("{:?}", c.rank).to_uppercase(),
                     })
                     .collect();
-                (idx as i16, cards)
+                (idx as u8, cards)
             })
             .collect();
 
@@ -168,9 +168,9 @@ impl GameFlowService {
         let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
 
         // Count tricks won by each player
-        let mut tricks_won = [0i16; 4];
+        let mut tricks_won = [0u8; 4];
         for trick in &all_tricks {
-            if trick.winner_seat >= 0 && trick.winner_seat < 4 {
+            if trick.winner_seat < 4 {
                 tricks_won[trick.winner_seat as usize] += 1;
             }
         }
@@ -191,7 +191,7 @@ impl GameFlowService {
             let prev_scores = scores::find_all_by_round(txn, prev_round.id).await?;
             let mut totals = [0i16; 4];
             for score in prev_scores {
-                if score.player_seat >= 0 && score.player_seat < 4 {
+                if score.player_seat < 4 {
                     totals[score.player_seat as usize] = score.total_score_after;
                 }
             }
@@ -201,7 +201,7 @@ impl GameFlowService {
         };
 
         // Calculate and persist scores for all 4 players
-        for seat in 0..4 {
+        for seat in 0..4u8 {
             let bid = all_bids
                 .iter()
                 .find(|b| b.player_seat == seat)
@@ -215,7 +215,7 @@ impl GameFlowService {
             let base_score = tricks;
             let bonus = if bid_met { 10 } else { 0 };
             let round_score = base_score + bonus;
-            let total_after = previous_totals[seat as usize] + round_score;
+            let total_after = previous_totals[seat as usize] + round_score as i16;
 
             scores::create_score(
                 txn,

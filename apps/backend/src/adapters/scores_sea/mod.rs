@@ -27,11 +27,11 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
 pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     round_id: i64,
-    player_seat: i16,
+    player_seat: u8,
 ) -> Result<Option<round_scores::Model>, sea_orm::DbErr> {
     round_scores::Entity::find()
         .filter(round_scores::Column::RoundId.eq(round_id))
-        .filter(round_scores::Column::PlayerSeat.eq(player_seat))
+        .filter(round_scores::Column::PlayerSeat.eq(player_seat as i16))
         .one(conn)
         .await
 }
@@ -46,13 +46,13 @@ pub async fn create_score(
     let score = round_scores::ActiveModel {
         id: sea_orm::NotSet,
         round_id: Set(dto.round_id),
-        player_seat: Set(dto.player_seat),
-        bid_value: Set(dto.bid_value),
-        tricks_won: Set(dto.tricks_won),
+        player_seat: Set(dto.player_seat as i16),
+        bid_value: Set(dto.bid_value as i16),
+        tricks_won: Set(dto.tricks_won as i16),
         bid_met: Set(dto.bid_met),
-        base_score: Set(dto.base_score),
-        bonus: Set(dto.bonus),
-        round_score: Set(dto.round_score),
+        base_score: Set(dto.base_score as i16),
+        bonus: Set(dto.bonus as i16),
+        round_score: Set(dto.round_score as i16),
         total_score_after: Set(dto.total_score_after),
         created_at: Set(now),
     };
@@ -85,7 +85,7 @@ pub async fn get_current_totals(
         // Build array (initialize to 0)
         let mut totals = [0i16; 4];
         for score in scores {
-            if score.player_seat >= 0 && score.player_seat < 4 {
+            if score.player_seat < 4 {
                 totals[score.player_seat as usize] = score.total_score_after;
             }
         }

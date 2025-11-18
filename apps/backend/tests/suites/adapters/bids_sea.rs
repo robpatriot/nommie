@@ -191,9 +191,9 @@ async fn test_unique_constraint_round_order() -> Result<(), AppError> {
             let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            bids::create_bid(txn, round.id, 0, 5, 0).await?;
+            bids::create_bid(txn, round.id, 0u8, 5u8, 0u8).await?;
 
-            let result = bids::create_bid(txn, round.id, 1, 7, 0).await;
+            let result = bids::create_bid(txn, round.id, 1u8, 7u8, 0u8).await;
 
             assert!(result.is_err(), "Duplicate bid_order should fail");
 

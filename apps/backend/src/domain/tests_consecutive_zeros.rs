@@ -9,9 +9,9 @@ use crate::domain::player_view::{GameHistory, RoundHistory, RoundScoreDetail};
 use crate::errors::domain::{DomainError, ValidationKind};
 
 /// Helper to create a round with specified bids
-fn make_round(round_no: i16, bids: [Option<u8>; 4]) -> RoundHistory {
+fn make_round(round_no: u8, bids: [Option<u8>; 4]) -> RoundHistory {
     // Calculate hand size for this round
-    let hand_size = crate::domain::hand_size_for_round(round_no as u8).unwrap_or(13) as u8;
+    let hand_size = crate::domain::hand_size_for_round(round_no).unwrap_or(13);
 
     RoundHistory {
         round_no,

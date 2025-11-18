@@ -12,7 +12,7 @@ use crate::errors::domain::DomainError;
 pub struct Hand {
     pub id: i64,
     pub round_id: i64,
-    pub player_seat: i16,
+    pub player_seat: u8,
     pub cards: Vec<Card>,
     pub created_at: time::OffsetDateTime,
 }
@@ -30,7 +30,7 @@ pub struct Card {
 pub async fn create_hands(
     txn: &DatabaseTransaction,
     round_id: i64,
-    hands: Vec<(i16, Vec<Card>)>, // Vec of (player_seat, cards)
+    hands: Vec<(u8, Vec<Card>)>, // Vec of (player_seat, cards)
 ) -> Result<Vec<Hand>, DomainError> {
     let mut results = Vec::new();
     for (seat, cards) in hands {
@@ -49,7 +49,7 @@ pub async fn create_hands(
 pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     round_id: i64,
-    player_seat: i16,
+    player_seat: u8,
 ) -> Result<Option<Hand>, DomainError> {
     let hand = hands_adapter::find_by_round_and_seat(conn, round_id, player_seat).await?;
     Ok(hand.map(Hand::from))
@@ -75,7 +75,7 @@ impl From<round_hands::Model> for Hand {
         Self {
             id: model.id,
             round_id: model.round_id,
-            player_seat: model.player_seat,
+            player_seat: model.player_seat as u8,
             cards,
             created_at: model.created_at,
         }

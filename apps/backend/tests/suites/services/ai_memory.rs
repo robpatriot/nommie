@@ -52,9 +52,9 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
         join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("round_card_plays_empty"))),
-        current_round: Set(Some(1)),
-        starting_dealer_pos: Set(Some(0)),
-        current_trick_no: Set(0),
+        current_round: Set(Some(1i16)),
+        starting_dealer_pos: Set(Some(0i16)),
+        current_trick_no: Set(0i16),
         current_round_id: Set(None),
         lock_version: Set(0),
     }
@@ -64,9 +64,9 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
     let round = game_rounds::ActiveModel {
         id: NotSet,
         game_id: Set(game.id),
-        round_no: Set(1),
-        hand_size: Set(13),
-        dealer_pos: Set(0),
+        round_no: Set(1i16),
+        hand_size: Set(13i16),
+        dealer_pos: Set(0i16),
         trump: Set(None),
         created_at: Set(OffsetDateTime::now_utc()),
         completed_at: Set(None),
@@ -120,9 +120,9 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("round_card_plays_tricks"))),
-        current_round: Set(Some(1)),
-        starting_dealer_pos: Set(Some(0)),
-        current_trick_no: Set(3),
+        current_round: Set(Some(1i16)),
+        starting_dealer_pos: Set(Some(0i16)),
+        current_trick_no: Set(3i16),
         current_round_id: Set(None),
         lock_version: Set(0),
     }
@@ -132,9 +132,9 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     let round = game_rounds::ActiveModel {
         id: NotSet,
         game_id: Set(game.id),
-        round_no: Set(1),
-        hand_size: Set(13),
-        dealer_pos: Set(0),
+        round_no: Set(1i16),
+        hand_size: Set(13i16),
+        dealer_pos: Set(0i16),
         trump: Set(None),
         created_at: Set(OffsetDateTime::now_utc()),
         completed_at: Set(None),
@@ -146,9 +146,9 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     let trick0 = round_tricks::ActiveModel {
         id: NotSet,
         round_id: Set(round.id),
-        trick_no: Set(1),
+        trick_no: Set(1i16),
         lead_suit: Set(CardSuit::Hearts),
-        winner_seat: Set(2),
+        winner_seat: Set(2i16),
         created_at: Set(OffsetDateTime::now_utc()),
     }
     .insert(txn)
@@ -163,9 +163,9 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         trick_plays::ActiveModel {
             id: NotSet,
             trick_id: Set(trick0.id),
-            player_seat: Set(seat),
+            player_seat: Set(seat as i16),
             card: Set(json!({"suit": suit, "rank": rank})),
-            play_order: Set(seat),
+            play_order: Set(seat as i16),
             played_at: Set(OffsetDateTime::now_utc()),
         }
         .insert(txn)
@@ -176,9 +176,9 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     let trick1 = round_tricks::ActiveModel {
         id: NotSet,
         round_id: Set(round.id),
-        trick_no: Set(2),
+        trick_no: Set(2i16),
         lead_suit: Set(CardSuit::Spades),
-        winner_seat: Set(1),
+        winner_seat: Set(1i16),
         created_at: Set(OffsetDateTime::now_utc()),
     }
     .insert(txn)
@@ -193,9 +193,9 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         trick_plays::ActiveModel {
             id: NotSet,
             trick_id: Set(trick1.id),
-            player_seat: Set(seat),
+            player_seat: Set(seat as i16),
             card: Set(json!({"suit": suit, "rank": rank})),
-            play_order: Set((seat + 2) % 4),
+            play_order: Set(((seat + 2) % 4) as i16),
             played_at: Set(OffsetDateTime::now_utc()),
         }
         .insert(txn)

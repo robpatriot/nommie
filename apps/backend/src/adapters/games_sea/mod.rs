@@ -134,7 +134,7 @@ pub async fn create_game(
         rng_seed: Set(Some(rng_seed)),
         current_round: NotSet,
         starting_dealer_pos: NotSet,
-        current_trick_no: Set(0),
+        current_trick_no: Set(0i16),
         current_round_id: NotSet,
         lock_version: Set(1),
     };
@@ -200,16 +200,22 @@ pub async fn update_round(
     optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |mut update| {
         // Apply optional field updates
         if let Some(round) = dto.current_round {
-            update = update.col_expr(games::Column::CurrentRound, Expr::val(Some(round)).into());
+            update = update.col_expr(
+                games::Column::CurrentRound,
+                Expr::val(Some(round as i16)).into(),
+            );
         }
         if let Some(pos) = dto.starting_dealer_pos {
             update = update.col_expr(
                 games::Column::StartingDealerPos,
-                Expr::val(Some(pos)).into(),
+                Expr::val(Some(pos as i16)).into(),
             );
         }
         if let Some(trick_no) = dto.current_trick_no {
-            update = update.col_expr(games::Column::CurrentTrickNo, Expr::val(trick_no).into());
+            update = update.col_expr(
+                games::Column::CurrentTrickNo,
+                Expr::val(trick_no as i16).into(),
+            );
         }
         update
     })

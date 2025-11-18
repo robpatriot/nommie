@@ -136,8 +136,8 @@ pub fn set_trump(
 /// * `Err(DomainError)` if they've already bid 0 in the last 3 rounds
 pub fn validate_consecutive_zero_bids(
     history: &GameHistory,
-    player_seat: i16,
-    current_round: i16,
+    player_seat: u8,
+    current_round: u8,
 ) -> Result<(), DomainError> {
     // Need at least 3 previous rounds to check
     if current_round < 4 {

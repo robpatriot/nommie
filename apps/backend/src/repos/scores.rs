@@ -11,13 +11,13 @@ use crate::errors::domain::DomainError;
 pub struct Score {
     pub id: i64,
     pub round_id: i64,
-    pub player_seat: i16,
-    pub bid_value: i16,
-    pub tricks_won: i16,
+    pub player_seat: u8,
+    pub bid_value: u8,
+    pub tricks_won: u8,
     pub bid_met: bool,
-    pub base_score: i16,
-    pub bonus: i16,
-    pub round_score: i16,
+    pub base_score: u8,
+    pub bonus: u8,
+    pub round_score: u8,
     pub total_score_after: i16,
     pub created_at: time::OffsetDateTime,
 }
@@ -26,13 +26,13 @@ pub struct Score {
 #[derive(Debug, Clone)]
 pub struct ScoreData {
     pub round_id: i64,
-    pub player_seat: i16,
-    pub bid_value: i16,
-    pub tricks_won: i16,
+    pub player_seat: u8,
+    pub bid_value: u8,
+    pub tricks_won: u8,
     pub bid_met: bool,
-    pub base_score: i16,
-    pub bonus: i16,
-    pub round_score: i16,
+    pub base_score: u8,
+    pub bonus: u8,
+    pub round_score: u8,
     pub total_score_after: i16,
 }
 
@@ -71,7 +71,7 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
 pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     round_id: i64,
-    player_seat: i16,
+    player_seat: u8,
 ) -> Result<Option<Score>, DomainError> {
     let score = scores_adapter::find_by_round_and_seat(conn, round_id, player_seat).await?;
     Ok(score.map(Score::from))
@@ -95,7 +95,7 @@ pub async fn get_current_totals(
 pub async fn get_scores_for_completed_rounds<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     game_id: i64,
-    round_no: i16,
+    round_no: u8,
 ) -> Result<[i16; 4], DomainError> {
     if round_no <= 1 {
         // First round - no previous scores
@@ -116,7 +116,7 @@ pub async fn get_scores_for_completed_rounds<C: ConnectionTrait + Send + Sync>(
     let mut score_array = [0i16; 4];
     let scores_list = find_all_by_round(conn, prev_round.id).await?;
     for score in scores_list {
-        if score.player_seat >= 0 && score.player_seat < 4 {
+        if score.player_seat < 4 {
             score_array[score.player_seat as usize] = score.total_score_after;
         }
     }
@@ -130,13 +130,13 @@ impl From<round_scores::Model> for Score {
         Self {
             id: model.id,
             round_id: model.round_id,
-            player_seat: model.player_seat,
-            bid_value: model.bid_value,
-            tricks_won: model.tricks_won,
+            player_seat: model.player_seat as u8,
+            bid_value: model.bid_value as u8,
+            tricks_won: model.tricks_won as u8,
             bid_met: model.bid_met,
-            base_score: model.base_score,
-            bonus: model.bonus,
-            round_score: model.round_score,
+            base_score: model.base_score as u8,
+            bonus: model.bonus as u8,
+            round_score: model.round_score as u8,
             total_score_after: model.total_score_after,
             created_at: model.created_at,
         }

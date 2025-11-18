@@ -8,7 +8,7 @@ pub struct MembershipUpdate {
     pub player_kind: crate::entities::game_players::PlayerKind,
     pub human_user_id: Option<i64>,
     pub ai_profile_id: Option<i64>,
-    pub turn_order: i32,
+    pub turn_order: u8,
     pub is_ready: bool,
 }
 
@@ -19,7 +19,7 @@ pub struct MembershipCreate {
     pub player_kind: crate::entities::game_players::PlayerKind,
     pub human_user_id: Option<i64>,
     pub ai_profile_id: Option<i64>,
-    pub turn_order: i32,
+    pub turn_order: u8,
     pub is_ready: bool,
 }
 

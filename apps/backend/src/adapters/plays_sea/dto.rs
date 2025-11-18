@@ -6,7 +6,7 @@ use crate::repos::plays::Card;
 #[derive(Debug, Clone)]
 pub struct PlayCreate {
     pub trick_id: i64,
-    pub player_seat: i16,
+    pub player_seat: u8,
     pub card: Card,
-    pub play_order: i16,
+    pub play_order: u8,
 }

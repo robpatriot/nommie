@@ -50,8 +50,8 @@ impl MemoryMode {
 /// Card plays for a single trick (undegraded format for internal use).
 #[derive(Debug, Clone)]
 pub struct TrickPlays {
-    pub trick_no: i16,
-    pub plays: Vec<(i16, Card)>, // (player_seat, card)
+    pub trick_no: u8,
+    pub plays: Vec<(u8, Card)>, // (player_seat, card)
 }
 
 /// Get card play history for a round, with memory degradation applied.

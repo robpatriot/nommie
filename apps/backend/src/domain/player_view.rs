@@ -15,10 +15,10 @@ use crate::domain::{valid_bid_range, Card, Trump};
 /// For trick 0: player to left of dealer (dealer_pos + 1) leads.
 /// For other tricks: winner of previous trick leads.
 pub fn determine_trick_leader(
-    trick_no: i16,
-    dealer_pos: i16,
-    prev_trick_winner: Option<i16>,
-) -> Option<i16> {
+    trick_no: u8,
+    dealer_pos: u8,
+    prev_trick_winner: Option<u8>,
+) -> Option<u8> {
     if trick_no == 0 {
         // First trick - leader is player to left of dealer
         Some((dealer_pos + 1) % 4)
@@ -83,19 +83,19 @@ pub struct CurrentRoundInfo {
     pub game_id: i64,
 
     /// Your seat position (0-3), determines turn order
-    pub player_seat: i16,
+    pub player_seat: u8,
 
     /// Current game phase: Bidding, TrumpSelect, or Trick
     pub game_state: Phase,
 
     /// Current round number (0-25, there are 26 rounds total)
-    pub current_round: i16,
+    pub current_round: u8,
 
     /// Number of cards each player has this round (varies: 13→2→2→2→3→13)
     pub hand_size: u8,
 
     /// Dealer position (0-3) - dealer bids last and has special restrictions
-    pub dealer_pos: i16,
+    pub dealer_pos: u8,
 
     /// Your current hand - cards you can play
     ///
@@ -120,7 +120,7 @@ pub struct CurrentRoundInfo {
     /// Current trick number (1 to hand_size)
     ///
     /// Each round has exactly `hand_size` tricks.
-    pub trick_no: i16,
+    pub trick_no: u8,
 
     /// Cards played in the current trick so far
     ///
@@ -129,7 +129,7 @@ pub struct CurrentRoundInfo {
     /// - Empty at start of trick
     /// - Up to 4 entries when trick is complete
     /// - First entry is the lead card (determines suit to follow)
-    pub current_trick_plays: Vec<(i16, Card)>,
+    pub current_trick_plays: Vec<(u8, Card)>,
 
     /// Cumulative scores for all players (indexed by seat 0-3)
     ///
@@ -141,7 +141,7 @@ pub struct CurrentRoundInfo {
     /// - `Some(seat)` during TrickPlay phase
     /// - `None` in other phases
     /// - Player to left of dealer leads trick 1, thereafter winner of previous trick leads
-    pub trick_leader: Option<i16>,
+    pub trick_leader: Option<u8>,
 }
 
 impl CurrentRoundInfo {
@@ -181,7 +181,7 @@ impl CurrentRoundInfo {
 
         // Check if it's this player's turn
         let bid_count = self.bids.iter().filter(|b| b.is_some()).count();
-        let expected_seat = (self.dealer_pos + 1 + bid_count as i16) % 4;
+        let expected_seat = (self.dealer_pos + 1 + bid_count as u8) % 4;
         if self.player_seat != expected_seat {
             return Vec::new();
         }
@@ -247,7 +247,7 @@ impl CurrentRoundInfo {
         } else {
             // Not first play - follow turn order from first player
             let first_player = self.current_trick_plays[0].0;
-            (first_player + play_count as i16) % 4
+            (first_player + play_count as u8) % 4
         };
 
         if self.player_seat != leader_seat && play_count > 0 {
@@ -373,13 +373,13 @@ pub struct GameHistory {
 #[derive(Debug, Clone)]
 pub struct RoundHistory {
     /// Round number (1-26)
-    pub round_no: i16,
+    pub round_no: u8,
 
     /// Hand size for this round (number of cards each player had)
     pub hand_size: u8,
 
     /// Who dealt this round (0-3)
-    pub dealer_seat: i16,
+    pub dealer_seat: u8,
 
     /// Bids by each player (indexed by seat 0-3)
     ///
@@ -389,7 +389,7 @@ pub struct RoundHistory {
     /// Who won the bidding and selected trump
     ///
     /// `None` if bidding not complete
-    pub trump_selector_seat: Option<i16>,
+    pub trump_selector_seat: Option<u8>,
 
     /// Trump choice for this round
     ///
@@ -404,7 +404,7 @@ pub struct RoundHistory {
 #[derive(Debug, Clone, Copy)]
 pub struct RoundScoreDetail {
     /// Points earned this round (+1 per trick, +10 bonus for exact bid)
-    pub round_score: i16,
+    pub round_score: u8,
 
     /// Total score after this round (cumulative)
     pub cumulative_score: i16,

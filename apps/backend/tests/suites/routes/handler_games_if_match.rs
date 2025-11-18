@@ -51,7 +51,7 @@ async fn setup_bidding_test(test_name: &str) -> Result<IfMatchTestContext, AppEr
 
     let setup = setup_game_in_bidding_phase(shared.transaction(), test_name).await?;
     let dealer_pos = setup.dealer_pos as usize;
-    let actor_seat = ((dealer_pos + 1) % 4) as i16;
+    let actor_seat = ((dealer_pos + 1) % 4) as u8;
 
     let user_sub = format!("{test_name}_user");
     let user_email = format!("{test_name}@example.com");
@@ -162,11 +162,13 @@ async fn setup_play_test(
     let round = backend::repos::rounds::find_by_game_and_round(
         shared.transaction(),
         setup.game_id,
-        game.current_round.expect("game should have current round"),
+        game.current_round
+            .and_then(|value| value.try_into().ok())
+            .expect("game should have current round"),
     )
     .await?
     .expect("round should exist");
-    let hand = hands::find_by_round_and_seat(shared.transaction(), round.id, first_player as i16)
+    let hand = hands::find_by_round_and_seat(shared.transaction(), round.id, first_player as u8)
         .await?
         .expect("player should have a hand");
     let first_card = backend::domain::cards_parsing::from_stored_format(

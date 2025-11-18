@@ -126,7 +126,7 @@ async fn get_snapshot(
                         continue;
                     }
 
-                    let seat = seat_idx as u8;
+                    let seat = seat_idx;
                     let mut seat_public = SeatPublic::empty(seat);
                     seat_public.is_ready = membership.is_ready;
 
@@ -228,7 +228,7 @@ async fn get_snapshot(
                     if state.round_no == 0 {
                         None
                     } else {
-                        match player_view::load_current_round_info(txn, id, seat as i16).await {
+                        match player_view::load_current_round_info(txn, id, seat).await {
                             Ok(info) => {
                                 Some(info.hand.into_iter().map(format_card).collect::<Vec<_>>())
                             }
@@ -257,7 +257,7 @@ async fn get_snapshot(
                             let history = player_view::load_game_history(txn, id).await?;
                             let zero_bid_locked = validate_consecutive_zero_bids(
                                 &history,
-                                viewer_seat_value as i16,
+                                viewer_seat_value,
                                 current_round_no,
                             )
                             .is_err();
@@ -382,7 +382,7 @@ struct GameResponse {
     updated_at: String,
     started_at: Option<String>,
     ended_at: Option<String>,
-    current_round: Option<i16>,
+    current_round: Option<u8>,
     player_count: i32,
     max_players: i32,
     viewer_is_member: bool,
@@ -763,14 +763,14 @@ async fn add_ai_seat(
                 }
                 if existing_memberships
                     .iter()
-                    .any(|m| m.turn_order == seat_val as i32)
+                    .any(|m| m.turn_order == seat_val)
                 {
                     return Err(AppError::conflict(
                         ErrorCode::SeatTaken,
                         format!("Seat {seat_val} is already taken"),
                     ));
                 }
-                seat_val as i32
+                seat_val
             } else {
                 let game_service = GameService;
                 game_service
@@ -780,7 +780,7 @@ async fn add_ai_seat(
                     })?
             };
 
-            let seat_index = seat_to_fill as u8;
+            let seat_index = seat_to_fill;
             let mut existing_display_names: HashSet<String> = HashSet::new();
 
             for membership in &existing_memberships {
@@ -962,10 +962,9 @@ async fn remove_ai_seat(
                     ));
                 }
 
-                let seat_i32 = seat_val as i32;
                 let membership = existing_memberships
                     .iter()
-                    .find(|m| m.turn_order == seat_i32)
+                    .find(|m| m.turn_order == seat_val)
                     .cloned()
                     .ok_or_else(|| {
                         AppError::bad_request(
@@ -1099,10 +1098,9 @@ async fn update_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            let seat_i32 = seat_val as i32;
             let membership = existing_memberships
                 .into_iter()
-                .find(|m| m.turn_order == seat_i32)
+                .find(|m| m.turn_order == seat_val)
                 .ok_or_else(|| {
                     AppError::bad_request(
                         ErrorCode::ValidationError,
@@ -1199,7 +1197,7 @@ async fn submit_bid(
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
-    let seat = membership.turn_order as i16;
+    let seat = membership.turn_order;
     let bid_value = body.bid;
 
     let updated_game = with_txn(Some(&http_req), &app_state, |txn| {
@@ -1230,7 +1228,7 @@ async fn select_trump(
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
-    let seat = membership.turn_order as i16;
+    let seat = membership.turn_order;
     let payload = body.into_inner();
     let normalized = payload.trump.trim().to_uppercase();
 
@@ -1276,7 +1274,7 @@ async fn play_card(
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
-    let seat = membership.turn_order as i16;
+    let seat = membership.turn_order;
 
     let payload = body.into_inner();
     let normalized = payload.card.trim().to_uppercase();

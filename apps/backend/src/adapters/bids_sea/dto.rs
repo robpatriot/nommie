@@ -4,7 +4,7 @@
 #[derive(Debug, Clone)]
 pub struct BidCreate {
     pub round_id: i64,
-    pub player_seat: i16,
-    pub bid_value: i16,
-    pub bid_order: i16,
+    pub player_seat: u8,
+    pub bid_value: u8,
+    pub bid_order: u8,
 }

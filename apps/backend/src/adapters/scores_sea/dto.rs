@@ -4,12 +4,12 @@
 #[derive(Debug, Clone)]
 pub struct ScoreCreate {
     pub round_id: i64,
-    pub player_seat: i16,
-    pub bid_value: i16,
-    pub tricks_won: i16,
+    pub player_seat: u8,
+    pub bid_value: u8,
+    pub tricks_won: u8,
     pub bid_met: bool,
-    pub base_score: i16,
-    pub bonus: i16,
-    pub round_score: i16,
+    pub base_score: u8,
+    pub bonus: u8,
+    pub round_score: u8,
     pub total_score_after: i16,
 }

@@ -64,10 +64,7 @@ impl GameFlowService {
             if let Some(action_tuple) = next_action {
                 let player_seat = action_tuple.0;
                 let memberships = memberships::find_all_by_game(txn, game_id).await?;
-                if let Some(player) = memberships
-                    .iter()
-                    .find(|m| m.turn_order == player_seat as i32)
-                {
+                if let Some(player) = memberships.iter().find(|m| m.turn_order == player_seat) {
                     if player.player_kind == crate::entities::game_players::PlayerKind::Human {
                         // Waiting for human input - done processing
                         return Ok(());
@@ -150,7 +147,7 @@ impl GameFlowService {
         const MAX_ITERATIONS: usize = 2000;
 
         // Cache that persists across iterations within the same round
-        let mut cached_round: Option<(i16, RoundCache)> = None;
+        let mut cached_round: Option<(u8, RoundCache)> = None;
 
         // Game history cache - loaded once and updated incrementally after round completion
         // This persists across all rounds in the game and is passed to AIs for strategic analysis

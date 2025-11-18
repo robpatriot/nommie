@@ -9,10 +9,10 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_name = "trick_id")]
     pub trick_id: i64,
-    #[sea_orm(column_name = "player_seat")]
+    #[sea_orm(column_name = "player_seat", column_type = "SmallInteger")]
     pub player_seat: i16,
     pub card: Json,
-    #[sea_orm(column_name = "play_order")]
+    #[sea_orm(column_name = "play_order", column_type = "SmallInteger")]
     pub play_order: i16,
     #[sea_orm(column_name = "played_at")]
     pub played_at: OffsetDateTime,

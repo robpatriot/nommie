@@ -11,9 +11,9 @@ use crate::errors::domain::DomainError;
 pub struct Trick {
     pub id: i64,
     pub round_id: i64,
-    pub trick_no: i16,
+    pub trick_no: u8,
     pub lead_suit: Suit,
-    pub winner_seat: i16,
+    pub winner_seat: u8,
     pub created_at: time::OffsetDateTime,
 }
 
@@ -32,9 +32,9 @@ pub enum Suit {
 pub async fn create_trick(
     txn: &DatabaseTransaction,
     round_id: i64,
-    trick_no: i16,
+    trick_no: u8,
     lead_suit: Suit,
-    winner_seat: i16,
+    winner_seat: u8,
 ) -> Result<Trick, DomainError> {
     let dto = tricks_adapter::TrickCreate {
         round_id,
@@ -50,7 +50,7 @@ pub async fn create_trick(
 pub async fn find_by_round_and_trick<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     round_id: i64,
-    trick_no: i16,
+    trick_no: u8,
 ) -> Result<Option<Trick>, DomainError> {
     let trick = tricks_adapter::find_by_round_and_trick(conn, round_id, trick_no).await?;
     Ok(trick.map(Trick::from))
@@ -78,7 +78,7 @@ pub async fn count_tricks_by_round<C: ConnectionTrait + Send + Sync>(
 pub async fn update_winner(
     txn: &DatabaseTransaction,
     trick_id: i64,
-    winner_seat: i16,
+    winner_seat: u8,
 ) -> Result<(), DomainError> {
     tricks_adapter::update_winner(txn, trick_id, winner_seat).await?;
     Ok(())
@@ -91,9 +91,9 @@ impl From<round_tricks::Model> for Trick {
         Self {
             id: model.id,
             round_id: model.round_id,
-            trick_no: model.trick_no,
+            trick_no: model.trick_no as u8,
             lead_suit: Suit::from(model.lead_suit),
-            winner_seat: model.winner_seat,
+            winner_seat: model.winner_seat as u8,
             created_at: model.created_at,
         }
     }

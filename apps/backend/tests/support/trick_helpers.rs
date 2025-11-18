@@ -35,13 +35,13 @@ use sea_orm::DatabaseTransaction;
 pub async fn create_tricks_with_winners(
     txn: &DatabaseTransaction,
     round_id: i64,
-    winners: &[i16],
-    starting_trick_no: i16,
+    winners: &[u8],
+    starting_trick_no: u8,
 ) -> Result<Vec<i64>, AppError> {
     let mut trick_ids = Vec::with_capacity(winners.len());
 
     for (idx, &winner_seat) in winners.iter().enumerate() {
-        let trick_no = starting_trick_no + idx as i16;
+        let trick_no = starting_trick_no + idx as u8;
 
         // Use a default suit based on winner to have some variety
         let suit = match winner_seat % 4 {
@@ -90,9 +90,9 @@ pub async fn create_tricks_by_winner_counts(
 
     for (seat, &count) in tricks_per_player.iter().enumerate() {
         for _ in 0..count {
-            winners.push(seat as i16);
+            winners.push(seat as u8);
         }
     }
 
-    create_tricks_with_winners(txn, round_id, &winners, 0).await
+    create_tricks_with_winners(txn, round_id, &winners, 0u8).await
 }

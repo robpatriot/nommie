@@ -15,8 +15,8 @@ pub struct Model {
     pub human_user_id: Option<i64>,
     #[sea_orm(column_name = "ai_profile_id")]
     pub ai_profile_id: Option<i64>,
-    #[sea_orm(column_name = "turn_order")]
-    pub turn_order: i32,
+    #[sea_orm(column_name = "turn_order", column_type = "SmallInteger")]
+    pub turn_order: i16,
     #[sea_orm(column_name = "is_ready")]
     pub is_ready: bool,
     #[sea_orm(column_name = "created_at")]

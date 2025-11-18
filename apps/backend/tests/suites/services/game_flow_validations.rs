@@ -327,7 +327,10 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     }
 
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-    let round_no = game.current_round.expect("Game should have started");
+    let round_no: u8 = game
+        .current_round
+        .and_then(|value| value.try_into().ok())
+        .expect("Game should have started");
     let round = backend::repos::rounds::find_by_game_and_round(txn, game_id, round_no)
         .await?
         .expect("Round should exist");
@@ -341,19 +344,20 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     )?;
 
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-    let dealer = game
+    let dealer: u8 = game
         .starting_dealer_pos
+        .and_then(|value| value.try_into().ok())
         .expect("Dealer position should be set");
 
     for i in 0..4 {
-        let seat = (dealer + 1 + i) % 4;
+        let seat = ((dealer as u16 + 1 + i as u16) % 4) as u8;
         let bid_value = if i < 3 { 1 } else { 0 };
         service
             .submit_bid(txn, game_id, seat, bid_value, None)
             .await?;
     }
 
-    let trump_selector = (dealer + 1) % 4;
+    let trump_selector = ((dealer as u16 + 1) % 4) as u8;
     service
         .set_trump(txn, game_id, trump_selector, rounds::Trump::Hearts, None)
         .await?;
@@ -361,14 +365,16 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     service.play_card(txn, game_id, 0, first_card, None).await?;
 
     for seat in 1..4 {
-        let hand = backend::repos::hands::find_by_round_and_seat(txn, round.id, seat)
+        let hand = backend::repos::hands::find_by_round_and_seat(txn, round.id, seat as u8)
             .await?
             .expect("Player should have a hand");
         let card = backend::domain::cards_parsing::from_stored_format(
             &hand.cards[0].suit,
             &hand.cards[0].rank,
         )?;
-        service.play_card(txn, game_id, seat, card, None).await?;
+        service
+            .play_card(txn, game_id, seat as u8, card, None)
+            .await?;
     }
 
     let result = service.play_card(txn, game_id, 0, first_card, None).await;

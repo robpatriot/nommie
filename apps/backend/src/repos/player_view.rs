@@ -14,7 +14,7 @@ use crate::repos::{bids, games, hands, plays, rounds, scores, tricks};
 pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     game_id: i64,
-    player_seat: i16,
+    player_seat: u8,
 ) -> Result<CurrentRoundInfo, AppError> {
     // Load game
     let game = games::require_game(conn, game_id).await?;
@@ -25,7 +25,7 @@ pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
 
     let hand_size = game.hand_size().ok_or_else(|| {
         DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
-    })? as u8;
+    })?;
 
     let dealer_pos = game.dealer_pos().unwrap_or(0);
 
@@ -81,8 +81,8 @@ pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
     let bid_records = bids::find_all_by_round(conn, round.id).await?;
     let mut bids = [None; 4];
     for bid in bid_records {
-        if bid.player_seat >= 0 && bid.player_seat < 4 {
-            bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
+        if bid.player_seat < 4 {
+            bids[bid.player_seat as usize] = Some(bid.bid_value);
         }
     }
 
@@ -169,8 +169,8 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
         let bid_records = bids::find_all_by_round(conn, round.id).await?;
         let mut bids = [None; 4];
         for bid in &bid_records {
-            if bid.player_seat >= 0 && bid.player_seat < 4 {
-                bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
+            if bid.player_seat < 4 {
+                bids[bid.player_seat as usize] = Some(bid.bid_value);
             }
         }
 
@@ -199,7 +199,7 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
         }; 4];
 
         for score in score_records {
-            if score.player_seat >= 0 && score.player_seat < 4 {
+            if score.player_seat < 4 {
                 round_scores[score.player_seat as usize] = RoundScoreDetail {
                     round_score: score.round_score,
                     cumulative_score: score.total_score_after,
@@ -209,7 +209,7 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
 
         round_histories.push(RoundHistory {
             round_no: round.round_no,
-            hand_size: round.hand_size as u8,
+            hand_size: round.hand_size,
             dealer_seat: round.dealer_pos,
             bids,
             trump_selector_seat,
@@ -227,9 +227,9 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
 ///
 /// Returns the seat of the player with the highest bid.
 /// Ties are broken by earliest bidder (from dealer+1 clockwise).
-fn calculate_winning_bidder(bids: &[Option<u8>; 4], dealer_pos: i16) -> Option<i16> {
+fn calculate_winning_bidder(bids: &[Option<u8>; 4], dealer_pos: u8) -> Option<u8> {
     let mut best_bid: Option<u8> = None;
-    let mut winner: Option<i16> = None;
+    let mut winner: Option<u8> = None;
 
     // Start from dealer+1 and go clockwise
     let start = (dealer_pos + 1) % 4;

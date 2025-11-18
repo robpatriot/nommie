@@ -58,11 +58,11 @@ pub struct Model {
     pub rules_version: String,
     #[sea_orm(column_name = "rng_seed")]
     pub rng_seed: Option<i64>,
-    #[sea_orm(column_name = "current_round")]
+    #[sea_orm(column_name = "current_round", column_type = "SmallInteger")]
     pub current_round: Option<i16>,
-    #[sea_orm(column_name = "starting_dealer_pos")]
+    #[sea_orm(column_name = "starting_dealer_pos", column_type = "SmallInteger")]
     pub starting_dealer_pos: Option<i16>,
-    #[sea_orm(column_name = "current_trick_no")]
+    #[sea_orm(column_name = "current_trick_no", column_type = "SmallInteger")]
     pub current_trick_no: i16,
     #[sea_orm(column_name = "current_round_id")]
     pub current_round_id: Option<i64>,
@@ -99,22 +99,22 @@ impl ActiveModelBehavior for ActiveModel {}
 impl Model {
     /// Computes the current hand size based on the current round number.
     /// Returns None if current_round is None or out of valid range.
-    pub fn hand_size(&self) -> Option<i16> {
+    pub fn hand_size(&self) -> Option<u8> {
         use crate::domain::rules;
 
-        let round_no = self.current_round?;
+        let round_no: u8 = self.current_round?.try_into().ok()?;
         if !(1..=26).contains(&round_no) {
             return None;
         }
 
-        rules::hand_size_for_round(round_no as u8).map(|hs| hs as i16)
+        rules::hand_size_for_round(round_no)
     }
 
     /// Computes the current dealer position based on starting dealer and current round.
     /// Returns None if either starting_dealer_pos or current_round is None.
-    pub fn dealer_pos(&self) -> Option<i16> {
-        let starting = self.starting_dealer_pos?;
-        let round = self.current_round?;
+    pub fn dealer_pos(&self) -> Option<u8> {
+        let starting: u8 = self.starting_dealer_pos?.try_into().ok()?;
+        let round: u8 = self.current_round?.try_into().ok()?;
 
         // Dealer rotates each round: (starting_dealer + round_no - 1) % 4
         // Subtract 1 because round_no starts at 1, not 0

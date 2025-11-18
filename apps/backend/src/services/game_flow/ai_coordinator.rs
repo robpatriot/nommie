@@ -49,10 +49,7 @@ impl GameFlowService {
                 return Ok(false);
             }
 
-            let player = ctx
-                .players
-                .iter()
-                .find(|m| m.turn_order == player_seat as i32);
+            let player = ctx.players.iter().find(|m| m.turn_order == player_seat);
 
             let Some(player) = player else {
                 // Player not found at this seat - stop AI processing
@@ -90,10 +87,7 @@ impl GameFlowService {
         } else {
             // Slow path: Load from database (used for Lobby, Dealing, etc.)
             let memberships = memberships::find_all_by_game(txn, game.id).await?;
-            let Some(player) = memberships
-                .iter()
-                .find(|m| m.turn_order == player_seat as i32)
-            else {
+            let Some(player) = memberships.iter().find(|m| m.turn_order == player_seat) else {
                 debug!(
                     game.id,
                     player_seat, "No player found at seat, stopping AI processing"
@@ -365,7 +359,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         game: &games::Game,
-    ) -> Result<Option<(i16, ActionType)>, AppError> {
+    ) -> Result<Option<(u8, ActionType)>, AppError> {
         match game.state {
             DbGameState::Lobby | DbGameState::Dealing | DbGameState::BetweenRounds => {
                 // No action needed - check_and_apply_transition handles state changes
@@ -388,13 +382,13 @@ impl GameFlowService {
                         )
                     })?;
 
-                let bid_count = bids::count_bids_by_round(txn, round.id).await? as i16;
+                let bid_count = bids::count_bids_by_round(txn, round.id).await?;
                 if bid_count >= 4 {
                     // All bids placed - no action needed (state transition will happen)
                     Ok(None)
                 } else {
                     let dealer_pos = game.dealer_pos().unwrap_or(0);
-                    let next_seat = (dealer_pos + 1 + bid_count) % 4;
+                    let next_seat = (dealer_pos + 1 + bid_count as u8) % 4;
                     Ok(Some((next_seat, ActionType::Bid)))
                 }
             }
@@ -451,10 +445,10 @@ impl GameFlowService {
 
                 if let Some(trick) = maybe_trick {
                     // Trick exists - determine next player based on current plays
-                    let play_count = plays::count_plays_by_trick(txn, trick.id).await? as i16;
+                    let play_count = plays::count_plays_by_trick(txn, trick.id).await?;
                     let all_plays = plays::find_all_by_trick(txn, trick.id).await?;
                     let first_player = all_plays.first().map(|p| p.player_seat).unwrap_or(0);
-                    let next_seat = (first_player + play_count) % 4;
+                    let next_seat = (first_player + play_count as u8) % 4;
                     Ok(Some((next_seat, ActionType::Play)))
                 } else {
                     // First play of trick - need to determine leader

@@ -286,45 +286,45 @@ async fn test_plays_ordering() -> Result<(), AppError> {
             plays::create_play(
                 txn,
                 trick.id,
-                2,
+                2u8,
                 plays::Card {
                     suit: "HEARTS".into(),
                     rank: "QUEEN".into(),
                 },
-                2,
+                2u8,
             )
             .await?;
             plays::create_play(
                 txn,
                 trick.id,
-                0,
+                0u8,
                 plays::Card {
                     suit: "HEARTS".into(),
                     rank: "ACE".into(),
                 },
-                0,
+                0u8,
             )
             .await?;
             plays::create_play(
                 txn,
                 trick.id,
-                3,
+                3u8,
                 plays::Card {
                     suit: "HEARTS".into(),
                     rank: "JACK".into(),
                 },
-                3,
+                3u8,
             )
             .await?;
             plays::create_play(
                 txn,
                 trick.id,
-                1,
+                1u8,
                 plays::Card {
                     suit: "HEARTS".into(),
                     rank: "KING".into(),
                 },
-                1,
+                1u8,
             )
             .await?;
 

@@ -62,7 +62,7 @@ impl AiService {
         txn: &DatabaseTransaction,
         game_id: i64,
         ai_profile_id: i64,
-        seat: i32,
+        seat: u8,
         overrides: Option<AiInstanceOverrides>,
     ) -> Result<i64, DomainError> {
         // Create game membership

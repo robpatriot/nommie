@@ -22,11 +22,11 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_name = "round_id")]
     pub round_id: i64,
-    #[sea_orm(column_name = "trick_no")]
+    #[sea_orm(column_name = "trick_no", column_type = "SmallInteger")]
     pub trick_no: i16,
     #[sea_orm(column_name = "lead_suit")]
     pub lead_suit: CardSuit,
-    #[sea_orm(column_name = "winner_seat")]
+    #[sea_orm(column_name = "winner_seat", column_type = "SmallInteger")]
     pub winner_seat: i16,
     #[sea_orm(column_name = "created_at")]
     pub created_at: OffsetDateTime,

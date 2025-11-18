@@ -21,10 +21,10 @@ use crate::repos::{bids, games as games_repo, hands, rounds};
 #[derive(Debug, Clone)]
 pub struct RoundCache {
     pub game_id: i64,
-    pub round_no: i16,
+    pub round_no: u8,
     pub round_id: i64,
     pub hand_size: u8,
-    pub dealer_pos: i16,
+    pub dealer_pos: u8,
     pub trump: Option<Trump>,
 
     /// All 4 player hands (indexed by seat 0-3)
@@ -55,7 +55,7 @@ impl RoundCache {
     pub async fn load(
         txn: &DatabaseTransaction,
         game_id: i64,
-        round_no: i16,
+        round_no: u8,
     ) -> Result<Self, AppError> {
         // Load game to get hand_size and dealer_pos
         let game = games_repo::require_game(txn, game_id).await?;
@@ -75,7 +75,7 @@ impl RoundCache {
         let mut hands: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
 
         for hand_record in hand_records {
-            if hand_record.player_seat >= 0 && hand_record.player_seat < 4 {
+            if hand_record.player_seat < 4 {
                 let seat = hand_record.player_seat as usize;
                 let cards: Vec<Card> = hand_record
                     .cards
@@ -90,8 +90,8 @@ impl RoundCache {
         let bid_records = bids::find_all_by_round(txn, round.id).await?;
         let mut bids = [None; 4];
         for bid in bid_records {
-            if bid.player_seat >= 0 && bid.player_seat < 4 {
-                bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
+            if bid.player_seat < 4 {
+                bids[bid.player_seat as usize] = Some(bid.bid_value);
             }
         }
 
@@ -137,7 +137,7 @@ impl RoundCache {
             round_id: round.id,
             hand_size: game.hand_size().ok_or_else(|| {
                 DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
-            })? as u8,
+            })?,
             dealer_pos: game.dealer_pos().unwrap_or(0),
             trump,
             hands,
@@ -149,7 +149,7 @@ impl RoundCache {
     }
 
     /// Get player hand by seat.
-    pub fn get_hand(&self, seat: i16) -> Result<&Vec<Card>, AppError> {
+    pub fn get_hand(&self, seat: u8) -> Result<&Vec<Card>, AppError> {
         if !(0..4).contains(&seat) {
             return Err(DomainError::validation(
                 ValidationKind::Other("INVALID_SEAT".into()),
@@ -166,14 +166,14 @@ impl RoundCache {
     }
 
     /// Check if a player is AI.
-    pub fn is_player_ai(&self, seat: i16) -> bool {
-        if !(0..4).contains(&seat) {
+    pub fn is_player_ai(&self, seat: u8) -> bool {
+        if seat >= 4 {
             return false;
         }
 
         self.players
             .iter()
-            .find(|p| p.turn_order == seat as i32)
+            .find(|p| p.turn_order == seat)
             .map(|p| p.player_kind == crate::entities::game_players::PlayerKind::Ai)
             .unwrap_or(false)
     }
@@ -185,9 +185,9 @@ impl RoundCache {
     pub async fn build_current_round_info(
         &self,
         txn: &DatabaseTransaction,
-        player_seat: i16,
+        player_seat: u8,
         game_state: crate::entities::games::GameState,
-        current_trick_no: i16,
+        current_trick_no: u8,
     ) -> Result<crate::domain::player_view::CurrentRoundInfo, AppError> {
         use crate::entities::games::GameState as DbGameState;
         use crate::repos::{plays, tricks};
@@ -202,8 +202,8 @@ impl RoundCache {
             let bid_records = bids::find_all_by_round(txn, self.round_id).await?;
             let mut fresh_bids = [None; 4];
             for bid in bid_records {
-                if bid.player_seat >= 0 && bid.player_seat < 4 {
-                    fresh_bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
+                if bid.player_seat < 4 {
+                    fresh_bids[bid.player_seat as usize] = Some(bid.bid_value);
                 }
             }
             fresh_bids

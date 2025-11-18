@@ -11,9 +11,9 @@ use crate::errors::domain::DomainError;
 pub struct Round {
     pub id: i64,
     pub game_id: i64,
-    pub round_no: i16,
-    pub hand_size: i16,
-    pub dealer_pos: i16,
+    pub round_no: u8,
+    pub hand_size: u8,
+    pub dealer_pos: u8,
     pub trump: Option<Trump>,
     pub created_at: time::OffsetDateTime,
     pub completed_at: Option<time::OffsetDateTime>,
@@ -35,7 +35,7 @@ pub enum Trump {
 pub async fn find_by_game_and_round<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     game_id: i64,
-    round_no: i16,
+    round_no: u8,
 ) -> Result<Option<Round>, DomainError> {
     let round = rounds_adapter::find_by_game_and_round(conn, game_id, round_no).await?;
     Ok(round.map(Round::from))
@@ -63,9 +63,9 @@ pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
 pub async fn create_round(
     txn: &DatabaseTransaction,
     game_id: i64,
-    round_no: i16,
-    hand_size: i16,
-    dealer_pos: i16,
+    round_no: u8,
+    hand_size: u8,
+    dealer_pos: u8,
 ) -> Result<Round, DomainError> {
     let dto = rounds_adapter::RoundCreate {
         game_id,
@@ -107,9 +107,9 @@ impl From<game_rounds::Model> for Round {
         Self {
             id: model.id,
             game_id: model.game_id,
-            round_no: model.round_no,
-            hand_size: model.hand_size,
-            dealer_pos: model.dealer_pos,
+            round_no: model.round_no as u8,
+            hand_size: model.hand_size as u8,
+            dealer_pos: model.dealer_pos as u8,
             trump: model.trump.map(Trump::from),
             created_at: model.created_at,
             completed_at: model.completed_at,

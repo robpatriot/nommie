@@ -11,9 +11,9 @@ use crate::errors::domain::DomainError;
 pub struct Bid {
     pub id: i64,
     pub round_id: i64,
-    pub player_seat: i16,
-    pub bid_value: i16,
-    pub bid_order: i16,
+    pub player_seat: u8,
+    pub bid_value: u8,
+    pub bid_order: u8,
     pub created_at: time::OffsetDateTime,
 }
 
@@ -23,9 +23,9 @@ pub struct Bid {
 pub async fn create_bid(
     txn: &DatabaseTransaction,
     round_id: i64,
-    player_seat: i16,
-    bid_value: i16,
-    bid_order: i16,
+    player_seat: u8,
+    bid_value: u8,
+    bid_order: u8,
 ) -> Result<Bid, DomainError> {
     let dto = bids_adapter::BidCreate {
         round_id,
@@ -71,9 +71,9 @@ impl From<round_bids::Model> for Bid {
         Self {
             id: model.id,
             round_id: model.round_id,
-            player_seat: model.player_seat,
-            bid_value: model.bid_value,
-            bid_order: model.bid_order,
+            player_seat: model.player_seat as u8,
+            bid_value: model.bid_value as u8,
+            bid_order: model.bid_order as u8,
             created_at: model.created_at,
         }
     }

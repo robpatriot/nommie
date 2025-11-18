@@ -115,7 +115,7 @@ pub async fn setup_game_with_players_ex<C: ConnectionTrait>(
 
     // Create game_players (memberships)
     for (i, user_id) in user_ids.iter().enumerate() {
-        create_test_game_player_with_ready(conn, game_id, *user_id, i as i32, all_ready).await?;
+        create_test_game_player_with_ready(conn, game_id, *user_id, i as u8, all_ready).await?;
     }
 
     Ok(GameSetup { game_id, user_ids })

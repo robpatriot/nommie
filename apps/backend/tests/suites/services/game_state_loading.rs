@@ -224,7 +224,7 @@ async fn test_load_state_second_trick_turn_advances() -> Result<(), AppError> {
 
             // Create trick #2 with first play by seat 3 (winner of trick #1)
             let trick_two =
-                tricks::create_trick(txn, round.id, 2, tricks::Suit::Hearts, -1).await?;
+                tricks::create_trick(txn, round.id, 2, tricks::Suit::Hearts, u8::MAX).await?;
 
             use backend::repos::plays;
             plays::create_play(
@@ -283,7 +283,7 @@ async fn test_load_state_removes_played_cards_from_hands() -> Result<(), AppErro
             let card_to_play = initial_state.hands[acting_seat as usize][0];
 
             flow_service
-                .play_card(txn, setup.game_id, acting_seat as i16, card_to_play, None)
+                .play_card(txn, setup.game_id, acting_seat, card_to_play, None)
                 .await?;
 
             let updated_state = game_service.load_game_state(txn, setup.game_id).await?;

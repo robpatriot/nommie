@@ -15,7 +15,7 @@ pub struct GameMembership {
     pub player_kind: PlayerKind,
     pub user_id: Option<i64>,
     pub ai_profile_id: Option<i64>,
-    pub turn_order: i32,
+    pub turn_order: u8,
     pub is_ready: bool,
     pub role: GameRole,
 }
@@ -56,7 +56,7 @@ pub async fn create_membership(
     txn: &DatabaseTransaction,
     game_id: i64,
     user_id: i64,
-    turn_order: i32,
+    turn_order: u8,
     is_ready: bool,
     role: GameRole,
 ) -> Result<GameMembership, DomainError> {
@@ -80,7 +80,7 @@ pub async fn create_membership(
         player_kind: PlayerKind::Human,
         user_id: membership.human_user_id,
         ai_profile_id: membership.ai_profile_id,
-        turn_order: membership.turn_order,
+        turn_order: membership.turn_order as u8,
         is_ready: membership.is_ready,
         role,
     })
@@ -90,7 +90,7 @@ pub async fn create_ai_membership(
     txn: &DatabaseTransaction,
     game_id: i64,
     ai_profile_id: i64,
-    turn_order: i32,
+    turn_order: u8,
     is_ready: bool,
     role: GameRole,
 ) -> Result<GameMembership, DomainError> {
@@ -114,7 +114,7 @@ pub async fn create_ai_membership(
         player_kind: PlayerKind::Ai,
         user_id: membership.human_user_id,
         ai_profile_id: membership.ai_profile_id,
-        turn_order: membership.turn_order,
+        turn_order: membership.turn_order as u8,
         is_ready: membership.is_ready,
         role,
     })
@@ -140,7 +140,7 @@ pub async fn update_membership(
         player_kind: updated.player_kind,
         user_id: updated.human_user_id,
         ai_profile_id: updated.ai_profile_id,
-        turn_order: updated.turn_order,
+        turn_order: updated.turn_order as u8,
         is_ready: updated.is_ready,
         role: GameRole::Player, // For now, all members are players
     })
@@ -186,7 +186,7 @@ pub async fn set_membership_ready(
         player_kind: updated.player_kind,
         user_id: updated.human_user_id,
         ai_profile_id: updated.ai_profile_id,
-        turn_order: updated.turn_order,
+        turn_order: updated.turn_order as u8,
         is_ready: updated.is_ready,
         role: GameRole::Player, // For now, all members are players
     })
@@ -200,7 +200,7 @@ impl From<crate::entities::game_players::Model> for GameMembership {
             player_kind: model.player_kind,
             user_id: model.human_user_id,
             ai_profile_id: model.ai_profile_id,
-            turn_order: model.turn_order,
+            turn_order: model.turn_order as u8,
             is_ready: model.is_ready,
             role: GameRole::Player, // For now, all members are players
         }

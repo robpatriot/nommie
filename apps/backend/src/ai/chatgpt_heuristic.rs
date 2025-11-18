@@ -256,7 +256,7 @@ impl HeuristicV1 {
     /// winning is possible; otherwise the lowest legal card.
     fn pick_smallest_winning_or_low(
         legal: &[Card],
-        current_plays: &[(i16, Card)],
+        current_plays: &[(u8, Card)],
         trump: Trump,
         lead: Option<Suit>,
     ) -> Card {

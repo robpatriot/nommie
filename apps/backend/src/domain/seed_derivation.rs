@@ -19,7 +19,7 @@
 /// # Returns
 ///
 /// Derived seed that is unique per (game, round, player) combination.
-pub fn derive_memory_seed(game_seed: i64, round_no: i16, player_seat: i16) -> u64 {
+pub fn derive_memory_seed(game_seed: i64, round_no: u8, player_seat: u8) -> u64 {
     // Cast i64 to u64 for RNG (sign doesn't matter for seed)
     let base = game_seed as u64;
 
@@ -42,7 +42,7 @@ pub fn derive_memory_seed(game_seed: i64, round_no: i16, player_seat: i16) -> u6
 /// # Returns
 ///
 /// Derived seed that is unique per (game, round) combination.
-pub fn derive_dealing_seed(game_seed: i64, round_no: i16) -> u64 {
+pub fn derive_dealing_seed(game_seed: i64, round_no: u8) -> u64 {
     // Cast i64 to u64 for RNG (sign doesn't matter for seed)
     let base = game_seed as u64;
 
@@ -110,7 +110,7 @@ mod tests {
     #[test]
     fn test_memory_vs_dealing_separation() {
         let base = 12345i64;
-        let round = 5i16;
+        let round = 5u8;
 
         // Memory and dealing seeds should be different even for same round
         let memory_seed = derive_memory_seed(base, round, 0);

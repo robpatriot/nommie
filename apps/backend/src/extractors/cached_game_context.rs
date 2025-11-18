@@ -94,7 +94,7 @@ impl FromRequest for CachedGameContext {
             // Extract dependencies
             let game_id = GameId::from_request(&req, &mut payload).await?;
             let membership = GameMembership::from_request(&req, &mut payload).await?;
-            let player_seat = membership.turn_order as i16;
+            let player_seat = membership.turn_order;
 
             // Get database connection and load data
             let app_state = req

@@ -55,7 +55,7 @@ impl GameService {
 
         let hand_size = game.hand_size().ok_or_else(|| {
             DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
-        })? as u8;
+        })?;
 
         // 3. Load round record
         let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
@@ -72,7 +72,7 @@ impl GameService {
         let mut hands_array: [Vec<Card>; 4] = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         for hand in all_hands {
-            if hand.player_seat >= 0 && hand.player_seat < 4 {
+            if hand.player_seat < 4 {
                 let domain_cards = hand
                     .cards
                     .iter()
@@ -86,8 +86,8 @@ impl GameService {
         let all_bids = bids::find_all_by_round(txn, round.id).await?;
         let mut bids_array = [None, None, None, None];
         for bid in &all_bids {
-            if bid.player_seat >= 0 && bid.player_seat < 4 {
-                bids_array[bid.player_seat as usize] = Some(bid.bid_value as u8);
+            if bid.player_seat < 4 {
+                bids_array[bid.player_seat as usize] = Some(bid.bid_value);
             }
         }
 
@@ -95,7 +95,7 @@ impl GameService {
         let winning_bidder = if bids_array.iter().all(|b| b.is_some()) {
             bids::find_winning_bid(txn, round.id)
                 .await?
-                .map(|b| b.player_seat as u8)
+                .map(|b| b.player_seat)
         } else {
             None
         };
@@ -118,10 +118,10 @@ impl GameService {
                 continue;
             }
 
-            // Skip placeholder winners for the in-progress trick (winner is 0 until trick is resolved)
+            // Skip placeholder winners for the in-progress trick (winner is u8::MAX until trick is resolved)
             if game.state == DbGameState::TrickPlay
                 && trick.trick_no == game.current_trick_no
-                && winner == 0
+                && winner == u8::MAX
             {
                 continue;
             }
@@ -158,7 +158,7 @@ impl GameService {
                     .iter()
                     .map(|p| {
                         let card = from_stored_format(&p.card.suit, &p.card.rank)?;
-                        Ok((p.player_seat as u8, card))
+                        Ok((p.player_seat, card))
                     })
                     .collect::<Result<Vec<_>, DomainError>>()?;
 
@@ -184,14 +184,14 @@ impl GameService {
         let phase = games_repo::db_game_state_to_phase(&game.state, current_trick_no);
 
         // 12. Determine turn_start, turn, leader
-        let dealer_pos = game.dealer_pos().unwrap_or(0) as u8;
+        let dealer_pos = game.dealer_pos().unwrap_or(0);
         let turn_start = (dealer_pos + 1) % 4;
 
         let last_completed_trick_winner: Option<u8> = all_tricks
             .iter()
             .rev()
             .find(|t| (0..=3).contains(&t.winner_seat))
-            .map(|t| t.winner_seat as u8);
+            .map(|t| t.winner_seat);
 
         let leader = match phase {
             Phase::Trick { .. } => {
@@ -221,13 +221,13 @@ impl GameService {
 
         Ok(GameState {
             phase,
-            round_no: current_round_no as u8,
+            round_no: current_round_no,
             hand_size,
             hands: hands_array,
             turn_start,
             turn,
             leader,
-            trick_no: current_trick_no as u8,
+            trick_no: current_trick_no,
             scores_total,
             round: RoundState {
                 trick_plays,
@@ -461,11 +461,11 @@ impl GameService {
     pub fn find_next_available_seat(
         &self,
         memberships: &[memberships::GameMembership],
-    ) -> Option<i32> {
-        let used_turn_orders: std::collections::HashSet<i32> =
+    ) -> Option<u8> {
+        let used_turn_orders: std::collections::HashSet<u8> =
             memberships.iter().map(|m| m.turn_order).collect();
 
-        (0..4).find(|&order| !used_turn_orders.contains(&order))
+        (0..4u8).find(|&order| !used_turn_orders.contains(&order))
     }
 
     /// Join a user to a game.

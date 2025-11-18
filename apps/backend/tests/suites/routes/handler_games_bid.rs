@@ -23,7 +23,7 @@ async fn submit_bid_success() -> Result<(), AppError> {
 
     let setup = setup_game_in_bidding_phase(shared.transaction(), "routes_bid_success").await?;
     let dealer_pos = setup.dealer_pos as usize;
-    let actor_seat = ((dealer_pos + 1) % 4) as i16;
+    let actor_seat = ((dealer_pos + 1) % 4) as u8;
 
     let service = GameFlowService;
     service
@@ -32,7 +32,7 @@ async fn submit_bid_success() -> Result<(), AppError> {
 
     let stored_bid = round_bids::Entity::find()
         .filter(round_bids::Column::RoundId.eq(setup.round_id))
-        .filter(round_bids::Column::PlayerSeat.eq(actor_seat))
+        .filter(round_bids::Column::PlayerSeat.eq(actor_seat as i16))
         .one(shared.transaction())
         .await?
         .expect("bid stored");
@@ -60,7 +60,7 @@ async fn submit_bid_out_of_turn_rejected() -> Result<(), AppError> {
     let shared = SharedTxn::open(&db).await?;
 
     let setup = setup_game_in_bidding_phase(shared.transaction(), "routes_bid_out_of_turn").await?;
-    let dealer_pos = setup.dealer_pos as i16;
+    let dealer_pos = setup.dealer_pos;
     let actor_seat = dealer_pos; // Dealer should bid last
 
     let service = GameFlowService;

@@ -57,9 +57,9 @@ pub async fn create_bid(
     let bid = round_bids::ActiveModel {
         id: sea_orm::NotSet,
         round_id: Set(dto.round_id),
-        player_seat: Set(dto.player_seat),
-        bid_value: Set(dto.bid_value),
-        bid_order: Set(dto.bid_order),
+        player_seat: Set(dto.player_seat as i16),
+        bid_value: Set(dto.bid_value as i16),
+        bid_order: Set(dto.bid_order as i16),
         created_at: Set(now),
     };
 

@@ -9,7 +9,7 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_name = "round_id")]
     pub round_id: i64,
-    #[sea_orm(column_name = "player_seat")]
+    #[sea_orm(column_name = "player_seat", column_type = "SmallInteger")]
     pub player_seat: i16,
     pub cards: Json,
     #[sea_orm(column_name = "created_at")]

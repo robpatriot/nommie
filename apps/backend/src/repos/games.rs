@@ -27,9 +27,9 @@ pub struct Game {
     pub join_code: Option<String>,
     pub rules_version: String,
     pub rng_seed: Option<i64>,
-    pub current_round: Option<i16>,
-    pub starting_dealer_pos: Option<i16>,
-    pub current_trick_no: i16,
+    pub current_round: Option<u8>,
+    pub starting_dealer_pos: Option<u8>,
+    pub current_trick_no: u8,
     pub current_round_id: Option<i64>,
     pub lock_version: i32,
 }
@@ -37,7 +37,7 @@ pub struct Game {
 impl Game {
     /// Computes the current hand size based on the current round number.
     /// Returns None if current_round is None or out of valid range.
-    pub fn hand_size(&self) -> Option<i16> {
+    pub fn hand_size(&self) -> Option<u8> {
         use crate::domain::rules;
 
         let round_no = self.current_round?;
@@ -45,12 +45,12 @@ impl Game {
             return None;
         }
 
-        rules::hand_size_for_round(round_no as u8).map(|hs| hs as i16)
+        rules::hand_size_for_round(round_no)
     }
 
     /// Computes the current dealer position based on starting dealer and current round.
     /// Returns None if either starting_dealer_pos or current_round is None.
-    pub fn dealer_pos(&self) -> Option<i16> {
+    pub fn dealer_pos(&self) -> Option<u8> {
         let starting = self.starting_dealer_pos?;
         let round = self.current_round?;
 
@@ -121,9 +121,9 @@ pub async fn update_round(
     txn: &DatabaseTransaction,
     id: i64,
     current_lock_version: i32,
-    current_round: Option<i16>,
-    starting_dealer_pos: Option<i16>,
-    current_trick_no: Option<i16>,
+    current_round: Option<u8>,
+    starting_dealer_pos: Option<u8>,
+    current_trick_no: Option<u8>,
 ) -> Result<Game, DomainError> {
     let mut dto = games_adapter::GameUpdateRound::new(id, current_lock_version);
     if let Some(round) = current_round {
@@ -144,14 +144,14 @@ pub async fn update_round(
 /// This function maps the database representation (DbGameState) to the domain
 /// representation (Phase). The database tracks implementation details like
 /// Lobby and Dealing, while the domain focuses on game logic phases.
-pub fn db_game_state_to_phase(db_state: &DbGameState, current_trick_no: i16) -> Phase {
+pub fn db_game_state_to_phase(db_state: &DbGameState, current_trick_no: u8) -> Phase {
     match *db_state {
         DbGameState::Lobby => Phase::Init,
         DbGameState::Dealing => Phase::Init,
         DbGameState::Bidding => Phase::Bidding,
         DbGameState::TrumpSelection => Phase::TrumpSelect,
         DbGameState::TrickPlay => Phase::Trick {
-            trick_no: current_trick_no as u8,
+            trick_no: current_trick_no,
         },
         DbGameState::Scoring => Phase::Scoring,
         DbGameState::BetweenRounds => Phase::Complete,
@@ -177,9 +177,9 @@ impl From<games::Model> for Game {
             join_code: model.join_code,
             rules_version: model.rules_version,
             rng_seed: model.rng_seed,
-            current_round: model.current_round,
-            starting_dealer_pos: model.starting_dealer_pos,
-            current_trick_no: model.current_trick_no,
+            current_round: model.current_round.map(|v| v as u8),
+            starting_dealer_pos: model.starting_dealer_pos.map(|v| v as u8),
+            current_trick_no: model.current_trick_no as u8,
             current_round_id: model.current_round_id,
             lock_version: model.lock_version,
         }

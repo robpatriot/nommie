@@ -12,9 +12,9 @@ use crate::errors::domain::DomainError;
 pub struct Play {
     pub id: i64,
     pub trick_id: i64,
-    pub player_seat: i16,
+    pub player_seat: u8,
     pub card: Card,
-    pub play_order: i16,
+    pub play_order: u8,
     pub played_at: time::OffsetDateTime,
 }
 
@@ -31,9 +31,9 @@ pub struct Card {
 pub async fn create_play(
     txn: &DatabaseTransaction,
     trick_id: i64,
-    player_seat: i16,
+    player_seat: u8,
     card: Card,
-    play_order: i16,
+    play_order: u8,
 ) -> Result<Play, DomainError> {
     let dto = plays_adapter::PlayCreate {
         trick_id,
@@ -76,9 +76,9 @@ impl From<trick_plays::Model> for Play {
         Self {
             id: model.id,
             trick_id: model.trick_id,
-            player_seat: model.player_seat,
+            player_seat: model.player_seat as u8,
             card,
-            play_order: model.play_order,
+            play_order: model.play_order as u8,
             played_at: model.played_at,
         }
     }

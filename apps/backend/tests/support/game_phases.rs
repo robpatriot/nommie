@@ -15,7 +15,7 @@ pub struct PhaseSetup {
     pub game_id: i64,
     pub user_ids: Vec<i64>,
     pub round_id: i64,
-    pub dealer_pos: i32,
+    pub dealer_pos: u8,
 }
 
 /// Set up a game in the Bidding phase (dealt, ready to bid).
@@ -48,7 +48,10 @@ pub async fn setup_game_in_bidding_phase(
 
     // Get round info
     let game = backend::adapters::games_sea::require_game(txn, game_setup.game_id).await?;
-    let round_no = game.current_round.expect("Game should have current round");
+    let round_no: u8 = game
+        .current_round
+        .and_then(|value| value.try_into().ok())
+        .expect("Game should have current round");
     let dealer_pos = game.dealer_pos().expect("Game should have dealer position");
 
     let round = backend::repos::rounds::find_by_game_and_round(txn, game_setup.game_id, round_no)
@@ -59,7 +62,7 @@ pub async fn setup_game_in_bidding_phase(
         game_id: game_setup.game_id,
         user_ids: game_setup.user_ids,
         round_id: round.id,
-        dealer_pos: dealer_pos as i32,
+        dealer_pos,
     })
 }
 
@@ -96,7 +99,7 @@ pub async fn setup_game_in_trump_selection_phase(
     for i in 0..4 {
         let seat = (first_bidder + i) % 4;
         service
-            .submit_bid(txn, phase_setup.game_id, seat as i16, bids[seat], None)
+            .submit_bid(txn, phase_setup.game_id, seat as u8, bids[seat], None)
             .await?;
     }
 
@@ -137,7 +140,7 @@ pub async fn setup_game_in_trick_play_phase(
 
     // Set trump
     service
-        .set_trump(txn, phase_setup.game_id, winning_bidder as i16, trump, None)
+        .set_trump(txn, phase_setup.game_id, winning_bidder, trump, None)
         .await?;
 
     Ok(phase_setup)
@@ -147,7 +150,7 @@ pub async fn setup_game_in_trick_play_phase(
 ///
 /// Winner is the player with the highest bid. In case of tie, the earlier bidder wins.
 /// Bidding order starts at (dealer_pos + 1) % 4.
-pub fn find_winning_bidder(bids: &[u8; 4], dealer_pos: i32) -> i32 {
+pub fn find_winning_bidder(bids: &[u8; 4], dealer_pos: u8) -> u8 {
     let first_bidder = ((dealer_pos + 1) % 4) as usize;
     let mut max_bid = 0;
     let mut winner = first_bidder;
@@ -160,7 +163,7 @@ pub fn find_winning_bidder(bids: &[u8; 4], dealer_pos: i32) -> i32 {
         }
     }
 
-    winner as i32
+    winner as u8
 }
 
 /// Set up a game at a specific round number (between rounds).
@@ -266,8 +269,12 @@ pub async fn setup_game_at_round(
         } else {
             None
         }),
-        starting_dealer_pos: Set(if completed_rounds > 0 { Some(0) } else { None }),
-        current_trick_no: Set(0),
+        starting_dealer_pos: Set(if completed_rounds > 0 {
+            Some(0i16)
+        } else {
+            None
+        }),
+        current_trick_no: Set(0i16),
         current_round_id: Set(None), // No active round
         lock_version: Set(0),
     };
@@ -279,7 +286,7 @@ pub async fn setup_game_at_round(
             txn,
             game_id,
             *user_id,
-            i as i32,
+            i as u8,
             true, // All ready
             memberships::GameRole::Player,
         )
@@ -300,11 +307,10 @@ pub async fn setup_game_at_round(
                 ))
             })?;
 
-        let dealer_pos = ((round_no - 1) % 4) as i16;
+        let dealer_pos = ((round_no - 1) % 4) as u8;
 
         let round =
-            rounds::create_round(txn, game_id, round_no as i16, hand_size as i16, dealer_pos)
-                .await?;
+            rounds::create_round(txn, game_id, round_no as u8, hand_size, dealer_pos).await?;
 
         last_round_id = round.id;
 
@@ -342,9 +348,9 @@ pub async fn setup_game_at_round(
         user_ids,
         round_id: last_round_id,
         dealer_pos: if completed_rounds > 0 {
-            (completed_rounds - 1) % 4
+            ((completed_rounds - 1) % 4) as u8
         } else {
-            0
+            0u8
         },
     })
 }

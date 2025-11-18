@@ -58,9 +58,9 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
         join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("game_hist_rounds"))),
-        current_round: Set(Some(2)),
-        starting_dealer_pos: Set(Some(0)),
-        current_trick_no: Set(0),
+        current_round: Set(Some(2i16)),
+        starting_dealer_pos: Set(Some(0i16)),
+        current_trick_no: Set(0i16),
         current_round_id: Set(None),
         lock_version: Set(0),
     }
@@ -71,9 +71,9 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
     let round1 = game_rounds::ActiveModel {
         id: NotSet,
         game_id: Set(game.id),
-        round_no: Set(1),
-        hand_size: Set(13),
-        dealer_pos: Set(0),
+        round_no: Set(1i16),
+        hand_size: Set(13i16),
+        dealer_pos: Set(0i16),
         trump: Set(Some(CardTrump::Hearts)),
         created_at: Set(OffsetDateTime::now_utc()),
         completed_at: Set(Some(OffsetDateTime::now_utc())),
@@ -86,9 +86,9 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
         round_bids::ActiveModel {
             id: NotSet,
             round_id: Set(round1.id),
-            player_seat: Set(seat),
-            bid_value: Set(bid_value),
-            bid_order: Set(seat),
+            player_seat: Set(seat as i16),
+            bid_value: Set(bid_value as i16),
+            bid_order: Set(seat as i16),
             created_at: Set(OffsetDateTime::now_utc()),
         }
         .insert(txn)
@@ -100,13 +100,13 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
         round_scores::ActiveModel {
             id: NotSet,
             round_id: Set(round1.id),
-            player_seat: Set(seat),
-            bid_value: Set([3, 4, 5, 2][seat as usize]),
-            tricks_won: Set([3, 4, 5, 2][seat as usize]),
+            player_seat: Set(seat as i16),
+            bid_value: Set([3, 4, 5, 2][seat as usize] as i16),
+            tricks_won: Set([3, 4, 5, 2][seat as usize] as i16),
             bid_met: Set(true),
-            base_score: Set([3, 4, 5, 2][seat as usize]),
-            bonus: Set(10),
-            round_score: Set(round_score),
+            base_score: Set([3, 4, 5, 2][seat as usize] as i16),
+            bonus: Set(10i16),
+            round_score: Set(round_score as i16),
             total_score_after: Set(total),
             created_at: Set(OffsetDateTime::now_utc()),
         }
@@ -118,9 +118,9 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
     let round2 = game_rounds::ActiveModel {
         id: NotSet,
         game_id: Set(game.id),
-        round_no: Set(2),
-        hand_size: Set(12),
-        dealer_pos: Set(1),
+        round_no: Set(2i16),
+        hand_size: Set(12i16),
+        dealer_pos: Set(1i16),
         trump: Set(None),
         created_at: Set(OffsetDateTime::now_utc()),
         completed_at: Set(None),
@@ -133,9 +133,9 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
         round_bids::ActiveModel {
             id: NotSet,
             round_id: Set(round2.id),
-            player_seat: Set(seat),
-            bid_value: Set(bid_value),
-            bid_order: Set((seat + 2) % 4),
+            player_seat: Set(seat as i16),
+            bid_value: Set(bid_value as i16),
+            bid_order: Set(((seat + 2) % 4) as i16),
             created_at: Set(OffsetDateTime::now_utc()),
         }
         .insert(txn)
@@ -201,9 +201,9 @@ async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
         join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("trump_sel_tie_break"))),
-        current_round: Set(Some(1)),
-        starting_dealer_pos: Set(Some(2)),
-        current_trick_no: Set(0),
+        current_round: Set(Some(1i16)),
+        starting_dealer_pos: Set(Some(2i16)),
+        current_trick_no: Set(0i16),
         current_round_id: Set(None),
         lock_version: Set(0),
     }
@@ -213,9 +213,9 @@ async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
     let round = game_rounds::ActiveModel {
         id: NotSet,
         game_id: Set(game.id),
-        round_no: Set(1),
-        hand_size: Set(13),
-        dealer_pos: Set(2), // Dealer at seat 2, so bidding starts at seat 3
+        round_no: Set(1i16),
+        hand_size: Set(13i16),
+        dealer_pos: Set(2i16), // Dealer at seat 2, so bidding starts at seat 3
         trump: Set(None),
         created_at: Set(OffsetDateTime::now_utc()),
         completed_at: Set(None),
@@ -231,9 +231,9 @@ async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
         round_bids::ActiveModel {
             id: NotSet,
             round_id: Set(round.id),
-            player_seat: Set(seat),
-            bid_value: Set(bid_value),
-            bid_order: Set((seat + 1) % 4), // Relative order from dealer
+            player_seat: Set(seat as i16),
+            bid_value: Set(bid_value as i16),
+            bid_order: Set(((seat + 1) % 4) as i16), // Relative order from dealer
             created_at: Set(OffsetDateTime::now_utc()),
         }
         .insert(txn)

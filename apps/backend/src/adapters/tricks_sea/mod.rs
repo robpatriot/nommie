@@ -15,11 +15,11 @@ pub use dto::TrickCreate;
 pub async fn find_by_round_and_trick<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     round_id: i64,
-    trick_no: i16,
+    trick_no: u8,
 ) -> Result<Option<round_tricks::Model>, sea_orm::DbErr> {
     round_tricks::Entity::find()
         .filter(round_tricks::Column::RoundId.eq(round_id))
-        .filter(round_tricks::Column::TrickNo.eq(trick_no))
+        .filter(round_tricks::Column::TrickNo.eq(trick_no as i16))
         .one(conn)
         .await
 }
@@ -57,9 +57,9 @@ pub async fn create_trick(
     let trick = round_tricks::ActiveModel {
         id: sea_orm::NotSet,
         round_id: Set(dto.round_id),
-        trick_no: Set(dto.trick_no),
+        trick_no: Set(dto.trick_no as i16),
         lead_suit: Set(dto.lead_suit),
-        winner_seat: Set(dto.winner_seat),
+        winner_seat: Set(dto.winner_seat as i16),
         created_at: Set(now),
     };
 
@@ -70,14 +70,14 @@ pub async fn create_trick(
 pub async fn update_winner(
     txn: &DatabaseTransaction,
     trick_id: i64,
-    winner_seat: i16,
+    winner_seat: u8,
 ) -> Result<round_tricks::Model, sea_orm::DbErr> {
     let trick = round_tricks::ActiveModel {
         id: Set(trick_id),
         round_id: sea_orm::NotSet,
         trick_no: sea_orm::NotSet,
         lead_suit: sea_orm::NotSet,
-        winner_seat: Set(winner_seat),
+        winner_seat: Set(winner_seat as i16),
         created_at: sea_orm::NotSet,
     };
 

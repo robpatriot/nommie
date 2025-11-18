@@ -130,7 +130,7 @@ pub async fn create_fresh_lobby_game(
         rng_seed: Set(Some(rng_seed)),
         current_round: Set(None),
         starting_dealer_pos: Set(None),
-        current_trick_no: Set(0),
+        current_trick_no: Set(0i16),
         current_round_id: Set(None),
         lock_version: Set(1), // New games start at lock_version 1
     };

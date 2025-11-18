@@ -15,11 +15,11 @@ pub use dto::{RoundCreate, RoundUpdateTrump};
 pub async fn find_by_game_and_round<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     game_id: i64,
-    round_no: i16,
+    round_no: u8,
 ) -> Result<Option<game_rounds::Model>, sea_orm::DbErr> {
     game_rounds::Entity::find()
         .filter(game_rounds::Column::GameId.eq(game_id))
-        .filter(game_rounds::Column::RoundNo.eq(round_no))
+        .filter(game_rounds::Column::RoundNo.eq(round_no as i16))
         .one(conn)
         .await
 }
@@ -56,9 +56,9 @@ pub async fn create_round(
     let round = game_rounds::ActiveModel {
         id: sea_orm::NotSet,
         game_id: Set(dto.game_id),
-        round_no: Set(dto.round_no),
-        hand_size: Set(dto.hand_size),
-        dealer_pos: Set(dto.dealer_pos),
+        round_no: Set(dto.round_no as i16),
+        hand_size: Set(dto.hand_size as i16),
+        dealer_pos: Set(dto.dealer_pos as i16),
         trump: Set(None),
         created_at: Set(now),
         completed_at: Set(None),

@@ -200,9 +200,9 @@ async fn create_test_round_with_plays(
         join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("helper_round_plays"))),
-        current_round: Set(Some(1)),
-        starting_dealer_pos: Set(Some(0)),
-        current_trick_no: Set(1),
+        current_round: Set(Some(1i16)),
+        starting_dealer_pos: Set(Some(0i16)),
+        current_trick_no: Set(1i16),
         current_round_id: Set(None),
         lock_version: Set(0),
     }
@@ -212,9 +212,9 @@ async fn create_test_round_with_plays(
     let round = game_rounds::ActiveModel {
         id: NotSet,
         game_id: Set(game.id),
-        round_no: Set(1),
-        hand_size: Set(13),
-        dealer_pos: Set(0),
+        round_no: Set(1i16),
+        hand_size: Set(13i16),
+        dealer_pos: Set(0i16),
         trump: Set(None),
         created_at: Set(OffsetDateTime::now_utc()),
         completed_at: Set(None),
@@ -226,9 +226,9 @@ async fn create_test_round_with_plays(
     let trick = round_tricks::ActiveModel {
         id: NotSet,
         round_id: Set(round.id),
-        trick_no: Set(1),
+        trick_no: Set(1i16),
         lead_suit: Set(CardSuit::Hearts),
-        winner_seat: Set(2),
+        winner_seat: Set(2i16),
         created_at: Set(OffsetDateTime::now_utc()),
     }
     .insert(txn)
@@ -243,9 +243,9 @@ async fn create_test_round_with_plays(
         trick_plays::ActiveModel {
             id: NotSet,
             trick_id: Set(trick.id),
-            player_seat: Set(seat),
+            player_seat: Set(seat as i16),
             card: Set(json!({"suit": suit, "rank": rank})),
-            play_order: Set(seat),
+            play_order: Set(seat as i16),
             played_at: Set(OffsetDateTime::now_utc()),
         }
         .insert(txn)

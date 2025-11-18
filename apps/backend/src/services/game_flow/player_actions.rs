@@ -26,7 +26,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-        player_seat: i16,
+        player_seat: u8,
         bid_value: u8,
         expected_lock_version: Option<i32>,
     ) -> Result<Game, AppError> {
@@ -51,7 +51,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-        player_seat: i16,
+        player_seat: u8,
         bid_value: u8,
         expected_lock_version: Option<i32>,
     ) -> Result<Game, AppError> {
@@ -84,7 +84,7 @@ impl GameFlowService {
 
         let hand_size = game.hand_size().ok_or_else(|| {
             DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
-        })? as u8;
+        })?;
 
         // Find the current round (needed for validation)
         let current_round_no = game.current_round.ok_or_else(|| {
@@ -119,7 +119,7 @@ impl GameFlowService {
             })?;
 
         // Determine bid_order (how many bids have been placed already)
-        let bid_order = bids::count_bids_by_round(txn, round.id).await? as i16;
+        let bid_order = bids::count_bids_by_round(txn, round.id).await?;
 
         // Turn order validation: bidding starts at dealer+1, then proceeds clockwise
         let dealer_pos = game.dealer_pos().ok_or_else(|| {
@@ -129,7 +129,7 @@ impl GameFlowService {
             )
         })?;
 
-        let expected_seat = (dealer_pos + 1 + bid_order) % 4;
+        let expected_seat = (dealer_pos + 1 + bid_order as u8) % 4;
         if player_seat != expected_seat {
             return Err(DomainError::validation(
                 ValidationKind::OutOfTurn,
@@ -144,10 +144,10 @@ impl GameFlowService {
         if bid_order == 3 {
             // This is the dealer's bid - sum of all bids cannot equal hand_size
             let existing_bids = bids::find_all_by_round(txn, round.id).await?;
-            let existing_sum: i16 = existing_bids.iter().map(|b| b.bid_value).sum();
-            let proposed_sum = existing_sum + bid_value as i16;
+            let existing_sum: u8 = existing_bids.iter().map(|b| b.bid_value).sum();
+            let proposed_sum = existing_sum + bid_value;
 
-            if proposed_sum == hand_size as i16 {
+            if proposed_sum == hand_size {
                 return Err(DomainError::validation(
                     ValidationKind::InvalidBid,
                     format!(
@@ -159,7 +159,7 @@ impl GameFlowService {
         }
 
         // Persist the bid
-        bids::create_bid(txn, round.id, player_seat, bid_value as i16, bid_order).await?;
+        bids::create_bid(txn, round.id, player_seat, bid_value, bid_order as u8).await?;
 
         info!(
             game_id,
@@ -190,7 +190,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-        player_seat: i16,
+        player_seat: u8,
         trump: rounds::Trump,
         expected_lock_version: Option<i32>,
     ) -> Result<Game, AppError> {
@@ -209,7 +209,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-        player_seat: i16,
+        player_seat: u8,
         trump: rounds::Trump,
         expected_lock_version: Option<i32>,
     ) -> Result<Game, AppError> {
@@ -304,7 +304,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-        player_seat: i16,
+        player_seat: u8,
         card: Card,
         expected_lock_version: Option<i32>,
     ) -> Result<Game, AppError> {
@@ -323,7 +323,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-        player_seat: i16,
+        player_seat: u8,
         card: Card,
         expected_lock_version: Option<i32>,
     ) -> Result<Game, AppError> {
@@ -413,12 +413,12 @@ impl GameFlowService {
                 crate::domain::Suit::Spades => tricks::Suit::Spades,
             };
 
-            // Winner placeholder - use sentinel -1 until resolve_trick determines the winner
-            tricks::create_trick(txn, round.id, current_trick_no, lead_suit, -1).await?
+            // Winner placeholder - use sentinel 255 (u8::MAX) until resolve_trick determines the winner
+            tricks::create_trick(txn, round.id, current_trick_no, lead_suit, u8::MAX).await?
         };
 
         // Determine play_order (how many plays already in this trick)
-        let play_order = plays::count_plays_by_trick(txn, trick.id).await? as i16;
+        let play_order = plays::count_plays_by_trick(txn, trick.id).await?;
 
         // Convert domain Card to repo Card
         let card_for_storage = plays::Card {
@@ -427,7 +427,14 @@ impl GameFlowService {
         };
 
         // Persist the play
-        plays::create_play(txn, trick.id, player_seat, card_for_storage, play_order).await?;
+        plays::create_play(
+            txn,
+            trick.id,
+            player_seat,
+            card_for_storage,
+            play_order as u8,
+        )
+        .await?;
 
         info!(
             game_id,

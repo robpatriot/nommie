@@ -9,18 +9,19 @@ pub struct Model {
     pub id: i64,
     #[sea_orm(column_name = "round_id")]
     pub round_id: i64,
-    #[sea_orm(column_name = "player_seat")]
+    #[sea_orm(column_name = "player_seat", column_type = "SmallInteger")]
     pub player_seat: i16,
-    #[sea_orm(column_name = "bid_value")]
+    #[sea_orm(column_name = "bid_value", column_type = "SmallInteger")]
     pub bid_value: i16,
-    #[sea_orm(column_name = "tricks_won")]
+    #[sea_orm(column_name = "tricks_won", column_type = "SmallInteger")]
     pub tricks_won: i16,
     #[sea_orm(column_name = "bid_met")]
     pub bid_met: bool,
-    #[sea_orm(column_name = "base_score")]
+    #[sea_orm(column_name = "base_score", column_type = "SmallInteger")]
     pub base_score: i16,
+    #[sea_orm(column_name = "bonus", column_type = "SmallInteger")]
     pub bonus: i16,
-    #[sea_orm(column_name = "round_score")]
+    #[sea_orm(column_name = "round_score", column_type = "SmallInteger")]
     pub round_score: i16,
     #[sea_orm(column_name = "total_score_after")]
     pub total_score_after: i16,

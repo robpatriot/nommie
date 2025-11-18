@@ -125,7 +125,7 @@ async fn test_find_all_by_round() -> Result<(), AppError> {
             assert_eq!(all_hands.len(), 4);
 
             // Verify all seats are present
-            let seats: Vec<i16> = all_hands.iter().map(|h| h.player_seat).collect();
+            let seats: Vec<u8> = all_hands.iter().map(|h| h.player_seat).collect();
             assert!(seats.contains(&0));
             assert!(seats.contains(&1));
             assert!(seats.contains(&2));

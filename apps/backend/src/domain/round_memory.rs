@@ -40,14 +40,14 @@ impl RoundMemory {
 #[derive(Debug, Clone)]
 pub struct TrickMemory {
     /// Trick number (1 to hand_size)
-    pub trick_no: i16,
+    pub trick_no: u8,
     /// What the AI remembers about each play (seat, card memory)
-    pub plays: Vec<(i16, PlayMemory)>,
+    pub plays: Vec<(u8, PlayMemory)>,
 }
 
 impl TrickMemory {
     /// Create a new TrickMemory.
-    pub fn new(trick_no: i16, plays: Vec<(i16, PlayMemory)>) -> Self {
+    pub fn new(trick_no: u8, plays: Vec<(u8, PlayMemory)>) -> Self {
         Self { trick_no, plays }
     }
 }
@@ -168,7 +168,7 @@ mod tests {
         assert_eq!(memory.len(), 0);
 
         let memory_with_tricks =
-            RoundMemory::new(MemoryMode::Full, vec![TrickMemory::new(0, vec![])]);
+            RoundMemory::new(MemoryMode::Full, vec![TrickMemory::new(0u8, vec![])]);
         assert!(!memory_with_tricks.is_empty());
         assert_eq!(memory_with_tricks.len(), 1);
     }

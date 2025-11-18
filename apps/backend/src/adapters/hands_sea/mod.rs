@@ -16,11 +16,11 @@ pub use dto::HandCreate;
 pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     round_id: i64,
-    player_seat: i16,
+    player_seat: u8,
 ) -> Result<Option<round_hands::Model>, sea_orm::DbErr> {
     round_hands::Entity::find()
         .filter(round_hands::Column::RoundId.eq(round_id))
-        .filter(round_hands::Column::PlayerSeat.eq(player_seat))
+        .filter(round_hands::Column::PlayerSeat.eq(player_seat as i16))
         .one(conn)
         .await
 }
@@ -49,7 +49,7 @@ pub async fn create_hand(
     let hand = round_hands::ActiveModel {
         id: sea_orm::NotSet,
         round_id: Set(dto.round_id),
-        player_seat: Set(dto.player_seat),
+        player_seat: Set(dto.player_seat as i16),
         cards: Set(cards_json),
         created_at: Set(now),
     };

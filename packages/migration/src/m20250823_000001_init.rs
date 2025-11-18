@@ -639,7 +639,11 @@ impl MigrationTrait for Migration {
                             .big_integer()
                             .null(),
                     )
-                    .col(ColumnDef::new(GamePlayers::TurnOrder).integer().not_null())
+                    .col(
+                        ColumnDef::new(GamePlayers::TurnOrder)
+                            .small_integer()
+                            .not_null(),
+                    )
                     .col(
                         ColumnDef::new(GamePlayers::IsReady)
                             .boolean()

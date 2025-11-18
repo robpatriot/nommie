@@ -84,9 +84,9 @@ impl GameUpdateMetadata {
 #[derive(Debug, Clone)]
 pub struct GameUpdateRound {
     pub id: i64,
-    pub current_round: Option<i16>,
-    pub starting_dealer_pos: Option<i16>,
-    pub current_trick_no: Option<i16>,
+    pub current_round: Option<u8>,
+    pub starting_dealer_pos: Option<u8>,
+    pub current_trick_no: Option<u8>,
     pub current_lock_version: i32,
 }
 
@@ -101,17 +101,17 @@ impl GameUpdateRound {
         }
     }
 
-    pub fn with_current_round(mut self, round: i16) -> Self {
+    pub fn with_current_round(mut self, round: u8) -> Self {
         self.current_round = Some(round);
         self
     }
 
-    pub fn with_starting_dealer_pos(mut self, pos: i16) -> Self {
+    pub fn with_starting_dealer_pos(mut self, pos: u8) -> Self {
         self.starting_dealer_pos = Some(pos);
         self
     }
 
-    pub fn with_current_trick_no(mut self, trick_no: i16) -> Self {
+    pub fn with_current_trick_no(mut self, trick_no: u8) -> Self {
         self.current_trick_no = Some(trick_no);
         self
     }

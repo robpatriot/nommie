@@ -48,9 +48,9 @@ pub async fn create_play(
     let play = trick_plays::ActiveModel {
         id: sea_orm::NotSet,
         trick_id: Set(dto.trick_id),
-        player_seat: Set(dto.player_seat),
+        player_seat: Set(dto.player_seat as i16),
         card: Set(card_json),
-        play_order: Set(dto.play_order),
+        play_order: Set(dto.play_order as i16),
         played_at: Set(now),
     };
 
