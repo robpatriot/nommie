@@ -117,7 +117,7 @@ impl GameService {
                 continue;
             }
 
-            // Guard against placeholder winners for the in-progress trick (legacy data used 0)
+            // Skip placeholder winners for the in-progress trick (winner is 0 until trick is resolved)
             if game.state == DbGameState::TrickPlay
                 && trick.trick_no == game.current_trick_no
                 && winner == 0

@@ -17,8 +17,6 @@ export { BackendApiError }
 // Re-export ProblemDetails interface for backward compatibility
 export type { ProblemDetails } from './api/error-parsing'
 
-// Removed unused api<T>() helper – fetchWithAuth is the single entrypoint for backend calls
-
 export async function fetchWithAuth(
   endpoint: string,
   options: RequestInit = {}
@@ -82,8 +80,6 @@ export async function fetchWithAuth(
 
   return response
 }
-
-// NOTE: /api/private/* endpoints have been removed in the backend. Do not use getMe().
 
 // Game-related API functions
 

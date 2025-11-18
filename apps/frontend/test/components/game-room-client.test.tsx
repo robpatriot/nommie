@@ -673,7 +673,6 @@ describe('GameRoomClient', () => {
       expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
 
       // The bid submission is tested through the handler guards
-      // Full UI interaction tests are in game-room-view.test.tsx
     })
   })
 

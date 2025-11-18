@@ -410,6 +410,4 @@ pub struct RoundScoreDetail {
     pub cumulative_score: i16,
 }
 
-impl GameHistory {
-    // Loading methods moved to repos::player_view
-}
+impl GameHistory {}

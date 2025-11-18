@@ -230,7 +230,6 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
 
     // Note: At level 50 with only 8 cards (2 tricks * 4 cards), degradation is probabilistic.
     // We don't assert degradation here since it may not occur in small samples.
-    // More comprehensive degradation tests are in ai_memory_degradation_test.rs
 
     Ok(())
 }

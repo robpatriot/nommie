@@ -142,8 +142,6 @@ async fn apply_db_settings(
     Ok(())
 }
 
-// shared pool cache moved to crate::db::shared_pool_cache
-
 /// Determine database engine type for logging
 /// Build the app DB *and* guarantee schema is current.
 /// Uses unified migration orchestration with appropriate pool creation strategy.

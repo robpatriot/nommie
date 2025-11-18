@@ -30,8 +30,7 @@ use crate::support::db_games::{
 fn test_policy_default_and_once_lock_behavior() {
     // These tests are in this file (not in unit tests) because this test binary
     // does not import mod common, so it uses the OnceLock default behavior.
-    // If these tests were moved to unit tests, they would fail because unit tests
-    // run with the constructor that sets policy to RollbackOnOk, making it
+    // Unit tests import mod common which sets policy to RollbackOnOk, making it
     // impossible to test the default CommitOnOk behavior and OnceLock mechanics.
 
     // Verify we start with the default policy (OnceLock is empty, so returns default)

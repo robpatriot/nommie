@@ -1,7 +1,7 @@
 // Test that verifies the player to the left of the dealer leads the first trick.
 //
-// This test would have caught the bug in games.rs where turn_start was incorrectly
-// set to dealer_pos instead of (dealer_pos + 1) % 4.
+// Verifies that turn_start is correctly set to (dealer_pos + 1) % 4, ensuring
+// the first trick leader rotates clockwise with the dealer position.
 
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;

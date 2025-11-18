@@ -26,4 +26,6 @@ rules:
       No commentary in edits — implement directly.
       Do not reference prompt artifacts in code comments. Implementation plans, step lists, or staged change descriptions provided by prompts should not appear in code comments.
       Keep comments focused on code rationale, invariants, and non-obvious behavior only.
+      Code comments should not be historical records. Do not document that code was moved, deleted, or changed. Comments should only explain current behavior and clarify non-obvious aspects of the code as it exists now.
+      Code comments should not signpost code elsewhere. Do not add comments that only point to where code is located (e.g., "X is in Y", "see Y"). Comments should explain current behavior, not direct readers to other files or modules.
 
