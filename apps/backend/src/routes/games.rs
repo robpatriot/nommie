@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use tracing::warn;
 
 use crate::adapters::games_sea::{self, GameUpdateRound};
-use crate::ai::{registry, AiConfig, HeuristicV1, RandomPlayer};
+use crate::ai::{registry, HeuristicV1, RandomPlayer};
 use crate::db::txn::with_txn;
 use crate::domain::bidding::validate_consecutive_zero_bids;
 use crate::domain::player_view::{CurrentRoundInfo, GameHistory};
@@ -430,7 +430,7 @@ fn game_to_response(
         .and_then(|id| {
             memberships
                 .iter()
-                .find(|m| m.user_id == id && m.role == GameRole::Player)
+                .find(|m| m.user_id == Some(id) && m.role == GameRole::Player)
         })
         .is_some();
 
@@ -575,7 +575,7 @@ async fn list_in_progress_games(
     let mut visible_games = Vec::new();
 
     for (game_model, memberships) in games {
-        let viewer_is_member = memberships.iter().any(|m| m.user_id == viewer_id);
+        let viewer_is_member = memberships.iter().any(|m| m.user_id == Some(viewer_id));
 
         if game_model.visibility == GameVisibility::Public || viewer_is_member {
             visible_games.push(game_to_response(&game_model, &memberships, Some(viewer_id)));
@@ -894,7 +894,7 @@ async fn add_ai_seat(
             };
 
             ai_service
-                .add_ai_to_game(txn, id, ai_profile.id, Some(overrides))
+                .add_ai_to_game(txn, id, ai_profile.id, seat_to_fill, Some(overrides))
                 .await
                 .map_err(AppError::from)?;
 
@@ -1341,7 +1341,7 @@ async fn delete_game(
 
             // Check host authorization
             let is_host = match game.created_by {
-                Some(created_by) => created_by == host_user_id,
+                Some(created_by) => Some(created_by) == host_user_id,
                 None => host_turn_order == 0,
             };
 

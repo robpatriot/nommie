@@ -81,7 +81,9 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     let membership = game_players::ActiveModel {
         id: sea_orm::NotSet,
         game_id: Set(game.id),
-        user_id: Set(user_id),
+        player_kind: Set(backend::entities::game_players::PlayerKind::Human),
+        human_user_id: Set(Some(user_id)),
+        ai_profile_id: Set(None),
         turn_order: Set(1),
         is_ready: Set(false),
         created_at: Set(now),
@@ -300,7 +302,9 @@ async fn test_membership_composition_with_current_user_and_game_id(
     let membership = game_players::ActiveModel {
         id: sea_orm::NotSet,
         game_id: Set(game.id),
-        user_id: Set(user_id),
+        player_kind: Set(backend::entities::game_players::PlayerKind::Human),
+        human_user_id: Set(Some(user_id)),
+        ai_profile_id: Set(None),
         turn_order: Set(2),
         is_ready: Set(true),
         created_at: Set(now),

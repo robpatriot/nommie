@@ -579,7 +579,8 @@ impl MigrationTrait for Migration {
         // Seed default AI catalog
         let backend = manager.get_database_backend();
         manager
-            .exec_stmt(Statement::from_string(
+            .get_connection()
+            .execute(Statement::from_string(
                 backend,
                 "INSERT INTO ai_profiles \
                  (registry_name, registry_version, variant, display_name, playstyle, difficulty, config, memory_level, created_at, updated_at) VALUES \

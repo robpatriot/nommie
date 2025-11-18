@@ -41,6 +41,7 @@ impl From<ai_profiles::Model> for AiProfile {
 }
 
 /// Create a new AI profile in the catalog.
+#[allow(clippy::too_many_arguments)]
 pub async fn create_profile(
     txn: &DatabaseTransaction,
     registry_name: impl Into<String>,

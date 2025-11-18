@@ -1,11 +1,7 @@
 use backend::db::txn::with_txn;
-use backend::entities::users;
 use backend::error::AppError;
 use backend::errors::domain::DomainError;
 use backend::repos::{ai_profiles, players};
-use rand::random;
-use sea_orm::{ActiveModelTrait, NotSet, Set};
-use time::OffsetDateTime;
 
 use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player;

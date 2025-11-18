@@ -34,7 +34,7 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     let ai1_seed = test_seed("full_game_ai_ai1");
     let ai2_seed = test_seed("full_game_ai_ai2");
     let ai3_seed = test_seed("full_game_ai_ai3");
-    let ai4_seed = test_seed("full_game_ai_ai4");
+    let _ai4_seed = test_seed("full_game_ai_ai4");
 
     let ai_profile = backend::repos::ai_profiles::find_by_registry_variant(
         txn,

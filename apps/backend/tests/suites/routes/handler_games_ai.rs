@@ -3,7 +3,7 @@ use actix_web::{test, web, HttpMessage};
 use backend::ai::{HeuristicV1, RandomPlayer};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::entities::{ai_overrides, ai_profiles, game_players, games, users};
+use backend::entities::{ai_profiles, game_players, games};
 use backend::error::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
@@ -244,7 +244,7 @@ async fn host_can_remove_ai_seat() -> Result<(), AppError> {
         .all(shared.transaction())
         .await?;
     assert_eq!(memberships.len(), 1);
-    assert_eq!(memberships[0].user_id, host_user_id);
+    assert_eq!(memberships[0].human_user_id, Some(host_user_id));
 
     shared.rollback().await?;
     Ok(())

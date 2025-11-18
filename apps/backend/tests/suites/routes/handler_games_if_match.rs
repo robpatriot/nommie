@@ -67,7 +67,7 @@ async fn setup_bidding_test(test_name: &str) -> Result<IfMatchTestContext, AppEr
         .expect("membership should exist");
 
     let mut membership: game_players::ActiveModel = membership.into();
-    membership.user_id = sea_orm::Set(user_id);
+    membership.human_user_id = sea_orm::Set(Some(user_id));
     ActiveModelTrait::update(membership, shared.transaction()).await?;
 
     let token = mint_test_token(&user_sub, &user_email, &security);
@@ -106,7 +106,7 @@ async fn setup_trump_test(test_name: &str) -> Result<IfMatchTestContext, AppErro
         .expect("membership should exist");
 
     let mut membership: game_players::ActiveModel = membership.into();
-    membership.user_id = sea_orm::Set(user_id);
+    membership.human_user_id = sea_orm::Set(Some(user_id));
     ActiveModelTrait::update(membership, shared.transaction()).await?;
 
     let token = mint_test_token(&user_sub, &user_email, &security);
@@ -152,7 +152,7 @@ async fn setup_play_test(
         .expect("membership should exist");
 
     let mut membership: game_players::ActiveModel = membership.into();
-    membership.user_id = sea_orm::Set(user_id);
+    membership.human_user_id = sea_orm::Set(Some(user_id));
     ActiveModelTrait::update(membership, shared.transaction()).await?;
 
     // Get a card from the player's hand directly
