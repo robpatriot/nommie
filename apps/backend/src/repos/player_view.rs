@@ -5,29 +5,11 @@ use sea_orm::ConnectionTrait;
 use crate::adapters::games_sea;
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::player_view::{CurrentRoundInfo, GameHistory, RoundHistory, RoundScoreDetail};
-use crate::domain::state::Phase;
 use crate::domain::{Card, Trump};
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, hands, plays, rounds, scores, tricks};
-
-/// Convert database game state to domain phase.
-fn db_game_state_to_phase(db_state: &DbGameState, current_trick_no: i16) -> Phase {
-    match *db_state {
-        DbGameState::Lobby => Phase::Init,
-        DbGameState::Dealing => Phase::Init,
-        DbGameState::Bidding => Phase::Bidding,
-        DbGameState::TrumpSelection => Phase::TrumpSelect,
-        DbGameState::TrickPlay => Phase::Trick {
-            trick_no: current_trick_no as u8,
-        },
-        DbGameState::Scoring => Phase::Scoring,
-        DbGameState::BetweenRounds => Phase::Complete,
-        DbGameState::Completed => Phase::GameOver,
-        DbGameState::Abandoned => Phase::GameOver,
-    }
-}
+use crate::repos::{bids, games, hands, plays, rounds, scores, tricks};
 
 /// Load current round info for a player from the database.
 pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
@@ -116,7 +98,7 @@ pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
 
     // Convert database state to domain phase
     let db_state = game.state;
-    let phase = db_game_state_to_phase(&db_state, game.current_trick_no);
+    let phase = games::db_game_state_to_phase(&db_state, game.current_trick_no);
 
     // Load current trick plays (if in TrickPlay phase)
     let mut current_trick_plays = Vec::new();

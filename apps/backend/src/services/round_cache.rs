@@ -12,7 +12,7 @@ use crate::domain::{Card, Trump};
 use crate::entities::ai_profiles;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, hands, rounds};
+use crate::repos::{bids, games, hands, rounds};
 
 /// Cached immutable data for a round.
 ///
@@ -191,24 +191,11 @@ impl RoundCache {
         game_state: crate::entities::games::GameState,
         current_trick_no: i16,
     ) -> Result<crate::domain::player_view::CurrentRoundInfo, AppError> {
-        use crate::domain::state::Phase;
         use crate::entities::games::GameState as DbGameState;
         use crate::repos::{plays, tricks};
 
         // Convert database state to domain phase
-        let phase = match game_state {
-            DbGameState::Lobby => Phase::Init,
-            DbGameState::Dealing => Phase::Init,
-            DbGameState::Bidding => Phase::Bidding,
-            DbGameState::TrumpSelection => Phase::TrumpSelect,
-            DbGameState::TrickPlay => Phase::Trick {
-                trick_no: current_trick_no as u8,
-            },
-            DbGameState::Scoring => Phase::Scoring,
-            DbGameState::BetweenRounds => Phase::Complete,
-            DbGameState::Completed => Phase::GameOver,
-            DbGameState::Abandoned => Phase::GameOver,
-        };
+        let phase = games::db_game_state_to_phase(&game_state, current_trick_no);
 
         // Load fresh bids if in Bidding phase (bids are mutable during this phase)
         // Otherwise use cached bids (immutable after bidding completes)

@@ -107,12 +107,12 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **10. Backend Domain Modules**
+### ✅ **10. Backend Domain Modules**
 **Dependencies:** 7  
 **Details:**
 - Pure logic modules: `rules`, `bidding`, `tricks`, `scoring`, `state`.
 - No SeaORM in domain modules.
-**Progress:** Core domain modules shipped, but `domain::player_view` still depends on `sea_orm::ConnectionTrait`; data-loading split into adapters remains TODO.  
+**Progress:** All domain modules are ORM-free. `CurrentRoundInfo::load()` and `GameHistory::load()` moved to `repos::player_view`. `CurrentRoundInfo` now uses domain `Phase` enum instead of `DbGameState`.  
 **Acceptance:** `grep` shows no ORM usage in domain code.
 
 ---

@@ -3,7 +3,8 @@
 use sea_orm::{ConnectionTrait, EntityTrait};
 
 use crate::adapters::players_sea as players_adapter;
-use crate::entities::{ai_profiles, game_players::PlayerKind, users};
+use crate::entities::game_players::PlayerKind;
+use crate::entities::{ai_profiles, users};
 use crate::errors::domain::{DomainError, NotFoundKind};
 use crate::routes::games::friendly_ai_name;
 

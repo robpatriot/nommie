@@ -35,13 +35,7 @@ impl GameService {
             Some(round_no) => round_no,
             None => {
                 // Game hasn't started yet - return empty initial state (no rounds exist)
-                let phase = match game.state {
-                    DbGameState::Lobby => Phase::Init,
-                    DbGameState::Dealing => Phase::Init,
-                    DbGameState::Bidding => Phase::Bidding,
-                    DbGameState::TrumpSelection => Phase::TrumpSelect,
-                    _ => Phase::Init,
-                };
+                let phase = games_repo::db_game_state_to_phase(&game.state, game.current_trick_no);
 
                 return Ok(GameState {
                     phase,
@@ -186,19 +180,7 @@ impl GameService {
         let scores_total = scores::get_current_totals(txn, game_id).await?;
 
         // 11. Convert DB phase to domain Phase
-        let phase = match game.state {
-            DbGameState::Lobby => Phase::Init,
-            DbGameState::Dealing => Phase::Init,
-            DbGameState::Bidding => Phase::Bidding,
-            DbGameState::TrumpSelection => Phase::TrumpSelect,
-            DbGameState::TrickPlay => Phase::Trick {
-                trick_no: current_trick_no as u8,
-            },
-            DbGameState::Scoring => Phase::Scoring,
-            DbGameState::BetweenRounds => Phase::Complete,
-            DbGameState::Completed => Phase::GameOver,
-            DbGameState::Abandoned => Phase::GameOver,
-        };
+        let phase = games_repo::db_game_state_to_phase(&game.state, current_trick_no);
 
         // 12. Determine turn_start, turn, leader
         let dealer_pos = game.dealer_pos().unwrap_or(0) as u8;
