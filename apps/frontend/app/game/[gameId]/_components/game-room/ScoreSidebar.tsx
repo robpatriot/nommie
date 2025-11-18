@@ -1,16 +1,10 @@
 import type { RoundPublic } from '@/lib/game-room/types'
 import { formatTrump } from './utils'
-import { AiSeatManager } from './AiSeatManager'
-import { ReadyPanel } from './ReadyPanel'
-import type { GameRoomViewProps } from '../game-room-view'
 
 interface ScoreSidebarProps {
   playerNames: [string, string, string, string]
   scores: [number, number, number, number]
   round: RoundPublic | null
-  readyState?: GameRoomViewProps['readyState']
-  aiState?: GameRoomViewProps['aiSeatState']
-  isPreGame: boolean
   className?: string
 }
 
@@ -18,9 +12,6 @@ export function ScoreSidebar({
   playerNames,
   scores,
   round,
-  readyState,
-  aiState,
-  isPreGame,
   className = '',
 }: ScoreSidebarProps) {
   return (
@@ -77,9 +68,6 @@ export function ScoreSidebar({
           <p>Tricks won: {round.tricks_won.join(' / ')}</p>
         </div>
       ) : null}
-
-      <ReadyPanel readyState={readyState} />
-      {isPreGame ? <AiSeatManager aiState={aiState} /> : null}
     </aside>
   )
 }
