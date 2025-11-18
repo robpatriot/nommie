@@ -16,15 +16,15 @@ export default async function Home() {
       <div className="mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="rounded-3xl border border-white/15 bg-surface/80 p-8 shadow-[0_40px_120px_rgba(0,0,0,0.25)] backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-subtle">
-            Calm, easy-going card nights
+            Steady Nomination Whist evenings
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-            {appName} keeps the table friendly across every screen.
+            {appName} seats your table and keeps the count so you can simply
+            play.
           </h1>
           <p className="mt-4 text-lg text-muted sm:text-xl">
-            Desktop brings the full felt table into view while mobile trims the
-            chrome for pure usability. Sit down, follow the flow, and stay in
-            rhythm with your friends.
+            Deal the cards, declare your bid, and let the table cue each action
+            wherever your friends are seated.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <form
@@ -45,34 +45,35 @@ export default async function Home() {
               </button>
             </form>
             <div className="flex items-center justify-center rounded-2xl border border-border/60 bg-surface px-4 py-3 text-sm font-semibold text-muted shadow-inner shadow-black/10 sm:w-60">
-              Built for phones & desktops
+              Take your seat from any device
             </div>
           </div>
 
           <dl className="mt-10 grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-border/60 bg-surface px-4 py-3">
               <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">
-                Table mode
+                Read the table
               </dt>
               <dd className="mt-1 text-sm text-foreground">
-                Desktop layout mirrors a flat felt table with quick glances for
-                seat context.
+                Follow each seat and trick at a glance, no fuss.
               </dd>
             </div>
             <div className="rounded-2xl border border-border/60 bg-surface px-4 py-3">
               <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">
-                Mobile focus
+                Prompted turns
               </dt>
               <dd className="mt-1 text-sm text-foreground">
-                Cards and CTA buttons scale up so thumbs never hunt for actions.
+                Play each card with clear prompts so the table keeps a reliable
+                pace.
               </dd>
             </div>
             <div className="rounded-2xl border border-border/60 bg-surface px-4 py-3">
               <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">
-                Quick resume
+                Resume swiftly
               </dt>
               <dd className="mt-1 text-sm text-foreground">
-                Jump back into your latest game directly from the header.
+                Rejoin your previous game from the header and resume the count
+                straightaway.
               </dd>
             </div>
           </dl>
@@ -80,42 +81,44 @@ export default async function Home() {
 
         <section className="relative hidden rounded-3xl border border-white/20 bg-gradient-to-br from-surface/70 to-surface-strong/40 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.35)] lg:flex lg:flex-col">
           <div className="text-sm font-semibold uppercase tracking-[0.4em] text-muted">
-            Table preview
+            At the table
           </div>
           <div className="mt-6 flex flex-1 items-center justify-center">
             <div className="relative aspect-[4/5] w-full max-w-xs rounded-[32px] border border-border/80 bg-gradient-to-b from-[#1f4639] to-[#0f2a21] p-6 shadow-2xl">
               <div className="absolute inset-6 rounded-[28px] border border-white/10" />
-                <div className="relative flex h-full flex-col items-center justify-between text-center text-card-cream">
+              <div className="relative flex h-full flex-col items-center justify-between text-center text-card-cream">
                 <div className="w-full">
-                    <p className="text-xs uppercase tracking-[0.4em] text-card-cream opacity-70">
-                    desktop
+                  <p className="text-xs uppercase tracking-[0.4em] text-card-cream opacity-70">
+                    your seat
                   </p>
-                  <p className="mt-2 text-2xl font-semibold">Tabletop</p>
+                  <p className="mt-2 text-2xl font-semibold">
+                    Dealer standing by
+                  </p>
                 </div>
                 <div className="grid w-full grid-cols-2 gap-3 text-left text-sm">
                   <div className="rounded-2xl bg-white/10 p-3 backdrop-blur">
-                      <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
+                    <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
                       Live turn
                     </p>
-                    <p className="text-lg font-semibold">You</p>
+                    <p className="text-lg font-semibold">Your turn</p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-3 backdrop-blur">
-                      <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
-                      Trick
+                    <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
+                      Tricks played
                     </p>
-                    <p className="text-lg font-semibold">3 / 7</p>
+                    <p className="text-lg font-semibold">3 of 7</p>
                   </div>
                   <div className="col-span-2 rounded-2xl bg-white/10 p-3 backdrop-blur">
-                      <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
-                      Mobile view
+                    <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
+                      Device swap
                     </p>
                     <p className="text-lg font-semibold">
-                      Large cards, thumbable actions.
+                      Swap devices mid-round and stay with the play.
                     </p>
                   </div>
                 </div>
-                  <div className="text-xs uppercase tracking-[0.5em] text-card-cream opacity-60">
-                  smooth rhythm
+                <div className="text-xs uppercase tracking-[0.5em] text-card-cream opacity-60">
+                  play on
                 </div>
               </div>
             </div>

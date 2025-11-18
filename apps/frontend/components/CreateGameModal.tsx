@@ -108,8 +108,8 @@ export default function CreateGameModal({
           </label>
 
           <p className="text-xs text-subtle">
-            Seats become touch-friendly on phones, and desktop keeps the full
-            table visible.
+            Name the table so your group knows where to sit; everything else
+            stays steady.
           </p>
 
           <div className="grid gap-3 sm:grid-cols-2">

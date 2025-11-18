@@ -206,11 +206,11 @@ export default function LobbyClient({
                 Game Lobby
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                Set the table and invite friends with ease.
+                Seat your table and deal the next hand.
               </h1>
               <p className="mt-3 text-sm text-muted sm:text-base">
-                Desktop keeps the table layout visible, while phones switch to a
-                focused list for quick thumb taps.
+                Select a table, claim a seat, and begin the bidding once
+                everyone is ready.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
