@@ -26,10 +26,10 @@ const stateLabels: Record<Game['state'], string> = {
 const stateClassNames: Record<Game['state'], string> = {
   LOBBY: 'bg-success/15 text-success-contrast',
   DEALING: 'bg-accent/15 text-accent-contrast',
-  BIDDING: 'bg-warning/15 text-warning-foreground',
-  TRUMP_SELECTION: 'bg-warning/15 text-warning-foreground',
+  BIDDING: 'bg-warning/15 text-warning-contrast',
+  TRUMP_SELECTION: 'bg-warning/15 text-warning-contrast',
   TRICK_PLAY: 'bg-accent/20 text-accent-contrast',
-  SCORING: 'bg-primary/15 text-primary-foreground/80',
+  SCORING: 'bg-primary/15 text-primary-contrast',
   BETWEEN_ROUNDS: 'bg-muted/15 text-subtle',
   COMPLETED: 'bg-muted/15 text-subtle',
   ABANDONED: 'bg-danger/15 text-danger-foreground',

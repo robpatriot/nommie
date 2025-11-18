@@ -236,12 +236,12 @@ export default function LobbyClient({
           </div>
 
           {lastActiveGameId ? (
-            <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm text-primary-foreground sm:flex-row sm:items-center sm:justify-between">
+            <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm text-primary-contrast sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-primary-foreground/70">
+                <p className="text-xs uppercase tracking-[0.4em] text-primary-contrast/80">
                   Resume
                 </p>
-                <p className="text-base font-semibold">
+                <p className="text-base font-semibold text-primary-contrast">
                   Jump back to Game #{lastActiveGameId}
                 </p>
               </div>

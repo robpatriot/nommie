@@ -21,6 +21,8 @@ module.exports = {
           DEFAULT: 'rgb(var(--color-primary) / <alpha-value>)',
           foreground: 'rgb(var(--color-primary-foreground) / <alpha-value>)',
         },
+        'primary-contrast':
+          'rgb(var(--color-primary-contrast) / <alpha-value>)',
         accent: {
           DEFAULT: 'rgb(var(--color-accent) / <alpha-value>)',
           foreground: 'rgb(var(--color-accent-foreground) / <alpha-value>)',

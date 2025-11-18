@@ -15,6 +15,7 @@
   --color-text-subtle: 109 132 123;
   --color-primary: 239 149 74;
   --color-primary-foreground: 255 252 248;
+  --color-primary-contrast: 18 35 30;
   --color-accent: 47 178 148;
   --color-accent-foreground: 12 45 37;
   --color-danger: 220 82 82;
@@ -52,6 +53,7 @@
   --color-text-subtle: 132 156 149;
   --color-primary: 255 176 111;
   --color-primary-foreground: 46 26 12;
+  --color-primary-contrast: 255 249 240;
   --color-accent: 98 220 189;
   --color-accent-foreground: 11 30 24;
   --color-accent-contrast: 236 252 247;
@@ -85,6 +87,7 @@
     --color-text-subtle: 132 156 149;
     --color-primary: 255 176 111;
     --color-primary-foreground: 46 26 12;
+    --color-primary-contrast: 255 249 240;
     --color-primary: 255 176 111;
     --color-primary-foreground: 46 26 12;
     --color-accent: 98 220 189;
