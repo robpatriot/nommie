@@ -21,8 +21,11 @@
   --color-danger-foreground: 255 245 244;
   --color-success: 71 181 117;
   --color-success-foreground: 10 53 36;
+  --color-success-contrast: 10 53 36;
   --color-warning: 246 193 75;
   --color-warning-foreground: 95 60 5;
+  --color-warning-contrast: 95 60 5;
+  --color-accent-contrast: 12 45 37;
   --shadow-elevated: 8 32 22 / 0.35;
   --felt-base: 14 67 53;
   --felt-highlight: 42 112 92;
@@ -51,12 +54,15 @@
   --color-primary-foreground: 46 26 12;
   --color-accent: 98 220 189;
   --color-accent-foreground: 11 30 24;
+  --color-accent-contrast: 236 252 247;
   --color-danger: 248 113 113;
   --color-danger-foreground: 48 8 8;
   --color-success: 120 229 171;
   --color-success-foreground: 9 36 24;
+  --color-success-contrast: 236 252 247;
   --color-warning: 253 224 130;
-  --color-warning-foreground: 60 42 9;
+  --color-warning-foreground: 46 26 12;
+  --color-warning-contrast: 255 231 191;
   --shadow-elevated: 0 0 0 / 0.45;
   --felt-base: 6 37 30;
   --felt-highlight: 26 76 64;
@@ -79,14 +85,19 @@
     --color-text-subtle: 132 156 149;
     --color-primary: 255 176 111;
     --color-primary-foreground: 46 26 12;
+    --color-primary: 255 176 111;
+    --color-primary-foreground: 46 26 12;
     --color-accent: 98 220 189;
     --color-accent-foreground: 11 30 24;
+    --color-accent-contrast: 236 252 247;
     --color-danger: 248 113 113;
     --color-danger-foreground: 48 8 8;
     --color-success: 120 229 171;
     --color-success-foreground: 9 36 24;
+    --color-success-contrast: 236 252 247;
     --color-warning: 253 224 130;
-    --color-warning-foreground: 60 42 9;
+    --color-warning-foreground: 46 26 12;
+    --color-warning-contrast: 255 231 191;
     --shadow-elevated: 0 0 0 / 0.45;
     --felt-base: 6 37 30;
     --felt-highlight: 26 76 64;
@@ -129,7 +140,8 @@
     position: relative;
     isolation: isolate;
     min-height: 100vh;
-    background: radial-gradient(
+    background:
+      radial-gradient(
         circle at 20% 20%,
         rgba(var(--felt-highlight), 0.4),
         transparent 45%
@@ -164,13 +176,15 @@
     content: '';
     position: fixed;
     inset: 0;
-    background-image: radial-gradient(
-        rgba(255, 255, 255, 0.04) 1px,
-        transparent 0
-      ),
+    background-image:
+      radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 0),
       radial-gradient(rgba(0, 0, 0, 0.08) 1px, transparent 0);
-    background-size: 120px 120px, 200px 200px;
-    background-position: 0 0, 60px 60px;
+    background-size:
+      120px 120px,
+      200px 200px;
+    background-position:
+      0 0,
+      60px 60px;
     opacity: 0.35;
     mix-blend-mode: soft-light;
     pointer-events: none;

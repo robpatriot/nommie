@@ -149,114 +149,114 @@ export function BiddingPanel({
     await bidding.onSubmit(normalizedBid)
   }
 
-    return (
-      <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-3xl border border-success/50 bg-success/15 p-5 shadow-[0_30px_90px_rgba(56,189,116,0.25)]">
-        <header className="flex flex-wrap items-center justify-between gap-2 text-success-foreground">
-          <div>
-            <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
-              Bidding
-            </h2>
-            <p className="text-xs text-success-foreground/80">
-              Select your bid between {minBid} and {maxBid}. Once submitted, the
-              next player will be prompted automatically.
-            </p>
-          </div>
-          <div className="rounded-full border border-success/60 bg-success/25 px-3 py-1 text-xs font-semibold">
-            Waiting on: {activeName}
-          </div>
-        </header>
-
-        <form
-          className="flex flex-col gap-3 rounded-2xl border border-success/30 bg-surface/85 p-4 shadow-inner shadow-success/20"
-          onSubmit={handleSubmit}
-        >
-          <label
-            htmlFor="bid-value"
-            className="text-xs font-medium uppercase tracking-wide text-success-foreground"
-          >
-            Your bid
-          </label>
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              id="bid-value"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={bidInput}
-              onChange={handleInputChange}
-              className={`w-24 rounded-xl border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                hasValidationIssue
-                  ? 'border-warning/70 focus:border-warning focus:ring focus:ring-warning/30'
-                  : 'border-success/40 focus:border-success focus:ring focus:ring-success/40'
-              } ${flashValidation && hasValidationIssue ? 'animate-pulse' : ''}`}
-              disabled={viewerBid !== null || bidding.isPending || !isViewerTurn}
-              aria-label="Bid value"
-              aria-describedby={describedByIds}
-              aria-invalid={hasValidationIssue}
-            />
-            <button
-              type="submit"
-              className="rounded-2xl bg-success px-4 py-2 text-sm font-semibold text-success-foreground shadow-lg shadow-success/40 transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70"
-              disabled={isSubmitDisabled}
-              aria-label={
-                bidding.isPending
-                  ? 'Submitting bid'
-                  : parsedBid !== null
-                    ? `Submit bid of ${parsedBid}`
-                    : 'Submit bid'
-              }
-            >
-              {bidding.isPending ? 'Submitting…' : 'Submit bid'}
-            </button>
-          </div>
-          <p id="bid-range-hint" className="text-xs text-success-foreground/80">
-            Allowed range: {minBid} – {maxBid}.{' '}
-            {isViewerTurn
-              ? viewerBid === null
-                ? "Choose a value and submit when you're ready."
-                : 'Bid submitted — waiting for other players.'
-              : `Waiting for ${activeName} to bid.`}
+  return (
+    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-3xl border border-success/50 bg-success/15 p-5 shadow-[0_30px_90px_rgba(56,189,116,0.25)]">
+      <header className="flex flex-wrap items-center justify-between gap-2 text-success-contrast">
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-success-contrast">
+            Bidding
+          </h2>
+          <p className="text-xs text-success-contrast/80">
+            Select your bid between {minBid} and {maxBid}. Once submitted, the
+            next player will be prompted automatically.
           </p>
-          {warningMessage ? (
-            <p
-              id="bid-validation-warning"
-              className={`text-xs font-semibold text-warning-foreground ${
-                flashValidation ? 'animate-pulse' : ''
-              }`}
-              role="alert"
-            >
-              {warningMessage}
-            </p>
-          ) : null}
-        </form>
-
-        <div className="rounded-2xl border border-success/20 bg-surface/70 p-4">
-          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-success-foreground">
-            Bid tracker
-          </h3>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {seatBids.map(({ seat, name, bid, orientation }) => (
-              <li
-                key={seat}
-                className={`flex items-center justify-between rounded-xl border border-border bg-surface/80 px-3 py-2 text-sm ${
-                  seat === phase.to_act
-                    ? 'border-success bg-success/10 text-success-foreground'
-                    : 'text-muted'
-                }`}
-              >
-                <div className="flex flex-col">
-                  <span className="font-medium text-foreground">{name}</span>
-                  <span className="text-[10px] uppercase text-subtle">
-                    {orientation}
-                  </span>
-                </div>
-                <span className="text-sm font-semibold text-foreground">
-                  {bid ?? '—'}
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
-      </section>
-    )
+        <div className="rounded-full border border-success/60 bg-success/25 px-3 py-1 text-xs font-semibold text-success-contrast">
+          Waiting on: {activeName}
+        </div>
+      </header>
+
+      <form
+        className="flex flex-col gap-3 rounded-2xl border border-success/30 bg-surface/85 p-4 shadow-inner shadow-success/20"
+        onSubmit={handleSubmit}
+      >
+        <label
+          htmlFor="bid-value"
+          className="text-xs font-medium uppercase tracking-wide text-success-contrast"
+        >
+          Your bid
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            id="bid-value"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={bidInput}
+            onChange={handleInputChange}
+            className={`w-24 rounded-xl border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              hasValidationIssue
+                ? 'border-warning/70 focus:border-warning focus:ring focus:ring-warning/30'
+                : 'border-success/40 focus:border-success focus:ring focus:ring-success/40'
+            } ${flashValidation && hasValidationIssue ? 'animate-pulse' : ''}`}
+            disabled={viewerBid !== null || bidding.isPending || !isViewerTurn}
+            aria-label="Bid value"
+            aria-describedby={describedByIds}
+            aria-invalid={hasValidationIssue}
+          />
+          <button
+            type="submit"
+            className="rounded-2xl bg-success px-4 py-2 text-sm font-semibold text-success-foreground shadow-lg shadow-success/40 transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70"
+            disabled={isSubmitDisabled}
+            aria-label={
+              bidding.isPending
+                ? 'Submitting bid'
+                : parsedBid !== null
+                  ? `Submit bid of ${parsedBid}`
+                  : 'Submit bid'
+            }
+          >
+            {bidding.isPending ? 'Submitting…' : 'Submit bid'}
+          </button>
+        </div>
+        <p id="bid-range-hint" className="text-xs text-success-contrast/80">
+          Allowed range: {minBid} – {maxBid}.{' '}
+          {isViewerTurn
+            ? viewerBid === null
+              ? "Choose a value and submit when you're ready."
+              : 'Bid submitted — waiting for other players.'
+            : `Waiting for ${activeName} to bid.`}
+        </p>
+        {warningMessage ? (
+          <p
+            id="bid-validation-warning"
+            className={`text-xs font-semibold text-warning-contrast ${
+              flashValidation ? 'animate-pulse' : ''
+            }`}
+            role="alert"
+          >
+            {warningMessage}
+          </p>
+        ) : null}
+      </form>
+
+      <div className="rounded-2xl border border-success/20 bg-surface/70 p-4">
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-success-contrast">
+          Bid tracker
+        </h3>
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {seatBids.map(({ seat, name, bid, orientation }) => (
+            <li
+              key={seat}
+              className={`flex items-center justify-between rounded-xl border border-border bg-surface/80 px-3 py-2 text-sm ${
+                seat === phase.to_act
+                  ? 'border-success bg-success/10 text-success-contrast'
+                  : 'text-muted'
+              }`}
+            >
+              <div className="flex flex-col">
+                <span className="font-medium text-foreground">{name}</span>
+                <span className="text-[10px] uppercase text-subtle">
+                  {orientation}
+                </span>
+              </div>
+              <span className="text-sm font-semibold text-foreground">
+                {bid ?? '—'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
 }

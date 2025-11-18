@@ -57,7 +57,7 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
                     seat.isReady
-                      ? 'bg-success/20 text-success-foreground'
+                      ? 'bg-success/20 text-success-contrast'
                       : 'bg-border/20 text-subtle'
                   }`}
                 >

@@ -24,11 +24,11 @@ const stateLabels: Record<Game['state'], string> = {
 }
 
 const stateClassNames: Record<Game['state'], string> = {
-  LOBBY: 'bg-success/15 text-success-foreground',
-  DEALING: 'bg-accent/15 text-accent-foreground',
+  LOBBY: 'bg-success/15 text-success-contrast',
+  DEALING: 'bg-accent/15 text-accent-contrast',
   BIDDING: 'bg-warning/15 text-warning-foreground',
   TRUMP_SELECTION: 'bg-warning/15 text-warning-foreground',
-  TRICK_PLAY: 'bg-accent/20 text-accent-foreground',
+  TRICK_PLAY: 'bg-accent/20 text-accent-contrast',
   SCORING: 'bg-primary/15 text-primary-foreground/80',
   BETWEEN_ROUNDS: 'bg-muted/15 text-subtle',
   COMPLETED: 'bg-muted/15 text-subtle',
@@ -106,7 +106,8 @@ export default function GameList({
         <div className="mt-6 grid gap-4">
           {filteredGames.map((game) => {
             const stateLabel = stateLabels[game.state] ?? game.state
-            const stateClass = stateClassNames[game.state] ?? 'bg-surface text-subtle'
+            const stateClass =
+              stateClassNames[game.state] ?? 'bg-surface text-subtle'
             const actions = renderActions?.(game)
             const relativeUpdated = formatRelativeTime(game.updated_at)
             const seatsOpen = Math.max(game.max_players - game.player_count, 0)

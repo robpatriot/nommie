@@ -80,7 +80,7 @@ export function SeatCard({
       </div>
 
       {isViewer ? (
-        <span className="mt-3 self-center rounded-full bg-success/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-success-foreground">
+        <span className="mt-3 self-center rounded-full bg-success/20 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-success-contrast">
           You
         </span>
       ) : null}

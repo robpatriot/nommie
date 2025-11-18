@@ -30,17 +30,17 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
     (aiState.registry?.isLoading ?? false)
 
   return (
-    <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-accent-foreground">
+    <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-accent-contrast">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h3 className="text-sm font-semibold text-accent-foreground">
+          <h3 className="text-sm font-semibold text-accent-contrast">
             AI Seats
           </h3>
-          <p className="text-xs text-accent-foreground/80">
+          <p className="text-xs text-accent-contrast/80">
             Use bots to fill empty seats before the game starts.
           </p>
         </div>
-        <span className="rounded-full border border-accent/40 bg-accent/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent-foreground">
+        <span className="rounded-full border border-accent/40 bg-accent/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent-contrast">
           {aiState.aiSeats} bots · {aiState.totalSeats - aiState.availableSeats}
           /{aiState.totalSeats} seats filled
         </span>
@@ -89,9 +89,11 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
               </span>
             ) : null}
           </button>
-          <span className="text-[11px] text-accent-foreground/75">
+          <span className="text-[11px] text-accent-contrast/80">
             Defaults to&nbsp;
-            <span className="font-semibold">{preferredDefaultName}</span>
+            <span className="font-semibold text-accent-contrast">
+              {preferredDefaultName}
+            </span>
             {isRegistryLoading ? ' (loading registry…)' : ''}
           </span>
         </div>
@@ -122,9 +124,9 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                       : 'Open seat'}
                   </span>
                   {seat.isAi && seat.aiProfile ? (
-                    <span className="text-[11px] text-accent-foreground/70">
+                    <span className="text-[11px] text-accent-contrast/90">
                       Profile:{' '}
-                      <span className="font-medium text-foreground">
+                      <span className="font-medium text-accent-contrast">
                         {seat.aiProfile.name}
                       </span>{' '}
                       · v{seat.aiProfile.version}
@@ -216,7 +218,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                       </button>
                     </>
                   ) : (
-                    <span className="rounded-md border border-accent/40 bg-accent/15 px-2 py-1 text-[11px] text-accent-foreground/80">
+                    <span className="rounded-md border border-accent/40 bg-accent/15 px-2 py-1 text-[11px] text-accent-contrast/80">
                       {seat.isOccupied ? 'Human player' : 'Awaiting player'}
                     </span>
                   )}

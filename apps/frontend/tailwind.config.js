@@ -33,10 +33,16 @@ module.exports = {
           DEFAULT: 'rgb(var(--color-success) / <alpha-value>)',
           foreground: 'rgb(var(--color-success-foreground) / <alpha-value>)',
         },
+        'success-contrast':
+          'rgb(var(--color-success-contrast) / <alpha-value>)',
         warning: {
           DEFAULT: 'rgb(var(--color-warning) / <alpha-value>)',
           foreground: 'rgb(var(--color-warning-foreground) / <alpha-value>)',
         },
+        'warning-contrast':
+          'rgb(var(--color-warning-contrast) / <alpha-value>)',
+        'accent-contrast':
+          'rgb(var(--color-accent-contrast) / <alpha-value>)',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

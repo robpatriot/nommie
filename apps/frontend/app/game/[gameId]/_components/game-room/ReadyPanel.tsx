@@ -44,7 +44,7 @@ export function ReadyPanel({
 
   return (
     <div
-      className={`rounded-2xl border border-success/40 bg-success/15 text-success-foreground shadow-inner shadow-success/20 ${
+      className={`rounded-2xl border border-success/40 bg-success/15 text-success-contrast shadow-inner shadow-success/20 ${
         isCompact
           ? 'flex flex-col gap-3 p-4 text-xs sm:flex-row sm:items-center sm:justify-between'
           : 'p-4 text-sm'
@@ -52,14 +52,14 @@ export function ReadyPanel({
     >
       <div>
         <h3
-          className={`font-semibold uppercase tracking-[0.4em] text-success-foreground ${
+          className={`font-semibold uppercase tracking-[0.4em] text-success-contrast ${
             isCompact ? 'text-[11px]' : 'mb-2 text-sm'
           }`}
         >
           Ready up
         </h3>
         <p
-          className={`text-success-foreground/80 ${
+          className={`text-success-contrast/80 ${
             isCompact ? 'text-[11px]' : 'mb-3 text-xs'
           }`}
         >
