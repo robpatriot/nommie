@@ -34,7 +34,7 @@
     "db:svc:stop": "docker compose stop postgres",
     "db:svc:logs": "docker compose logs -f postgres",
     "db:svc:ready": "docker exec -it nommie-postgres pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
-    "db:svc:psql": "docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -it nommie-postgres psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""
+    "db:svc:psql": "docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -i nommie-postgres psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""
   },
   "devDependencies": {}
 }
