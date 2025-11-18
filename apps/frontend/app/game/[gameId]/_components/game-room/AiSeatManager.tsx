@@ -193,7 +193,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                           aiState.onRemoveSeat?.(seat.seat)
                         }}
                         disabled={aiState.isPending}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-accent/40 text-accent-foreground transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:text-accent-foreground/60"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-accent/40 text-accent-contrast transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:text-accent-contrast/60"
                         aria-label={`Remove AI from seat ${seat.seat + 1}`}
                       >
                         <span className="sr-only">
