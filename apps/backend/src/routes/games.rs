@@ -585,6 +585,52 @@ async fn list_in_progress_games(
     }))
 }
 
+/// GET /api/games/overview
+///
+/// Returns a combined list of lobby and in-progress games the viewer can see.
+async fn list_overview_games(
+    http_req: HttpRequest,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
+) -> Result<web::Json<GameListResponse>, AppError> {
+    let viewer_id = current_user.id;
+
+    let lobby_games = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameService;
+            service.list_public_lobby_games(txn).await
+        })
+    })
+    .await?;
+
+    let active_games = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameService;
+            service.list_active_games(txn).await
+        })
+    })
+    .await?;
+
+    let mut combined_games = Vec::new();
+
+    for (game_model, memberships) in lobby_games {
+        combined_games.push(game_to_response(&game_model, &memberships, Some(viewer_id)));
+    }
+
+    for (game_model, memberships) in active_games {
+        let viewer_is_member = memberships.iter().any(|m| m.user_id == Some(viewer_id));
+        if game_model.visibility == GameVisibility::Public || viewer_is_member {
+            combined_games.push(game_to_response(&game_model, &memberships, Some(viewer_id)));
+        }
+    }
+
+    combined_games.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+
+    Ok(web::Json(GameListResponse {
+        games: combined_games,
+    }))
+}
+
 /// GET /api/games/last-active
 ///
 /// Returns the game ID of the most recently active game for the current user.
@@ -1435,6 +1481,7 @@ fn format_card(card: Card) -> String {
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("").route(web::post().to(create_game)));
     cfg.service(web::resource("/joinable").route(web::get().to(list_joinable_games)));
+    cfg.service(web::resource("/overview").route(web::get().to(list_overview_games)));
     cfg.service(web::resource("/in-progress").route(web::get().to(list_in_progress_games)));
     cfg.service(web::resource("/last-active").route(web::get().to(get_last_active_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));

@@ -2,11 +2,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import LobbyClient from '@/components/LobbyClient'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import {
-  getJoinableGames,
-  getInProgressGames,
-  getLastActiveGame,
-} from '@/lib/api'
+import { getAvailableGames, getLastActiveGame } from '@/lib/api'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 
 export default async function LobbyPage() {
@@ -17,11 +13,25 @@ export default async function LobbyPage() {
     redirect('/')
   }
 
-  const [joinableGames, inProgressGames, lastActiveGameId] = await Promise.all([
-    getJoinableGames(),
-    getInProgressGames(),
+  const [allGames, lastActiveGameId] = await Promise.all([
+    getAvailableGames(),
     getLastActiveGame(),
   ])
+
+  const lobbyGames = allGames.filter((game) => game.state === 'LOBBY')
+  const joinableGames = lobbyGames.filter(
+    (game) => game.player_count < game.max_players
+  )
+  const fullLobbyGames = lobbyGames.filter(
+    (game) => game.player_count >= game.max_players
+  )
+  const activeGames = allGames.filter((game) => game.state !== 'LOBBY')
+
+  const inProgressGamesMap = new Map<number, (typeof activeGames)[number]>()
+  for (const game of [...fullLobbyGames, ...activeGames]) {
+    inProgressGamesMap.set(game.id, game)
+  }
+  const inProgressGames = Array.from(inProgressGamesMap.values())
 
   const creatorName = session.user?.name || 'You'
 

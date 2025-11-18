@@ -372,6 +372,34 @@ impl GameService {
         Ok(results)
     }
 
+    /// List all public games in the lobby regardless of seat availability.
+    pub async fn list_public_lobby_games(
+        &self,
+        txn: &DatabaseTransaction,
+    ) -> Result<Vec<(Game, Vec<memberships::GameMembership>)>, AppError> {
+        let lobby_games = games::Entity::find()
+            .filter(games::Column::State.eq(DbGameState::Lobby))
+            .order_by_desc(games::Column::UpdatedAt)
+            .all(txn)
+            .await
+            .map_err(AppError::from)?;
+
+        let mut results = Vec::new();
+        for game_model in lobby_games {
+            let game = Game::from(game_model);
+            if game.visibility != GameVisibility::Public {
+                continue;
+            }
+
+            let memberships = memberships::find_all_by_game(txn, game.id)
+                .await
+                .map_err(AppError::from)?;
+            results.push((game, memberships));
+        }
+
+        Ok(results)
+    }
+
     /// List all games that are actively in progress (non-lobby, non-finished states).
     ///
     /// Includes memberships so the caller can determine viewer participation.

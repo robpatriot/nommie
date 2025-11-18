@@ -83,14 +83,8 @@ export async function fetchWithAuth(
 
 // Game-related API functions
 
-export async function getJoinableGames(): Promise<Game[]> {
-  const response = await fetchWithAuth('/api/games/joinable')
-  const data: GameListResponse = await response.json()
-  return data.games
-}
-
-export async function getInProgressGames(): Promise<Game[]> {
-  const response = await fetchWithAuth('/api/games/in-progress')
+export async function getAvailableGames(): Promise<Game[]> {
+  const response = await fetchWithAuth('/api/games/overview')
   const data: GameListResponse = await response.json()
   return data.games
 }
