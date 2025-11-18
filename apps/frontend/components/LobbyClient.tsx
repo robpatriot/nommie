@@ -32,14 +32,12 @@ const sortByUpdatedAtDesc = (a: Game, b: Game) => {
 type LobbyClientProps = {
   joinableGames: Game[]
   inProgressGames: Game[]
-  lastActiveGameId: number | null
   creatorName: string
 }
 
 export default function LobbyClient({
   joinableGames: initialJoinable,
   inProgressGames: initialInProgress,
-  lastActiveGameId,
   creatorName,
 }: LobbyClientProps) {
   const router = useRouter()
@@ -186,101 +184,79 @@ export default function LobbyClient({
     router.refresh()
   }
 
-  const handleResume = () => {
-    if (lastActiveGameId) {
-      router.push(`/game/${lastActiveGameId}`)
-    }
-  }
-
   const openSeatCount = filteredJoinableGames.reduce((total, game) => {
     return total + Math.max(game.max_players - game.player_count, 0)
   }, 0)
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pb-16 pt-8 text-foreground sm:pt-12">
-        <section className="rounded-3xl border border-white/15 bg-surface/80 p-6 shadow-[0_45px_120px_rgba(0,0,0,0.35)] backdrop-blur">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-                Game Lobby
-              </p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                Seat your table and deal the next hand.
-              </h1>
-              <p className="mt-3 text-sm text-muted sm:text-base">
-                Select a table, claim a seat, and begin the bidding once
-                everyone is ready.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
-                aria-label="Create a new game"
-              >
-                <span role="img" aria-hidden>
-                  ➕
-                </span>
-                <span className="ml-2">Create game</span>
-              </button>
-              <button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="inline-flex items-center justify-center rounded-2xl border border-border/60 bg-surface px-5 py-3 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                aria-live="polite"
-              >
-                {refreshing ? 'Refreshing…' : 'Refresh'}
-              </button>
-            </div>
-          </div>
-
-          {lastActiveGameId ? (
-            <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-primary/40 bg-primary/10 p-4 text-sm text-primary-contrast sm:flex-row sm:items-center sm:justify-between">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-12 pt-6 text-foreground sm:pt-8">
+        <section className="rounded-3xl border border-white/15 bg-surface/80 p-5 shadow-[0_45px_120px_rgba(0,0,0,0.35)] backdrop-blur">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-4 lg:flex-1">
               <div>
-                <p className="text-xs uppercase tracking-[0.4em] text-primary-contrast/80">
-                  Resume
+                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+                  Game Lobby
                 </p>
-                <p className="text-base font-semibold text-primary-contrast">
-                  Jump back to Game #{lastActiveGameId}
+                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                  Seat your table and deal the next hand.
+                </h1>
+                <p className="mt-2 text-sm text-muted sm:text-base">
+                  Select a table, claim a seat, and begin the bidding once
+                  everyone is ready.
                 </p>
               </div>
-              <button
-                onClick={handleResume}
-                className="inline-flex items-center justify-center rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
-                aria-label="Resume most recent game"
-              >
-                ▶ Continue
-              </button>
             </div>
-          ) : null}
-
-          <dl className="mt-6 grid gap-3 text-sm text-muted sm:grid-cols-3">
-            <div className="rounded-2xl border border-border/50 bg-surface px-4 py-3">
-              <dt className="text-xs uppercase tracking-wide text-subtle">
-                Joinable tables
-              </dt>
-              <dd className="mt-1 text-2xl font-semibold text-foreground">
-                {filteredJoinableGames.length}
-              </dd>
+            <div className="grid gap-3 text-sm text-muted sm:grid-cols-3 lg:grid-cols-3 lg:max-w-sm">
+              <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/50 bg-surface px-4 py-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+                  Joinable tables
+                </p>
+                <p className="text-2xl font-semibold text-foreground">
+                  {filteredJoinableGames.length}
+                </p>
+                <p className="text-xs text-muted">Open public tables</p>
+              </div>
+              <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/50 bg-surface px-4 py-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+                  Seats available
+                </p>
+                <p className="text-2xl font-semibold text-foreground">
+                  {openSeatCount}
+                </p>
+                <p className="text-xs text-muted">Across joinable tables</p>
+              </div>
+              <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/50 bg-surface px-4 py-3 text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+                  In progress
+                </p>
+                <p className="text-2xl font-semibold text-foreground">
+                  {sortedInProgressGames.length}
+                </p>
+                <p className="text-xs text-muted">Active or full tables</p>
+              </div>
             </div>
-            <div className="rounded-2xl border border-border/50 bg-surface px-4 py-3">
-              <dt className="text-xs uppercase tracking-wide text-subtle">
-                Seats available
-              </dt>
-              <dd className="mt-1 text-2xl font-semibold text-foreground">
-                {openSeatCount}
-              </dd>
-            </div>
-            <div className="rounded-2xl border border-border/50 bg-surface px-4 py-3">
-              <dt className="text-xs uppercase tracking-wide text-subtle">
-                In progress
-              </dt>
-              <dd className="mt-1 text-2xl font-semibold text-foreground">
-                {sortedInProgressGames.length}
-              </dd>
-            </div>
-          </dl>
+          </div>
+          <div className="mt-4 flex flex-col gap-3 text-sm sm:flex-row">
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
+              aria-label="Create a new game"
+            >
+              <span role="img" aria-hidden>
+                ➕
+              </span>
+              <span className="ml-2">Create game</span>
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="inline-flex w-full items-center justify-center rounded-2xl border border-border/60 bg-surface px-5 py-3 font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              aria-live="polite"
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh list'}
+            </button>
+          </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">

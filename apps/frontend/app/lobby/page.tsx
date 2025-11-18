@@ -2,7 +2,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import LobbyClient from '@/components/LobbyClient'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import { getAvailableGames, getLastActiveGame } from '@/lib/api'
+import { getAvailableGames } from '@/lib/api'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 
 export default async function LobbyPage() {
@@ -13,10 +13,7 @@ export default async function LobbyPage() {
     redirect('/')
   }
 
-  const [allGames, lastActiveGameId] = await Promise.all([
-    getAvailableGames(),
-    getLastActiveGame(),
-  ])
+  const allGames = await getAvailableGames()
 
   const lobbyGames = allGames.filter((game) => game.state === 'LOBBY')
   const joinableGames = lobbyGames.filter(
@@ -41,7 +38,6 @@ export default async function LobbyPage() {
       <LobbyClient
         joinableGames={joinableGames}
         inProgressGames={inProgressGames}
-        lastActiveGameId={lastActiveGameId}
         creatorName={creatorName}
       />
     </ErrorBoundary>
