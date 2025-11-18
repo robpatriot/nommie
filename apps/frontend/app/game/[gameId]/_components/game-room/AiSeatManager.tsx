@@ -8,8 +8,8 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
   if (!aiState) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-surface/60 p-4 text-sm text-subtle">
-        The host is configuring AI players for this game. Seating updates will
-        appear once the match begins.
+        The host manages AI seats for this table. You&apos;ll see each seat
+        update in real time as they adjust the lineup.
       </div>
     )
   }
