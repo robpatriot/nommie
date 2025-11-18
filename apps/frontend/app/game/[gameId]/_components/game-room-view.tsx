@@ -235,29 +235,34 @@ export function GameRoomView(props: GameRoomViewProps) {
               </div>
               <div className="flex w-full flex-col gap-4 lg:w-auto">
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
+                  <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                      Seats filled
+                      Total players
                     </p>
                     <p className="text-2xl font-semibold text-foreground">
                       {filledSeatCount}/{totalSeatCount}
                     </p>
+                    <p className="text-xs text-muted">
+                      Human or AI seats assigned
+                    </p>
                   </div>
-                  <div className="rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
+                  <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                      AI seats
+                      AI players
                     </p>
                     <p className="text-2xl font-semibold text-foreground">
                       {aiSeatCount}
                     </p>
+                    <p className="text-xs text-muted">Bots currently seated</p>
                   </div>
-                  <div className="rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
+                  <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
                       Ready players
                     </p>
                     <p className="text-2xl font-semibold text-foreground">
                       {readySeatCount}/{totalSeatCount}
                     </p>
+                    <p className="text-xs text-muted">Marked ready so far</p>
                   </div>
                 </div>
                 <ReadyPanel readyState={readyState} variant="compact" />
