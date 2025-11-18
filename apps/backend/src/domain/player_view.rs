@@ -409,5 +409,3 @@ pub struct RoundScoreDetail {
     /// Total score after this round (cumulative)
     pub cumulative_score: i16,
 }
-
-impl GameHistory {}
