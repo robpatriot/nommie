@@ -2,8 +2,9 @@ use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::ServiceResponse;
 use actix_web::http::StatusCode;
-use actix_web::{test, web};
+use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
+use backend::db::txn::SharedTxn;
 use backend::error::AppError;
 use backend::extractors::current_user::CurrentUser;
 use backend::middleware::jwt_extract::JwtExtract;
@@ -149,10 +150,9 @@ async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
     let email = unique_email("test");
     let expired_token = mint_expired_token(&sub, &email, &security_config);
 
-    {
-        let db = require_db(&state)?;
-        create_test_user(db, &sub, Some("Expired User")).await?;
-    }
+    let db = require_db(&state)?;
+    let shared = SharedTxn::open(db).await?;
+    create_test_user(shared.transaction(), &sub, Some("Expired User")).await?;
 
     let mut app = build_auth_test_app(state).await?;
 
@@ -161,10 +161,13 @@ async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
         .uri("/test-auth/me")
         .insert_header(("Authorization", format!("Bearer {expired_token}")))
         .to_request();
+    req.extensions_mut().insert(shared.clone());
 
     let (status, detail) = call_and_capture_error(&mut app, req).await?;
     assert_eq!(status.as_u16(), 401);
     assert_eq!(detail, "UnauthorizedExpiredJwt");
+
+    shared.rollback().await?;
 
     Ok(())
 }
@@ -183,10 +186,9 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
     let email = unique_email("test");
     let token = mint_test_token(&sub, &email, &security_config);
 
-    {
-        let db = require_db(&state)?;
-        create_test_user(db, &sub, Some("Happy User")).await?;
-    }
+    let db = require_db(&state)?;
+    let shared = SharedTxn::open(db).await?;
+    create_test_user(shared.transaction(), &sub, Some("Happy User")).await?;
 
     let app = build_auth_test_app(state).await?;
 
@@ -195,6 +197,7 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
         .uri("/test-auth/me")
         .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
+    req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
 
@@ -203,6 +206,8 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["sub"], sub);
     assert_eq!(body["email"], email);
+
+    shared.rollback().await?;
 
     Ok(())
 }
