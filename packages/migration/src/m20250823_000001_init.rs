@@ -578,17 +578,36 @@ impl MigrationTrait for Migration {
 
         // Seed default AI catalog
         let backend = manager.get_database_backend();
-        manager
-            .get_connection()
-            .execute(Statement::from_string(
-                backend,
-                "INSERT INTO ai_profiles \
-                 (registry_name, registry_version, variant, display_name, playstyle, difficulty, config, memory_level, created_at, updated_at) VALUES \
-                 ('RandomPlayer','1.0.0','default','Random Player','random',NULL,'{}'::jsonb,50,now(),now()), \
-                 ('HeuristicV1','1.0.0','default','Heuristic V1','heuristic',NULL,'{}'::jsonb,80,now(),now()) \
-                 ON CONFLICT (registry_name, registry_version, variant) DO NOTHING;",
-            ))
-            .await?;
+        match backend {
+            sea_orm::DatabaseBackend::Postgres => {
+                manager
+                    .get_connection()
+                    .execute(Statement::from_string(
+                        backend,
+                        "INSERT INTO ai_profiles \
+                         (registry_name, registry_version, variant, display_name, playstyle, difficulty, config, memory_level, created_at, updated_at) VALUES \
+                         ('RandomPlayer','1.0.0','default','Random Player','random',NULL,'{}',50,now(),now()), \
+                         ('HeuristicV1','1.0.0','default','Heuristic V1','heuristic',NULL,'{}',80,now(),now()) \
+                         ON CONFLICT (registry_name, registry_version, variant) DO NOTHING;",
+                    ))
+                    .await?;
+            }
+            sea_orm::DatabaseBackend::Sqlite => {
+                manager
+                    .get_connection()
+                    .execute(Statement::from_string(
+                        backend,
+                        "INSERT OR IGNORE INTO ai_profiles \
+                         (registry_name, registry_version, variant, display_name, playstyle, difficulty, config, memory_level, created_at, updated_at) VALUES \
+                         ('RandomPlayer','1.0.0','default','Random Player','random',NULL,'{}',50,datetime('now'),datetime('now')), \
+                         ('HeuristicV1','1.0.0','default','Heuristic V1','heuristic',NULL,'{}',80,datetime('now'),datetime('now'));",
+                    ))
+                    .await?;
+            }
+            _ => {
+                return Err(DbErr::Custom("Unsupported database backend".into()));
+            }
+        }
 
         // game_players
         manager
