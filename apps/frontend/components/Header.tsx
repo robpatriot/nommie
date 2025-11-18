@@ -1,6 +1,29 @@
 'use client'
 
 import Link from 'next/link'
+import { useState } from 'react'
+function getInitials(email?: string | null) {
+  if (!email) {
+    return '👤'
+  }
+
+  const [namePart] = email.split('@')
+  if (!namePart) {
+    return email.charAt(0).toUpperCase()
+  }
+
+  const parts = namePart
+    .replace(/[._-]+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+
+  return parts[0].slice(0, 2).toUpperCase()
+}
+
 import ResumeGameButton from './ResumeGameButton'
 import { ThemeToggle } from './theme-toggle'
 import {
@@ -17,6 +40,7 @@ type HeaderProps = {
 export default function Header({ session, lastActiveGameId }: HeaderProps) {
   const { crumbs } = useHeaderBreadcrumbs()
   const hasBreadcrumbs = session?.user && crumbs.length > 0
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-surface-strong/70 px-3 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-lg">
@@ -76,7 +100,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="relative flex flex-wrap items-center gap-2 sm:justify-end">
           <ThemeToggle className="bg-surface/80 text-foreground" />
           {session?.user ? (
             <>
@@ -84,17 +108,34 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
                 lastActiveGameId={lastActiveGameId ?? null}
                 className="bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary"
               />
-              <span className="rounded-full bg-surface px-3 py-1 text-xs font-medium uppercase tracking-wide text-muted">
-                {session.user.email}
-              </span>
-              <form action={signOutAction}>
-                <button
-                  type="submit"
-                  className="rounded-full border border-border/70 bg-surface px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
-                >
-                  Sign out
-                </button>
-              </form>
+              <button
+                type="button"
+                onClick={() => setIsUserMenuOpen((open) => !open)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-surface text-sm font-semibold uppercase tracking-wide text-muted transition hover:border-primary/50 hover:text-foreground"
+                aria-haspopup="true"
+                aria-expanded={isUserMenuOpen}
+                aria-label="Account menu"
+              >
+                {getInitials(session.user.email)}
+              </button>
+              {isUserMenuOpen ? (
+                <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border/60 bg-surface p-3 text-sm shadow-lg shadow-black/20">
+                  <p className="mb-2 truncate text-xs uppercase tracking-wide text-subtle">
+                    Signed in as
+                  </p>
+                  <p className="mb-3 truncate text-foreground">
+                    {session.user.email}
+                  </p>
+                  <form action={signOutAction}>
+                    <button
+                      type="submit"
+                      className="w-full rounded-2xl border border-border/70 bg-surface px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
+                    >
+                      Sign out
+                    </button>
+                  </form>
+                </div>
+              ) : null}
             </>
           ) : (
             <form action={signInWithGoogleAction} className="w-full sm:w-auto">
