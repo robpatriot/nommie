@@ -34,7 +34,7 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
     let ai1_seed = test_seed("full_game_ai_ai1");
     let ai2_seed = test_seed("full_game_ai_ai2");
     let ai3_seed = test_seed("full_game_ai_ai3");
-    let _ai4_seed = test_seed("full_game_ai_ai4");
+    let ai4_seed = test_seed("full_game_ai_ai4");
 
     let ai_profile = backend::repos::ai_profiles::find_by_registry_variant(
         txn,
@@ -94,7 +94,6 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         .await?;
 
     // Seat 3: Override config and memory
-    let override_seed = test_seed("full_game_ai_ai4_override");
     ai_service
         .add_ai_to_game(
             txn,
@@ -103,8 +102,8 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
             3,
             Some(AiInstanceOverrides {
                 name: Some("Hard Mode Bot".to_string()),
-                memory_level: Some(50),                       // Reduced memory
-                config: Some(json!({"seed": override_seed})), // Test-specific seed
+                memory_level: Some(50),                  // Reduced memory
+                config: Some(json!({"seed": ai4_seed})), // Test-specific seed
             }),
         )
         .await?;
