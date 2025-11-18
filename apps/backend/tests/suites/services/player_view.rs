@@ -5,8 +5,8 @@
 
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::domain::player_view::GameHistory;
 use backend::error::AppError;
+use backend::repos::player_view;
 
 use crate::support::build_test_state;
 use crate::support::factory::create_fresh_lobby_game;
@@ -21,7 +21,7 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
 
     let game_id = create_fresh_lobby_game(txn, "game_hist_empty").await?;
 
-    let history = GameHistory::load(txn, game_id).await?;
+    let history = player_view::load_game_history(txn, game_id).await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;
@@ -143,7 +143,7 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
     }
 
     // Load game history
-    let history = GameHistory::load(txn, game.id).await?;
+    let history = player_view::load_game_history(txn, game.id).await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;
@@ -240,7 +240,7 @@ async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
         .await?;
     }
 
-    let history = GameHistory::load(txn, game.id).await?;
+    let history = player_view::load_game_history(txn, game.id).await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;

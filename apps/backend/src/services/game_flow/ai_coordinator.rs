@@ -7,7 +7,7 @@ use crate::entities::ai_profiles;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, memberships, plays, rounds, tricks};
+use crate::repos::{bids, memberships, player_view, plays, rounds, tricks};
 
 /// Type of action needed from a player.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -204,8 +204,7 @@ impl GameFlowService {
                     .await?
             } else {
                 // Fallback: Load everything from DB
-                use crate::domain::player_view::CurrentRoundInfo;
-                CurrentRoundInfo::load(txn, game.id, player_seat).await?
+                player_view::load_current_round_info(txn, game.id, player_seat).await?
             };
 
             // Build RoundMemory if memory is enabled

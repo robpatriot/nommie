@@ -13,7 +13,6 @@ use crate::adapters::games_sea::{self, GameUpdateRound};
 use crate::ai::{registry, HeuristicV1, RandomPlayer};
 use crate::db::txn::with_txn;
 use crate::domain::bidding::validate_consecutive_zero_bids;
-use crate::domain::player_view::{CurrentRoundInfo, GameHistory};
 use crate::domain::snapshot::{GameSnapshot, SeatAiProfilePublic, SeatPublic};
 use crate::domain::state::Seat;
 use crate::domain::{Card, Rank, Suit};
@@ -26,7 +25,7 @@ use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::{game_etag, ExpectedVersion};
 use crate::repos::memberships::{self, GameRole};
-use crate::repos::{ai_overrides, ai_profiles, rounds, users};
+use crate::repos::{ai_overrides, ai_profiles, player_view, rounds, users};
 use crate::services::ai::{AiInstanceOverrides, AiService};
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
@@ -230,7 +229,7 @@ async fn get_snapshot(
                     if state.round_no == 0 {
                         None
                     } else {
-                        match CurrentRoundInfo::load(txn, id, seat as i16).await {
+                        match player_view::load_current_round_info(txn, id, seat as i16).await {
                             Ok(info) => {
                                 Some(info.hand.into_iter().map(format_card).collect::<Vec<_>>())
                             }
@@ -256,7 +255,7 @@ async fn get_snapshot(
                 ) {
                     if let Some(current_round_no) = game.current_round {
                         if let Some(viewer_seat_value) = viewer_seat {
-                            let history = GameHistory::load(txn, id).await?;
+                            let history = player_view::load_game_history(txn, id).await?;
                             let zero_bid_locked = validate_consecutive_zero_bids(
                                 &history,
                                 viewer_seat_value as i16,

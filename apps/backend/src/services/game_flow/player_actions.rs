@@ -10,7 +10,7 @@ use crate::entities::games;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{ConflictKind, DomainError, ValidationKind};
-use crate::repos::{bids, plays, rounds, tricks};
+use crate::repos::{bids, player_view, plays, rounds, tricks};
 
 impl GameFlowService {
     /// Submit a bid for a player in the current round.
@@ -106,7 +106,7 @@ impl GameFlowService {
         // Validate consecutive zero bids rule (if bidding 0)
         if bid_value == 0 {
             // Load game history for validation (service owns its validation data)
-            let history = crate::domain::player_view::GameHistory::load(txn, game_id).await?;
+            let history = player_view::load_game_history(txn, game_id).await?;
             validate_consecutive_zero_bids(&history, player_seat, current_round_no)?;
         }
 
@@ -371,8 +371,7 @@ impl GameFlowService {
 
         // SECURITY: Validate the card is in the player's remaining hand
         // This prevents cheating by playing cards they don't have or already played
-        use crate::domain::player_view::CurrentRoundInfo;
-        let player_state = CurrentRoundInfo::load(txn, game_id, player_seat).await?;
+        let player_state = player_view::load_current_round_info(txn, game_id, player_seat).await?;
 
         if !player_state.hand.contains(&card) {
             return Err(DomainError::validation(

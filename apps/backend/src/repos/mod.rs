@@ -6,6 +6,7 @@ pub mod bids;
 pub mod games;
 pub mod hands;
 pub mod memberships;
+pub mod player_view;
 pub mod players;
 pub mod plays;
 pub mod rounds;

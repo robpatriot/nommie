@@ -17,8 +17,8 @@ use crate::adapters::games_sea;
 use crate::db::require_db;
 use crate::db::txn::SharedTxn;
 use crate::domain::game_context::GameContext;
-use crate::domain::player_view::{CurrentRoundInfo, GameHistory};
 use crate::error::AppError;
+use crate::repos::player_view;
 use crate::state::app_state::AppState;
 
 /// Request-scoped cached game context.
@@ -124,10 +124,11 @@ impl FromRequest for CachedGameContext {
 
                 // If game has started, load history and round info
                 if game.current_round.is_some() {
-                    let history = GameHistory::load(txn, game_id.0).await?;
+                    let history = player_view::load_game_history(txn, game_id.0).await?;
                     context = context.with_history(history);
 
-                    let round_info = CurrentRoundInfo::load(txn, game_id.0, player_seat).await?;
+                    let round_info =
+                        player_view::load_current_round_info(txn, game_id.0, player_seat).await?;
                     context = context.with_round_info(round_info);
                 }
             } else {
@@ -139,10 +140,11 @@ impl FromRequest for CachedGameContext {
 
                 // If game has started, load history and round info
                 if game.current_round.is_some() {
-                    let history = GameHistory::load(db, game_id.0).await?;
+                    let history = player_view::load_game_history(db, game_id.0).await?;
                     context = context.with_history(history);
 
-                    let round_info = CurrentRoundInfo::load(db, game_id.0, player_seat).await?;
+                    let round_info =
+                        player_view::load_current_round_info(db, game_id.0, player_seat).await?;
                     context = context.with_round_info(round_info);
                 }
             }

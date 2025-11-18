@@ -3,8 +3,8 @@ use testkit::{assert_bid_legal, assert_play_legal, assert_trump_legal};
 
 mod testkit {
     use backend::domain::player_view::CurrentRoundInfo;
+    use backend::domain::state::Phase;
     use backend::domain::{Card, GameContext, Rank, Suit, Trump};
-    use backend::entities::games::GameState as DbGameState;
 
     #[derive(Clone)]
     pub struct Scenario {
@@ -39,7 +39,7 @@ mod testkit {
         let state = CurrentRoundInfo {
             game_id: 1,
             player_seat: 0,
-            game_state: DbGameState::Bidding,
+            game_state: Phase::Bidding,
             current_round: 1,
             hand_size: 5,
             dealer_pos: 0,
@@ -80,7 +80,7 @@ mod testkit {
         let state = CurrentRoundInfo {
             game_id: 2,
             player_seat: 2,
-            game_state: DbGameState::TrickPlay,
+            game_state: Phase::Trick { trick_no: 1 },
             current_round: 1,
             hand_size: 3,
             dealer_pos: 1,
@@ -116,7 +116,7 @@ mod testkit {
         let state = CurrentRoundInfo {
             game_id: 3,
             player_seat: 0,
-            game_state: DbGameState::TrumpSelection,
+            game_state: Phase::TrumpSelect,
             current_round: 1,
             hand_size: 3,
             dealer_pos: 0,

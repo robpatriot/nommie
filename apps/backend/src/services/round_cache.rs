@@ -191,8 +191,24 @@ impl RoundCache {
         game_state: crate::entities::games::GameState,
         current_trick_no: i16,
     ) -> Result<crate::domain::player_view::CurrentRoundInfo, AppError> {
+        use crate::domain::state::Phase;
         use crate::entities::games::GameState as DbGameState;
         use crate::repos::{plays, tricks};
+
+        // Convert database state to domain phase
+        let phase = match game_state {
+            DbGameState::Lobby => Phase::Init,
+            DbGameState::Dealing => Phase::Init,
+            DbGameState::Bidding => Phase::Bidding,
+            DbGameState::TrumpSelection => Phase::TrumpSelect,
+            DbGameState::TrickPlay => Phase::Trick {
+                trick_no: current_trick_no as u8,
+            },
+            DbGameState::Scoring => Phase::Scoring,
+            DbGameState::BetweenRounds => Phase::Complete,
+            DbGameState::Completed => Phase::GameOver,
+            DbGameState::Abandoned => Phase::GameOver,
+        };
 
         // Load fresh bids if in Bidding phase (bids are mutable during this phase)
         // Otherwise use cached bids (immutable after bidding completes)
@@ -268,7 +284,7 @@ impl RoundCache {
         Ok(crate::domain::player_view::CurrentRoundInfo {
             game_id: self.game_id,
             player_seat,
-            game_state,
+            game_state: phase,
             current_round: self.round_no,
             hand_size: self.hand_size,
             dealer_pos: self.dealer_pos,

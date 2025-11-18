@@ -3,15 +3,12 @@
 //! This module provides CurrentRoundInfo which represents all information
 //! available to a player at their decision point for the current round, including legal moves.
 //! It also provides GameHistory for accessing all public game history (bids, trumps, scores).
+//!
+//! To load these types from the database, use [`crate::repos::player_view::load_current_round_info`]
+//! and [`crate::repos::player_view::load_game_history`].
 
-use sea_orm::ConnectionTrait;
-
-use crate::domain::cards_parsing::from_stored_format;
+use crate::domain::state::Phase;
 use crate::domain::{valid_bid_range, Card, Trump};
-use crate::entities::games::GameState as DbGameState;
-use crate::error::AppError;
-use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, hands, plays, rounds, scores, tricks};
 
 /// Helper function to determine who should lead a trick.
 ///
@@ -47,7 +44,7 @@ pub fn determine_trick_leader(
 /// ## Key Fields
 ///
 /// - **Your hand**: [`hand`](Self::hand) - cards you can currently play
-/// - **Current phase**: [`game_state`](Self::game_state) - Bidding, TrumpSelection, or TrickPlay
+/// - **Current phase**: [`game_state`](Self::game_state) - Bidding, TrumpSelect, or Trick
 /// - **Bids**: [`bids`](Self::bids) - who has bid what so far
 /// - **Trick state**: [`current_trick_plays`](Self::current_trick_plays) - cards played this trick
 /// - **Scores**: [`scores`](Self::scores) - cumulative scores for all players
@@ -88,8 +85,8 @@ pub struct CurrentRoundInfo {
     /// Your seat position (0-3), determines turn order
     pub player_seat: i16,
 
-    /// Current game phase: Bidding, TrumpSelection, or TrickPlay
-    pub game_state: DbGameState,
+    /// Current game phase: Bidding, TrumpSelect, or Trick
+    pub game_state: Phase,
 
     /// Current round number (0-25, there are 26 rounds total)
     pub current_round: i16,
@@ -148,142 +145,6 @@ pub struct CurrentRoundInfo {
 }
 
 impl CurrentRoundInfo {
-    /// Load current round info for a player from the database.
-    pub async fn load<C: ConnectionTrait + Send + Sync>(
-        conn: &C,
-        game_id: i64,
-        player_seat: i16,
-    ) -> Result<Self, AppError> {
-        use crate::adapters::games_sea;
-
-        // Load game
-        let game = games_sea::require_game(conn, game_id).await?;
-
-        let current_round = game.current_round.ok_or_else(|| {
-            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
-        })?;
-
-        let hand_size = game.hand_size().ok_or_else(|| {
-            DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
-        })? as u8;
-
-        let dealer_pos = game.dealer_pos().unwrap_or(0);
-
-        // Load round
-        let round = rounds::find_by_game_and_round(conn, game_id, current_round)
-            .await?
-            .ok_or_else(|| {
-                DomainError::validation(
-                    ValidationKind::Other("ROUND_NOT_FOUND".into()),
-                    "Round not found",
-                )
-            })?;
-
-        // Load player's original dealt hand
-        let hand_record = hands::find_by_round_and_seat(conn, round.id, player_seat)
-            .await?
-            .ok_or_else(|| {
-                DomainError::validation(
-                    ValidationKind::Other("HAND_NOT_FOUND".into()),
-                    "Hand not found",
-                )
-            })?;
-
-        let original_hand: Vec<Card> = hand_record
-            .cards
-            .iter()
-            .map(|c| from_stored_format(&c.suit, &c.rank))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // Load all cards this player has played this round (across all tricks)
-        let all_round_tricks = tricks::find_all_by_round(conn, round.id).await?;
-        let mut played_cards: Vec<Card> = Vec::new();
-
-        for trick in all_round_tricks {
-            let trick_plays = plays::find_all_by_trick(conn, trick.id).await?;
-            for play in trick_plays {
-                if play.player_seat == player_seat {
-                    let card = from_stored_format(&play.card.suit, &play.card.rank)?;
-                    played_cards.push(card);
-                }
-            }
-        }
-
-        // Compute remaining hand = original - played
-        let mut hand = original_hand;
-        for played in played_cards {
-            if let Some(pos) = hand.iter().position(|c| *c == played) {
-                hand.remove(pos);
-            }
-        }
-
-        // Load bids
-        let bid_records = bids::find_all_by_round(conn, round.id).await?;
-        let mut bids = [None; 4];
-        for bid in bid_records {
-            if bid.player_seat >= 0 && bid.player_seat < 4 {
-                bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
-            }
-        }
-
-        // Load trump
-        let trump = round.trump.map(|t| match t {
-            rounds::Trump::Clubs => Trump::Clubs,
-            rounds::Trump::Diamonds => Trump::Diamonds,
-            rounds::Trump::Hearts => Trump::Hearts,
-            rounds::Trump::Spades => Trump::Spades,
-            rounds::Trump::NoTrump => Trump::NoTrump,
-        });
-
-        // Load current trick plays (if in TrickPlay phase)
-        let mut current_trick_plays = Vec::new();
-        if game.state == DbGameState::TrickPlay {
-            let trick_no = game.current_trick_no;
-            if let Some(trick) = tricks::find_by_round_and_trick(conn, round.id, trick_no).await? {
-                let play_records = plays::find_all_by_trick(conn, trick.id).await?;
-                for play in play_records {
-                    let card = from_stored_format(&play.card.suit, &play.card.rank)?;
-                    current_trick_plays.push((play.player_seat, card));
-                }
-            }
-        }
-
-        // Load cumulative scores from completed rounds
-        use crate::repos::scores;
-        let scores = scores::get_scores_for_completed_rounds(conn, game_id, current_round).await?;
-
-        // Determine trick leader (who should play first)
-        let trick_leader = if game.state == DbGameState::TrickPlay {
-            let current_trick_no = game.current_trick_no;
-            let prev_trick_winner = if current_trick_no > 0 {
-                tricks::find_by_round_and_trick(conn, round.id, current_trick_no - 1)
-                    .await?
-                    .map(|t| t.winner_seat)
-            } else {
-                None
-            };
-            determine_trick_leader(current_trick_no, dealer_pos, prev_trick_winner)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            game_id,
-            player_seat,
-            game_state: game.state,
-            current_round,
-            hand_size,
-            dealer_pos,
-            hand,
-            bids,
-            trump,
-            trick_no: game.current_trick_no,
-            current_trick_plays,
-            scores,
-            trick_leader,
-        })
-    }
-
     /// Get legal bids for this player.
     ///
     /// Returns valid bid values (0 to hand_size) that this player can make right now.
@@ -314,7 +175,7 @@ impl CurrentRoundInfo {
     /// let bid = legal_bids[0];
     /// ```
     pub fn legal_bids(&self) -> Vec<u8> {
-        if self.game_state != DbGameState::Bidding {
+        if self.game_state != Phase::Bidding {
             return Vec::new();
         }
 
@@ -373,7 +234,7 @@ impl CurrentRoundInfo {
     /// };
     /// ```
     pub fn legal_plays(&self) -> Vec<Card> {
-        if self.game_state != DbGameState::TrickPlay {
+        if !matches!(self.game_state, Phase::Trick { .. }) {
             return Vec::new();
         }
 
@@ -550,111 +411,5 @@ pub struct RoundScoreDetail {
 }
 
 impl GameHistory {
-    /// Load complete game history for a game.
-    ///
-    /// Returns all rounds (completed and partially completed current round) with their
-    /// bids, trump selector, trump choice, and scores.
-    ///
-    /// In production, this is called once at game start and updated incrementally
-    /// after each round completion, then cached in [`CurrentRoundInfo`] via
-    /// [`with_game_history()`](CurrentRoundInfo::with_game_history).
-    pub async fn load<C: ConnectionTrait + Send + Sync>(
-        conn: &C,
-        game_id: i64,
-    ) -> Result<Self, AppError> {
-        // Load all rounds for this game
-        let all_rounds = rounds::find_all_by_game(conn, game_id).await?;
-
-        let mut round_histories = Vec::new();
-
-        for round in all_rounds {
-            // Load bids for this round
-            let bid_records = bids::find_all_by_round(conn, round.id).await?;
-            let mut bids = [None; 4];
-            for bid in &bid_records {
-                if bid.player_seat >= 0 && bid.player_seat < 4 {
-                    bids[bid.player_seat as usize] = Some(bid.bid_value as u8);
-                }
-            }
-
-            // Calculate trump_selector_seat (winning bidder) from bids
-            // Only calculate if all bids are present
-            let trump_selector_seat = if bids.iter().all(|b| b.is_some()) {
-                calculate_winning_bidder(&bids, round.dealer_pos)
-            } else {
-                None
-            };
-
-            // Convert trump
-            let trump = round.trump.map(|t| match t {
-                rounds::Trump::Clubs => Trump::Clubs,
-                rounds::Trump::Diamonds => Trump::Diamonds,
-                rounds::Trump::Hearts => Trump::Hearts,
-                rounds::Trump::Spades => Trump::Spades,
-                rounds::Trump::NoTrump => Trump::NoTrump,
-            });
-
-            // Load scores for this round (if the round is completed)
-            let score_records = scores::find_all_by_round(conn, round.id).await?;
-            let mut round_scores = [RoundScoreDetail {
-                round_score: 0,
-                cumulative_score: 0,
-            }; 4];
-
-            for score in score_records {
-                if score.player_seat >= 0 && score.player_seat < 4 {
-                    round_scores[score.player_seat as usize] = RoundScoreDetail {
-                        round_score: score.round_score,
-                        cumulative_score: score.total_score_after,
-                    };
-                }
-            }
-
-            round_histories.push(RoundHistory {
-                round_no: round.round_no,
-                hand_size: round.hand_size as u8,
-                dealer_seat: round.dealer_pos,
-                bids,
-                trump_selector_seat,
-                trump,
-                scores: round_scores,
-            });
-        }
-
-        Ok(GameHistory {
-            rounds: round_histories,
-        })
-    }
-}
-
-/// Calculate the winning bidder from bids.
-///
-/// Returns the seat of the player with the highest bid.
-/// Ties are broken by earliest bidder (from dealer+1 clockwise).
-fn calculate_winning_bidder(bids: &[Option<u8>; 4], dealer_pos: i16) -> Option<i16> {
-    let mut best_bid: Option<u8> = None;
-    let mut winner: Option<i16> = None;
-
-    // Start from dealer+1 and go clockwise
-    let start = (dealer_pos + 1) % 4;
-
-    for i in 0..4 {
-        let seat = (start + i) % 4;
-        if let Some(bid_value) = bids[seat as usize] {
-            match best_bid {
-                None => {
-                    best_bid = Some(bid_value);
-                    winner = Some(seat);
-                }
-                Some(curr) => {
-                    if bid_value > curr {
-                        best_bid = Some(bid_value);
-                        winner = Some(seat);
-                    }
-                }
-            }
-        }
-    }
-
-    winner
+    // Loading methods moved to repos::player_view
 }

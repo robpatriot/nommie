@@ -7,7 +7,7 @@ use crate::adapters::memberships_sea;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, memberships, plays, rounds, tricks};
+use crate::repos::{bids, memberships, player_view, plays, rounds, tricks};
 
 impl GameFlowService {
     /// Check if all players are ready and start the game if conditions are met.
@@ -137,8 +137,7 @@ impl GameFlowService {
                 // Load game history if not yet loaded
                 if game_history.is_none() {
                     debug!(game_id, "Loading GameHistory cache");
-                    game_history =
-                        Some(crate::domain::player_view::GameHistory::load(txn, game_id).await?);
+                    game_history = Some(player_view::load_game_history(txn, game_id).await?);
                 }
 
                 if let Some(current_round) = game.current_round {
@@ -163,9 +162,7 @@ impl GameFlowService {
                             round_no = current_round,
                             "Reloading GameHistory cache for new round"
                         );
-                        game_history = Some(
-                            crate::domain::player_view::GameHistory::load(txn, game_id).await?,
-                        );
+                        game_history = Some(player_view::load_game_history(txn, game_id).await?);
                     }
                     // else: reuse existing cache (optimization!)
                 }
