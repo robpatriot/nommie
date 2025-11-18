@@ -18,10 +18,18 @@ impl GameFlowService {
         txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
-        info!(game_id, "Dealing new round");
-
-        // Load game from DB
         let game = games::require_game(txn, game_id).await?;
+        self.deal_round_internal(txn, &game).await
+    }
+
+    /// Internal version that accepts game object to avoid redundant loads.
+    pub(super) async fn deal_round_internal(
+        &self,
+        txn: &DatabaseTransaction,
+        game: &games::Game,
+    ) -> Result<(), AppError> {
+        let game_id = game.id;
+        info!(game_id, "Dealing new round");
 
         // Determine next round number
         let next_round = game.current_round.unwrap_or(0) + 1;
@@ -61,7 +69,7 @@ impl GameFlowService {
             txn,
             game_id,
             updated_game.lock_version,
-            Some(next_round as i16),
+            Some(next_round),
             starting_dealer_pos,
             None,
         )
@@ -75,7 +83,7 @@ impl GameFlowService {
         let round = rounds::create_round(
             txn,
             game_id,
-            next_round as i16,
+            next_round,
             computed_hand_size,
             computed_dealer_pos,
         )
@@ -120,10 +128,18 @@ impl GameFlowService {
         txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
-        info!(game_id, "Scoring round");
-
-        // Load game
         let game = games::require_game(txn, game_id).await?;
+        self.score_round_internal(txn, &game).await
+    }
+
+    /// Internal version that accepts game object to avoid redundant loads.
+    pub(super) async fn score_round_internal(
+        &self,
+        txn: &DatabaseTransaction,
+        game: &games::Game,
+    ) -> Result<(), AppError> {
+        let game_id = game.id;
+        info!(game_id, "Scoring round");
 
         let current_round_no = game.current_round.ok_or_else(|| {
             DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
@@ -241,10 +257,18 @@ impl GameFlowService {
         txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
-        info!(game_id, "Advancing to next round");
-
-        // Load game
         let game = games::require_game(txn, game_id).await?;
+        self.advance_to_next_round_internal(txn, &game).await
+    }
+
+    /// Internal version that accepts game object to avoid redundant loads.
+    pub(super) async fn advance_to_next_round_internal(
+        &self,
+        txn: &DatabaseTransaction,
+        game: &games::Game,
+    ) -> Result<(), AppError> {
+        let game_id = game.id;
+        info!(game_id, "Advancing to next round");
 
         if game.state != DbGameState::Scoring {
             return Err(DomainError::validation(

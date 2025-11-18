@@ -456,10 +456,18 @@ impl GameFlowService {
         txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
-        debug!(game_id, "Resolving trick");
-
-        // Load game
         let game = games::require_game(txn, game_id).await?;
+        self.resolve_trick_internal(txn, &game).await
+    }
+
+    /// Internal version that accepts game object to avoid redundant loads.
+    pub(super) async fn resolve_trick_internal(
+        &self,
+        txn: &DatabaseTransaction,
+        game: &games::Game,
+    ) -> Result<(), AppError> {
+        let game_id = game.id;
+        debug!(game_id, "Resolving trick");
 
         if game.state != DbGameState::TrickPlay {
             return Err(DomainError::validation(

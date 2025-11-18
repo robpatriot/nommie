@@ -45,8 +45,35 @@ impl GameFlowService {
             info!(game_id, "All players ready, starting game");
             // Deal first round
             self.deal_round(txn, game_id).await?;
-            // Process game state to handle transitions and AI actions
+
+            // Process game state - it loops internally until no AI actions or transitions are possible
+            // It will exit early if game completes or is abandoned
             self.process_game_state(txn, game_id).await?;
+
+            // Reload game to check final state after processing
+            let game = games::require_game(txn, game_id).await?;
+
+            // Early exit if game completed or abandoned (all AI players finished the game)
+            if game.state == DbGameState::Completed || game.state == DbGameState::Abandoned {
+                return Ok(());
+            }
+
+            // Check if next player to act is human (if process_game_state returned normally
+            // and game isn't completed/abandoned, it means we're waiting for human input)
+            let next_action = self.determine_next_action(txn, &game).await?;
+            if let Some(action_tuple) = next_action {
+                let player_seat = action_tuple.0;
+                let memberships = memberships::find_all_by_game(txn, game_id).await?;
+                if let Some(player) = memberships
+                    .iter()
+                    .find(|m| m.turn_order == player_seat as i32)
+                {
+                    if player.player_kind == crate::entities::game_players::PlayerKind::Human {
+                        // Waiting for human input - done processing
+                        return Ok(());
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -73,7 +100,7 @@ impl GameFlowService {
                 )
             })?;
 
-        // Mark ready
+        // Mark ready (automatically updates game updated_at)
         memberships::set_membership_ready(txn, membership.id, true).await?;
 
         info!(game_id, user_id, "Player marked ready");
@@ -93,9 +120,24 @@ impl GameFlowService {
     ///
     /// This is a loop-based approach to avoid deep recursion and stack overflow.
     ///
-    /// Performance: Maintains RoundCache across iterations within the same round,
+    /// # Performance
+    ///
+    /// Maintains RoundCache across iterations within the same round,
     /// only reloading when the round number changes. This avoids ~1,400 redundant cache
     /// creations per game (reduces to ~26, once per round).
+    ///
+    /// # Return Values
+    ///
+    /// - `Ok(())`: Successfully processed game state. Returns when:
+    ///   - Game is completed or abandoned (exits early)
+    ///   - No more transitions or AI actions are possible (waiting for human input or game complete)
+    /// - `Err(AppError::InternalError)`: Exceeded MAX_ITERATIONS limit (indicates a bug causing infinite loop)
+    ///
+    /// # Safety
+    ///
+    /// The function has a MAX_ITERATIONS guard (2000 iterations) to prevent infinite loops.
+    /// A full 26-round game requires approximately 1,560 iterations (26 rounds × ~60 actions),
+    /// so 2000 provides a ~28% safety margin.
     pub async fn process_game_state(
         &self,
         txn: &DatabaseTransaction,
@@ -103,7 +145,9 @@ impl GameFlowService {
     ) -> Result<(), AppError> {
         use crate::services::round_cache::RoundCache;
 
-        const MAX_ITERATIONS: usize = 2000; // Allow for full 26-round game with all actions
+        // Safety limit: ~26 rounds × ~60 actions (4 bids + 1 trump + 52 plays) ≈ 1,560 iterations
+        // 2000 provides ~28% safety margin. If exceeded, indicates a bug causing infinite loop.
+        const MAX_ITERATIONS: usize = 2000;
 
         // Cache that persists across iterations within the same round
         let mut cached_round: Option<(i16, RoundCache)> = None;
@@ -112,12 +156,24 @@ impl GameFlowService {
         // This persists across all rounds in the game and is passed to AIs for strategic analysis
         let mut game_history: Option<crate::domain::player_view::GameHistory> = None;
 
+        // Cache game object to avoid redundant loads - only reload after state changes
+        let mut game = games::require_game(txn, game_id).await?;
+
         for _iteration in 0..MAX_ITERATIONS {
-            let game = games::require_game(txn, game_id).await?;
+            // Early exit if game is already completed or abandoned
+            // Abandoned games should stop processing immediately to avoid waiting
+            // indefinitely for actions that will never come (e.g., waiting for human
+            // player who abandoned the game)
+            if game.state == DbGameState::Completed || game.state == DbGameState::Abandoned {
+                return Ok(());
+            }
 
             // Priority 1: Check if we need a state transition
-            if self.check_and_apply_transition_internal(txn, &game).await? {
-                // Transition happened, loop again
+            let transition_applied = self.check_and_apply_transition_internal(txn, &game).await?;
+            if transition_applied {
+                // Transition happened - reload game to get updated state and lock_version
+                game = games::require_game(txn, game_id).await?;
+                // Loop again - completion will be caught at line 138 on next iteration
                 continue;
             }
 
@@ -169,16 +225,22 @@ impl GameFlowService {
             }
 
             // Priority 2: Check if an AI needs to act (pass cache if available)
-            if self
+            let ai_acted = self
                 .check_and_execute_ai_action_with_cache(
                     txn,
                     &game,
                     cached_round.as_ref().map(|(_, ctx)| ctx),
                     game_history.as_ref(),
                 )
-                .await?
-            {
-                // AI acted, loop again (cache remains valid for next iteration!)
+                .await?;
+
+            if ai_acted {
+                // AI acted - reload game to get updated state and lock_version
+                game = games::require_game(txn, game_id).await?;
+                // Loop again (cache remains valid for next iteration!)
+                // Note: Game can't be Completed here - completion only happens through
+                // transition checks on the next iteration, which will be caught at line 138.
+                // Similarly, Abandoned state will be caught at line 138 on next iteration.
                 continue;
             }
 
@@ -256,12 +318,12 @@ impl GameFlowService {
 
                 if round.trump.is_some() {
                     // Trump is set - transition to TrickPlay and initialize to trick 1
-                    let updated_game = games::require_game(txn, game.id).await?;
+                    // Use the game object passed in instead of reloading
                     let updated_game = games::update_state(
                         txn,
                         game.id,
                         DbGameState::TrickPlay,
-                        updated_game.lock_version,
+                        game.lock_version,
                     )
                     .await?;
 
@@ -309,8 +371,8 @@ impl GameFlowService {
                             trick_no = game.current_trick_no,
                             "Trick complete, resolving"
                         );
-                        self.resolve_trick(txn, game.id).await?;
-                        // Note: resolve_trick will call process_game_state
+                        self.resolve_trick_internal(txn, game).await?;
+                        // State modified; caller's loop will continue processing
                         return Ok(true);
                     }
                 }
@@ -334,20 +396,20 @@ impl GameFlowService {
 
                 if round.completed_at.is_some() {
                     // Round scored - advance to next round
-                    self.advance_to_next_round(txn, game.id).await?;
-                    // Note: advance_to_next_round will call process_game_state
+                    self.advance_to_next_round_internal(txn, game).await?;
+                    // State modified; caller's loop will continue processing
                     return Ok(true);
                 } else {
                     // Need to score the round first
-                    self.score_round(txn, game.id).await?;
-                    // Note: score_round will call process_game_state
+                    self.score_round_internal(txn, game).await?;
+                    // State modified; caller's loop will continue processing
                     return Ok(true);
                 }
             }
             DbGameState::BetweenRounds => {
                 // Automatically deal next round
-                self.deal_round(txn, game.id).await?;
-                // Note: deal_round will call process_game_state
+                self.deal_round_internal(txn, game).await?;
+                // State modified; caller's loop will continue processing
                 return Ok(true);
             }
             DbGameState::Lobby
