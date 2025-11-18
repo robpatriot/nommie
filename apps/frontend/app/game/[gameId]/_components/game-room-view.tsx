@@ -1,8 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
-
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
 import { formatTime } from '@/utils/date-formatting'
 import {
@@ -23,6 +21,8 @@ import { ScoreSidebar } from './game-room/ScoreSidebar'
 import { AiSeatManager } from './game-room/AiSeatManager'
 import { ReadyPanel } from './game-room/ReadyPanel'
 import { SetupSeatList } from './game-room/SetupSeatList'
+import { PageHero } from '@/components/PageHero'
+import { PageContainer } from '@/components/PageContainer'
 import type {
   AiSeatState,
   BiddingState,
@@ -144,51 +144,6 @@ export function GameRoomView(props: GameRoomViewProps) {
         orientationOrder.indexOf(b.orientation)
     )
 
-  const headerSection = (
-    <header className="border-b border-white/10 bg-surface-strong/70 px-3 py-4 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur-lg">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-            Game #{gameId}
-          </span>
-          <h1 className="text-2xl font-semibold">Nommie Table</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {onRefresh ? (
-            <button
-              type="button"
-              onClick={onRefresh}
-              className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground"
-              disabled={isRefreshing}
-              aria-label={
-                isRefreshing ? 'Refreshing game state' : 'Refresh game state'
-              }
-            >
-              {isRefreshing ? 'Refreshing…' : 'Refresh'}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => {
-              const url = window.location.href
-              void navigator.clipboard.writeText(url)
-            }}
-            className="rounded-full border border-border/70 px-4 py-2 text-sm font-semibold text-muted transition hover:text-foreground"
-            aria-label="Copy invite link to clipboard"
-          >
-            Copy invite
-          </button>
-          <Link
-            href="/lobby"
-            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary/90"
-          >
-            Back to lobby
-          </Link>
-        </div>
-      </div>
-    </header>
-  )
-
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
 
   useEffect(() => {
@@ -215,25 +170,30 @@ export function GameRoomView(props: GameRoomViewProps) {
 
   if (isPreGame) {
     return (
-      <div className="flex min-h-screen flex-col text-foreground">
-        {headerSection}
-        <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
-          <section className="rounded-3xl border border-white/10 bg-surface/80 p-6 shadow-[0_45px_120px_rgba(0,0,0,0.35)] backdrop-blur">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl space-y-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-                  Setup
-                </p>
-                <h2 className="mt-2 text-3xl font-semibold text-foreground sm:text-4xl">
-                  Configure seats before the first deal
-                </h2>
-                <p className="mt-2 text-sm text-muted sm:text-base">
-                  Confirm who is seated, drop in AI partners where needed, and
-                  ready up once your table is set. The match begins when every
-                  seat is marked ready.
-                </p>
+      <div className="flex flex-col text-foreground">
+        <PageContainer>
+          <PageHero
+            introClassName="lg:flex-[1.35]"
+            intro={
+              <div className="flex flex-col gap-4">
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
+                    Setup · Game #{gameId}
+                  </p>
+                  <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
+                    Add players
+                  </h2>
+                  <p className="text-sm text-muted sm:text-base">
+                    Confirm who is seated, drop in AI partners where needed, and
+                    ready up once your table is set. The match begins when every
+                    seat is marked ready.
+                  </p>
+                </div>
+                <ReadyPanel readyState={readyState} />
               </div>
-              <div className="flex w-full flex-col gap-4 lg:w-auto">
+            }
+            aside={
+              <>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
@@ -265,25 +225,54 @@ export function GameRoomView(props: GameRoomViewProps) {
                     <p className="text-xs text-muted">Marked ready so far</p>
                   </div>
                 </div>
-                <ReadyPanel readyState={readyState} variant="compact" />
-              </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {onRefresh ? (
+                    <button
+                      type="button"
+                      onClick={onRefresh}
+                      className="w-full rounded-2xl border border-border/70 px-4 py-2 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground sm:flex-1"
+                      disabled={isRefreshing}
+                      aria-label={
+                        isRefreshing
+                          ? 'Refreshing game state'
+                          : 'Refresh game state'
+                      }
+                    >
+                      {isRefreshing ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = window.location.href
+                      void navigator.clipboard.writeText(url)
+                    }}
+                    className="w-full rounded-2xl border border-border/70 px-4 py-2 text-sm font-semibold text-muted transition hover:text-foreground sm:flex-1"
+                    aria-label="Copy invite link to clipboard"
+                  >
+                    Copy invite
+                  </button>
+                </div>
+              </>
+            }
+          />
+
+          <section className="flex flex-col gap-6 lg:flex-row lg:items-start">
+            <div className="flex flex-1 flex-col gap-6">
+              <SetupSeatList seats={setupSeatEntries} />
+            </div>
+            <div className="lg:flex-[0.8]">
+              <AiSeatManager aiState={aiSeatState} />
             </div>
           </section>
-
-          <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px]">
-            <SetupSeatList seats={setupSeatEntries} />
-            <AiSeatManager aiState={aiSeatState} />
-          </section>
-        </main>
+        </PageContainer>
       </div>
     )
   }
 
   return (
-    <div className="flex min-h-screen flex-col text-foreground">
-      {headerSection}
-
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6 lg:px-10">
+    <div className="flex flex-col text-foreground">
+      <PageContainer>
         <section className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-surface/80 p-5 shadow-[0_45px_120px_rgba(0,0,0,0.35)] backdrop-blur">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -337,8 +326,8 @@ export function GameRoomView(props: GameRoomViewProps) {
           ) : null}
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="flex flex-col gap-6">
+        <section className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="flex flex-1 flex-col gap-6 lg:pr-6">
             <div className="rounded-[40px] border border-white/10 bg-gradient-to-b from-[#1a5a46]/90 via-[#0c3025]/90 to-[#041a12]/95 p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
               <div className="hidden grid-cols-3 grid-rows-3 gap-4 lg:grid">
                 {seatSummaries.map((summary) => (
@@ -395,15 +384,17 @@ export function GameRoomView(props: GameRoomViewProps) {
               onPlayCard={handlePlayCard}
             />
           </div>
-
-          <ScoreSidebar
-            playerNames={playerNames}
-            scores={snapshot.game.scores_total}
-            round={round}
-            className="lg:sticky lg:top-6"
-          />
+          <div className="mt-6 lg:mt-0 lg:flex-[0.75] lg:self-stretch">
+            <div className="lg:sticky lg:top-6">
+              <ScoreSidebar
+                playerNames={playerNames}
+                scores={snapshot.game.scores_total}
+                round={round}
+              />
+            </div>
+          </div>
         </section>
-      </main>
+      </PageContainer>
     </div>
   )
 }

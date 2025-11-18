@@ -126,6 +126,7 @@
     min-height: 100vh;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'liga', 'kern';
     background-color: rgb(var(--color-bg));
+    scrollbar-gutter: stable both-edges;
   }
 
   body::backdrop {

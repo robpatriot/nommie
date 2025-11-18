@@ -3,11 +3,11 @@ import { redirect } from 'next/navigation'
 
 import { GameRoomClient } from './_components/game-room-client'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
-import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 
 interface GamePageProps {
   params: Promise<{

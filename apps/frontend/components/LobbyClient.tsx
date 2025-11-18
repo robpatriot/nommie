@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import GameList from './GameList'
 import CreateGameModal from './CreateGameModal'
 import Toast from './Toast'
+import { PageHero } from './PageHero'
+import { PageContainer } from './PageContainer'
 import { useToast } from '@/hooks/useToast'
 import {
   createGameAction,
@@ -190,15 +192,16 @@ export default function LobbyClient({
 
   return (
     <>
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-12 pt-6 text-foreground sm:pt-8">
-        <section className="rounded-3xl border border-white/15 bg-surface/80 p-5 shadow-[0_45px_120px_rgba(0,0,0,0.35)] backdrop-blur">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-4 lg:flex-1">
+      <PageContainer>
+        <PageHero
+          className="border-white/15"
+          intro={
+            <div className="space-y-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+                Game Lobby
+              </p>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-                  Game Lobby
-                </p>
-                <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
                   Seat your table and deal the next hand.
                 </h1>
                 <p className="mt-2 text-sm text-muted sm:text-base">
@@ -207,7 +210,9 @@ export default function LobbyClient({
                 </p>
               </div>
             </div>
-            <div className="grid gap-3 text-sm text-muted sm:grid-cols-3 lg:grid-cols-3 lg:max-w-sm">
+          }
+          aside={
+            <div className="grid gap-3 text-sm text-muted sm:grid-cols-3">
               <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/50 bg-surface px-4 py-3 text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
                   Joinable tables
@@ -236,28 +241,30 @@ export default function LobbyClient({
                 <p className="text-xs text-muted">Active or full tables</p>
               </div>
             </div>
-          </div>
-          <div className="mt-4 flex flex-col gap-3 text-sm sm:flex-row">
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
-              aria-label="Create a new game"
-            >
-              <span role="img" aria-hidden>
-                ➕
-              </span>
-              <span className="ml-2">Create game</span>
-            </button>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="inline-flex w-full items-center justify-center rounded-2xl border border-border/60 bg-surface px-5 py-3 font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              aria-live="polite"
-            >
-              {refreshing ? 'Refreshing…' : 'Refresh list'}
-            </button>
-          </div>
-        </section>
+          }
+          footer={
+            <div className="flex flex-col gap-3 text-sm sm:flex-row">
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
+                aria-label="Create a new game"
+              >
+                <span role="img" aria-hidden>
+                  ➕
+                </span>
+                <span className="ml-2">Create game</span>
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-border/60 bg-surface px-5 py-3 font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                aria-live="polite"
+              >
+                {refreshing ? 'Refreshing…' : 'Refresh list'}
+              </button>
+            </div>
+          }
+        />
 
         <div className="grid gap-6 lg:grid-cols-2">
           <GameList
@@ -358,7 +365,7 @@ export default function LobbyClient({
             }}
           />
         </div>
-      </main>
+      </PageContainer>
 
       <CreateGameModal
         isOpen={isCreateModalOpen}
