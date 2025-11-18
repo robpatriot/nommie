@@ -93,7 +93,8 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 - Unified request-path DB access through `with_txn`.
 - Rollback-by-default test policy.
 - Nested `with_txn` behavior defined and tested.
-**Acceptance:** All handlers use `with_txn`; no direct `state.db` usage; lint and tests clean.
+- **Determinism Tools:** Injectable clock, seeded RNG, and mock time for reproducible tests (transactional harness and DTO structure already support deterministic time injection).
+**Acceptance:** All handlers use `with_txn`; no direct `state.db` usage; lint and tests clean; tests are reproducible with deterministic time injection.
 
 ---
 
@@ -101,7 +102,8 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Dependencies:** 5, 6, 7  
 **Details:**
 - Implemented: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, and `ValidatedJson<T>`.
-**Acceptance:** Handlers are thin; extractor tests pass; single DB hit for user and membership.
+- **Extractor Unification:** Ensure all routes use `ValidatedJson<T>`, `AuthToken`, `CurrentUser`, `GameId`, and `GameMembership` consistently.
+**Acceptance:** Handlers are thin; extractor tests pass; single DB hit for user and membership; input validation consistent across all handlers.
 
 ---
 
@@ -150,8 +152,9 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - Invalid bids/plays return proper Problem Details.
 - Property tests confirm trick/scoring invariants.
+- **Extended Property Tests:** Verify correctness for dealing, progression, scoring, bidding, and serialization invariants (bidding, tricks, legality, consistency already covered).
 **Progress:** Service suites assert Problem Details codes for invalid bids/plays, while `domain/tests_props_*.rs` proptest suites lock in trick legality, scoring, and consistency invariants (with regression seeds tracked).  
-**Acceptance:** Error cases handled consistently; all properties hold across generated games.
+**Acceptance:** Error cases handled consistently; all properties hold across generated games; invariants verified for dealing, progression, scoring, bidding, and serialization.
 
 ---
 
@@ -214,31 +217,60 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 ### 🟨 **19. Documentation & Decision Log**
 **Dependencies:** 11  
 **Details:**
-- README: setup and reset flow.
-- CONTRIBUTING: module layout, extractor policy, `_test` guard.
-- DECISIONS.md: locked technical decisions.
+- **README:** Setup and reset flow; architecture explanation.
+- **CONTRIBUTING:** Module layout, extractor policy, `_test` guard.
+- **DECISIONS.md:** Locked technical decisions.
+- **Inline Comments:** Add comments for complex logic (e.g., JWT refresh).
+- **JSDoc Documentation:** Add JSDoc for public APIs and complex functions.
 **Progress:** `.cursorrules` and roadmap current; README/CONTRIBUTING need refresh for layering and DTO policies.  
-**Acceptance:** New developers can onboard independently.
+**Acceptance:** New developers can onboard independently; architecture is documented; complex logic is explained inline; APIs have JSDoc comments.
 
 ---
 
 ### 🕓 **20. Observability & Stability**
 **Dependencies:** 5, 11  
 **Details:**
-- Logs include `user_id` and `game_id` when relevant.
-- Frontend displays `trace_id` on error surfaces.
-- `/health` endpoint checks DB connectivity.
+- **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id` when relevant.
+- **Frontend Trace Display:** Frontend displays `trace_id` on error surfaces.
+- **Health Endpoint:** Add `/health` route reporting DB connectivity and version info.
 **Progress:** Trace IDs active; enrichment and health route pending.  
-**Acceptance:** Logs actionable; trace ID visible end-to-end.
+**Acceptance:** Logs actionable; trace ID visible end-to-end; endpoint returns up/down status with trace context.
 
 ---
 
 ### 🕓 **21. Open Source Observability Stack**
 **Dependencies:** 18, 10  
 **Details:**
-- Grafana, Tempo, Loki, and Prometheus in Docker Compose.
+- **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus in Docker Compose for full observability.
 **Progress:** Docker baseline complete; observability stack not yet deployed.  
-**Acceptance:** Metrics, logs, and traces integrated and viewable.
+**Acceptance:** Metrics, logs, and traces visible in dashboards.
+
+---
+
+### **22. Accessibility (a11y)**
+**Dependencies:** 11, 15  
+**Details:**
+- **Keyboard-First Play:** Full keyboard navigation and control for all game interactions (card selection, bidding, trump selection, card play).  
+  - Lobby: Tab navigation through toolbar → header → game rows; Arrow Up/Down navigate rows; Enter joins; `r` refresh; `c` create; `f` focus search.
+  - Game Room: `?` shortcuts menu; `g l` Lobby; `s` Sidebar; Hand (Arrows/Home/End/Enter/Esc); Bidding (number keys/Up/Down/Enter/Esc); Ready `y`; Start `Shift+S` (host confirm).
+- **Focus Management:** Visible focus indicators, logical tab order, focus trapping in dialogs, focus restoration after actions.
+- **ARIA Labels & Semantics:** 
+  - All interactive elements have descriptive `aria-label` attributes (e.g., "Seven of Hearts, legal" for cards).
+  - Semantic HTML (`<table>` for lobby, proper heading hierarchy, live regions for phase/turn announcements).
+  - Contextual aria-labels that describe button state (pending, disabled, selected).
+- **Color Contrast:** Minimum 4.5:1 contrast ratio for all text and interactive elements.
+- **Motion Preferences:** Honor `prefers-reduced-motion` for animations (150–200ms ease-out for play/trick-win animations).
+- **Screen Reader Support:** Live regions for phase/turn changes, proper announcements for game state updates.
+- **Enhanced Accessibility:** Continue improving beyond current aria-label implementation (form inputs, complex interactions, error states).
+**Acceptance:** Fully keyboard-operable gameplay; a11y checks pass basic audit (WCAG 2.1 Level AA); screen reader testing confirms usability; motion preferences respected.
+
+---
+
+### **23. Internationalisation Foundations**
+**Dependencies:** 11, 15  
+**Details:**
+- **Internationalisation Foundations:** Define and implement the initial i18n strategy (framework choice, locale loading, placeholder translations) with scope finalised before execution.  
+**Acceptance:** Core tooling and process for multiple locales is in place, even if only one language ships initially.
 
 ---
 
@@ -263,17 +295,12 @@ Independent improvements that enhance robustness, performance, and developer exp
 - **PII-Safe Logging:** Mask or hash sensitive identifiers in logs.  
 - **Error Code Catalog:** Centralize all SCREAMING_SNAKE error codes.  
 - **Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.  
-- **Determinism Tools:** Introduce injectable clock, seeded RNG, and mock time for reproducible tests.  
 
 *Progress:* Transactional harness and DTO structure already support deterministic time injection and data hygiene hooks.
 
 ---
 
-### **3. Extractors, Testing, and Validation**
-- **Extractor Unification:** Ensure all routes use `ValidatedJson<T>`, `AuthToken`, `CurrentUser`, `GameId`, and `GameMembership`.  
-  *Acceptance:* Input validation consistent across all handlers.
-- **Extended Property Tests:** Verify correctness for dealing, progression, scoring, bidding, and serialization invariants.  
-  *Acceptance:* Invariants hold across generated games.  
+### **3. Testing & Validation Enhancements**
 - **Golden Snapshot Fixtures:** Canonical JSON snapshots for all game phases, shared between frontend and backend.  
   *Acceptance:* Schema or logic changes surface as test diffs.  
 - **Deterministic AI Simulation:** Replay identical seeded games for regression testing.  
@@ -281,31 +308,21 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **4. Developer Experience & Frontend Quality**
+### **4. Frontend Experience Enhancements**
+- **React Query Adoption:** Introduce React Query for client data fetching (lobby lists, game snapshots) while keeping room for future caching/state patterns.
+  - Addresses polling inefficiency (requests made even when nothing changed).
+  - Provides request deduplication automatically.
+  - Enables optimistic updates for game actions (bid, play, etc.).
+  - Improves caching and state synchronization.
+  - **Offline Detection and Retry Logic:** React Query provides automatic retry logic with configurable retry attempts and exponential backoff. Combined with network status detection, this enables graceful handling of offline scenarios and automatic retry when connectivity is restored.
+  *Acceptance:* Critical frontend requests flow through React Query with documented fetch policies; polling is optimized; request deduplication works; optimistic updates are implemented where appropriate; application gracefully handles offline scenarios and retries failed requests when connectivity is restored.
 - **Import Hygiene & Lazy Loading:** Standardized import order, type-only imports, and dynamic loading for heavy libraries.  
-  *Acceptance:* Consistent imports and improved build performance.  
-- **Documentation Enhancements:** Add `DECISIONS.md`, `CONTRIBUTING.md`, and `_test` guard docs.  
-  *Acceptance:* Onboarding and contribution processes are self-contained.  
+  *Acceptance:* Consistent imports and improved build performance.
 - **Frontend Polish:** Continue refining UI clarity and responsiveness beyond Round 1.
 
 ---
 
-### **5. Observability & Health**
-- **Health Endpoint:** Add `/health` route reporting DB connectivity and version info.  
-  *Acceptance:* Endpoint returns up/down status with trace context.  
-- **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus for full observability.  
-  *Acceptance:* Metrics, logs, and traces visible in dashboards.  
-- **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id`.
-
----
-
-### **6. Frontend Experience Enhancements**
-- **React Query Adoption:** Introduce React Query for client data fetching (lobby lists, game snapshots) while keeping room for future caching/state patterns.  
-  *Acceptance:* Critical frontend requests flow through React Query with documented fetch policies.
-
----
-
-### **7. AI & Simulation Initiatives**
+### **5. AI & Simulation Initiatives**
 - **AI Profile Discovery & Registry Alignment:** Audit current AI profile usage, enable discovery, and either sync profiles into the existing registry or replace the registry with profile-driven loading.  
   *Acceptance:* Contributors can register/discover AIs via a single authoritative source with clear onboarding steps.
 - **Multi-Engine AI Implementation Drive:** Coordinate all simulation/production engines to deliver best-possible AI implementations aligned with the AI Player guide.  
@@ -315,6 +332,14 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **8. Internationalisation Foundations**
-- **Internationalisation Foundations:** Define and implement the initial i18n strategy (framework choice, locale loading, placeholder translations) with scope finalised before execution.  
-  *Acceptance:* Core tooling and process for multiple locales is in place, even if only one language ships initially.
+### **6. Code Organization & Refactoring**
+- **Refactor `game-room-client.tsx`:** The component is 791 lines with complex state management that could benefit from a reducer pattern.  
+  *Acceptance:* Component is refactored with improved state management; complexity is reduced; maintainability is improved.
+
+---
+
+### **7. Future Architecture Considerations**
+- **State Management Library:** Consider using a state management library (Redux/Zustand) for complex game state if needed.  
+  *Acceptance:* Decision made on whether external state management is needed; if adopted, implementation is complete.
+- **Component-Level Lazy Loading:** Add component-level lazy loading as an optimization for heavy components.  
+  *Acceptance:* Heavy components are lazy-loaded; bundle size and initial load time are improved.
