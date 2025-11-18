@@ -2,15 +2,14 @@ use sea_orm::DatabaseTransaction;
 use tracing::{debug, info};
 
 use super::GameFlowService;
-use crate::adapters::games_sea::{self, GameUpdateRound, GameUpdateState};
 use crate::domain::bidding::{validate_consecutive_zero_bids, Bid};
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::{card_beats, Card, Suit};
-use crate::entities::games;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{ConflictKind, DomainError, ValidationKind};
-use crate::repos::{bids, player_view, plays, rounds, tricks};
+use crate::repos::games::Game;
+use crate::repos::{bids, games, player_view, plays, rounds, tricks};
 
 impl GameFlowService {
     /// Submit a bid for a player in the current round.
@@ -30,12 +29,12 @@ impl GameFlowService {
         player_seat: i16,
         bid_value: u8,
         expected_lock_version: Option<i32>,
-    ) -> Result<games::Model, AppError> {
+    ) -> Result<Game, AppError> {
         self.submit_bid_internal(txn, game_id, player_seat, bid_value, expected_lock_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
         // Reload game after state processing to get final lock_version
-        let final_game = games_sea::require_game(txn, game_id).await?;
+        let final_game = games::require_game(txn, game_id).await?;
         Ok(final_game)
     }
 
@@ -55,11 +54,11 @@ impl GameFlowService {
         player_seat: i16,
         bid_value: u8,
         expected_lock_version: Option<i32>,
-    ) -> Result<games::Model, AppError> {
+    ) -> Result<Game, AppError> {
         debug!(game_id, player_seat, bid_value, "Submitting bid");
 
         // Load game
-        let game = games_sea::require_game(txn, game_id).await?;
+        let game = games::require_game(txn, game_id).await?;
 
         // Validate lock version if provided (optimistic locking)
         if let Some(expected_version) = expected_lock_version {
@@ -171,8 +170,8 @@ impl GameFlowService {
         // This ensures each bid increments the version, not just state transitions
         // Use expected_lock_version if provided, otherwise use the current lock_version from the game
         let lock_version_to_use = expected_lock_version.unwrap_or(game.lock_version);
-        let lock_bump = GameUpdateRound::new(game_id, lock_version_to_use);
-        let updated_game = games_sea::update_round(txn, lock_bump).await?;
+        let updated_game =
+            games::update_round(txn, game_id, lock_version_to_use, None, None, None).await?;
 
         Ok(updated_game)
     }
@@ -194,12 +193,12 @@ impl GameFlowService {
         player_seat: i16,
         trump: rounds::Trump,
         expected_lock_version: Option<i32>,
-    ) -> Result<games::Model, AppError> {
+    ) -> Result<Game, AppError> {
         self.set_trump_internal(txn, game_id, player_seat, trump, expected_lock_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
         // Reload game after state processing to get final lock_version
-        let final_game = games_sea::require_game(txn, game_id).await?;
+        let final_game = games::require_game(txn, game_id).await?;
         Ok(final_game)
     }
 
@@ -213,11 +212,11 @@ impl GameFlowService {
         player_seat: i16,
         trump: rounds::Trump,
         expected_lock_version: Option<i32>,
-    ) -> Result<games::Model, AppError> {
+    ) -> Result<Game, AppError> {
         info!(game_id, player_seat, trump = ?trump, "Setting trump");
 
         // Load game
-        let game = games_sea::require_game(txn, game_id).await?;
+        let game = games::require_game(txn, game_id).await?;
 
         // Validate lock version if provided (optimistic locking)
         if let Some(expected_version) = expected_lock_version {
@@ -287,7 +286,7 @@ impl GameFlowService {
         );
 
         // Return the game (lock_version may be updated by state transition)
-        let updated_game = games_sea::require_game(txn, game_id).await?;
+        let updated_game = games::require_game(txn, game_id).await?;
         Ok(updated_game)
     }
 
@@ -308,12 +307,12 @@ impl GameFlowService {
         player_seat: i16,
         card: Card,
         expected_lock_version: Option<i32>,
-    ) -> Result<games::Model, AppError> {
+    ) -> Result<Game, AppError> {
         self.play_card_internal(txn, game_id, player_seat, card, expected_lock_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
         // Reload game after state processing to get final lock_version
-        let final_game = games_sea::require_game(txn, game_id).await?;
+        let final_game = games::require_game(txn, game_id).await?;
         Ok(final_game)
     }
 
@@ -327,11 +326,11 @@ impl GameFlowService {
         player_seat: i16,
         card: Card,
         expected_lock_version: Option<i32>,
-    ) -> Result<games::Model, AppError> {
+    ) -> Result<Game, AppError> {
         debug!(game_id, player_seat, "Playing card");
 
         // Load game
-        let game = games_sea::require_game(txn, game_id).await?;
+        let game = games::require_game(txn, game_id).await?;
 
         // Validate lock version if provided (optimistic locking)
         if let Some(expected_version) = expected_lock_version {
@@ -442,8 +441,8 @@ impl GameFlowService {
         // This ensures each card play increments the version (consistent with bid behavior)
         // Use expected_lock_version if provided, otherwise use the current lock_version from the game
         let lock_version_to_use = expected_lock_version.unwrap_or(game.lock_version);
-        let lock_bump = GameUpdateRound::new(game_id, lock_version_to_use);
-        let updated_game = games_sea::update_round(txn, lock_bump).await?;
+        let updated_game =
+            games::update_round(txn, game_id, lock_version_to_use, None, None, None).await?;
 
         Ok(updated_game)
     }
@@ -460,7 +459,7 @@ impl GameFlowService {
         debug!(game_id, "Resolving trick");
 
         // Load game
-        let game = games_sea::require_game(txn, game_id).await?;
+        let game = games::require_game(txn, game_id).await?;
 
         if game.state != DbGameState::TrickPlay {
             return Err(DomainError::validation(
@@ -564,13 +563,18 @@ impl GameFlowService {
                 trick_no = current_trick_no,
                 "All tricks complete, transitioning to Scoring"
             );
-            let update = GameUpdateState::new(game_id, DbGameState::Scoring, game.lock_version);
-            games_sea::update_state(txn, update).await?;
+            games::update_state(txn, game_id, DbGameState::Scoring, game.lock_version).await?;
         } else {
             // Advance to next trick
-            let update = GameUpdateRound::new(game_id, game.lock_version)
-                .with_current_trick_no(next_trick_no);
-            games_sea::update_round(txn, update).await?;
+            games::update_round(
+                txn,
+                game_id,
+                game.lock_version,
+                None,
+                None,
+                Some(next_trick_no),
+            )
+            .await?;
             info!(
                 game_id,
                 trick_no = current_trick_no,

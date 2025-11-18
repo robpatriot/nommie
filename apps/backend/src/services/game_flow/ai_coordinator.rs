@@ -7,7 +7,7 @@ use crate::entities::ai_profiles;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, memberships, player_view, plays, rounds, tricks};
+use crate::repos::{bids, games, memberships, player_view, plays, rounds, tricks};
 
 /// Type of action needed from a player.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,7 +28,7 @@ impl GameFlowService {
     pub(super) async fn check_and_execute_ai_action_with_cache(
         &self,
         txn: &DatabaseTransaction,
-        game: &crate::entities::games::Model,
+        game: &games::Game,
         round_cache: Option<&crate::services::round_cache::RoundCache>,
         game_history: Option<&crate::domain::player_view::GameHistory>,
     ) -> Result<bool, AppError> {
@@ -193,7 +193,7 @@ impl GameFlowService {
             // Build current round info - use cache if available
             let state = if let Some(cache) = round_cache {
                 // Fast path: Use cached data
-                let game_model = crate::adapters::games_sea::require_game(txn, game.id).await?;
+                let game_model = crate::repos::games::require_game(txn, game.id).await?;
                 cache
                     .build_current_round_info(
                         txn,
@@ -364,7 +364,7 @@ impl GameFlowService {
     async fn determine_next_action(
         &self,
         txn: &DatabaseTransaction,
-        game: &crate::entities::games::Model,
+        game: &games::Game,
     ) -> Result<Option<(i16, ActionType)>, AppError> {
         match game.state {
             DbGameState::Lobby | DbGameState::Dealing | DbGameState::BetweenRounds => {

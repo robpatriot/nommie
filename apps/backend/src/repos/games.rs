@@ -9,12 +9,55 @@ use crate::entities::games::GameState as DbGameState;
 use crate::errors::domain::DomainError;
 
 /// Game domain model
+///
+/// This represents a game in the domain layer, with all fields needed for
+/// game logic and state management. It's converted from the database model
+/// (games::Model) when loaded through repos functions.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Game {
     pub id: i64,
-    pub join_code: String,
+    pub created_by: Option<i64>,
+    pub visibility: games::GameVisibility,
+    pub state: DbGameState,
     pub created_at: time::OffsetDateTime,
     pub updated_at: time::OffsetDateTime,
+    pub started_at: Option<time::OffsetDateTime>,
+    pub ended_at: Option<time::OffsetDateTime>,
+    pub name: Option<String>,
+    pub join_code: Option<String>,
+    pub rules_version: String,
+    pub rng_seed: Option<i64>,
+    pub current_round: Option<i16>,
+    pub starting_dealer_pos: Option<i16>,
+    pub current_trick_no: i16,
+    pub current_round_id: Option<i64>,
+    pub lock_version: i32,
+}
+
+impl Game {
+    /// Computes the current hand size based on the current round number.
+    /// Returns None if current_round is None or out of valid range.
+    pub fn hand_size(&self) -> Option<i16> {
+        use crate::domain::rules;
+
+        let round_no = self.current_round?;
+        if !(1..=26).contains(&round_no) {
+            return None;
+        }
+
+        rules::hand_size_for_round(round_no as u8).map(|hs| hs as i16)
+    }
+
+    /// Computes the current dealer position based on starting dealer and current round.
+    /// Returns None if either starting_dealer_pos or current_round is None.
+    pub fn dealer_pos(&self) -> Option<i16> {
+        let starting = self.starting_dealer_pos?;
+        let round = self.current_round?;
+
+        // Dealer rotates each round: (starting_dealer + round_no - 1) % 4
+        // Subtract 1 because round_no starts at 1, not 0
+        Some((starting + (round - 1)) % 4)
+    }
 }
 
 // Free functions (generic) mirroring the previous trait methods
@@ -40,6 +83,59 @@ pub async fn create_game(
     dto: games_adapter::GameCreate,
 ) -> Result<Game, DomainError> {
     let game = games_adapter::create_game(txn, dto).await?;
+    Ok(Game::from(game))
+}
+
+/// Find game by ID or return error if not found.
+///
+/// This is a convenience helper that converts `None` into a DomainError,
+/// eliminating the repetitive `ok_or_else` pattern when a game must exist.
+pub async fn require_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Game, DomainError> {
+    let game = games_adapter::require_game(conn, game_id).await?;
+    Ok(Game::from(game))
+}
+
+/// Update game state with optimistic locking.
+///
+/// Updates the game's state field and increments lock_version atomically.
+/// Returns the updated game model.
+pub async fn update_state(
+    txn: &DatabaseTransaction,
+    id: i64,
+    state: DbGameState,
+    current_lock_version: i32,
+) -> Result<Game, DomainError> {
+    let dto = games_adapter::GameUpdateState::new(id, state, current_lock_version);
+    let game = games_adapter::update_state(txn, dto).await?;
+    Ok(Game::from(game))
+}
+
+/// Update game round data with optimistic locking.
+///
+/// Updates round-related fields (current_round, starting_dealer_pos, current_trick_no)
+/// and increments lock_version atomically. Returns the updated game model.
+pub async fn update_round(
+    txn: &DatabaseTransaction,
+    id: i64,
+    current_lock_version: i32,
+    current_round: Option<i16>,
+    starting_dealer_pos: Option<i16>,
+    current_trick_no: Option<i16>,
+) -> Result<Game, DomainError> {
+    let mut dto = games_adapter::GameUpdateRound::new(id, current_lock_version);
+    if let Some(round) = current_round {
+        dto = dto.with_current_round(round);
+    }
+    if let Some(pos) = starting_dealer_pos {
+        dto = dto.with_starting_dealer_pos(pos);
+    }
+    if let Some(trick_no) = current_trick_no {
+        dto = dto.with_current_trick_no(trick_no);
+    }
+    let game = games_adapter::update_round(txn, dto).await?;
     Ok(Game::from(game))
 }
 
@@ -70,9 +166,22 @@ impl From<games::Model> for Game {
     fn from(model: games::Model) -> Self {
         Self {
             id: model.id,
-            join_code: model.join_code.unwrap_or_default(),
+            created_by: model.created_by,
+            visibility: model.visibility,
+            state: model.state,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            started_at: model.started_at,
+            ended_at: model.ended_at,
+            name: model.name,
+            join_code: model.join_code,
+            rules_version: model.rules_version,
+            rng_seed: model.rng_seed,
+            current_round: model.current_round,
+            starting_dealer_pos: model.starting_dealer_pos,
+            current_trick_no: model.current_trick_no,
+            current_round_id: model.current_round_id,
+            lock_version: model.lock_version,
         }
     }
 }

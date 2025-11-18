@@ -2,7 +2,6 @@
 
 use sea_orm::ConnectionTrait;
 
-use crate::adapters::games_sea;
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::player_view::{CurrentRoundInfo, GameHistory, RoundHistory, RoundScoreDetail};
 use crate::domain::{Card, Trump};
@@ -18,7 +17,7 @@ pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
     player_seat: i16,
 ) -> Result<CurrentRoundInfo, AppError> {
     // Load game
-    let game = games_sea::require_game(conn, game_id).await?;
+    let game = games::require_game(conn, game_id).await?;
 
     let current_round = game.current_round.ok_or_else(|| {
         DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")

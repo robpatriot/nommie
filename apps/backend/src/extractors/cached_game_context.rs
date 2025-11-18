@@ -13,12 +13,11 @@ use actix_web::{FromRequest, HttpMessage, HttpRequest};
 
 use super::game_id::GameId;
 use super::game_membership::GameMembership;
-use crate::adapters::games_sea;
 use crate::db::require_db;
 use crate::db::txn::SharedTxn;
 use crate::domain::game_context::GameContext;
 use crate::error::AppError;
-use crate::repos::player_view;
+use crate::repos::{games, player_view};
 use crate::state::app_state::AppState;
 
 /// Request-scoped cached game context.
@@ -120,7 +119,7 @@ impl FromRequest for CachedGameContext {
                 let txn = shared_txn.transaction();
 
                 // Load game to check if it has started
-                let game = games_sea::require_game(txn, game_id.0).await?;
+                let game = games::require_game(txn, game_id.0).await?;
 
                 // If game has started, load history and round info
                 if game.current_round.is_some() {
@@ -136,7 +135,7 @@ impl FromRequest for CachedGameContext {
                 let db = require_db(app_state)?;
 
                 // Load game to check if it has started
-                let game = games_sea::require_game(db, game_id.0).await?;
+                let game = games::require_game(db, game_id.0).await?;
 
                 // If game has started, load history and round info
                 if game.current_round.is_some() {

@@ -2,7 +2,7 @@
 
 use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder};
 
-use crate::adapters::games_sea::{self, GameCreate};
+use crate::adapters::games_sea::GameCreate;
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::state::{GameState, Phase, RoundState};
 use crate::domain::{Card, Suit, Trump};
@@ -10,6 +10,7 @@ use crate::entities::game_players;
 use crate::entities::games::{self, GameState as DbGameState, GameVisibility};
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
+use crate::repos::games::Game;
 use crate::repos::memberships::GameRole;
 use crate::repos::{bids, games as games_repo, hands, memberships, plays, rounds, scores, tricks};
 use crate::utils::join_code::generate_join_code;
@@ -28,7 +29,7 @@ impl GameService {
         game_id: i64,
     ) -> Result<GameState, AppError> {
         // 1. Load game record
-        let game = games_sea::require_game(txn, game_id).await?;
+        let game = games_repo::require_game(txn, game_id).await?;
 
         // 2. Check if game has started (has a current round)
         let current_round_no = match game.current_round {
@@ -261,7 +262,7 @@ impl GameService {
         txn: &DatabaseTransaction,
         user_id: i64,
         name: Option<String>,
-    ) -> Result<(games::Model, Vec<memberships::GameMembership>), AppError> {
+    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
         const MAX_RETRIES: usize = 5;
 
         // Generate join code and create game with retry logic.
@@ -299,28 +300,12 @@ impl GameService {
                     .await
                     .map_err(AppError::from)?;
 
-                    // Fetch game entity and all memberships
-                    let game_model = games_sea::find_by_id(txn, game.id)
-                        .await
-                        .map_err(|e| {
-                            AppError::internal(
-                                crate::errors::ErrorCode::InternalError,
-                                format!("failed to fetch game: {e}"),
-                                e,
-                            )
-                        })?
-                        .ok_or_else(|| {
-                            AppError::not_found(
-                                crate::errors::ErrorCode::GameNotFound,
-                                format!("Game {} not found after creation", game.id),
-                            )
-                        })?;
-
+                    // Fetch game and all memberships
                     let all_memberships = memberships::find_all_by_game(txn, game.id)
                         .await
                         .map_err(AppError::from)?;
 
-                    return Ok((game_model, all_memberships));
+                    return Ok((game, all_memberships));
                 }
                 Err(AppError::Conflict {
                     code: crate::errors::ErrorCode::JoinCodeConflict,
@@ -358,7 +343,7 @@ impl GameService {
     pub async fn list_joinable_games(
         &self,
         txn: &DatabaseTransaction,
-    ) -> Result<Vec<(games::Model, Vec<memberships::GameMembership>)>, AppError> {
+    ) -> Result<Vec<(Game, Vec<memberships::GameMembership>)>, AppError> {
         let lobby_games = games::Entity::find()
             .filter(games::Column::State.eq(DbGameState::Lobby))
             .order_by_desc(games::Column::UpdatedAt)
@@ -367,7 +352,8 @@ impl GameService {
             .map_err(AppError::from)?;
 
         let mut results = Vec::new();
-        for game in lobby_games {
+        for game_model in lobby_games {
+            let game = Game::from(game_model);
             let memberships = memberships::find_all_by_game(txn, game.id)
                 .await
                 .map_err(AppError::from)?;
@@ -392,7 +378,7 @@ impl GameService {
     pub async fn list_active_games(
         &self,
         txn: &DatabaseTransaction,
-    ) -> Result<Vec<(games::Model, Vec<memberships::GameMembership>)>, AppError> {
+    ) -> Result<Vec<(Game, Vec<memberships::GameMembership>)>, AppError> {
         let active_states = [
             DbGameState::Dealing,
             DbGameState::Bidding,
@@ -410,7 +396,8 @@ impl GameService {
             .map_err(AppError::from)?;
 
         let mut results = Vec::with_capacity(active_games.len());
-        for game in active_games {
+        for game_model in active_games {
+            let game = Game::from(game_model);
             let memberships = memberships::find_all_by_game(txn, game.id)
                 .await
                 .map_err(AppError::from)?;
@@ -505,9 +492,9 @@ impl GameService {
         txn: &DatabaseTransaction,
         game_id: i64,
         user_id: i64,
-    ) -> Result<(games::Model, Vec<memberships::GameMembership>), AppError> {
+    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
         // Fetch game and verify it exists
-        let game_model = games_sea::find_by_id(txn, game_id)
+        let game = games_repo::find_by_id(txn, game_id)
             .await
             .map_err(|e| {
                 AppError::internal(
@@ -524,12 +511,12 @@ impl GameService {
             })?;
 
         // Verify game is in LOBBY state
-        if game_model.state != DbGameState::Lobby {
+        if game.state != DbGameState::Lobby {
             return Err(AppError::bad_request(
                 crate::errors::ErrorCode::PhaseMismatch,
                 format!(
                     "Game is not in LOBBY state (current state: {:?})",
-                    game_model.state
+                    game.state
                 ),
             ));
         }
@@ -592,6 +579,6 @@ impl GameService {
             .await
             .map_err(AppError::from)?;
 
-        Ok((game_model, updated_memberships))
+        Ok((game, updated_memberships))
     }
 }

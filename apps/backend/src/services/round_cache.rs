@@ -12,7 +12,7 @@ use crate::domain::{Card, Trump};
 use crate::entities::ai_profiles;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, games, hands, rounds};
+use crate::repos::{bids, games as games_repo, hands, rounds};
 
 /// Cached immutable data for a round.
 ///
@@ -57,10 +57,8 @@ impl RoundCache {
         game_id: i64,
         round_no: i16,
     ) -> Result<Self, AppError> {
-        use crate::adapters::games_sea;
-
         // Load game to get hand_size and dealer_pos
-        let game = games_sea::require_game(txn, game_id).await?;
+        let game = games_repo::require_game(txn, game_id).await?;
 
         // Load round
         let round = rounds::find_by_game_and_round(txn, game_id, round_no)
@@ -195,7 +193,7 @@ impl RoundCache {
         use crate::repos::{plays, tricks};
 
         // Convert database state to domain phase
-        let phase = games::db_game_state_to_phase(&game_state, current_trick_no);
+        let phase = games_repo::db_game_state_to_phase(&game_state, current_trick_no);
 
         // Load fresh bids if in Bidding phase (bids are mutable during this phase)
         // Otherwise use cached bids (immutable after bidding completes)

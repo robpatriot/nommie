@@ -9,7 +9,6 @@ use rand::random;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-use crate::adapters::games_sea::{self, GameUpdateRound};
 use crate::ai::{registry, HeuristicV1, RandomPlayer};
 use crate::db::txn::with_txn;
 use crate::domain::bidding::validate_consecutive_zero_bids;
@@ -25,7 +24,7 @@ use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::{game_etag, ExpectedVersion};
 use crate::repos::memberships::{self, GameRole};
-use crate::repos::{ai_overrides, ai_profiles, player_view, rounds, users};
+use crate::repos::{ai_overrides, ai_profiles, games as games_repo, player_view, rounds, users};
 use crate::services::ai::{AiInstanceOverrides, AiService};
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
@@ -89,7 +88,7 @@ async fn get_snapshot(
         with_txn(Some(&http_req), &app_state, |txn| {
             Box::pin(async move {
                 // Fetch game from database to get lock_version
-                let game = games_sea::find_by_id(txn, id)
+                let game = games_repo::find_by_id(txn, id)
                     .await
                     .map_err(|e| AppError::db("failed to fetch game", e))?
                     .ok_or_else(|| {
@@ -413,9 +412,9 @@ fn game_visibility_to_string(visibility: &GameVisibility) -> String {
     }
 }
 
-/// Helper function to convert game entity + memberships to frontend Game format
+/// Helper function to convert game domain model + memberships to frontend Game format
 fn game_to_response(
-    game_model: &crate::entities::games::Model,
+    game: &crate::repos::games::Game,
     memberships: &[memberships::GameMembership],
     viewer_user_id: Option<i64>,
 ) -> GameResponse {
@@ -435,23 +434,23 @@ fn game_to_response(
 
     // Check if viewer is the host (creator of the game)
     let viewer_is_host = viewer_user_id
-        .and_then(|id| game_model.created_by.map(|created_by| created_by == id))
+        .and_then(|id| game.created_by.map(|created_by| created_by == id))
         .unwrap_or(false);
 
     GameResponse {
-        id: game_model.id,
-        name: game_model
+        id: game.id,
+        name: game
             .name
             .clone()
-            .unwrap_or_else(|| format!("Game {}", game_model.id)),
-        state: game_state_to_string(&game_model.state),
-        visibility: game_visibility_to_string(&game_model.visibility),
-        created_by: game_model.created_by.unwrap_or(0),
-        created_at: game_model.created_at.to_string(),
-        updated_at: game_model.updated_at.to_string(),
-        started_at: game_model.started_at.map(|dt| dt.to_string()),
-        ended_at: game_model.ended_at.map(|dt| dt.to_string()),
-        current_round: game_model.current_round,
+            .unwrap_or_else(|| format!("Game {}", game.id)),
+        state: game_state_to_string(&game.state),
+        visibility: game_visibility_to_string(&game.visibility),
+        created_by: game.created_by.unwrap_or(0),
+        created_at: game.created_at.to_string(),
+        updated_at: game.updated_at.to_string(),
+        started_at: game.started_at.map(|dt| dt.to_string()),
+        ended_at: game.ended_at.map(|dt| dt.to_string()),
+        current_round: game.current_round,
         player_count,
         max_players: 4,
         viewer_is_member,
@@ -714,7 +713,7 @@ async fn add_ai_seat(
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_sea::find_by_id(txn, id)
+            let game = games_repo::find_by_id(txn, id)
                 .await
                 .map_err(|e| AppError::db("failed to fetch game", e))?
                 .ok_or_else(|| {
@@ -897,7 +896,7 @@ async fn add_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            games_sea::update_round(txn, GameUpdateRound::new(id, game.lock_version))
+            games_repo::update_round(txn, id, game.lock_version, None, None, None)
                 .await
                 .map_err(AppError::from)?;
 
@@ -931,7 +930,7 @@ async fn remove_ai_seat(
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_sea::find_by_id(txn, id)
+            let game = games_repo::find_by_id(txn, id)
                 .await
                 .map_err(|e| AppError::db("failed to fetch game", e))?
                 .ok_or_else(|| {
@@ -1035,7 +1034,7 @@ async fn remove_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            games_sea::update_round(txn, GameUpdateRound::new(id, game.lock_version))
+            games_repo::update_round(txn, id, game.lock_version, None, None, None)
                 .await
                 .map_err(AppError::from)?;
 
@@ -1073,7 +1072,7 @@ async fn update_ai_seat(
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_sea::find_by_id(txn, id)
+            let game = games_repo::find_by_id(txn, id)
                 .await
                 .map_err(|e| AppError::db("failed to fetch game", e))?
                 .ok_or_else(|| {
@@ -1183,7 +1182,7 @@ async fn update_ai_seat(
                 }
             }
 
-            games_sea::update_round(txn, GameUpdateRound::new(id, game.lock_version))
+            games_repo::update_round(txn, id, game.lock_version, None, None, None)
                 .await
                 .map_err(AppError::from)?;
 
@@ -1336,7 +1335,7 @@ async fn delete_game(
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             // Load game to verify it exists, check host authorization, and validate lock version
-            let game = games_sea::require_game(txn, id).await?;
+            let game = games_repo::require_game(txn, id).await?;
 
             // Check host authorization
             let is_host = match game.created_by {

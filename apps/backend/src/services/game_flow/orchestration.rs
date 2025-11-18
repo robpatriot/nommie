@@ -2,12 +2,10 @@ use sea_orm::DatabaseTransaction;
 use tracing::{debug, info};
 
 use super::GameFlowService;
-use crate::adapters::games_sea::{self, GameUpdateRound, GameUpdateState};
-use crate::adapters::memberships_sea;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, memberships, player_view, plays, rounds, tricks};
+use crate::repos::{bids, games, memberships, player_view, plays, rounds, tricks};
 
 impl GameFlowService {
     /// Check if all players are ready and start the game if conditions are met.
@@ -24,7 +22,7 @@ impl GameFlowService {
         let all_ready = all_memberships.iter().all(|m| m.is_ready);
 
         if all_ready && all_memberships.len() == 4 {
-            let game = games_sea::require_game(txn, game_id).await?;
+            let game = games::require_game(txn, game_id).await?;
 
             // Only auto-start from the lobby; completed games (or other states) should not deal again.
             if game.state == DbGameState::Completed {
@@ -76,11 +74,7 @@ impl GameFlowService {
             })?;
 
         // Mark ready
-        let dto = memberships_sea::MembershipSetReady {
-            id: membership.id,
-            is_ready: true,
-        };
-        memberships_sea::set_membership_ready(txn, dto).await?;
+        memberships::set_membership_ready(txn, membership.id, true).await?;
 
         info!(game_id, user_id, "Player marked ready");
 
@@ -119,7 +113,7 @@ impl GameFlowService {
         let mut game_history: Option<crate::domain::player_view::GameHistory> = None;
 
         for _iteration in 0..MAX_ITERATIONS {
-            let game = games_sea::require_game(txn, game_id).await?;
+            let game = games::require_game(txn, game_id).await?;
 
             // Priority 1: Check if we need a state transition
             if self.check_and_apply_transition_internal(txn, &game).await? {
@@ -208,7 +202,7 @@ impl GameFlowService {
     pub(super) async fn check_and_apply_transition_internal(
         &self,
         txn: &DatabaseTransaction,
-        game: &crate::entities::games::Model,
+        game: &games::Game,
     ) -> Result<bool, AppError> {
         match game.state {
             DbGameState::Bidding => {
@@ -231,12 +225,13 @@ impl GameFlowService {
                 let bid_count = bids::count_bids_by_round(txn, round.id).await?;
                 if bid_count == 4 {
                     // All bids placed - transition to Trump Selection
-                    let update = GameUpdateState::new(
+                    games::update_state(
+                        txn,
                         game.id,
                         DbGameState::TrumpSelection,
                         game.lock_version,
-                    );
-                    games_sea::update_state(txn, update).await?;
+                    )
+                    .await?;
                     info!(game.id, "All bids placed, transitioning to Trump Selection");
                     debug!(game.id, "Transition: Bidding -> TrumpSelection");
                     return Ok(true);
@@ -261,18 +256,25 @@ impl GameFlowService {
 
                 if round.trump.is_some() {
                     // Trump is set - transition to TrickPlay and initialize to trick 1
-                    let updated_game = games_sea::require_game(txn, game.id).await?;
-                    let update = GameUpdateState::new(
+                    let updated_game = games::require_game(txn, game.id).await?;
+                    let updated_game = games::update_state(
+                        txn,
                         game.id,
                         DbGameState::TrickPlay,
                         updated_game.lock_version,
-                    );
-                    let updated_game = games_sea::update_state(txn, update).await?;
+                    )
+                    .await?;
 
                     // Initialize current_trick_no to 1 (first trick)
-                    let update_trick = GameUpdateRound::new(game.id, updated_game.lock_version)
-                        .with_current_trick_no(1);
-                    games_sea::update_round(txn, update_trick).await?;
+                    games::update_round(
+                        txn,
+                        game.id,
+                        updated_game.lock_version,
+                        None,
+                        None,
+                        Some(1),
+                    )
+                    .await?;
 
                     info!(game.id, "Trump set, transitioning to Trick Play");
                     debug!(game.id, "Transition: TrumpSelection -> TrickPlay");

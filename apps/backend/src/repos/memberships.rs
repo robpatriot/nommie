@@ -153,6 +153,29 @@ pub async fn delete_membership(
     Ok(())
 }
 
+/// Set the ready status of a membership.
+pub async fn set_membership_ready(
+    txn: &DatabaseTransaction,
+    membership_id: i64,
+    is_ready: bool,
+) -> Result<GameMembership, DomainError> {
+    let dto = memberships_adapter::MembershipSetReady {
+        id: membership_id,
+        is_ready,
+    };
+    let updated = memberships_adapter::set_membership_ready(txn, dto).await?;
+    Ok(GameMembership {
+        id: updated.id,
+        game_id: updated.game_id,
+        player_kind: updated.player_kind,
+        user_id: updated.human_user_id,
+        ai_profile_id: updated.ai_profile_id,
+        turn_order: updated.turn_order,
+        is_ready: updated.is_ready,
+        role: GameRole::Player, // For now, all members are players
+    })
+}
+
 impl From<crate::entities::game_players::Model> for GameMembership {
     fn from(model: crate::entities::game_players::Model) -> Self {
         Self {
