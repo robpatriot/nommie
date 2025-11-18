@@ -46,36 +46,36 @@ export async function fetchGameSnapshot(
         ? Number.parseInt(viewerSeatHeader, 10)
         : null
 
-      // Validate seat value before using it. Invalid values indicate backend bugs.
-      let parsedViewerSeat: Seat | null = null
-      if (viewerSeat !== null) {
-        if (isValidSeat(viewerSeat)) {
-          parsedViewerSeat = viewerSeat
-        } else {
-          // Log warning for invalid seat values to catch backend bugs
-          // Don't clamp - fail hard to surface the issue
-          console.warn(
-            `Invalid seat value from backend: ${viewerSeat} (expected 0-3, got ${viewerSeat})`
-          )
-          // Still set to null to indicate invalid seat
-          parsedViewerSeat = null
-        }
+    // Validate seat value before using it. Invalid values indicate backend bugs.
+    let parsedViewerSeat: Seat | null = null
+    if (viewerSeat !== null) {
+      if (isValidSeat(viewerSeat)) {
+        parsedViewerSeat = viewerSeat
+      } else {
+        // Log warning for invalid seat values to catch backend bugs
+        // Don't clamp - fail hard to surface the issue
+        console.warn(
+          `Invalid seat value from backend: ${viewerSeat} (expected 0-3, got ${viewerSeat})`
+        )
+        // Still set to null to indicate invalid seat
+        parsedViewerSeat = null
       }
-      const viewerHand =
-        Array.isArray(body.viewer_hand) &&
-        body.viewer_hand.every((card) => typeof card === 'string')
-          ? (body.viewer_hand as Card[])
-          : []
-      const bidConstraints = toBidConstraints(body.bid_constraints) ?? null
+    }
+    const viewerHand =
+      Array.isArray(body.viewer_hand) &&
+      body.viewer_hand.every((card) => typeof card === 'string')
+        ? (body.viewer_hand as Card[])
+        : []
+    const bidConstraints = toBidConstraints(body.bid_constraints) ?? null
 
-      return {
-        kind: 'ok',
-        snapshot: body.snapshot,
-        etag,
-        viewerSeat: parsedViewerSeat,
-        viewerHand,
-        bidConstraints,
-      }
+    return {
+      kind: 'ok',
+      snapshot: body.snapshot,
+      etag,
+      viewerSeat: parsedViewerSeat,
+      viewerHand,
+      bidConstraints,
+    }
   } catch (error) {
     if (error instanceof BackendApiError && error.status === 304) {
       return { kind: 'not_modified' }
@@ -226,21 +226,11 @@ function toBidConstraints(
     return undefined
   }
 
-  if (!isZeroBidLockedTuple(payload.zero_bid_locked)) {
+  if (typeof payload.zero_bid_locked !== 'boolean') {
     return undefined
   }
 
   return {
     zeroBidLocked: payload.zero_bid_locked,
   }
-}
-
-function isZeroBidLockedTuple(
-  value: unknown
-): value is [boolean, boolean, boolean, boolean] {
-  return (
-    Array.isArray(value) &&
-    value.length === 4 &&
-    value.every((entry) => typeof entry === 'boolean')
-  )
 }

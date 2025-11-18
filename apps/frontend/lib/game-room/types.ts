@@ -79,5 +79,5 @@ export interface GameSnapshot {
 }
 
 export interface BidConstraints {
-  zeroBidLocked: [boolean, boolean, boolean, boolean]
+  zeroBidLocked: boolean
 }

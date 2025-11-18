@@ -423,9 +423,7 @@ export function GameRoomClient({
     return {
       viewerSeat: viewerSeatForInteractions,
       isPending: isBidPending,
-      zeroBidLocked:
-        snapshot.bidConstraints?.zeroBidLocked?.[viewerSeatForInteractions] ??
-        false,
+      zeroBidLocked: snapshot.bidConstraints?.zeroBidLocked ?? false,
       onSubmit: handleSubmitBid,
     }
   }, [

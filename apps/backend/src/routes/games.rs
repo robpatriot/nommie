@@ -43,7 +43,7 @@ struct GameSnapshotResponse {
 
 #[derive(Serialize)]
 struct BidConstraintsResponse {
-    zero_bid_locked: [bool; 4],
+    zero_bid_locked: bool,
 }
 
 #[derive(Serialize)]
@@ -255,20 +255,16 @@ async fn get_snapshot(
                     crate::domain::snapshot::PhaseSnapshot::Bidding(_)
                 ) {
                     if let Some(current_round_no) = game.current_round {
-                        let history = GameHistory::load(txn, id).await?;
-                        let mut zero_bid_locked = [false; 4];
-                        for seat in 0..4 {
-                            if validate_consecutive_zero_bids(
+                        if let Some(viewer_seat_value) = viewer_seat {
+                            let history = GameHistory::load(txn, id).await?;
+                            let zero_bid_locked = validate_consecutive_zero_bids(
                                 &history,
-                                seat as i16,
+                                viewer_seat_value as i16,
                                 current_round_no,
                             )
-                            .is_err()
-                            {
-                                zero_bid_locked[seat as usize] = true;
-                            }
+                            .is_err();
+                            bid_constraints = Some(BidConstraintsResponse { zero_bid_locked });
                         }
-                        bid_constraints = Some(BidConstraintsResponse { zero_bid_locked });
                     }
                 }
 

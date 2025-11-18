@@ -34,8 +34,8 @@ export function BiddingPanel({
   const isViewerTurn = phase.to_act === viewerSeat
   const activeName =
     phase.to_act === viewerSeat ? 'You' : playerNames[phase.to_act]
-  const [bidInput, setBidInput] = useState<string>(
-    () => (viewerBid ?? minBid).toString()
+  const [bidInput, setBidInput] = useState<string>(() =>
+    (viewerBid ?? minBid).toString()
   )
   const [flashValidation, setFlashValidation] = useState(false)
 
@@ -93,9 +93,7 @@ export function BiddingPanel({
   const parsedBid =
     bidInput.trim() === '' ? null : Number.parseInt(bidInput, 10)
   const hitsHandSize =
-    isFinalBid &&
-    parsedBid !== null &&
-    sumOfOtherBids + parsedBid === handSize
+    isFinalBid && parsedBid !== null && sumOfOtherBids + parsedBid === handSize
 
   const validationMessages: string[] = []
 
@@ -109,7 +107,7 @@ export function BiddingPanel({
       validationMessages.push(`Bid cannot exceed ${maxBid}.`)
     }
     if (parsedBid === 0 && zeroBidLocked) {
-      validationMessages.push('You cannot bid 0 again right now.')
+      validationMessages.push("You've bid 0 the maximum number of times.")
     }
     if (hitsHandSize) {
       validationMessages.push(
