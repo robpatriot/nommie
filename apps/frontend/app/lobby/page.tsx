@@ -7,6 +7,7 @@ import {
   getInProgressGames,
   getLastActiveGame,
 } from '@/lib/api'
+import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 
 export default async function LobbyPage() {
   const session = await auth()
@@ -26,6 +27,7 @@ export default async function LobbyPage() {
 
   return (
     <ErrorBoundary>
+      <BreadcrumbSetter crumbs={[{ label: 'Lobby' }]} />
       <LobbyClient
         joinableGames={joinableGames}
         inProgressGames={inProgressGames}

@@ -7,6 +7,7 @@ import {
   signInWithGoogleAction,
   signOutAction,
 } from '@/app/actions/auth-actions'
+import { useHeaderBreadcrumbs } from './header-breadcrumbs'
 
 type HeaderProps = {
   session: { user?: { email?: string | null } } | null
@@ -14,6 +15,9 @@ type HeaderProps = {
 }
 
 export default function Header({ session, lastActiveGameId }: HeaderProps) {
+  const { crumbs } = useHeaderBreadcrumbs()
+  const hasBreadcrumbs = session?.user && crumbs.length > 0
+
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-surface-strong/70 px-3 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-lg">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -28,21 +32,43 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
             </span>
             <span className="tracking-tight">Nommie</span>
           </Link>
-          {session?.user ? (
-            <nav className="hidden items-center gap-2 text-sm text-muted sm:flex">
-              <Link
-                href="/lobby"
-                className="rounded-full px-3 py-1.5 font-medium text-muted transition hover:bg-surface/80 hover:text-foreground"
-              >
-                Lobby
-              </Link>
-              <span aria-hidden className="text-muted">
-                /
-              </span>
-              <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-subtle">
-                Focused play
-              </span>
+          {hasBreadcrumbs ? (
+            <nav
+              className="hidden items-center gap-2 text-sm text-muted sm:flex"
+              aria-label="Breadcrumb"
+            >
+              {crumbs.map((crumb, index) => {
+                const isLast = index === crumbs.length - 1
+                return (
+                  <div
+                    key={`${crumb.label}-${index}`}
+                    className="flex items-center gap-2"
+                  >
+                    {index > 0 ? (
+                      <span aria-hidden className="text-muted">
+                        /
+                      </span>
+                    ) : null}
+                    {crumb.href && !isLast ? (
+                      <Link
+                        href={crumb.href}
+                        className="rounded-full px-3 py-1.5 font-medium text-muted transition hover:bg-surface/80 hover:text-foreground"
+                      >
+                        {crumb.label}
+                      </Link>
+                    ) : (
+                      <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+                        {crumb.label}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </nav>
+          ) : session?.user ? (
+            <span className="text-sm text-muted">
+              A calm table for playing Nomination Whist
+            </span>
           ) : (
             <span className="text-sm text-muted">
               A calm table for playing Nomination Whist

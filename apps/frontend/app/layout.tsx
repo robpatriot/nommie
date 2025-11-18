@@ -6,6 +6,7 @@ import Script from 'next/script'
 import { cookies } from 'next/headers'
 import './globals.css'
 import Header from '@/components/Header'
+import { HeaderBreadcrumbProvider } from '@/components/header-breadcrumbs'
 import { signOut } from '@/auth'
 import { getLastActiveGame } from '@/lib/api'
 import {
@@ -96,29 +97,31 @@ export default async function RootLayout({
     }
   }
 
-    return (
-      <html
-        lang="en"
-        data-theme={initialResolved}
-        data-user-theme={initialTheme}
-        suppressHydrationWarning
-      >
-        <body className={`${inter.className} tabletop-shell`}>
-          <Script id="theme-sync" strategy="beforeInteractive">
-            {themeScript}
-          </Script>
-          <ThemeProvider
-            initialTheme={initialTheme}
-            initialResolved={initialResolved}
-          >
+  return (
+    <html
+      lang="en"
+      data-theme={initialResolved}
+      data-user-theme={initialTheme}
+      suppressHydrationWarning
+    >
+      <body className={`${inter.className} tabletop-shell`}>
+        <Script id="theme-sync" strategy="beforeInteractive">
+          {themeScript}
+        </Script>
+        <ThemeProvider
+          initialTheme={initialTheme}
+          initialResolved={initialResolved}
+        >
+          <HeaderBreadcrumbProvider>
             <div className="tabletop-content">
               <Suspense fallback={null}>
                 <Header session={session} lastActiveGameId={lastActiveGameId} />
               </Suspense>
               {children}
             </div>
-          </ThemeProvider>
-        </body>
-      </html>
-    )
+          </HeaderBreadcrumbProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  )
 }

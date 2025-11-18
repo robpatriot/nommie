@@ -7,6 +7,7 @@ import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 
 interface GamePageProps {
   params: Promise<{
@@ -54,8 +55,15 @@ export default async function GamePage({ params }: GamePageProps) {
     bidConstraints: snapshotResult.bidConstraints ?? null,
   }
 
+  const gameName =
+    snapshotResult.snapshot.game.name?.trim() ||
+    `Game #${snapshotResult.snapshot.game.id ?? resolvedGameId}`
+
   return (
     <ErrorBoundary>
+      <BreadcrumbSetter
+        crumbs={[{ label: 'Lobby', href: '/lobby' }, { label: gameName }]}
+      />
       <GameRoomClient initialData={initialPayload} gameId={resolvedGameId} />
     </ErrorBoundary>
   )
