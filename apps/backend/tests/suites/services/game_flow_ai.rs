@@ -108,7 +108,8 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
         )
         .await?;
 
-    // AI seats are auto-ready; no manual mark_ready needed
+    let game_flow_service = backend::services::game_flow::GameFlowService;
+    game_flow_service.process_game_state(txn, game_id).await?;
 
     // Load game and verify it completed
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;

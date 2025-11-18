@@ -5,6 +5,7 @@ use tracing::debug;
 
 use crate::errors::domain::DomainError;
 use crate::repos::{ai_overrides, memberships};
+use crate::services::game_flow::GameFlowService;
 
 /// Merge two JSON configs, with override taking precedence.
 pub fn merge_json_configs(
@@ -93,6 +94,19 @@ impl AiService {
                 );
             }
         }
+
+        // Check if all players are ready and start the game if so
+        // AI players are always added as ready, so this may trigger auto-start
+        let game_flow_service = GameFlowService;
+        game_flow_service
+            .check_and_start_game_if_ready(txn, game_id)
+            .await
+            .map_err(|e| {
+                DomainError::infra(
+                    crate::errors::domain::InfraErrorKind::Other(e.code().to_string()),
+                    e.to_string(),
+                )
+            })?;
 
         Ok(membership.id)
     }
