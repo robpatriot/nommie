@@ -5,6 +5,7 @@ use sea_orm::{ConnectionTrait, DatabaseTransaction};
 use crate::adapters::memberships_sea as memberships_adapter;
 use crate::entities::game_players::PlayerKind;
 use crate::errors::domain::DomainError;
+use crate::repos::games;
 
 /// Game membership domain model
 #[derive(Debug, Clone, PartialEq)]
@@ -68,6 +69,11 @@ pub async fn create_membership(
         is_ready,
     };
     let membership = memberships_adapter::create_membership(txn, dto).await?;
+
+    // Update game updated_at when membership changes (touch game timestamp)
+    let game = games::require_game(txn, game_id).await?;
+    games::update_round(txn, game_id, game.lock_version, None, None, None).await?;
+
     Ok(GameMembership {
         id: membership.id,
         game_id: membership.game_id,
@@ -97,6 +103,11 @@ pub async fn create_ai_membership(
         is_ready,
     };
     let membership = memberships_adapter::create_membership(txn, dto).await?;
+
+    // Update game updated_at when membership changes (touch game timestamp)
+    let game = games::require_game(txn, game_id).await?;
+    games::update_round(txn, game_id, game.lock_version, None, None, None).await?;
+
     Ok(GameMembership {
         id: membership.id,
         game_id: membership.game_id,
@@ -164,6 +175,11 @@ pub async fn set_membership_ready(
         is_ready,
     };
     let updated = memberships_adapter::set_membership_ready(txn, dto).await?;
+
+    // Update game updated_at when membership changes (touch game timestamp)
+    let game = games::require_game(txn, updated.game_id).await?;
+    games::update_round(txn, updated.game_id, game.lock_version, None, None, None).await?;
+
     Ok(GameMembership {
         id: updated.id,
         game_id: updated.game_id,

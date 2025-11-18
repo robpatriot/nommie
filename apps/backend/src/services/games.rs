@@ -562,7 +562,7 @@ impl GameService {
                 )
             })?;
 
-        // Create membership
+        // Create membership (automatically updates game updated_at)
         memberships::create_membership(
             txn,
             game_id,
@@ -574,8 +574,12 @@ impl GameService {
         .await
         .map_err(AppError::from)?;
 
-        // Fetch updated memberships
+        // Fetch updated memberships and reload game
         let updated_memberships = memberships::find_all_by_game(txn, game_id)
+            .await
+            .map_err(AppError::from)?;
+
+        let game = games_repo::require_game(txn, game_id)
             .await
             .map_err(AppError::from)?;
 

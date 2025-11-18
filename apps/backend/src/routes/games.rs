@@ -891,12 +891,9 @@ async fn add_ai_seat(
                 config: override_config,
             };
 
+            // add_ai_to_game automatically updates game updated_at via create_ai_membership
             ai_service
                 .add_ai_to_game(txn, id, ai_profile.id, seat_to_fill, Some(overrides))
-                .await
-                .map_err(AppError::from)?;
-
-            games_repo::update_round(txn, id, game.lock_version, None, None, None)
                 .await
                 .map_err(AppError::from)?;
 
