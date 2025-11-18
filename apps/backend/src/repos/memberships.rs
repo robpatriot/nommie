@@ -59,14 +59,14 @@ pub async fn create_membership(
     is_ready: bool,
     role: GameRole,
 ) -> Result<GameMembership, DomainError> {
-    let dto = memberships_adapter::MembershipCreate::new(
+    let dto = memberships_adapter::MembershipCreate {
         game_id,
-        PlayerKind::Human,
-        Some(user_id),
-        None,
+        player_kind: PlayerKind::Human,
+        human_user_id: Some(user_id),
+        ai_profile_id: None,
         turn_order,
         is_ready,
-    );
+    };
     let membership = memberships_adapter::create_membership(txn, dto).await?;
     Ok(GameMembership {
         id: membership.id,
@@ -88,14 +88,14 @@ pub async fn create_ai_membership(
     is_ready: bool,
     role: GameRole,
 ) -> Result<GameMembership, DomainError> {
-    let dto = memberships_adapter::MembershipCreate::new(
+    let dto = memberships_adapter::MembershipCreate {
         game_id,
-        PlayerKind::Ai,
-        None,
-        Some(ai_profile_id),
+        player_kind: PlayerKind::Ai,
+        human_user_id: None,
+        ai_profile_id: Some(ai_profile_id),
         turn_order,
         is_ready,
-    );
+    };
     let membership = memberships_adapter::create_membership(txn, dto).await?;
     Ok(GameMembership {
         id: membership.id,
@@ -113,15 +113,15 @@ pub async fn update_membership(
     txn: &DatabaseTransaction,
     membership: GameMembership,
 ) -> Result<GameMembership, DomainError> {
-    let dto = memberships_adapter::MembershipUpdate::new(
-        membership.id,
-        membership.game_id,
-        membership.player_kind.clone(),
-        membership.user_id,
-        membership.ai_profile_id,
-        membership.turn_order,
-        membership.is_ready,
-    );
+    let dto = memberships_adapter::MembershipUpdate {
+        id: membership.id,
+        game_id: membership.game_id,
+        player_kind: membership.player_kind.clone(),
+        human_user_id: membership.user_id,
+        ai_profile_id: membership.ai_profile_id,
+        turn_order: membership.turn_order,
+        is_ready: membership.is_ready,
+    };
     let updated = memberships_adapter::update_membership(txn, dto).await?;
     Ok(GameMembership {
         id: updated.id,

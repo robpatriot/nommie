@@ -18,14 +18,14 @@ async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
                     .await?;
 
             // Create membership via adapter
-            let dto = MembershipCreate::new(
+            let dto = MembershipCreate {
                 game_id,
-                backend::entities::game_players::PlayerKind::Human,
-                Some(user_id),
-                None,
-                0,
-                false,
-            );
+                player_kind: backend::entities::game_players::PlayerKind::Human,
+                human_user_id: Some(user_id),
+                ai_profile_id: None,
+                turn_order: 0,
+                is_ready: false,
+            };
             let membership =
                 backend::adapters::memberships_sea::create_membership(txn, dto).await?;
 
@@ -67,14 +67,14 @@ async fn test_set_ready_updates_only_updated_at() -> Result<(), AppError> {
                     .await?;
 
             // Create membership
-            let dto = MembershipCreate::new(
+            let dto = MembershipCreate {
                 game_id,
-                backend::entities::game_players::PlayerKind::Human,
-                Some(user_id),
-                None,
-                0,
-                false,
-            );
+                player_kind: backend::entities::game_players::PlayerKind::Human,
+                human_user_id: Some(user_id),
+                ai_profile_id: None,
+                turn_order: 0,
+                is_ready: false,
+            };
             let membership =
                 backend::adapters::memberships_sea::create_membership(txn, dto).await?;
 

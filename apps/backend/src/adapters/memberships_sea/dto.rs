@@ -12,29 +12,6 @@ pub struct MembershipUpdate {
     pub is_ready: bool,
 }
 
-impl MembershipUpdate {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        id: i64,
-        game_id: i64,
-        player_kind: crate::entities::game_players::PlayerKind,
-        human_user_id: Option<i64>,
-        ai_profile_id: Option<i64>,
-        turn_order: i32,
-        is_ready: bool,
-    ) -> Self {
-        Self {
-            id,
-            game_id,
-            player_kind,
-            human_user_id,
-            ai_profile_id,
-            turn_order,
-            is_ready,
-        }
-    }
-}
-
 /// DTO for creating a new game membership.
 #[derive(Debug, Clone)]
 pub struct MembershipCreate {
@@ -44,27 +21,6 @@ pub struct MembershipCreate {
     pub ai_profile_id: Option<i64>,
     pub turn_order: i32,
     pub is_ready: bool,
-}
-
-impl MembershipCreate {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        game_id: i64,
-        player_kind: crate::entities::game_players::PlayerKind,
-        human_user_id: Option<i64>,
-        ai_profile_id: Option<i64>,
-        turn_order: i32,
-        is_ready: bool,
-    ) -> Self {
-        Self {
-            game_id,
-            player_kind,
-            human_user_id,
-            ai_profile_id,
-            turn_order,
-            is_ready,
-        }
-    }
 }
 
 /// DTO for setting a membership's ready status.

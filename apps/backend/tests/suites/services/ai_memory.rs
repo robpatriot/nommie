@@ -249,14 +249,15 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     let variant = format!("test-{}", Uuid::new_v4());
     let profile = ai_profiles::create_profile(
         txn,
-        RandomPlayer::NAME,
-        RandomPlayer::VERSION,
-        &variant,
-        "Test AI".to_string(),
-        Some("random".to_string()),
-        Some(5),
-        None,
-        Some(75),
+        ai_profiles::AiProfileDraft::new(
+            RandomPlayer::NAME,
+            RandomPlayer::VERSION,
+            &variant,
+            "Test AI",
+        )
+        .with_playstyle("random")
+        .with_difficulty(5)
+        .with_memory_level(75),
     )
     .await?;
 
