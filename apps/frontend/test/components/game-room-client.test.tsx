@@ -117,30 +117,34 @@ describe('GameRoomClient', () => {
   })
 
   describe('Initialization', () => {
-    it('renders with initial data', () => {
+    it('renders with initial data', async () => {
       const initialData = createInitialData()
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       expect(screen.getByText(/Init/i)).toBeInTheDocument()
     })
 
-    it('starts in idle state', () => {
+    it('starts in idle state', async () => {
       const initialData = createInitialData()
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       // Component should render without errors
       expect(screen.getByText(/Init/i)).toBeInTheDocument()
@@ -154,25 +158,31 @@ describe('GameRoomClient', () => {
         const initialData = createInitialData()
         const pollingMs = 1000
 
-        render(
-          <GameRoomClient
-            initialData={initialData}
-            gameId={42}
-            pollingMs={pollingMs}
-          />
-        )
+        await act(async () => {
+          render(
+            <GameRoomClient
+              initialData={initialData}
+              gameId={42}
+              pollingMs={pollingMs}
+            />
+          )
+        })
 
         // Initial render should not trigger poll immediately
         expect(mockGetGameRoomSnapshotAction).not.toHaveBeenCalled()
 
         // Advance timer by polling interval
-        await vi.advanceTimersByTimeAsync(pollingMs)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(pollingMs)
+        })
 
         // Should have polled once
         expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
 
         // Advance timer again
-        await vi.advanceTimersByTimeAsync(pollingMs)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(pollingMs)
+        })
 
         // Should have polled again
         expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(2)
@@ -185,13 +195,15 @@ describe('GameRoomClient', () => {
       const initialData = createInitialData()
       const pollingMs = 1000
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={pollingMs}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={pollingMs}
+          />
+        )
+      })
 
       // Trigger a manual refresh (sets activity to refreshing)
       const refreshButton = screen.getByRole('button', {
@@ -213,7 +225,9 @@ describe('GameRoomClient', () => {
       // Wait a short time - polling should be skipped because activity was refreshing
       // Note: With real timers, we can't perfectly test this without waiting the full interval
       // The important thing is that concurrent refreshes are prevented
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      })
 
       // The call count might increase due to polling, but the key is that
       // the manual refresh completed first
@@ -226,24 +240,34 @@ describe('GameRoomClient', () => {
         const initialData = createInitialData()
         const pollingMs = 1000
 
-        const { unmount } = render(
-          <GameRoomClient
-            initialData={initialData}
-            gameId={42}
-            pollingMs={pollingMs}
-          />
-        )
+        let unmount: () => void
+        await act(async () => {
+          const result = render(
+            <GameRoomClient
+              initialData={initialData}
+              gameId={42}
+              pollingMs={pollingMs}
+            />
+          )
+          unmount = result.unmount
+        })
 
         // Advance timer once
-        await vi.advanceTimersByTimeAsync(pollingMs)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(pollingMs)
+        })
 
         expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
 
         // Unmount component
-        unmount()
+        await act(async () => {
+          unmount()
+        })
 
         // Advance timer again - should not poll after unmount
-        await vi.advanceTimersByTimeAsync(pollingMs)
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(pollingMs)
+        })
 
         // Should still be only 1 call
         expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
@@ -264,13 +288,15 @@ describe('GameRoomClient', () => {
         data: newData,
       })
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
@@ -301,13 +327,15 @@ describe('GameRoomClient', () => {
         kind: 'not_modified',
       })
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
@@ -338,13 +366,15 @@ describe('GameRoomClient', () => {
         traceId: 'trace-123',
       })
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
@@ -372,13 +402,15 @@ describe('GameRoomClient', () => {
       })
       mockGetGameRoomSnapshotAction.mockReturnValueOnce(firstPromise)
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
@@ -424,13 +456,15 @@ describe('GameRoomClient', () => {
       })
       mockMarkPlayerReadyAction.mockReturnValueOnce(readyPromise)
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       // Start ready action
       const readyButton = screen.getByRole('button', {
@@ -464,13 +498,15 @@ describe('GameRoomClient', () => {
     it('marks player ready and refreshes', async () => {
       const initialData = createInitialData()
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const readyButton = screen.getByRole('button', {
         name: /Mark yourself as ready/i,
@@ -494,13 +530,15 @@ describe('GameRoomClient', () => {
     it('prevents duplicate ready calls', async () => {
       const initialData = createInitialData()
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const readyButton = screen.getByRole('button', {
         name: /Mark yourself as ready/i,
@@ -532,13 +570,15 @@ describe('GameRoomClient', () => {
         status: 400,
       })
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const readyButton = screen.getByRole('button', {
         name: /Mark yourself as ready/i,
@@ -562,13 +602,15 @@ describe('GameRoomClient', () => {
     it('resets hasMarkedReady when phase changes', async () => {
       const initialData = createInitialData()
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       // Mark ready
       const readyButton = screen.getByRole('button', {
@@ -617,13 +659,15 @@ describe('GameRoomClient', () => {
         viewerHand: ['2H', '3C'],
       })
 
-      render(
-        <GameRoomClient
-          initialData={biddingData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={biddingData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       // Component should render with bidding phase immediately (from initial data)
       expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
@@ -640,13 +684,15 @@ describe('GameRoomClient', () => {
         hostSeat: 0,
       })
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       // Wait for async operations (AI registry fetch - enough for promise to resolve)
       await act(async () => {
@@ -664,13 +710,15 @@ describe('GameRoomClient', () => {
         hostSeat: 0,
       })
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       // AI registry should not be fetched for non-host
       expect(mockFetchAiRegistryAction).not.toHaveBeenCalled()
@@ -682,13 +730,15 @@ describe('GameRoomClient', () => {
         hostSeat: 0,
       })
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       // Wait for AI registry to load
       await act(async () => {
@@ -721,16 +771,22 @@ describe('GameRoomClient', () => {
       })
       mockFetchAiRegistryAction.mockReturnValueOnce(registryPromise)
 
-      const { unmount } = render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      let unmount: () => void
+      await act(async () => {
+        const result = render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+        unmount = result.unmount
+      })
 
       // Unmount before registry resolves
-      unmount()
+      await act(async () => {
+        unmount()
+      })
 
       // Resolve after unmount - should not cause state updates
       await act(async () => {
@@ -753,13 +809,15 @@ describe('GameRoomClient', () => {
         traceId: 'trace-abc-123',
       })
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
@@ -786,13 +844,15 @@ describe('GameRoomClient', () => {
         new Error('Network error')
       )
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
@@ -819,13 +879,15 @@ describe('GameRoomClient', () => {
       })
       mockMarkPlayerReadyAction.mockReturnValueOnce(readyPromise)
 
-      render(
-        <GameRoomClient
-          initialData={initialData}
-          gameId={42}
-          pollingMs={3000}
-        />
-      )
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
 
       // Start ready action
       const readyButton = screen.getByRole('button', {
