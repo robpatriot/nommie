@@ -11,7 +11,7 @@
     "test:v": "pnpm be:test:v && pnpm fe:test",
     "test:q": "pnpm be:test:q && pnpm --silent fe:test",
     "test:ci": "pnpm be:test:q && pnpm fe:test:cov",
-    "be:dev": "if [ -f .dev/be.pid ] && kill -0 $(cat .dev/be.pid) 2>/dev/null; then exit 1; fi; if lsof -ti :3001 >/dev/null 2>&1; then echo 'Port 3001 is already in use.'; exit 1; fi; RUST_LOG=${RUST_LOG:-info} cargo run --manifest-path apps/backend/Cargo.toml >> .dev/dev.log 2>&1 & echo $! > .dev/be.pid",
+    "be:dev": "if [ -f .dev/be.pid ] && kill -0 $(cat .dev/be.pid) 2>/dev/null; then exit 1; fi; if lsof -ti :3001 >/dev/null 2>&1; then echo 'Port 3001 is already in use.'; exit 1; fi; cargo run --manifest-path apps/backend/Cargo.toml >> .dev/dev.log 2>&1 & echo $! > .dev/be.pid",
     "be:stop": "if [ -f .dev/be.pid ]; then kill $(cat .dev/be.pid) 2>/dev/null || true; rm -f .dev/be.pid; fi",
     "be:build": "cargo build --manifest-path apps/backend/Cargo.toml",
     "be:lint": "cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings",
