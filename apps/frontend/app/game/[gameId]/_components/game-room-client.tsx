@@ -92,7 +92,6 @@ export function GameRoomClient({
   }, [])
 
   // Derived state for convenience
-  const isIdle = activity.type === 'idle'
   const isRefreshing = activity.type === 'refreshing'
   const isReadyPending =
     activity.type === 'action' && activity.action === 'ready'
@@ -326,16 +325,15 @@ export function GameRoomClient({
    */
   const enqueueOrExecuteAction = useCallback(
     async (actionFn: () => Promise<void>) => {
-      if (!isIdle) {
-        // Queue the action to execute after current operation completes
+      const currentActivity = activityRef.current
+      if (currentActivity.type !== 'idle') {
         pendingActionRef.current = actionFn
         return
       }
 
-      // Execute immediately
       await actionFn()
     },
-    [isIdle]
+    []
   )
 
   const markReady = useCallback(async () => {
@@ -805,6 +803,10 @@ export function GameRoomClient({
         isRefreshing={isRefreshing}
         isSlowSync={isSlowSync}
         error={error}
+        status={{
+          lastSyncedAt: snapshot.timestamp,
+          isPolling: activity.type === 'polling',
+        }}
         readyState={{
           canReady: canMarkReady,
           isPending: isReadyPending,

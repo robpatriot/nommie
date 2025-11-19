@@ -68,7 +68,9 @@ export function ReadyPanel({
       </div>
       <button
         type="button"
-        onClick={() => readyState.onReady()}
+        onClick={() => {
+          readyState.onReady()
+        }}
         className={`rounded-2xl bg-success text-sm font-semibold text-success-foreground shadow-lg shadow-success/30 transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70 ${
           isCompact ? 'w-full px-4 py-2 sm:w-auto' : 'w-full px-3 py-2'
         }`}

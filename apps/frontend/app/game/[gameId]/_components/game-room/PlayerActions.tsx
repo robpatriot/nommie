@@ -61,7 +61,7 @@ export function PlayerActions({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-3 rounded-3xl border border-white/10 bg-surface/80 p-5 text-sm text-muted shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur">
+    <section className="flex w-full flex-col gap-3 rounded-3xl border border-white/10 bg-surface/80 p-5 text-sm text-muted shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur">
       <header className="flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
           Table actions

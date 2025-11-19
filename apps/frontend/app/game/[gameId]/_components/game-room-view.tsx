@@ -22,7 +22,6 @@ import { ReadyPanel } from './game-room/ReadyPanel'
 import { SetupSeatList } from './game-room/SetupSeatList'
 import { PageHero } from '@/components/PageHero'
 import { PageContainer } from '@/components/PageContainer'
-import { SurfaceCard } from '@/components/SurfaceCard'
 import { StatCard } from '@/components/StatCard'
 import type {
   AiSeatState,
@@ -51,6 +50,10 @@ export interface GameRoomViewProps {
   trumpState?: TrumpState
   playState?: PlayState
   aiSeatState?: AiSeatState
+  status?: {
+    lastSyncedAt?: string
+    isPolling?: boolean
+  }
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
@@ -69,6 +72,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     trumpState,
     playState,
     aiSeatState,
+    status,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -292,10 +296,29 @@ export function GameRoomView(props: GameRoomViewProps) {
                       </span>
                     </button>
                   </div>
+                  {isSlowSync ? (
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary-foreground">
+                      <span className="inline-flex h-2 w-2 animate-pulse items-center justify-center rounded-full bg-primary" />
+                      <span>Updating game state…</span>
+                    </div>
+                  ) : null}
                 </div>
               </>
             }
           />
+
+          <span className="sr-only">{phase.phase}</span>
+
+          {error ? (
+            <div className="mt-6 rounded-2xl border border-warning/60 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
+              <p>{error.message}</p>
+              {error.traceId ? (
+                <p className="text-xs text-warning-foreground/80">
+                  traceId: {error.traceId}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
 
           <section className="flex flex-col gap-6 lg:flex-row lg:items-start">
             <div className="flex flex-1 flex-col gap-6">
@@ -310,47 +333,61 @@ export function GameRoomView(props: GameRoomViewProps) {
     )
   }
 
+  const biddingPhase = phase.phase === 'Bidding' ? phase.data : null
+  const bidStatus =
+    biddingPhase === null
+      ? []
+      : ([0, 1, 2, 3] as const).map((seatIndex) => ({
+          seat: seatIndex,
+          name: seatDisplayName(seatIndex as Seat),
+          bid: biddingPhase.bids[seatIndex],
+          isActive: biddingPhase.to_act === seatIndex,
+        }))
+  const isSyncing = Boolean(isRefreshing || status?.isPolling)
+
   return (
     <div className="flex flex-col text-foreground">
-      <PageContainer>
-        <SurfaceCard
-          as="section"
-          padding="md"
-          className="flex flex-col gap-4 shadow-[0_45px_120px_rgba(0,0,0,0.35)]"
-        >
+      <PageContainer className="pb-16">
+        <section className="rounded-[32px] border border-white/10 bg-surface/70 p-6 shadow-[0_45px_120px_rgba(0,0,0,0.35)]">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
+            <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-                Phase
+                Game #{gameId}
               </p>
               <div className="text-3xl font-semibold">
                 {getPhaseLabel(phase)}
               </div>
+              <p className="text-xs font-medium uppercase tracking-[0.35em] text-subtle">
+                Turn:{' '}
+                <span className="text-sm text-foreground">{activeName}</span>
+              </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-              <span className="flex items-center gap-2 rounded-full bg-surface px-3 py-1 font-semibold text-foreground">
-                Turn: {activeName}
-              </span>
-            </div>
-          </div>
-          {isSlowSync ? (
-            <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary-foreground">
-              <span className="inline-flex h-2 w-2 animate-pulse items-center justify-center rounded-full bg-primary" />
-              <span>Updating game state…</span>
-            </div>
-          ) : null}
-          {error ? (
-            <div className="rounded-lg border border-warning/60 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
-              <p>{error.message}</p>
-              {error.traceId ? (
-                <p className="text-xs text-warning-foreground/80">
-                  traceId: {error.traceId}
-                </p>
+            <div className="flex flex-wrap items-center gap-3">
+              {isSyncing ? (
+                <span className="rounded-full border border-primary/60 bg-primary/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-primary-foreground">
+                  Syncing…
+                </span>
+              ) : null}
+              {phase.phase === 'Trick' ? (
+                <span className="rounded-full bg-surface px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
+                  Trick {phase.data.trick_no} / {round?.hand_size ?? '?'}
+                </span>
+              ) : null}
+              {onRefresh ? (
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={isRefreshing}
+                  className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.35em] text-foreground transition hover:border-primary/60 hover:text-primary disabled:opacity-60"
+                  aria-label="Refresh game state"
+                >
+                  {isRefreshing ? 'Syncing…' : 'Refresh'}
+                </button>
               ) : null}
             </div>
-          ) : null}
+          </div>
           {round ? (
-            <div className="grid gap-3 text-sm text-muted sm:grid-cols-4">
+            <div className="mt-4 grid gap-3 text-sm text-muted md:grid-cols-4">
               <PhaseFact label="Round" value={`#${snapshot.game.round_no}`} />
               <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
               <PhaseFact
@@ -360,50 +397,79 @@ export function GameRoomView(props: GameRoomViewProps) {
               <PhaseFact label="Trump" value={formatTrump(round.trump)} />
             </div>
           ) : null}
-          {phase.phase === 'Trick' ? (
-            <span className="text-xs text-subtle">
-              Trick {phase.data.trick_no} of {round?.hand_size ?? '?'}
-            </span>
-          ) : null}
-        </SurfaceCard>
-
-        <section className="flex flex-col gap-6 lg:flex-row lg:items-start">
-          <div className="flex flex-1 flex-col gap-6 lg:pr-6">
-            <div className="rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.9)] via-[rgba(var(--felt-base),0.9)] to-[rgba(var(--felt-shadow),0.95)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
-              <div className="hidden grid-cols-3 grid-rows-3 gap-4 lg:grid">
-                {seatSummaries.map((summary) => (
-                  <SeatCard key={summary.seat} summary={summary} />
-                ))}
-                <TrickArea
-                  trickMap={trickMap}
-                  getSeatName={seatDisplayName}
-                  round={round}
-                  phase={phase}
-                  viewerSeat={effectiveViewerSeat ?? 0}
-                  className="hidden lg:flex col-start-2 row-start-2 h-64"
-                />
-              </div>
-              <div className="flex flex-col gap-3 lg:hidden">
-                {mobileSeatSummaries.map((summary) => (
-                  <SeatCard
-                    key={`mobile-${summary.seat}`}
-                    summary={summary}
-                    variant="list"
-                  />
-                ))}
-              </div>
-              <div className="mt-4 lg:hidden">
-                <TrickArea
-                  trickMap={trickMap}
-                  getSeatName={seatDisplayName}
-                  round={round}
-                  phase={phase}
-                  viewerSeat={effectiveViewerSeat ?? 0}
-                  className="lg:hidden"
-                />
-              </div>
+          {isSlowSync ? (
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary-foreground">
+              <span className="inline-flex h-2 w-2 animate-pulse items-center justify-center rounded-full bg-primary" />
+              <span>Updating game state…</span>
             </div>
+          ) : null}
+          {error ? (
+            <div className="mt-4 rounded-lg border border-warning/60 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
+              <p>{error.message}</p>
+              {error.traceId ? (
+                <p className="text-xs text-warning-foreground/80">
+                  traceId: {error.traceId}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {bidStatus.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {bidStatus.map(({ seat, name, bid, isActive }) => (
+                <div
+                  key={seat}
+                  className={`flex items-center gap-3 rounded-2xl border px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] ${
+                    isActive
+                      ? 'border-success bg-success/15 text-success-contrast'
+                      : 'border-white/15 bg-surface text-muted'
+                  }`}
+                >
+                  <span className="text-[11px] tracking-[0.2em] text-subtle">
+                    {name}
+                  </span>
+                  <span className="text-base font-semibold text-foreground">
+                    {bid ?? '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
 
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
+            <div className="hidden min-h-[420px] grid-cols-3 grid-rows-3 gap-4 lg:grid">
+              {seatSummaries.map((summary) => (
+                <SeatCard key={summary.seat} summary={summary} />
+              ))}
+              <TrickArea
+                trickMap={trickMap}
+                getSeatName={seatDisplayName}
+                round={round}
+                phase={phase}
+                viewerSeat={effectiveViewerSeat ?? 0}
+                className="col-start-2 row-start-2 h-full w-full"
+              />
+            </div>
+            <div className="flex flex-col gap-3 lg:hidden">
+              {mobileSeatSummaries.map((summary) => (
+                <SeatCard
+                  key={`mobile-${summary.seat}`}
+                  summary={summary}
+                  variant="list"
+                  showBid={false}
+                />
+              ))}
+            </div>
+            <div className="lg:hidden">
+              <TrickArea
+                trickMap={trickMap}
+                getSeatName={seatDisplayName}
+                round={round}
+                phase={phase}
+                viewerSeat={effectiveViewerSeat ?? 0}
+              />
+            </div>
             <PlayerHand
               viewerHand={viewerHand}
               phase={phase}
@@ -412,8 +478,11 @@ export function GameRoomView(props: GameRoomViewProps) {
               playState={playState}
               selectedCard={selectedCard}
               onSelectCard={setSelectedCard}
+              className="bg-black/40"
             />
+          </section>
 
+          <aside className="flex flex-col gap-4 xl:sticky xl:top-6">
             <PlayerActions
               phase={phase}
               viewerSeat={effectiveViewerSeat ?? 0}
@@ -424,17 +493,13 @@ export function GameRoomView(props: GameRoomViewProps) {
               selectedCard={selectedCard}
               onPlayCard={handlePlayCard}
             />
-          </div>
-          <div className="mt-6 lg:mt-0 lg:flex-[0.75] lg:self-stretch">
-            <div className="lg:sticky lg:top-6">
-              <ScoreSidebar
-                playerNames={playerNames}
-                scores={snapshot.game.scores_total}
-                round={round}
-              />
-            </div>
-          </div>
-        </section>
+            <ScoreSidebar
+              playerNames={playerNames}
+              scores={snapshot.game.scores_total}
+              round={round}
+            />
+          </aside>
+        </div>
       </PageContainer>
     </div>
   )

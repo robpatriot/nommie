@@ -3,6 +3,8 @@
 import { useMemo } from 'react'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
+import { cn } from '@/lib/cn'
+import { PlayingCard } from './PlayingCard'
 
 interface PlayerHandProps {
   viewerHand: Card[]
@@ -12,6 +14,7 @@ interface PlayerHandProps {
   playState?: GameRoomViewProps['playState']
   selectedCard: Card | null
   onSelectCard: (card: Card | null) => void
+  className?: string
 }
 
 export function PlayerHand({
@@ -22,6 +25,7 @@ export function PlayerHand({
   playState,
   selectedCard,
   onSelectCard,
+  className,
 }: PlayerHandProps) {
   const isTrickPhase = phase.phase === 'Trick' && !!playState
   const viewerTurn =
@@ -70,64 +74,75 @@ export function PlayerHand({
     onSelectCard(selectedCard === card ? null : card)
   }
 
-    return (
-      <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur">
-        <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
+  return (
+    <section
+      className={cn(
+        'flex w-full flex-col gap-3 rounded-[28px] border border-white/15 bg-surface/80 p-4 text-foreground shadow-[0_35px_80px_rgba(0,0,0,0.4)] backdrop-blur',
+        className
+      )}
+    >
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
             Your hand
-          </h2>
-          <span
-            className="rounded-full bg-surface px-3 py-1 text-xs text-muted"
-            aria-live="polite"
-          >
-            {handStatus}
           </span>
-        </header>
-        <div className="flex gap-3 overflow-x-auto pb-2 pt-1 sm:flex-wrap sm:justify-center [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          {viewerHand.length === 0 ? (
-            <span className="text-sm text-subtle">
-              Hand will appear once available.
-            </span>
-          ) : (
-            viewerHand.map((card) => {
-              const isPlayable = playableCards.has(card)
-              const isSelected = selectedCard === card
-              const isDisabled =
-                !isTrickPhase ||
-                !playState ||
-                !isPlayable ||
-                !viewerTurn ||
-                playState.isPending
-
-              const cardLabel = isPlayable
-                ? `${card}, ${isSelected ? 'selected' : 'playable'}`
-                : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
-              return (
-                <button
-                  key={card}
-                  type="button"
-                  onClick={() => handleCardClick(card)}
-                  disabled={isDisabled}
-                  className={`min-w-[4rem] rounded-2xl border px-4 py-3 text-2xl font-semibold tracking-wide transition sm:min-w-0 sm:text-xl ${
-                    isSelected
-                      ? 'border-success bg-success/20 text-foreground shadow-lg shadow-success/30'
-                      : isPlayable && viewerTurn
-                        ? 'border-success/60 bg-surface text-foreground hover:border-success hover:bg-success/10'
-                        : 'border-border bg-surface text-muted'
-                  } ${
-                    isDisabled
-                      ? 'cursor-not-allowed opacity-60'
-                      : 'cursor-pointer'
-                  }`}
-                  aria-label={cardLabel}
-                  aria-pressed={isSelected}
-                >
-                  {card}
-                </button>
-              )
-            })
-          )}
+          <p className="text-xs text-muted" aria-live="polite">
+            {handStatus}
+          </p>
         </div>
-      </section>
-    )
+        {isTrickPhase ? (
+          <span className="rounded-full border border-white/15 bg-surface px-3 py-1 text-xs font-semibold text-subtle">
+            {viewerTurn ? 'Your play' : `Waiting on ${waitingOnName ?? '—'}`}
+          </span>
+        ) : null}
+      </header>
+      <div className="flex gap-2 overflow-x-auto pb-2 pt-1 sm:justify-center sm:gap-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        {viewerHand.length === 0 ? (
+          <span className="text-sm text-subtle">
+            Hand will appear once available.
+          </span>
+        ) : (
+          viewerHand.map((card) => {
+            const isPlayable = playableCards.has(card)
+            const isSelected = selectedCard === card
+            const isDisabled =
+              !isTrickPhase ||
+              !playState ||
+              !isPlayable ||
+              !viewerTurn ||
+              playState.isPending
+
+            const cardLabel = isPlayable
+              ? `${card}, ${isSelected ? 'selected' : 'playable'}`
+              : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
+            return (
+              <button
+                key={card}
+                type="button"
+                onClick={() => handleCardClick(card)}
+                disabled={isDisabled}
+                className={cn(
+                  'relative rounded-[1.45rem] border border-transparent p-[2px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed',
+                  isSelected
+                    ? 'border-success/80 bg-success/20 shadow-[0_20px_35px_rgba(34,197,94,0.35)]'
+                    : isPlayable && viewerTurn
+                      ? 'hover:-translate-y-1 hover:bg-primary/10'
+                      : 'opacity-60'
+                )}
+                aria-label={cardLabel}
+                aria-pressed={isSelected}
+              >
+                <PlayingCard
+                  card={card}
+                  size="md"
+                  isDimmed={isDisabled && !isSelected}
+                  isSelected={isSelected}
+                />
+              </button>
+            )
+          })
+        )}
+      </div>
+    </section>
+  )
 }

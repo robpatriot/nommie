@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, act } from '../utils'
+import { render, screen, waitFor, act, fireEvent } from '../utils'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 
@@ -209,7 +209,9 @@ describe('GameRoomClient', () => {
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
-      await userEvent.click(refreshButton)
+      await act(async () => {
+        fireEvent.click(refreshButton)
+      })
 
       // Wait for refresh to complete
       await waitFor(
@@ -470,13 +472,13 @@ describe('GameRoomClient', () => {
       const readyButton = screen.getByRole('button', {
         name: /Mark yourself as ready/i,
       })
-      await userEvent.click(readyButton)
+      fireEvent.click(readyButton)
 
       // Try to refresh while action is in progress
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
-      await userEvent.click(refreshButton)
+      fireEvent.click(refreshButton)
 
       // Refresh should not be called yet
       expect(mockGetGameRoomSnapshotAction).not.toHaveBeenCalled()
@@ -636,7 +638,9 @@ describe('GameRoomClient', () => {
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
-      await userEvent.click(refreshButton)
+      await act(async () => {
+        fireEvent.click(refreshButton)
+      })
 
       // Wait for refresh to complete (enough for promise to resolve)
       await act(async () => {
@@ -898,7 +902,9 @@ describe('GameRoomClient', () => {
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
-      await userEvent.click(refreshButton)
+      await act(async () => {
+        fireEvent.click(refreshButton)
+      })
 
       // Refresh should not execute yet
       expect(mockGetGameRoomSnapshotAction).not.toHaveBeenCalled()
@@ -954,7 +960,9 @@ describe('GameRoomClient', () => {
       })
       const readyCallCountBefore = mockMarkPlayerReadyAction.mock.calls.length
 
-      await userEvent.click(readyButton)
+      await act(async () => {
+        fireEvent.click(readyButton)
+      })
 
       // Ready action should not execute yet (poll is in progress)
       expect(mockMarkPlayerReadyAction.mock.calls.length).toBe(
@@ -972,17 +980,15 @@ describe('GameRoomClient', () => {
       await act(async () => {
         resolvePoll!()
         await pollPromise
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        await vi.advanceTimersByTimeAsync(0)
       })
 
       // Now the queued ready action should execute
-      await waitFor(
-        () => {
-          expect(mockMarkPlayerReadyAction.mock.calls.length).toBe(
-            readyCallCountBefore + 1
-          )
-        },
-        { timeout: 500 }
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(mockMarkPlayerReadyAction.mock.calls.length).toBe(
+        readyCallCountBefore + 1
       )
 
       vi.useRealTimers()
@@ -1027,7 +1033,9 @@ describe('GameRoomClient', () => {
       })
       const callCountBefore = mockGetGameRoomSnapshotAction.mock.calls.length
 
-      await userEvent.click(refreshButton)
+      await act(async () => {
+        fireEvent.click(refreshButton)
+      })
 
       // Manual refresh should not trigger another call (poll is already in progress)
       expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
@@ -1038,7 +1046,7 @@ describe('GameRoomClient', () => {
       await act(async () => {
         resolvePoll!()
         await pollPromise
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await vi.advanceTimersByTimeAsync(0)
       })
 
       // Still should only have the one poll call
@@ -1088,29 +1096,20 @@ describe('GameRoomClient', () => {
       })
 
       // Check for slow sync indicator
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Updating game state/i)).toBeInTheDocument()
-        },
-        { timeout: 100 }
-      )
+      expect(screen.getByText(/Updating game state/i)).toBeInTheDocument()
 
       // Resolve the poll
       await act(async () => {
         resolvePoll!()
         await pollPromise
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        await vi.advanceTimersByTimeAsync(0)
       })
 
       // Slow sync indicator should disappear
-      await waitFor(
-        () => {
-          expect(
-            screen.queryByText(/Updating game state/i)
-          ).not.toBeInTheDocument()
-        },
-        { timeout: 100 }
-      )
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(screen.queryByText(/Updating game state/i)).not.toBeInTheDocument()
 
       vi.useRealTimers()
     })

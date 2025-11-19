@@ -150,18 +150,18 @@ export function BiddingPanel({
   }
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-4 rounded-3xl border border-success/50 bg-success/15 p-5 shadow-[0_30px_90px_rgba(56,189,116,0.25)]">
-      <header className="flex flex-wrap items-center justify-between gap-2 text-success-contrast">
+    <section className="flex w-full flex-col gap-4 rounded-3xl border border-success/50 bg-success/10 p-5 text-success-contrast shadow-[0_30px_90px_rgba(56,189,116,0.25)]">
+      <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-success-contrast">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
             Bidding
           </h2>
           <p className="text-xs text-success-contrast/80">
-            Select your bid between {minBid} and {maxBid}. Once submitted, the
-            next player will be prompted automatically.
+            Select a number between {minBid} and {maxBid}. Everyone’s bids stay
+            visible below.
           </p>
         </div>
-        <div className="rounded-full border border-success/60 bg-success/25 px-3 py-1 text-xs font-semibold text-success-contrast">
+        <div className="rounded-full border border-success/60 bg-success/25 px-3 py-1 text-xs font-semibold">
           Waiting on: {activeName}
         </div>
       </header>
@@ -172,7 +172,7 @@ export function BiddingPanel({
       >
         <label
           htmlFor="bid-value"
-          className="text-xs font-medium uppercase tracking-wide text-success-contrast"
+          className="text-xs font-medium uppercase tracking-wide"
         >
           Your bid
         </label>
@@ -231,31 +231,31 @@ export function BiddingPanel({
       </form>
 
       <div className="rounded-2xl border border-success/20 bg-surface/70 p-4">
-        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-success-contrast">
-          Bid tracker
+        <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide">
+          Table bids
         </h3>
-        <ul className="grid gap-2 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
           {seatBids.map(({ seat, name, bid, orientation }) => (
-            <li
+            <div
               key={seat}
-              className={`flex items-center justify-between rounded-xl border border-border bg-surface/80 px-3 py-2 text-sm ${
+              className={`flex items-center justify-between rounded-2xl px-3 py-2 text-sm ${
                 seat === phase.to_act
-                  ? 'border-success bg-success/10 text-success-contrast'
-                  : 'text-muted'
+                  ? 'bg-success/20 text-success-contrast'
+                  : 'bg-surface text-muted'
               }`}
             >
               <div className="flex flex-col">
-                <span className="font-medium text-foreground">{name}</span>
+                <span className="font-semibold text-foreground">{name}</span>
                 <span className="text-[10px] uppercase text-subtle">
                   {orientation}
                 </span>
               </div>
-              <span className="text-sm font-semibold text-foreground">
+              <span className="text-base font-semibold text-foreground">
                 {bid ?? '—'}
               </span>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       </div>
     </section>
   )
