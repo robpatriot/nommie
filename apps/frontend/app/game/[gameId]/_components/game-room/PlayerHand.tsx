@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect, useState } from 'react'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
@@ -61,6 +61,104 @@ export function PlayerHand({
     }
   }
 
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [overlapAmount, setOverlapAmount] = useState(16) // Default -ml-4 (16px)
+
+  useEffect(() => {
+    if (!containerRef.current || viewerHand.length === 0) {
+      if (viewerHand.length === 0) {
+        setOverlapAmount(16) // Reset to default when empty
+      }
+      return
+    }
+
+    const updateOverlap = () => {
+      const container = containerRef.current
+      if (!container) return
+
+      // Measure container width (accounting for padding)
+      const containerWidth = container.clientWidth
+
+      // Card width: md size is w-20 (80px) + padding p-[2px] (4px total) = ~84px
+      // We'll measure the first card button to get exact width
+      const firstCard = container.querySelector('button')
+      if (!firstCard) {
+        // If no card found yet, retry after a short delay
+        return
+      }
+
+      const cardWidth = firstCard.offsetWidth
+      const cardCount = viewerHand.length
+
+      if (cardCount <= 1) {
+        setOverlapAmount(0)
+        return
+      }
+
+      // Calculate how much space we need
+      const totalWidthNeeded = cardWidth * cardCount
+      const availableWidth = containerWidth
+
+      // If cards already fit, use minimal overlap
+      if (totalWidthNeeded <= availableWidth) {
+        setOverlapAmount(16) // Default overlap
+        return
+      }
+
+      // Calculate overlap needed: we want the last card to fit
+      // Total visible width = cardWidth + (cardCount - 1) * (cardWidth - overlap)
+      // We want: cardWidth + (cardCount - 1) * (cardWidth - overlap) <= availableWidth
+      // Solving for overlap: overlap >= (totalWidthNeeded - availableWidth) / (cardCount - 1)
+      const overlapNeeded =
+        (totalWidthNeeded - availableWidth) / (cardCount - 1)
+
+      // Ensure overlap is at least a minimum (so cards are still distinct)
+      // and at most cardWidth - some visible portion (we want to see at least rank/suit)
+      const minOverlap = 4
+      const maxOverlap = cardWidth - 40 // Ensure at least 40px of each card is visible
+
+      const newOverlap = Math.max(
+        minOverlap,
+        Math.min(maxOverlap, overlapNeeded)
+      )
+      setOverlapAmount(newOverlap)
+    }
+
+    // Use multiple timing strategies to ensure we measure after DOM updates
+    // Strategy 1: Double RAF (catches immediate DOM updates)
+    const rafId1 = requestAnimationFrame(() => {
+      requestAnimationFrame(updateOverlap)
+    })
+
+    // Strategy 2: setTimeout fallback (catches delayed React updates)
+    const timeoutId = setTimeout(() => {
+      updateOverlap()
+    }, 150)
+
+    // Use ResizeObserver to handle container size changes
+    const resizeObserver = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(updateOverlap)
+      })
+    })
+    resizeObserver.observe(containerRef.current)
+
+    // Also handle window resize
+    const handleResize = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(updateOverlap)
+      })
+    }
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      cancelAnimationFrame(rafId1)
+      clearTimeout(timeoutId)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [viewerHand.length])
+
   const handleCardClick = (card: Card) => {
     if (!isTrickPhase || !playState) {
       return
@@ -96,13 +194,16 @@ export function PlayerHand({
           </span>
         ) : null}
       </header>
-      <div className="flex gap-2 overflow-x-auto pb-2 pt-1 sm:justify-center sm:gap-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={containerRef}
+        className="flex justify-center overflow-hidden pb-2 pt-1"
+      >
         {viewerHand.length === 0 ? (
           <span className="text-sm text-subtle">
             Hand will appear once available.
           </span>
         ) : (
-          viewerHand.map((card) => {
+          viewerHand.map((card, index) => {
             const isPlayable = playableCards.has(card)
             const isSelected = selectedCard === card
             const isDisabled =
@@ -121,23 +222,32 @@ export function PlayerHand({
                 type="button"
                 onClick={() => handleCardClick(card)}
                 disabled={isDisabled}
+                style={{
+                  marginLeft: index === 0 ? 0 : -overlapAmount,
+                  transitionProperty: 'margin-left, transform, scale, z-index',
+                  transitionDuration: '300ms',
+                  transitionTimingFunction: 'ease-out',
+                }}
                 className={cn(
-                  'relative rounded-[1.45rem] border border-transparent p-[2px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed',
+                  'relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed',
+                  'hover:z-10 hover:translate-y-[-4px] hover:scale-105',
                   isSelected
-                    ? 'border-success/80 bg-success/20 shadow-[0_20px_35px_rgba(34,197,94,0.35)]'
+                    ? 'z-20 translate-y-[-8px] scale-110 border-success/80 bg-success/20 shadow-[0_20px_35px_rgba(34,197,94,0.35)]'
                     : isPlayable && viewerTurn
-                      ? 'hover:-translate-y-1 hover:bg-primary/10'
-                      : 'opacity-60'
+                      ? 'z-0'
+                      : ''
                 )}
                 aria-label={cardLabel}
                 aria-pressed={isSelected}
               >
-                <PlayingCard
-                  card={card}
-                  size="md"
-                  isDimmed={isDisabled && !isSelected}
-                  isSelected={isSelected}
-                />
+                <div className="rounded-[1.45rem] border border-transparent p-[2px]">
+                  <PlayingCard
+                    card={card}
+                    size="md"
+                    isDimmed={isDisabled && !isSelected}
+                    isSelected={isSelected}
+                  />
+                </div>
               </button>
             )
           })

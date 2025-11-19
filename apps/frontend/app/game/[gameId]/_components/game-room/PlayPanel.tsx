@@ -37,17 +37,17 @@ export function PlayPanel({
   }
 
   return (
-    <section className="flex w-full flex-col gap-4 rounded-3xl border border-primary/40 bg-primary/15 p-5 text-primary-foreground shadow-[0_30px_90px_rgba(239,149,74,0.25)]">
+    <section className="flex w-full flex-col gap-4 rounded-3xl border border-primary/40 bg-primary/15 p-5 text-foreground shadow-[0_30px_90px_rgba(239,149,74,0.25)]">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
             Play card
           </h2>
-          <p className="text-xs text-primary-foreground/80">
+          <p className="text-xs text-muted">
             Choose a legal card from your hand. Only allowed cards stay enabled.
           </p>
         </div>
-        <div className="rounded-full border border-primary/50 bg-primary/25 px-3 py-1 text-xs font-semibold">
+        <div className="rounded-full border border-primary/50 bg-primary/25 px-3 py-1 text-xs font-semibold text-foreground">
           Waiting on: {activeName}
         </div>
       </header>
@@ -56,8 +56,8 @@ export function PlayPanel({
         className="flex flex-col gap-4 rounded-2xl border border-primary/30 bg-surface/85 p-4 shadow-inner shadow-primary/20"
         onSubmit={handleSubmit}
       >
-        <div className="flex flex-col items-start gap-3 text-sm text-primary-foreground">
-          <span className="text-xs uppercase tracking-wide text-primary-foreground/70">
+        <div className="flex flex-col items-start gap-3 text-sm text-foreground">
+          <span className="text-xs uppercase tracking-wide text-muted">
             Selected card
           </span>
           {selectedCard ? (
@@ -88,7 +88,7 @@ export function PlayPanel({
               ? 'Play selected card'
               : `Waiting for ${activeName}`}
         </button>
-        <p className="text-xs text-primary-foreground/70">
+        <p className="text-xs text-muted">
           Legal cards: {play.playable.length ? play.playable.join(', ') : '—'}
         </p>
       </form>

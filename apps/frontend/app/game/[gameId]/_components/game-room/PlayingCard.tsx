@@ -61,7 +61,9 @@ export function PlayingCard({
         suitKey === 'S' || suitKey === 'C'
           ? 'text-slate-900 drop-shadow-[0_6px_12px_rgba(0,0,0,0.25)]'
           : 'drop-shadow-[0_6px_12px_rgba(184,28,28,0.35)]',
-        isDimmed ? 'opacity-60 saturate-75' : '',
+        isDimmed
+          ? '[filter:grayscale(60%)_brightness(0.75)] saturate-[75%]'
+          : '',
         isSelected ? 'ring-2 ring-success/80 scale-[1.02]' : '',
         className
       )}
