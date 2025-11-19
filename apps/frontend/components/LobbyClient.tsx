@@ -44,7 +44,7 @@ export default function LobbyClient({
   creatorName,
 }: LobbyClientProps) {
   const router = useRouter()
-  const { toast, showToast, hideToast } = useToast()
+  const { toasts, showToast, hideToast } = useToast()
   const [refreshing, setRefreshing] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
@@ -363,7 +363,7 @@ export default function LobbyClient({
         creatorName={creatorName}
       />
 
-      <Toast toast={toast} onClose={hideToast} />
+      <Toast toasts={toasts} onClose={hideToast} />
     </>
   )
 }

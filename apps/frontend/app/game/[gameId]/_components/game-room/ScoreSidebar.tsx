@@ -12,8 +12,6 @@ interface ScoreSidebarProps {
   roundNo: number
   dealer: Seat
   seatDisplayName: (seat: Seat) => string
-  isSyncing?: boolean
-  isSlowSync?: boolean
   error?: { message: string; traceId?: string } | null
   bidStatus?: Array<{
     seat: number
@@ -36,8 +34,6 @@ export function ScoreSidebar({
   roundNo,
   dealer,
   seatDisplayName,
-  isSyncing = false,
-  isSlowSync = false,
   error,
   bidStatus = [],
   onRefresh,
@@ -61,11 +57,6 @@ export function ScoreSidebar({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {isSyncing ? (
-            <span className="rounded-full border border-primary/60 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary-foreground">
-              Syncing…
-            </span>
-          ) : null}
           {phase.phase === 'Trick' ? (
             <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
               Trick {phase.data.trick_no} / {round?.hand_size ?? '?'}
@@ -91,13 +82,6 @@ export function ScoreSidebar({
           <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
           <PhaseFact label="Dealer" value={seatDisplayName(dealer)} />
           <PhaseFact label="Trump" value={formatTrump(round.trump)} />
-        </div>
-      ) : null}
-
-      {isSlowSync ? (
-        <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary-foreground">
-          <span className="inline-flex h-2 w-2 animate-pulse items-center justify-center rounded-full bg-primary" />
-          <span>Updating game state…</span>
         </div>
       ) : null}
 

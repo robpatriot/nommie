@@ -41,7 +41,7 @@ const mockExecuteApiAction = vi.fn()
 
 vi.mock('@/hooks/useToast', () => ({
   useToast: () => ({
-    toast: null,
+    toasts: [],
     showToast: mockShowToast,
     hideToast: mockHideToast,
   }),

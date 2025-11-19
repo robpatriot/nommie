@@ -7,30 +7,42 @@ import { BackendApiError } from '@/lib/errors'
 /**
  * Hook for managing toast notifications.
  * Provides a consistent API for showing success and error toasts.
+ * Toasts are stackable and appear on top of each other.
  *
  * @returns An object with toast state and show function
  */
 export function useToast() {
-  const [toast, setToast] = useState<ToastMessage | null>(null)
+  const [toasts, setToasts] = useState<ToastMessage[]>([])
 
   const showToast = useCallback(
     (message: string, type: ToastMessage['type'], error?: BackendApiError) => {
-      setToast({
-        id: Date.now().toString(),
-        message,
-        type,
-        error,
-      })
+      const id = Date.now().toString()
+      setToasts((prev) => [
+        ...prev,
+        {
+          id,
+          message,
+          type,
+          error,
+        },
+      ])
+      return id
     },
     []
   )
 
-  const hideToast = useCallback(() => {
-    setToast(null)
+  const hideToast = useCallback((id?: string) => {
+    if (id) {
+      // Hide specific toast by id
+      setToasts((prev) => prev.filter((toast) => toast.id !== id))
+    } else {
+      // Hide all toasts (backward compatibility)
+      setToasts([])
+    }
   }, [])
 
   return {
-    toast,
+    toasts,
     showToast,
     hideToast,
   }

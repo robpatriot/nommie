@@ -40,7 +40,6 @@ export interface GameRoomViewProps {
   viewerHand?: Card[]
   onRefresh?: () => void
   isRefreshing?: boolean
-  isSlowSync?: boolean
   error?: GameRoomError | null
   readyState?: ReadyState
   biddingState?: BiddingState
@@ -62,14 +61,12 @@ export function GameRoomView(props: GameRoomViewProps) {
     gameId,
     onRefresh,
     isRefreshing = false,
-    isSlowSync = false,
     error,
     readyState,
     biddingState,
     trumpState,
     playState,
     aiSeatState,
-    status,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -293,12 +290,6 @@ export function GameRoomView(props: GameRoomViewProps) {
                       </span>
                     </button>
                   </div>
-                  {isSlowSync ? (
-                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary-foreground">
-                      <span className="inline-flex h-2 w-2 animate-pulse items-center justify-center rounded-full bg-primary" />
-                      <span>Updating game state…</span>
-                    </div>
-                  ) : null}
                 </div>
               </>
             }
@@ -340,7 +331,6 @@ export function GameRoomView(props: GameRoomViewProps) {
           bid: biddingPhase.bids[seatIndex],
           isActive: biddingPhase.to_act === seatIndex,
         }))
-  const isSyncing = Boolean(isRefreshing || status?.isPolling)
 
   return (
     <div className="flex flex-col text-foreground">
@@ -412,8 +402,6 @@ export function GameRoomView(props: GameRoomViewProps) {
               roundNo={snapshot.game.round_no}
               dealer={snapshot.game.dealer}
               seatDisplayName={seatDisplayName}
-              isSyncing={isSyncing}
-              isSlowSync={isSlowSync}
               error={error}
               bidStatus={bidStatus}
               onRefresh={onRefresh}

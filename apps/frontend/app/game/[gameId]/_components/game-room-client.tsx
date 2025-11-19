@@ -57,7 +57,7 @@ export function GameRoomClient({
   } | null>(null)
   const [activity, setActivity] = useState<ActivityState>({ type: 'idle' })
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
-  const { toast, showToast, hideToast } = useToast()
+  const { toasts, showToast, hideToast } = useToast()
   const [aiRegistry, setAiRegistry] = useState<AiRegistryEntryState[]>([])
   const [isAiRegistryLoading, setIsAiRegistryLoading] = useState(false)
   const [aiRegistryError, setAiRegistryError] = useState<string | null>(null)
@@ -76,6 +76,7 @@ export function GameRoomClient({
   const pendingManualRefreshRef = useRef(false)
   const pendingActionRef = useRef<(() => Promise<void>) | null>(null)
   const slowSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const slowSyncToastIdRef = useRef<string | null>(null)
 
   // Keep ref in sync with state so callbacks always see current activity
   useEffect(() => {
@@ -90,6 +91,20 @@ export function GameRoomClient({
       }
     }
   }, [])
+
+  // Show/hide slow sync toast when isSlowSync changes
+  useEffect(() => {
+    if (isSlowSync) {
+      // Show warning toast and store its ID
+      slowSyncToastIdRef.current = showToast('Updating game state…', 'warning')
+    } else {
+      // Hide the slow sync warning toast when sync completes
+      if (slowSyncToastIdRef.current) {
+        hideToast(slowSyncToastIdRef.current)
+        slowSyncToastIdRef.current = null
+      }
+    }
+  }, [isSlowSync, showToast, hideToast])
 
   // Derived state for convenience
   const isRefreshing = activity.type === 'refreshing'
@@ -801,7 +816,6 @@ export function GameRoomClient({
         viewerHand={snapshot.viewerHand}
         onRefresh={() => void requestRefresh('manual')}
         isRefreshing={isRefreshing}
-        isSlowSync={isSlowSync}
         error={error}
         status={{
           lastSyncedAt: snapshot.timestamp,
@@ -820,7 +834,7 @@ export function GameRoomClient({
         playState={playControls}
         aiSeatState={aiSeatState}
       />
-      <Toast toast={toast} onClose={hideToast} />
+      <Toast toasts={toasts} onClose={hideToast} />
     </>
   )
 }
