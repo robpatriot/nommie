@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
-import { formatTime } from '@/utils/date-formatting'
 import {
   buildSeatSummaries,
   formatTrump,
@@ -23,11 +22,12 @@ import { ReadyPanel } from './game-room/ReadyPanel'
 import { SetupSeatList } from './game-room/SetupSeatList'
 import { PageHero } from '@/components/PageHero'
 import { PageContainer } from '@/components/PageContainer'
+import { SurfaceCard } from '@/components/SurfaceCard'
+import { StatCard } from '@/components/StatCard'
 import type {
   AiSeatState,
   BiddingState,
   GameRoomError,
-  GameRoomStatus,
   PlayState,
   ReadyState,
   TrumpState,
@@ -42,9 +42,9 @@ export interface GameRoomViewProps {
   playerNames: [string, string, string, string]
   viewerSeat?: Seat
   viewerHand?: Card[]
-  status: GameRoomStatus
   onRefresh?: () => void
   isRefreshing?: boolean
+  isSlowSync?: boolean
   error?: GameRoomError | null
   readyState?: ReadyState
   biddingState?: BiddingState
@@ -59,10 +59,10 @@ export function GameRoomView(props: GameRoomViewProps) {
     playerNames,
     viewerSeat,
     viewerHand = [],
-    status,
     gameId,
     onRefresh,
     isRefreshing = false,
+    isSlowSync = false,
     error,
     readyState,
     biddingState,
@@ -88,10 +88,6 @@ export function GameRoomView(props: GameRoomViewProps) {
   )
   const activeName =
     typeof activeSeat === 'number' ? seatDisplayName(activeSeat) : 'Waiting'
-  const syncLabel = formatTime(status.lastSyncedAt, {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
 
   const setupSeatEntries = snapshot.game.seating
     .map((assignment, index) => {
@@ -106,7 +102,8 @@ export function GameRoomView(props: GameRoomViewProps) {
         name: seatDisplayName(seatIndex),
         isAi: Boolean(assignment.is_ai),
         isReady: Boolean(assignment.is_ready),
-        isOccupied: Boolean(assignment.user_id),
+        // Treat both humans and AI as occupying a seat for setup stats
+        isOccupied: Boolean(assignment.user_id) || Boolean(assignment.is_ai),
         isViewer: effectiveViewerSeat === seatIndex,
       }
     })
@@ -195,63 +192,106 @@ export function GameRoomView(props: GameRoomViewProps) {
             aside={
               <>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                      Total players
-                    </p>
-                    <p className="text-2xl font-semibold text-foreground">
-                      {filledSeatCount}/{totalSeatCount}
-                    </p>
-                    <p className="text-xs text-muted">
-                      Human or AI seats assigned
-                    </p>
-                  </div>
-                  <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                      AI players
-                    </p>
-                    <p className="text-2xl font-semibold text-foreground">
-                      {aiSeatCount}
-                    </p>
-                    <p className="text-xs text-muted">Bots currently seated</p>
-                  </div>
-                  <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/60 bg-surface/70 px-4 py-3 text-center">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                      Ready players
-                    </p>
-                    <p className="text-2xl font-semibold text-foreground">
-                      {readySeatCount}/{totalSeatCount}
-                    </p>
-                    <p className="text-xs text-muted">Marked ready so far</p>
-                  </div>
+                  <StatCard
+                    label="Total players"
+                    value={`${filledSeatCount}/${totalSeatCount}`}
+                    description="Human or AI seats assigned"
+                  />
+                  <StatCard
+                    label="AI players"
+                    value={aiSeatCount}
+                    description="Bots currently seated"
+                  />
+                  <StatCard
+                    label="Ready players"
+                    value={`${readySeatCount}/${totalSeatCount}`}
+                    description="Marked ready so far"
+                  />
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  {onRefresh ? (
+                <div className="rounded-3xl border border-white/10 bg-surface/70 p-4 shadow-[0_30px_90px_rgba(0,0,0,0.35)]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                    <span>Quick actions</span>
+                    <span className="text-[10px] font-normal tracking-[0.2em] text-muted">
+                      Stay synced & invite friends
+                    </span>
+                  </div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    {onRefresh ? (
+                      <button
+                        type="button"
+                        onClick={onRefresh}
+                        className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed"
+                        disabled={isRefreshing}
+                        aria-label={
+                          isRefreshing
+                            ? 'Refreshing game state'
+                            : 'Refresh game state'
+                        }
+                      >
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                            Manual sync
+                          </p>
+                          <p className="text-base font-semibold text-foreground">
+                            {isRefreshing
+                              ? 'Refreshing…'
+                              : 'Refresh game state'}
+                          </p>
+                        </div>
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
+                          <svg
+                            aria-hidden="true"
+                            className="h-5 w-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M21 2v6h-6" />
+                            <path d="M3 22v-6h6" />
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8" />
+                            <path d="M20.49 15a9 9 0 0 1-14.85 3.36L3 16" />
+                          </svg>
+                        </span>
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={onRefresh}
-                      className="w-full rounded-2xl border border-border/70 px-4 py-2 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground sm:flex-1"
-                      disabled={isRefreshing}
-                      aria-label={
-                        isRefreshing
-                          ? 'Refreshing game state'
-                          : 'Refresh game state'
-                      }
+                      onClick={() => {
+                        const url = window.location.href
+                        void navigator.clipboard.writeText(url)
+                      }}
+                      className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      aria-label="Copy invite link to clipboard"
                     >
-                      {isRefreshing ? 'Refreshing…' : 'Refresh'}
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                          Share link
+                        </p>
+                        <p className="text-base font-semibold text-foreground">
+                          Copy invite
+                        </p>
+                      </div>
+                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
+                        <svg
+                          aria-hidden="true"
+                          className="h-5 w-5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <path d="M15 3h6v6" />
+                          <path d="m10 14 11-11" />
+                        </svg>
+                      </span>
                     </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = window.location.href
-                      void navigator.clipboard.writeText(url)
-                    }}
-                    className="w-full rounded-2xl border border-border/70 px-4 py-2 text-sm font-semibold text-muted transition hover:text-foreground sm:flex-1"
-                    aria-label="Copy invite link to clipboard"
-                  >
-                    Copy invite
-                  </button>
+                  </div>
                 </div>
               </>
             }
@@ -273,7 +313,11 @@ export function GameRoomView(props: GameRoomViewProps) {
   return (
     <div className="flex flex-col text-foreground">
       <PageContainer>
-        <section className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-surface/80 p-5 shadow-[0_45px_120px_rgba(0,0,0,0.35)] backdrop-blur">
+        <SurfaceCard
+          as="section"
+          padding="md"
+          className="flex flex-col gap-4 shadow-[0_45px_120px_rgba(0,0,0,0.35)]"
+        >
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
@@ -287,17 +331,14 @@ export function GameRoomView(props: GameRoomViewProps) {
               <span className="flex items-center gap-2 rounded-full bg-surface px-3 py-1 font-semibold text-foreground">
                 Turn: {activeName}
               </span>
-              <span className="flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
-                <span
-                  className={`inline-flex h-2.5 w-2.5 items-center justify-center rounded-full ${
-                    status.isPolling ? 'animate-pulse bg-success' : 'bg-subtle'
-                  }`}
-                  aria-hidden
-                />
-                {status.isPolling ? 'Syncing' : 'Idle'} • {syncLabel}
-              </span>
             </div>
           </div>
+          {isSlowSync ? (
+            <div className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary-foreground">
+              <span className="inline-flex h-2 w-2 animate-pulse items-center justify-center rounded-full bg-primary" />
+              <span>Updating game state…</span>
+            </div>
+          ) : null}
           {error ? (
             <div className="rounded-lg border border-warning/60 bg-warning/10 px-3 py-2 text-sm text-warning-foreground">
               <p>{error.message}</p>
@@ -324,11 +365,11 @@ export function GameRoomView(props: GameRoomViewProps) {
               Trick {phase.data.trick_no} of {round?.hand_size ?? '?'}
             </span>
           ) : null}
-        </section>
+        </SurfaceCard>
 
         <section className="flex flex-col gap-6 lg:flex-row lg:items-start">
           <div className="flex flex-1 flex-col gap-6 lg:pr-6">
-            <div className="rounded-[40px] border border-white/10 bg-gradient-to-b from-[#1a5a46]/90 via-[#0c3025]/90 to-[#041a12]/95 p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
+            <div className="rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.9)] via-[rgba(var(--felt-base),0.9)] to-[rgba(var(--felt-shadow),0.95)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
               <div className="hidden grid-cols-3 grid-rows-3 gap-4 lg:grid">
                 {seatSummaries.map((summary) => (
                   <SeatCard key={summary.seat} summary={summary} />

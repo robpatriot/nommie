@@ -6,11 +6,6 @@ export interface AiSeatSelection {
   seed?: number
 }
 
-export interface GameRoomStatus {
-  lastSyncedAt: string
-  isPolling: boolean
-}
-
 export interface GameRoomError {
   message: string
   traceId?: string

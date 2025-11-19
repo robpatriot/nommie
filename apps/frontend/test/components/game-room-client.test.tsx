@@ -914,5 +914,205 @@ describe('GameRoomClient', () => {
       // Now refresh should execute
       expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
     })
+
+    it('queues user action when sync is in progress and executes after sync completes', async () => {
+      const initialData = createInitialData()
+      vi.useFakeTimers()
+
+      // Make poll slow so we can queue an action during it
+      let resolvePoll: () => void
+      const pollPromise = new Promise<{
+        kind: 'ok'
+        data: GameRoomSnapshotPayload
+      }>((resolve) => {
+        resolvePoll = () =>
+          resolve({
+            kind: 'ok',
+            data: createInitialData(),
+          })
+      })
+      mockGetGameRoomSnapshotAction.mockReturnValueOnce(pollPromise)
+
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
+
+      // Trigger a poll
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+
+      // While poll is in progress, try to mark ready (should be queued)
+      const readyButton = screen.getByRole('button', {
+        name: /Mark yourself as ready/i,
+      })
+      const readyCallCountBefore = mockMarkPlayerReadyAction.mock.calls.length
+
+      await userEvent.click(readyButton)
+
+      // Ready action should not execute yet (poll is in progress)
+      expect(mockMarkPlayerReadyAction.mock.calls.length).toBe(
+        readyCallCountBefore
+      )
+
+      // Set up mocks for after poll resolves
+      mockMarkPlayerReadyAction.mockResolvedValueOnce({ kind: 'ok' })
+      mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
+        kind: 'ok',
+        data: createInitialData(),
+      })
+
+      // Resolve the poll
+      await act(async () => {
+        resolvePoll!()
+        await pollPromise
+        await new Promise((resolve) => setTimeout(resolve, 100))
+      })
+
+      // Now the queued ready action should execute
+      await waitFor(
+        () => {
+          expect(mockMarkPlayerReadyAction.mock.calls.length).toBe(
+            readyCallCountBefore + 1
+          )
+        },
+        { timeout: 500 }
+      )
+
+      vi.useRealTimers()
+    })
+
+    it('does nothing when manual refresh is clicked during automatic poll', async () => {
+      const initialData = createInitialData()
+      vi.useFakeTimers()
+
+      // Make poll slow
+      let resolvePoll: () => void
+      const pollPromise = new Promise<{
+        kind: 'ok'
+        data: GameRoomSnapshotPayload
+      }>((resolve) => {
+        resolvePoll = () =>
+          resolve({
+            kind: 'ok',
+            data: createInitialData(),
+          })
+      })
+      mockGetGameRoomSnapshotAction.mockReturnValueOnce(pollPromise)
+
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
+
+      // Trigger a poll
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+
+      // While poll is in progress, try manual refresh
+      const refreshButton = screen.getByRole('button', {
+        name: /Refresh game state/i,
+      })
+      const callCountBefore = mockGetGameRoomSnapshotAction.mock.calls.length
+
+      await userEvent.click(refreshButton)
+
+      // Manual refresh should not trigger another call (poll is already in progress)
+      expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
+        callCountBefore
+      )
+
+      // Resolve the poll
+      await act(async () => {
+        resolvePoll!()
+        await pollPromise
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+
+      // Still should only have the one poll call
+      expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
+        callCountBefore
+      )
+
+      vi.useRealTimers()
+    })
+
+    it('shows slow sync indicator when refresh takes longer than 1 second', async () => {
+      const initialData = createInitialData()
+      vi.useFakeTimers()
+
+      // Make poll slow (longer than 1 second)
+      let resolvePoll: () => void
+      const pollPromise = new Promise<{
+        kind: 'ok'
+        data: GameRoomSnapshotPayload
+      }>((resolve) => {
+        resolvePoll = () =>
+          resolve({
+            kind: 'ok',
+            data: createInitialData(),
+          })
+      })
+      mockGetGameRoomSnapshotAction.mockReturnValueOnce(pollPromise)
+
+      await act(async () => {
+        render(
+          <GameRoomClient
+            initialData={initialData}
+            gameId={42}
+            pollingMs={3000}
+          />
+        )
+      })
+
+      // Trigger a poll
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000)
+      })
+
+      // Advance time by 1 second - slow sync indicator should appear
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000)
+      })
+
+      // Check for slow sync indicator
+      await waitFor(
+        () => {
+          expect(screen.getByText(/Updating game state/i)).toBeInTheDocument()
+        },
+        { timeout: 100 }
+      )
+
+      // Resolve the poll
+      await act(async () => {
+        resolvePoll!()
+        await pollPromise
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+
+      // Slow sync indicator should disappear
+      await waitFor(
+        () => {
+          expect(
+            screen.queryByText(/Updating game state/i)
+          ).not.toBeInTheDocument()
+        },
+        { timeout: 100 }
+      )
+
+      vi.useRealTimers()
+    })
   })
 })

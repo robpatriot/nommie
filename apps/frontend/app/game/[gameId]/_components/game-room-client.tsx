@@ -61,21 +61,35 @@ export function GameRoomClient({
   const [aiRegistry, setAiRegistry] = useState<AiRegistryEntryState[]>([])
   const [isAiRegistryLoading, setIsAiRegistryLoading] = useState(false)
   const [aiRegistryError, setAiRegistryError] = useState<string | null>(null)
+  const [isSlowSync, setIsSlowSync] = useState(false)
   // Refs for concurrent operations:
   // - inflightRef: Tracks if an API call is in progress (used to prevent concurrent requests)
   // - activityRef: Current activity state as ref (used to avoid stale closures in callbacks)
   // - pendingManualRefreshRef: Flags if a manual refresh should run after current operation completes
+  // - pendingActionRef: Queued user action to execute after current operation completes
+  // - slowSyncTimeoutRef: Timeout ID for slow sync detection
   // Why both state and refs? React state updates are asynchronous, but we need synchronous
   // checks in callbacks (like performRefresh) to avoid race conditions. The ref provides
   // the current value immediately, while state triggers re-renders for UI updates.
   const inflightRef = useRef(false)
   const activityRef = useRef<ActivityState>(activity)
   const pendingManualRefreshRef = useRef(false)
+  const pendingActionRef = useRef<(() => Promise<void>) | null>(null)
+  const slowSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Keep ref in sync with state so callbacks always see current activity
   useEffect(() => {
     activityRef.current = activity
   }, [activity])
+
+  // Cleanup slow sync timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (slowSyncTimeoutRef.current) {
+        clearTimeout(slowSyncTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Derived state for convenience
   const isIdle = activity.type === 'idle'
@@ -107,11 +121,30 @@ export function GameRoomClient({
       activityRef.current = newActivity
       setActivity(newActivity)
 
+      // Clear any existing slow sync timeout
+      if (slowSyncTimeoutRef.current) {
+        clearTimeout(slowSyncTimeoutRef.current)
+        slowSyncTimeoutRef.current = null
+      }
+      setIsSlowSync(false)
+
+      // Set timeout to detect slow sync (1 second)
+      slowSyncTimeoutRef.current = setTimeout(() => {
+        setIsSlowSync(true)
+      }, 1000)
+
       try {
         const result = await getGameRoomSnapshotAction({
           gameId,
           etag,
         })
+
+        // Clear slow sync timeout if refresh completed quickly
+        if (slowSyncTimeoutRef.current) {
+          clearTimeout(slowSyncTimeoutRef.current)
+          slowSyncTimeoutRef.current = null
+        }
+        setIsSlowSync(false)
 
         if (result.kind === 'ok') {
           // Don't preserve viewerSeat from previous snapshot - if API returns null,
@@ -130,6 +163,13 @@ export function GameRoomClient({
           setError({ message: result.message, traceId: result.traceId })
         }
       } catch (err) {
+        // Clear slow sync timeout on error
+        if (slowSyncTimeoutRef.current) {
+          clearTimeout(slowSyncTimeoutRef.current)
+          slowSyncTimeoutRef.current = null
+        }
+        setIsSlowSync(false)
+
         // Network errors are now handled by retry logic in fetchWithAuth.
         // If we reach here, either retries were exhausted or it's a non-network error.
         console.error('Snapshot refresh failed', err)
@@ -145,6 +185,10 @@ export function GameRoomClient({
         const hasPendingManualRefresh = pendingManualRefreshRef.current
         pendingManualRefreshRef.current = false
 
+        // Check if there's a pending action that was queued during this operation
+        const hasPendingAction = pendingActionRef.current
+        pendingActionRef.current = null
+
         // Handle pending refresh: If a manual refresh was requested while this operation
         // was in progress, trigger it now. This ensures queued refreshes always execute.
         // Note: This is a tail-recursive call, but it's safe because:
@@ -157,8 +201,13 @@ export function GameRoomClient({
           setActivity({ type: 'refreshing' })
           // Recursive call: execute the pending refresh
           void executeRefresh('refreshing')
+        } else if (hasPendingAction) {
+          // Execute queued action
+          activityRef.current = { type: 'idle' }
+          setActivity({ type: 'idle' })
+          void hasPendingAction()
         } else {
-          // No pending refresh - reset to idle
+          // No pending refresh or action - reset to idle
           activityRef.current = { type: 'idle' }
           setActivity({ type: 'idle' })
         }
@@ -187,19 +236,19 @@ export function GameRoomClient({
         return
       }
 
-      // Manual refresh: Queue if there's an operation in progress, execute immediately otherwise
+      // Manual refresh: Queue if there's an action in progress, ignore if automatic poll is in progress
       if (mode === 'manual') {
         // If there's an action in progress, queue the refresh to run after it completes
         if (currentActivity.type === 'action') {
           pendingManualRefreshRef.current = true
           return
         }
-        // If there's an inflight API call (refresh/poll), queue manual refresh for after it completes
-        if (inflightRef.current) {
-          pendingManualRefreshRef.current = true
-          // Set activity to refreshing immediately to stop polling after this cycle
-          activityRef.current = { type: 'refreshing' }
-          setActivity({ type: 'refreshing' })
+        // If there's an automatic poll in progress, do nothing (manual refresh is redundant)
+        if (inflightRef.current && currentActivity.type === 'polling') {
+          return
+        }
+        // If there's an inflight manual refresh, don't start another
+        if (inflightRef.current && currentActivity.type === 'refreshing') {
           return
         }
         // If already refreshing, don't start another
@@ -228,18 +277,6 @@ export function GameRoomClient({
     }
   }, [requestRefresh, pollingMs])
 
-  // Status derived from activity state
-  // Only recompute when timestamp or polling state changes (not all activities)
-  // This prevents unnecessary re-renders when other activities (refresh, actions) occur
-  const isPolling = activity.type === 'polling'
-  const status = useMemo(
-    () => ({
-      lastSyncedAt: snapshot.timestamp,
-      isPolling,
-    }),
-    [snapshot.timestamp, isPolling]
-  )
-
   const phase = snapshot.snapshot.phase
   const phaseName = phase.phase
   const canMarkReady = phaseName === 'Init'
@@ -265,6 +302,7 @@ export function GameRoomClient({
    * 1. Reset activity to idle (both state and ref for immediate effect)
    * 2. If a refresh is in progress, queue this refresh for after it completes
    * 3. Otherwise, execute refresh immediately
+   * 4. After refresh completes, execute any queued action
    */
   const completeActionAndRefresh = useCallback(async () => {
     // Reset activity to idle and update ref immediately (ref needed for synchronous checks)
@@ -282,72 +320,94 @@ export function GameRoomClient({
     await executeRefresh('refreshing')
   }, [executeRefresh])
 
-  const markReady = useCallback(async () => {
-    if (!canMarkReady || isReadyPending || hasMarkedReady || !isIdle) {
-      return
-    }
-
-    setActivity({ type: 'action', action: 'ready' })
-
-    try {
-      const result = await markPlayerReadyAction(gameId)
-      if (result.kind === 'error') {
-        setError({ message: result.message, traceId: result.traceId })
-        setActivity({ type: 'idle' })
-        activityRef.current = { type: 'idle' }
+  /**
+   * Generic helper to enqueue an action if not idle, or execute immediately if idle.
+   * Ensures only one action is queued at a time.
+   */
+  const enqueueOrExecuteAction = useCallback(
+    async (actionFn: () => Promise<void>) => {
+      if (!isIdle) {
+        // Queue the action to execute after current operation completes
+        pendingActionRef.current = actionFn
         return
       }
 
-      setHasMarkedReady(true)
-    } catch (err) {
-      if (err instanceof Error) {
-        setError({ message: err.message })
-      } else {
-        setError({ message: 'Unable to mark ready' })
-      }
-      setActivity({ type: 'idle' })
-      activityRef.current = { type: 'idle' }
-    } finally {
-      // Only complete action if we're still in the ready action state
-      // (might have changed if another action started)
-      const currentActivity = activityRef.current
-      if (
-        currentActivity.type === 'action' &&
-        currentActivity.action === 'ready'
-      ) {
-        await completeActionAndRefresh()
-      }
+      // Execute immediately
+      await actionFn()
+    },
+    [isIdle]
+  )
+
+  const markReady = useCallback(async () => {
+    if (!canMarkReady || isReadyPending || hasMarkedReady) {
+      return
     }
+
+    await enqueueOrExecuteAction(async () => {
+      setActivity({ type: 'action', action: 'ready' })
+
+      try {
+        const result = await markPlayerReadyAction(gameId)
+        if (result.kind === 'error') {
+          setError({ message: result.message, traceId: result.traceId })
+          setActivity({ type: 'idle' })
+          activityRef.current = { type: 'idle' }
+          return
+        }
+
+        setHasMarkedReady(true)
+      } catch (err) {
+        if (err instanceof Error) {
+          setError({ message: err.message })
+        } else {
+          setError({ message: 'Unable to mark ready' })
+        }
+        setActivity({ type: 'idle' })
+        activityRef.current = { type: 'idle' }
+      } finally {
+        // Only complete action if we're still in the ready action state
+        // (might have changed if another action started)
+        const currentActivity = activityRef.current
+        if (
+          currentActivity.type === 'action' &&
+          currentActivity.action === 'ready'
+        ) {
+          await completeActionAndRefresh()
+        }
+      }
+    })
   }, [
     canMarkReady,
     gameId,
     hasMarkedReady,
     isReadyPending,
-    isIdle,
+    enqueueOrExecuteAction,
     completeActionAndRefresh,
   ])
 
   const handleSubmitBid = useCallback(
     async (bid: number) => {
-      if (isBidPending || !isIdle) {
+      if (isBidPending) {
         return
       }
 
-      setActivity({ type: 'action', action: 'bid' })
+      await enqueueOrExecuteAction(async () => {
+        setActivity({ type: 'action', action: 'bid' })
 
-      try {
-        await executeApiAction(() => submitBidAction({ gameId, bid, etag }), {
-          successMessage: 'Bid submitted',
-        })
-      } finally {
-        await completeActionAndRefresh()
-      }
+        try {
+          await executeApiAction(() => submitBidAction({ gameId, bid, etag }), {
+            successMessage: 'Bid submitted',
+          })
+        } finally {
+          await completeActionAndRefresh()
+        }
+      })
     },
     [
       gameId,
       etag,
       isBidPending,
-      isIdle,
+      enqueueOrExecuteAction,
       executeApiAction,
       completeActionAndRefresh,
     ]
@@ -355,28 +415,30 @@ export function GameRoomClient({
 
   const handleSelectTrump = useCallback(
     async (trump: Trump) => {
-      if (isTrumpPending || !isIdle) {
+      if (isTrumpPending) {
         return
       }
 
-      setActivity({ type: 'action', action: 'trump' })
+      await enqueueOrExecuteAction(async () => {
+        setActivity({ type: 'action', action: 'trump' })
 
-      try {
-        await executeApiAction(
-          () => selectTrumpAction({ gameId, trump, etag }),
-          {
-            successMessage: 'Trump selected',
-          }
-        )
-      } finally {
-        await completeActionAndRefresh()
-      }
+        try {
+          await executeApiAction(
+            () => selectTrumpAction({ gameId, trump, etag }),
+            {
+              successMessage: 'Trump selected',
+            }
+          )
+        } finally {
+          await completeActionAndRefresh()
+        }
+      })
     },
     [
       gameId,
       etag,
       isTrumpPending,
-      isIdle,
+      enqueueOrExecuteAction,
       executeApiAction,
       completeActionAndRefresh,
     ]
@@ -384,25 +446,30 @@ export function GameRoomClient({
 
   const handlePlayCard = useCallback(
     async (card: string) => {
-      if (isPlayPending || !isIdle) {
+      if (isPlayPending) {
         return
       }
 
-      setActivity({ type: 'action', action: 'play' })
+      await enqueueOrExecuteAction(async () => {
+        setActivity({ type: 'action', action: 'play' })
 
-      try {
-        await executeApiAction(() => submitPlayAction({ gameId, card, etag }), {
-          successMessage: 'Card played',
-        })
-      } finally {
-        await completeActionAndRefresh()
-      }
+        try {
+          await executeApiAction(
+            () => submitPlayAction({ gameId, card, etag }),
+            {
+              successMessage: 'Card played',
+            }
+          )
+        } finally {
+          await completeActionAndRefresh()
+        }
+      })
     },
     [
       gameId,
       etag,
       isPlayPending,
-      isIdle,
+      enqueueOrExecuteAction,
       executeApiAction,
       completeActionAndRefresh,
     ]
@@ -497,7 +564,8 @@ export function GameRoomClient({
         seat: seatIndex,
         name,
         userId: seat.user_id,
-        isOccupied: Boolean(seat.user_id),
+        // Consider both human and AI assignments as occupying the seat
+        isOccupied: Boolean(seat.user_id) || seat.is_ai,
         isAi: seat.is_ai,
         isReady: seat.is_ready,
         aiProfile: seat.ai_profile ?? null,
@@ -513,7 +581,7 @@ export function GameRoomClient({
   const hostSeat: Seat = snapshot.hostSeat
   const viewerIsHost = viewerSeatForInteractions === hostSeat
   const canViewAiManager = viewerIsHost && phase.phase === 'Init'
-  const aiControlsEnabled = canViewAiManager && isIdle
+  const aiControlsEnabled = canViewAiManager
 
   // AI registry fetch effect: Loads AI registry when AI manager is visible
   // Cleanup: Cancels pending fetch on unmount or when canViewAiManager changes to prevent memory leaks
@@ -567,44 +635,46 @@ export function GameRoomClient({
 
   const handleAddAi = useCallback(
     async (selection?: AiSeatSelection) => {
-      if (isAiPending || !aiControlsEnabled || !isIdle) {
+      if (isAiPending || !aiControlsEnabled) {
         return
       }
 
-      setActivity({ type: 'action', action: 'ai' })
+      await enqueueOrExecuteAction(async () => {
+        setActivity({ type: 'action', action: 'ai' })
 
-      try {
-        const registryName =
-          selection?.registryName ??
-          aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
-          DEFAULT_AI_NAME
-        const registryVersion =
-          selection?.registryVersion ??
-          aiRegistry.find((entry) => entry.name === registryName)?.version
+        try {
+          const registryName =
+            selection?.registryName ??
+            aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
+            DEFAULT_AI_NAME
+          const registryVersion =
+            selection?.registryVersion ??
+            aiRegistry.find((entry) => entry.name === registryName)?.version
 
-        await executeApiAction(
-          () =>
-            addAiSeatAction({
-              gameId,
-              registryName,
-              registryVersion,
-              seed: selection?.seed,
-            }),
-          {
-            successMessage: 'AI seat added',
-            errorMessage: 'Failed to add AI seat',
-          }
-        )
-      } finally {
-        await completeActionAndRefresh()
-      }
+          await executeApiAction(
+            () =>
+              addAiSeatAction({
+                gameId,
+                registryName,
+                registryVersion,
+                seed: selection?.seed,
+              }),
+            {
+              successMessage: 'AI seat added',
+              errorMessage: 'Failed to add AI seat',
+            }
+          )
+        } finally {
+          await completeActionAndRefresh()
+        }
+      })
     },
     [
       aiRegistry,
       aiControlsEnabled,
       gameId,
       isAiPending,
-      isIdle,
+      enqueueOrExecuteAction,
       executeApiAction,
       completeActionAndRefresh,
     ]
@@ -612,26 +682,28 @@ export function GameRoomClient({
 
   const handleRemoveAiSeat = useCallback(
     async (seat: Seat) => {
-      if (isAiPending || !aiControlsEnabled || !isIdle) {
+      if (isAiPending || !aiControlsEnabled) {
         return
       }
 
-      setActivity({ type: 'action', action: 'ai' })
+      await enqueueOrExecuteAction(async () => {
+        setActivity({ type: 'action', action: 'ai' })
 
-      try {
-        await executeApiAction(() => removeAiSeatAction({ gameId, seat }), {
-          successMessage: 'AI seat removed',
-          errorMessage: 'Failed to remove AI seat',
-        })
-      } finally {
-        await completeActionAndRefresh()
-      }
+        try {
+          await executeApiAction(() => removeAiSeatAction({ gameId, seat }), {
+            successMessage: 'AI seat removed',
+            errorMessage: 'Failed to remove AI seat',
+          })
+        } finally {
+          await completeActionAndRefresh()
+        }
+      })
     },
     [
       aiControlsEnabled,
       gameId,
       isAiPending,
-      isIdle,
+      enqueueOrExecuteAction,
       executeApiAction,
       completeActionAndRefresh,
     ]
@@ -639,36 +711,38 @@ export function GameRoomClient({
 
   const handleUpdateAiSeat = useCallback(
     async (seat: Seat, selection: AiSeatSelection) => {
-      if (isAiPending || !aiControlsEnabled || !isIdle) {
+      if (isAiPending || !aiControlsEnabled) {
         return
       }
 
-      setActivity({ type: 'action', action: 'ai' })
+      await enqueueOrExecuteAction(async () => {
+        setActivity({ type: 'action', action: 'ai' })
 
-      try {
-        await executeApiAction(
-          () =>
-            updateAiSeatAction({
-              gameId,
-              seat,
-              registryName: selection.registryName,
-              registryVersion: selection.registryVersion,
-              seed: selection.seed,
-            }),
-          {
-            successMessage: 'AI seat updated',
-            errorMessage: 'Failed to update AI seat',
-          }
-        )
-      } finally {
-        await completeActionAndRefresh()
-      }
+        try {
+          await executeApiAction(
+            () =>
+              updateAiSeatAction({
+                gameId,
+                seat,
+                registryName: selection.registryName,
+                registryVersion: selection.registryVersion,
+                seed: selection.seed,
+              }),
+            {
+              successMessage: 'AI seat updated',
+              errorMessage: 'Failed to update AI seat',
+            }
+          )
+        } finally {
+          await completeActionAndRefresh()
+        }
+      })
     },
     [
       aiControlsEnabled,
       gameId,
       isAiPending,
-      isIdle,
+      enqueueOrExecuteAction,
       executeApiAction,
       completeActionAndRefresh,
     ]
@@ -727,9 +801,9 @@ export function GameRoomClient({
         playerNames={snapshot.playerNames}
         viewerSeat={snapshot.viewerSeat ?? undefined}
         viewerHand={snapshot.viewerHand}
-        status={status}
         onRefresh={() => void requestRefresh('manual')}
         isRefreshing={isRefreshing}
+        isSlowSync={isSlowSync}
         error={error}
         readyState={{
           canReady: canMarkReady,
