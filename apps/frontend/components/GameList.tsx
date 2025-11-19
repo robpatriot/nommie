@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from 'react'
 import type { Game } from '@/lib/types'
+import { SurfaceCard } from './SurfaceCard'
 
 interface GameListProps {
   games: Game[]
@@ -74,7 +75,11 @@ export default function GameList({
   const showActions = typeof renderActions === 'function'
 
   return (
-    <section className="rounded-3xl border border-white/10 bg-surface/80 p-5 shadow-[0_30px_90px_rgba(0,0,0,0.3)] backdrop-blur">
+    <SurfaceCard
+      as="section"
+      padding="md"
+      className="shadow-[0_30px_90px_rgba(0,0,0,0.3)]"
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
         {games.length > 0 ? (
@@ -173,6 +178,6 @@ export default function GameList({
           })}
         </div>
       )}
-    </section>
+    </SurfaceCard>
   )
 }

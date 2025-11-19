@@ -1,5 +1,8 @@
 import { auth, signIn } from '@/auth'
 import { redirect } from 'next/navigation'
+import { PageContainer } from '@/components/PageContainer'
+import { SurfaceCard } from '@/components/SurfaceCard'
+import { StatCard } from '@/components/StatCard'
 
 export default async function Home() {
   const session = await auth()
@@ -12,9 +15,14 @@ export default async function Home() {
   const appName = process.env.NEXT_PUBLIC_APP_NAME || 'Nommie'
 
   return (
-    <main className="flex flex-1 items-center justify-center px-4 pb-16 pt-10 sm:pt-16">
-      <div className="mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="rounded-3xl border border-white/15 bg-surface/80 p-8 shadow-[0_40px_120px_rgba(0,0,0,0.25)] backdrop-blur">
+    <PageContainer className="flex-1 justify-center gap-0 pb-16 pt-10 sm:pt-16">
+      <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <SurfaceCard
+          as="section"
+          padding="lg"
+          tone="strong"
+          className="shadow-[0_40px_120px_rgba(0,0,0,0.25)]"
+        >
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-subtle">
             Steady Nomination Whist evenings
           </p>
@@ -49,42 +57,39 @@ export default async function Home() {
             </div>
           </div>
 
-          <dl className="mt-10 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl border border-border/60 bg-surface px-4 py-3">
-              <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">
-                Read the table
-              </dt>
-              <dd className="mt-1 text-sm text-foreground">
-                Follow each seat and trick at a glance, no fuss.
-              </dd>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-surface px-4 py-3">
-              <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">
-                Prompted turns
-              </dt>
-              <dd className="mt-1 text-sm text-foreground">
-                Play each card with clear prompts so the table keeps a reliable
-                pace.
-              </dd>
-            </div>
-            <div className="rounded-2xl border border-border/60 bg-surface px-4 py-3">
-              <dt className="text-xs font-semibold uppercase tracking-wide text-subtle">
-                Resume swiftly
-              </dt>
-              <dd className="mt-1 text-sm text-foreground">
-                Rejoin your previous game from the header and resume the count
-                straightaway.
-              </dd>
-            </div>
-          </dl>
-        </section>
+          <div className="mt-10 grid gap-4 sm:grid-cols-3">
+            <StatCard
+              align="start"
+              label="Read the table"
+              value="Follow each seat and trick at a glance, no fuss."
+              valueClassName="text-sm font-semibold text-foreground"
+            />
+            <StatCard
+              align="start"
+              label="Prompted turns"
+              value="Play each card with clear prompts so the table keeps a reliable pace."
+              valueClassName="text-sm font-semibold text-foreground"
+            />
+            <StatCard
+              align="start"
+              label="Resume swiftly"
+              value="Jump back into your previous game and resume the count straightaway."
+              valueClassName="text-sm font-semibold text-foreground"
+            />
+          </div>
+        </SurfaceCard>
 
-        <section className="relative hidden rounded-3xl border border-white/20 bg-gradient-to-br from-surface/70 to-surface-strong/40 p-6 shadow-[0_30px_90px_rgba(0,0,0,0.35)] lg:flex lg:flex-col">
+        <SurfaceCard
+          as="section"
+          padding="lg"
+          tone="subtle"
+          className="relative hidden border-white/20 bg-gradient-to-br from-surface/70 to-surface-strong/40 shadow-[0_30px_90px_rgba(0,0,0,0.35)] lg:flex lg:flex-col"
+        >
           <div className="text-sm font-semibold uppercase tracking-[0.4em] text-muted">
             At the table
           </div>
           <div className="mt-6 flex flex-1 items-center justify-center">
-            <div className="relative aspect-[4/5] w-full max-w-xs rounded-[32px] border border-border/80 bg-gradient-to-b from-[#1f4639] to-[#0f2a21] p-6 shadow-2xl">
+            <div className="relative aspect-[4/5] w-full max-w-xs rounded-[32px] border border-border/80 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.85)] to-[rgba(var(--felt-base),0.95)] p-6 shadow-2xl">
               <div className="absolute inset-6 rounded-[28px] border border-white/10" />
               <div className="relative flex h-full flex-col items-center justify-between text-center text-card-cream">
                 <div className="w-full">
@@ -123,8 +128,8 @@ export default async function Home() {
               </div>
             </div>
           </div>
-        </section>
+        </SurfaceCard>
       </div>
-    </main>
+    </PageContainer>
   )
 }

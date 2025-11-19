@@ -30,6 +30,8 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
 
       <ul className="space-y-3">
         {seats.map((seat) => {
+          const displayName =
+            seat.isOccupied || seat.isAi ? seat.name : 'Waiting for player'
           const statusLabel = seat.isAi
             ? 'AI player'
             : seat.isOccupied
@@ -51,7 +53,7 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
                     Seat {seat.seatNumber}
                   </p>
                   <p className="text-base font-semibold text-foreground">
-                    {seat.name}
+                    {displayName}
                   </p>
                 </div>
                 <span

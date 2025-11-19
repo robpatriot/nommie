@@ -7,6 +7,7 @@ import CreateGameModal from './CreateGameModal'
 import Toast from './Toast'
 import { PageHero } from './PageHero'
 import { PageContainer } from './PageContainer'
+import { StatCard } from './StatCard'
 import { useToast } from '@/hooks/useToast'
 import {
   createGameAction,
@@ -212,34 +213,22 @@ export default function LobbyClient({
             </div>
           }
           aside={
-            <div className="grid gap-3 text-sm text-muted sm:grid-cols-3">
-              <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/50 bg-surface px-4 py-3 text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                  Joinable tables
-                </p>
-                <p className="text-2xl font-semibold text-foreground">
-                  {filteredJoinableGames.length}
-                </p>
-                <p className="text-xs text-muted">Open public tables</p>
-              </div>
-              <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/50 bg-surface px-4 py-3 text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                  Seats available
-                </p>
-                <p className="text-2xl font-semibold text-foreground">
-                  {openSeatCount}
-                </p>
-                <p className="text-xs text-muted">Across joinable tables</p>
-              </div>
-              <div className="flex h-full flex-col items-center gap-1 rounded-2xl border border-border/50 bg-surface px-4 py-3 text-center">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                  In progress
-                </p>
-                <p className="text-2xl font-semibold text-foreground">
-                  {sortedInProgressGames.length}
-                </p>
-                <p className="text-xs text-muted">Active or full tables</p>
-              </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <StatCard
+                label="Joinable tables"
+                value={filteredJoinableGames.length}
+                description="Open public tables"
+              />
+              <StatCard
+                label="Seats available"
+                value={openSeatCount}
+                description="Across joinable tables"
+              />
+              <StatCard
+                label="In progress"
+                value={sortedInProgressGames.length}
+                description="Active or full tables"
+              />
             </div>
           }
           footer={
