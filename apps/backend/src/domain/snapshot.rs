@@ -105,6 +105,8 @@ pub struct TrickSnapshot {
     pub current_trick: Vec<(Seat, Card)>,
     pub to_act: Seat,
     pub playable: Vec<Card>,
+    /// Last completed trick (4 cards) for display purposes.
+    pub last_trick: Option<Vec<(Seat, Card)>>,
 }
 
 /// Scoring phase snapshot.
@@ -222,6 +224,7 @@ fn snapshot_trick(state: &GameState, trick_no: u8) -> PhaseSnapshot {
         current_trick,
         to_act,
         playable,
+        last_trick: state.round.last_trick.clone(),
     })
 }
 

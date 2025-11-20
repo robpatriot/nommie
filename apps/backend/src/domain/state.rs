@@ -38,6 +38,8 @@ pub struct RoundState {
     pub bids: [Option<u8>; PLAYERS],
     /// Player who won the bidding (once determined).
     pub winning_bidder: Option<PlayerId>,
+    /// Last completed trick (4 cards) for display purposes.
+    pub last_trick: Option<Vec<(PlayerId, Card)>>,
 }
 
 impl RoundState {
@@ -49,6 +51,7 @@ impl RoundState {
             trump: None,
             bids: [None, None, None, None],
             winning_bidder: None,
+            last_trick: None,
         }
     }
 }

@@ -177,6 +177,34 @@ impl GameService {
             (Vec::new(), None)
         };
 
+        // 9a. Load last completed trick (if in TrickPlay and not first trick)
+        let last_trick = if matches!(game.state, DbGameState::TrickPlay) {
+            all_tricks
+                .iter()
+                .filter(|t| t.trick_no < current_trick_no && (0..=3).contains(&t.winner_seat))
+                .max_by_key(|t| t.trick_no)
+                .map(|prev_trick| prev_trick.id)
+        } else {
+            None
+        };
+
+        let last_trick = if let Some(trick_id) = last_trick {
+            let prev_plays = plays::find_all_by_trick(txn, trick_id).await?;
+            (prev_plays.len() == 4)
+                .then(|| {
+                    prev_plays
+                        .iter()
+                        .map(|p| {
+                            let card = from_stored_format(&p.card.suit, &p.card.rank)?;
+                            Ok((p.player_seat, card))
+                        })
+                        .collect::<Result<Vec<_>, DomainError>>()
+                })
+                .transpose()?
+        } else {
+            None
+        };
+
         // 10. Load cumulative scores
         let scores_total = scores::get_current_totals(txn, game_id).await?;
 
@@ -236,6 +264,7 @@ impl GameService {
                 trump,
                 bids: bids_array,
                 winning_bidder,
+                last_trick,
             },
         })
     }

@@ -48,7 +48,11 @@ export function PlayerActions({
 
   if (phase.phase === 'Trick') {
     return (
-      <LastTrick lastTrick={lastTrick ?? null} getSeatName={seatDisplayName} />
+      <LastTrick
+        lastTrick={lastTrick ?? null}
+        getSeatName={seatDisplayName}
+        viewerSeat={viewerSeat}
+      />
     )
   }
 

@@ -53,6 +53,7 @@ export interface TrickSnapshot {
   current_trick: Array<[Seat, Card]>
   to_act: Seat
   playable: Card[]
+  last_trick: Array<[Seat, Card]> | null
 }
 
 export interface ScoringSnapshot {

@@ -140,8 +140,6 @@ export function GameRoomView(props: GameRoomViewProps) {
     )
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
-  const [lastTrick, setLastTrick] = useState<Array<[Seat, Card]> | null>(null)
-  const [previousTrickNo, setPreviousTrickNo] = useState<number>(0)
 
   useEffect(() => {
     if (phase.phase !== 'Trick' || !playState) {
@@ -154,34 +152,8 @@ export function GameRoomView(props: GameRoomViewProps) {
     }
   }, [phase, playState, selectedCard])
 
-  // Track last completed trick
-  useEffect(() => {
-    if (phase.phase === 'Trick') {
-      const currentTrick = phase.data.current_trick
-      const currentTrickNo = phase.data.trick_no
-
-      // If current trick has 4 cards, store it as the last trick
-      // (it will be cleared when the trick completes)
-      if (currentTrick.length === 4) {
-        setLastTrick([...currentTrick] as Array<[Seat, Card]>)
-      }
-      // If trick number increased, keep the last stored trick
-      else if (currentTrickNo > previousTrickNo && previousTrickNo > 0) {
-        // Trick completed - lastTrick should already be set from when it had 4 cards
-        // If not, we'll show empty (would need backend support for full history)
-      }
-      // If current trick is empty and we're on a new trick, keep last trick
-      else if (currentTrick.length === 0 && lastTrick !== null) {
-        // Keep showing the last trick
-      }
-
-      setPreviousTrickNo(currentTrickNo)
-    } else {
-      // Reset when not in trick phase
-      setLastTrick(null)
-      setPreviousTrickNo(0)
-    }
-  }, [phase, previousTrickNo, lastTrick])
+  // Get last trick from backend snapshot
+  const lastTrick = phase.phase === 'Trick' ? phase.data.last_trick : null
 
   const handlePlayCard = useCallback(
     async (card: Card) => {
