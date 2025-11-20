@@ -1,6 +1,7 @@
 import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
 import { formatTrump, getPhaseLabel } from './utils'
 import { PhaseFact } from './PhaseFact'
+import { StatCard } from '@/components/StatCard'
 
 interface ScoreSidebarProps {
   gameId: number
@@ -44,43 +45,54 @@ export function ScoreSidebar({
     <aside
       className={`flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur ${className}`}
     >
-      <header className="flex flex-col gap-3">
+      <header className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.4em] text-subtle">
             Game #{gameId}
           </p>
-          <h2 className="text-xl font-semibold text-foreground">
+          <h2 className="text-2xl font-bold text-foreground">
             {getPhaseLabel(phase)}
           </h2>
-          <p className="text-xs font-medium uppercase tracking-[0.35em] text-subtle">
-            Turn: <span className="text-sm text-foreground">{activeName}</span>
-          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {phase.phase === 'Trick' ? (
-            <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
-              Trick {phase.data.trick_no} / {round?.hand_size ?? '?'}
+        {phase.phase === 'Trick' ? (
+          <StatCard
+            label="Trick"
+            value={`${phase.data.trick_no} / ${round?.hand_size ?? '?'}`}
+            description="Round progress"
+            className="px-2 py-1.5 row-span-2 self-start"
+            valueClassName="text-lg"
+          />
+        ) : null}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-lg bg-primary/15 px-3 py-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-subtle">
+              Turn
             </span>
-          ) : null}
+            <span className="text-sm font-bold text-primary">{activeName}</span>
+          </div>
           {onRefresh ? (
             <button
               type="button"
               onClick={onRefresh}
               disabled={isRefreshing}
-              className="rounded-full border border-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-foreground transition hover:border-primary/60 hover:text-primary disabled:opacity-60"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-surface/60 text-xs font-semibold text-foreground transition hover:border-primary/60 hover:bg-primary/10 hover:text-primary disabled:opacity-60"
               aria-label="Refresh game state"
             >
-              {isRefreshing ? 'Syncing…' : 'Refresh'}
+              {isRefreshing ? (
+                <span className="animate-spin">⟳</span>
+              ) : (
+                <span>⟳</span>
+              )}
             </button>
           ) : null}
         </div>
       </header>
 
       {round ? (
-        <div className="grid gap-2 rounded-2xl border border-border/60 bg-surface/70 p-3 text-sm text-muted">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-border/60 bg-surface/70 p-3 text-sm text-muted">
           <PhaseFact label="Round" value={`#${roundNo}`} />
-          <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
           <PhaseFact label="Dealer" value={seatDisplayName(dealer)} />
+          <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
           <PhaseFact label="Trump" value={formatTrump(round.trump)} />
         </div>
       ) : null}
@@ -148,15 +160,6 @@ export function ScoreSidebar({
           </ul>
         </div>
       </details>
-
-      {round ? (
-        <div className="rounded-2xl border border-border/60 bg-surface/70 p-4 text-sm text-muted">
-          <div className="mb-2 text-xs uppercase tracking-wide text-subtle">
-            Round snapshot
-          </div>
-          <p>Tricks won: {round.tricks_won.join(' / ')}</p>
-        </div>
-      ) : null}
     </aside>
   )
 }

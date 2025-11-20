@@ -49,16 +49,8 @@ export function PlayerHand({
 
   if (!viewerHand.length) {
     handStatus = 'Hand will appear once the game starts.'
-  } else if (isTrickPhase) {
-    if (!viewerTurn) {
-      handStatus = `Waiting for ${waitingOnName ?? 'next player'} to play`
-    } else if (playState?.isPending) {
-      handStatus = 'Playing card…'
-    } else if (selectedCard) {
-      handStatus = `Selected ${selectedCard}`
-    } else {
-      handStatus = 'Select a card to play'
-    }
+  } else if (isTrickPhase && !viewerTurn) {
+    handStatus = `Waiting for ${waitingOnName ?? 'next player'}`
   }
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -184,13 +176,15 @@ export function PlayerHand({
           <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
             Your hand
           </span>
-          <p className="text-xs text-muted" aria-live="polite">
-            {handStatus}
-          </p>
+          {handStatus !== 'Read-only preview' && (
+            <p className="text-xs text-muted" aria-live="polite">
+              {handStatus}
+            </p>
+          )}
         </div>
-        {isTrickPhase ? (
+        {isTrickPhase && !viewerTurn ? (
           <span className="rounded-full border border-white/15 bg-surface px-3 py-1 text-xs font-semibold text-subtle">
-            {viewerTurn ? 'Your play' : `Waiting on ${waitingOnName ?? '—'}`}
+            Waiting on {waitingOnName ?? '—'}
           </span>
         ) : null}
       </header>

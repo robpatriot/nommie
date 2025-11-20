@@ -363,7 +363,6 @@ export function GameRoomView(props: GameRoomViewProps) {
                   key={`mobile-${summary.seat}`}
                   summary={summary}
                   variant="list"
-                  showBid={false}
                 />
               ))}
             </div>

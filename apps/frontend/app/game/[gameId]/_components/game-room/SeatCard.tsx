@@ -5,17 +5,14 @@ type SeatCardProps = {
   summary: SeatSummary
   variant?: 'table' | 'list'
   className?: string
-  showBid?: boolean
 }
 
 export function SeatCard({
   summary,
   variant = 'table',
   className = '',
-  showBid = true,
 }: SeatCardProps) {
-  const { orientation, name, score, isViewer, tricksWon, bid, isActive } =
-    summary
+  const { orientation, name, isViewer, tricksWon, isActive } = summary
 
   const positionStyles: Record<SeatSummary['orientation'], string> = {
     top: 'lg:col-start-2 lg:row-start-1 lg:justify-self-center lg:self-center',
@@ -55,25 +52,12 @@ export function SeatCard({
           {badge}
         </span>
         <span className="text-sm font-semibold text-foreground">{name}</span>
-        <span className="text-[11px] text-muted">Score {score}</span>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-1 text-[10px] sm:justify-end">
         {typeof tricksWon === 'number' ? (
           <span className="rounded-full bg-black/20 px-2 py-0.5 font-semibold text-foreground">
             Tricks {tricksWon}
-          </span>
-        ) : null}
-        {showBid && bid !== undefined ? (
-          <span
-            className={cn(
-              'rounded-full px-2 py-0.5 font-semibold',
-              bid === null
-                ? 'border border-white/10 text-muted'
-                : 'bg-warning/15 text-warning-contrast'
-            )}
-          >
-            Bid {bid ?? '—'}
           </span>
         ) : null}
       </div>
