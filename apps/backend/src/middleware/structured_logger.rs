@@ -2,9 +2,11 @@ use std::future::{ready, Ready};
 use std::time::Instant;
 
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
-use actix_web::{Error as ActixError, HttpMessage};
+use actix_web::Error as ActixError;
 use futures_util::future::LocalBoxFuture;
 use tracing::{error, info, warn};
+
+use crate::web::trace_ctx;
 
 pub struct StructuredLogger;
 
@@ -46,12 +48,6 @@ where
         let method = req.method().to_string();
         let path = req.path().to_string();
 
-        let trace_id = req
-            .extensions()
-            .get::<String>()
-            .cloned()
-            .unwrap_or_else(|| "unknown".to_string());
-
         let fut = self.service.call(req);
 
         Box::pin(async move {
@@ -64,6 +60,8 @@ where
 
             let duration_us = start.elapsed().as_micros() as u64;
             let status_code = status.as_u16();
+
+            let trace_id = trace_ctx::trace_id();
 
             if status.is_server_error() {
                 error!(http.method=%method, url.path=%path, http.status_code=%status_code, duration_us=%duration_us, trace_id=%trace_id, message="request_completed");

@@ -4,6 +4,8 @@ use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{test, web, App, Error};
 use backend::error::AppError;
 use backend::middleware::request_trace::RequestTrace;
+use backend::middleware::structured_logger::StructuredLogger;
+use backend::middleware::trace_span::TraceSpan;
 use backend::routes;
 use backend::state::app_state::AppState;
 
@@ -51,13 +53,18 @@ impl TestAppBuilder {
         // Wrap AppState with web::Data at the boundary
         let data = web::Data::new(state);
 
-        let service = test::init_service(App::new().wrap(RequestTrace).app_data(data).configure(
-            move |cfg| {
-                if let Some(config_fn) = &route_config {
-                    config_fn(cfg);
-                }
-            },
-        ))
+        let service = test::init_service(
+            App::new()
+                .wrap(StructuredLogger)
+                .wrap(TraceSpan)
+                .wrap(RequestTrace)
+                .app_data(data)
+                .configure(move |cfg| {
+                    if let Some(config_fn) = &route_config {
+                        config_fn(cfg);
+                    }
+                }),
+        )
         .await;
 
         Ok(service)

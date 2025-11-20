@@ -355,3 +355,9 @@ Independent improvements that enhance robustness, performance, and developer exp
   *Acceptance:* Decision made on whether external state management is needed; if adopted, implementation is complete.
 - **Component-Level Lazy Loading:** Add component-level lazy loading as an optimization for heavy components.  
   *Acceptance:* Heavy components are lazy-loaded; bundle size and initial load time are improved.
+
+---
+
+### **Optional**
+- **Trace ID Logging Strategy Review:** Decide on a single source of truth for `trace_id` emission (span-only vs. event field vs. conditional) so console and aggregated logs stay consistent without duplicate IDs.  
+  *Acceptance:* Preferred logging strategy is chosen, documented, and implemented across middleware/tests.

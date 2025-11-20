@@ -54,8 +54,8 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(cors_middleware())
             .wrap(StructuredLogger)
-            .wrap(RequestTrace)
             .wrap(TraceSpan)
+            .wrap(RequestTrace)
             .app_data(data.clone())
             .service(
                 web::scope("/api/games")
