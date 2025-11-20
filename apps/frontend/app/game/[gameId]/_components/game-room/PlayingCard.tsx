@@ -8,6 +8,12 @@ const suitMap = {
   C: { symbol: '♣', color: 'text-slate-900', label: 'Clubs' },
 } as const
 
+export const CARD_DIMENSIONS = {
+  sm: { width: 56, height: 80 },
+  md: { width: 80, height: 112 },
+  lg: { width: 96, height: 144 },
+} as const
+
 const sizeStyles = {
   sm: {
     card: 'h-20 w-14 text-2xl',

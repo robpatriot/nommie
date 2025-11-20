@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useRef, useEffect, useState } from 'react'
+import { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
-import { PlayingCard } from './PlayingCard'
+import { PlayingCard, CARD_DIMENSIONS } from './PlayingCard'
 
 interface PlayerHandProps {
   viewerHand: Card[]
@@ -61,11 +61,24 @@ export function PlayerHand({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [overlapAmount, setOverlapAmount] = useState(16) // Default -ml-4 (16px)
+  const [hasMeasured, setHasMeasured] = useState(false)
+  const previousHandSizeRef = useRef(viewerHand.length)
 
   useEffect(() => {
+    if (viewerHand.length === 0) {
+      setHasMeasured(true)
+    } else if (previousHandSizeRef.current === 0 && viewerHand.length > 0) {
+      setHasMeasured(false)
+    }
+
+    previousHandSizeRef.current = viewerHand.length
+  }, [viewerHand.length])
+
+  useLayoutEffect(() => {
     if (!containerRef.current || viewerHand.length === 0) {
       if (viewerHand.length === 0) {
         setOverlapAmount(16) // Reset to default when empty
+        setHasMeasured(true)
       }
       return
     }
@@ -77,19 +90,12 @@ export function PlayerHand({
       // Measure container width (accounting for padding)
       const containerWidth = container.clientWidth
 
-      // Card width: md size is w-20 (80px) + padding p-[2px] (4px total) = ~84px
-      // We'll measure the first card button to get exact width
-      const firstCard = container.querySelector('button')
-      if (!firstCard) {
-        // If no card found yet, retry after a short delay
-        return
-      }
-
-      const cardWidth = firstCard.offsetWidth
+      const cardWidth = CARD_DIMENSIONS.md.width + 8 // includes padding & border
       const cardCount = viewerHand.length
 
       if (cardCount <= 1) {
         setOverlapAmount(0)
+        setHasMeasured(true)
         return
       }
 
@@ -120,41 +126,36 @@ export function PlayerHand({
         Math.min(maxOverlap, overlapNeeded)
       )
       setOverlapAmount(newOverlap)
+      setHasMeasured(true)
     }
 
-    // Use multiple timing strategies to ensure we measure after DOM updates
-    // Strategy 1: Double RAF (catches immediate DOM updates)
-    const rafId1 = requestAnimationFrame(() => {
-      requestAnimationFrame(updateOverlap)
-    })
+    updateOverlap()
 
-    // Strategy 2: setTimeout fallback (catches delayed React updates)
-    const timeoutId = setTimeout(() => {
-      updateOverlap()
-    }, 150)
-
-    // Use ResizeObserver to handle container size changes (when available)
     let resizeObserver: ResizeObserver | null = null
-    if (typeof ResizeObserver !== 'undefined') {
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
       resizeObserver = new ResizeObserver(() => {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(updateOverlap)
-        })
+        updateOverlap()
       })
       resizeObserver.observe(containerRef.current)
     }
 
+    let rafId: number | null = null
+
     // Also handle window resize
     const handleResize = () => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(updateOverlap)
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
+      rafId = requestAnimationFrame(() => {
+        updateOverlap()
       })
     }
     window.addEventListener('resize', handleResize)
 
     return () => {
-      cancelAnimationFrame(rafId1)
-      clearTimeout(timeoutId)
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId)
+      }
       resizeObserver?.disconnect()
       window.removeEventListener('resize', handleResize)
     }
@@ -182,13 +183,17 @@ export function PlayerHand({
   }
 
   const sidePadding = Math.max(24, overlapAmount + 12)
+  const hasCards = viewerHand.length > 0
+  const isReady = !hasCards || hasMeasured
 
   return (
     <section
       className={cn(
         'flex w-full flex-col gap-3 rounded-[28px] border border-white/15 bg-surface/80 p-4 text-foreground shadow-[0_35px_80px_rgba(0,0,0,0.4)] backdrop-blur',
+        !isReady ? 'opacity-0' : 'opacity-100 transition-opacity duration-150',
         className
       )}
+      aria-hidden={!isReady}
     >
       <header className="grid grid-cols-3 items-center gap-3">
         <div className="flex flex-col gap-1">
@@ -269,13 +274,16 @@ export function PlayerHand({
       </header>
       <div
         ref={containerRef}
-        className="flex justify-center overflow-x-visible overflow-y-visible pb-2 pt-4"
+        className={cn(
+          'flex justify-center overflow-y-visible pb-2 pt-4',
+          isReady ? 'overflow-x-visible' : 'overflow-x-hidden'
+        )}
         style={{
           paddingLeft: sidePadding,
           paddingRight: sidePadding,
         }}
       >
-        {viewerHand.length === 0 ? (
+        {!isReady ? null : viewerHand.length === 0 ? (
           <span className="text-sm text-subtle">
             Hand will appear once available.
           </span>
@@ -301,7 +309,7 @@ export function PlayerHand({
                 disabled={isDisabled}
                 style={{
                   marginLeft: index === 0 ? 0 : -overlapAmount,
-                  transitionProperty: 'margin-left, transform, scale, z-index',
+                  transitionProperty: 'transform, scale, z-index',
                   transitionDuration: '300ms',
                   transitionTimingFunction: 'ease-out',
                 }}
