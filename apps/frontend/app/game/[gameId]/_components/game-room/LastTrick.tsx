@@ -27,26 +27,14 @@ export function LastTrick({
     )
   }
 
-  const cards = lastTrick.map(([seat, card]) => ({
+  // Preserve play order from lastTrick array - don't sort by orientation
+  const cards = lastTrick.map(([seat, card], playOrder) => ({
     seat,
     card,
     label: getSeatName(seat),
     orientation: getOrientation(viewerSeat, seat),
+    playOrder, // Track original play order for z-index layering
   }))
-
-  const orientationOrder: Array<'bottom' | 'right' | 'top' | 'left'> = [
-    'left',
-    'top',
-    'right',
-    'bottom',
-  ]
-  const orderedCards = cards
-    .slice()
-    .sort(
-      (a, b) =>
-        orientationOrder.indexOf(a.orientation) -
-        orientationOrder.indexOf(b.orientation)
-    )
 
   return (
     <section className="flex w-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/80 p-5 text-sm text-muted shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur">
@@ -59,7 +47,8 @@ export function LastTrick({
         {/* Bounding box for cards - larger to accommodate names */}
         <div className="relative mx-auto h-[154px] w-[154px]">
           {/* Cards container - using absolute positioning for diamond layout */}
-          {orderedCards.map(({ seat, card, orientation }, index) => {
+          {/* Cards are displayed in play order, with later cards layered on top */}
+          {cards.map(({ seat, card, orientation, playOrder }) => {
             // Calculate position offsets for diamond shape
             // All cards start centered, then offset based on orientation
             // Using inline styles to combine transforms properly
@@ -84,7 +73,7 @@ export function LastTrick({
                 key={seat}
                 className="absolute left-1/2 top-1/2 transition-all duration-300"
                 style={{
-                  zIndex: 20 + index,
+                  zIndex: 20 + playOrder, // Later played cards appear on top
                   transform: getTransform(),
                 }}
               >
@@ -96,7 +85,7 @@ export function LastTrick({
           })}
 
           {/* Names positioned relative to bounding box */}
-          {orderedCards.map(({ seat, label, orientation }) => {
+          {cards.map(({ seat, label, orientation }) => {
             // Determine max length based on orientation
             // Top/Bottom have more horizontal space, Left/Right have less
             const maxLength =
