@@ -45,8 +45,8 @@ describe('GameRoomView', () => {
     expect(screen.getByText('Bidding Round')).toBeInTheDocument()
     expect(screen.getAllByText('Alex').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Tricks/)[0].textContent).toContain('0')
-    expect(screen.getByText('Bid 2')).toBeInTheDocument()
-    expect(screen.getByText('Refresh')).toBeInTheDocument()
+    expect(screen.getAllByText('Bid 2').length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('Refresh game state')).toBeInTheDocument()
   })
 
   it('surface errors and polling status', () => {
@@ -64,7 +64,6 @@ describe('GameRoomView', () => {
 
     expect(screen.getByText('Sync failed')).toBeInTheDocument()
     expect(screen.getByText(/traceId: abc123/)).toBeInTheDocument()
-    expect(screen.getByText('Syncing…')).toBeInTheDocument()
   })
 
   it('renders bidding controls and submits bid for the active viewer', async () => {
@@ -128,7 +127,8 @@ describe('GameRoomView', () => {
       />
     )
 
-    expect(screen.getByText('Legal cards: 2H, KD, QC')).toBeInTheDocument()
+    expect(screen.getByText('Legal cards:')).toBeInTheDocument()
+    expect(screen.getByText('2H, KD, QC')).toBeInTheDocument()
 
     // aria-label format: "${card}, ${isSelected ? 'selected' : 'playable'}" or "${card}, not playable"
     const legalCardButton = screen.getByRole('button', { name: /^2H,/i })

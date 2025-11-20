@@ -1060,6 +1060,7 @@ describe('GameRoomClient', () => {
     it('shows slow sync indicator when refresh takes longer than 1 second', async () => {
       const initialData = createInitialData()
       vi.useFakeTimers()
+      mockShowToast.mockReturnValueOnce('slow-sync-id')
 
       // Make poll slow (longer than 1 second)
       let resolvePoll: () => void
@@ -1095,8 +1096,11 @@ describe('GameRoomClient', () => {
         await vi.advanceTimersByTimeAsync(1000)
       })
 
-      // Check for slow sync indicator
-      expect(screen.getByText(/Updating game state/i)).toBeInTheDocument()
+      // Check for slow sync indicator (toast)
+      expect(mockShowToast).toHaveBeenCalledWith(
+        'Updating game state…',
+        'warning'
+      )
 
       // Resolve the poll
       await act(async () => {
@@ -1109,7 +1113,7 @@ describe('GameRoomClient', () => {
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0)
       })
-      expect(screen.queryByText(/Updating game state/i)).not.toBeInTheDocument()
+      expect(mockHideToast).toHaveBeenCalledWith('slow-sync-id')
 
       vi.useRealTimers()
     })
