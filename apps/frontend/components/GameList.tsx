@@ -125,7 +125,7 @@ export default function GameList({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-[0.4em] text-subtle">
-                      Game #{game.id}
+                      Game {game.id}
                     </p>
                     <h3 className="text-xl font-semibold text-foreground">
                       {game.name}

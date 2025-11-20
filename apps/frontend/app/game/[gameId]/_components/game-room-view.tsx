@@ -176,7 +176,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               <div className="flex flex-col gap-4">
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
-                    Setup · Game #{gameId}
+                    Setup · Game {gameId}
                   </p>
                   <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
                     Add players

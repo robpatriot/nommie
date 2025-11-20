@@ -41,7 +41,7 @@ export function ScoreSidebar({
       <header className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2">
         <div>
           <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.4em] text-subtle">
-            Game #{gameId}
+            Game {gameId}
           </p>
           <h2 className="text-2xl font-bold text-foreground">
             {getPhaseLabel(phase)}
@@ -83,7 +83,7 @@ export function ScoreSidebar({
 
       {round ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-border/60 bg-surface/70 p-3 text-sm text-muted">
-          <PhaseFact label="Round" value={`#${roundNo}`} />
+          <PhaseFact label="Round" value={`${roundNo}`} />
           <PhaseFact label="Dealer" value={seatDisplayName(dealer)} />
           <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
           <PhaseFact label="Trump" value={formatTrump(round.trump)} />

@@ -57,7 +57,7 @@ export default async function GamePage({ params }: GamePageProps) {
 
   const gameName =
     snapshotResult.snapshot.game.name?.trim() ||
-    `Game #${snapshotResult.snapshot.game.id ?? resolvedGameId}`
+    `Game ${snapshotResult.snapshot.game.id ?? resolvedGameId}`
 
   return (
     <ErrorBoundary>
