@@ -85,7 +85,7 @@ export default function LobbyClient({
 
   const handleCreateGame = async (name: string) => {
     // Use default name if provided name is empty
-    const defaultName = `${creatorName} game`
+    const defaultName = `${creatorName}'s game`
     const gameName = name.trim() || defaultName
 
     const result = await createGameAction({

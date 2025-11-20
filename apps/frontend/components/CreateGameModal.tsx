@@ -17,7 +17,7 @@ export default function CreateGameModal({
 }: CreateGameModalProps) {
   const [name, setName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const defaultName = `${creatorName} game`
+  const defaultName = `${creatorName}'s game`
 
   const handleCancel = useCallback(() => {
     setName('')
