@@ -4,6 +4,7 @@ use unicode_normalization::UnicodeNormalization;
 
 use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind, ValidationKind};
 use crate::logging::pii::Redacted;
+use crate::repos::user_options as user_options_repo;
 use crate::repos::users::{self as users_repo, User};
 
 /// Redacts a google_sub value for logging purposes.
@@ -157,6 +158,8 @@ impl UserService {
                     .await?
                     .ok_or_else(|| DomainError::not_found(NotFoundKind::User, "User not found"))?;
 
+                user_options_repo::ensure_default_for_user(txn, user.id).await?;
+
                 // Log repeat login (same email + same google_sub)
                 debug!(
                     user_id = user_id,
@@ -184,6 +187,8 @@ impl UserService {
                 // Create new user credentials with auto-generated ID
                 users_repo::create_credentials(txn, user.id, &clean_email, Some(google_sub))
                     .await?;
+
+                user_options_repo::ensure_default_for_user(txn, user.id).await?;
 
                 // Log first user creation
                 info!(

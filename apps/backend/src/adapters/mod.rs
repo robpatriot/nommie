@@ -11,4 +11,5 @@ pub mod plays_sea;
 pub mod rounds_sea;
 pub mod scores_sea;
 pub mod tricks_sea;
+pub mod user_options_sea;
 pub mod users_sea;

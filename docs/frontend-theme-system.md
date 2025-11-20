@@ -19,7 +19,7 @@ Next.js frontend and how to extend it responsibly.
   to Tailwind color names (for example `bg-background`, `text-muted`,
   `border-border`, `bg-primary`, `bg-success`, `bg-warning`, etc.). This keeps
   utility usage consistent and makes palettes easy to swap.
-- **Runtime theme control**: `ThemeProvider` (`apps/frontend/components/theme-provider.tsx`)
+- **Runtime appearance control**: `ThemeProvider` (`apps/frontend/components/theme-provider.tsx`)
   manages the user’s preference. It:
   - reads `localStorage` for a stored choice (`light`, `dark`, or `system`);
   - listens to `prefers-color-scheme`;
@@ -27,8 +27,9 @@ Next.js frontend and how to extend it responsibly.
   - exposes `useTheme()` so components can react to `theme` / `resolvedTheme`.
 - **Initial render**: `app/layout.tsx` injects a small script before hydration to
   apply the correct theme immediately and wraps the app in `ThemeProvider`.
-- **Toggle UI**: `ThemeToggle` (`apps/frontend/components/theme-toggle.tsx`) cycles
-  between `system → light → dark` and persists the selection.
+- **User control**: `AppearanceSelector` (`apps/frontend/components/AppearanceSelector.tsx`)
+  submits changes to `/api/user/options`, ensuring the backend-stored appearance
+  preference stays in sync with the local cookie/localStorage cache.
 
 ## Using Theme Tokens
 
@@ -74,7 +75,7 @@ re-implementing preference storage or DOM updates.
 ## Testing & QA Checklist
 
 - Verify light/dark modes in browsers that support `prefers-color-scheme`.
-- Ensure `ThemeToggle` cycles through the three states and the selection
+- Ensure the Appearance selector updates all three states and the selection
   persists across reloads.
 - Confirm overriding the theme does not break when system preference changes.
 - When adding new components, audit for stray palette colors (`gray-*`,

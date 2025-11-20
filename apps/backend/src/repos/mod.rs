@@ -12,4 +12,5 @@ pub mod plays;
 pub mod rounds;
 pub mod scores;
 pub mod tricks;
+pub mod user_options;
 pub mod users;

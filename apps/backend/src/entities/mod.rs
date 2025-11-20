@@ -9,4 +9,5 @@ pub mod round_scores;
 pub mod round_tricks;
 pub mod trick_plays;
 pub mod user_credentials;
+pub mod user_options;
 pub mod users;

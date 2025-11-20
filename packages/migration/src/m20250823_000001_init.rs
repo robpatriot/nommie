@@ -1,7 +1,7 @@
 use sea_orm::Statement;
 use sea_orm_migration::prelude::*;
 use sea_orm_migration::sea_query::extension::postgres::Type as PgType;
-use sea_orm_migration::sea_query::{ColumnDef, ForeignKeyAction, Index, Table};
+use sea_orm_migration::sea_query::{ColumnDef, Expr, ForeignKeyAction, Index, Table};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -28,6 +28,14 @@ enum UserCredentials {
     GoogleSub,
     LastLogin,
     CreatedAt,
+    UpdatedAt,
+}
+
+#[derive(Iden)]
+enum UserOptions {
+    Table,
+    UserId,
+    AppearanceMode,
     UpdatedAt,
 }
 
@@ -295,6 +303,41 @@ impl MigrationTrait for Migration {
                         ForeignKey::create()
                             .name("fk_user_credentials_user_id")
                             .from(UserCredentials::Table, UserCredentials::UserId)
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        // user_options
+        manager
+            .create_table(
+                Table::create()
+                    .table(UserOptions::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(UserOptions::UserId)
+                            .big_integer()
+                            .not_null()
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new(UserOptions::AppearanceMode)
+                            .string()
+                            .not_null()
+                            .default("system"),
+                    )
+                    .col(
+                        ColumnDef::new(UserOptions::UpdatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null()
+                            .default(Expr::current_timestamp()),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_user_options_user_id")
+                            .from(UserOptions::Table, UserOptions::UserId)
                             .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
@@ -1556,6 +1599,10 @@ impl MigrationTrait for Migration {
 
         manager
             .drop_table(Table::drop().table(UserCredentials::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(UserOptions::Table).to_owned())
             .await?;
 
         // Drop users.sub unique index before dropping users table
