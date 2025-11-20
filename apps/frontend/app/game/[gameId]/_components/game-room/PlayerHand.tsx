@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useEffect, useLayoutEffect, useState } from 'react'
+import { useMemo, useRef, useLayoutEffect, useState } from 'react'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
@@ -61,24 +61,11 @@ export function PlayerHand({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [overlapAmount, setOverlapAmount] = useState(16) // Default -ml-4 (16px)
-  const [hasMeasured, setHasMeasured] = useState(false)
-  const previousHandSizeRef = useRef(viewerHand.length)
-
-  useEffect(() => {
-    if (viewerHand.length === 0) {
-      setHasMeasured(true)
-    } else if (previousHandSizeRef.current === 0 && viewerHand.length > 0) {
-      setHasMeasured(false)
-    }
-
-    previousHandSizeRef.current = viewerHand.length
-  }, [viewerHand.length])
 
   useLayoutEffect(() => {
     if (!containerRef.current || viewerHand.length === 0) {
       if (viewerHand.length === 0) {
         setOverlapAmount(16) // Reset to default when empty
-        setHasMeasured(true)
       }
       return
     }
@@ -95,7 +82,6 @@ export function PlayerHand({
 
       if (cardCount <= 1) {
         setOverlapAmount(0)
-        setHasMeasured(true)
         return
       }
 
@@ -126,7 +112,6 @@ export function PlayerHand({
         Math.min(maxOverlap, overlapNeeded)
       )
       setOverlapAmount(newOverlap)
-      setHasMeasured(true)
     }
 
     updateOverlap()
@@ -183,17 +168,13 @@ export function PlayerHand({
   }
 
   const sidePadding = Math.max(24, overlapAmount + 12)
-  const hasCards = viewerHand.length > 0
-  const isReady = !hasCards || hasMeasured
 
   return (
     <section
       className={cn(
         'flex w-full flex-col gap-3 rounded-[28px] border border-white/15 bg-surface/80 p-4 text-foreground shadow-[0_35px_80px_rgba(0,0,0,0.4)] backdrop-blur',
-        !isReady ? 'opacity-0' : 'opacity-100 transition-opacity duration-150',
         className
       )}
-      aria-hidden={!isReady}
     >
       <header className="grid grid-cols-3 items-center gap-3">
         <div className="flex flex-col gap-1">
@@ -274,16 +255,13 @@ export function PlayerHand({
       </header>
       <div
         ref={containerRef}
-        className={cn(
-          'flex justify-center overflow-y-visible pb-2 pt-4',
-          isReady ? 'overflow-x-visible' : 'overflow-x-hidden'
-        )}
+        className="flex justify-center overflow-x-visible overflow-y-visible pb-2 pt-4"
         style={{
           paddingLeft: sidePadding,
           paddingRight: sidePadding,
         }}
       >
-        {!isReady ? null : viewerHand.length === 0 ? (
+        {viewerHand.length === 0 ? (
           <span className="text-sm text-subtle">
             Hand will appear once available.
           </span>
