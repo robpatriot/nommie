@@ -36,5 +36,7 @@
     "db:svc:ready": "docker exec -it nommie-postgres pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"",
     "db:svc:psql": "docker exec -e PGPASSWORD=\"$POSTGRES_PASSWORD\" -i nommie-postgres psql -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "baseline-browser-mapping": "^2.8.30"
+  }
 }
