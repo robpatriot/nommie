@@ -166,6 +166,8 @@ export function PlayerHand({
     onSelectCard(selectedCard === card ? null : card)
   }
 
+  const sidePadding = Math.max(24, overlapAmount + 12)
+
   return (
     <section
       className={cn(
@@ -246,7 +248,11 @@ export function PlayerHand({
       </header>
       <div
         ref={containerRef}
-        className="flex justify-center overflow-x-hidden overflow-y-visible pb-2 pt-4"
+        className="flex justify-center overflow-x-visible overflow-y-visible pb-2 pt-4"
+        style={{
+          paddingLeft: sidePadding,
+          paddingRight: sidePadding,
+        }}
       >
         {viewerHand.length === 0 ? (
           <span className="text-sm text-subtle">
