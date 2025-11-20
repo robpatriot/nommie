@@ -843,9 +843,11 @@ describe('GameRoomClient', () => {
     it('handles network errors gracefully', async () => {
       const initialData = createInitialData()
 
-      mockGetGameRoomSnapshotAction.mockRejectedValue(
-        new Error('Network error')
-      )
+      const expectedError = new Error('Network error')
+      mockGetGameRoomSnapshotAction.mockRejectedValue(expectedError)
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {})
 
       await act(async () => {
         render(
@@ -860,14 +862,35 @@ describe('GameRoomClient', () => {
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
-      await userEvent.click(refreshButton)
+      try {
+        const callCountBefore = mockGetGameRoomSnapshotAction.mock.calls.length
 
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Network error/i)).toBeInTheDocument()
-        },
-        { timeout: 2000 }
-      )
+        await expect(userEvent.click(refreshButton)).resolves.toBeUndefined()
+
+        await waitFor(
+          () => {
+            expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
+              callCountBefore + 1
+            )
+          },
+          { timeout: 2000 }
+        )
+
+        const failingCall =
+          mockGetGameRoomSnapshotAction.mock.results.at(-1)?.value ??
+          Promise.reject(new Error('Missing promise'))
+
+        await expect(failingCall).rejects.toThrow('Network error')
+
+        await waitFor(
+          () => {
+            expect(screen.getByText(/Network error/i)).toBeInTheDocument()
+          },
+          { timeout: 2000 }
+        )
+      } finally {
+        consoleErrorSpy.mockRestore()
+      }
     })
   })
 
