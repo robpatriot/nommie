@@ -111,6 +111,70 @@ export function formatTrump(trump: RoundPublic['trump']): string {
   }
 }
 
+/**
+ * Shortens a name to fit within a maximum length using progressive strategies.
+ * Tries abbreviation strategies first, then truncates as a last resort.
+ *
+ * @param name - The full name to shorten
+ * @param maxLength - Maximum character length allowed
+ * @returns Shortened name that fits within maxLength
+ */
+export function shortenNameForDisplay(name: string, maxLength: number): string {
+  // Step 1: Full name (if it fits)
+  if (name.length <= maxLength) {
+    return name
+  }
+
+  const words = name.trim().split(/\s+/)
+  const wordCount = words.length
+
+  // Step 2: Abbreviate middle/last name
+  if (wordCount >= 3) {
+    // "First Middle Last" -> "First M. Last"
+    const abbreviated = `${words[0]} ${words[1][0]}. ${words[wordCount - 1]}`
+    if (abbreviated.length <= maxLength) {
+      return abbreviated
+    }
+  } else if (wordCount === 2) {
+    // "First Last" -> "First L."
+    const abbreviated = `${words[0]} ${words[1][0]}.`
+    if (abbreviated.length <= maxLength) {
+      return abbreviated
+    }
+  }
+
+  // Step 3: First initial + last name
+  if (wordCount >= 2) {
+    // "First Last" or "First Middle Last" -> "F. Last"
+    const firstInitial = `${words[0][0]}. ${words[wordCount - 1]}`
+    if (firstInitial.length <= maxLength) {
+      return firstInitial
+    }
+  }
+
+  // Step 4: First name only
+  if (wordCount >= 2) {
+    const firstName = words[0]
+    if (firstName.length <= maxLength) {
+      return firstName
+    }
+  }
+
+  // Step 5: Initials
+  if (wordCount >= 2) {
+    // "First Last" -> "FL"
+    const initials = words.map((w) => w[0]).join('')
+    if (initials.length <= maxLength) {
+      return initials
+    }
+  }
+
+  // Step 6: Final fallback - truncate to maxLength or 8, whichever is smaller (no ellipsis)
+  const truncateLength = Math.min(maxLength, 8)
+  const truncated = name.substring(0, truncateLength)
+  return truncated
+}
+
 export function buildSeatSummaries(params: {
   playerNames: [string, string, string, string]
   viewerSeat: Seat
