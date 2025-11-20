@@ -177,13 +177,39 @@ impl GameService {
             (Vec::new(), None)
         };
 
-        // 9a. Load last completed trick (if in TrickPlay and not first trick)
+        // 9a. Load last completed trick
+        // - If in TrickPlay: load last trick from current round
+        // - If in Bidding/TrumpSelect: load final trick from previous round
         let last_trick = if matches!(game.state, DbGameState::TrickPlay) {
+            // Current round, previous trick
             all_tricks
                 .iter()
                 .filter(|t| t.trick_no < current_trick_no && (0..=3).contains(&t.winner_seat))
                 .max_by_key(|t| t.trick_no)
                 .map(|prev_trick| prev_trick.id)
+        } else if matches!(
+            game.state,
+            DbGameState::Bidding | DbGameState::TrumpSelection
+        ) {
+            // Previous round's final trick
+            // Only load if we're in round 2 or later (round 1 has no previous round)
+            if current_round_no > 1 {
+                let prev_round_no = current_round_no - 1;
+                if let Some(prev_round) =
+                    rounds::find_by_game_and_round(txn, game_id, prev_round_no).await?
+                {
+                    let prev_round_tricks = tricks::find_all_by_round(txn, prev_round.id).await?;
+                    prev_round_tricks
+                        .iter()
+                        .filter(|t| (0..=3).contains(&(t.winner_seat as i16)))
+                        .max_by_key(|t| t.trick_no)
+                        .map(|prev_trick| prev_trick.id)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
         } else {
             None
         };

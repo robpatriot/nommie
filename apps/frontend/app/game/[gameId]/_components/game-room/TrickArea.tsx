@@ -2,6 +2,7 @@ import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
 import type { Card } from '@/lib/game-room/types'
 import { getOrientation } from './utils'
 import { PlayingCard } from './PlayingCard'
+import { LastTrickCards } from './LastTrickCards'
 import { cn } from '@/lib/cn'
 
 interface TrickAreaProps {
@@ -10,6 +11,7 @@ interface TrickAreaProps {
   round: RoundPublic | null
   phase: PhaseSnapshot
   viewerSeat: Seat
+  lastTrick?: Array<[Seat, Card]> | null
   className?: string
 }
 
@@ -19,6 +21,7 @@ export function TrickArea({
   round,
   phase,
   viewerSeat,
+  lastTrick,
   className = '',
 }: TrickAreaProps) {
   const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
@@ -42,6 +45,13 @@ export function TrickArea({
         orientationOrder.indexOf(b.orientation)
     )
 
+  // Show last trick during bidding/trump selection (previous round's final trick)
+  // when there's no current trick being played
+  const isBetweenRounds =
+    phase.phase === 'Bidding' || phase.phase === 'TrumpSelect'
+  const showLastTrick =
+    isBetweenRounds && cards.length === 0 && lastTrick && lastTrick.length > 0
+
   return (
     <div
       className={cn(
@@ -49,7 +59,24 @@ export function TrickArea({
         className
       )}
     >
-      {cards.length === 0 ? (
+      {showLastTrick ? (
+        <>
+          {/* Display last trick */}
+          <div className="flex w-full flex-col gap-4">
+            <header className="flex items-center justify-center">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
+                {isBetweenRounds ? "Last round's final trick" : 'Last trick'}
+              </h2>
+            </header>
+            <LastTrickCards
+              lastTrick={lastTrick}
+              getSeatName={getSeatName}
+              viewerSeat={viewerSeat}
+              showNames={false}
+            />
+          </div>
+        </>
+      ) : cards.length === 0 ? (
         <>
           <div className="flex flex-col items-center gap-2">
             <span className="text-sm font-medium text-subtle">

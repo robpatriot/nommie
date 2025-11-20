@@ -62,6 +62,7 @@ export const biddingSnapshotFixture: GameSnapshot = {
       bids: [2, null, null, null],
       min_bid: 0,
       max_bid: 8,
+      last_trick: null,
     },
   },
 }
@@ -104,6 +105,7 @@ export const trickSnapshotFixture: GameSnapshot = {
       ],
       to_act: 0,
       playable: ['2H', 'KD', 'QC'],
+      last_trick: null,
     },
   },
 }
@@ -136,6 +138,26 @@ export const initPhaseSnapshot: PhaseSnapshot = { phase: 'Init' }
 export const gameOverPhaseSnapshot: PhaseSnapshot = { phase: 'GameOver' }
 
 export const biddingPhaseSnapshot: BiddingSnapshot =
-  biddingSnapshotFixture.phase.data
+  biddingSnapshotFixture.phase.phase === 'Bidding'
+    ? biddingSnapshotFixture.phase.data
+    : {
+        round: baseRound,
+        to_act: 1,
+        bids: [2, null, null, null],
+        min_bid: 0,
+        max_bid: 8,
+        last_trick: null,
+      }
 
-export const trickPhaseSnapshot: TrickSnapshot = trickSnapshotFixture.phase.data
+export const trickPhaseSnapshot: TrickSnapshot =
+  trickSnapshotFixture.phase.phase === 'Trick'
+    ? trickSnapshotFixture.phase.data
+    : {
+        round: baseRound,
+        trick_no: 1,
+        leader: 0,
+        current_trick: [],
+        to_act: 0,
+        playable: [],
+        last_trick: null,
+      }

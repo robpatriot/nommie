@@ -153,7 +153,14 @@ export function GameRoomView(props: GameRoomViewProps) {
   }, [phase, playState, selectedCard])
 
   // Get last trick from backend snapshot
-  const lastTrick = phase.phase === 'Trick' ? phase.data.last_trick : null
+  // - In Trick phase: last trick from current round
+  // - In Bidding/TrumpSelect: final trick from previous round
+  const lastTrick =
+    phase.phase === 'Trick' ||
+    phase.phase === 'Bidding' ||
+    phase.phase === 'TrumpSelect'
+      ? phase.data.last_trick
+      : null
 
   const handlePlayCard = useCallback(
     async (card: Card) => {
@@ -346,6 +353,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 round={round}
                 phase={phase}
                 viewerSeat={effectiveViewerSeat ?? 0}
+                lastTrick={lastTrick}
                 className="col-start-2 row-start-2 h-full w-full min-h-[280px]"
               />
             </div>
@@ -365,6 +373,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 round={round}
                 phase={phase}
                 viewerSeat={effectiveViewerSeat ?? 0}
+                lastTrick={lastTrick}
               />
             </div>
             <PlayerHand

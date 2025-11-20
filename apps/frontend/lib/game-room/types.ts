@@ -38,12 +38,14 @@ export interface BiddingSnapshot {
   bids: [number | null, number | null, number | null, number | null]
   min_bid: number
   max_bid: number
+  last_trick: Array<[Seat, Card]> | null
 }
 
 export interface TrumpSelectSnapshot {
   round: RoundPublic
   to_act: Seat
   allowed_trumps: Trump[]
+  last_trick: Array<[Seat, Card]> | null
 }
 
 export interface TrickSnapshot {

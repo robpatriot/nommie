@@ -68,6 +68,7 @@ const mockSnapshot: GameSnapshot = {
       ],
       to_act: 0,
       playable: ['2H', '5H', '8H', 'AS'],
+      last_trick: null,
     },
   },
 }

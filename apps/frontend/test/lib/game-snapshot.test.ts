@@ -16,10 +16,12 @@ describe('GameSnapshot contract', () => {
 
     expectTypeOf(parsed).toMatchTypeOf<GameSnapshot>()
     expect(parsed.phase.phase).toBe('Bidding')
-    expect(parsed.phase.data.bids).toHaveLength(4)
-    expect(parsed.phase.data.min_bid).toBeLessThanOrEqual(
-      parsed.phase.data.max_bid
-    )
+    if (parsed.phase.phase === 'Bidding') {
+      expect(parsed.phase.data.bids).toHaveLength(4)
+      expect(parsed.phase.data.min_bid).toBeLessThanOrEqual(
+        parsed.phase.data.max_bid
+      )
+    }
   })
 
   it('supports trick snapshot tuple payloads', () => {
@@ -27,8 +29,10 @@ describe('GameSnapshot contract', () => {
     const parsed = JSON.parse(json) as GameSnapshot
 
     expect(parsed.phase.phase).toBe('Trick')
-    expect(parsed.phase.data.current_trick[0]).toEqual([2, 'AS'])
-    expect(parsed.phase.data.playable).toContain('KD')
+    if (parsed.phase.phase === 'Trick') {
+      expect(parsed.phase.data.current_trick[0]).toEqual([2, 'AS'])
+      expect(parsed.phase.data.playable).toContain('KD')
+    }
   })
 
   it('covers terminal phases as discriminated unions', () => {

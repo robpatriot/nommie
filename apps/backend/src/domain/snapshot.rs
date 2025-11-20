@@ -86,6 +86,8 @@ pub struct BiddingSnapshot {
     pub bids: [Option<u8>; 4],
     pub min_bid: u8,
     pub max_bid: u8,
+    /// Last completed trick from previous round (4 cards) for display purposes.
+    pub last_trick: Option<Vec<(Seat, Card)>>,
 }
 
 /// Trump selection phase snapshot.
@@ -94,6 +96,8 @@ pub struct TrumpSelectSnapshot {
     pub round: RoundPublic,
     pub to_act: Seat,
     pub allowed_trumps: Vec<Trump>,
+    /// Last completed trick from previous round (4 cards) for display purposes.
+    pub last_trick: Option<Vec<(Seat, Card)>>,
 }
 
 /// Trick-playing phase snapshot.
@@ -183,6 +187,7 @@ fn snapshot_bidding(state: &GameState) -> PhaseSnapshot {
         bids,
         min_bid,
         max_bid,
+        last_trick: state.round.last_trick.clone(),
     })
 }
 
@@ -202,6 +207,7 @@ fn snapshot_trump_select(state: &GameState) -> PhaseSnapshot {
         round,
         to_act,
         allowed_trumps,
+        last_trick: state.round.last_trick.clone(),
     })
 }
 

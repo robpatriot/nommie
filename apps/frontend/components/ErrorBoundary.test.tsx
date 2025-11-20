@@ -121,7 +121,11 @@ describe('ErrorBoundary', () => {
 
   it('displays error details in development mode', () => {
     const originalEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'development'
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: 'development',
+      writable: true,
+      configurable: true,
+    })
 
     render(
       <ErrorBoundary>
@@ -136,12 +140,20 @@ describe('ErrorBoundary', () => {
     const stackTrace = screen.getByText(/Error: Test error message/)
     expect(stackTrace).toBeInTheDocument()
 
-    process.env.NODE_ENV = originalEnv
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: originalEnv,
+      writable: true,
+      configurable: true,
+    })
   })
 
   it('hides error details in production mode', () => {
     const originalEnv = process.env.NODE_ENV
-    process.env.NODE_ENV = 'production'
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: 'production',
+      writable: true,
+      configurable: true,
+    })
 
     render(
       <ErrorBoundary>
@@ -153,7 +165,11 @@ describe('ErrorBoundary', () => {
       screen.queryByText('Error details (dev only)')
     ).not.toBeInTheDocument()
 
-    process.env.NODE_ENV = originalEnv
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: originalEnv,
+      writable: true,
+      configurable: true,
+    })
   })
 
   it('displays default message when error has no message', () => {
