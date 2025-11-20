@@ -90,7 +90,7 @@ function ToastItem({
                 ? 'text-danger'
                 : isWarning
                   ? 'text-warning-foreground dark:text-warning'
-                  : 'text-success-foreground'
+                  : 'text-success-foreground dark:text-success-contrast'
             }`}
           >
             {toast.message}
@@ -135,7 +135,7 @@ function ToastItem({
               ? 'text-danger hover:text-danger/80'
               : isWarning
                 ? 'text-warning-foreground dark:text-warning hover:text-warning-foreground/80 dark:hover:text-warning/80'
-                : 'text-success-foreground hover:text-success-foreground/80'
+                : 'text-success-foreground dark:text-success-contrast hover:text-success-foreground/80 dark:hover:text-success-contrast/80'
           }`}
           aria-label="Close"
         >
