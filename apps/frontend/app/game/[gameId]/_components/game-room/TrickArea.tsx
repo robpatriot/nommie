@@ -28,39 +28,79 @@ export function TrickArea({
     orientation: getOrientation(viewerSeat, seat),
   }))
 
+  const orientationOrder: Array<'bottom' | 'right' | 'top' | 'left'> = [
+    'left',
+    'top',
+    'right',
+    'bottom',
+  ]
+  const orderedCards = cards
+    .slice()
+    .sort(
+      (a, b) =>
+        orientationOrder.indexOf(a.orientation) -
+        orientationOrder.indexOf(b.orientation)
+    )
+
   return (
     <div
       className={cn(
-        'flex h-full flex-col items-center justify-center gap-4 rounded-[32px] border border-white/10 bg-black/25 p-6 text-center text-sm text-muted shadow-[0_35px_90px_rgba(0,0,0,0.4)] backdrop-blur',
+        'relative flex h-full min-h-[280px] items-center justify-center rounded-[32px] border border-white/10 bg-black/25 p-8 text-center text-sm text-muted shadow-[0_35px_90px_rgba(0,0,0,0.4)] backdrop-blur',
         className
       )}
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-        Current trick
-      </p>
-      <div className="flex flex-wrap items-center justify-center gap-6">
-        {cards.length === 0 ? (
-          <span className="text-sm text-subtle">Waiting for lead…</span>
-        ) : (
-          cards.map(({ seat, card, label, orientation }) => (
-            <div key={seat} className="flex flex-col items-center gap-2">
-              <PlayingCard card={card} size="md" />
-              <span className="text-xs font-semibold text-foreground">
-                {label}
+      {cards.length === 0 ? (
+        <>
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-sm font-medium text-subtle">
+              Waiting for lead…
+            </span>
+            {phase.phase === 'Trick' ? (
+              <span className="text-xs text-muted">
+                Trick {phase.data.trick_no} of {round?.hand_size ?? '?'}
               </span>
-              <span className="text-[10px] uppercase tracking-wide text-subtle">
-                {orientation}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
-      {phase.phase === 'Trick' ? (
-        <p className="text-xs text-muted">
-          Leader: {getSeatName(phase.data.leader)} — Trick {phase.data.trick_no}{' '}
-          of {round?.hand_size ?? '?'}
-        </p>
-      ) : null}
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Cards positioned inside a bounded fan area */}
+          <div className="relative flex max-w-[280px] flex-wrap items-center justify-center gap-0 overflow-visible px-2">
+            {orderedCards.map(({ seat, card, label, orientation }, index) => {
+              const offsetClass =
+                orientation === 'top'
+                  ? '-translate-y-3'
+                  : orientation === 'bottom'
+                    ? 'translate-y-3'
+                    : orientation === 'left'
+                      ? '-translate-x-2'
+                      : 'translate-x-2'
+              return (
+                <div
+                  key={seat}
+                  className={cn(
+                    'relative flex flex-col items-center gap-2 transition-all duration-300',
+                    index > 0 ? '-ml-8' : '',
+                    offsetClass
+                  )}
+                  style={{ zIndex: 20 + index }}
+                >
+                  <div className="relative">
+                    <PlayingCard card={card} size="md" />
+                    {/* Subtle glow for active player */}
+                    {phase.phase === 'Trick' && phase.data.to_act === seat ? (
+                      <div className="absolute inset-0 -z-10 rounded-[1.35rem] bg-success/20 blur-xl" />
+                    ) : null}
+                  </div>
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-foreground">
+                    {label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }

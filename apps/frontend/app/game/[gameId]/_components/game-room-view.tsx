@@ -337,7 +337,14 @@ export function GameRoomView(props: GameRoomViewProps) {
       <PageContainer className="pb-16">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
-            <div className="hidden min-h-[420px] grid-cols-3 grid-rows-3 gap-4 lg:grid">
+            <div
+              className="hidden gap-3 lg:grid"
+              style={{
+                gridTemplateColumns:
+                  'minmax(140px,1fr) minmax(0,2.2fr) minmax(140px,1fr)',
+                gridTemplateRows: 'auto 1fr auto',
+              }}
+            >
               {seatSummaries.map((summary) => (
                 <SeatCard key={summary.seat} summary={summary} />
               ))}
@@ -347,7 +354,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 round={round}
                 phase={phase}
                 viewerSeat={effectiveViewerSeat ?? 0}
-                className="col-start-2 row-start-2 h-full w-full"
+                className="col-start-2 row-start-2 h-full w-full min-h-[280px]"
               />
             </div>
             <div className="flex flex-col gap-3 lg:hidden">
