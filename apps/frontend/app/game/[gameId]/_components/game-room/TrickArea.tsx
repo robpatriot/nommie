@@ -112,13 +112,7 @@ export function TrickArea({
                   )}
                   style={{ zIndex: 20 + index }}
                 >
-                  <div className="relative">
-                    <PlayingCard card={card} size="md" />
-                    {/* Subtle glow for active player */}
-                    {phase.phase === 'Trick' && phase.data.to_act === seat ? (
-                      <div className="absolute inset-0 -z-10 rounded-[1.35rem] bg-success/20 blur-xl" />
-                    ) : null}
-                  </div>
+                  <PlayingCard card={card} size="md" />
                   <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-foreground">
                     {label}
                   </span>
