@@ -56,58 +56,142 @@ export function TrumpSelectPanel({
       ? 'Confirm Trump'
       : `Waiting for ${activeName}`
 
+  // Helper to get suit symbol
+  const getSuitSymbol = (trump: Trump): string => {
+    switch (trump) {
+      case 'CLUBS':
+        return '♣'
+      case 'DIAMONDS':
+        return '♦'
+      case 'HEARTS':
+        return '♥'
+      case 'SPADES':
+        return '♠'
+      case 'NO_TRUMP':
+        return 'NT'
+      default:
+        return ''
+    }
+  }
+
+  // Helper to get suit color classes
+  const getSuitColor = (trump: Trump): string => {
+    switch (trump) {
+      case 'HEARTS':
+      case 'DIAMONDS':
+        return 'text-rose-600'
+      case 'CLUBS':
+      case 'SPADES':
+        return 'text-slate-900'
+      case 'NO_TRUMP':
+        return 'text-accent-contrast'
+      default:
+        return ''
+    }
+  }
+
+  // Separate suits from no trump
+  const suits = allowedTrumps.filter((t) => t !== 'NO_TRUMP').reverse()
+  const hasNoTrump = allowedTrumps.includes('NO_TRUMP')
+
   return (
     <section className="flex w-full flex-col gap-4 rounded-3xl border border-accent/50 bg-accent/15 p-5 text-accent-contrast shadow-[0_30px_90px_rgba(94,234,212,0.25)]">
-      <header className="flex flex-wrap items-center justify-between gap-2 text-accent-contrast">
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-accent-contrast">
-            Select trump
-          </h2>
-          <p className="text-xs text-accent-contrast/80">
-            Choose the trump suit for this round. Trump cards outrank all other
-            suits.
-          </p>
-        </div>
-        <div className="rounded-full border border-accent/60 bg-accent/25 px-3 py-1 text-xs font-semibold text-accent-contrast">
-          Waiting on: {activeName}
-        </div>
+      <header>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
+          Select trump
+        </h2>
+        <p className="text-xs text-accent-contrast/80">
+          Choose the trump suit for this round. Trump cards outrank all other
+          suits.
+        </p>
       </header>
 
       <form
         className="flex flex-col gap-3 rounded-2xl border border-accent/30 bg-surface/85 p-4 shadow-inner shadow-accent/20"
         onSubmit={handleSubmit}
       >
-        <div className="flex flex-wrap gap-2">
-          {allowedTrumps.map((option) => {
-            const isSelected = option === selectedTrump
-            const disabled = !canSelect || isPending
-            return (
+        <div className="flex flex-col gap-3">
+          {/* Suits row */}
+          {suits.length > 0 && (
+            <div
+              className="grid gap-2"
+              style={{
+                gridTemplateColumns: `repeat(${suits.length}, minmax(0, 1fr))`,
+              }}
+            >
+              {suits.map((option) => {
+                const isSelected = option === selectedTrump
+                const disabled = !canSelect || isPending
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => {
+                      if (disabled) {
+                        return
+                      }
+                      setSelectedTrump(isSelected ? null : option)
+                    }}
+                    disabled={disabled}
+                    className={`flex items-center justify-center rounded-2xl border px-4 py-3 text-center transition ${
+                      isSelected
+                        ? 'border-accent bg-accent/30 text-accent-contrast shadow-md shadow-accent/30'
+                        : canSelect
+                          ? 'border-accent/40 bg-surface text-accent-contrast hover:border-accent hover:bg-accent/15'
+                          : 'border-border bg-surface text-muted'
+                    } ${
+                      disabled
+                        ? 'cursor-not-allowed opacity-60'
+                        : 'cursor-pointer'
+                    }`}
+                    aria-label={`Select ${formatTrump(option)} as trump suit${isSelected ? ', currently selected' : ''}`}
+                    aria-pressed={isSelected}
+                  >
+                    <span
+                      className={`text-5xl font-semibold ${getSuitColor(option)}`}
+                    >
+                      {getSuitSymbol(option)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* No Trump row */}
+          {hasNoTrump && (
+            <div className="grid gap-2" style={{ gridTemplateColumns: '1fr' }}>
               <button
-                key={option}
                 type="button"
                 onClick={() => {
-                  if (disabled) {
+                  if (!canSelect || isPending) {
                     return
                   }
-                  setSelectedTrump(option)
+                  setSelectedTrump(
+                    selectedTrump === 'NO_TRUMP' ? null : 'NO_TRUMP'
+                  )
                 }}
-                disabled={disabled}
-                className={`rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
-                  isSelected
+                disabled={!canSelect || isPending}
+                className={`flex items-center justify-center rounded-2xl border px-4 py-3 text-center transition ${
+                  selectedTrump === 'NO_TRUMP'
                     ? 'border-accent bg-accent/30 text-accent-contrast shadow-md shadow-accent/30'
                     : canSelect
                       ? 'border-accent/40 bg-surface text-accent-contrast hover:border-accent hover:bg-accent/15'
                       : 'border-border bg-surface text-muted'
                 } ${
-                  disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+                  !canSelect || isPending
+                    ? 'cursor-not-allowed opacity-60'
+                    : 'cursor-pointer'
                 }`}
-                aria-label={`Select ${formatTrump(option)} as trump suit${isSelected ? ', currently selected' : ''}`}
-                aria-pressed={isSelected}
+                aria-label={`Select ${formatTrump('NO_TRUMP')} as trump${selectedTrump === 'NO_TRUMP' ? ', currently selected' : ''}`}
+                aria-pressed={selectedTrump === 'NO_TRUMP'}
               >
-                {formatTrump(option)}
+                <span className="text-xl font-semibold text-accent-contrast">
+                  No Trumps
+                </span>
               </button>
-            )
-          })}
+            </div>
+          )}
         </div>
 
         <button
