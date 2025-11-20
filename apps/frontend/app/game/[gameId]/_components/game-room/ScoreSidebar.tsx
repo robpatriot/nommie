@@ -14,12 +14,6 @@ interface ScoreSidebarProps {
   dealer: Seat
   seatDisplayName: (seat: Seat) => string
   error?: { message: string; traceId?: string } | null
-  bidStatus?: Array<{
-    seat: number
-    name: string
-    bid: number | null
-    isActive: boolean
-  }>
   onRefresh?: () => void
   isRefreshing?: boolean
   className?: string
@@ -36,7 +30,6 @@ export function ScoreSidebar({
   dealer,
   seatDisplayName,
   error,
-  bidStatus = [],
   onRefresh,
   isRefreshing = false,
   className = '',
@@ -105,33 +98,6 @@ export function ScoreSidebar({
               traceId: {error.traceId}
             </p>
           ) : null}
-        </div>
-      ) : null}
-
-      {bidStatus.length > 0 ? (
-        <div className="rounded-2xl border border-border/60 bg-surface/70 p-3">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
-            Bidding Status
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {bidStatus.map(({ seat, name, bid, isActive }) => (
-              <div
-                key={seat}
-                className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.3em] ${
-                  isActive
-                    ? 'border-success bg-success/15 text-success-contrast'
-                    : 'border-white/15 bg-surface text-muted'
-                }`}
-              >
-                <span className="text-[10px] tracking-[0.2em] text-subtle">
-                  {name}
-                </span>
-                <span className="text-sm font-semibold text-foreground">
-                  {bid ?? '—'}
-                </span>
-              </div>
-            ))}
-          </div>
         </div>
       ) : null}
 

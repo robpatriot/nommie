@@ -151,18 +151,30 @@ export function BiddingPanel({
 
   return (
     <section className="flex w-full flex-col gap-4 rounded-3xl border border-success/50 bg-success/10 p-5 text-success-contrast shadow-[0_30px_90px_rgba(56,189,116,0.25)]">
-      <header className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      <header className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
             Bidding
           </h2>
           <p className="text-xs text-success-contrast/80">
-            Select a number between {minBid} and {maxBid}. Everyone’s bids stay
-            visible below.
+            Everyone&apos;s bids stay visible below.
           </p>
         </div>
-        <div className="rounded-full border border-success/60 bg-success/25 px-3 py-1 text-xs font-semibold">
-          Waiting on: {activeName}
+        <div
+          className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 ${
+            isViewerTurn
+              ? 'bg-success/25 border-success/60'
+              : 'bg-success/15 border-success/40'
+          } border`}
+        >
+          <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-success-contrast/80">
+            {isViewerTurn ? 'Your turn' : 'Waiting'}
+          </span>
+          {!isViewerTurn && (
+            <span className="text-sm font-bold text-success-contrast/90">
+              {activeName}
+            </span>
+          )}
         </div>
       </header>
 

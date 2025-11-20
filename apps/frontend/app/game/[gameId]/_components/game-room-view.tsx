@@ -324,17 +324,6 @@ export function GameRoomView(props: GameRoomViewProps) {
     )
   }
 
-  const biddingPhase = phase.phase === 'Bidding' ? phase.data : null
-  const bidStatus =
-    biddingPhase === null
-      ? []
-      : ([0, 1, 2, 3] as const).map((seatIndex) => ({
-          seat: seatIndex,
-          name: seatDisplayName(seatIndex as Seat),
-          bid: biddingPhase.bids[seatIndex],
-          isActive: biddingPhase.to_act === seatIndex,
-        }))
-
   return (
     <div className="flex flex-col text-foreground">
       <PageContainer className="pb-16">
@@ -412,7 +401,6 @@ export function GameRoomView(props: GameRoomViewProps) {
               dealer={snapshot.game.dealer}
               seatDisplayName={seatDisplayName}
               error={error}
-              bidStatus={bidStatus}
               onRefresh={onRefresh}
               isRefreshing={isRefreshing}
             />
