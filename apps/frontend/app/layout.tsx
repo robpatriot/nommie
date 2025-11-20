@@ -7,7 +7,6 @@ import { cookies } from 'next/headers'
 import './globals.css'
 import Header from '@/components/Header'
 import { HeaderBreadcrumbProvider } from '@/components/header-breadcrumbs'
-import { signOut } from '@/auth'
 import { getLastActiveGame } from '@/lib/api'
 import {
   resolveBackendJwt,
@@ -61,7 +60,11 @@ export default async function RootLayout({
   if (resolution.state === 'missing-session') {
     session = null
   } else if (resolution.state === 'missing-jwt') {
-    await signOut({ redirectTo: '/' })
+    // JWT is missing but session exists - allow page to render
+    // Pages will handle missing JWT by redirecting or showing appropriate UI
+    // Don't redirect here to avoid infinite loops (home page checks session and redirects to lobby)
+    session = resolution.session
+    backendJwt = undefined
   } else {
     session = resolution.session
     backendJwt = resolution.backendJwt

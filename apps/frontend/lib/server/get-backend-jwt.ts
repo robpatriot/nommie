@@ -6,6 +6,7 @@ import { getToken } from 'next-auth/jwt'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import type { Session } from 'next-auth'
+import * as jose from 'jose'
 
 interface NextAuthToken {
   backendJwt?: unknown
@@ -15,7 +16,10 @@ interface NextAuthToken {
   sub?: unknown
 }
 
-const REFRESH_THRESHOLD_SECONDS = 60
+const REFRESH_THRESHOLD_SECONDS = 300 // 5 minutes - consistent with backend token expiry
+
+// Request-level deduplication: track in-flight refresh requests
+const refreshPromises = new Map<string, Promise<string | null>>()
 
 export type BackendJwtResolution =
   | { state: 'missing-session'; session: null }
@@ -60,11 +64,26 @@ export async function resolveBackendJwt(): Promise<BackendJwtResolution> {
         ? token.backendJwt
         : undefined
 
+    // Check if JWT exists and is still valid (not expiring within threshold)
     if (existingJwt && !isJwtExpiring(existingJwt, REFRESH_THRESHOLD_SECONDS)) {
       return { state: 'ready', session, backendJwt: existingJwt }
     }
 
-    const refreshed = await refreshBackendJwt({ session, token })
+    // Create deduplication key based on user identity
+    // This ensures parallel requests from the same user share the same refresh request
+    const dedupeKey =
+      (token?.email && typeof token.email === 'string' ? token.email : '') +
+      '|' +
+      (token?.googleSub && typeof token.googleSub === 'string'
+        ? token.googleSub
+        : '')
+
+    // Refresh backend JWT if needed
+    const refreshed = await refreshBackendJwt({
+      session,
+      token,
+      dedupeKey,
+    })
     if (refreshed) {
       return { state: 'ready', session, backendJwt: refreshed }
     }
@@ -90,20 +109,15 @@ export async function requireBackendJwt(): Promise<string> {
 
 function isJwtExpiring(token: string, thresholdSeconds: number): boolean {
   try {
-    const [, payload] = token.split('.')
-    if (!payload) return true
+    const decoded = jose.decodeJwt(token)
+    const exp = decoded.exp
 
-    const decoded = JSON.parse(
-      Buffer.from(payload, 'base64url').toString()
-    ) as {
-      exp?: number
-    }
-    if (typeof decoded.exp !== 'number') {
+    if (typeof exp !== 'number' || !exp) {
       return true
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000)
-    return decoded.exp - nowSeconds <= thresholdSeconds
+    return exp - nowSeconds <= thresholdSeconds
   } catch {
     return true
   }
@@ -112,10 +126,18 @@ function isJwtExpiring(token: string, thresholdSeconds: number): boolean {
 async function refreshBackendJwt({
   session,
   token,
+  dedupeKey,
 }: {
   session: Session
   token: NextAuthToken | null
+  dedupeKey: string
 }): Promise<string | null> {
+  // Check if refresh is already in flight
+  const existingPromise = refreshPromises.get(dedupeKey)
+  if (existingPromise) {
+    return existingPromise
+  }
+
   const email =
     (typeof session.user?.email === 'string' && session.user.email) ||
     (token?.email && typeof token.email === 'string' ? token.email : null)
@@ -136,31 +158,49 @@ async function refreshBackendJwt({
     return null
   }
 
-  const backendBase = getBackendBaseUrlOrThrow()
+  // Create refresh promise
+  const refreshPromise = (async () => {
+    try {
+      const backendBase = getBackendBaseUrlOrThrow()
 
-  try {
-    const response = await fetch(`${backendBase}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        name,
-        google_sub: googleSub,
-      }),
-    })
+      const response = await fetch(`${backendBase}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          name,
+          google_sub: googleSub,
+        }),
+      })
 
-    if (!response.ok) {
-      console.warn('Backend JWT refresh failed', response.status)
+      if (!response.ok) {
+        console.warn('Backend JWT refresh failed', response.status)
+        return null
+      }
+
+      const data = (await response.json()) as { token?: unknown }
+      if (data && typeof data.token === 'string' && data.token.length > 0) {
+        // Note: We cannot use unstable_update() here because it modifies cookies,
+        // which can only be done in Server Actions or Route Handlers.
+        // The refreshed JWT will be returned and used for the current request.
+        // On the next request, if the JWT is still missing/expired, it will be refreshed again.
+        // This is acceptable since the deduplication prevents duplicate refresh requests.
+        return data.token
+      }
+
       return null
+    } catch (error) {
+      console.warn('Error refreshing backend JWT', error)
+      return null
+    } finally {
+      // Clean up deduplication cache immediately after completion
+      // The delay is handled by checking if promise exists before creating new one
+      refreshPromises.delete(dedupeKey)
     }
+  })()
 
-    const data = (await response.json()) as { token?: unknown }
-    if (data && typeof data.token === 'string' && data.token.length > 0) {
-      return data.token
-    }
-  } catch (error) {
-    console.warn('Error refreshing backend JWT', error)
-  }
+  // Store promise for deduplication
+  refreshPromises.set(dedupeKey, refreshPromise)
 
-  return null
+  return refreshPromise
 }
