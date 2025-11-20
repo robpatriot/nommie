@@ -34,14 +34,14 @@ export function BiddingPanel({
   const isViewerTurn = phase.to_act === viewerSeat
   const activeName =
     phase.to_act === viewerSeat ? 'You' : playerNames[phase.to_act]
-  const [bidInput, setBidInput] = useState<string>(() =>
-    (viewerBid ?? minBid).toString()
-  )
+  const [bidInput, setBidInput] = useState<string>('')
   const [flashValidation, setFlashValidation] = useState(false)
+  const [hasTyped, setHasTyped] = useState(false)
 
   useEffect(() => {
     if (viewerBid !== null) {
-      setBidInput(viewerBid.toString())
+      setBidInput('')
+      setHasTyped(false)
       return
     }
 
@@ -98,7 +98,9 @@ export function BiddingPanel({
   const validationMessages: string[] = []
 
   if (parsedBid === null) {
-    validationMessages.push('Enter a bid before submitting.')
+    if (hasTyped) {
+      validationMessages.push('Enter a bid before submitting.')
+    }
   } else {
     if (parsedBid < minBid) {
       validationMessages.push(`Bid must be at least ${minBid}.`)
@@ -129,6 +131,9 @@ export function BiddingPanel({
     const value = event.target.value
     if (value === '' || /^\d+$/.test(value)) {
       setBidInput(value)
+      if (!hasTyped && value !== '') {
+        setHasTyped(true)
+      }
     }
   }
 
@@ -139,7 +144,10 @@ export function BiddingPanel({
       return
     }
 
-    if (parsedBid === null || hasValidationIssue) {
+    if ((parsedBid === null && !hasTyped) || hasValidationIssue) {
+      if (!hasTyped) {
+        setHasTyped(true)
+      }
       setFlashValidation(true)
       return
     }
@@ -196,6 +204,7 @@ export function BiddingPanel({
             pattern="[0-9]*"
             value={bidInput}
             onChange={handleInputChange}
+            placeholder={viewerBid !== null ? undefined : minBid.toString()}
             className={`w-24 rounded-xl border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
               hasValidationIssue
                 ? 'border-warning/70 focus:border-warning focus:ring focus:ring-warning/30'
