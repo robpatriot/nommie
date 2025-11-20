@@ -167,7 +167,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **16. Frontend UX Pass (Round 2)**
+### ✅ **16. Frontend UX Pass (Round 2)**
 **Dependencies:** 15  
 **Details:**
 - **Implement Design v1:** Apply the first-endorsed product design across Nommie (typography, spacing, components).  
@@ -175,11 +175,23 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 - **Last Trick UI:** Persist the most recent trick as a compact card row so play can continue immediately after the final card.  
 - **User Options:** Add per-account settings (e.g., theme, gameplay preferences) surfaced via a profile/options view.  
 - **Card Play Confirmation Toggle:** Provide a per-account option for confirming card plays before submission.  
+**Progress:** Stage 1 UI roadmap items are complete—Design v1, the config/play split, Last Trick UI, user options, confirmation toggle, and polish/animation passes are live in production.  
 **Acceptance:** Core screens match design reference; users transition smoothly between config and play areas; previous trick reviewable; account preferences persist; card confirmation toggle works.
 
 ---
 
-### 🟨 **17. PATCH Endpoints with ETag Support**
+### 🟨 **17. Mobile Design & UI Implementation**
+**Dependencies:** 11, 15, 16  
+**Details:**
+- **Design System Parity:** Define a mobile-specific design kit (spacing, typography, colors, components) that mirrors the web experience while honoring native platform conventions and accessibility.  
+- **Expo App Foundations:** Scaffold the `apps/mobile` Expo client with navigation (stack + modal flows), theming, and auth hand-off using the existing backend JWT flow.  
+- **End-to-End Screens:** Implement lobby list, game configuration, and in-game play surfaces (bidding, trump select, trick play, last-trick review) with responsive layouts, gestures, and haptics.  
+- **State & Sync:** Reuse shared types/API wrapper, add optimistic interactions for bid/play actions, and support offline/foreground-resume states with snapshot hydration.  
+**Acceptance:** Mobile users can authenticate, configure games, and play full rounds with UX parity to the web client; navigation, theming, and interactions feel native; the app handles reconnects and snapshot refreshes gracefully.
+
+---
+
+### 🟨 **18. PATCH Endpoints with ETag Support**
 **Dependencies:** 5, 9, 12  
 **Details:**
 - Implement PATCH endpoints for **game configuration only** (not gameplay actions) with conditional request support via ETags.
@@ -204,7 +216,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **18. CI Pipeline**
+### 🟨 **19. CI Pipeline**
 **Dependencies:** 4, 5, 6, 7, 9, 14, 15  
 **Details:**
 - Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.
@@ -214,7 +226,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **19. Documentation & Decision Log**
+### 🟨 **20. Documentation & Decision Log**
 **Dependencies:** 11  
 **Details:**
 - **README:** Setup and reset flow; architecture explanation.
@@ -227,7 +239,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🕓 **20. Observability & Stability**
+### 🕓 **21. Observability & Stability**
 **Dependencies:** 5, 11  
 **Details:**
 - **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id` when relevant.
@@ -238,8 +250,8 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🕓 **21. Open Source Observability Stack**
-**Dependencies:** 18, 10  
+### 🕓 **22. Open Source Observability Stack**
+**Dependencies:** 19, 10  
 **Details:**
 - **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus in Docker Compose for full observability.
 **Progress:** Docker baseline complete; observability stack not yet deployed.  
@@ -247,7 +259,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### **22. Accessibility (a11y)**
+### **23. Accessibility (a11y)**
 **Dependencies:** 11, 15  
 **Details:**
 - **Keyboard-First Play:** Full keyboard navigation and control for all game interactions (card selection, bidding, trump selection, card play).  
@@ -266,7 +278,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### **23. Internationalisation Foundations**
+### **24. Internationalisation Foundations**
 **Dependencies:** 11, 15  
 **Details:**
 - **Internationalisation Foundations:** Define and implement the initial i18n strategy (framework choice, locale loading, placeholder translations) with scope finalised before execution.  
