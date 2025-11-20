@@ -5,6 +5,7 @@ import {
   type FormEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import type { BiddingSnapshot, Seat } from '@/lib/game-room/types'
@@ -37,6 +38,7 @@ export function BiddingPanel({
   const [bidInput, setBidInput] = useState<string>('')
   const [flashValidation, setFlashValidation] = useState(false)
   const [hasTyped, setHasTyped] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (viewerBid !== null) {
@@ -60,6 +62,12 @@ export function BiddingPanel({
       return current
     })
   }, [maxBid, minBid, viewerBid])
+
+  useEffect(() => {
+    if (isViewerTurn && viewerBid === null) {
+      inputRef.current?.focus()
+    }
+  }, [isViewerTurn, viewerBid])
 
   useEffect(() => {
     if (!flashValidation) {
@@ -152,7 +160,8 @@ export function BiddingPanel({
       return
     }
 
-    const normalizedBid = Math.min(Math.max(parsedBid, minBid), maxBid)
+    const safeBid = parsedBid ?? minBid
+    const normalizedBid = Math.min(Math.max(safeBid, minBid), maxBid)
     setBidInput(normalizedBid.toString())
     await bidding.onSubmit(normalizedBid)
   }
@@ -204,7 +213,6 @@ export function BiddingPanel({
             pattern="[0-9]*"
             value={bidInput}
             onChange={handleInputChange}
-            placeholder={viewerBid !== null ? undefined : minBid.toString()}
             className={`w-24 rounded-xl border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
               hasValidationIssue
                 ? 'border-warning/70 focus:border-warning focus:ring focus:ring-warning/30'
@@ -214,6 +222,7 @@ export function BiddingPanel({
             aria-label="Bid value"
             aria-describedby={describedByIds}
             aria-invalid={hasValidationIssue}
+            ref={inputRef}
           />
           <button
             type="submit"
