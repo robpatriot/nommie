@@ -50,6 +50,7 @@ export interface GameRoomViewProps {
     lastSyncedAt?: string
     isPolling?: boolean
   }
+  requireCardConfirmation?: boolean
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
@@ -67,6 +68,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     trumpState,
     playState,
     aiSeatState,
+    requireCardConfirmation = true,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -385,6 +387,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               selectedCard={selectedCard}
               onSelectCard={setSelectedCard}
               onPlayCard={handlePlayCard}
+              requireCardConfirmation={requireCardConfirmation}
               className="bg-black/40"
             />
           </section>

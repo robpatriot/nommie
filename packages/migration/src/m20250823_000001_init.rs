@@ -36,6 +36,7 @@ enum UserOptions {
     Table,
     UserId,
     AppearanceMode,
+    RequireCardConfirmation,
     UpdatedAt,
 }
 
@@ -327,6 +328,12 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null()
                             .default("system"),
+                    )
+                    .col(
+                        ColumnDef::new(UserOptions::RequireCardConfirmation)
+                            .boolean()
+                            .not_null()
+                            .default(true),
                     )
                     .col(
                         ColumnDef::new(UserOptions::UpdatedAt)

@@ -23,6 +23,7 @@ pub async fn ensure_default_for_user(
     let active = user_options::ActiveModel {
         user_id: Set(user_id),
         appearance_mode: Set("system".to_string()),
+        require_card_confirmation: Set(true),
         updated_at: Set(OffsetDateTime::now_utc()),
     };
 
@@ -38,14 +39,25 @@ pub async fn ensure_default_for_user(
     }
 }
 
-pub async fn set_appearance_mode(
+pub async fn update_options(
     txn: &DatabaseTransaction,
     user_id: i64,
-    appearance_mode: &str,
+    appearance_mode: Option<&str>,
+    require_card_confirmation: Option<bool>,
 ) -> Result<user_options::Model, sea_orm::DbErr> {
     let existing = ensure_default_for_user(txn, user_id).await?;
+
+    if appearance_mode.is_none() && require_card_confirmation.is_none() {
+        return Ok(existing);
+    }
+
     let mut active: user_options::ActiveModel = existing.into();
-    active.appearance_mode = Set(appearance_mode.to_string());
+    if let Some(mode) = appearance_mode {
+        active.appearance_mode = Set(mode.to_string());
+    }
+    if let Some(require_confirmation) = require_card_confirmation {
+        active.require_card_confirmation = Set(require_confirmation);
+    }
     active.updated_at = Set(OffsetDateTime::now_utc());
     active.update(txn).await
 }

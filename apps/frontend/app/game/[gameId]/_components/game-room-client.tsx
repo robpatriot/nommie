@@ -42,12 +42,14 @@ interface GameRoomClientProps {
   initialData: GameRoomSnapshotPayload
   gameId: number
   pollingMs?: number
+  requireCardConfirmation?: boolean
 }
 
 export function GameRoomClient({
   initialData,
   gameId,
   pollingMs = 3000,
+  requireCardConfirmation = true,
 }: GameRoomClientProps) {
   const [snapshot, setSnapshot] = useState(initialData)
   const [etag, setEtag] = useState<string | undefined>(initialData.etag)
@@ -833,6 +835,7 @@ export function GameRoomClient({
         trumpState={trumpControls}
         playState={playControls}
         aiSeatState={aiSeatState}
+        requireCardConfirmation={requireCardConfirmation}
       />
       <Toast toasts={toasts} onClose={hideToast} />
     </>

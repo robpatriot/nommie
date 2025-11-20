@@ -41,7 +41,14 @@ impl AppearanceMode {
 pub struct UserOptions {
     pub user_id: i64,
     pub appearance_mode: AppearanceMode,
+    pub require_card_confirmation: bool,
     pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct UpdateUserOptions {
+    pub appearance_mode: Option<AppearanceMode>,
+    pub require_card_confirmation: Option<bool>,
 }
 
 pub async fn find_by_user_id<C: ConnectionTrait + Send + Sync>(
@@ -60,12 +67,18 @@ pub async fn ensure_default_for_user(
     UserOptions::try_from(model)
 }
 
-pub async fn set_appearance_mode(
+pub async fn update_options(
     txn: &DatabaseTransaction,
     user_id: i64,
-    mode: AppearanceMode,
+    options: UpdateUserOptions,
 ) -> Result<UserOptions, DomainError> {
-    let model = adapter::set_appearance_mode(txn, user_id, mode.as_str()).await?;
+    let model = adapter::update_options(
+        txn,
+        user_id,
+        options.appearance_mode.map(|mode| mode.as_str()),
+        options.require_card_confirmation,
+    )
+    .await?;
     UserOptions::try_from(model)
 }
 
@@ -77,6 +90,7 @@ impl TryFrom<crate::entities::user_options::Model> for UserOptions {
         Ok(Self {
             user_id: model.user_id,
             appearance_mode,
+            require_card_confirmation: model.require_card_confirmation,
             updated_at: model.updated_at,
         })
     }

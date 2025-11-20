@@ -146,6 +146,42 @@ describe('GameRoomView', () => {
     expect(onPlay).toHaveBeenCalledWith('2H')
   })
 
+  it('plays a card immediately when confirmation is disabled', async () => {
+    const onPlay = vi.fn().mockResolvedValue(undefined)
+
+    const playableCards =
+      trickSnapshotFixture.phase.phase === 'Trick'
+        ? trickSnapshotFixture.phase.data.playable
+        : []
+
+    render(
+      <GameRoomView
+        gameId={99}
+        snapshot={trickSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={['2H', 'KD', 'QC', 'AS']}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        playState={{
+          viewerSeat: 0,
+          playable: playableCards,
+          isPending: false,
+          onPlay,
+        }}
+        requireCardConfirmation={false}
+      />
+    )
+
+    expect(
+      screen.queryByRole('button', { name: /Play selected card/i })
+    ).not.toBeInTheDocument()
+
+    const legalCardButton = screen.getByRole('button', { name: /^2H,/i })
+    await userEvent.click(legalCardButton)
+
+    expect(onPlay).toHaveBeenCalledWith('2H')
+  })
+
   it('renders AI management panel for host controls before the game starts', async () => {
     const onAdd = vi.fn()
     const onRemoveSeat = vi.fn()

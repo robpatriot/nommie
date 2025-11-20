@@ -16,6 +16,7 @@ interface PlayerHandProps {
   onSelectCard: (card: Card | null) => void
   onPlayCard?: (card: Card) => Promise<void> | void
   className?: string
+  requireCardConfirmation?: boolean
 }
 
 export function PlayerHand({
@@ -28,6 +29,7 @@ export function PlayerHand({
   onSelectCard,
   onPlayCard,
   className,
+  requireCardConfirmation = true,
 }: PlayerHandProps) {
   const isTrickPhase = phase.phase === 'Trick' && !!playState
   const viewerTurn =
@@ -53,6 +55,8 @@ export function PlayerHand({
     handStatus = 'Hand will appear once the game starts.'
   } else if (isTrickPhase && !viewerTurn) {
     handStatus = `Waiting for ${waitingOnName ?? 'next player'}`
+  } else if (viewerTurn && isTrickPhase && !requireCardConfirmation) {
+    handStatus = 'Tap a legal card to play immediately.'
   }
 
   const containerRef = useRef<HTMLDivElement>(null)
@@ -129,13 +133,16 @@ export function PlayerHand({
       updateOverlap()
     }, 150)
 
-    // Use ResizeObserver to handle container size changes
-    const resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(updateOverlap)
+    // Use ResizeObserver to handle container size changes (when available)
+    let resizeObserver: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(updateOverlap)
+        })
       })
-    })
-    resizeObserver.observe(containerRef.current)
+      resizeObserver.observe(containerRef.current)
+    }
 
     // Also handle window resize
     const handleResize = () => {
@@ -148,7 +155,7 @@ export function PlayerHand({
     return () => {
       cancelAnimationFrame(rafId1)
       clearTimeout(timeoutId)
-      resizeObserver.disconnect()
+      resizeObserver?.disconnect()
       window.removeEventListener('resize', handleResize)
     }
   }, [viewerHand.length])
@@ -160,6 +167,14 @@ export function PlayerHand({
 
     const isPlayable = playableCards.has(card)
     if (!viewerTurn || !isPlayable || playState.isPending) {
+      return
+    }
+
+    if (!requireCardConfirmation) {
+      onSelectCard(null)
+      if (onPlayCard) {
+        void onPlayCard(card)
+      }
       return
     }
 
@@ -188,35 +203,41 @@ export function PlayerHand({
         </div>
         {isTrickPhase && playState ? (
           <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={async () => {
-                if (onPlayCard && selectedCard && viewerTurn) {
-                  await onPlayCard(selectedCard)
-                  onSelectCard(null)
+            {requireCardConfirmation ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (onPlayCard && selectedCard && viewerTurn) {
+                    await onPlayCard(selectedCard)
+                    onSelectCard(null)
+                  }
+                }}
+                disabled={
+                  !viewerTurn ||
+                  playState.isPending ||
+                  !selectedCard ||
+                  !playState.playable.includes(selectedCard)
                 }
-              }}
-              disabled={
-                !viewerTurn ||
-                playState.isPending ||
-                !selectedCard ||
-                !playState.playable.includes(selectedCard)
-              }
-              className="rounded-2xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
-              aria-label={
-                playState.isPending
-                  ? 'Playing card'
-                  : selectedCard
-                    ? `Play selected card: ${selectedCard}`
-                    : 'Select a card to play'
-              }
-            >
-              {playState.isPending
-                ? 'Playing…'
-                : viewerTurn
-                  ? 'Play selected card'
-                  : `Waiting for ${waitingOnName ?? 'next player'}`}
-            </button>
+                className="rounded-2xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
+                aria-label={
+                  playState.isPending
+                    ? 'Playing card'
+                    : selectedCard
+                      ? `Play selected card: ${selectedCard}`
+                      : 'Select a card to play'
+                }
+              >
+                {playState.isPending
+                  ? 'Playing…'
+                  : viewerTurn
+                    ? 'Play selected card'
+                    : `Waiting for ${waitingOnName ?? 'next player'}`}
+              </button>
+            ) : (
+              <span className="rounded-full border border-white/15 bg-surface px-4 py-1 text-xs font-semibold text-subtle">
+                Tap any legal card to play
+              </span>
+            )}
           </div>
         ) : (
           <div />
