@@ -64,7 +64,7 @@ export function PlayingCard({
         isDimmed
           ? '[filter:grayscale(60%)_brightness(0.75)] saturate-[75%]'
           : '',
-        isSelected ? 'ring-2 ring-success/80 scale-[1.02]' : '',
+        isSelected ? 'scale-[1.02]' : '',
         className
       )}
       aria-label={`${rankLabel} of ${suit.label}`}

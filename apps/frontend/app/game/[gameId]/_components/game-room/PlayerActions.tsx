@@ -1,6 +1,6 @@
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import { BiddingPanel } from './BiddingPanel'
-import { PlayPanel } from './PlayPanel'
+import { LastTrick } from './LastTrick'
 import { TrumpSelectPanel } from './TrumpSelectPanel'
 import type { GameRoomViewProps } from '../game-room-view'
 
@@ -10,9 +10,8 @@ interface PlayerActionsProps {
   playerNames: [string, string, string, string]
   bidding?: GameRoomViewProps['biddingState']
   trump?: GameRoomViewProps['trumpState']
-  play?: GameRoomViewProps['playState']
-  selectedCard: Card | null
-  onPlayCard: (card: Card) => Promise<void> | void
+  lastTrick?: Array<[Seat, Card]> | null
+  seatDisplayName: (seat: Seat) => string
 }
 
 export function PlayerActions({
@@ -21,9 +20,8 @@ export function PlayerActions({
   playerNames,
   bidding,
   trump,
-  play,
-  selectedCard,
-  onPlayCard,
+  lastTrick,
+  seatDisplayName,
 }: PlayerActionsProps) {
   if (phase.phase === 'Bidding' && bidding) {
     return (
@@ -48,15 +46,9 @@ export function PlayerActions({
     )
   }
 
-  if (phase.phase === 'Trick' && play) {
+  if (phase.phase === 'Trick') {
     return (
-      <PlayPanel
-        phase={phase.data}
-        playerNames={playerNames}
-        play={play}
-        selectedCard={selectedCard}
-        onPlayCard={onPlayCard}
-      />
+      <LastTrick lastTrick={lastTrick ?? null} getSeatName={seatDisplayName} />
     )
   }
 
