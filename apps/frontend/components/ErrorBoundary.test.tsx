@@ -17,6 +17,7 @@ beforeEach(() => {
 
 afterEach(() => {
   console.error = originalError
+  vi.unstubAllEnvs()
 })
 
 describe('ErrorBoundary', () => {
@@ -120,12 +121,7 @@ describe('ErrorBoundary', () => {
   })
 
   it('displays error details in development mode', () => {
-    const originalEnv = process.env.NODE_ENV
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: 'development',
-      writable: true,
-      configurable: true,
-    })
+    vi.stubEnv('NODE_ENV', 'development')
 
     render(
       <ErrorBoundary>
@@ -139,21 +135,10 @@ describe('ErrorBoundary', () => {
     // Verify stack trace is present
     const stackTrace = screen.getByText(/Error: Test error message/)
     expect(stackTrace).toBeInTheDocument()
-
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: originalEnv,
-      writable: true,
-      configurable: true,
-    })
   })
 
   it('hides error details in production mode', () => {
-    const originalEnv = process.env.NODE_ENV
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: 'production',
-      writable: true,
-      configurable: true,
-    })
+    vi.stubEnv('NODE_ENV', 'production')
 
     render(
       <ErrorBoundary>
@@ -164,12 +149,6 @@ describe('ErrorBoundary', () => {
     expect(
       screen.queryByText('Error details (dev only)')
     ).not.toBeInTheDocument()
-
-    Object.defineProperty(process.env, 'NODE_ENV', {
-      value: originalEnv,
-      writable: true,
-      configurable: true,
-    })
   })
 
   it('displays default message when error has no message', () => {
