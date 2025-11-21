@@ -86,7 +86,7 @@ describe('GameRoomView', () => {
     )
 
     const bidInput = screen.getByLabelText('Bid value') as HTMLInputElement
-    expect(bidInput.value).toBe('0')
+    expect(bidInput.value).toBe('')
 
     fireEvent.change(bidInput, { target: { value: '4' } })
     expect(bidInput.value).toBe('4')
