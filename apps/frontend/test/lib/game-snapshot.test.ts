@@ -19,6 +19,8 @@ describe('GameSnapshot contract', () => {
     if (parsed.phase.phase === 'Bidding') {
       expect(parsed.phase.data.bids).toHaveLength(4)
       expect(parsed.phase.data.round.bids).toHaveLength(4)
+      expect(parsed.phase.data.previous_round?.bids).toEqual([2, 3, 1, 1])
+      expect(parsed.phase.data.previous_round?.tricks_won).toEqual([2, 1, 0, 1])
       expect(parsed.phase.data.min_bid).toBeLessThanOrEqual(
         parsed.phase.data.max_bid
       )

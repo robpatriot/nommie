@@ -188,6 +188,10 @@ export function buildSeatSummaries(params: {
   round: RoundPublic | null
   activeSeat: Seat | null
   actualViewerSeat?: Seat | null
+  historicalStats?: {
+    bids?: [number | null, number | null, number | null, number | null]
+    tricksWon?: [number, number, number, number]
+  }
 }): SeatSummary[] {
   const {
     playerNames,
@@ -198,6 +202,7 @@ export function buildSeatSummaries(params: {
     round,
     activeSeat,
     actualViewerSeat,
+    historicalStats,
   } = params
 
   // Use actualViewerSeat if provided (for isViewer check), otherwise use viewerSeat (for orientation)
@@ -207,9 +212,17 @@ export function buildSeatSummaries(params: {
   return [0, 1, 2, 3].map((seat) => {
     const orientation = getOrientation(viewerSeat, seat as Seat)
     const isViewer = viewerSeatForCheck !== null && seat === viewerSeatForCheck
-    const tricksWon = round?.tricks_won[seat as Seat]
+    const historicalTricks = historicalStats?.tricksWon?.[seat as Seat]
+    const tricksWon =
+      historicalTricks !== undefined
+        ? historicalTricks
+        : round?.tricks_won[seat as Seat]
     const currentCard = trickMap.get(seat as Seat)
-    const bid = getBidForSeat(phase, seat as Seat, round)
+    const historicalBid = historicalStats?.bids?.[seat as Seat]
+    const bid =
+      historicalBid !== undefined
+        ? historicalBid
+        : getBidForSeat(phase, seat as Seat, round)
     const isActive = activeSeat === seat
 
     return {

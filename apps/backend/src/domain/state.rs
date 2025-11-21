@@ -40,6 +40,8 @@ pub struct RoundState {
     pub winning_bidder: Option<PlayerId>,
     /// Last completed trick (4 cards) for display purposes.
     pub last_trick: Option<Vec<(PlayerId, Card)>>,
+    /// Summary of the most recently completed round (if any).
+    pub previous_round: Option<PreviousRound>,
 }
 
 impl RoundState {
@@ -52,8 +54,17 @@ impl RoundState {
             bids: [None, None, None, None],
             winning_bidder: None,
             last_trick: None,
+            previous_round: None,
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct PreviousRound {
+    pub round_no: u8,
+    pub hand_size: u8,
+    pub tricks_won: [u8; PLAYERS],
+    pub bids: [Option<u8>; PLAYERS],
 }
 
 /// Entire game/round container, sufficient for pure domain operations.

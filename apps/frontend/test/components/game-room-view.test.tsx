@@ -44,7 +44,7 @@ describe('GameRoomView', () => {
 
     expect(screen.getByText('Bidding Round')).toBeInTheDocument()
     expect(screen.getAllByText('Alex').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Tricks/)[0].textContent).toContain('0')
+    expect(screen.getAllByText(/Tricks/)[0].textContent).toContain('2')
     expect(screen.getAllByText('Bid 2').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Refresh game state')).toBeInTheDocument()
   })
@@ -99,6 +99,22 @@ describe('GameRoomView', () => {
 
     await userEvent.click(submitButton)
     expect(onSubmit).toHaveBeenCalledWith(4)
+  })
+
+  it('shows previous round bids and tricks during bidding', () => {
+    render(
+      <GameRoomView
+        gameId={77}
+        snapshot={biddingSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+      />
+    )
+
+    expect(screen.getAllByText('Tricks 2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Bid 3').length).toBeGreaterThan(0)
   })
 
   it('enforces legal card gating and triggers play submission', async () => {

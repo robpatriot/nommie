@@ -64,6 +64,12 @@ export const biddingSnapshotFixture: GameSnapshot = {
       min_bid: 0,
       max_bid: 8,
       last_trick: null,
+      previous_round: {
+        round_no: 0,
+        hand_size: 8,
+        tricks_won: [2, 1, 0, 1],
+        bids: [2, 3, 1, 1],
+      },
     },
   },
 }
@@ -149,6 +155,12 @@ export const biddingPhaseSnapshot: BiddingSnapshot =
         min_bid: 0,
         max_bid: 8,
         last_trick: null,
+        previous_round: {
+          round_no: 0,
+          hand_size: 8,
+          tricks_won: [2, 1, 0, 1],
+          bids: [2, 3, 1, 1],
+        },
       }
 
 export const trickPhaseSnapshot: TrickSnapshot =

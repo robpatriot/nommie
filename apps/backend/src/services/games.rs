@@ -4,7 +4,7 @@ use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryO
 
 use crate::adapters::games_sea::GameCreate;
 use crate::domain::cards_parsing::from_stored_format;
-use crate::domain::state::{GameState, Phase, RoundState};
+use crate::domain::state::{GameState, Phase, PreviousRound, RoundState};
 use crate::domain::{Card, Suit, Trump};
 use crate::entities::game_players;
 use crate::entities::games::{self, GameState as DbGameState, GameVisibility};
@@ -129,6 +129,71 @@ impl GameService {
             tricks_won[winner as usize] += 1;
         }
 
+        // 8a. Capture previous round summary (for start-of-round display) and its final trick
+        let mut previous_round_summary: Option<PreviousRound> = None;
+        let mut previous_round_last_trick: Option<Vec<(u8, Card)>> = None;
+
+        if current_round_no > 1
+            && matches!(
+                game.state,
+                DbGameState::Bidding | DbGameState::TrumpSelection
+            )
+        {
+            let prev_round_no = current_round_no - 1;
+            if let Some(prev_round) =
+                rounds::find_by_game_and_round(txn, game_id, prev_round_no).await?
+            {
+                let prev_round_tricks = tricks::find_all_by_round(txn, prev_round.id).await?;
+                let mut prev_tricks_won = [0u8; 4];
+                let mut prev_last_trick_meta: Option<(i16, i64)> = None;
+
+                for trick in &prev_round_tricks {
+                    let winner = trick.winner_seat;
+                    if (0..=3).contains(&winner) {
+                        prev_tricks_won[winner as usize] += 1;
+                        let should_replace = prev_last_trick_meta
+                            .map(|(existing_no, _)| i16::from(trick.trick_no) > existing_no)
+                            .unwrap_or(true);
+                        if should_replace {
+                            prev_last_trick_meta = Some((i16::from(trick.trick_no), trick.id));
+                        }
+                    }
+                }
+
+                let prev_bids_models = bids::find_all_by_round(txn, prev_round.id).await?;
+                let mut prev_bids = [None, None, None, None];
+                for bid in prev_bids_models {
+                    if bid.player_seat < 4 {
+                        prev_bids[bid.player_seat as usize] = Some(bid.bid_value);
+                    }
+                }
+
+                let prev_hand_size = prev_round.hand_size;
+
+                previous_round_summary = Some(PreviousRound {
+                    round_no: prev_round_no,
+                    hand_size: prev_hand_size,
+                    tricks_won: prev_tricks_won,
+                    bids: prev_bids,
+                });
+
+                if let Some((_, trick_id)) = prev_last_trick_meta {
+                    let prev_plays = plays::find_all_by_trick(txn, trick_id).await?;
+                    previous_round_last_trick = (prev_plays.len() == 4)
+                        .then(|| {
+                            prev_plays
+                                .iter()
+                                .map(|p| {
+                                    let card = from_stored_format(&p.card.suit, &p.card.rank)?;
+                                    Ok((p.player_seat, card))
+                                })
+                                .collect::<Result<Vec<_>, DomainError>>()
+                        })
+                        .transpose()?;
+                }
+            }
+        }
+
         // Remove all played cards from players' hands to reflect current state
         for trick in &all_tricks {
             let play_records = plays::find_all_by_trick(txn, trick.id).await?;
@@ -179,54 +244,36 @@ impl GameService {
 
         // 9a. Load last completed trick
         // - If in TrickPlay: load last trick from current round
-        // - If in Bidding/TrumpSelect: load final trick from previous round
+        // - If in Bidding/TrumpSelect: reuse final trick from previous round summary
         let last_trick = if matches!(game.state, DbGameState::TrickPlay) {
             // Current round, previous trick
-            all_tricks
+            let prev_trick_id = all_tricks
                 .iter()
                 .filter(|t| t.trick_no < current_trick_no && (0..=3).contains(&t.winner_seat))
                 .max_by_key(|t| t.trick_no)
-                .map(|prev_trick| prev_trick.id)
+                .map(|prev_trick| prev_trick.id);
+
+            if let Some(trick_id) = prev_trick_id {
+                let prev_plays = plays::find_all_by_trick(txn, trick_id).await?;
+                (prev_plays.len() == 4)
+                    .then(|| {
+                        prev_plays
+                            .iter()
+                            .map(|p| {
+                                let card = from_stored_format(&p.card.suit, &p.card.rank)?;
+                                Ok((p.player_seat, card))
+                            })
+                            .collect::<Result<Vec<_>, DomainError>>()
+                    })
+                    .transpose()?
+            } else {
+                None
+            }
         } else if matches!(
             game.state,
             DbGameState::Bidding | DbGameState::TrumpSelection
         ) {
-            // Previous round's final trick
-            // Only load if we're in round 2 or later (round 1 has no previous round)
-            if current_round_no > 1 {
-                let prev_round_no = current_round_no - 1;
-                if let Some(prev_round) =
-                    rounds::find_by_game_and_round(txn, game_id, prev_round_no).await?
-                {
-                    let prev_round_tricks = tricks::find_all_by_round(txn, prev_round.id).await?;
-                    prev_round_tricks
-                        .iter()
-                        .filter(|t| (0..=3).contains(&(t.winner_seat as i16)))
-                        .max_by_key(|t| t.trick_no)
-                        .map(|prev_trick| prev_trick.id)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        let last_trick = if let Some(trick_id) = last_trick {
-            let prev_plays = plays::find_all_by_trick(txn, trick_id).await?;
-            (prev_plays.len() == 4)
-                .then(|| {
-                    prev_plays
-                        .iter()
-                        .map(|p| {
-                            let card = from_stored_format(&p.card.suit, &p.card.rank)?;
-                            Ok((p.player_seat, card))
-                        })
-                        .collect::<Result<Vec<_>, DomainError>>()
-                })
-                .transpose()?
+            previous_round_last_trick
         } else {
             None
         };
@@ -291,6 +338,7 @@ impl GameService {
                 bids: bids_array,
                 winning_bidder,
                 last_trick,
+                previous_round: previous_round_summary,
             },
         })
     }

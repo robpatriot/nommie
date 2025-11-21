@@ -33,6 +33,13 @@ export interface RoundPublic {
   bids: [number | null, number | null, number | null, number | null]
 }
 
+export interface RoundResult {
+  round_no: number
+  hand_size: number
+  tricks_won: [number, number, number, number]
+  bids: [number | null, number | null, number | null, number | null]
+}
+
 export interface BiddingSnapshot {
   round: RoundPublic
   to_act: Seat
@@ -40,6 +47,7 @@ export interface BiddingSnapshot {
   min_bid: number
   max_bid: number
   last_trick: Array<[Seat, Card]> | null
+  previous_round?: RoundResult | null
 }
 
 export interface TrumpSelectSnapshot {

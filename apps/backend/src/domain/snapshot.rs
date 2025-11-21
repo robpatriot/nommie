@@ -79,6 +79,15 @@ pub struct RoundPublic {
     pub bids: [Option<u8>; 4],
 }
 
+/// Summary of the previous round for transition UIs.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RoundResult {
+    pub round_no: u8,
+    pub hand_size: u8,
+    pub tricks_won: [u8; 4],
+    pub bids: [Option<u8>; 4],
+}
+
 /// Bidding phase snapshot.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BiddingSnapshot {
@@ -89,6 +98,9 @@ pub struct BiddingSnapshot {
     pub max_bid: u8,
     /// Last completed trick from previous round (4 cards) for display purposes.
     pub last_trick: Option<Vec<(Seat, Card)>>,
+    /// Final state of the last completed round, if any.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_round: Option<RoundResult>,
 }
 
 /// Trump selection phase snapshot.
@@ -182,6 +194,12 @@ fn snapshot_bidding(state: &GameState) -> PhaseSnapshot {
     let range = valid_bid_range(state.hand_size);
     let min_bid = *range.start();
     let max_bid = *range.end();
+    let previous_round = state.round.previous_round.as_ref().map(|prev| RoundResult {
+        round_no: prev.round_no,
+        hand_size: prev.hand_size,
+        tricks_won: prev.tricks_won,
+        bids: prev.bids,
+    });
 
     PhaseSnapshot::Bidding(BiddingSnapshot {
         round,
@@ -190,6 +208,7 @@ fn snapshot_bidding(state: &GameState) -> PhaseSnapshot {
         min_bid,
         max_bid,
         last_trick: state.round.last_trick.clone(),
+        previous_round,
     })
 }
 

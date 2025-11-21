@@ -117,6 +117,14 @@ export function GameRoomView(props: GameRoomViewProps) {
   const readySeatCount = setupSeatEntries.filter((seat) => seat.isReady).length
 
   const trickMap = getCurrentTrickMap(phase)
+  const historicalStats =
+    phase.phase === 'Bidding' && phase.data.previous_round
+      ? {
+          bids: phase.data.previous_round.bids,
+          tricksWon: phase.data.previous_round.tricks_won,
+        }
+      : undefined
+
   const seatSummaries = buildSeatSummaries({
     playerNames,
     viewerSeat: effectiveViewerSeat ?? 0, // Use 0 as fallback for orientation calculation only
@@ -126,6 +134,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     round,
     activeSeat,
     actualViewerSeat: effectiveViewerSeat, // Pass actual viewer seat separately for isViewer check
+    historicalStats,
   })
   const orientationOrder: SeatSummary['orientation'][] = [
     'bottom',
