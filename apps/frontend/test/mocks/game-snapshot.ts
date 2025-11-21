@@ -13,6 +13,7 @@ const baseRound: RoundPublic = {
   bid_winner: null,
   trump: null,
   tricks_won: [0, 0, 0, 0],
+  bids: [null, null, null, null],
 }
 
 const seatingFixture: [SeatPublic, SeatPublic, SeatPublic, SeatPublic] = [
@@ -96,6 +97,7 @@ export const trickSnapshotFixture: GameSnapshot = {
         bid_winner: 3,
         trump: 'HEARTS',
         tricks_won: [1, 0, 2, 1],
+        bids: [2, 4, 5, 3],
       },
       trick_no: 3,
       leader: 2,

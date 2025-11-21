@@ -146,6 +146,22 @@ describe('GameRoomView', () => {
     expect(onPlay).toHaveBeenCalledWith('2H')
   })
 
+  it('keeps bids visible during trick phase', () => {
+    render(
+      <GameRoomView
+        gameId={55}
+        snapshot={trickSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={['2H', 'KD']}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+      />
+    )
+
+    expect(screen.getAllByText('Bid 5').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Bid 3').length).toBeGreaterThan(0)
+  })
+
   it('plays a card immediately when confirmation is disabled', async () => {
     const onPlay = vi.fn().mockResolvedValue(undefined)
 

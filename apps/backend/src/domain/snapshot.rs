@@ -76,6 +76,7 @@ pub struct RoundPublic {
     pub bid_winner: Option<Seat>,
     pub trump: Option<Trump>,
     pub tricks_won: [u8; 4],
+    pub bids: [Option<u8>; 4],
 }
 
 /// Bidding phase snapshot.
@@ -170,6 +171,7 @@ fn build_round_public(state: &GameState) -> RoundPublic {
         bid_winner: state.round.winning_bidder,
         trump: state.round.trump,
         tricks_won: state.round.tricks_won,
+        bids: state.round.bids,
     }
 }
 

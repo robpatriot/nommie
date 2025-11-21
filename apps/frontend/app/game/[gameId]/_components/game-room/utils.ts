@@ -82,10 +82,14 @@ export function getCurrentTrickMap(phase: PhaseSnapshot): Map<Seat, Card> {
 
 export function getBidForSeat(
   phase: PhaseSnapshot,
-  seat: Seat
+  seat: Seat,
+  round?: RoundPublic | null
 ): number | null | undefined {
   if (phase.phase === 'Bidding') {
     return phase.data.bids[seat]
+  }
+  if (round?.bids) {
+    return round.bids[seat]
   }
   return undefined
 }
@@ -205,7 +209,7 @@ export function buildSeatSummaries(params: {
     const isViewer = viewerSeatForCheck !== null && seat === viewerSeatForCheck
     const tricksWon = round?.tricks_won[seat as Seat]
     const currentCard = trickMap.get(seat as Seat)
-    const bid = getBidForSeat(phase, seat as Seat)
+    const bid = getBidForSeat(phase, seat as Seat, round)
     const isActive = activeSeat === seat
 
     return {

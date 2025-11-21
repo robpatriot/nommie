@@ -30,6 +30,7 @@ export interface RoundPublic {
   bid_winner: Seat | null
   trump: Trump | null
   tricks_won: [number, number, number, number]
+  bids: [number | null, number | null, number | null, number | null]
 }
 
 export interface BiddingSnapshot {
