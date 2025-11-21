@@ -14,12 +14,14 @@ import { TrickArea } from './game-room/TrickArea'
 import { PlayerHand } from './game-room/PlayerHand'
 import { PlayerActions } from './game-room/PlayerActions'
 import { ScoreSidebar } from './game-room/ScoreSidebar'
+import { ScoreHistoryDialog } from './game-room/ScoreHistoryDialog'
 import { AiSeatManager } from './game-room/AiSeatManager'
 import { ReadyPanel } from './game-room/ReadyPanel'
 import { SetupSeatList } from './game-room/SetupSeatList'
 import { PageHero } from '@/components/PageHero'
 import { PageContainer } from '@/components/PageContainer'
 import { StatCard } from '@/components/StatCard'
+import { useGameHistory } from '@/hooks/useGameHistory'
 import type {
   AiSeatState,
   BiddingState,
@@ -151,6 +153,13 @@ export function GameRoomView(props: GameRoomViewProps) {
     )
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const {
+    history,
+    isLoading: isHistoryLoading,
+    error: historyError,
+    fetchHistory,
+  } = useGameHistory(gameId)
 
   useEffect(() => {
     if (phase.phase !== 'Trick' || !playState) {
@@ -162,6 +171,13 @@ export function GameRoomView(props: GameRoomViewProps) {
       setSelectedCard(null)
     }
   }, [phase, playState, selectedCard])
+
+  useEffect(() => {
+    if (!isHistoryOpen) {
+      return
+    }
+    void fetchHistory()
+  }, [isHistoryOpen, fetchHistory])
 
   // Get last trick from backend snapshot
   // - In Trick phase: last trick from current round
@@ -188,6 +204,14 @@ export function GameRoomView(props: GameRoomViewProps) {
     },
     [playState]
   )
+
+  const handleOpenHistory = useCallback(() => {
+    setIsHistoryOpen(true)
+  }, [])
+
+  const handleCloseHistory = useCallback(() => {
+    setIsHistoryOpen(false)
+  }, [])
 
   if (isPreGame) {
     return (
@@ -351,7 +375,39 @@ export function GameRoomView(props: GameRoomViewProps) {
     <div className="flex flex-col text-foreground">
       <PageContainer className="pb-16">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
+          <section className="relative flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
+            {onRefresh ? (
+              <div className="pointer-events-auto absolute right-6 top-6 z-10">
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-primary/60 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label={
+                    isRefreshing
+                      ? 'Refreshing game state'
+                      : 'Refresh game state'
+                  }
+                >
+                  <span>Sync</span>
+                  <svg
+                    aria-hidden="true"
+                    className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 2v6h-6" />
+                    <path d="M3 22v-6h6" />
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8" />
+                    <path d="M20.49 15a9 9 0 0 1-14.85 3.36L3 16" />
+                  </svg>
+                </button>
+              </div>
+            ) : null}
             {showPreviousRoundPosition ? (
               <div className="text-left text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
                 Last round&apos;s final position
@@ -434,12 +490,21 @@ export function GameRoomView(props: GameRoomViewProps) {
               dealer={snapshot.game.dealer}
               seatDisplayName={seatDisplayName}
               error={error}
-              onRefresh={onRefresh}
-              isRefreshing={isRefreshing}
+              onShowHistory={handleOpenHistory}
+              isHistoryLoading={isHistoryLoading}
             />
           </aside>
         </div>
       </PageContainer>
+      <ScoreHistoryDialog
+        isOpen={isHistoryOpen}
+        onClose={handleCloseHistory}
+        rounds={history?.rounds ?? []}
+        playerNames={playerNames}
+        seatDisplayName={seatDisplayName}
+        isLoading={isHistoryLoading}
+        error={historyError}
+      />
     </div>
   )
 }

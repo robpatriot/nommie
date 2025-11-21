@@ -14,7 +14,7 @@ use crate::db::txn::with_txn;
 use crate::domain::bidding::validate_consecutive_zero_bids;
 use crate::domain::snapshot::{GameSnapshot, SeatAiProfilePublic, SeatPublic};
 use crate::domain::state::Seat;
-use crate::domain::{Card, Rank, Suit};
+use crate::domain::{Card, Rank, Suit, Trump};
 use crate::entities::games::{self, GameState, GameVisibility};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -42,6 +42,22 @@ struct GameSnapshotResponse {
 #[derive(Serialize)]
 struct BidConstraintsResponse {
     zero_bid_locked: bool,
+}
+
+#[derive(Serialize)]
+struct GameHistoryResponse {
+    rounds: Vec<RoundHistoryResponse>,
+}
+
+#[derive(Serialize)]
+struct RoundHistoryResponse {
+    round_no: u8,
+    hand_size: u8,
+    dealer_seat: u8,
+    bids: [Option<u8>; 4],
+    trump_selector_seat: Option<u8>,
+    trump: Option<&'static str>,
+    cumulative_scores: [i16; 4],
 }
 
 #[derive(Serialize)]
@@ -314,6 +330,38 @@ async fn get_snapshot(
         viewer_hand,
         bid_constraints,
     }))
+}
+
+async fn get_game_history(
+    http_req: HttpRequest,
+    game_id: GameId,
+    _membership: GameMembership,
+    app_state: web::Data<AppState>,
+) -> Result<web::Json<GameHistoryResponse>, AppError> {
+    let id = game_id.0;
+
+    let history = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move { player_view::load_game_history(txn, id).await })
+    })
+    .await?;
+
+    let rounds = history
+        .rounds
+        .into_iter()
+        .map(|round| RoundHistoryResponse {
+            round_no: round.round_no,
+            hand_size: round.hand_size,
+            dealer_seat: round.dealer_seat,
+            bids: round.bids,
+            trump_selector_seat: round.trump_selector_seat,
+            trump: round.trump.map(trump_to_api_value),
+            cumulative_scores: round
+                .scores
+                .map(|score_detail| score_detail.cumulative_score),
+        })
+        .collect();
+
+    Ok(web::Json(GameHistoryResponse { rounds }))
 }
 
 /// GET /api/games/{game_id}/players/{seat}/display_name
@@ -1478,6 +1526,16 @@ fn format_card(card: Card) -> String {
     format!("{rank_char}{suit_char}")
 }
 
+fn trump_to_api_value(trump: Trump) -> &'static str {
+    match trump {
+        Trump::Clubs => "CLUBS",
+        Trump::Diamonds => "DIAMONDS",
+        Trump::Hearts => "HEARTS",
+        Trump::Spades => "SPADES",
+        Trump::NoTrump => "NO_TRUMP",
+    }
+}
+
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("").route(web::post().to(create_game)));
     cfg.service(web::resource("/joinable").route(web::get().to(list_joinable_games)));
@@ -1494,6 +1552,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/{game_id}/trump").route(web::post().to(select_trump)));
     cfg.service(web::resource("/{game_id}/play").route(web::post().to(play_card)));
     cfg.service(web::resource("/{game_id}/snapshot").route(web::get().to(get_snapshot)));
+    cfg.service(web::resource("/{game_id}/history").route(web::get().to(get_game_history)));
     cfg.service(
         web::resource("/{game_id}/players/{seat}/display_name")
             .route(web::get().to(get_player_display_name)),

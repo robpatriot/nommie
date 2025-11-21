@@ -14,8 +14,8 @@ interface ScoreSidebarProps {
   dealer: Seat
   seatDisplayName: (seat: Seat) => string
   error?: { message: string; traceId?: string } | null
-  onRefresh?: () => void
-  isRefreshing?: boolean
+  onShowHistory?: () => void
+  isHistoryLoading?: boolean
   className?: string
 }
 
@@ -30,53 +30,35 @@ export function ScoreSidebar({
   dealer,
   seatDisplayName,
   error,
-  onRefresh,
-  isRefreshing = false,
+  onShowHistory,
+  isHistoryLoading = false,
   className = '',
 }: ScoreSidebarProps) {
   return (
     <aside
       className={`flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur ${className}`}
     >
-      <header className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2">
-        <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.4em] text-subtle">
-            Game {gameId}
-          </p>
-          <h2 className="text-2xl font-bold text-foreground">
-            {getPhaseLabel(phase)}
-          </h2>
-        </div>
-        {phase.phase === 'Trick' ? (
-          <StatCard
-            label="Trick"
-            value={`${phase.data.trick_no} / ${round?.hand_size ?? '?'}`}
-            description="Round progress"
-            className="px-2 py-1.5 row-span-2 self-start"
-            valueClassName="text-lg"
-          />
-        ) : null}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 rounded-lg bg-primary/15 px-3 py-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-subtle">
-              Turn
-            </span>
-            <span className="text-sm font-bold text-primary">{activeName}</span>
+      <header className="space-y-3 rounded-2xl p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-subtle">
+              Game {gameId}
+            </p>
+            <h2 className="text-2xl font-bold text-foreground">
+              {getPhaseLabel(phase)}
+            </h2>
+            <p className="text-sm text-muted">
+              Turn{' '}
+              <span className="font-semibold text-primary">{activeName}</span>
+            </p>
           </div>
-          {onRefresh ? (
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-surface/60 text-xs font-semibold text-foreground transition hover:border-primary/60 hover:bg-primary/10 hover:text-primary disabled:opacity-60"
-              aria-label="Refresh game state"
-            >
-              {isRefreshing ? (
-                <span className="animate-spin">⟳</span>
-              ) : (
-                <span>⟳</span>
-              )}
-            </button>
+          {phase.phase === 'Trick' ? (
+            <StatCard
+              label="Trick"
+              value={`${phase.data.trick_no} / ${round?.hand_size ?? '?'}`}
+              className="px-3 py-1.5"
+              valueClassName="text-base"
+            />
           ) : null}
         </div>
       </header>
@@ -105,8 +87,37 @@ export function ScoreSidebar({
         className="rounded-2xl border border-border/60 bg-surface/70"
         open
       >
-        <summary className="cursor-pointer list-none rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-surface">
-          Scoreboard
+        <summary className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-surface">
+          <span>Scoreboard</span>
+          {onShowHistory ? (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault()
+                onShowHistory()
+              }}
+              disabled={isHistoryLoading}
+              className="flex items-center gap-1 rounded-full border border-white/20 bg-surface/60 px-3 py-1 text-[11px] font-semibold text-foreground transition hover:border-primary/60 hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Show score history"
+            >
+              <span>{isHistoryLoading ? 'Opening…' : 'History'}</span>
+              <svg
+                aria-hidden="true"
+                className="h-3 w-3"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 2h9l5 5v15H6z" />
+                <path d="M14 2v6h6" />
+                <path d="M8 13h8" />
+                <path d="M8 17h5" />
+              </svg>
+            </button>
+          ) : null}
         </summary>
         <div className="px-4 pb-4">
           <ul className="flex flex-col gap-3 text-sm text-muted">

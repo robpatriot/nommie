@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -17,6 +17,12 @@ vi.mock('next/link', () => ({
     <a {...props}>{children}</a>
   ),
 }))
+
+const originalFetch = globalThis.fetch
+
+afterEach(() => {
+  globalThis.fetch = originalFetch
+})
 
 describe('GameRoomView', () => {
   const playerNames: [string, string, string, string] = [
@@ -116,6 +122,59 @@ describe('GameRoomView', () => {
     expect(screen.getAllByText('Tricks 2').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Bid 3').length).toBeGreaterThan(0)
     expect(screen.getByText("Last round's final position")).toBeInTheDocument()
+  })
+
+  it('opens score history dialog when requested', async () => {
+    const historyPayload = {
+      rounds: [
+        {
+          round_no: 1,
+          hand_size: 7,
+          dealer_seat: 0,
+          trump_selector_seat: 2,
+          trump: 'HEARTS',
+          bids: [3, 1, 4, 0] as [
+            number | null,
+            number | null,
+            number | null,
+            number | null,
+          ],
+          cumulative_scores: [13, 4, 17, 2] as [number, number, number, number],
+        },
+      ],
+    }
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => historyPayload,
+    })
+    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch
+
+    render(
+      <GameRoomView
+        gameId={42}
+        snapshot={biddingSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+      />
+    )
+
+    const historyButton = screen.getByRole('button', {
+      name: /show score history/i,
+    })
+    await userEvent.click(historyButton)
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/games/42/history',
+      expect.objectContaining({ method: 'GET' })
+    )
+
+    expect(await screen.findByText('Score sheet')).toBeInTheDocument()
+    expect(await screen.findByText('Round 1')).toBeInTheDocument()
+    expect(screen.getAllByText('Bid 3').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('17').length).toBeGreaterThan(0)
   })
 
   it('enforces legal card gating and triggers play submission', async () => {

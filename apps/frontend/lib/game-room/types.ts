@@ -93,3 +93,17 @@ export interface GameSnapshot {
 export interface BidConstraints {
   zeroBidLocked: boolean
 }
+
+export interface RoundHistoryEntry {
+  roundNo: number
+  handSize: number
+  dealerSeat: Seat
+  trumpSelectorSeat: Seat | null
+  trump: Trump | null
+  bids: [number | null, number | null, number | null, number | null]
+  cumulativeScores: [number, number, number, number]
+}
+
+export interface GameHistorySummary {
+  rounds: RoundHistoryEntry[]
+}
