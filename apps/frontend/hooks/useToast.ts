@@ -16,7 +16,7 @@ export function useToast() {
 
   const showToast = useCallback(
     (message: string, type: ToastMessage['type'], error?: BackendApiError) => {
-      const id = Date.now().toString()
+      const id = createToastId()
       setToasts((prev) => [
         ...prev,
         {
@@ -46,4 +46,14 @@ export function useToast() {
     showToast,
     hideToast,
   }
+}
+
+function createToastId() {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
