@@ -173,6 +173,11 @@ export function GameRoomView(props: GameRoomViewProps) {
       ? phase.data.last_trick
       : null
 
+  const showPreviousRoundPosition =
+    phase.phase === 'Bidding' &&
+    trickMap.size === 0 &&
+    Boolean(lastTrick && lastTrick.length > 0)
+
   const handlePlayCard = useCallback(
     async (card: Card) => {
       if (!playState) {
@@ -347,6 +352,11 @@ export function GameRoomView(props: GameRoomViewProps) {
       <PageContainer className="pb-16">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
+            {showPreviousRoundPosition ? (
+              <div className="text-left text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
+                Last round&apos;s final position
+              </div>
+            ) : null}
             <div
               className="hidden gap-3 lg:grid"
               style={{
@@ -365,6 +375,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 phase={phase}
                 viewerSeat={effectiveViewerSeat ?? 0}
                 lastTrick={lastTrick}
+                showPreviousRoundPosition={showPreviousRoundPosition}
                 className="col-start-2 row-start-2 h-full w-full min-h-[280px]"
               />
             </div>
@@ -385,6 +396,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 phase={phase}
                 viewerSeat={effectiveViewerSeat ?? 0}
                 lastTrick={lastTrick}
+                showPreviousRoundPosition={showPreviousRoundPosition}
               />
             </div>
             <PlayerHand

@@ -115,6 +115,7 @@ describe('GameRoomView', () => {
 
     expect(screen.getAllByText('Tricks 2').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Bid 3').length).toBeGreaterThan(0)
+    expect(screen.getByText("Last round's final position")).toBeInTheDocument()
   })
 
   it('enforces legal card gating and triggers play submission', async () => {

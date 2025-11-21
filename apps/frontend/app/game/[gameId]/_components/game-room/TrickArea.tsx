@@ -12,6 +12,7 @@ interface TrickAreaProps {
   phase: PhaseSnapshot
   viewerSeat: Seat
   lastTrick?: Array<[Seat, Card]> | null
+  showPreviousRoundPosition?: boolean
   className?: string
 }
 
@@ -22,6 +23,7 @@ export function TrickArea({
   phase,
   viewerSeat,
   lastTrick,
+  showPreviousRoundPosition,
   className = '',
 }: TrickAreaProps) {
   const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
@@ -50,7 +52,9 @@ export function TrickArea({
   const isBetweenRounds =
     phase.phase === 'Bidding' || phase.phase === 'TrumpSelect'
   const showLastTrick =
-    isBetweenRounds && cards.length === 0 && lastTrick && lastTrick.length > 0
+    (showPreviousRoundPosition ?? (isBetweenRounds && cards.length === 0)) &&
+    lastTrick &&
+    lastTrick.length > 0
 
   return (
     <div
@@ -61,13 +65,7 @@ export function TrickArea({
     >
       {showLastTrick ? (
         <>
-          {/* Display last trick */}
           <div className="flex w-full flex-col gap-4">
-            <header className="flex items-center justify-center">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
-                {isBetweenRounds ? "Last round's final trick" : 'Last trick'}
-              </h2>
-            </header>
             <LastTrickCards
               lastTrick={lastTrick}
               getSeatName={getSeatName}
