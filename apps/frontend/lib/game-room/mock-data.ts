@@ -58,6 +58,7 @@ const mockSnapshot: GameSnapshot = {
         bid_winner: 3,
         trump: 'HEARTS',
         tricks_won: [2, 1, 0, 2],
+        bids: [null, null, null, null],
       },
       trick_no: 3,
       leader: 1,

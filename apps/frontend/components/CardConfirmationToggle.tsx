@@ -24,7 +24,7 @@ export function CardConfirmationToggle({
         require_card_confirmation: nextValue,
       })
 
-      if ('error' in result) {
+      if ('error' in result && result.error) {
         setEnabled(!nextValue)
         setErrorMessage(result.error.message)
       } else {

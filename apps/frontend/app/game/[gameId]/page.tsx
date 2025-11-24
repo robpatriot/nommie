@@ -64,9 +64,7 @@ export default async function GamePage({ params }: GamePageProps) {
     // Fallback to default behavior if options cannot be loaded
   }
 
-  const gameName =
-    snapshotResult.snapshot.game.name?.trim() ||
-    `Game ${snapshotResult.snapshot.game.id ?? resolvedGameId}`
+  const gameName = `Game ${resolvedGameId}`
 
   return (
     <ErrorBoundary>
