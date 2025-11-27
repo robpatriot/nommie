@@ -1,10 +1,16 @@
 .git
 .gitignore
+.dev
 node_modules
 apps/frontend/.next
 apps/frontend/node_modules
 apps/backend/target
 target
+docker/postgres/data
 docker/postgres/init.sh~*
+.env
+apps/frontend/.env
+apps/frontend/.env.local
+**/*.log
 **/*.swp
 **/*.swo

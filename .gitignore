@@ -14,6 +14,10 @@ node_modules/
 apps/frontend/.env.local
 docs/env.example.txt
 
+# Docker environment files (contain secrets)
+docker/**/*.env
+!docker/**/*.env.example
+
 # Postgres data
 postgres_data/
 
