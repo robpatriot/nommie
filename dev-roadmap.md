@@ -5,3 +5,7 @@ This document tracks the current work plan for building the Nommie UI on web (Ne
 ---
 
 ## Work Items
+[ ] - Create oauth keys for Nommie Local Prod
+[ ] - Configure env files
+[ ] - Build containers
+[ ] - Run both containers
