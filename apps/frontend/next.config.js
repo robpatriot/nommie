@@ -4,6 +4,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_BACKEND_BASE_URL: process.env.BACKEND_BASE_URL,
   },
+  output: 'standalone',
 }
 
 module.exports = nextConfig

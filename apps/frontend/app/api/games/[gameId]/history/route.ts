@@ -5,13 +5,14 @@ import { NextResponse } from 'next/server'
 import { fetchWithAuth, BackendApiError } from '@/lib/api'
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     gameId: string
-  }
+  }>
 }
 
 export async function GET(_request: Request, { params }: RouteParams) {
-  const parsedGameId = Number.parseInt(params.gameId, 10)
+  const { gameId } = await params
+  const parsedGameId = Number.parseInt(gameId, 10)
 
   if (!Number.isFinite(parsedGameId) || parsedGameId <= 0) {
     return NextResponse.json(
