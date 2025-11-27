@@ -32,6 +32,7 @@ export function getBackendBaseUrlOrThrow(): string {
 
 export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
   secret: process.env.AUTH_SECRET,
+  trustHost: true, // Required when behind a reverse proxy like Caddy
 
   session: {
     strategy: 'jwt',
@@ -90,10 +91,6 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
       }
 
       return token
-    },
-    async session({ session }) {
-      // backendJwt is NOT attached to session - it remains server-only in the JWT token
-      return session
     },
   },
 })

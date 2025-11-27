@@ -57,6 +57,13 @@ export async function resolveBackendJwt(): Promise<BackendJwtResolution> {
     const token = (await getToken({
       req,
       secret: process.env.AUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === 'production',
+      // Auth.js v5: salt should match the session cookie name
+      salt:
+        process.env.NODE_ENV === 'production'
+          ? '__Secure-authjs.session-token'
+          : 'authjs.session-token',
+      // Note: getToken() should auto-detect from Next.js context, but manual req breaks this
     })) as NextAuthToken | null
 
     const existingJwt =
