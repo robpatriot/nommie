@@ -15,6 +15,7 @@ export type GameSnapshotResult =
       kind: 'ok'
       snapshot: GameSnapshot
       etag?: string
+      lockVersion?: number
       viewerSeat?: Seat | null
       viewerHand: Card[]
       bidConstraints?: BidConstraints | null
@@ -23,6 +24,7 @@ export type GameSnapshotResult =
 
 export interface SnapshotEnvelope {
   snapshot: GameSnapshot
+  lock_version?: number
   viewer_hand?: Card[] | null
   bid_constraints?: {
     zero_bid_locked?: boolean[]
@@ -67,11 +69,14 @@ export async function fetchGameSnapshot(
         ? (body.viewer_hand as Card[])
         : []
     const bidConstraints = toBidConstraints(body.bid_constraints) ?? null
+    const lockVersion =
+      typeof body.lock_version === 'number' ? body.lock_version : undefined
 
     return {
       kind: 'ok',
       snapshot: body.snapshot,
       etag,
+      lockVersion,
       viewerSeat: parsedViewerSeat,
       viewerHand,
       bidConstraints,
@@ -93,48 +98,33 @@ export async function markPlayerReady(gameId: number): Promise<void> {
 export async function submitBid(
   gameId: number,
   bid: number,
-  etag?: string
+  lockVersion: number
 ): Promise<void> {
-  const headers: Record<string, string> = {}
-  if (etag) {
-    headers['If-Match'] = etag
-  }
   await fetchWithAuth(`/api/games/${gameId}/bid`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ bid }),
+    body: JSON.stringify({ bid, lock_version: lockVersion }),
   })
 }
 
 export async function selectTrump(
   gameId: number,
   trump: Trump,
-  etag?: string
+  lockVersion: number
 ): Promise<void> {
-  const headers: Record<string, string> = {}
-  if (etag) {
-    headers['If-Match'] = etag
-  }
   await fetchWithAuth(`/api/games/${gameId}/trump`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ trump }),
+    body: JSON.stringify({ trump, lock_version: lockVersion }),
   })
 }
 
 export async function submitPlay(
   gameId: number,
   card: string,
-  etag?: string
+  lockVersion: number
 ): Promise<void> {
-  const headers: Record<string, string> = {}
-  if (etag) {
-    headers['If-Match'] = etag
-  }
   await fetchWithAuth(`/api/games/${gameId}/play`, {
     method: 'POST',
-    headers,
-    body: JSON.stringify({ card }),
+    body: JSON.stringify({ card, lock_version: lockVersion }),
   })
 }
 

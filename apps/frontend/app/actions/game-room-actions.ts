@@ -44,6 +44,7 @@ export type GameRoomSnapshotActionResult =
 export interface GameRoomSnapshotPayload {
   snapshot: GameSnapshot
   etag?: string
+  lockVersion?: number
   playerNames: [string, string, string, string]
   viewerSeat: Seat | null
   viewerHand: Card[]
@@ -79,6 +80,7 @@ export async function getGameRoomSnapshotAction(
       data: {
         snapshot: snapshotResult.snapshot,
         etag: snapshotResult.etag,
+        lockVersion: snapshotResult.lockVersion,
         playerNames,
         viewerSeat,
         viewerHand: snapshotResult.viewerHand ?? [],
@@ -120,7 +122,7 @@ export async function markPlayerReadyAction(
 export interface SubmitBidRequest {
   gameId: number
   bid: number
-  etag?: string
+  lockVersion: number
 }
 
 export async function submitBidAction(
@@ -136,8 +138,16 @@ export async function submitBidAction(
     }
   }
 
+  if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
+    return {
+      kind: 'error',
+      message: 'Invalid lock version',
+      status: 400,
+    }
+  }
+
   try {
-    await submitBid(request.gameId, bidValue, request.etag)
+    await submitBid(request.gameId, bidValue, request.lockVersion)
     return { kind: 'ok' }
   } catch (error) {
     return toErrorResult(error, 'Failed to submit bid')
@@ -147,14 +157,22 @@ export async function submitBidAction(
 export interface SelectTrumpRequest {
   gameId: number
   trump: Trump
-  etag?: string
+  lockVersion: number
 }
 
 export async function selectTrumpAction(
   request: SelectTrumpRequest
 ): Promise<SimpleActionResult> {
+  if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
+    return {
+      kind: 'error',
+      message: 'Invalid lock version',
+      status: 400,
+    }
+  }
+
   try {
-    await selectTrump(request.gameId, request.trump, request.etag)
+    await selectTrump(request.gameId, request.trump, request.lockVersion)
     return { kind: 'ok' }
   } catch (error) {
     return toErrorResult(error, 'Failed to select trump')
@@ -164,7 +182,7 @@ export async function selectTrumpAction(
 export interface SubmitPlayRequest {
   gameId: number
   card: string
-  etag?: string
+  lockVersion: number
 }
 
 export async function submitPlayAction(
@@ -181,8 +199,16 @@ export async function submitPlayAction(
     }
   }
 
+  if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
+    return {
+      kind: 'error',
+      message: 'Invalid lock version',
+      status: 400,
+    }
+  }
+
   try {
-    await submitPlay(request.gameId, card, request.etag)
+    await submitPlay(request.gameId, card, request.lockVersion)
     return { kind: 'ok' }
   } catch (error) {
     return toErrorResult(error, 'Failed to play card')

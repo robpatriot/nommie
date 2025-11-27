@@ -22,7 +22,7 @@ use crate::extractors::current_user::CurrentUser;
 use crate::extractors::game_id::GameId;
 use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
-use crate::http::etag::{game_etag, ExpectedVersion};
+use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
 use crate::repos::{ai_overrides, ai_profiles, games as games_repo, player_view, rounds, users};
 use crate::services::ai::{AiInstanceOverrides, AiService};
@@ -37,6 +37,7 @@ struct GameSnapshotResponse {
     viewer_hand: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     bid_constraints: Option<BidConstraintsResponse>,
+    lock_version: i32,
 }
 
 #[derive(Serialize)]
@@ -329,6 +330,7 @@ async fn get_snapshot(
         snapshot,
         viewer_hand,
         bid_constraints,
+        lock_version,
     }))
 }
 
@@ -730,16 +732,24 @@ async fn mark_ready(
 #[derive(serde::Deserialize)]
 struct SubmitBidRequest {
     bid: u8,
+    lock_version: i32,
 }
 
 #[derive(serde::Deserialize)]
 struct SetTrumpRequest {
     trump: String,
+    lock_version: i32,
 }
 
 #[derive(serde::Deserialize)]
 struct PlayCardRequest {
     card: String,
+    lock_version: i32,
+}
+
+#[derive(serde::Deserialize)]
+struct DeleteGameRequest {
+    lock_version: i32,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -1281,13 +1291,12 @@ async fn update_ai_seat(
 /// Submits a bid for the current player. Bidding order and validation are enforced
 /// by the service layer.
 ///
-/// Requires If-Match header with the current game ETag for optimistic locking.
+/// Requires lock_version in request body for optimistic locking.
 async fn submit_bid(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
     body: ValidatedJson<SubmitBidRequest>,
-    expected_version: ExpectedVersion,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
@@ -1298,7 +1307,7 @@ async fn submit_bid(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .submit_bid(txn, id, seat, bid_value, Some(expected_version.0))
+                .submit_bid(txn, id, seat, bid_value, Some(body.lock_version))
                 .await
         })
     })
@@ -1312,13 +1321,12 @@ async fn submit_bid(
 
 /// Sets the trump suit for the current round. Only the winning bidder can set trump.
 ///
-/// Requires If-Match header with the current game ETag for optimistic locking.
+/// Requires lock_version in request body for optimistic locking.
 async fn select_trump(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
     body: ValidatedJson<SetTrumpRequest>,
-    expected_version: ExpectedVersion,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
@@ -1344,7 +1352,7 @@ async fn select_trump(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .set_trump(txn, id, seat, trump, Some(expected_version.0))
+                .set_trump(txn, id, seat, trump, Some(payload.lock_version))
                 .await
         })
     })
@@ -1358,13 +1366,12 @@ async fn select_trump(
 
 /// Plays a card for the current player in the current trick.
 ///
-/// Requires If-Match header with the current game ETag for optimistic locking.
+/// Requires lock_version in request body for optimistic locking.
 async fn play_card(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
     body: ValidatedJson<PlayCardRequest>,
-    expected_version: ExpectedVersion,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
@@ -1386,7 +1393,7 @@ async fn play_card(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .play_card(txn, id, seat, card, Some(expected_version.0))
+                .play_card(txn, id, seat, card, Some(payload.lock_version))
                 .await
         })
     })
@@ -1402,17 +1409,18 @@ async fn play_card(
 ///
 /// Deletes a game. Only the host can delete a game.
 ///
-/// Requires If-Match header with the current game ETag for optimistic locking.
+/// Requires lock_version in request body for optimistic locking.
 async fn delete_game(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
-    expected_version: ExpectedVersion,
+    body: ValidatedJson<DeleteGameRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
     let host_user_id = membership.user_id;
     let host_turn_order = membership.turn_order;
+    let lock_version = body.lock_version;
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
@@ -1433,12 +1441,12 @@ async fn delete_game(
             }
 
             // Validate optimistic lock version
-            if game.lock_version != expected_version.0 {
+            if game.lock_version != lock_version {
                 return Err(AppError::conflict(
                     ErrorCode::OptimisticLock,
                     format!(
                         "Game lock version mismatch: expected {}, but game has version {}",
-                        expected_version.0, game.lock_version
+                        lock_version, game.lock_version
                     ),
                 ));
             }
@@ -1448,7 +1456,7 @@ async fn delete_game(
             use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
             let delete_result = games::Entity::delete_many()
                 .filter(games::Column::Id.eq(id))
-                .filter(games::Column::LockVersion.eq(expected_version.0))
+                .filter(games::Column::LockVersion.eq(lock_version))
                 .exec(txn)
                 .await
                 .map_err(|e| AppError::db("failed to delete game", e))?;
@@ -1461,7 +1469,7 @@ async fn delete_game(
                     ErrorCode::OptimisticLock,
                     format!(
                         "Game lock version mismatch: expected version {}, but game was modified or deleted",
-                        expected_version.0
+                        lock_version
                     ),
                 ));
             }

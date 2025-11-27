@@ -53,6 +53,9 @@ export function GameRoomClient({
 }: GameRoomClientProps) {
   const [snapshot, setSnapshot] = useState(initialData)
   const [etag, setEtag] = useState<string | undefined>(initialData.etag)
+  const [lockVersion, setLockVersion] = useState<number | undefined>(
+    initialData.lockVersion
+  )
   const [error, setError] = useState<{
     message: string
     traceId?: string
@@ -168,6 +171,7 @@ export function GameRoomClient({
           // seat changes or API response is missing this field.
           setSnapshot(result.data)
           setEtag(result.data.etag)
+          setLockVersion(result.data.lockVersion)
           setError(null)
         } else if (result.kind === 'not_modified') {
           setSnapshot((prev) => ({
@@ -410,9 +414,15 @@ export function GameRoomClient({
         setActivity({ type: 'action', action: 'bid' })
 
         try {
-          await executeApiAction(() => submitBidAction({ gameId, bid, etag }), {
-            successMessage: 'Bid submitted',
-          })
+          if (lockVersion === undefined) {
+            throw new Error('Lock version is required to submit bid')
+          }
+          await executeApiAction(
+            () => submitBidAction({ gameId, bid, lockVersion }),
+            {
+              successMessage: 'Bid submitted',
+            }
+          )
         } finally {
           await completeActionAndRefresh()
         }
@@ -420,7 +430,7 @@ export function GameRoomClient({
     },
     [
       gameId,
-      etag,
+      lockVersion,
       isBidPending,
       enqueueOrExecuteAction,
       executeApiAction,
@@ -438,8 +448,11 @@ export function GameRoomClient({
         setActivity({ type: 'action', action: 'trump' })
 
         try {
+          if (lockVersion === undefined) {
+            throw new Error('Lock version is required to select trump')
+          }
           await executeApiAction(
-            () => selectTrumpAction({ gameId, trump, etag }),
+            () => selectTrumpAction({ gameId, trump, lockVersion }),
             {
               successMessage: 'Trump selected',
             }
@@ -451,7 +464,7 @@ export function GameRoomClient({
     },
     [
       gameId,
-      etag,
+      lockVersion,
       isTrumpPending,
       enqueueOrExecuteAction,
       executeApiAction,
@@ -469,8 +482,11 @@ export function GameRoomClient({
         setActivity({ type: 'action', action: 'play' })
 
         try {
+          if (lockVersion === undefined) {
+            throw new Error('Lock version is required to play card')
+          }
           await executeApiAction(
-            () => submitPlayAction({ gameId, card, etag }),
+            () => submitPlayAction({ gameId, card, lockVersion }),
             {
               successMessage: 'Card played',
             }
@@ -482,7 +498,7 @@ export function GameRoomClient({
     },
     [
       gameId,
-      etag,
+      lockVersion,
       isPlayPending,
       enqueueOrExecuteAction,
       executeApiAction,

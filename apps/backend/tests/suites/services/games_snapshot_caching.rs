@@ -101,12 +101,16 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
         "ETag should be in format \"game-{{id}}-v{{version}}\""
     );
 
-    // Verify we can parse the version back
-    let parsed_version = backend::http::etag::parse_game_version_from_etag(&etag_str)
-        .expect("Should be able to parse version from ETag");
+    // Verify lock_version is present in JSON response body
+    let json: Value = serde_json::from_slice(&_body).expect("Body should be valid JSON");
+    let response_lock_version = json
+        .get("lock_version")
+        .expect("Response should include lock_version field")
+        .as_i64()
+        .expect("lock_version should be an integer") as i32;
     assert_eq!(
-        parsed_version, game.lock_version,
-        "Parsed version should match game lock_version"
+        response_lock_version, game.lock_version,
+        "lock_version in JSON response should match game lock_version"
     );
 
     shared.rollback().await?;
