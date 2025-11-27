@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1.6
+
+FROM rust:latest AS builder
+
+WORKDIR /app
+
+# Install dependencies required for building OpenSSL-dependent crates
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy manifest files first to maximize build caching
+COPY Cargo.toml Cargo.lock ./
+COPY apps/backend/Cargo.toml apps/backend/Cargo.toml
+COPY apps/migration-cli/Cargo.toml apps/migration-cli/Cargo.toml
+COPY packages/migration/Cargo.toml packages/migration/Cargo.toml
+COPY packages/backend-test-support/Cargo.toml packages/backend-test-support/Cargo.toml
+
+# Copy library package sources (they're dependencies, need real code)
+COPY packages/migration/src packages/migration/src
+COPY packages/backend-test-support/src packages/backend-test-support/src
+
+# Create dummy source files only for binaries to cache dependency compilation
+RUN mkdir -p apps/backend/src \
+    && echo "fn main() {}" > apps/backend/src/main.rs \
+    && mkdir -p apps/migration-cli/src \
+    && echo "fn main() {}" > apps/migration-cli/src/main.rs
+
+RUN cargo build --release --manifest-path apps/backend/Cargo.toml
+
+# Remove dummy sources before copying the real ones
+RUN rm -rf apps/backend/src \
+    && rm -rf apps/migration-cli/src
+
+# Copy the full workspace
+COPY . .
+
+# Build the actual backend binary
+RUN cargo build --locked --release --manifest-path apps/backend/Cargo.toml
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Default port matches backend default (can be overridden via BACKEND_PORT at runtime)
+ARG PORT=3001
+EXPOSE ${PORT}
+
+COPY --from=builder /app/target/release/backend /usr/local/bin/backend
+
+CMD ["backend"]
+

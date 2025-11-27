@@ -1,0 +1,71 @@
+name: nommie-local-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ./db.env
+    volumes:
+      - nommie_local_prod_db_data:/var/lib/postgresql/data
+      - ../postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 100ms
+      timeout: 1s
+      retries: 1
+      start_period: 200ms
+
+  backend:
+    build:
+      context: ../..
+      dockerfile: apps/backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./backend.env
+      - ./db.env
+    depends_on:
+      db:
+        condition: service_started
+    # backend must listen on 0.0.0.0:3001 inside the container
+    expose:
+      - "3001"
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        BACKEND_BASE_URL: ${BACKEND_BASE_URL}
+    restart: unless-stopped
+    env_file:
+      - ./frontend.env
+    environment:
+      BACKEND_BASE_URL: ${BACKEND_BASE_URL}
+    depends_on:
+      - backend
+    # frontend must listen on 0.0.0.0:3000 inside the container
+    expose:
+      - "3000"
+
+  caddy:
+    build: ./caddy
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    env_file:
+      - ./caddy.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - nommie_local_prod_caddy_data:/data
+      - nommie_local_prod_caddy_config:/config
+
+volumes:
+  nommie_local_prod_db_data:
+  nommie_local_prod_caddy_data:
+  nommie_local_prod_caddy_config:
+
