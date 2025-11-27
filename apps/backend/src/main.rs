@@ -15,11 +15,19 @@ mod telemetry;
 async fn main() -> std::io::Result<()> {
     telemetry::init_tracing();
 
-    // Load environment variables from apps/backend/.env (when running from repo root)
-    // Fallback to .env in current working directory if present
-    let _ = dotenvy::from_filename("apps/backend/.env").or_else(|_| dotenvy::from_filename(".env"));
+    // Environment variables must be set by the runtime environment:
+    // - Docker: Set via docker-compose env_file or docker run --env-file
+    // - Local dev: Source env files manually (e.g., set -a; . ./.env; set +a)
+    let host = std::env::var("BACKEND_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = std::env::var("BACKEND_PORT")
+        .unwrap_or_else(|_| "3001".to_string())
+        .parse::<u16>()
+        .unwrap_or_else(|_| {
+            eprintln!("❌ BACKEND_PORT must be a valid port number");
+            std::process::exit(1);
+        });
 
-    println!("🚀 Starting Nommie Backend on http://127.0.0.1:3001");
+    println!("🚀 Starting Nommie Backend on http://{}:{}", host, port);
 
     let jwt = match std::env::var("BACKEND_JWT_SECRET") {
         Ok(jwt) => jwt,
@@ -64,7 +72,7 @@ async fn main() -> std::io::Result<()> {
             )
             .configure(routes::configure)
     })
-    .bind(("127.0.0.1", 3001))?
+    .bind((host.as_str(), port))?
     .run()
     .await
 }

@@ -24,15 +24,62 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 
 > Tip: If a shell is new, re-source env: `set -a; . ./.env; set +a`
 
+## Production Containers
+
+We ship standalone Dockerfiles for the backend (`apps/backend/Dockerfile`) and the frontend (`apps/frontend/Dockerfile`). Create dedicated env files (e.g. `.env.backend.prod`, `.env.frontend.prod`) and pass them via `docker run --env-file` to avoid baking secrets into images.
+
+### Backend API
+
+```bash
+docker build -f apps/backend/Dockerfile -t nommie-backend:prod .
+docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
+```
+
+Minimum env:
+
+- `BACKEND_JWT_SECRET`
+- Database coordinates (`POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `APP_DB_USER`, `APP_DB_PASSWORD`)
+- Any telemetry or feature flags your deployment needs
+
+The container listens on port `3001` and logs to stdout/stderr. Run migrations beforehand (e.g. via `apps/migration-cli`) and point the env vars at the migrated database.
+
+### Frontend (Next.js)
+
+```bash
+docker build -f apps/frontend/Dockerfile -t nommie-frontend:prod .
+docker run --env-file .env.frontend.prod -p 3000:3000 nommie-frontend:prod
+```
+
+Important env:
+
+- `BACKEND_BASE_URL` pointing at your backend API
+- NextAuth secrets/providers (`AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`)
+- Any `NEXT_PUBLIC_*` values you expose to the client
+
+The image uses Next.js `output: 'standalone'` and serves the app with `node server.js` on port `3000`.
+
 ## Environment
 
 We don't store `DATABASE_URL`. We store **parts** in `.env` and construct URLs in code.
 
-**Important:** Environment variables must be sourced in each new shell session:
+**Important:** Environment variables must be set by the runtime environment. The application does not automatically load `.env` files.
+
+### Setting Environment Variables
+
+**For Local Development:**
+Environment variables must be sourced in each new shell session:
 ```bash
 set -a; . ./.env; set +a
 ```
-The project does not use `dotenvx` or `dotenvy` - all environment loading is done via shell sourcing.
+
+**For Docker Deployments:**
+Environment variables are set via `docker-compose.yml` `env_file` directives or `docker run --env-file`. See the Docker setup sections below.
+
+**For Standalone Docker Containers:**
+Pass environment files when running containers:
+```bash
+docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
+```
 
 ### Key Environment Variables
 
