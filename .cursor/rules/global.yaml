@@ -3,9 +3,9 @@ rules:
   - id: dev-workflow
     scope: workspace
     text: |
-      Before any pnpm commands, source `apps/backend/.env` once per shell session:
-      set -a; source apps/backend/.env; set +a
-      Do not source the env file repeatedly in the same shell.
+      Before any pnpm commands, source both environment files once per shell session:
+      set -a; source apps/backend/.env; source docker/dev-db/db.env; set +a
+      Do not source the env files repeatedly in the same shell.
       After completing backend code changes, run the linter: `pnpm be:lint`.
       After completing backend development or when testing during development, run tests: `pnpm be:test`.
       You may append additional arguments to run specific test subsets.
