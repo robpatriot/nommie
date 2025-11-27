@@ -8,7 +8,6 @@ use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Tr
 use actix_web::http::header;
 use actix_web::{web, Error, HttpMessage};
 use futures_util::future::{ready, LocalBoxFuture, Ready};
-use tracing::warn;
 
 use crate::auth::claims::BackendClaims;
 use crate::auth::jwt::JwtClaims;
@@ -54,38 +53,6 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        // [AUTH_BYPASS] START - Temporary debugging feature - remove when done
-        // Check if authentication bypass is enabled via environment variable
-        let disable_auth = std::env::var("DISABLE_AUTH")
-            .unwrap_or_default()
-            .parse::<bool>()
-            .unwrap_or(false);
-
-        if disable_auth {
-            warn!("⚠️  AUTHENTICATION BYPASSED in JWT middleware - This should only be enabled for debugging!");
-
-            // Get test user configuration from environment
-            let test_sub =
-                std::env::var("TEST_USER_SUB").unwrap_or_else(|_| "test-user".to_string());
-            let test_email =
-                std::env::var("TEST_USER_EMAIL").unwrap_or_else(|_| "test@example.com".to_string());
-
-            // Create fake BackendClaims for bypass mode
-            let fake_claims = BackendClaims {
-                sub: test_sub,
-                email: test_email,
-                exp: usize::MAX, // Never expires
-            };
-
-            // Store claims in request extensions
-            req.extensions_mut().insert(fake_claims);
-
-            // Call the downstream service without JWT validation
-            let fut = self.service.call(req);
-            return Box::pin(fut);
-        }
-        // [AUTH_BYPASS] END
-
         // Extract Authorization header and AppState before moving req
         let auth_header = req.headers().get(header::AUTHORIZATION).cloned();
         let app_state = req.app_data::<web::Data<AppState>>().cloned();
