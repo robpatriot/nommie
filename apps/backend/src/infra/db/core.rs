@@ -1,4 +1,5 @@
 // Standard library imports
+use std::future::Future;
 use std::process;
 use std::str::FromStr;
 use std::time::{Duration, Instant};
@@ -48,6 +49,52 @@ fn get_db_path(db_kind: DbKind) -> String {
         DbKind::SqliteFile => "sqlite file".to_string(),
         DbKind::SqliteMemory => "sqlite::memory:".to_string(),
     }
+}
+
+/// Retry a connection attempt with fixed interval delays
+/// Returns the result of the last attempt after all retries are exhausted
+async fn retry_connection<T, F, Fut>(
+    mut connect_fn: F,
+    max_attempts: u32,
+    interval_ms: u64,
+) -> Result<T, AppError>
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, AppError>>,
+{
+    let mut last_error = None;
+
+    for attempt in 1..=max_attempts {
+        match connect_fn().await {
+            Ok(result) => {
+                if attempt > 1 {
+                    info!(
+                        "connection_retry=success attempts={} interval_ms={}",
+                        attempt, interval_ms
+                    );
+                }
+                return Ok(result);
+            }
+            Err(e) => {
+                last_error = Some(e);
+                if attempt < max_attempts {
+                    warn!(
+                        "connection_retry=failed attempt={} max_attempts={} interval_ms={}",
+                        attempt, max_attempts, interval_ms
+                    );
+                    tokio::time::sleep(Duration::from_millis(interval_ms)).await;
+                }
+            }
+        }
+    }
+
+    let final_error = last_error.unwrap_or_else(|| {
+        AppError::config_msg(
+            "connection retry failed",
+            "no error recorded after max attempts (this should not happen)",
+        )
+    });
+    Err(final_error)
 }
 
 /// Helper function to create AppError with preserved error context
@@ -222,7 +269,27 @@ pub async fn build_admin_pool(
         .acquire_timeout(Duration::from_secs(2))
         .sqlx_logging(true);
 
-    let pool = Database::connect(opt).await?;
+    // Retry connection on startup for Postgres only (max 5 tries, 0.5s interval)
+    // SQLite connections don't need retry since they're local
+    let pool = if matches!(db_kind, DbKind::Postgres) {
+        retry_connection(
+            || {
+                let opt_clone = opt.clone();
+                async move {
+                    Database::connect(opt_clone).await.map_err(|e| {
+                        AppError::config("failed to connect to Postgres (admin pool)", e)
+                    })
+                }
+            },
+            5,
+            500,
+        )
+        .await?
+    } else {
+        Database::connect(opt)
+            .await
+            .map_err(|e| AppError::config("failed to connect to database (admin pool)", e))?
+    };
     Ok(pool)
 }
 
@@ -293,6 +360,8 @@ pub async fn build_pool(
             );
 
             // Build raw SQLx pool so we can apply a true per-connection hook
+            // Note: No retry logic needed here - if we reach this point, the admin pool
+            // connection already succeeded (with retries if needed), so the database is ready
             let db_settings = pool_cfg.db_settings.clone();
             let sqlx_pool = PgPoolOptions::new()
                 .min_connections(pool_cfg.pool_min)

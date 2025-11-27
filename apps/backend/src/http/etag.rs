@@ -40,8 +40,8 @@ pub fn game_etag(id: i64, version: i32) -> String {
 /// assert_eq!(version, 5);
 /// ```
 pub fn parse_game_version_from_etag(s: &str) -> Result<i32, AppError> {
-    // Remove quotes if present
-    let s = s.trim_matches('"');
+    // Remove quotes if present and trim whitespace
+    let s = s.trim_matches('"').trim();
 
     // Expected format: game-{id}-v{version}
     // We need to extract the version after the last "-v"
@@ -56,11 +56,28 @@ pub fn parse_game_version_from_etag(s: &str) -> Result<i32, AppError> {
         })?
         + version_prefix.len();
 
-    let version_str = &s[version_start..];
+    // Extract only the numeric part (stop at first non-digit character)
+    // This prevents issues where additional text might be appended (e.g., "11-gzip")
+    let version_slice = &s[version_start..];
+    let version_end = version_slice
+        .char_indices()
+        .find(|(_, c)| !c.is_ascii_digit())
+        .map(|(idx, _)| idx)
+        .unwrap_or(version_slice.len());
+
+    let version_str = &version_slice[..version_end];
+
+    if version_str.is_empty() {
+        return Err(AppError::bad_request(
+            ErrorCode::InvalidHeader,
+            format!("Invalid ETag format: version is empty. Expected format: \"game-{{id}}-v{{version}}\", got: \"{s}\""),
+        ));
+    }
+
     version_str.parse::<i32>().map_err(|_| {
         AppError::bad_request(
             ErrorCode::InvalidHeader,
-            format!("Invalid ETag format: version must be a valid integer, got: \"{version_str}\""),
+            format!("Invalid ETag format: version must be a valid integer, got: \"{version_str}\" (from ETag: \"{s}\")"),
         )
     })
 }
@@ -107,10 +124,46 @@ impl FromRequest for ExpectedVersion {
                 )
             })?;
 
-            // Parse the version from the ETag
-            let version = parse_game_version_from_etag(if_match_str)?;
+            // RFC 7232: If-Match can contain multiple ETags separated by commas
+            // We take the first valid ETag. Split by comma and trim whitespace.
+            let etag_candidates: Vec<&str> = if_match_str.split(',').map(|s| s.trim()).collect();
 
-            Ok(ExpectedVersion(version))
+            // Try to parse each ETag candidate until we find a valid one
+            let mut last_error = None;
+            for candidate in etag_candidates {
+                // Skip wildcard
+                if candidate == "*" {
+                    continue;
+                }
+
+                match parse_game_version_from_etag(candidate) {
+                    Ok(version) => return Ok(ExpectedVersion(version)),
+                    Err(e) => {
+                        last_error = Some((candidate.to_string(), e));
+                    }
+                }
+            }
+
+            // If we got here, none of the ETags were valid
+            let (failed_etag, error) = last_error.unwrap_or_else(|| {
+                (
+                    if_match_str.to_string(),
+                    AppError::bad_request(
+                        ErrorCode::InvalidHeader,
+                        "If-Match header contains no valid ETags",
+                    ),
+                )
+            });
+
+            Err(AppError::bad_request(
+                ErrorCode::InvalidHeader,
+                format!(
+                    "Invalid If-Match header: failed to parse ETag \"{}\" from header value \"{}\". Original error: {}",
+                    failed_etag,
+                    if_match_str,
+                    error
+                ),
+            ))
         })
     }
 }
@@ -158,6 +211,19 @@ mod tests {
 
         let result = parse_game_version_from_etag(r#""game-123-v""#);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_game_version_from_etag_with_suffix() {
+        // Test that parsing stops at first non-digit character
+        // This handles cases where additional text might be appended (e.g., "11-gzip")
+        let result = parse_game_version_from_etag(r#""game-123-v11-gzip""#);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 11);
+
+        let result = parse_game_version_from_etag("game-123-v42-extra");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
     }
 
     #[test]
