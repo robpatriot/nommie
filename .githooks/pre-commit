@@ -71,7 +71,7 @@ if ((${#ESLINT_REL[@]})); then
     pnpm --filter @nommie/frontend lint
   else
     echo "  • FE eslint --fix (staged TS/TSX files)"
-    pnpm --filter @nommie/frontend exec eslint --fix --max-warnings=0 -- "${ESLINT_REL[@]}"
+    ESLINT_USE_FLAT_CONFIG=false pnpm --filter @nommie/frontend exec eslint --fix --max-warnings=0 -- "${ESLINT_REL[@]}"
 
     # Auto-stage only files actually modified by eslint --fix
     for file in "${ESLINT_REL[@]}"; do

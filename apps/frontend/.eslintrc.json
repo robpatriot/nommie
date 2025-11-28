@@ -89,6 +89,9 @@
     "dist",
     "build",
     "coverage",
-    "*.config.*"
+    "*.config.js",
+    "*.config.ts",
+    "*.config.mjs",
+    "*.config.cjs"
   ]
 }
