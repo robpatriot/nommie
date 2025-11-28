@@ -3,6 +3,7 @@
 import {
   type ChangeEvent,
   type FormEvent,
+  startTransition,
   useEffect,
   useMemo,
   useRef,
@@ -40,28 +41,16 @@ export function BiddingPanel({
   const [hasTyped, setHasTyped] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Reset input when bid is submitted
+  // Use startTransition to mark as non-urgent update to avoid cascading renders
   useEffect(() => {
     if (viewerBid !== null) {
-      setBidInput('')
-      setHasTyped(false)
-      return
+      startTransition(() => {
+        setBidInput('')
+        setHasTyped(false)
+      })
     }
-
-    setBidInput((current) => {
-      if (current.trim() === '') {
-        return current
-      }
-
-      const parsed = Number(current)
-      if (!Number.isFinite(parsed)) {
-        return ''
-      }
-
-      if (parsed < minBid) return String(minBid)
-      if (parsed > maxBid) return String(maxBid)
-      return current
-    })
-  }, [maxBid, minBid, viewerBid])
+  }, [viewerBid])
 
   useEffect(() => {
     if (isViewerTurn && viewerBid === null) {
@@ -145,6 +134,23 @@ export function BiddingPanel({
     }
   }
 
+  const handleInputBlur = () => {
+    // Constrain input value to valid range on blur
+    setBidInput((current) => {
+      if (current.trim() === '') {
+        return current
+      }
+
+      const parsed = Number(current)
+      if (!Number.isFinite(parsed)) {
+        return ''
+      }
+
+      const constrained = Math.max(minBid, Math.min(maxBid, parsed))
+      return String(constrained)
+    })
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
@@ -213,6 +219,7 @@ export function BiddingPanel({
             pattern="[0-9]*"
             value={bidInput}
             onChange={handleInputChange}
+            onBlur={handleInputBlur}
             className={`w-24 rounded-xl border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
               hasValidationIssue
                 ? 'border-warning/70 focus:border-warning focus:ring focus:ring-warning/30'

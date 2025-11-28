@@ -1,6 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
 import { getPlayerDisplayName } from '@/utils/player-names'
 import {
@@ -159,17 +165,31 @@ export function GameRoomView(props: GameRoomViewProps) {
     error: historyError,
     fetchHistory,
   } = useGameHistory(gameId)
+  const prevPhaseRef = useRef(phase.phase)
 
+  // Reset and validate selectedCard when phase or playState changes
+  // Use startTransition to mark as non-urgent update to avoid cascading renders
   useEffect(() => {
-    if (phase.phase !== 'Trick' || !playState) {
-      setSelectedCard(null)
-      return
-    }
+    const currentPhase = phase.phase
 
-    if (selectedCard && !playState.playable.includes(selectedCard)) {
-      setSelectedCard(null)
-    }
-  }, [phase, playState, selectedCard])
+    startTransition(() => {
+      setSelectedCard((current) => {
+        // Reset when not in Trick phase or playState unavailable
+        if (currentPhase !== 'Trick' || !playState) {
+          return null
+        }
+
+        // Reset if current card is not playable
+        if (current && !playState.playable.includes(current)) {
+          return null
+        }
+
+        return current
+      })
+    })
+
+    prevPhaseRef.current = currentPhase
+  }, [phase, playState])
 
   useEffect(() => {
     if (!isHistoryOpen) {
@@ -201,7 +221,7 @@ export function GameRoomView(props: GameRoomViewProps) {
       await playState.onPlay(card)
       setSelectedCard(null)
     },
-    [playState]
+    [playState, setSelectedCard]
   )
 
   const handleOpenHistory = useCallback(() => {

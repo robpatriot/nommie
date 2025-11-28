@@ -13,7 +13,35 @@ export default async function LobbyPage() {
     redirect('/')
   }
 
-  const allGames = await getAvailableGames()
+  // Fetch games, but handle backend startup gracefully
+  let allGames: Awaited<ReturnType<typeof getAvailableGames>> = []
+  try {
+    allGames = await getAvailableGames()
+  } catch (error) {
+    // If backend is not ready yet (connection error), start with empty games list
+    // The client component can handle refresh once backend is available
+    const errorMessage =
+      error instanceof Error ? error.message.toLowerCase() : ''
+    // Access cause property safely (may not exist in all TypeScript lib versions)
+    const causeMessage =
+      error instanceof Error && 'cause' in error && error.cause instanceof Error
+        ? error.cause.message.toLowerCase()
+        : ''
+
+    const isConnectionError =
+      error instanceof Error &&
+      (errorMessage.includes('econnrefused') ||
+        errorMessage.includes('fetch failed') ||
+        errorMessage.includes('authentication required') ||
+        causeMessage.includes('econnrefused') ||
+        causeMessage.includes('connect econnrefused'))
+
+    // Only log non-connection errors (connection/auth errors during startup are expected)
+    if (!isConnectionError) {
+      console.error('Failed to fetch games', error)
+    }
+    // allGames remains empty array - client will show empty state and can retry
+  }
 
   const lobbyGames = allGames.filter((game) => game.state === 'LOBBY')
   const joinableGames = lobbyGames.filter(

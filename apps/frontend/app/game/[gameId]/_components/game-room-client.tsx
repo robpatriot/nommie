@@ -135,6 +135,7 @@ export function GameRoomClient({
         return
       }
 
+      // Set inflight flag and activity state synchronously to prevent race conditions
       inflightRef.current = true
       const newActivity: ActivityState = { type: activityType }
       activityRef.current = newActivity
@@ -244,40 +245,56 @@ export function GameRoomClient({
    */
   const requestRefresh = useCallback(
     async (mode: 'manual' | 'poll') => {
-      const currentActivity = activityRef.current
-
-      // Polling: Only poll when idle (no actions or refreshes in progress)
-      if (mode === 'poll') {
-        if (currentActivity.type !== 'idle' || inflightRef.current) {
-          return
+      // Check inflight flag FIRST - this is the most reliable indicator
+      // It's set synchronously at the start of executeRefresh
+      if (inflightRef.current) {
+        // If there's any inflight operation, handle based on mode
+        if (mode === 'manual') {
+          const currentActivity = activityRef.current
+          // Queue manual refresh if there's an action in progress
+          if (currentActivity.type === 'action') {
+            pendingManualRefreshRef.current = true
+          }
+          // Otherwise, ignore manual refresh (poll or refresh already in progress)
         }
-        // Start polling refresh
-        await executeRefresh('polling')
         return
       }
 
-      // Manual refresh: Queue if there's an action in progress, ignore if automatic poll is in progress
+      const currentActivity = activityRef.current
+
+      // For manual refresh, also check activity state as an additional safeguard
+      // This catches cases where activity is set but inflightRef hasn't been checked yet
       if (mode === 'manual') {
         // If there's an action in progress, queue the refresh to run after it completes
         if (currentActivity.type === 'action') {
           pendingManualRefreshRef.current = true
           return
         }
-        // If there's an automatic poll in progress, do nothing (manual refresh is redundant)
-        if (inflightRef.current && currentActivity.type === 'polling') {
-          return
-        }
-        // If there's an inflight manual refresh, don't start another
-        if (inflightRef.current && currentActivity.type === 'refreshing') {
-          return
-        }
-        // If already refreshing, don't start another
-        if (currentActivity.type === 'refreshing') {
+        // If polling or refreshing is in progress, don't start another manual refresh
+        if (
+          currentActivity.type === 'polling' ||
+          currentActivity.type === 'refreshing'
+        ) {
           return
         }
       }
 
-      // All checks passed - execute refresh immediately
+      // Polling: Only poll when idle (no actions or refreshes in progress)
+      if (mode === 'poll') {
+        if (currentActivity.type !== 'idle') {
+          return
+        }
+        // Set activity state immediately to prevent race conditions
+        // This ensures manual refresh will see 'polling' state even if executeRefresh
+        // hasn't completed yet. executeRefresh will set it again, but that's harmless.
+        activityRef.current = { type: 'polling' }
+        setActivity({ type: 'polling' })
+        // Start polling refresh - this will set inflightRef synchronously
+        await executeRefresh('polling')
+        return
+      }
+
+      // Manual refresh: All checks passed - execute refresh immediately
       await executeRefresh('refreshing')
     },
     [executeRefresh]

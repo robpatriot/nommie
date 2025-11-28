@@ -2,11 +2,11 @@
 
 import {
   createContext,
+  startTransition,
   useCallback,
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react'
 
@@ -85,26 +85,23 @@ export function ThemeProvider({
   initialTheme = 'system',
   initialResolved = 'light',
 }: ThemeProviderProps) {
-  const initialRef = useRef<InitialThemeState | null>(null)
-
-  if (initialRef.current === null) {
-    const systemPreference = readSystemPreference()
-    initialRef.current = {
-      theme: initialTheme,
-      systemTheme: systemPreference,
-      resolvedTheme:
-        initialTheme === 'system'
-          ? (initialResolved ?? systemPreference)
-          : (initialTheme as ResolvedTheme),
-    }
+  // Compute initial values directly instead of using refs (React 19 doesn't allow ref access during render)
+  const systemPreference = readSystemPreference()
+  const initialThemeState: InitialThemeState = {
+    theme: initialTheme,
+    systemTheme: systemPreference,
+    resolvedTheme:
+      initialTheme === 'system'
+        ? (initialResolved ?? systemPreference)
+        : (initialTheme as ResolvedTheme),
   }
 
-  const [theme, setThemeState] = useState<ThemeMode>(initialRef.current.theme)
+  const [theme, setThemeState] = useState<ThemeMode>(initialThemeState.theme)
   const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(
-    initialRef.current.systemTheme
+    initialThemeState.systemTheme
   )
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(
-    initialRef.current.resolvedTheme
+    initialThemeState.resolvedTheme
   )
   const [hydrated, setHydrated] = useState(false)
 
@@ -134,10 +131,12 @@ export function ThemeProvider({
     const nextResolved =
       nextTheme === 'system' ? domResolved : (nextTheme as ResolvedTheme)
 
-    setThemeState(nextTheme)
-    setResolvedTheme(nextResolved)
+    startTransition(() => {
+      setThemeState(nextTheme)
+      setResolvedTheme(nextResolved)
+      setHydrated(true)
+    })
     applyTheme(nextTheme, nextResolved)
-    setHydrated(true)
   }, [applyTheme])
 
   useEffect(() => {
@@ -150,7 +149,9 @@ export function ThemeProvider({
       setSystemTheme(event.matches ? 'dark' : 'light')
     }
 
-    setSystemTheme(media.matches ? 'dark' : 'light')
+    startTransition(() => {
+      setSystemTheme(media.matches ? 'dark' : 'light')
+    })
     media.addEventListener('change', handleChange)
 
     return () => media.removeEventListener('change', handleChange)
@@ -181,7 +182,9 @@ export function ThemeProvider({
   useEffect(() => {
     const nextResolved =
       theme === 'system' ? systemTheme : (theme as ResolvedTheme)
-    setResolvedTheme(nextResolved)
+    startTransition(() => {
+      setResolvedTheme(nextResolved)
+    })
     applyTheme(theme, nextResolved)
 
     if (typeof window !== 'undefined') {

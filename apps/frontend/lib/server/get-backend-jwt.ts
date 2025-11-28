@@ -197,7 +197,37 @@ async function refreshBackendJwt({
 
       return null
     } catch (error) {
-      console.warn('Error refreshing backend JWT', error)
+      // Check if this is a connection error (backend not ready yet)
+      const errorMessage =
+        error instanceof Error ? error.message.toLowerCase() : ''
+      // Access cause property safely (may not exist in all TypeScript lib versions)
+      const causeMessage =
+        error instanceof Error &&
+        'cause' in error &&
+        error.cause instanceof Error
+          ? error.cause.message.toLowerCase()
+          : ''
+
+      const isConnectionError =
+        error instanceof Error &&
+        (errorMessage.includes('econnrefused') ||
+          errorMessage.includes('fetch failed') ||
+          errorMessage.includes('connection') ||
+          causeMessage.includes('econnrefused') ||
+          causeMessage.includes('connect econnrefused'))
+
+      if (isConnectionError) {
+        // Backend not ready yet - this is expected during startup, log at debug level
+        // The page will work once the backend starts, or on the next request
+        if (process.env.NODE_ENV === 'development') {
+          console.debug(
+            'Backend not ready yet, JWT refresh will retry on next request'
+          )
+        }
+      } else {
+        // Other errors should still be logged
+        console.warn('Error refreshing backend JWT', error)
+      }
       return null
     } finally {
       // Clean up deduplication cache immediately after completion

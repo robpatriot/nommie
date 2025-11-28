@@ -1,6 +1,6 @@
 'use client'
 
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, startTransition, useEffect, useState } from 'react'
 import type { Seat, Trump, TrumpSelectSnapshot } from '@/lib/game-room/types'
 import { getPlayerDisplayName } from '@/utils/player-names'
 import { formatTrump } from './utils'
@@ -23,17 +23,19 @@ export function TrumpSelectPanel({
   const [selectedTrump, setSelectedTrump] = useState<Trump | null>(null)
 
   useEffect(() => {
-    if (allowedTrumps.length === 0) {
-      setSelectedTrump(null)
-      return
-    }
-    setSelectedTrump((current) => {
-      // Only preserve existing selection if it's still valid
-      // Don't auto-select if nothing was selected
-      if (current && allowedTrumps.includes(current)) {
-        return current
+    startTransition(() => {
+      if (allowedTrumps.length === 0) {
+        setSelectedTrump(null)
+        return
       }
-      return null
+      setSelectedTrump((current) => {
+        // Only preserve existing selection if it's still valid
+        // Don't auto-select if nothing was selected
+        if (current && allowedTrumps.includes(current)) {
+          return current
+        }
+        return null
+      })
     })
   }, [allowedTrumps])
 

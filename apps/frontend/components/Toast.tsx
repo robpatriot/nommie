@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import { BackendApiError } from '@/lib/errors'
 
 export interface ToastMessage {
@@ -58,7 +58,10 @@ function ToastItem({
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
-    setExpanded(false)
+    // Use startTransition to mark as non-urgent update to avoid cascading renders
+    startTransition(() => {
+      setExpanded(false)
+    })
     // Auto-dismiss success messages after 3 seconds
     if (toast.type === 'success') {
       const timer = setTimeout(() => {

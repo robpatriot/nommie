@@ -1,6 +1,12 @@
 'use client'
 
-import { useMemo, useRef, useLayoutEffect, useState } from 'react'
+import {
+  startTransition,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
@@ -65,7 +71,10 @@ export function PlayerHand({
   useLayoutEffect(() => {
     if (!containerRef.current || viewerHand.length === 0) {
       if (viewerHand.length === 0) {
-        setOverlapAmount(16) // Reset to default when empty
+        // Use startTransition for layout-related state updates to avoid cascading renders
+        startTransition(() => {
+          setOverlapAmount(16) // Reset to default when empty
+        })
       }
       return
     }
