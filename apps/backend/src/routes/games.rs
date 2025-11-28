@@ -24,6 +24,7 @@ use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
+use crate::repos::players::{friendly_ai_name, resolve_display_name_for_membership};
 use crate::repos::{ai_overrides, ai_profiles, games as games_repo, player_view, rounds, users};
 use crate::services::ai::{AiInstanceOverrides, AiService};
 use crate::services::game_flow::GameFlowService;
@@ -139,22 +140,19 @@ async fn get_snapshot(
                     let mut seat_public = SeatPublic::empty(seat);
                     seat_public.is_ready = membership.is_ready;
 
-                    let ai_override = ai_overrides::find_by_game_player_id(txn, membership.id)
-                        .await
-                        .map_err(AppError::from)?;
+                    // Use consolidated function to resolve display name (with final fallback)
+                    let display_name = resolve_display_name_for_membership(
+                        txn,
+                        &membership,
+                        seat,
+                        true, // with_final_fallback = true for snapshot
+                    )
+                    .await
+                    .map_err(AppError::from)?;
 
-                    let mut display_name: Option<String> = ai_override
-                        .as_ref()
-                        .and_then(|ovr| ovr.name.as_ref())
-                        .and_then(|name| {
-                            let trimmed = name.trim();
-                            if trimmed.is_empty() {
-                                None
-                            } else {
-                                Some(trimmed.to_owned())
-                            }
-                        });
+                    seat_public.display_name = Some(display_name);
 
+                    // Build additional SeatPublic fields
                     match membership.player_kind {
                         crate::entities::game_players::PlayerKind::Human => {
                             if let Some(user_id) = membership.user_id {
@@ -170,19 +168,6 @@ async fn get_snapshot(
                                     })?;
 
                                 seat_public.is_ai = user.is_ai;
-
-                                if display_name.is_none() {
-                                    if let Some(username) = &user.username {
-                                        let trimmed = username.trim();
-                                        if !trimmed.is_empty() {
-                                            display_name = Some(trimmed.to_owned());
-                                        }
-                                    }
-                                }
-
-                                if display_name.is_none() {
-                                    display_name = Some(user.sub.clone());
-                                }
 
                                 if creator_user_id == Some(user_id) {
                                     host_seat = seat;
@@ -201,32 +186,15 @@ async fn get_snapshot(
                                     .map_err(AppError::from)?;
 
                                 if let Some(profile) = profile.as_ref() {
-                                    let trimmed = profile.display_name.trim();
-                                    if display_name.is_none() && !trimmed.is_empty() {
-                                        display_name = Some(trimmed.to_owned());
-                                    }
-
                                     seat_public.ai_profile = Some(SeatAiProfilePublic {
                                         name: profile.registry_name.clone(),
                                         version: profile.registry_version.clone(),
                                     });
                                 }
-
-                                if display_name.is_none() {
-                                    display_name =
-                                        Some(friendly_ai_name(profile_id, seat as usize));
-                                }
-                            } else if display_name.is_none() {
-                                display_name = Some(friendly_ai_name(membership.id, seat as usize));
                             }
                         }
                     }
 
-                    if display_name.is_none() {
-                        display_name = Some(format!("Player {}", seat as usize + 1));
-                    }
-
-                    seat_public.display_name = display_name;
                     seating[seat_idx as usize] = seat_public;
                 }
 
@@ -1003,62 +971,22 @@ async fn add_ai_seat(
             let seat_index = seat_to_fill;
             let mut existing_display_names: HashSet<String> = HashSet::new();
 
+            // Collect existing display names using consolidated function
             for membership in &existing_memberships {
                 if membership.turn_order == seat_to_fill {
                     continue;
                 }
 
-                if let Some(override_record) =
-                    ai_overrides::find_by_game_player_id(txn, membership.id)
-                        .await
-                        .map_err(AppError::from)?
-                {
-                    if let Some(name) = override_record.name {
-                        let trimmed = name.trim();
-                        if !trimmed.is_empty() {
-                            existing_display_names.insert(trimmed.to_owned());
-                            continue;
-                        }
-                    }
-                }
+                let display_name = resolve_display_name_for_membership(
+                    txn,
+                    membership,
+                    membership.turn_order,
+                    false, // No final fallback needed for uniqueness check
+                )
+                .await
+                .map_err(AppError::from)?;
 
-                match membership.player_kind {
-                    crate::entities::game_players::PlayerKind::Human => {
-                        if let Some(user_id) = membership.user_id {
-                            if let Some(user) = users::find_user_by_id(txn, user_id)
-                                .await
-                                .map_err(AppError::from)?
-                            {
-                                if let Some(username) = &user.username {
-                                    let trimmed = username.trim();
-                                    if !trimmed.is_empty() {
-                                        existing_display_names.insert(trimmed.to_owned());
-                                        continue;
-                                    }
-                                }
-                                existing_display_names.insert(user.sub);
-                            }
-                        }
-                    }
-                    crate::entities::game_players::PlayerKind::Ai => {
-                        if let Some(profile_id) = membership.ai_profile_id {
-                            if let Some(profile) = ai_profiles::find_by_id(txn, profile_id)
-                                .await
-                                .map_err(AppError::from)?
-                            {
-                                let trimmed = profile.display_name.trim();
-                                if !trimmed.is_empty() {
-                                    existing_display_names.insert(trimmed.to_owned());
-                                    continue;
-                                }
-                            }
-                            existing_display_names.insert(friendly_ai_name(
-                                profile_id,
-                                membership.turn_order as usize,
-                            ));
-                        }
-                    }
-                }
+                existing_display_names.insert(display_name);
             }
 
             let ai_service = AiService;
@@ -1563,16 +1491,6 @@ async fn delete_game(
     .await?;
 
     Ok(HttpResponse::NoContent().finish())
-}
-
-pub fn friendly_ai_name(seed: i64, seat_index: usize) -> String {
-    const AI_NAMES: [&str; 16] = [
-        "Atlas", "Blaze", "Comet", "Dynamo", "Echo", "Flare", "Glyph", "Helix", "Ion", "Jet",
-        "Kilo", "Lumen", "Nova", "Orion", "Pulse", "Quark",
-    ];
-
-    let idx = ((seed as usize) ^ seat_index) % AI_NAMES.len();
-    AI_NAMES[idx].to_string()
 }
 
 fn unique_ai_display_name(existing: &HashSet<String>, base: &str) -> String {
