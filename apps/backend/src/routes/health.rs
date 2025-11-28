@@ -8,7 +8,7 @@ use crate::db::require_db;
 use crate::error::AppError;
 use crate::state::app_state::AppState;
 
-async fn root() -> Result<HttpResponse, AppError> {
+pub async fn root() -> Result<HttpResponse, AppError> {
     Ok(HttpResponse::Ok().body("Hello from Nommie Backend! 🃏"))
 }
 
@@ -80,6 +80,6 @@ async fn health(app_state: web::Data<AppState>) -> Result<HttpResponse, AppError
 }
 
 pub fn configure_routes(cfg: &mut actix_web::web::ServiceConfig) {
-    cfg.route("/", web::get().to(root))
-        .route("/health", web::get().to(health));
+    // Only configure health route - root route is configured separately in main.rs
+    cfg.route("/health", web::get().to(health));
 }

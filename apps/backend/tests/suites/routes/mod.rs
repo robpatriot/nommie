@@ -11,6 +11,7 @@ pub mod handler_games_ready;
 pub mod handler_players;
 pub mod healthcheck;
 pub mod rate_limiting;
+pub mod security_headers;
 pub mod state_builder;
 // trace_span is in its own test binary (trace_span_tests.rs)
 pub mod validated_json;

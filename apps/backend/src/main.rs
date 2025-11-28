@@ -7,6 +7,7 @@ use backend::middleware::cors::cors_middleware;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::middleware::rate_limit::{api_rate_limit_config, auth_rate_limit_config};
 use backend::middleware::request_trace::RequestTrace;
+use backend::middleware::security_headers::SecurityHeaders;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
 use backend::routes;
@@ -82,27 +83,40 @@ async fn main() -> std::io::Result<()> {
             .wrap(RequestTrace)
             .app_data(data.clone())
             .service(
-                // Auth routes with strict rate limiting (5 req/min)
+                // Auth routes with strict rate limiting (5 req/min) and security headers
                 web::scope("/api/auth")
+                    .wrap(SecurityHeaders)
                     .wrap(auth_limiter)
                     .configure(routes::auth::configure_routes),
             )
             .service(
-                // Games routes with general rate limiting (100 req/min)
+                // Games routes with general rate limiting (100 req/min) and security headers
                 web::scope("/api/games")
+                    .wrap(SecurityHeaders)
                     .wrap(api_limiter.clone())
                     .wrap(JwtExtract)
                     .configure(routes::games::configure_routes),
             )
             .service(
-                // User routes with general rate limiting (100 req/min)
+                // User routes with general rate limiting (100 req/min) and security headers
                 web::scope("/api/user")
+                    .wrap(SecurityHeaders)
                     .wrap(api_limiter)
                     .wrap(JwtExtract)
                     .configure(routes::user_options::configure_routes),
             )
-            // Health check routes - no rate limiting
-            .configure(routes::configure)
+            // Health check route - security headers only, no rate limiting
+            .service(
+                web::scope("/health")
+                    .wrap(SecurityHeaders)
+                    .configure(routes::health::configure_routes),
+            )
+            // Root route - security headers (but no Cache-Control: no-store)
+            .service(
+                web::scope("")
+                    .wrap(SecurityHeaders)
+                    .route("/", web::get().to(routes::health::root)),
+            )
     })
     .bind((host.as_str(), port))?
     .run()
