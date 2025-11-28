@@ -2,6 +2,8 @@
  * Utility functions for player name normalization and extraction.
  */
 
+import type { Seat } from '@/lib/game-room/types'
+
 export interface SeatWithDisplayName {
   display_name?: string | null
 }
@@ -40,4 +42,20 @@ export function extractPlayerNames(
     string,
     string,
   ]
+}
+
+/**
+ * Returns the display name for a seat, showing "You" if it's the viewer's seat.
+ *
+ * @param seat - The seat index (0-3)
+ * @param viewerSeat - The viewer's seat index, or null if unknown
+ * @param playerNames - Tuple of 4 player names
+ * @returns Display name: "You" if seat matches viewerSeat, otherwise playerNames[seat]
+ */
+export function getPlayerDisplayName(
+  seat: Seat,
+  viewerSeat: Seat | null,
+  playerNames: [string, string, string, string]
+): string {
+  return viewerSeat !== null && seat === viewerSeat ? 'You' : playerNames[seat]
 }

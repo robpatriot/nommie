@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react'
 import type { BiddingSnapshot, Seat } from '@/lib/game-room/types'
+import { getPlayerDisplayName } from '@/utils/player-names'
 import { getOrientation } from './utils'
 import type { GameRoomViewProps } from '../game-room-view'
 
@@ -33,8 +34,7 @@ export function BiddingPanel({
   const viewerBid = phase.bids[viewerSeat] ?? null
   const zeroBidLocked = bidding.zeroBidLocked ?? false
   const isViewerTurn = phase.to_act === viewerSeat
-  const activeName =
-    phase.to_act === viewerSeat ? 'You' : playerNames[phase.to_act]
+  const activeName = getPlayerDisplayName(phase.to_act, viewerSeat, playerNames)
   const [bidInput, setBidInput] = useState<string>('')
   const [flashValidation, setFlashValidation] = useState(false)
   const [hasTyped, setHasTyped] = useState(false)
@@ -82,7 +82,7 @@ export function BiddingPanel({
     () =>
       ([0, 1, 2, 3] as const).map((seat) => ({
         seat,
-        name: seat === viewerSeat ? 'You' : playerNames[seat],
+        name: getPlayerDisplayName(seat, viewerSeat, playerNames),
         bid: phase.bids[seat],
         orientation: getOrientation(layoutSeat, seat),
       })),

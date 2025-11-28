@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useState } from 'react'
 import type { Seat, Trump, TrumpSelectSnapshot } from '@/lib/game-room/types'
+import { getPlayerDisplayName } from '@/utils/player-names'
 import { formatTrump } from './utils'
 import type { GameRoomViewProps } from '../game-room-view'
 
@@ -36,8 +37,7 @@ export function TrumpSelectPanel({
     })
   }, [allowedTrumps])
 
-  const isViewerTurn = phase.to_act === viewerSeat
-  const activeName = isViewerTurn ? 'You' : playerNames[phase.to_act]
+  const activeName = getPlayerDisplayName(phase.to_act, viewerSeat, playerNames)
   const canSelect = trump?.canSelect ?? false
   const isPending = trump?.isPending ?? false
 

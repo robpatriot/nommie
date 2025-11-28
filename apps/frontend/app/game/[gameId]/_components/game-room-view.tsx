@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
+import { getPlayerDisplayName } from '@/utils/player-names'
 import {
   buildSeatSummaries,
   getActiveSeat,
@@ -83,9 +84,7 @@ export function GameRoomView(props: GameRoomViewProps) {
 
   const seatDisplayName = useCallback(
     (seat: Seat) =>
-      effectiveViewerSeat !== null && seat === effectiveViewerSeat
-        ? 'You'
-        : playerNames[seat],
+      getPlayerDisplayName(seat, effectiveViewerSeat, playerNames),
     [playerNames, effectiveViewerSeat]
   )
   const activeName =

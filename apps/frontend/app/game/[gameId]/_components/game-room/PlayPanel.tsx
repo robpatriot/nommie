@@ -2,6 +2,7 @@
 
 import { type FormEvent } from 'react'
 import type { Card, TrickSnapshot } from '@/lib/game-room/types'
+import { getPlayerDisplayName } from '@/utils/player-names'
 import type { GameRoomViewProps } from '../game-room-view'
 import { PlayingCard } from './PlayingCard'
 
@@ -21,8 +22,11 @@ export function PlayPanel({
   onPlayCard,
 }: PlayPanelProps) {
   const isViewerTurn = phase.to_act === play.viewerSeat
-  const activeName =
-    phase.to_act === play.viewerSeat ? 'You' : playerNames[phase.to_act]
+  const activeName = getPlayerDisplayName(
+    phase.to_act,
+    play.viewerSeat,
+    playerNames
+  )
   const isCardPlayable = !!selectedCard && play.playable.includes(selectedCard)
   const isSubmitDisabled = !isViewerTurn || play.isPending || !isCardPlayable
 
