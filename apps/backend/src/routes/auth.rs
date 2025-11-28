@@ -76,5 +76,6 @@ async fn login(
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.service(web::resource("/api/auth/login").route(web::post().to(login)));
+    // Route path is relative to the scope in main.rs (/api/auth)
+    cfg.service(web::resource("/login").route(web::post().to(login)));
 }

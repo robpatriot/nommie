@@ -1,8 +1,11 @@
+use actix_extensible_rate_limit::backend::memory::InMemoryBackend;
+use actix_extensible_rate_limit::RateLimiter;
 use actix_web::{web, App, HttpServer};
 use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::state::build_state;
 use backend::middleware::cors::cors_middleware;
 use backend::middleware::jwt_extract::JwtExtract;
+use backend::middleware::rate_limit::{api_rate_limit_config, auth_rate_limit_config};
 use backend::middleware::request_trace::RequestTrace;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
@@ -59,6 +62,19 @@ async fn main() -> std::io::Result<()> {
     let data = web::Data::new(app_state);
 
     HttpServer::new(move || {
+        // Create rate limiters for different route groups (one per worker thread)
+        let auth_backend = InMemoryBackend::builder().build();
+        let auth_input = auth_rate_limit_config().build();
+        let auth_limiter = RateLimiter::builder(auth_backend, auth_input)
+            .add_headers()
+            .build();
+
+        let api_backend = InMemoryBackend::builder().build();
+        let api_input = api_rate_limit_config().build();
+        let api_limiter = RateLimiter::builder(api_backend, api_input)
+            .add_headers()
+            .build();
+
         App::new()
             .wrap(cors_middleware())
             .wrap(StructuredLogger)
@@ -66,10 +82,26 @@ async fn main() -> std::io::Result<()> {
             .wrap(RequestTrace)
             .app_data(data.clone())
             .service(
+                // Auth routes with strict rate limiting (5 req/min)
+                web::scope("/api/auth")
+                    .wrap(auth_limiter)
+                    .configure(routes::auth::configure_routes),
+            )
+            .service(
+                // Games routes with general rate limiting (100 req/min)
                 web::scope("/api/games")
+                    .wrap(api_limiter.clone())
                     .wrap(JwtExtract)
                     .configure(routes::games::configure_routes),
             )
+            .service(
+                // User routes with general rate limiting (100 req/min)
+                web::scope("/api/user")
+                    .wrap(api_limiter)
+                    .wrap(JwtExtract)
+                    .configure(routes::user_options::configure_routes),
+            )
+            // Health check routes - no rate limiting
             .configure(routes::configure)
     })
     .bind((host.as_str(), port))?
