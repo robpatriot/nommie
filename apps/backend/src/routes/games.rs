@@ -7,7 +7,7 @@ use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use rand::random;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::ai::{registry, HeuristicV1, RandomPlayer};
 use crate::db::txn::with_txn;
@@ -299,7 +299,9 @@ async fn get_snapshot(
 
     // Check If-None-Match header for HTTP caching
     if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        debug!(game_id = id, "Found If-None-Match header present");
         if let Ok(client_etag) = if_none_match.to_str() {
+            debug!(game_id = id, client_etag = %client_etag, current_etag = %etag_value, "Received If-None-Match ETag header");
             // Check for wildcard match (RFC 9110) or specific ETag match
             // Wildcard "*" means "any representation exists"
             let matches = client_etag.trim() == "*"
@@ -309,6 +311,7 @@ async fn get_snapshot(
                     .any(|etag| etag == etag_value);
 
             if matches {
+                debug!(game_id = id, "ETag match found, returning 304 Not Modified");
                 // Resource hasn't changed, return 304 Not Modified
                 let mut not_modified = HttpResponse::build(StatusCode::NOT_MODIFIED);
                 not_modified.insert_header((ETAG, etag_value));
@@ -316,7 +319,14 @@ async fn get_snapshot(
                     not_modified.insert_header(("x-viewer-seat", seat.to_string()));
                 }
                 return Ok(not_modified.finish());
+            } else {
+                debug!(game_id = id, "ETag mismatch, returning full response");
             }
+        } else {
+            debug!(
+                game_id = id,
+                "Failed to convert If-None-Match header to string"
+            );
         }
     }
 
@@ -334,18 +344,77 @@ async fn get_snapshot(
     }))
 }
 
+/// GET /api/games/{game_id}/history
+///
+/// Returns the game history with an ETag header for HTTP caching.
+/// Supports `If-None-Match` for HTTP caching: if the client's ETag matches the current version,
+/// returns `304 Not Modified` with no body.
 async fn get_game_history(
     http_req: HttpRequest,
     game_id: GameId,
     _membership: GameMembership,
     app_state: web::Data<AppState>,
-) -> Result<web::Json<GameHistoryResponse>, AppError> {
+) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
 
-    let history = with_txn(Some(&http_req), &app_state, |txn| {
-        Box::pin(async move { player_view::load_game_history(txn, id).await })
+    // Load game to get lock_version and history within a transaction
+    let (history, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            // Fetch game from database to get lock_version
+            let game = games_repo::find_by_id(txn, id)
+                .await
+                .map_err(|e| AppError::db("failed to fetch game", e))?
+                .ok_or_else(|| {
+                    AppError::not_found(
+                        crate::errors::ErrorCode::GameNotFound,
+                        format!("Game with ID {id} not found"),
+                    )
+                })?;
+
+            // Load game history
+            let history = player_view::load_game_history(txn, id).await?;
+
+            Ok((history, game.lock_version))
+        })
     })
     .await?;
+
+    // Generate ETag from game ID and lock version
+    let etag_value = game_etag(id, lock_version);
+
+    // Check If-None-Match header for HTTP caching
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        debug!(game_id = id, "Found If-None-Match header present");
+        if let Ok(client_etag) = if_none_match.to_str() {
+            debug!(
+                game_id = id,
+                client_etag = %client_etag,
+                current_etag = %etag_value,
+                "Received If-None-Match ETag header"
+            );
+            // Check for wildcard match (RFC 9110) or specific ETag match
+            let matches = client_etag.trim() == "*"
+                || client_etag
+                    .split(',')
+                    .map(str::trim)
+                    .any(|etag| etag == etag_value);
+
+            if matches {
+                debug!(game_id = id, "ETag match found, returning 304 Not Modified");
+                // Resource hasn't changed, return 304 Not Modified
+                let mut not_modified = HttpResponse::build(StatusCode::NOT_MODIFIED);
+                not_modified.insert_header((ETAG, etag_value));
+                return Ok(not_modified.finish());
+            } else {
+                debug!(game_id = id, "ETag mismatch, returning full response");
+            }
+        } else {
+            debug!(
+                game_id = id,
+                "Failed to convert If-None-Match header to string"
+            );
+        }
+    }
 
     let rounds = history
         .rounds
@@ -363,30 +432,91 @@ async fn get_game_history(
         })
         .collect();
 
-    Ok(web::Json(GameHistoryResponse { rounds }))
+    // Resource is new or modified, return full response
+    let mut response = HttpResponse::Ok();
+    response.insert_header((ETAG, etag_value));
+    Ok(response.json(GameHistoryResponse { rounds }))
 }
 
 /// GET /api/games/{game_id}/players/{seat}/display_name
 ///
 /// Returns the display name of the player at the specified seat in the game.
+/// Supports `If-None-Match` for HTTP caching: if the client's ETag matches the current version,
+/// returns `304 Not Modified` with no body.
 async fn get_player_display_name(
     http_req: HttpRequest,
     path: web::Path<(i64, u8)>,
     app_state: web::Data<AppState>,
-) -> Result<web::Json<PlayerDisplayNameResponse>, AppError> {
+) -> Result<HttpResponse, AppError> {
     let (game_id, seat) = path.into_inner();
 
-    // Get display name within a transaction
-    let display_name = with_txn(Some(&http_req), &app_state, |txn| {
+    // Get display name and game lock_version within a transaction
+    let (display_name, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
+            // Fetch game from database to get lock_version
+            let game = games_repo::find_by_id(txn, game_id)
+                .await
+                .map_err(|e| AppError::db("failed to fetch game", e))?
+                .ok_or_else(|| {
+                    AppError::not_found(
+                        crate::errors::ErrorCode::GameNotFound,
+                        format!("Game with ID {game_id} not found"),
+                    )
+                })?;
+
+            // Get display name
             let service = PlayerService;
-            Ok(service.get_display_name_by_seat(txn, game_id, seat).await?)
+            let display_name = service.get_display_name_by_seat(txn, game_id, seat).await?;
+
+            Ok((display_name, game.lock_version))
         })
     })
     .await?;
 
-    // Return JSON response
-    Ok(web::Json(PlayerDisplayNameResponse { display_name }))
+    // Generate ETag from game ID and lock version
+    let etag_value = game_etag(game_id, lock_version);
+
+    // Check If-None-Match header for HTTP caching
+    if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
+        debug!(game_id = game_id, "Found If-None-Match header present");
+        if let Ok(client_etag) = if_none_match.to_str() {
+            debug!(
+                game_id = game_id,
+                client_etag = %client_etag,
+                current_etag = %etag_value,
+                "Received If-None-Match ETag header"
+            );
+            // Check for wildcard match (RFC 9110) or specific ETag match
+            let matches = client_etag.trim() == "*"
+                || client_etag
+                    .split(',')
+                    .map(str::trim)
+                    .any(|etag| etag == etag_value);
+
+            if matches {
+                debug!(
+                    game_id = game_id,
+                    "ETag match found, returning 304 Not Modified"
+                );
+                // Resource hasn't changed, return 304 Not Modified
+                let mut not_modified = HttpResponse::build(StatusCode::NOT_MODIFIED);
+                not_modified.insert_header((ETAG, etag_value));
+                return Ok(not_modified.finish());
+            } else {
+                debug!(game_id = game_id, "ETag mismatch, returning full response");
+            }
+        } else {
+            debug!(
+                game_id = game_id,
+                "Failed to convert If-None-Match header to string"
+            );
+        }
+    }
+
+    // Resource is new or modified, return full response
+    let mut response = HttpResponse::Ok();
+    response.insert_header((ETAG, etag_value));
+    Ok(response.json(PlayerDisplayNameResponse { display_name }))
 }
 
 #[derive(serde::Serialize)]
