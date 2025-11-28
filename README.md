@@ -11,14 +11,13 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 2. Copy env file and source it **once per shell**:
    - `cp .env.example .env`
    - `set -a; . ./.env; set +a`
-3. Start Postgres:
-   - `pnpm db:up`
-4. Create/refresh databases:
-   - Dev DB (owner role): `pnpm db:fresh`
-   - Test DB (owner role): `pnpm db:fresh:test`
+3. Start Postgres (run manually with docker-compose):
+   - `docker compose -f docker/dev-db/docker-compose.yml up -d postgres`
+4. Create/refresh databases (run manually - see Database & Migrations section):
 5. Run backend + frontend:
-   - Backend: `pnpm be:up` (logs → `.dev/dev.log`, stop with `pnpm be:down`)
-   - Frontend: `pnpm fe:up` (stop with `pnpm fe:down`)
+   - Both: `pnpm up` (starts backend and frontend, logs → `.dev/dev.log`)
+   - Or individually: `pnpm be:up` / `pnpm fe:up`
+   - Stop: `pnpm down` (stops both) or `pnpm be:down` / `pnpm fe:down`
 6. Run backend tests:
    - `pnpm be:test` (plain `cargo test --nocapture` for now)
 
@@ -109,16 +108,17 @@ docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
 
 **Auto-Migration**: Empty databases are automatically migrated on first connection via `build_state()`.
 
-**Manual Migration Commands** (run with **Owner** role):
-- Migrate prod DB:
-  - `pnpm db:migrate`  (equivalent to `MIGRATION_TARGET=prod … -- up`)
-- Fresh prod DB:
-  - `pnpm db:fresh`
-- Fresh test DB:
-  - `pnpm db:fresh:test` (uses `MIGRATION_TARGET=test`)
-- Readiness helpers:
-  - `pnpm db:pg_isready`
-  - `pnpm db:psql`
+**Docker Compose Commands** (run manually):
+- Start Postgres: `docker compose -f docker/dev-db/docker-compose.yml up -d postgres`
+- Stop Postgres: `docker compose -f docker/dev-db/docker-compose.yml stop postgres`
+- Check readiness: `pnpm db:svc:ready`
+- View logs: `docker compose -f docker/dev-db/docker-compose.yml logs -f postgres`
+- Connect via psql: `docker compose -f docker/dev-db/docker-compose.yml exec postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"`
+
+**Manual Migration Commands** (run with **Owner** role using migration-cli):
+- Migrate prod DB: `cargo run --bin migration-cli -- --env prod --db postgres up`
+- Fresh prod DB: `cargo run --bin migration-cli -- --env prod --db postgres fresh`
+- Fresh test DB: `cargo run --bin migration-cli -- --env test --db postgres fresh`
 
 ---
 
@@ -132,7 +132,7 @@ We use **cargo-nextest** as the primary test runner with sensible defaults.
 - `pnpm be:test` - Run all tests (quiet by default)
 - `pnpm be:test:v` - Verbose with success output at the end
 - `pnpm be:test:q` - Quiet mode with final failure summary only
-- `pnpm be:test:cargo` - Fallback to standard cargo test
+- `pnpm be:test:full` - Run all tests including ignored tests
 
 **Targeted runs:**
 - **Substring filter:** `pnpm be:test -- login` (runs tests with "login" in name)
@@ -180,7 +180,7 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 4. Copy Client ID and Client Secret to your `apps/frontend/.env.local` as `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`
 
 ### 🚀 Running with Authentication
-- **Start the app:** `pnpm dev` (from root) or `pnpm dev:fe` (from `apps/frontend`)
+- **Start the app:** `pnpm up` (from root) or `pnpm up` (from `apps/frontend`)
 - **Sign in:** Click "Sign in with Google" in the header
 - **Protected routes:** `/dashboard` requires authentication
 - **Sign out:** Click "Sign out" in the header when signed in
@@ -228,21 +228,32 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 
 ## 🔒 Backend: Optimistic Concurrency
 
-The backend uses optimistic locking with HTTP-native ETag/If-Match headers for safe concurrent updates.
+The backend uses optimistic locking with `lock_version` in JSON request bodies for safe concurrent updates. ETags are used separately for HTTP cache validation on GET endpoints.
 
 ### How It Works
 
-1. **Reading Resources**: GET endpoints return an `ETag` header containing the resource version:
+1. **Reading Resources**: GET endpoints return both:
+   - An `ETag` header for HTTP cache validation (`If-None-Match`)
+   - A `lock_version` field in the JSON response body for optimistic locking
+   ```json
+   {
+     "snapshot": {...},
+     "lock_version": 5
+   }
+   ```
    ```
    ETag: "game-123-v5"
    ```
 
-2. **Updating Resources**: PATCH/DELETE endpoints require an `If-Match` header with the last known ETag:
-   ```
-   If-Match: "game-123-v5"
+2. **Updating Resources**: Mutation endpoints require `lock_version` in the JSON request body:
+   ```json
+   {
+     "bid": 3,
+     "lock_version": 5
+   }
    ```
    
-   If the `If-Match` header is missing, the server returns `428 Precondition Required`.
+   The `lock_version` must match the current resource version for the update to succeed.
 
 3. **Conflict Detection**: If the resource has been modified since the client last read it, the server returns `409 Conflict`:
    ```json
@@ -271,25 +282,36 @@ The backend uses optimistic locking with HTTP-native ETag/If-Match headers for s
 
 **For Developers Adding Mutation Endpoints:**
 
-Use the `ExpectedVersion` extractor to automatically parse the `If-Match` header:
+Request DTOs must include a `lock_version` field, which is used for optimistic locking:
 
 ```rust
-use crate::http::etag::{ExpectedVersion, game_etag};
+#[derive(serde::Deserialize)]
+struct UpdateGameRequest {
+    // ... other fields ...
+    lock_version: i32,
+}
 
 async fn update_game(
     game_id: GameId,
-    expected_version: ExpectedVersion, // Automatically parses If-Match
-    payload: Json<UpdatePayload>,
+    body: ValidatedJson<UpdateGameRequest>,
+    // ... other params ...
 ) -> Result<HttpResponse, AppError> {
-    // Use expected_version.0 when calling the repository
-    game_repo::update(conn, game_id.0, expected_version.0, payload).await?;
+    // Use body.lock_version when calling the repository
+    let updated_game = game_service::update(
+        txn, 
+        game_id.0, 
+        body.lock_version,
+        // ... other params ...
+    ).await?;
     
-    // Return new ETag in response
+    // Return new ETag in response (for GET caching only)
     Ok(HttpResponse::Ok()
-        .insert_header((ETAG, game_etag(game_id.0, new_version)))
+        .insert_header((ETAG, game_etag(game_id.0, updated_game.lock_version)))
         .json(result))
 }
 ```
+
+**For GET endpoints**, ETags are generated from `lock_version` but are only used for HTTP cache validation (`If-None-Match`).
 
 **Observability:**
 

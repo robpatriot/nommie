@@ -1,7 +1,7 @@
 name: nommie-local-prod
 
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file:
@@ -27,7 +27,7 @@ services:
       - ./backend.env
       - ./db.env
     depends_on:
-      db:
+      postgres:
         condition: service_started
     # backend must listen on 0.0.0.0:3001 inside the container
     expose:

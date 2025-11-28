@@ -18,11 +18,16 @@ This document outlines the development workflow and conventions for contributing
    cp docs/env.example.txt .env
    set -a; . ./.env; set +a
    ```
-4. Start PostgreSQL: `pnpm db:up`
-5. Create databases:
+4. Start PostgreSQL (run manually):
    ```bash
-   pnpm db:fresh      # Dev database
-   pnpm db:fresh:test # Test database
+   docker compose -f docker/dev-db/docker-compose.yml up -d postgres
+   ```
+5. Create/refresh databases (run manually using migration-cli):
+   ```bash
+   # Dev database
+   cargo run --bin migration-cli -- --env prod --db postgres fresh
+   # Test database
+   cargo run --bin migration-cli -- --env test --db postgres fresh
    ```
 
 ## Development Commands
@@ -43,21 +48,25 @@ This document outlines the development workflow and conventions for contributing
 - **Format:** `pnpm fe:format`
 
 ### Database
-- **Start:** `pnpm db:up`
-- **Stop:** `pnpm db:stop`
-- **Destroy:** `pnpm db:down`
-- **Migrate:** `pnpm db:migrate`
-- **Fresh dev DB:** `pnpm db:fresh`
-- **Fresh test DB:** `pnpm db:fresh:test`
-- **Check health:** `pnpm db:pg_isready`
-- **Connect:** `pnpm db:psql`
+Run docker-compose commands manually:
+- **Start:** `docker compose -f docker/dev-db/docker-compose.yml up -d postgres`
+- **Stop:** `docker compose -f docker/dev-db/docker-compose.yml stop postgres`
+- **Destroy:** `docker compose -f docker/dev-db/docker-compose.yml down -v`
+- **Check readiness:** `pnpm db:svc:ready`
+- **View logs:** `docker compose -f docker/dev-db/docker-compose.yml logs -f postgres`
+- **Connect via psql:** `docker compose -f docker/dev-db/docker-compose.yml exec postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"`
+
+For migrations, use the migration-cli binary:
+- **Migrate prod DB:** `cargo run --bin migration-cli -- --env prod --db postgres up`
+- **Fresh prod DB:** `cargo run --bin migration-cli -- --env prod --db postgres fresh`
+- **Fresh test DB:** `cargo run --bin migration-cli -- --env test --db postgres fresh`
 
 ### Combined
-- **Start all:** `pnpm dev:up`
-- **Stop all:** `pnpm dev:down`
-- **Status:** `pnpm dev:status`
-- **Lint all:** `pnpm dev:lint`
-- **Format all:** `pnpm dev:format`
+- **Start all:** `pnpm up` (starts backend and frontend)
+- **Stop all:** `pnpm down` (stops backend and frontend)
+- **Status:** `pnpm status` (shows backend and frontend status)
+- **Lint all:** `pnpm lint`
+- **Format all:** `pnpm format`
 
 ---
 
@@ -122,10 +131,12 @@ set -a; . ./.env; set +a
 
 ## Database Migrations
 
-Migrations run with the **Owner** role and use `MIGRATION_TARGET` environment variable:
+Migrations run with the **Owner** role using the migration-cli binary:
 
-- **Production:** `pnpm db:migrate` (defaults to `MIGRATION_TARGET=prod`)
-- **Test:** `MIGRATION_TARGET=test pnpm db:migrate`
+- **Production:** `cargo run --bin migration-cli -- --env prod --db postgres up`
+- **Test:** `cargo run --bin migration-cli -- --env test --db postgres up`
+- **Fresh (prod):** `cargo run --bin migration-cli -- --env prod --db postgres fresh`
+- **Fresh (test):** `cargo run --bin migration-cli -- --env test --db postgres fresh`
 
 ## Architecture Guidelines
 
@@ -149,8 +160,8 @@ Migrations run with the **Owner** role and use `MIGRATION_TARGET` environment va
 1. Create a feature branch from `main`
 2. Make your changes following the conventions above
 3. Run tests: `pnpm be:test`
-4. Run linters: `pnpm dev:lint`
-5. Run formatters: `pnpm dev:format`
+4. Run linters: `pnpm lint`
+5. Run formatters: `pnpm format`
 6. Ensure all tests pass
 7. Submit a pull request with a clear description
 
