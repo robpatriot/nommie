@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { BackendApiError } from '@/lib/errors'
-import { toErrorResult, backendErrorToResult } from './action-helpers'
+import { toErrorResult } from './action-helpers'
 
 describe('toErrorResult', () => {
-  it('converts BackendApiError to ErrorResult', () => {
+  it('converts BackendApiError to error result', () => {
     const error = new BackendApiError(
       'Invalid bid value',
       400,
@@ -22,7 +22,7 @@ describe('toErrorResult', () => {
     })
   })
 
-  it('converts Error to ErrorResult with default message', () => {
+  it('converts Error to error result with default message', () => {
     const error = new Error('Network timeout')
 
     const result = toErrorResult(error, 'Failed to submit bid')
@@ -36,7 +36,7 @@ describe('toErrorResult', () => {
     })
   })
 
-  it('converts Error to ErrorResult with custom default status', () => {
+  it('converts Error to error result with custom default status', () => {
     const error = new Error('Validation failed')
 
     const result = toErrorResult(error, 'Failed to validate', 400)
@@ -50,7 +50,7 @@ describe('toErrorResult', () => {
     })
   })
 
-  it('converts unknown error type to ErrorResult', () => {
+  it('converts unknown error type to error result', () => {
     const error = { customProperty: 'value' }
 
     const result = toErrorResult(error, 'Failed to submit bid')
@@ -64,7 +64,7 @@ describe('toErrorResult', () => {
     })
   })
 
-  it('converts null to ErrorResult', () => {
+  it('converts null to error result', () => {
     const result = toErrorResult(null, 'Failed to submit bid')
 
     expect(result).toEqual({
@@ -76,7 +76,7 @@ describe('toErrorResult', () => {
     })
   })
 
-  it('converts undefined to ErrorResult', () => {
+  it('converts undefined to error result', () => {
     const result = toErrorResult(undefined, 'Failed to submit bid')
 
     expect(result).toEqual({
@@ -113,56 +113,5 @@ describe('toErrorResult', () => {
       code: undefined,
       traceId: undefined,
     })
-  })
-})
-
-describe('backendErrorToResult', () => {
-  it('converts BackendApiError to ErrorResult', () => {
-    const error = new BackendApiError(
-      'Invalid bid value',
-      400,
-      'VALIDATION_ERROR',
-      'trace-123'
-    )
-
-    const result = backendErrorToResult(error)
-
-    expect(result).toEqual({
-      kind: 'error',
-      message: 'Invalid bid value',
-      status: 400,
-      code: 'VALIDATION_ERROR',
-      traceId: 'trace-123',
-    })
-  })
-
-  it('handles BackendApiError without optional fields', () => {
-    const error = new BackendApiError('Error message', 500)
-
-    const result = backendErrorToResult(error)
-
-    expect(result).toEqual({
-      kind: 'error',
-      message: 'Error message',
-      status: 500,
-      code: undefined,
-      traceId: undefined,
-    })
-  })
-
-  it('preserves all error properties', () => {
-    const error = new BackendApiError(
-      'Custom error message',
-      404,
-      'NOT_FOUND',
-      'trace-xyz'
-    )
-
-    const result = backendErrorToResult(error)
-
-    expect(result.message).toBe('Custom error message')
-    expect(result.status).toBe(404)
-    expect(result.code).toBe('NOT_FOUND')
-    expect(result.traceId).toBe('trace-xyz')
   })
 })

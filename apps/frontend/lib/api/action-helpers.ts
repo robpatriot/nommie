@@ -3,25 +3,42 @@
 import { BackendApiError } from '@/lib/errors'
 
 /**
- * Error result format for actions that return SimpleActionResult
+ * Generic action result type with discriminated union.
+ * Use this for actions that return data.
  */
-export interface ErrorResult {
-  kind: 'error'
-  message: string
-  status: number
-  code?: string
-  traceId?: string
-}
+export type ActionResult<T = void> =
+  | { kind: 'ok'; data: T }
+  | {
+      kind: 'error'
+      message: string
+      status: number
+      code?: string
+      traceId?: string
+    }
 
 /**
- * Convert an error (BackendApiError or unknown) to an ErrorResult.
+ * Simple action result type for actions that return void.
+ * Use this for actions that only succeed or fail.
+ */
+export type SimpleActionResult =
+  | { kind: 'ok' }
+  | {
+      kind: 'error'
+      message: string
+      status: number
+      code?: string
+      traceId?: string
+    }
+
+/**
+ * Convert an error (BackendApiError or unknown) to an error result.
  * Wraps unexpected errors in BackendApiError for consistent error handling.
  */
 export function toErrorResult(
   error: unknown,
   defaultMessage: string,
   defaultStatus: number = 500
-): ErrorResult {
+): Extract<SimpleActionResult, { kind: 'error' }> {
   if (error instanceof BackendApiError) {
     return {
       kind: 'error',
@@ -44,19 +61,5 @@ export function toErrorResult(
     status: wrappedError.status,
     code: wrappedError.code,
     traceId: wrappedError.traceId,
-  }
-}
-
-/**
- * Convert a BackendApiError to an ErrorResult.
- * Use this when you know the error is already a BackendApiError.
- */
-export function backendErrorToResult(error: BackendApiError): ErrorResult {
-  return {
-    kind: 'error',
-    message: error.message,
-    status: error.status,
-    code: error.code,
-    traceId: error.traceId,
   }
 }

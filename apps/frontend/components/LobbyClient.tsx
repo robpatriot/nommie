@@ -9,6 +9,7 @@ import { PageHero } from './PageHero'
 import { PageContainer } from './PageContainer'
 import { StatCard } from './StatCard'
 import { useToast } from '@/hooks/useToast'
+import { BackendApiError } from '@/lib/errors'
 import {
   createGameAction,
   deleteGameAction,
@@ -92,44 +93,49 @@ export default function LobbyClient({
       name: gameName,
     })
 
-    if (result.error) {
-      showToast(
-        result.error.message || 'Failed to create game',
-        'error',
-        result.error
+    if (result.kind === 'error') {
+      const error = new BackendApiError(
+        result.message || 'Failed to create game',
+        result.status,
+        result.code,
+        result.traceId
       )
+      showToast(result.message || 'Failed to create game', 'error', error)
       // Log traceId in dev
-      if (process.env.NODE_ENV === 'development' && result.error.traceId) {
-        console.error('Create game error traceId:', result.error.traceId)
+      if (process.env.NODE_ENV === 'development' && result.traceId) {
+        console.error('Create game error traceId:', result.traceId)
       }
-      throw result.error // Re-throw so modal can handle it
+      throw error // Re-throw so modal can handle it
     }
 
     showToast('Game created successfully!', 'success')
     // Refresh the page to show the new game
     router.refresh()
     // Navigate to the new game
-    router.push(`/game/${result.game.id}`)
+    router.push(`/game/${result.data.id}`)
   }
 
   const handleJoin = async (gameId: number) => {
     const result = await joinGameAction(gameId)
 
-    if (result.error) {
-      let message = result.error.message || 'Failed to join game'
+    if (result.kind === 'error') {
+      let message = result.message || 'Failed to join game'
 
-      if (
-        result.error.status === 400 &&
-        result.error.code === 'VALIDATION_ERROR'
-      ) {
+      if (result.status === 400 && result.code === 'VALIDATION_ERROR') {
         message = 'That game just filled up. Please choose another one.'
         router.refresh()
       }
 
-      showToast(message, 'error', result.error)
+      const error = new BackendApiError(
+        message,
+        result.status,
+        result.code,
+        result.traceId
+      )
+      showToast(message, 'error', error)
       // Log traceId in dev
-      if (process.env.NODE_ENV === 'development' && result.error.traceId) {
-        console.error('Join game error traceId:', result.error.traceId)
+      if (process.env.NODE_ENV === 'development' && result.traceId) {
+        console.error('Join game error traceId:', result.traceId)
       }
       return
     }
@@ -154,30 +160,27 @@ export default function LobbyClient({
     // deleteGameAction will fetch the ETag automatically if not provided
     const result = await deleteGameAction(gameId)
 
-    if (result.error) {
+    if (result.kind === 'error') {
       // Handle 428 Precondition Required (missing If-Match) or 409 Conflict (stale ETag)
-      if (result.error.status === 428) {
-        showToast(
-          'Cannot delete game: missing version information. Please try again.',
-          'error',
-          result.error
-        )
-      } else if (result.error.status === 409) {
-        showToast(
-          'Cannot delete game: game was modified. Please refresh and try again.',
-          'error',
-          result.error
-        )
-      } else {
-        showToast(
-          result.error.message || 'Failed to delete game',
-          'error',
-          result.error
-        )
+      let message = result.message || 'Failed to delete game'
+      if (result.status === 428) {
+        message =
+          'Cannot delete game: missing version information. Please try again.'
+      } else if (result.status === 409) {
+        message =
+          'Cannot delete game: game was modified. Please refresh and try again.'
       }
+
+      const error = new BackendApiError(
+        message,
+        result.status,
+        result.code,
+        result.traceId
+      )
+      showToast(message, 'error', error)
       // Log traceId in dev
-      if (process.env.NODE_ENV === 'development' && result.error.traceId) {
-        console.error('Delete game error traceId:', result.error.traceId)
+      if (process.env.NODE_ENV === 'development' && result.traceId) {
+        console.error('Delete game error traceId:', result.traceId)
       }
       return
     }

@@ -13,7 +13,10 @@ import {
   listRegisteredAis,
   type AiRegistryEntry,
 } from '@/lib/api/game-room'
-import { toErrorResult } from '@/lib/api/action-helpers'
+import {
+  toErrorResult,
+  type SimpleActionResult,
+} from '@/lib/api/action-helpers'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
 import { validateSeat } from '@/utils/seat-validation'
@@ -97,16 +100,6 @@ export async function getGameRoomSnapshotAction(
     return toErrorResult(error, 'Failed to fetch game snapshot')
   }
 }
-
-export type SimpleActionResult =
-  | { kind: 'ok' }
-  | {
-      kind: 'error'
-      message: string
-      status: number
-      code?: string
-      traceId?: string
-    }
 
 export async function markPlayerReadyAction(
   gameId: number

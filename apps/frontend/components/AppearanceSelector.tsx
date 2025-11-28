@@ -53,8 +53,8 @@ export function AppearanceSelector() {
 
     startTransition(async () => {
       const result = await updateAppearanceAction(mode)
-      if ('error' in result && result.error) {
-        setErrorMessage(result.error.message)
+      if (result.kind === 'error') {
+        setErrorMessage(result.message)
         setTheme(previousTheme)
       } else {
         setErrorMessage(null)

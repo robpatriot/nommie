@@ -1,7 +1,9 @@
 'use server'
 
-import { deleteGame, fetchWithAuth, BackendApiError } from '@/lib/api'
+import { deleteGame, fetchWithAuth } from '@/lib/api'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
+import { toErrorResult } from '@/lib/api/action-helpers'
+import type { ActionResult, SimpleActionResult } from '@/lib/api/action-helpers'
 import type { Game } from '@/lib/types'
 
 export interface CreateGameRequest {
@@ -10,9 +12,7 @@ export interface CreateGameRequest {
 
 export async function createGameAction(
   request: CreateGameRequest
-): Promise<
-  { game: Game; error?: never } | { error: BackendApiError; game?: never }
-> {
+): Promise<ActionResult<Game>> {
   try {
     // Auth is enforced centrally in fetchWithAuth
 
@@ -27,28 +27,15 @@ export async function createGameAction(
       body: JSON.stringify(body),
     })
     const data: { game: Game } = await response.json()
-    return { game: data.game }
+    return { kind: 'ok', data: data.game }
   } catch (error) {
-    // Re-throw BackendApiError to preserve traceId
-    if (error instanceof BackendApiError) {
-      return { error }
-    }
-    // Wrap other errors
-    return {
-      error: new BackendApiError(
-        error instanceof Error ? error.message : 'Failed to create game',
-        500,
-        'UNKNOWN_ERROR'
-      ),
-    }
+    return toErrorResult(error, 'Failed to create game')
   }
 }
 
 export async function joinGameAction(
   gameId: number
-): Promise<
-  { game: Game; error?: never } | { error: BackendApiError; game?: never }
-> {
+): Promise<ActionResult<Game>> {
   try {
     // Auth is enforced centrally in fetchWithAuth
 
@@ -56,31 +43,16 @@ export async function joinGameAction(
       method: 'POST',
     })
     const data: { game: Game } = await response.json()
-    return { game: data.game }
+    return { kind: 'ok', data: data.game }
   } catch (error) {
-    // Re-throw BackendApiError to preserve traceId
-    if (error instanceof BackendApiError) {
-      return { error }
-    }
-    // Wrap other errors
-    return {
-      error: new BackendApiError(
-        error instanceof Error ? error.message : 'Failed to join game',
-        500,
-        'UNKNOWN_ERROR'
-      ),
-    }
+    return toErrorResult(error, 'Failed to join game')
   }
 }
-
-export type DeleteGameResult =
-  | { success: true; error?: never }
-  | { error: BackendApiError; success?: never }
 
 export async function deleteGameAction(
   gameId: number,
   etag?: string
-): Promise<DeleteGameResult> {
+): Promise<SimpleActionResult> {
   try {
     // Auth is enforced centrally in fetchWithAuth
 
@@ -100,19 +72,8 @@ export async function deleteGameAction(
     }
 
     await deleteGame(gameId, finalEtag)
-    return { success: true }
+    return { kind: 'ok' }
   } catch (error) {
-    // Re-throw BackendApiError to preserve traceId
-    if (error instanceof BackendApiError) {
-      return { error }
-    }
-    // Wrap other errors
-    return {
-      error: new BackendApiError(
-        error instanceof Error ? error.message : 'Failed to delete game',
-        500,
-        'UNKNOWN_ERROR'
-      ),
-    }
+    return toErrorResult(error, 'Failed to delete game')
   }
 }

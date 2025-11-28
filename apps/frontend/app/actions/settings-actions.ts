@@ -1,11 +1,9 @@
 'use server'
 
-import { BackendApiError, fetchWithAuth } from '@/lib/api'
+import { fetchWithAuth } from '@/lib/api'
+import { toErrorResult } from '@/lib/api/action-helpers'
+import type { SimpleActionResult } from '@/lib/api/action-helpers'
 import type { ThemeMode } from '@/components/theme-provider'
-
-export type UpdateUserOptionsResult =
-  | { success: true; error?: never }
-  | { error: BackendApiError; success?: never }
 
 export type UpdateUserOptionsPayload = {
   appearance_mode?: ThemeMode
@@ -14,18 +12,17 @@ export type UpdateUserOptionsPayload = {
 
 export async function updateUserOptionsAction(
   payload: UpdateUserOptionsPayload
-): Promise<UpdateUserOptionsResult> {
+): Promise<SimpleActionResult> {
   if (
     !payload ||
     (payload.appearance_mode === undefined &&
       payload.require_card_confirmation === undefined)
   ) {
     return {
-      error: new BackendApiError(
-        'No settings provided',
-        400,
-        'INVALID_SETTINGS_PAYLOAD'
-      ),
+      kind: 'error',
+      message: 'No settings provided',
+      status: 400,
+      code: 'INVALID_SETTINGS_PAYLOAD',
     }
   }
 
@@ -34,18 +31,9 @@ export async function updateUserOptionsAction(
       method: 'PUT',
       body: JSON.stringify(payload),
     })
-    return { success: true }
+    return { kind: 'ok' }
   } catch (error) {
-    if (error instanceof BackendApiError) {
-      return { error }
-    }
-    return {
-      error: new BackendApiError(
-        error instanceof Error ? error.message : 'Failed to update settings',
-        500,
-        'UNKNOWN_ERROR'
-      ),
-    }
+    return toErrorResult(error, 'Failed to update settings')
   }
 }
 
