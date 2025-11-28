@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Web server framework
-actix-web = { version = "4.4", features = ["macros"] }
+actix-web = { version = "4", features = ["macros"] }
 actix-cors = "0.7"
 actix-http = "3"
 
@@ -31,7 +31,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 log = "0.4"
 
 # Authentication and security
-jsonwebtoken = "9.0"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 
 # Data types and utilities
 uuid = { version = "1.0", features = ["v4"] }
@@ -46,8 +46,8 @@ regex = "1"
 unicode-normalization = "0.1"
 
 # Concurrency and hashing
-rand = "0.8"
-dashmap = "5.5"
+rand = "0.9"
+dashmap = "6"
 moka = { version = "0.12", features = ["future"] }
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 
@@ -60,11 +60,11 @@ migration = { path = "../../packages/migration" }
 
 [dev-dependencies]
 # Testing
-ctor = "0.2"
+ctor = "0.6"
 serial_test = "3.2.0"
-proptest = "1.5"
+proptest = "1.9"
 tempfile = "3.8"
-tracing-timing = "0.6"
+tracing-timing = "0.7"
 
 # Internal test packages
 backend-test-support = { path = "../../packages/backend-test-support" }

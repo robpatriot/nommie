@@ -12,4 +12,4 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-sea-orm = "1.1.15"
+sea-orm = "1.1"
