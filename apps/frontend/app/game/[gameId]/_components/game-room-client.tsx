@@ -636,7 +636,7 @@ export function GameRoomClient({
         }
 
         if (result.kind === 'ok') {
-          setAiRegistry(result.ais)
+          setAiRegistry(result.data)
         } else {
           setAiRegistryError(result.message)
         }

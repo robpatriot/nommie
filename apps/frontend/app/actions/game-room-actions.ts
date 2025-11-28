@@ -15,7 +15,9 @@ import {
 } from '@/lib/api/game-room'
 import {
   toErrorResult,
+  type ActionResult,
   type SimpleActionResult,
+  type SnapshotActionResult,
 } from '@/lib/api/action-helpers'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
@@ -34,15 +36,7 @@ export interface GameRoomSnapshotRequest {
 }
 
 export type GameRoomSnapshotActionResult =
-  | { kind: 'ok'; data: GameRoomSnapshotPayload }
-  | { kind: 'not_modified' }
-  | {
-      kind: 'error'
-      message: string
-      status: number
-      code?: string
-      traceId?: string
-    }
+  SnapshotActionResult<GameRoomSnapshotPayload>
 
 export interface GameRoomSnapshotPayload {
   snapshot: GameSnapshot
@@ -291,20 +285,12 @@ export async function updateAiSeatAction(
   }
 }
 
-export type AiRegistryActionResult =
-  | { kind: 'ok'; ais: AiRegistryEntry[] }
-  | {
-      kind: 'error'
-      message: string
-      status: number
-      code?: string
-      traceId?: string
-    }
-
-export async function fetchAiRegistryAction(): Promise<AiRegistryActionResult> {
+export async function fetchAiRegistryAction(): Promise<
+  ActionResult<AiRegistryEntry[]>
+> {
   try {
     const ais = await listRegisteredAis()
-    return { kind: 'ok', ais }
+    return { kind: 'ok', data: ais }
   } catch (error) {
     return toErrorResult(error, 'Failed to fetch AI registry')
   }

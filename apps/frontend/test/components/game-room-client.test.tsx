@@ -97,7 +97,7 @@ describe('GameRoomClient', () => {
     mockRemoveAiSeatAction.mockResolvedValue({ kind: 'ok' })
     mockFetchAiRegistryAction.mockResolvedValue({
       kind: 'ok',
-      ais: [
+      data: [
         { name: 'HeuristicV1', version: '1.0.0' },
         { name: 'RandomPlayer', version: '1.0.0' },
       ],
@@ -764,12 +764,12 @@ describe('GameRoomClient', () => {
       let resolveRegistry: () => void
       const registryPromise = new Promise<{
         kind: 'ok'
-        ais: Array<{ name: string; version: string }>
+        data: Array<{ name: string; version: string }>
       }>((resolve) => {
         resolveRegistry = () =>
           resolve({
             kind: 'ok',
-            ais: [{ name: 'HeuristicV1', version: '1.0.0' }],
+            data: [{ name: 'HeuristicV1', version: '1.0.0' }],
           })
       })
       mockFetchAiRegistryAction.mockReturnValueOnce(registryPromise)
