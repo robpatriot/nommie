@@ -19,9 +19,7 @@ export function TrumpSelectPanel({
   trump,
 }: TrumpSelectPanelProps) {
   const allowedTrumps = phase.allowed_trumps
-  const [selectedTrump, setSelectedTrump] = useState<Trump | null>(
-    () => allowedTrumps[0] ?? null
-  )
+  const [selectedTrump, setSelectedTrump] = useState<Trump | null>(null)
 
   useEffect(() => {
     if (allowedTrumps.length === 0) {
@@ -29,10 +27,12 @@ export function TrumpSelectPanel({
       return
     }
     setSelectedTrump((current) => {
+      // Only preserve existing selection if it's still valid
+      // Don't auto-select if nothing was selected
       if (current && allowedTrumps.includes(current)) {
         return current
       }
-      return allowedTrumps[0] ?? null
+      return null
     })
   }, [allowedTrumps])
 
