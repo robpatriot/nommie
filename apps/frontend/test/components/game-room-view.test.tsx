@@ -18,10 +18,15 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-const originalFetch = globalThis.fetch
+// Mock server actions
+const mockGetGameHistoryAction = vi.fn()
+
+vi.mock('@/app/actions/game-actions', () => ({
+  getGameHistoryAction: (gameId: number) => mockGetGameHistoryAction(gameId),
+}))
 
 afterEach(() => {
-  globalThis.fetch = originalFetch
+  vi.clearAllMocks()
 })
 
 describe('GameRoomView', () => {
@@ -144,11 +149,10 @@ describe('GameRoomView', () => {
       ],
     }
 
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => historyPayload,
+    mockGetGameHistoryAction.mockResolvedValue({
+      kind: 'ok',
+      data: historyPayload,
     })
-    globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch
 
     render(
       <GameRoomView
@@ -166,10 +170,7 @@ describe('GameRoomView', () => {
     })
     await userEvent.click(historyButton)
 
-    expect(mockFetch).toHaveBeenCalledWith(
-      '/api/games/42/history',
-      expect.objectContaining({ method: 'GET' })
-    )
+    expect(mockGetGameHistoryAction).toHaveBeenCalledWith(42)
 
     expect(await screen.findByText('Score sheet')).toBeInTheDocument()
     expect(await screen.findByText('Round 1')).toBeInTheDocument()

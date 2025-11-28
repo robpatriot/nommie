@@ -5,6 +5,8 @@ import { beforeAll, afterAll, afterEach, vi } from 'vitest'
 // Import mocks to register them globally
 import './test/mocks/next-auth'
 import './test/mocks/next-navigation'
+import './test/mocks/next-server'
+import './test/mocks/auth'
 
 // Import MSW server
 import { server } from './test/msw/server'

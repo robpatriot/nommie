@@ -77,3 +77,30 @@ export async function deleteGameAction(
     return toErrorResult(error, 'Failed to delete game')
   }
 }
+
+export interface GameHistoryApiRound {
+  round_no: number
+  hand_size: number
+  dealer_seat: number
+  trump_selector_seat: number | null
+  trump: string | null
+  bids: [number | null, number | null, number | null, number | null]
+  cumulative_scores: [number, number, number, number]
+}
+
+export interface GameHistoryApiResponse {
+  rounds: GameHistoryApiRound[]
+}
+
+export async function getGameHistoryAction(
+  gameId: number
+): Promise<ActionResult<GameHistoryApiResponse>> {
+  try {
+    // Auth is enforced centrally in fetchWithAuth
+    const response = await fetchWithAuth(`/api/games/${gameId}/history`)
+    const data = (await response.json()) as GameHistoryApiResponse
+    return { kind: 'ok', data }
+  } catch (error) {
+    return toErrorResult(error, 'Failed to fetch game history')
+  }
+}
