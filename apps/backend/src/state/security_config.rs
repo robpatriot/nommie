@@ -46,8 +46,8 @@ impl SecurityConfig {
     #[cfg(test)]
     pub fn for_tests() -> Self {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
-        let secret: [u8; 32] = rng.gen();
+        let mut rng = rand::rng();
+        let secret: [u8; 32] = rng.random();
         Self::new(secret.to_vec())
     }
 }

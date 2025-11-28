@@ -12,8 +12,8 @@ pub mod sqlite_diagnostics {
     /// Generate a short random hex ID for pool/connection tracking
     pub fn generate_short_id() -> String {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
-        let bytes: u32 = rng.gen();
+        let mut rng = rand::rng();
+        let bytes: u32 = rng.random();
         format!("{:08x}", bytes)[..8].to_string()
     }
 

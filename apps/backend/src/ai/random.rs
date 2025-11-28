@@ -92,7 +92,7 @@ impl RandomPlayer {
         let rng = if let Some(s) = seed {
             StdRng::seed_from_u64(s)
         } else {
-            StdRng::from_entropy()
+            StdRng::from_os_rng()
         };
         Self {
             rng: Mutex::new(rng),

@@ -3,9 +3,7 @@
 //! This module provides utilities for generating unique join codes for games.
 //! Join codes are 10-character strings using Crockford's Base32 alphabet.
 
-use rand::distributions::Uniform;
-use rand::prelude::*;
-use rand::rngs::OsRng;
+use rand::Rng;
 
 const CROCKFORD: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // no I, L, O, U
 
@@ -27,12 +25,13 @@ const CROCKFORD: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // no I, L, O, U
 /// assert_eq!(code1.len(), 10);
 /// ```
 pub fn generate_join_code() -> String {
-    let mut rng = OsRng;
-    let dist = Uniform::from(0..CROCKFORD.len());
+    let mut rng = rand::rng();
+    let len = CROCKFORD.len() as u64;
 
     let mut s = String::with_capacity(10);
     for _ in 0..10 {
-        s.push(CROCKFORD[dist.sample(&mut rng)] as char);
+        let idx = (rng.random::<u64>() % len) as usize;
+        s.push(CROCKFORD[idx] as char);
     }
     s
 }

@@ -433,7 +433,7 @@ where
 
         // Backoff with jitter
         let base_delay_ms = (5u64 << attempts.saturating_sub(1)).min(80);
-        let jitter_ms = rand::thread_rng().gen_range(0..=BACKOFF_JITTER_MS_MAX);
+        let jitter_ms = rand::rng().random::<u64>() % (BACKOFF_JITTER_MS_MAX + 1);
         let delay_ms = base_delay_ms + jitter_ms;
 
         debug!(

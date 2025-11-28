@@ -170,7 +170,7 @@ pub fn apply_memory_degradation(
             let mut rng = if let Some(s) = seed {
                 StdRng::seed_from_u64(s)
             } else {
-                StdRng::from_entropy()
+                StdRng::from_os_rng()
             };
 
             // Calculate total tricks for recency calculation
@@ -230,7 +230,7 @@ fn degrade_card_memory<R: Rng>(
     let remember_exactly = base_prob * (0.5 + importance_weight * 0.5) * recency_boost;
     let remember_exactly = remember_exactly.min(1.0); // Cap at 100%
 
-    if rng.gen_bool(remember_exactly) {
+    if rng.random_bool(remember_exactly) {
         // Perfect recall
         return PlayMemory::Exact(*card);
     }
@@ -239,7 +239,7 @@ fn degrade_card_memory<R: Rng>(
     // Also apply recency boost to partial memory
     let partial_prob = (base_prob * 0.7 * recency_boost).min(1.0);
 
-    if rng.gen_bool(partial_prob) {
+    if rng.random_bool(partial_prob) {
         // Remember suit but not exact rank
         return PlayMemory::Suit(card.suit);
     }
