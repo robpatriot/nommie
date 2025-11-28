@@ -15,9 +15,9 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
    - `docker compose -f docker/dev-db/docker-compose.yml up -d postgres`
 4. Create/refresh databases (run manually - see Database & Migrations section):
 5. Run backend + frontend:
-   - Both: `pnpm up` (starts backend and frontend, logs → `.dev/dev.log`)
+   - Both: `pnpm start` (starts backend and frontend, logs → `.dev/dev.log`)
    - Or individually: `pnpm be:up` / `pnpm fe:up`
-   - Stop: `pnpm down` (stops both) or `pnpm be:down` / `pnpm fe:down`
+   - Stop: `pnpm stop` (stops both) or `pnpm be:down` / `pnpm fe:down`
 6. Run backend tests:
    - `pnpm be:test` (plain `cargo test --nocapture` for now)
 
@@ -180,7 +180,7 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 4. Copy Client ID and Client Secret to your `apps/frontend/.env.local` as `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`
 
 ### 🚀 Running with Authentication
-- **Start the app:** `pnpm up` (from root) or `pnpm up` (from `apps/frontend`)
+- **Start the app:** `pnpm start` (from root)
 - **Sign in:** Click "Sign in with Google" in the header
 - **Protected routes:** `/dashboard` requires authentication
 - **Sign out:** Click "Sign out" in the header when signed in

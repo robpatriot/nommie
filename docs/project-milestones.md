@@ -32,7 +32,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - Docker Compose with Postgres (roles, DBs, grants).
 - Host-pnpm for speed; backend runs on host or in container.
-**Acceptance:** `pnpm up` starts frontend and backend; Postgres reachable; frontend communicates with backend.
+**Acceptance:** `pnpm start` starts frontend and backend; Postgres reachable; frontend communicates with backend.
 
 ---
 

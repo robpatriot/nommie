@@ -62,8 +62,8 @@ For migrations, use the migration-cli binary:
 - **Fresh test DB:** `cargo run --bin migration-cli -- --env test --db postgres fresh`
 
 ### Combined
-- **Start all:** `pnpm up` (starts backend and frontend)
-- **Stop all:** `pnpm down` (stops backend and frontend)
+- **Start all:** `pnpm start` (starts backend and frontend)
+- **Stop all:** `pnpm stop` (stops backend and frontend)
 - **Status:** `pnpm status` (shows backend and frontend status)
 - **Lint all:** `pnpm lint`
 - **Format all:** `pnpm format`
