@@ -330,6 +330,8 @@ Independent improvements that enhance robustness, performance, and developer exp
   *Acceptance:* Critical frontend requests flow through React Query with documented fetch policies; polling is optimized; request deduplication works; optimistic updates are implemented where appropriate; application gracefully handles offline scenarios and retries failed requests when connectivity is restored.
 - **Import Hygiene & Lazy Loading:** Standardized import order, type-only imports, and dynamic loading for heavy libraries.  
   *Acceptance:* Consistent imports and improved build performance.
+- **Tailwind CSS v3 to v4 Migration:** Migrate from Tailwind CSS v3 to v4, updating configuration, utilities, and any breaking changes.  
+  *Acceptance:* Application successfully runs on Tailwind v4 with all styling preserved; configuration updated; breaking changes addressed.
 - **Frontend Polish:** Continue refining UI clarity and responsiveness beyond Round 1.
 
 ---
