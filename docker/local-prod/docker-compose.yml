@@ -21,6 +21,8 @@ services:
       context: ../..
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
+    environment:
+      RUST_LOG: ${RUST_LOG:-warn}
     env_file:
       - ./backend.env
       - ./db.env
