@@ -83,6 +83,21 @@ describe('GameRoomClient', () => {
     // Individual tests can switch to fake timers for timing-specific tests
     vi.useRealTimers()
 
+    // Explicitly reset all mocks to clear any queued implementations from previous tests
+    // mockReset() clears both call history AND implementation queues
+    mockGetGameRoomSnapshotAction.mockReset()
+    mockMarkPlayerReadyAction.mockReset()
+    mockSubmitBidAction.mockReset()
+    mockSelectTrumpAction.mockReset()
+    mockSubmitPlayAction.mockReset()
+    mockAddAiSeatAction.mockReset()
+    mockUpdateAiSeatAction.mockReset()
+    mockRemoveAiSeatAction.mockReset()
+    mockFetchAiRegistryAction.mockReset()
+    mockShowToast.mockReset()
+    mockHideToast.mockReset()
+    mockExecuteApiAction.mockReset()
+
     // Default mock implementations
     mockGetGameRoomSnapshotAction.mockResolvedValue({
       kind: 'ok',
@@ -876,9 +891,14 @@ describe('GameRoomClient', () => {
           { timeout: 2000 }
         )
 
+        const results = mockGetGameRoomSnapshotAction.mock.results
         const failingCall =
-          mockGetGameRoomSnapshotAction.mock.results.at(-1)?.value ??
-          Promise.reject(new Error('Missing promise'))
+          results.length > 0
+            ? results[results.length - 1]?.value
+            : Promise.reject(new Error('Missing promise'))
+        if (!failingCall) {
+          throw new Error('Missing promise')
+        }
 
         await expect(failingCall).rejects.toThrow('Network error')
 
@@ -1009,10 +1029,17 @@ describe('GameRoomClient', () => {
       // Now the queued ready action should execute
       await act(async () => {
         await Promise.resolve()
+        await Promise.resolve()
       })
       expect(mockMarkPlayerReadyAction.mock.calls.length).toBe(
         readyCallCountBefore + 1
       )
+
+      // Ensure all async operations complete before test ends
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
 
       vi.useRealTimers()
     })
@@ -1048,19 +1075,30 @@ describe('GameRoomClient', () => {
       // Trigger a poll
       await act(async () => {
         await vi.advanceTimersByTimeAsync(3000)
+        // Wait multiple microtasks to ensure poll's executeRefresh has fully started
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
       })
 
-      // While poll is in progress, try manual refresh
+      // Verify poll has started (one call should have been made)
+      const callCountBefore = mockGetGameRoomSnapshotAction.mock.calls.length
+      expect(callCountBefore).toBe(1) // Poll should have made one call
+
+      // While poll is in progress (pollPromise hasn't resolved), try manual refresh
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
-      const callCountBefore = mockGetGameRoomSnapshotAction.mock.calls.length
 
       await act(async () => {
         fireEvent.click(refreshButton)
+        // Wait for any async operations to complete
+        await Promise.resolve()
+        await Promise.resolve()
       })
 
       // Manual refresh should not trigger another call (poll is already in progress)
+      // The call count should remain the same
       expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
         callCountBefore
       )
@@ -1076,6 +1114,12 @@ describe('GameRoomClient', () => {
       expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
         callCountBefore
       )
+
+      // Ensure all async operations complete before test ends
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
 
       vi.useRealTimers()
     })
