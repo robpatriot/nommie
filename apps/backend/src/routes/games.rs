@@ -593,11 +593,25 @@ fn game_visibility_to_string(visibility: &GameVisibility) -> String {
 }
 
 /// Helper function to convert game domain model + memberships to frontend Game format
+///
+/// Returns an error if the game does not have a creator (created_by is None).
+/// This enforces that all games must have a creator (hard breaking change).
 fn game_to_response(
     game: &crate::repos::games::Game,
     memberships: &[memberships::GameMembership],
     viewer_user_id: Option<i64>,
-) -> GameResponse {
+) -> Result<GameResponse, AppError> {
+    let created_by = game.created_by.ok_or_else(|| {
+        AppError::internal(
+            ErrorCode::DataCorruption,
+            format!(
+                "Game {} does not have a creator (created_by is None)",
+                game.id
+            ),
+            std::io::Error::other("game.created_by must be set"),
+        )
+    })?;
+
     // Count players (exclude spectators)
     let player_count = memberships
         .iter()
@@ -613,11 +627,9 @@ fn game_to_response(
         .is_some();
 
     // Check if viewer is the host (creator of the game)
-    let viewer_is_host = viewer_user_id
-        .and_then(|id| game.created_by.map(|created_by| created_by == id))
-        .unwrap_or(false);
+    let viewer_is_host = viewer_user_id.map(|id| created_by == id).unwrap_or(false);
 
-    GameResponse {
+    Ok(GameResponse {
         id: game.id,
         name: game
             .name
@@ -625,7 +637,7 @@ fn game_to_response(
             .unwrap_or_else(|| format!("Game {}", game.id)),
         state: game_state_to_string(&game.state),
         visibility: game_visibility_to_string(&game.visibility),
-        created_by: game.created_by.unwrap_or(0),
+        created_by,
         created_at: game.created_at.to_string(),
         updated_at: game.updated_at.to_string(),
         started_at: game.started_at.map(|dt| dt.to_string()),
@@ -635,7 +647,7 @@ fn game_to_response(
         max_players: 4,
         viewer_is_member,
         viewer_is_host,
-    }
+    })
 }
 
 /// POST /api/games
@@ -671,7 +683,7 @@ async fn create_game(
     })
     .await?;
 
-    let response = game_to_response(&game_model, &memberships, Some(user_id));
+    let response = game_to_response(&game_model, &memberships, Some(user_id))?;
 
     Ok(web::Json(CreateGameResponse { game: response }))
 }
@@ -697,7 +709,7 @@ async fn join_game(
     })
     .await?;
 
-    let response = game_to_response(&game_model, &memberships, Some(user_id));
+    let response = game_to_response(&game_model, &memberships, Some(user_id))?;
 
     Ok(web::Json(JoinGameResponse { game: response }))
 }
@@ -725,7 +737,7 @@ async fn list_joinable_games(
         .map(|(game_model, memberships)| {
             game_to_response(&game_model, &memberships, Some(viewer_id))
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(web::Json(GameListResponse {
         games: response_games,
@@ -756,7 +768,11 @@ async fn list_in_progress_games(
         let viewer_is_member = memberships.iter().any(|m| m.user_id == Some(viewer_id));
 
         if game_model.visibility == GameVisibility::Public || viewer_is_member {
-            visible_games.push(game_to_response(&game_model, &memberships, Some(viewer_id)));
+            visible_games.push(game_to_response(
+                &game_model,
+                &memberships,
+                Some(viewer_id),
+            )?);
         }
     }
 
@@ -794,13 +810,21 @@ async fn list_overview_games(
     let mut combined_games = Vec::new();
 
     for (game_model, memberships) in lobby_games {
-        combined_games.push(game_to_response(&game_model, &memberships, Some(viewer_id)));
+        combined_games.push(game_to_response(
+            &game_model,
+            &memberships,
+            Some(viewer_id),
+        )?);
     }
 
     for (game_model, memberships) in active_games {
         let viewer_is_member = memberships.iter().any(|m| m.user_id == Some(viewer_id));
         if game_model.visibility == GameVisibility::Public || viewer_is_member {
-            combined_games.push(game_to_response(&game_model, &memberships, Some(viewer_id)));
+            combined_games.push(game_to_response(
+                &game_model,
+                &memberships,
+                Some(viewer_id),
+            )?);
         }
     }
 
@@ -943,7 +967,6 @@ async fn add_ai_seat(
     let request = body.map(|b| b.into_inner()).unwrap_or_default();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
-    let host_turn_order = membership.turn_order;
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
@@ -957,13 +980,8 @@ async fn add_ai_seat(
                     )
                 })?;
 
-            let is_host = match (game.created_by, host_user_id) {
-                (Some(created_by), Some(host_id)) => created_by == host_id,
-                (None, _) => host_turn_order == 0,
-                _ => false,
-            };
-
-            if !is_host {
+            let game_service = GameService;
+            if !game_service.is_host(&game, host_user_id) {
                 return Err(AppError::forbidden_with_code(
                     ErrorCode::Forbidden,
                     "Only the host can manage AI seats",
@@ -1150,7 +1168,6 @@ async fn remove_ai_seat(
     let request = body.map(|b| b.into_inner()).unwrap_or_default();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
-    let host_turn_order = membership.turn_order;
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
@@ -1164,13 +1181,8 @@ async fn remove_ai_seat(
                     )
                 })?;
 
-            let is_host = match (game.created_by, host_user_id) {
-                (Some(created_by), Some(host_id)) => created_by == host_id,
-                (None, _) => host_turn_order == 0,
-                _ => false,
-            };
-
-            if !is_host {
+            let game_service = GameService;
+            if !game_service.is_host(&game, host_user_id) {
                 return Err(AppError::forbidden_with_code(
                     ErrorCode::Forbidden,
                     "Only the host can manage AI seats",
@@ -1306,15 +1318,9 @@ async fn update_ai_seat(
                 })?;
 
             let host_user_id = membership.user_id;
-            let host_turn_order = membership.turn_order;
 
-            let is_host = match (game.created_by, host_user_id) {
-                (Some(created_by), Some(host_id)) => created_by == host_id,
-                (None, _) => host_turn_order == 0,
-                _ => false,
-            };
-
-            if !is_host {
+            let game_service = GameService;
+            if !game_service.is_host(&game, host_user_id) {
                 return Err(AppError::forbidden_with_code(
                     ErrorCode::Forbidden,
                     "Only the host can manage AI seats",
@@ -1549,7 +1555,6 @@ async fn delete_game(
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
     let host_user_id = membership.user_id;
-    let host_turn_order = membership.turn_order;
     let lock_version = body.lock_version;
 
     with_txn(Some(&http_req), &app_state, |txn| {
@@ -1558,12 +1563,8 @@ async fn delete_game(
             let game = games_repo::require_game(txn, id).await?;
 
             // Check host authorization
-            let is_host = match game.created_by {
-                Some(created_by) => Some(created_by) == host_user_id,
-                None => host_turn_order == 0,
-            };
-
-            if !is_host {
+            let game_service = GameService;
+            if !game_service.is_host(&game, host_user_id) {
                 return Err(AppError::forbidden_with_code(
                     ErrorCode::Forbidden,
                     "Only the host can delete a game",

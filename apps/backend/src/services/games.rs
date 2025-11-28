@@ -599,6 +599,24 @@ impl GameService {
         (0..4u8).find(|&order| !used_turn_orders.contains(&order))
     }
 
+    /// Check if a user is the host of a game.
+    ///
+    /// A user is the host if the game's `created_by` matches the user's ID.
+    /// Both `created_by` and `user_id` must be present - no legacy fallbacks.
+    ///
+    /// # Arguments
+    /// * `game` - The game to check
+    /// * `user_id` - User ID to check (must be Some)
+    ///
+    /// # Returns
+    /// `true` if the user is the host, `false` otherwise
+    pub fn is_host(&self, game: &Game, user_id: Option<i64>) -> bool {
+        match (game.created_by, user_id) {
+            (Some(created_by), Some(host_id)) => created_by == host_id,
+            _ => false,
+        }
+    }
+
     /// Join a user to a game.
     ///
     /// This method handles:
