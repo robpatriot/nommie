@@ -41,8 +41,8 @@ async fn test_update_nonexistent_game_returns_not_found() -> Result<(), AppError
                 DomainError::NotFound(kind, detail) => {
                     // Verify it's the correct kind of NotFound
                     assert!(
-                        matches!(kind, NotFoundKind::Other(_)),
-                        "should be NotFound variant"
+                        matches!(kind, NotFoundKind::Game),
+                        "should be NotFound variant with NotFoundKind::Game"
                     );
                     assert!(
                         detail.contains("not found") || detail.contains("Not found"),

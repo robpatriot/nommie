@@ -189,13 +189,7 @@ async fn not_found_is_404() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(resp.status().as_u16(), 404);
 
     // Validate error structure
-    assert_problem_details_structure(
-        resp,
-        404,
-        "GAME_NOT_FOUND",
-        "Game not found with id: 999999",
-    )
-    .await;
+    assert_problem_details_structure(resp, 404, "GAME_NOT_FOUND", "Game 999999 not found").await;
 
     Ok(())
 }

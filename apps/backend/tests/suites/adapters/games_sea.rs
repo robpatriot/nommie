@@ -145,8 +145,8 @@ async fn test_require_game_not_found() -> Result<(), AppError> {
             assert!(result.is_err());
             let err: DomainError = result.unwrap_err().into();
             assert!(
-                matches!(err, DomainError::NotFound(NotFoundKind::Other(_), _)),
-                "should be NotFound error"
+                matches!(err, DomainError::NotFound(NotFoundKind::Game, _)),
+                "should be NotFound error with NotFoundKind::Game"
             );
 
             Ok::<_, AppError>(())

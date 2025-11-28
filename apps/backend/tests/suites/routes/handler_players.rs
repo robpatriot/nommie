@@ -130,7 +130,7 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
         resp,
         404,
         "PLAYER_NOT_FOUND",
-        "Player not found at seat",
+        "Player not found at seat 0",
     )
     .await;
 
