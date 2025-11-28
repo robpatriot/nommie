@@ -9,6 +9,7 @@ import { PageHero } from './PageHero'
 import { PageContainer } from './PageContainer'
 import { StatCard } from './StatCard'
 import { useToast } from '@/hooks/useToast'
+import { useApiAction } from '@/hooks/useApiAction'
 import { BackendApiError } from '@/lib/errors'
 import {
   createGameAction,
@@ -48,6 +49,10 @@ export default function LobbyClient({
   const { toasts, showToast, hideToast } = useToast()
   const [refreshing, setRefreshing] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  const executeApiAction = useApiAction({
+    showToast,
+  })
 
   const joinableGames = initialJoinable
   const inProgressGames = initialInProgress
@@ -89,9 +94,7 @@ export default function LobbyClient({
     const defaultName = `${creatorName}'s game`
     const gameName = name.trim() || defaultName
 
-    const result = await createGameAction({
-      name: gameName,
-    })
+    const result = await createGameAction({ name: gameName })
 
     if (result.kind === 'error') {
       const error = new BackendApiError(
@@ -101,7 +104,6 @@ export default function LobbyClient({
         result.traceId
       )
       showToast(result.message || 'Failed to create game', 'error', error)
-      // Log traceId in dev
       if (process.env.NODE_ENV === 'development' && result.traceId) {
         console.error('Create game error traceId:', result.traceId)
       }
@@ -109,39 +111,37 @@ export default function LobbyClient({
     }
 
     showToast('Game created successfully!', 'success')
-    // Refresh the page to show the new game
     router.refresh()
-    // Navigate to the new game
     router.push(`/game/${result.data.id}`)
   }
 
   const handleJoin = async (gameId: number) => {
-    const result = await joinGameAction(gameId)
-
-    if (result.kind === 'error') {
-      let message = result.message || 'Failed to join game'
-
-      if (result.status === 400 && result.code === 'VALIDATION_ERROR') {
-        message = 'That game just filled up. Please choose another one.'
-        router.refresh()
+    await executeApiAction(
+      async () => {
+        const result = await joinGameAction(gameId)
+        if (result.kind === 'error') {
+          // Customize error message for validation errors
+          if (result.status === 400 && result.code === 'VALIDATION_ERROR') {
+            router.refresh()
+            return {
+              kind: 'error' as const,
+              message: 'That game just filled up. Please choose another one.',
+              status: result.status,
+              code: result.code,
+              traceId: result.traceId,
+            }
+          }
+        }
+        return result
+      },
+      {
+        successMessage: 'Joined game successfully!',
+        errorMessage: 'Failed to join game',
+        onSuccess: () => {
+          router.push(`/game/${gameId}`)
+        },
       }
-
-      const error = new BackendApiError(
-        message,
-        result.status,
-        result.code,
-        result.traceId
-      )
-      showToast(message, 'error', error)
-      // Log traceId in dev
-      if (process.env.NODE_ENV === 'development' && result.traceId) {
-        console.error('Join game error traceId:', result.traceId)
-      }
-      return
-    }
-
-    showToast('Joined game successfully!', 'success')
-    router.push(`/game/${gameId}`)
+    )
   }
 
   const handleRejoin = (gameId: number) => {
@@ -158,36 +158,37 @@ export default function LobbyClient({
     }
 
     // deleteGameAction will fetch the ETag automatically if not provided
-    const result = await deleteGameAction(gameId)
-
-    if (result.kind === 'error') {
-      // Handle 428 Precondition Required (missing If-Match) or 409 Conflict (stale ETag)
-      let message = result.message || 'Failed to delete game'
-      if (result.status === 428) {
-        message =
-          'Cannot delete game: missing version information. Please try again.'
-      } else if (result.status === 409) {
-        message =
-          'Cannot delete game: game was modified. Please refresh and try again.'
+    await executeApiAction(
+      async () => {
+        const result = await deleteGameAction(gameId)
+        if (result.kind === 'error') {
+          // Customize error messages for specific status codes
+          let message = result.message || 'Failed to delete game'
+          if (result.status === 428) {
+            message =
+              'Cannot delete game: missing version information. Please try again.'
+          } else if (result.status === 409) {
+            message =
+              'Cannot delete game: game was modified. Please refresh and try again.'
+          }
+          return {
+            kind: 'error' as const,
+            message,
+            status: result.status,
+            code: result.code,
+            traceId: result.traceId,
+          }
+        }
+        return result
+      },
+      {
+        successMessage: 'Game deleted successfully',
+        errorMessage: 'Failed to delete game',
+        onSuccess: () => {
+          router.refresh()
+        },
       }
-
-      const error = new BackendApiError(
-        message,
-        result.status,
-        result.code,
-        result.traceId
-      )
-      showToast(message, 'error', error)
-      // Log traceId in dev
-      if (process.env.NODE_ENV === 'development' && result.traceId) {
-        console.error('Delete game error traceId:', result.traceId)
-      }
-      return
-    }
-
-    showToast('Game deleted successfully', 'success')
-    // Refresh the page to remove the deleted game from the list
-    router.refresh()
+    )
   }
 
   const openSeatCount = filteredJoinableGames.reduce((total, game) => {
