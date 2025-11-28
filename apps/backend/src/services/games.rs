@@ -655,7 +655,7 @@ impl GameService {
             .ok_or_else(|| {
                 AppError::not_found(
                     crate::errors::ErrorCode::GameNotFound,
-                    format!("Game with ID {game_id} not found"),
+                    format!("Game {game_id} not found"),
                 )
             })?;
 

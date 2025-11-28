@@ -65,10 +65,7 @@ impl FromRequest for GameId {
             };
 
             game.ok_or_else(|| {
-                AppError::not_found(
-                    ErrorCode::GameNotFound,
-                    format!("Game not found with id: {game_id}"),
-                )
+                AppError::not_found(ErrorCode::GameNotFound, format!("Game {game_id} not found"))
             })?;
 
             Ok(GameId(game_id))

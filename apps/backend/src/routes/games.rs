@@ -1542,7 +1542,7 @@ async fn delete_game(
                 .filter(games::Column::LockVersion.eq(lock_version))
                 .exec(txn)
                 .await
-                .map_err(|e| AppError::db("failed to delete game", e))?;
+                .map_err(AppError::from)?;
 
             if delete_result.rows_affected == 0 {
                 // This should not happen if lock version matched, but handle it gracefully

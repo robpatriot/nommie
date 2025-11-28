@@ -68,10 +68,26 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
 
     match &e {
         sea_orm::DbErr::RecordNotFound(_) => {
+            // Generic record not found
             return DomainError::not_found(
                 NotFoundKind::Other("Record".into()),
                 "Record not found",
             );
+        }
+        sea_orm::DbErr::Custom(msg) if msg.starts_with("GAME_NOT_FOUND:") => {
+            // Structured game not found error from adapter layer
+            if let Some(game_id_str) = msg.strip_prefix("GAME_NOT_FOUND:") {
+                if let Ok(game_id) = game_id_str.parse::<i64>() {
+                    warn!(trace_id = %trace_id, game_id, "Game not found");
+                    return DomainError::not_found(
+                        NotFoundKind::Game,
+                        format!("Game {game_id} not found"),
+                    );
+                }
+            }
+            // Fallback if parsing fails
+            warn!(trace_id = %trace_id, raw_error = %Redacted(msg), "Failed to parse GAME_NOT_FOUND error");
+            return DomainError::not_found(NotFoundKind::Game, "Game not found");
         }
         sea_orm::DbErr::Custom(msg) if msg.starts_with("OPTIMISTIC_LOCK:") => {
             // Try to parse structured version info

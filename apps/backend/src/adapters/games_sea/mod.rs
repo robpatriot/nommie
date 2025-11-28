@@ -59,7 +59,7 @@ where
             );
             return Err(sea_orm::DbErr::Custom(payload));
         } else {
-            return Err(sea_orm::DbErr::RecordNotFound("Game not found".to_string()));
+            return Err(sea_orm::DbErr::Custom(format!("GAME_NOT_FOUND:{}", id)));
         }
     }
 
@@ -67,7 +67,7 @@ where
     games::Entity::find_by_id(id)
         .one(txn)
         .await?
-        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))
+        .ok_or_else(|| sea_orm::DbErr::Custom(format!("GAME_NOT_FOUND:{}", id)))
 }
 
 pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
@@ -96,7 +96,7 @@ pub async fn require_game<C: ConnectionTrait + Send + Sync>(
 ) -> Result<games::Model, sea_orm::DbErr> {
     find_by_id(conn, game_id)
         .await?
-        .ok_or_else(|| sea_orm::DbErr::RecordNotFound("Game not found".to_string()))
+        .ok_or_else(|| sea_orm::DbErr::Custom(format!("GAME_NOT_FOUND:{}", game_id)))
 }
 
 pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
