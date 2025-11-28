@@ -105,15 +105,7 @@ async fn get_snapshot(
         with_txn(Some(&http_req), &app_state, |txn| {
             Box::pin(async move {
                 // Fetch game from database to get lock_version
-                let game = games_repo::find_by_id(txn, id)
-                    .await
-                    .map_err(|e| AppError::db("failed to fetch game", e))?
-                    .ok_or_else(|| {
-                        AppError::not_found(
-                            crate::errors::ErrorCode::GameNotFound,
-                            format!("Game with ID {id} not found"),
-                        )
-                    })?;
+                let game = games_repo::require_game(txn, id).await?;
 
                 // Create game service and load game state
                 let game_service = crate::services::games::GameService;
@@ -361,15 +353,7 @@ async fn get_game_history(
     let (history, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             // Fetch game from database to get lock_version
-            let game = games_repo::find_by_id(txn, id)
-                .await
-                .map_err(|e| AppError::db("failed to fetch game", e))?
-                .ok_or_else(|| {
-                    AppError::not_found(
-                        crate::errors::ErrorCode::GameNotFound,
-                        format!("Game with ID {id} not found"),
-                    )
-                })?;
+            let game = games_repo::require_game(txn, id).await?;
 
             // Load game history
             let history = player_view::load_game_history(txn, id).await?;
@@ -454,15 +438,7 @@ async fn get_player_display_name(
     let (display_name, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             // Fetch game from database to get lock_version
-            let game = games_repo::find_by_id(txn, game_id)
-                .await
-                .map_err(|e| AppError::db("failed to fetch game", e))?
-                .ok_or_else(|| {
-                    AppError::not_found(
-                        crate::errors::ErrorCode::GameNotFound,
-                        format!("Game with ID {game_id} not found"),
-                    )
-                })?;
+            let game = games_repo::require_game(txn, game_id).await?;
 
             // Get display name
             let service = PlayerService;
@@ -970,15 +946,7 @@ async fn add_ai_seat(
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_repo::find_by_id(txn, id)
-                .await
-                .map_err(|e| AppError::db("failed to fetch game", e))?
-                .ok_or_else(|| {
-                    AppError::not_found(
-                        ErrorCode::GameNotFound,
-                        format!("Game with ID {id} not found"),
-                    )
-                })?;
+            let game = games_repo::require_game(txn, id).await?;
 
             let game_service = GameService;
             if !game_service.is_host(&game, host_user_id) {
@@ -1171,15 +1139,7 @@ async fn remove_ai_seat(
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_repo::find_by_id(txn, id)
-                .await
-                .map_err(|e| AppError::db("failed to fetch game", e))?
-                .ok_or_else(|| {
-                    AppError::not_found(
-                        ErrorCode::GameNotFound,
-                        format!("Game with ID {id} not found"),
-                    )
-                })?;
+            let game = games_repo::require_game(txn, id).await?;
 
             let game_service = GameService;
             if !game_service.is_host(&game, host_user_id) {
@@ -1307,15 +1267,7 @@ async fn update_ai_seat(
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_repo::find_by_id(txn, id)
-                .await
-                .map_err(|e| AppError::db("failed to fetch game", e))?
-                .ok_or_else(|| {
-                    AppError::not_found(
-                        ErrorCode::GameNotFound,
-                        format!("Game with ID {id} not found"),
-                    )
-                })?;
+            let game = games_repo::require_game(txn, id).await?;
 
             let host_user_id = membership.user_id;
 
