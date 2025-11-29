@@ -29,6 +29,7 @@ pub mod services;
 pub mod state;
 pub mod utils;
 pub mod web;
+pub mod ws;
 
 // Re-exports for public API
 pub use auth::claims::BackendClaims;

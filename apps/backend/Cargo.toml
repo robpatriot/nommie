@@ -8,6 +8,7 @@ edition = "2021"
 actix-web = { version = "4", features = ["macros"] }
 actix-cors = "0.7"
 actix-http = "3"
+actix-web-actors = "4"
 
 # Async runtime and utilities
 tokio = { version = "1.0", features = ["full"] }

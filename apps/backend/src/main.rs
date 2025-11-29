@@ -13,6 +13,7 @@ use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
 use backend::routes;
 use backend::state::security_config::SecurityConfig;
+use backend::ws;
 
 mod telemetry;
 
@@ -154,7 +155,6 @@ async fn main() -> std::io::Result<()> {
                     .wrap(JwtExtract)
                     .configure(routes::games::configure_routes),
             )
-            .service(
                 // User routes with general rate limiting (100 req/min) and security headers
                 web::scope("/api/user")
                     .wrap(SecurityHeaders)
@@ -173,6 +173,12 @@ async fn main() -> std::io::Result<()> {
                 web::scope("")
                     .wrap(SecurityHeaders)
                     .route("/", web::get().to(routes::health::root)),
+            )
+            // WebSocket routes for real-time game updates
+            .service(
+                web::scope("/ws").wrap(JwtExtract).service(
+                    web::resource("/games/{game_id}").route(web::get().to(ws::game::upgrade)),
+                ),
             )
     })
     .bind((host.as_str(), port))?
