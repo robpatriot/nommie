@@ -32,8 +32,8 @@ use crate::services::games::GameService;
 use crate::services::players::PlayerService;
 use crate::state::app_state::AppState;
 
-#[derive(Serialize)]
-struct GameSnapshotResponse {
+#[derive(Clone, Serialize)]
+pub(crate) struct GameSnapshotResponse {
     snapshot: GameSnapshot,
     viewer_hand: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -41,78 +41,28 @@ struct GameSnapshotResponse {
     lock_version: i32,
 }
 
-#[derive(Serialize)]
-struct BidConstraintsResponse {
+#[derive(Clone, Serialize)]
+pub(crate) struct BidConstraintsResponse {
     zero_bid_locked: bool,
 }
 
-#[derive(Serialize)]
-struct GameHistoryResponse {
-    rounds: Vec<RoundHistoryResponse>,
-}
-
-#[derive(Serialize)]
-struct RoundHistoryResponse {
-    round_no: u8,
-    hand_size: u8,
-    dealer_seat: u8,
-    bids: [Option<u8>; 4],
-    trump_selector_seat: Option<u8>,
-    trump: Option<&'static str>,
-    cumulative_scores: [i16; 4],
-}
-
-#[derive(Serialize)]
-struct AiRegistryEntryResponse {
-    name: &'static str,
-    version: &'static str,
-}
-
-#[derive(Serialize)]
-struct AiRegistryListResponse {
-    ais: Vec<AiRegistryEntryResponse>,
-}
-
-async fn list_registered_ais() -> Result<web::Json<AiRegistryListResponse>, AppError> {
-    let ais = registry::registered_ais()
-        .iter()
-        .map(|factory| AiRegistryEntryResponse {
-            name: factory.name,
-            version: factory.version,
-        })
-        .collect();
-
-    Ok(web::Json(AiRegistryListResponse { ais }))
-}
-
-/// GET /api/games/{game_id}/snapshot
-///
-/// Returns the current game snapshot as JSON with an ETag header for optimistic concurrency.
-/// This is a read-only endpoint that produces a public view of the game state
-/// without exposing private information (e.g., other players' hands).
-///
-/// Supports `If-None-Match` for HTTP caching: if the client's ETag matches the current version,
-/// returns `304 Not Modified` with no body.
-async fn get_snapshot(
-    http_req: HttpRequest,
-    game_id: GameId,
-    current_user: CurrentUser,
-    app_state: web::Data<AppState>,
-) -> Result<HttpResponse, AppError> {
-    let id = game_id.0;
-
-    // Load game state and produce snapshot within a transaction
+pub(crate) async fn build_snapshot_response(
+    http_req: Option<&HttpRequest>,
+    app_state: &web::Data<AppState>,
+    game_id: i64,
+    current_user: &CurrentUser,
+) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
     let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
-        with_txn(Some(&http_req), &app_state, |txn| {
+        with_txn(http_req, app_state, |txn| {
             Box::pin(async move {
                 // Fetch game from database to get lock_version
-                let game = games_repo::require_game(txn, id).await?;
+                let game = games_repo::require_game(txn, game_id).await?;
 
                 // Create game service and load game state
                 let game_service = crate::services::games::GameService;
-                let state = game_service.load_game_state(txn, id).await?;
+                let state = game_service.load_game_state(txn, game_id).await?;
 
-                let memberships = memberships::find_all_by_game(txn, id)
+                let memberships = memberships::find_all_by_game(txn, game_id)
                     .await
                     .map_err(AppError::from)?;
 
@@ -205,13 +155,13 @@ async fn get_snapshot(
                     if state.round_no == 0 {
                         None
                     } else {
-                        match player_view::load_current_round_info(txn, id, seat).await {
+                        match player_view::load_current_round_info(txn, game_id, seat).await {
                             Ok(info) => {
                                 Some(info.hand.into_iter().map(format_card).collect::<Vec<_>>())
                             }
                             Err(err) => {
                                 warn!(
-                                    game_id = id,
+                                    game_id = game_id,
                                     seat,
                                     error = %err,
                                     "Failed to load viewer hand"
@@ -231,7 +181,7 @@ async fn get_snapshot(
                 ) {
                     if let Some(current_round_no) = game.current_round {
                         if let Some(viewer_seat_value) = viewer_seat {
-                            let history = player_view::load_game_history(txn, id).await?;
+                            let history = player_view::load_game_history(txn, game_id).await?;
                             let zero_bid_locked = validate_consecutive_zero_bids(
                                 &history,
                                 viewer_seat_value,
@@ -254,8 +204,77 @@ async fn get_snapshot(
         })
         .await?;
 
+    let response = GameSnapshotResponse {
+        snapshot,
+        viewer_hand,
+        bid_constraints,
+        lock_version,
+    };
+
+    Ok((response, viewer_seat))
+}
+
+#[derive(Serialize)]
+struct GameHistoryResponse {
+    rounds: Vec<RoundHistoryResponse>,
+}
+
+#[derive(Serialize)]
+struct RoundHistoryResponse {
+    round_no: u8,
+    hand_size: u8,
+    dealer_seat: u8,
+    bids: [Option<u8>; 4],
+    trump_selector_seat: Option<u8>,
+    trump: Option<&'static str>,
+    cumulative_scores: [i16; 4],
+}
+
+#[derive(Serialize)]
+struct AiRegistryEntryResponse {
+    name: &'static str,
+    version: &'static str,
+}
+
+#[derive(Serialize)]
+struct AiRegistryListResponse {
+    ais: Vec<AiRegistryEntryResponse>,
+}
+
+async fn list_registered_ais() -> Result<web::Json<AiRegistryListResponse>, AppError> {
+    let ais = registry::registered_ais()
+        .iter()
+        .map(|factory| AiRegistryEntryResponse {
+            name: factory.name,
+            version: factory.version,
+        })
+        .collect();
+
+    Ok(web::Json(AiRegistryListResponse { ais }))
+}
+
+/// GET /api/games/{game_id}/snapshot
+///
+/// Returns the current game snapshot as JSON with an ETag header for optimistic concurrency.
+/// This is a read-only endpoint that produces a public view of the game state
+/// without exposing private information (e.g., other players' hands).
+///
+/// Supports `If-None-Match` for HTTP caching: if the client's ETag matches the current version,
+/// returns `304 Not Modified` with no body.
+async fn get_snapshot(
+    http_req: HttpRequest,
+    game_id: GameId,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let id = game_id.0;
+
+    // Load game state and produce snapshot within a transaction
+    let (snapshot_response, viewer_seat) =
+        build_snapshot_response(Some(&http_req), &app_state, id, &current_user).await?;
+
     // Generate ETag from game ID and lock version
-    let etag_value = game_etag(id, lock_version);
+    let etag_value = game_etag(id, snapshot_response.lock_version);
 
     // Check If-None-Match header for HTTP caching
     if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
@@ -296,12 +315,7 @@ async fn get_snapshot(
     if let Some(seat) = viewer_seat {
         response.insert_header(("x-viewer-seat", seat.to_string()));
     }
-    Ok(response.json(GameSnapshotResponse {
-        snapshot,
-        viewer_hand,
-        bid_constraints,
-        lock_version,
-    }))
+    Ok(response.json(snapshot_response))
 }
 
 /// GET /api/games/{game_id}/history

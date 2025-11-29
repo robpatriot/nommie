@@ -8,6 +8,7 @@ use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
 use backend::routes;
 use backend::state::security_config::SecurityConfig;
+use backend::ws;
 
 mod telemetry;
 
@@ -69,6 +70,11 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api/games")
                     .wrap(JwtExtract)
                     .configure(routes::games::configure_routes),
+            )
+            .service(
+                web::scope("/ws").wrap(JwtExtract).service(
+                    web::resource("/games/{game_id}").route(web::get().to(ws::game::upgrade)),
+                ),
             )
             .configure(routes::configure)
     })
