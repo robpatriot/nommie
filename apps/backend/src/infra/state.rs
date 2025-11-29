@@ -3,6 +3,7 @@ use crate::error::AppError;
 use crate::infra::db::bootstrap_db;
 use crate::state::app_state::AppState;
 use crate::state::security_config::SecurityConfig;
+use crate::ws::hub::RealtimeBroker;
 
 /// Builder for creating AppState instances (used in both tests and main)
 #[derive(Default)]
@@ -10,6 +11,7 @@ pub struct StateBuilder {
     security_config: SecurityConfig,
     env: Option<RuntimeEnv>,
     db_kind: Option<DbKind>,
+    redis_url: Option<String>,
 }
 
 impl StateBuilder {
@@ -28,15 +30,27 @@ impl StateBuilder {
         self
     }
 
+    pub fn with_redis_url(mut self, redis_url: Option<String>) -> Self {
+        self.redis_url = redis_url;
+        self
+    }
+
     pub async fn build(self) -> Result<AppState, AppError> {
-        match (self.env, self.db_kind) {
+        let mut app_state = match (self.env, self.db_kind) {
             (Some(env), Some(db_kind)) => {
                 // Bootstrap database directly with env and db_kind
                 let conn = bootstrap_db(env, db_kind).await?;
-                Ok(AppState::new(conn, self.security_config))
+                AppState::new(conn, self.security_config)
             }
-            _ => Ok(AppState::new_without_db(self.security_config)),
+            _ => AppState::new_without_db(self.security_config),
+        };
+
+        if let Some(redis_url) = self.redis_url {
+            let realtime = RealtimeBroker::connect(&redis_url).await?;
+            app_state = app_state.with_realtime(realtime);
         }
+
+        Ok(app_state)
     }
 }
 

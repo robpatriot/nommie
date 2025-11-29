@@ -1,6 +1,7 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use actix::{Actor, StreamHandler};
+use actix::prelude::*;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use serde::Serialize;
@@ -13,6 +14,7 @@ use crate::extractors::game_id::GameId;
 use crate::extractors::game_membership::GameMembership;
 use crate::routes::games::{build_snapshot_response, GameSnapshotResponse};
 use crate::state::app_state::AppState;
+use crate::ws::hub::{GameSessionRegistry, SnapshotBroadcast};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(20);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(40);
@@ -38,8 +40,10 @@ pub async fn upgrade(
             .await
             .map_err(Error::from)?;
 
+    let registry = app_state.realtime.as_ref().map(|broker| broker.registry());
+
     let session = GameWsSession::new(
-        app_state,
+        registry,
         game_id.0,
         current_user,
         vec![
@@ -60,14 +64,15 @@ pub struct GameWsSession {
     game_id: i64,
     user_id: i64,
     user_sub: String,
-    app_state: web::Data<AppState>,
     last_heartbeat: Instant,
     pending_messages: Vec<OutgoingMessage>,
+    registry: Option<Arc<GameSessionRegistry>>,
+    registry_token: Option<Uuid>,
 }
 
 impl GameWsSession {
     fn new(
-        app_state: web::Data<AppState>,
+        registry: Option<Arc<GameSessionRegistry>>,
         game_id: i64,
         current_user: CurrentUser,
         pending_messages: Vec<OutgoingMessage>,
@@ -77,9 +82,10 @@ impl GameWsSession {
             game_id,
             user_id: current_user.id,
             user_sub: current_user.sub,
-            app_state,
             last_heartbeat: Instant::now(),
             pending_messages,
+            registry,
+            registry_token: None,
         }
     }
 
@@ -125,11 +131,21 @@ impl Actor for GameWsSession {
             user_id = self.user_id,
             "Websocket session started"
         );
+
+        if let Some(registry) = &self.registry {
+            let token = registry.register(self.game_id, ctx.address().recipient());
+            self.registry_token = Some(token);
+        }
+
         self.start_heartbeat(ctx);
         self.flush_pending(ctx);
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
+        if let (Some(registry), Some(token)) = (&self.registry, self.registry_token) {
+            registry.unregister(self.game_id, token);
+        }
+
         info!(
             session_id = %self.session_id,
             game_id = self.game_id,
@@ -175,6 +191,26 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for GameWsSession {
                 );
                 ctx.stop();
             }
+        }
+    }
+}
+
+impl Handler<SnapshotBroadcast> for GameWsSession {
+    type Result = ();
+
+    fn handle(&mut self, msg: SnapshotBroadcast, ctx: &mut Self::Context) -> Self::Result {
+        let outgoing = OutgoingMessage::Snapshot {
+            data: (*msg.payload).clone(),
+        };
+
+        match to_string(&outgoing) {
+            Ok(serialized) => ctx.text(serialized),
+            Err(err) => warn!(
+                session_id = %self.session_id,
+                game_id = self.game_id,
+                error = %err,
+                "Failed to serialize broadcast snapshot"
+            ),
         }
     }
 }
