@@ -39,6 +39,8 @@ This document defines the plan for evolving Nommie's game synchronization from H
    - Client sends `{ "type": "subscribe", "gameId": number }` immediately after connect (if URL doesnt already imply game ID) and `{ "type": "ping" }` for custom heartbeats as needed.
 
 ## Open Questions / To Refine Next
-- Do we want delta messages (diffs) or full snapshots only?
 - How do we gate the feature (per-user flag, per-game flag, or global config)?
 - What level of metrics/logging do we need for socket lifecycle (connect, disconnect, errors)?
+
+## Decisions
+- Websocket payloads will use full snapshots (same shape as REST) for v1; message versioning allows future diff-based optimizations if monitoring shows bandwidth pressure.
