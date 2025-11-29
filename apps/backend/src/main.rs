@@ -40,7 +40,14 @@ async fn main() -> std::io::Result<()> {
 
     println!("🚀 Starting Nommie Backend on http://{}:{}", host, port);
 
-    let jwt = std::env::var("BACKEND_JWT_SECRET").expect("BACKEND_JWT_SECRET must be set");
+    let jwt = std::env::var("BACKEND_JWT_SECRET").unwrap_or_else(|_| {
+        eprintln!("❌ BACKEND_JWT_SECRET must be set");
+        std::process::exit(1);
+    });
+    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| {
+        eprintln!("❌ REDIS_URL must be set");
+        std::process::exit(1);
+    });
     let security_config = SecurityConfig::new(jwt.as_bytes());
 
     // Create application state using unified builder
@@ -49,6 +56,7 @@ async fn main() -> std::io::Result<()> {
         .with_db(DbKind::Postgres)
         .with_security(security_config)
         .with_email_allowlist(EmailAllowlist::from_env())
+        .with_redis_url(Some(redis_url))
         .build()
         .await
     {
@@ -155,6 +163,7 @@ async fn main() -> std::io::Result<()> {
                     .wrap(JwtExtract)
                     .configure(routes::games::configure_routes),
             )
+            .service(
                 // User routes with general rate limiting (100 req/min) and security headers
                 web::scope("/api/user")
                     .wrap(SecurityHeaders)
