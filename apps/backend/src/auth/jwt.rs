@@ -27,6 +27,24 @@ pub fn mint_access_token(
     now: SystemTime,
     security: &SecurityConfig,
 ) -> Result<String, AppError> {
+    mint_access_token_with_ttl(sub, email, now, 15 * 60, security)
+}
+
+pub fn mint_access_token_with_ttl(
+    sub: &str,
+    email: &str,
+    now: SystemTime,
+    ttl_seconds: i64,
+    security: &SecurityConfig,
+) -> Result<String, AppError> {
+    if ttl_seconds <= 0 {
+        return Err(AppError::internal(
+            crate::errors::ErrorCode::InternalError,
+            "JWT TTL must be positive".to_string(),
+            std::io::Error::other("invalid ttl"),
+        ));
+    }
+
     let iat = now
         .duration_since(UNIX_EPOCH)
         .map_err(|e| {
@@ -38,8 +56,7 @@ pub fn mint_access_token(
         })?
         .as_secs() as i64;
 
-    // 60 minutes expiration
-    let exp = iat + 60 * 60;
+    let exp = iat + ttl_seconds;
 
     let claims = Claims {
         sub: sub.to_string(),

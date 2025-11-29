@@ -34,6 +34,13 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  redis:
+    image: redis:7
+    command: ["redis-server", "--save", ""] # disable RDB for dev
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    restart: unless-stopped
+
 volumes:
   nommie_dev_db_data:
   nommie_dev_db_ssl:

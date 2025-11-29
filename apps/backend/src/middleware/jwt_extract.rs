@@ -4,6 +4,8 @@
 //! in request extensions. It only runs on protected routes (/api/games/*)
 //! and returns 401 if no valid claims are found.
 
+use std::collections::HashMap;
+
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::http::header;
 use actix_web::{web, Error, HttpMessage};
@@ -54,49 +56,26 @@ where
     forward_ready!(service);
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        // Extract Authorization header and AppState before moving req
+        // Extract Authorization sources and AppState before moving req
         let auth_header = req.headers().get(header::AUTHORIZATION).cloned();
         let app_state = req.app_data::<web::Data<AppState>>().cloned();
 
-        // Parse token from Authorization header (check early for quick failure)
-        let token = if let Some(auth_value) = auth_header.as_ref() {
-            let auth_str = match auth_value.to_str() {
-                Ok(s) => s,
-                Err(_) => {
+        // Parse token from Authorization header or query string fallback (for WebSocket)
+        let token = match extract_bearer_from_header(auth_header.as_ref()) {
+            Ok(Some(token)) => token,
+            Ok(None) => match extract_token_from_query(req.uri().query()) {
+                Some(token) => token,
+                None => {
                     return Box::pin(async {
                         Err(unauthorized_error(
-                            "Missing or invalid Authorization header".to_string(),
+                            "Missing Authorization header".to_string(),
                         ))
-                    });
+                    })
                 }
-            };
-
-            // Parse "Bearer <token>" format
-            let parts: Vec<&str> = auth_str.split_whitespace().collect();
-            if parts.len() != 2 || parts[0] != "Bearer" {
-                return Box::pin(async {
-                    Err(unauthorized_error(
-                        "Missing or invalid Bearer token".to_string(),
-                    ))
-                });
+            },
+            Err(err) => {
+                return Box::pin(async { Err(err) });
             }
-
-            let token_str = parts[1];
-            if token_str.is_empty() {
-                return Box::pin(async {
-                    Err(unauthorized_error(
-                        "Missing or invalid Bearer token".to_string(),
-                    ))
-                });
-            }
-
-            token_str.to_string()
-        } else {
-            return Box::pin(async {
-                Err(unauthorized_error(
-                    "Missing Authorization header".to_string(),
-                ))
-            });
         };
 
         // Get AppState - must be available
@@ -136,4 +115,47 @@ where
             Err(e) => Box::pin(async move { Err(unauthorized_error(format!("{}", e))) }),
         }
     }
+}
+
+fn extract_bearer_from_header(
+    header_value: Option<&actix_web::http::HeaderValue>,
+) -> Result<Option<String>, Error> {
+    let auth_value = match header_value {
+        Some(value) => value,
+        None => return Ok(None),
+    };
+
+    let auth_str = match auth_value.to_str() {
+        Ok(s) => s,
+        Err(_) => {
+            return Err(unauthorized_error(
+                "Missing or invalid Authorization header".to_string(),
+            ))
+        }
+    };
+
+    let parts: Vec<&str> = auth_str.split_whitespace().collect();
+    if parts.len() != 2 || parts[0] != "Bearer" {
+        return Err(unauthorized_error(
+            "Missing or invalid Bearer token".to_string(),
+        ));
+    }
+
+    let token_str = parts[1];
+    if token_str.is_empty() {
+        return Err(unauthorized_error(
+            "Missing or invalid Bearer token".to_string(),
+        ));
+    }
+
+    Ok(Some(token_str.to_string()))
+}
+
+fn extract_token_from_query(query: Option<&str>) -> Option<String> {
+    let query_str = query?;
+    let params = web::Query::<HashMap<String, String>>::from_query(query_str).ok()?;
+    params
+        .get("token")
+        .cloned()
+        .filter(|value| !value.is_empty())
 }
