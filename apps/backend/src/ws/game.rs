@@ -41,8 +41,10 @@ pub async fn upgrade(
             .map_err(Error::from)?;
 
     let registry = app_state.realtime.as_ref().map(|broker| broker.registry());
+    let initial_lock_version = snapshot_response.lock_version;
 
     let session = GameWsSession::new(
+        app_state.clone(),
         registry,
         game_id.0,
         current_user,
@@ -54,6 +56,7 @@ pub async fn upgrade(
                 data: snapshot_response,
             },
         ],
+        initial_lock_version,
     );
 
     ws::start(session, &req, stream)
@@ -64,28 +67,36 @@ pub struct GameWsSession {
     game_id: i64,
     user_id: i64,
     user_sub: String,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
     last_heartbeat: Instant,
     pending_messages: Vec<OutgoingMessage>,
     registry: Option<Arc<GameSessionRegistry>>,
     registry_token: Option<Uuid>,
+    last_lock_version: i32,
 }
 
 impl GameWsSession {
     fn new(
+        app_state: web::Data<AppState>,
         registry: Option<Arc<GameSessionRegistry>>,
         game_id: i64,
         current_user: CurrentUser,
         pending_messages: Vec<OutgoingMessage>,
+        initial_lock_version: i32,
     ) -> Self {
         Self {
             session_id: Uuid::new_v4(),
             game_id,
             user_id: current_user.id,
             user_sub: current_user.sub,
+            current_user,
+            app_state,
             last_heartbeat: Instant::now(),
             pending_messages,
             registry,
             registry_token: None,
+            last_lock_version: initial_lock_version,
         }
     }
 
@@ -199,18 +210,40 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
     type Result = ();
 
     fn handle(&mut self, msg: SnapshotBroadcast, ctx: &mut Self::Context) -> Self::Result {
-        let outgoing = OutgoingMessage::Snapshot {
-            data: (*msg.payload).clone(),
-        };
-
-        match to_string(&outgoing) {
-            Ok(serialized) => ctx.text(serialized),
-            Err(err) => warn!(
-                session_id = %self.session_id,
-                game_id = self.game_id,
-                error = %err,
-                "Failed to serialize broadcast snapshot"
-            ),
+        if msg.lock_version <= self.last_lock_version {
+            return;
         }
+
+        let app_state = self.app_state.clone();
+        let current_user = self.current_user.clone();
+        let game_id = self.game_id;
+
+        ctx.spawn(
+            async move { build_snapshot_response(None, &app_state, game_id, &current_user).await }
+                .into_actor(self)
+                .map(|result, actor, ctx| match result {
+                    Ok((snapshot, _viewer_seat)) => {
+                        actor.last_lock_version = snapshot.lock_version;
+                        let outgoing = OutgoingMessage::Snapshot { data: snapshot };
+                        match to_string(&outgoing) {
+                            Ok(serialized) => ctx.text(serialized),
+                            Err(err) => warn!(
+                                session_id = %actor.session_id,
+                                game_id = actor.game_id,
+                                error = %err,
+                                "Failed to serialize broadcast snapshot"
+                            ),
+                        }
+                    }
+                    Err(err) => {
+                        warn!(
+                            session_id = %actor.session_id,
+                            game_id = actor.game_id,
+                            error = %err,
+                            "Failed to build snapshot for websocket client"
+                        );
+                    }
+                }),
+        );
     }
 }

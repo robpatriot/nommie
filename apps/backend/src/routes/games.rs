@@ -829,14 +829,17 @@ async fn mark_ready(
     let id = game_id.0;
     let user_id = current_user.id;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
             service.mark_ready(txn, id, user_id).await?;
-            Ok(())
+            let game = games_repo::require_game(txn, id).await?;
+            Ok(game.lock_version)
         })
     })
     .await?;
+
+    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -926,7 +929,7 @@ async fn add_ai_seat(
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1059,10 +1062,13 @@ async fn add_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            Ok(())
+            let updated_game = games_repo::require_game(txn, id).await?;
+            Ok(updated_game.lock_version)
         })
     })
     .await?;
+
+    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1079,7 +1085,7 @@ async fn remove_ai_seat(
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1175,10 +1181,13 @@ async fn remove_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            Ok(())
+            let updated_game = games_repo::require_game(txn, id).await?;
+            Ok(updated_game.lock_version)
         })
     })
     .await?;
+
+    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1207,7 +1216,7 @@ async fn update_ai_seat(
         ));
     }
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1308,10 +1317,13 @@ async fn update_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            Ok(())
+            let updated_game = games_repo::require_game(txn, id).await?;
+            Ok(updated_game.lock_version)
         })
     })
     .await?;
+
+    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1344,6 +1356,7 @@ async fn submit_bid(
     .await?;
 
     let etag = game_etag(updated_game.id, updated_game.lock_version);
+    publish_snapshot_with_lock(&app_state, id, updated_game.lock_version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1389,6 +1402,7 @@ async fn select_trump(
     .await?;
 
     let etag = game_etag(updated_game.id, updated_game.lock_version);
+    publish_snapshot_with_lock(&app_state, id, updated_game.lock_version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1430,6 +1444,7 @@ async fn play_card(
     .await?;
 
     let etag = game_etag(updated_game.id, updated_game.lock_version);
+    publish_snapshot_with_lock(&app_state, id, updated_game.lock_version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1557,6 +1572,37 @@ fn trump_to_api_value(trump: Trump) -> &'static str {
         Trump::Spades => "SPADES",
         Trump::NoTrump => "NO_TRUMP",
     }
+}
+
+#[allow(dead_code)]
+async fn publish_snapshot_from_db(
+    app_state: &web::Data<AppState>,
+    game_id: i64,
+) -> Result<(), AppError> {
+    if app_state.realtime.is_none() {
+        return Ok(());
+    }
+
+    let lock_version = with_txn(None, app_state, |txn| {
+        Box::pin(async move {
+            let game = games_repo::require_game(txn, game_id).await?;
+            Ok::<i32, AppError>(game.lock_version)
+        })
+    })
+    .await?;
+
+    publish_snapshot_with_lock(app_state, game_id, lock_version).await
+}
+
+async fn publish_snapshot_with_lock(
+    app_state: &web::Data<AppState>,
+    game_id: i64,
+    lock_version: i32,
+) -> Result<(), AppError> {
+    if let Some(realtime) = &app_state.realtime {
+        realtime.publish_snapshot(game_id, lock_version).await?;
+    }
+    Ok(())
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {

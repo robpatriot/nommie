@@ -12,20 +12,10 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::errors::ErrorCode;
-use crate::routes::games::GameSnapshotResponse;
-
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct SnapshotBroadcast {
-    pub payload: Arc<GameSnapshotResponse>,
-}
-
-impl SnapshotBroadcast {
-    pub fn new(payload: GameSnapshotResponse) -> Self {
-        Self {
-            payload: Arc::new(payload),
-        }
-    }
+    pub lock_version: i32,
 }
 
 #[derive(Default)]
@@ -109,15 +99,11 @@ impl RealtimeBroker {
         self.registry.clone()
     }
 
-    pub async fn publish_snapshot(
-        &self,
-        game_id: i64,
-        payload: &GameSnapshotResponse,
-    ) -> Result<(), AppError> {
+    pub async fn publish_snapshot(&self, game_id: i64, lock_version: i32) -> Result<(), AppError> {
         let mut publisher = self.publisher.lock().await;
         let envelope = RedisEnvelope {
             game_id,
-            snapshot: payload.clone(),
+            lock_version,
         };
         let encoded = serde_json::to_string(&envelope).map_err(|err| AppError::Internal {
             code: ErrorCode::InternalError,
@@ -140,7 +126,7 @@ impl RealtimeBroker {
 #[derive(Serialize, Deserialize)]
 struct RedisEnvelope {
     game_id: i64,
-    snapshot: GameSnapshotResponse,
+    lock_version: i32,
 }
 
 fn spawn_subscriber(client: Client, registry: Arc<GameSessionRegistry>) {
@@ -182,7 +168,12 @@ async fn run_subscription_loop(
             if let Some(game_id) = parse_channel(&channel) {
                 match serde_json::from_str::<RedisEnvelope>(&payload) {
                     Ok(envelope) => {
-                        registry.broadcast(game_id, SnapshotBroadcast::new(envelope.snapshot));
+                        registry.broadcast(
+                            game_id,
+                            SnapshotBroadcast {
+                                lock_version: envelope.lock_version,
+                            },
+                        );
                     }
                     Err(err) => {
                         error!(error = %err, "Failed to decode Redis snapshot payload");
