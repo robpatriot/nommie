@@ -27,7 +27,8 @@ This document defines the plan for evolving Nommie's game synchronization from H
    - Implement ping/pong heartbeats and server-triggered disconnects on idle or auth failure.
 2. **Update Broadcast Path**
    - When game state mutates (existing services already know when lock_version changes), enqueue a snapshot broadcast event containing the latest `GameSnapshotResponse`.
-   - Registry fans out serialized snapshots to every connected client for that game; HTTP clients can still fetch manually.
+   - Use Redis pub/sub: every backend instance publishes to `game:<id>` channels; instances with local websocket subscribers receive the payload and forward it.
+   - Keep a minimal in-process registry for dev/single-node setups, but treat Redis as mandatory for multi-node fan-out.
 3. **Frontend Sync Service**
    - Extract polling logic from `GameRoomClient` into a dedicated `useGameSync` hook or service that owns transport state.
    - Hook accepts a `transport` implementation (polling vs websocket) so we can roll out behind a feature flag and fall back when sockets fail.
@@ -38,7 +39,6 @@ This document defines the plan for evolving Nommie's game synchronization from H
    - Client sends `{ "type": "subscribe", "gameId": number }` immediately after connect (if URL doesnt already imply game ID) and `{ "type": "ping" }` for custom heartbeats as needed.
 
 ## Open Questions / To Refine Next
-- Connection fan-out strategy if we add multiple app servers (Redis pub/sub? internal message bus?).
 - Do we want delta messages (diffs) or full snapshots only?
 - How do we gate the feature (per-user flag, per-game flag, or global config)?
 - What level of metrics/logging do we need for socket lifecycle (connect, disconnect, errors)?
