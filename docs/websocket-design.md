@@ -38,9 +38,7 @@ This document defines the plan for evolving Nommie's game synchronization from H
    - Optional `{ "type": "error", "code": ..., "message": ... }` for server-side issues.
    - Client sends `{ "type": "subscribe", "gameId": number }` immediately after connect (if URL doesnt already imply game ID) and `{ "type": "ping" }` for custom heartbeats as needed.
 
-## Open Questions / To Refine Next
-- What level of metrics/logging do we need for socket lifecycle (connect, disconnect, errors)?
-
 ## Decisions
 - Websocket payloads will use full snapshots (same shape as REST) for v1; message versioning allows future diff-based optimizations if monitoring shows bandwidth pressure.
 - Because the product is still pre-production, we will ship a direct cutover: websocket sync replaces polling entirely with no dual-support period or backwards compatibility for old clients.
+- Instrument both structured logs (connect, disconnect, broadcast, error events tagged with game/user context) and basic counters/gauges (`ws_connections_active`, `ws_connect_total`, `ws_disconnect_total` with reason, `ws_broadcast_total`, `ws_broadcast_fail_total`, heartbeat failures). Even without dashboards today, emitting these metrics positions us for future telemetry aggregation.
