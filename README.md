@@ -11,8 +11,8 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 2. Copy env file and source it **once per shell**:
    - `cp .env.example .env`
    - `set -a; . ./.env; set +a`
-3. Start Postgres (run manually with docker-compose):
-   - `docker compose -f docker/dev-db/docker-compose.yml up -d postgres`
+3. Start Postgres & Redis (run manually with docker-compose):
+   - `docker compose -f docker/dev-db/docker-compose.yml up -d postgres redis`
 4. Create/refresh databases (run manually - see Database & Migrations section):
 5. Run backend + frontend:
    - Both: `pnpm start` (starts backend and frontend, logs → `.dev/dev.log`)
@@ -91,10 +91,12 @@ docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
 **Backend Configuration:**
 - `APP_JWT_SECRET` - JWT signing secret (required)
 - `CORS_ALLOWED_ORIGINS` - Comma-separated allowed origins (defaults to localhost:3000, 127.0.0.1:3000)
+- `REDIS_URL` - Redis connection string for realtime fan-out (e.g. `redis://127.0.0.1:6379/0`)
 
 **Frontend Configuration:**
 - `BACKEND_BASE_URL` - Backend API URL (e.g., `http://localhost:3001`)
 - `APP_JWT_SECRET` - NextAuth secret (shared with backend JWT secret from root .env)
+- `NEXT_PUBLIC_BACKEND_WS_URL` - Optional override for websocket base (falls back to `BACKEND_BASE_URL` with `ws://`)
 - See Authentication Setup section for Google OAuth configuration
 
 ### Environment File Setup

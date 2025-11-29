@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use actix::prelude::*;
@@ -7,7 +8,7 @@ use redis::{AsyncCommands, Client};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
-use tracing::{error, info};
+use tracing::{error, info, trace};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -18,15 +19,20 @@ pub struct SnapshotBroadcast {
     pub lock_version: i32,
 }
 
-#[derive(Default)]
 pub struct GameSessionRegistry {
     sessions: DashMap<i64, DashMap<Uuid, Recipient<SnapshotBroadcast>>>,
+    active_connections: AtomicUsize,
+    total_connections: AtomicUsize,
+    broadcasts_total: AtomicUsize,
 }
 
 impl GameSessionRegistry {
     pub fn new() -> Self {
         Self {
             sessions: DashMap::new(),
+            active_connections: AtomicUsize::new(0),
+            total_connections: AtomicUsize::new(0),
+            broadcasts_total: AtomicUsize::new(0),
         }
     }
 
@@ -34,6 +40,16 @@ impl GameSessionRegistry {
         let token = Uuid::new_v4();
         let entry = self.sessions.entry(game_id).or_insert_with(DashMap::new);
         entry.insert(token, recipient);
+
+        let total = self.total_connections.fetch_add(1, Ordering::Relaxed) + 1;
+        let active = self.active_connections.fetch_add(1, Ordering::Relaxed) + 1;
+        info!(
+            game_id,
+            active_connections = active,
+            total_connections = total,
+            "Websocket session registered"
+        );
+
         token
     }
 
@@ -44,9 +60,22 @@ impl GameSessionRegistry {
                 self.sessions.remove(&game_id);
             }
         }
+
+        let previous = self.active_connections.load(Ordering::Relaxed);
+        if previous > 0 {
+            self.active_connections.fetch_sub(1, Ordering::Relaxed);
+        }
+        let active = previous.saturating_sub(1);
+        info!(
+            game_id,
+            active_connections = active,
+            "Websocket session unregistered"
+        );
     }
 
     pub fn broadcast(&self, game_id: i64, message: SnapshotBroadcast) {
+        let total = self.broadcasts_total.fetch_add(1, Ordering::Relaxed) + 1;
+        trace!(game_id, broadcasts_total = total, "Broadcasting snapshot");
         if let Some(entry) = self.sessions.get(&game_id) {
             for recipient in entry.iter() {
                 let _ = recipient.value().do_send(message.clone());
@@ -192,4 +221,10 @@ fn parse_channel(channel: &str) -> Option<i64> {
         .split(':')
         .nth(1)
         .and_then(|value| value.parse().ok())
+}
+
+impl Default for GameSessionRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }

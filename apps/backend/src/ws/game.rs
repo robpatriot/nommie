@@ -9,6 +9,7 @@ use serde_json::to_string;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::domain::state::Seat;
 use crate::extractors::current_user::CurrentUser;
 use crate::extractors::game_id::GameId;
 use crate::extractors::game_membership::GameMembership;
@@ -22,9 +23,17 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(40);
 #[derive(Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum OutgoingMessage {
-    Snapshot { data: GameSnapshotResponse },
-    Ack { message: &'static str },
-    Error { code: &'static str, message: String },
+    Snapshot {
+        data: GameSnapshotResponse,
+        viewer_seat: Option<Seat>,
+    },
+    Ack {
+        message: &'static str,
+    },
+    Error {
+        code: &'static str,
+        message: String,
+    },
 }
 
 pub async fn upgrade(
@@ -35,7 +44,7 @@ pub async fn upgrade(
     _membership: GameMembership,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, Error> {
-    let (snapshot_response, _) =
+    let (snapshot_response, viewer_seat) =
         build_snapshot_response(Some(&req), &app_state, game_id.0, &current_user)
             .await
             .map_err(Error::from)?;
@@ -54,6 +63,7 @@ pub async fn upgrade(
             },
             OutgoingMessage::Snapshot {
                 data: snapshot_response,
+                viewer_seat,
             },
         ],
         initial_lock_version,
@@ -222,9 +232,12 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
             async move { build_snapshot_response(None, &app_state, game_id, &current_user).await }
                 .into_actor(self)
                 .map(|result, actor, ctx| match result {
-                    Ok((snapshot, _viewer_seat)) => {
+                    Ok((snapshot, viewer_seat)) => {
                         actor.last_lock_version = snapshot.lock_version;
-                        let outgoing = OutgoingMessage::Snapshot { data: snapshot };
+                        let outgoing = OutgoingMessage::Snapshot {
+                            data: snapshot,
+                            viewer_seat,
+                        };
                         match to_string(&outgoing) {
                             Ok(serialized) => ctx.text(serialized),
                             Err(err) => warn!(

@@ -22,7 +22,7 @@ This document defines the plan for evolving Nommie's game synchronization from H
 
 ## Proposed Architecture (High Level)
 1. **Transport Layer**
-   - Add a websocket endpoint (e.g., `GET /ws/games/:id`) that authenticates via the same backend JWT used for REST calls.
+   - Add a websocket endpoint (e.g., `GET /ws/games/:id`) that authenticates via the same backend JWT used for REST calls. For browser clients, allow a `token` query parameter that carries a short-lived JWT issued by the backend.
    - Use an Actix websocket actor per connection; manage connections in a registry keyed by game ID.
    - Implement ping/pong heartbeats and server-triggered disconnects on idle or auth failure.
 2. **Update Broadcast Path**
@@ -42,7 +42,7 @@ This document defines the plan for evolving Nommie's game synchronization from H
 
 ### Websocket Endpoint & Auth
 - New route: `GET /ws/games/{game_id}` handled by an Actix websocket actor.
-- Handshake verifies the backend JWT exactly like REST endpoints (`require_backend_jwt`); rejects if token missing/invalid.
+- Handshake verifies the backend JWT exactly like REST endpoints (`require_backend_jwt`). If the `Authorization` header is missing (browser WebSocket restriction), the middleware falls back to a `token` query parameter that carries a short-lived JWT minted via `/api/ws/token`. Tokens expire quickly (≈90s) and reuse the existing signing secret.
 - Actor stores `game_id`, `user_id`, and connection metadata (connected_at, last_ping).
 
 ### Connection Registry & Redis Integration
@@ -50,6 +50,7 @@ This document defines the plan for evolving Nommie's game synchronization from H
 - At startup, the process also subscribes to Redis channel pattern `game:*`.
 - Publishing flow: whenever a game snapshot changes, code running inside the request/command publishes `{"gameId":123,"payload":...}` to `game:123`.
 - Receiving flow: Redis subscription callback looks up local connections for that game and forwards the serialized payload to each actor; actors drop clients that fail to accept data (backpressure).
+- Maintain simple gauges/counters inside the registry (`ws_connections_active`, cumulative connection count, broadcast count) and emit structured traces for connect/disconnect/broadcast events.
 
 ### Broadcast Trigger Points
 - Wrap the existing state mutation paths (bids, plays, ready, AI management) so that after DB commit succeeds we:
@@ -66,31 +67,31 @@ This document defines the plan for evolving Nommie's game synchronization from H
 
 ### Sync Abstraction
 - Introduce `useGameSync({ gameId, initialSnapshot })` hook responsible for:
-  - Establishing the websocket.
-  - Maintaining connection status (`connected | reconnecting | closed`).
-  - Surfacing the latest snapshot + lockVersion + metadata.
-  - Providing imperative methods `refresh()` (manual fetch fallback) and `sendAction()` hooks if needed later.
-- Hook exposes same data shape currently managed inside `GameRoomClient`, so UI changes are limited to wiring.
+  - Fetching a short-lived websocket token via a Next.js route handler (`/api/ws-token`) that calls the backend.
+  - Establishing the websocket and maintaining connection status (`connecting | connected | reconnecting | disconnected`).
+  - Surfacing the latest snapshot + `lockVersion` + metadata, mapping backend payloads into the existing `GameRoomSnapshotPayload`.
+  - Providing an imperative `refreshSnapshot('manual' | 'fallback')` method that reuses the existing server action for manual fetch fallback.
+- Hook exposes the same data shape currently managed inside `GameRoomClient`, so UI changes are limited to rewiring state consumption.
 
 ### Websocket Client Details
-- Browser connects to `${NEXT_PUBLIC_BACKEND_WS_URL}/ws/games/${gameId}` with `Authorization: Bearer <jwt>` header (Next proxy or custom fetcher).
-- Implements exponential backoff reconnect (e.g., 1s, 2s, 4s up to 30s).
+- Browser connects to `${NEXT_PUBLIC_BACKEND_WS_URL || BACKEND_BASE_URL→ws}/ws/games/${gameId}?token=<short_jwt>`, where the token is fetched just-in-time via `/api/ws-token`.
+- Implements exponential backoff reconnect (e.g., 1s, 2s, 4s up to 30s) and exposes connection state so the UI can surface “reconnecting” banners.
 - Displays toast/banner when disconnected to prompt manual refresh if necessary.
 - Manual refresh button still calls the REST snapshot action to cover the rare case of persistent socket failure.
 
 ### Existing Actions
-- Bids/plays/AI actions remain HTTP POSTs for now; after each successful action we rely on push updates rather than forcing an immediate refetch (manual refresh remains as fallback).
+- Bids/plays/AI actions remain HTTP POSTs for now. After each successful action we still call `refreshSnapshot('manual')` as a fallback while waiting for the push update so that acting players see immediate feedback.
 
 ## Infrastructure & Configuration
 - Add Redis to dev docker-compose; define `REDIS_URL` consumed by backend.
 - Backend config: enable/disable websocket feature (default on), Redis connection pool size, ping intervals.
-- Frontend config: `NEXT_PUBLIC_BACKEND_WS_URL` (can reuse HTTP base with `wss://` prefix).
+- Frontend config: `NEXT_PUBLIC_BACKEND_WS_URL` (optional override; otherwise derived from `BACKEND_BASE_URL` by swapping http→ws).
 - Update dev docs so contributors know how to run Redis locally.
 
 ## Testing & Validation
-- **Unit tests:** websocket actor handles subscribe/unsubscribe, heartbeat timeouts, JSON encoding/decoding.
-- **Integration tests:** spin up redis + backend, simulate multiple connections, verify broadcast fan-out and reconnect behavior.
-- **Frontend tests:** hook-level tests using mocked websocket to ensure reconnection logic and state transitions.
+- **Unit tests:** websocket actor handles subscribe/unsubscribe, heartbeat timeouts, JSON encoding/decoding. `/api/ws/token` minting respects TTL boundaries.
+- **Integration tests:** spin up redis + backend, simulate multiple connections, verify broadcast fan-out and reconnect behavior. Cover the query-parameter authentication path to ensure browser clients can connect.
+- **Frontend tests:** hook-level tests using mocked websocket/token fetch to ensure reconnection logic and state transitions.
 - **Load tests:** simulate high-frequency state updates to ensure broadcast latency stays <250 ms and Redis throughput is adequate.
 - **Failure drills:** kill Redis or backend instance to confirm clients reconnect and fall back gracefully.
 
