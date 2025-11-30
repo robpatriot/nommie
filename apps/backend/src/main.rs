@@ -76,12 +76,52 @@ async fn main() -> std::io::Result<()> {
             .add_headers()
             .build();
 
+        // Configure request body size limits to prevent DoS attacks
+        // 1MB limit for JSON payloads (sufficient for game actions)
+        let json_config = web::JsonConfig::default()
+            .limit(1024 * 1024) // 1MB
+            .error_handler(|err, _req| {
+                use actix_web::error::JsonPayloadError;
+                use actix_web::HttpResponse;
+
+                let (status, detail) = match err {
+                    JsonPayloadError::Overflow { limit: _ } => (
+                        actix_web::http::StatusCode::PAYLOAD_TOO_LARGE,
+                        "Payload too large. Maximum size is 1MB.",
+                    ),
+                    JsonPayloadError::ContentType => (
+                        actix_web::http::StatusCode::BAD_REQUEST,
+                        "Content type error",
+                    ),
+                    _ => (
+                        actix_web::http::StatusCode::BAD_REQUEST,
+                        "Invalid JSON payload",
+                    ),
+                };
+
+                actix_web::error::InternalError::from_response(
+                    err,
+                    HttpResponse::build(status).json(serde_json::json!({
+                        "type": "https://tools.ietf.org/html/rfc7231#section-6.5.11",
+                        "title": "Payload Too Large",
+                        "status": status.as_u16(),
+                        "detail": detail,
+                    })),
+                )
+                .into()
+            });
+
+        // 1MB limit for form data and other payloads
+        let payload_config = web::PayloadConfig::default().limit(1024 * 1024); // 1MB
+
         App::new()
             .wrap(cors_middleware())
             .wrap(StructuredLogger)
             .wrap(TraceSpan)
             .wrap(RequestTrace)
             .app_data(data.clone())
+            .app_data(json_config)
+            .app_data(payload_config)
             .service(
                 // Auth routes with strict rate limiting (5 req/min) and security headers
                 web::scope("/api/auth")
