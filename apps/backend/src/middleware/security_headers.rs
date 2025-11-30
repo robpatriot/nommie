@@ -5,6 +5,8 @@
 //! - X-Frame-Options: DENY
 //! - Strict-Transport-Security: max-age=31536000; includeSubDomains
 //! - Referrer-Policy: strict-origin-when-cross-origin
+//! - Content-Security-Policy: Restrictive policy to prevent XSS attacks
+//! - Permissions-Policy: Restricts browser features
 //! - Cache-Control: no-store (only for /api/* and /health endpoints)
 
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
@@ -80,6 +82,36 @@ where
             headers.insert(
                 header::HeaderName::from_static("referrer-policy"),
                 header::HeaderValue::from_static("strict-origin-when-cross-origin"),
+            );
+
+            // Content-Security-Policy: Restrictive policy to prevent XSS attacks
+            // For API endpoints, we can be very restrictive since we only return JSON
+            if path.starts_with("/api/") || path == "/health" {
+                // API endpoints: very restrictive CSP (no scripts, styles, etc.)
+                headers.insert(
+                    header::HeaderName::from_static("content-security-policy"),
+                    header::HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'"),
+                );
+            } else {
+                // For other endpoints (like root), use a more permissive CSP
+                // This can be customized per route if needed
+                headers.insert(
+                    header::HeaderName::from_static("content-security-policy"),
+                    header::HeaderValue::from_static("default-src 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;"),
+                );
+            }
+
+            // Permissions-Policy: Restrict browser features
+            // Disable geolocation, microphone, camera, and other sensitive features
+            headers.insert(
+                header::HeaderName::from_static("permissions-policy"),
+                header::HeaderValue::from_static("geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"),
+            );
+
+            // X-XSS-Protection: Legacy header (deprecated but still useful for older browsers)
+            headers.insert(
+                header::HeaderName::from_static("x-xss-protection"),
+                header::HeaderValue::from_static("1; mode=block"),
             );
 
             // Cache-Control: no-store - Only for API and health endpoints
