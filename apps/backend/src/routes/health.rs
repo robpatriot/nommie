@@ -81,5 +81,7 @@ async fn health(app_state: web::Data<AppState>) -> Result<HttpResponse, AppError
 
 pub fn configure_routes(cfg: &mut actix_web::web::ServiceConfig) {
     // Only configure health route - root route is configured separately in main.rs
-    cfg.route("/health", web::get().to(health));
+    // Note: This is called within a /health scope in main.rs, so we use "" here
+    // to create /health (without trailing slash), matching the pattern used in games routes
+    cfg.service(web::resource("").route(web::get().to(health)));
 }

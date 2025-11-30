@@ -3,13 +3,19 @@
 'use server'
 
 import {
-  BackendJwtMissingError,
-  requireBackendJwt,
-} from '@/lib/server/get-backend-jwt'
+  ensureBackendJwt,
+  BackendJwtError,
+} from '@/lib/auth/refresh-backend-jwt'
+import { getBackendBaseUrlOrThrow } from '@/auth'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
 import { BackendApiError } from './errors'
 import { retryOnNetworkError } from './retry'
 import { parseErrorResponse } from './api/error-parsing'
+import {
+  markBackendUp,
+  shouldLogError,
+  isInStartupWindow,
+} from '@/lib/server/backend-status'
 
 // Re-export BackendApiError for convenience (it's also available from ./errors)
 export { BackendApiError }
@@ -17,20 +23,33 @@ export { BackendApiError }
 // Re-export ProblemDetails interface for backward compatibility
 export type { ProblemDetails } from './api/error-parsing'
 
+/**
+ * Make an authenticated API request to the backend.
+ * Works from both Server Components and Server Actions.
+ * Automatically refreshes JWT if needed.
+ */
 export async function fetchWithAuth(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  // Always require backend JWT for authenticated requests
+  // Get backend JWT (refreshes if needed)
   let authHeaders: Record<string, string> = {}
   try {
-    const backendJwt = await requireBackendJwt()
-
+    const backendJwt = await ensureBackendJwt()
     authHeaders = {
       Authorization: `Bearer ${backendJwt}`,
     }
   } catch (error) {
-    if (error instanceof BackendJwtMissingError) {
+    if (error instanceof BackendJwtError) {
+      // During startup, if backend isn't ready, use 503 (Service Unavailable)
+      // Otherwise, use 401 (Unauthorized) for actual auth issues
+      if (isInStartupWindow() && error.message.includes('starting up')) {
+        throw new BackendApiError(
+          'Backend is starting up, please try again shortly',
+          503,
+          'BACKEND_STARTING'
+        )
+      }
       throw new BackendApiError(
         'Authentication required',
         401,
@@ -40,36 +59,90 @@ export async function fetchWithAuth(
     throw error
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
-  if (!baseUrl) {
-    throw new Error('NEXT_PUBLIC_BACKEND_BASE_URL not configured')
-  }
-
+  const baseUrl = getBackendBaseUrlOrThrow()
   const url = `${baseUrl}${endpoint}`
 
-  // Retry network errors with exponential backoff (1 retry by default)
-  // Application errors (4xx, 5xx) are not retried
-  const response = await retryOnNetworkError(
-    async () => {
-      return await fetch(url, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders,
-          ...options.headers,
-        },
-      })
-    },
-    {
-      maxRetries: 1,
-      baseDelayMs: 500,
-      maxDelayMs: 2000,
+  let response: Response
+  try {
+    // Retry network errors with exponential backoff (1 retry by default)
+    // Application errors (4xx, 5xx) are not retried
+    response = await retryOnNetworkError(
+      async () => {
+        return await fetch(url, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+            ...options.headers,
+          },
+        })
+      },
+      {
+        maxRetries: 1,
+        baseDelayMs: 500,
+        maxDelayMs: 2000,
+      }
+    )
+
+    // Mark backend as up if we got a response (even if error) - connection succeeded
+    // This helps differentiate startup failures from runtime failures
+    markBackendUp()
+  } catch (error) {
+    // Handle network errors - check if we should log
+    const errorMessage =
+      error instanceof Error ? error.message.toLowerCase() : ''
+    const causeMessage =
+      error instanceof Error && 'cause' in error && error.cause instanceof Error
+        ? error.cause.message.toLowerCase()
+        : ''
+
+    const isConnectionError =
+      error instanceof Error &&
+      (errorMessage.includes('econnrefused') ||
+        errorMessage.includes('fetch failed') ||
+        errorMessage.includes('connection') ||
+        errorMessage.includes('timeout') ||
+        causeMessage.includes('econnrefused') ||
+        causeMessage.includes('connect econnrefused'))
+
+    // Only log connection errors if we should (outside startup window or runtime failure)
+    if (shouldLogError() && isConnectionError) {
+      console.warn('Backend connection error during API request', error)
+    } else if (shouldLogError() && !isConnectionError) {
+      // Other errors should be logged if outside startup window
+      console.warn('Network error during API request', error)
     }
-  )
+
+    throw error
+  }
 
   if (!response.ok) {
+    // Handle rate limit errors (429) - these are application errors, not network errors
+    if (response.status === 429) {
+      // Rate limit exceeded - parse error response but don't log during startup
+      const parsedError = await parseErrorResponse(response)
+      if (shouldLogError()) {
+        console.warn(
+          'Rate limit exceeded',
+          parsedError.code,
+          parsedError.message
+        )
+      }
+      throw new BackendApiError(
+        parsedError.message,
+        response.status,
+        parsedError.code,
+        parsedError.traceId
+      )
+    }
+
     // Parse Problem Details error response (RFC 7807)
     const parsedError = await parseErrorResponse(response)
+    // Only log if we should (outside startup window or runtime failure)
+    if (shouldLogError() && response.status >= 500) {
+      // Server errors should be logged
+      console.warn('Backend API error', response.status, parsedError.message)
+    }
     throw new BackendApiError(
       parsedError.message,
       response.status,

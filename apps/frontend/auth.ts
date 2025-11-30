@@ -57,7 +57,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
         token.googleSub = profile.sub
         token.name = profile.name || token.name
 
-        // Only refresh backend JWT on initial login
+        // Store backend JWT in cookie on initial login
+        // (Also stored in token for backward compatibility during migration)
         const backendBase = getBackendBaseUrlOrThrow()
 
         try {
@@ -74,7 +75,13 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
           if (response.ok) {
             const data = await response.json()
             if (data && typeof data.token === 'string') {
+              // Store in token for backward compatibility
               token.backendJwt = data.token
+
+              // Also store in cookie (new approach)
+              const { setBackendJwtInCookie } =
+                await import('@/lib/auth/backend-jwt-cookie')
+              await setBackendJwtInCookie(data.token)
             }
           }
         } catch (error) {

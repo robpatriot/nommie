@@ -31,6 +31,11 @@ export interface SnapshotEnvelope {
   }
 }
 
+/**
+ * Fetch game snapshot.
+ * Works from both Server Components and Server Actions.
+ * Automatically refreshes JWT if needed.
+ */
 export async function fetchGameSnapshot(
   gameId: number,
   options: { etag?: string } = {}

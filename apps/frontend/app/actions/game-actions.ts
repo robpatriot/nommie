@@ -1,6 +1,6 @@
 'use server'
 
-import { deleteGame, fetchWithAuth } from '@/lib/api'
+import { deleteGame, fetchWithAuth, getAvailableGames } from '@/lib/api'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { toErrorResult } from '@/lib/api/action-helpers'
 import type { ActionResult, SimpleActionResult } from '@/lib/api/action-helpers'
@@ -8,6 +8,19 @@ import type { Game } from '@/lib/types'
 
 export interface CreateGameRequest {
   name?: string
+}
+
+/**
+ * Server Action to refresh the games list.
+ * Automatically refreshes JWT if needed.
+ */
+export async function refreshGamesListAction(): Promise<ActionResult<Game[]>> {
+  try {
+    const games = await getAvailableGames()
+    return { kind: 'ok', data: games }
+  } catch (error) {
+    return toErrorResult(error, 'Failed to refresh games list')
+  }
 }
 
 export async function createGameAction(

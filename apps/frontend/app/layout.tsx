@@ -8,10 +8,7 @@ import './globals.css'
 import Header from '@/components/Header'
 import { HeaderBreadcrumbProvider } from '@/components/header-breadcrumbs'
 import { getLastActiveGame } from '@/lib/api'
-import {
-  resolveBackendJwt,
-  BackendJwtResolution,
-} from '@/lib/server/get-backend-jwt'
+import { auth } from '@/auth'
 import type { Session } from 'next-auth'
 
 import {
@@ -52,33 +49,15 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  let session: Session | null = null
-  let backendJwt: string | undefined
+  const session: Session | null = await auth()
 
-  const resolution: BackendJwtResolution = await resolveBackendJwt()
-
-  if (resolution.state === 'missing-session') {
-    session = null
-  } else if (resolution.state === 'missing-jwt') {
-    // JWT is missing but session exists - allow page to render
-    // Pages will handle missing JWT by redirecting or showing appropriate UI
-    // Don't redirect here to avoid infinite loops (home page checks session and redirects to lobby)
-    session = resolution.session
-    backendJwt = undefined
-  } else {
-    session = resolution.session
-    backendJwt = resolution.backendJwt
-  }
-
-  // Only try to get last active game if we have a backend JWT
-  // This prevents 401 errors when the token is missing or expired
+  // Try to get last active game (will refresh JWT if needed)
   let lastActiveGameId: number | null = null
-
-  if (backendJwt) {
+  if (session) {
     try {
       lastActiveGameId = await getLastActiveGame()
     } catch {
-      // Silently handle errors - the endpoint might not exist or token might be expired
+      // Silently handle errors - the endpoint might not exist or JWT might be missing
       // The header will just not show the resume button
     }
   }

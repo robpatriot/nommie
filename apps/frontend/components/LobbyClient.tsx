@@ -15,6 +15,7 @@ import {
   createGameAction,
   deleteGameAction,
   joinGameAction,
+  refreshGamesListAction,
 } from '@/app/actions/game-actions'
 import type { Game } from '@/lib/types'
 
@@ -84,9 +85,21 @@ export default function LobbyClient({
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    router.refresh()
-    // Reset refreshing state after a short delay
-    setTimeout(() => setRefreshing(false), 500)
+    try {
+      // Use Server Action to refresh games list (can refresh JWT if needed)
+      const result = await refreshGamesListAction()
+      if (result.kind === 'ok') {
+        // Refresh the page to show updated games
+        router.refresh()
+      } else {
+        showToast(result.message || 'Failed to refresh games list', 'error')
+      }
+    } catch {
+      showToast('Failed to refresh games list', 'error')
+    } finally {
+      // Reset refreshing state after a short delay
+      setTimeout(() => setRefreshing(false), 500)
+    }
   }
 
   const handleCreateGame = async (name: string) => {
