@@ -20,7 +20,7 @@ pub struct Claims {
     pub exp: i64,
 }
 
-/// Mint a HS256 JWT access token with a 15-minute TTL.
+/// Mint a HS256 JWT access token with a 60-minute TTL.
 pub fn mint_access_token(
     sub: &str,
     email: &str,
@@ -38,8 +38,8 @@ pub fn mint_access_token(
         })?
         .as_secs() as i64;
 
-    // 15 minutes expiration
-    let exp = iat + 15 * 60;
+    // 60 minutes expiration
+    let exp = iat + 60 * 60;
 
     let claims = Claims {
         sub: sub.to_string(),
@@ -161,7 +161,7 @@ mod tests {
             claims.iat,
             now.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64
         );
-        assert_eq!(claims.exp, claims.iat + 15 * 60);
+        assert_eq!(claims.exp, claims.iat + 60 * 60);
     }
 
     #[tokio::test]
