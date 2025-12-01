@@ -36,7 +36,8 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
 
   session: {
     strategy: 'jwt',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    // Shorter session lifetime during early rollout to reduce exposure window
+    maxAge: 14 * 24 * 60 * 60, // 14 days
   },
   providers: [
     Google({
