@@ -22,6 +22,11 @@ async fn main() -> std::io::Result<()> {
     // Environment variables must be set by the runtime environment:
     // - Docker: Set via docker-compose env_file or docker run --env-file
     // - Local dev: Source env files manually (e.g., set -a; . ./.env; set +a)
+    //
+    // Validate critical environment variables up front and fail fast with
+    // clear, human-friendly messages if anything is misconfigured.
+    validate_env_or_exit();
+
     let host = std::env::var("BACKEND_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
     let port = std::env::var("BACKEND_PORT")
         .unwrap_or_else(|_| "3001".to_string())
@@ -33,13 +38,7 @@ async fn main() -> std::io::Result<()> {
 
     println!("🚀 Starting Nommie Backend on http://{}:{}", host, port);
 
-    let jwt = match std::env::var("BACKEND_JWT_SECRET") {
-        Ok(jwt) => jwt,
-        Err(_) => {
-            eprintln!("❌ BACKEND_JWT_SECRET must be set");
-            std::process::exit(1);
-        }
-    };
+    let jwt = std::env::var("BACKEND_JWT_SECRET").expect("BACKEND_JWT_SECRET must be set");
     let security_config = SecurityConfig::new(jwt.as_bytes());
 
     // Create application state using unified builder
@@ -161,4 +160,40 @@ async fn main() -> std::io::Result<()> {
     .bind((host.as_str(), port))?
     .run()
     .await
+}
+
+/// Validate critical environment variables at startup and exit with a clear
+/// error message if any required values are missing or obviously invalid.
+fn validate_env_or_exit() {
+    use std::env;
+
+    // BACKEND_JWT_SECRET: required, non-empty, minimum length
+    match env::var("BACKEND_JWT_SECRET") {
+        Ok(secret) if secret.len() >= 32 => {}
+        Ok(_) => {
+            eprintln!(
+                "❌ BACKEND_JWT_SECRET is too short. It should be at least 32 characters for security."
+            );
+            std::process::exit(1);
+        }
+        Err(_) => {
+            eprintln!("❌ BACKEND_JWT_SECRET must be set.");
+            std::process::exit(1);
+        }
+    }
+
+    // Database environment for production: basic presence checks
+    // (detailed validation still happens in db config errors).
+    if cfg!(not(test)) {
+        if let Ok(runtime_env) = env::var("RUNTIME_ENV") {
+            if runtime_env.eq_ignore_ascii_case("prod") {
+                for name in &["PROD_DB", "APP_DB_USER", "APP_DB_PASSWORD"] {
+                    if env::var(name).is_err() {
+                        eprintln!("❌ {name} must be set when RUNTIME_ENV=prod.");
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+    }
 }
