@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, process};
 
+use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use sea_orm::DatabaseBackend;
 
 use crate::error::AppError;
@@ -189,6 +190,20 @@ pub fn build_connection_settings(
     })
 }
 
+/// Encode username/password for use in PostgreSQL connection URLs.
+///
+/// Based on RFC 3986 userinfo, allowing unreserved characters plus a
+/// conservative subset and percent-encoding everything else.
+const USERINFO_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~');
+
+fn encode_userinfo(value: &str) -> String {
+    utf8_percent_encode(value, USERINFO_ENCODE_SET).to_string()
+}
+
 /// Validate database configuration
 pub fn validate_db_config(env: RuntimeEnv, db_kind: DbKind) -> Result<(), AppError> {
     match (env, db_kind) {
@@ -287,13 +302,16 @@ pub fn make_conn_spec(
             };
 
             // Inline credentials logic
-            let (username, password) = match owner {
+            let (username_raw, password_raw) = match owner {
                 DbOwner::App => (must_var("APP_DB_USER")?, must_var("APP_DB_PASSWORD")?),
                 DbOwner::Owner => (
                     must_var("NOMMIE_OWNER_USER")?,
                     must_var("NOMMIE_OWNER_PASSWORD")?,
                 ),
             };
+
+            let username = encode_userinfo(&username_raw);
+            let password = encode_userinfo(&password_raw);
 
             let url = format!("postgresql://{username}:{password}@{host}:{port}/{db_name}");
             Ok(url)
