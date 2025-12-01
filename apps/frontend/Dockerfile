@@ -28,6 +28,10 @@ ENV NODE_ENV=production \
     PORT=3000 \
     NEXT_TELEMETRY_DISABLED=1
 
+# Ensure runtime does not run as root
+RUN chown -R node:node /app
+USER node
+
 # Copy the standalone build output
 COPY --from=builder /app/apps/frontend/.next/standalone ./
 # Copy static files to where the server expects them (relative to apps/frontend/)

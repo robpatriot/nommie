@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 
-FROM rust:latest AS builder
+FROM rust:1.84 AS builder
 
 WORKDIR /app
 
@@ -42,7 +42,13 @@ FROM debian:bookworm-slim AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    # Create non-root runtime user and set up app directory
+    && useradd -m -u 1000 appuser \
+    && mkdir -p /app \
+    && chown -R appuser:appuser /app
+
+USER appuser
 
 WORKDIR /app
 
