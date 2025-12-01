@@ -79,9 +79,18 @@ pub fn verify_access_token(token: &str, security: &SecurityConfig) -> Result<Cla
     )
     .map(|data| data.claims)
     .map_err(|e| match e.kind() {
-        jsonwebtoken::errors::ErrorKind::ExpiredSignature => AppError::unauthorized_expired_jwt(),
-        jsonwebtoken::errors::ErrorKind::InvalidSignature => AppError::unauthorized_invalid_jwt(),
-        _ => AppError::unauthorized_invalid_jwt(),
+        jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+            crate::logging::security::login_failed("token_expired", None);
+            AppError::unauthorized_expired_jwt()
+        }
+        jsonwebtoken::errors::ErrorKind::InvalidSignature => {
+            crate::logging::security::login_failed("invalid_signature", None);
+            AppError::unauthorized_invalid_jwt()
+        }
+        _ => {
+            crate::logging::security::login_failed("invalid_token", None);
+            AppError::unauthorized_invalid_jwt()
+        }
     })
 }
 
