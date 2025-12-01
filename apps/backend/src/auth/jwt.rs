@@ -170,8 +170,8 @@ mod tests {
 
         let sub = unique_str("test-sub-expired");
         let email = unique_email("test");
-        // 20 minutes ago so 15-minute token is expired
-        let now = SystemTime::now() - Duration::from_secs(20 * 60);
+        // 70 minutes ago so 60-minute token is expired
+        let now = SystemTime::now() - Duration::from_secs(70 * 60);
 
         let token = mint_access_token(&sub, &email, now, &security).unwrap();
         let result = verify_access_token(&token, &security);

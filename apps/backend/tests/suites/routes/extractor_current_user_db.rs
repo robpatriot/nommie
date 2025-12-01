@@ -154,13 +154,7 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(resp.status().as_u16(), 403);
 
     // Validate error structure
-    assert_problem_details_structure(
-        resp,
-        403,
-        "FORBIDDEN_USER_NOT_FOUND",
-        "User not found in database",
-    )
-    .await;
+    assert_problem_details_structure(resp, 403, "FORBIDDEN_USER_NOT_FOUND", "Access denied").await;
 
     Ok(())
 }
