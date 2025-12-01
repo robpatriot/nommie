@@ -221,8 +221,9 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.
 - Planned CI: GitHub Actions gates merges with lint, tests, and schema checks.
-**Progress:** Local grep gates and lint/test guards complete; remote CI integration pending.  
-**Acceptance:** CI green gate required for merges; schema re-applies cleanly.
+- Security: Automated container image vulnerability scanning (e.g., Trivy, Snyk) for backend and frontend images.
+**Progress:** Local grep gates and lint/test guards complete; remote CI integration and image scanning pending.  
+**Acceptance:** CI green gate required for merges; schema re-applies cleanly; image scans run on CI and block merges on critical vulnerabilities.
 
 ---
 
