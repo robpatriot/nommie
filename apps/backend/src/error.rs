@@ -181,7 +181,11 @@ impl AppError {
             AppError::UnauthorizedInvalidJwt => "Invalid JWT".to_string(),
             AppError::UnauthorizedExpiredJwt => "Token expired".to_string(),
             AppError::Forbidden { detail, .. } => detail.clone(),
-            AppError::ForbiddenUserNotFound => "User not found in database".to_string(),
+            AppError::ForbiddenUserNotFound => {
+                // Avoid leaking whether a user record exists; present a generic message
+                // to the client while preserving specifics in logs.
+                "Access denied".to_string()
+            }
             AppError::BadRequest { detail, .. } => detail.clone(),
             AppError::Internal { detail, .. } => detail.clone(),
             AppError::Config { detail, .. } => detail.clone(),
