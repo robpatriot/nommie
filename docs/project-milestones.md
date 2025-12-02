@@ -191,28 +191,14 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **18. PATCH Endpoints with ETag Support**
-**Dependencies:** 5, 9, 12  
+### 🟨 **18. Architecture & Reliability**
 **Details:**
-- Implement PATCH endpoints for **game configuration only** (not gameplay actions) with conditional request support via ETags.
-- **Context:** Gameplay actions (bidding, playing cards, selecting trump) already use ETags via POST endpoints with `If-Match` headers (implemented in earlier milestones). This milestone adds PATCH endpoints for configuration changes.
-- **Scope:** PATCH is used for game configuration changes such as:
-  - Adding/removing AI seats
-  - Updating game settings/options
-  - Modifying game metadata (name, visibility, etc.)
-- **Not in scope:** Gameplay actions (bidding, playing cards, selecting trump, marking ready) already use POST endpoints with ETag/If-Match support and remain unchanged.
-- **ETag generation:** Generate strong ETags from resource version/state (e.g., using `lock_version` or content hash), consistent with existing POST gameplay endpoints.
-- **If-Match header handling:** Require `If-Match` header for PATCH requests; validate ETag matches current resource version (same pattern as POST gameplay endpoints).
-- **Error responses:**
-  - `409 Conflict` with `OptimisticLock` error code when `If-Match` ETag is stale (resource modified concurrently).
-  - `428 Precondition Required` when `If-Match` header is missing (required for PATCH operations, consistent with POST gameplay endpoints).
-  - Include version information in error extensions for client retry logic.
-- **Success behavior:** PATCH with matching ETag succeeds and increments resource version/ETag (returns new ETag in response header).
-- **Test coverage:**
-  - `patch_with_matching_if_match_succeeds_and_bumps_etag` - Valid PATCH updates resource and returns new ETag.
-  - `patch_with_stale_if_match_returns_409_with_extensions` - Stale ETag returns 409 with version details in extensions.
-  - `patch_missing_if_match_returns_428` - Missing `If-Match` header returns 428 Precondition Required (consistent with POST gameplay endpoints).
-**Acceptance:** PATCH endpoints enforce ETag validation for configuration changes; gameplay actions continue using POST with existing ETag support; concurrent modification conflicts return structured 409 responses; all test cases pass.
+- **WebSockets / Server Push:** Replace polling with WebSockets or SSE.  
+  *Acceptance:* Real-time updates replace polling.
+- **Deployment Stub:** Minimal production-style environment including FE, BE, DB, and observability stubs.  
+  *Acceptance:* Application runs in minimal production configuration.
+- **Race-Safe `ensure_user`:** Handle concurrent insertions safely by re-fetching on unique violations.  
+  *Acceptance:* No duplicate users under concurrency.
 
 ---
 
@@ -293,35 +279,13 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **1. Architecture & Reliability**
-- **WebSockets / Server Push:** Replace polling with WebSockets or SSE.  
-  *Acceptance:* Real-time updates replace polling.
-- **Deployment Stub:** Minimal production-style environment including FE, BE, DB, and observability stubs.  
-  *Acceptance:* Application runs in minimal production configuration.
-- **Race-Safe `ensure_user`:** Handle concurrent insertions safely by re-fetching on unique violations.  
-  *Acceptance:* No duplicate users under concurrency.
+### **1. Code Organization & Refactoring**
+- **Refactor `game-room-client.tsx`:** The component is 791 lines with complex state management that could benefit from a reducer pattern.  
+  *Acceptance:* Component is refactored with improved state management; complexity is reduced; maintainability is improved.
 
 ---
 
-### **2. Behavioral & Infrastructure Improvements**
-- **Data & Auth Hygiene:** Email normalization (trim, lowercase, Unicode NFKC), validation, username cleaning, skip redundant writes.  
-- **PII-Safe Logging:** Mask or hash sensitive identifiers in logs.  
-- **Error Code Catalog:** Centralize all SCREAMING_SNAKE error codes.  
-- **Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.  
-
-*Progress:* Transactional harness and DTO structure already support deterministic time injection and data hygiene hooks.
-
----
-
-### **3. Testing & Validation Enhancements**
-- **Golden Snapshot Fixtures:** Canonical JSON snapshots for all game phases, shared between frontend and backend.  
-  *Acceptance:* Schema or logic changes surface as test diffs.  
-- **Deterministic AI Simulation:** Replay identical seeded games for regression testing.  
-  *Acceptance:* Identical seeds yield identical results.
-
----
-
-### **4. Frontend Experience Enhancements**
+### **2. Frontend Experience Enhancements**
 - **React Query Adoption:** Introduce React Query for client data fetching (lobby lists, game snapshots) while keeping room for future caching/state patterns.
   - Addresses polling inefficiency (requests made even when nothing changed).
   - Provides request deduplication automatically.
@@ -337,6 +301,24 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
+### **3. Behavioral & Infrastructure Improvements**
+- **Data & Auth Hygiene:** Email normalization (trim, lowercase, Unicode NFKC), validation, username cleaning, skip redundant writes.  
+- **PII-Safe Logging:** Mask or hash sensitive identifiers in logs.  
+- **Error Code Catalog:** Centralize all SCREAMING_SNAKE error codes.  
+- **Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.  
+
+*Progress:* Transactional harness and DTO structure already support deterministic time injection and data hygiene hooks. Rate limiting in place
+
+---
+
+### **4. Testing & Validation Enhancements**
+- **Golden Snapshot Fixtures:** Canonical JSON snapshots for all game phases, shared between frontend and backend.  
+  *Acceptance:* Schema or logic changes surface as test diffs.  
+- **Deterministic AI Simulation:** Replay identical seeded games for regression testing.  
+  *Acceptance:* Identical seeds yield identical results.
+
+---
+
 ### **5. AI & Simulation Initiatives**
 - **AI Profile Discovery & Registry Alignment:** Audit current AI profile usage, enable discovery, and either sync profiles into the existing registry or replace the registry with profile-driven loading.  
   *Acceptance:* Contributors can register/discover AIs via a single authoritative source with clear onboarding steps.
@@ -347,13 +329,7 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **6. Code Organization & Refactoring**
-- **Refactor `game-room-client.tsx`:** The component is 791 lines with complex state management that could benefit from a reducer pattern.  
-  *Acceptance:* Component is refactored with improved state management; complexity is reduced; maintainability is improved.
-
----
-
-### **7. Future Architecture Considerations**
+### **6. Future Architecture Considerations**
 - **State Management Library:** Consider using a state management library (Redux/Zustand) for complex game state if needed.  
   *Acceptance:* Decision made on whether external state management is needed; if adopted, implementation is complete.
 - **Component-Level Lazy Loading:** Add component-level lazy loading as an optimization for heavy components.  
@@ -361,6 +337,32 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **Optional**
+### **7. Trace ID Logging Strategy Review**
 - **Trace ID Logging Strategy Review:** Decide on a single source of truth for `trace_id` emission (span-only vs. event field vs. conditional) so console and aggregated logs stay consistent without duplicate IDs.  
   *Acceptance:* Preferred logging strategy is chosen, documented, and implemented across middleware/tests.
+
+---
+
+### 🟨 **8. PATCH Endpoints with ETag Support**
+**Dependencies:** 5, 9, 12  
+**Details:**
+- Implement PATCH endpoints for **game configuration only** (not gameplay actions) with conditional request support via ETags.
+- **Context:** Gameplay actions (bidding, playing cards, selecting trump) already use ETags via POST endpoints with `If-Match` headers (implemented in earlier milestones). This milestone adds PATCH endpoints for configuration changes.
+- **Scope:** PATCH is used for game configuration changes such as:
+  - Adding/removing AI seats
+  - Updating game settings/options
+  - Modifying game metadata (name, visibility, etc.)
+- **Not in scope:** Gameplay actions (bidding, playing cards, selecting trump, marking ready) already use POST endpoints with ETag/If-Match support and remain unchanged.
+- **ETag generation:** Generate strong ETags from resource version/state (e.g., using `lock_version` or content hash), consistent with existing POST gameplay endpoints.
+- **If-Match header handling:** Require `If-Match` header for PATCH requests; validate ETag matches current resource version (same pattern as POST gameplay endpoints).
+- **Error responses:**
+  - `409 Conflict` with `OptimisticLock` error code when `If-Match` ETag is stale (resource modified concurrently).
+  - `428 Precondition Required` when `If-Match` header is missing (required for PATCH operations, consistent with POST gameplay endpoints).
+  - Include version information in error extensions for client retry logic.
+- **Success behavior:** PATCH with matching ETag succeeds and increments resource version/ETag (returns new ETag in response header).
+- **Test coverage:**
+  - `patch_with_matching_if_match_succeeds_and_bumps_etag` - Valid PATCH updates resource and returns new ETag.
+  - `patch_with_stale_if_match_returns_409_with_extensions` - Stale ETag returns 409 with version details in extensions.
+  - `patch_missing_if_match_returns_428` - Missing `If-Match` header returns 428 Precondition Required (consistent with POST gameplay endpoints).
+**Acceptance:** PATCH endpoints enforce ETag validation for configuration changes; gameplay actions continue using POST with existing ETag support; concurrent modification conflicts return structured 409 responses; all test cases pass.
+
