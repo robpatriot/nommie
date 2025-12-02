@@ -2,7 +2,17 @@ name: nommie-dev-db
 
 services:
   postgres:
-    image: postgres:16
+    # Build TLS-enabled Postgres image with CA secrets
+    # CA key/cert paths can be overridden via environment variables:
+    #   NOMMIE_CA_KEY_PATH (default: ~/secrets/nommie-ca/ca.key)
+    #   NOMMIE_CA_CERT_PATH (default: ~/secrets/nommie-ca/ca.crt)
+    build:
+      context: ../postgres-tls
+      dockerfile: Dockerfile
+      secrets:
+        - nommie_ca_key
+        - nommie_ca_crt
+    image: nommie-postgres-tls:latest
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     env_file:
@@ -12,6 +22,9 @@ services:
     volumes:
       - nommie_dev_db_data:/var/lib/postgresql/data
       - ../postgres/init.sh:/docker-entrypoint-initdb.d/00-init.sh:ro
+      # Mount CA cert for local backend connections (if backend runs outside Docker)
+      # This should be the public CA cert (safe to commit to git)
+      - ../shared/ca.crt:/etc/ssl/certs/nommie-ca.crt:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
@@ -22,4 +35,12 @@ services:
 
 volumes:
   nommie_dev_db_data:
+
+secrets:
+  # CA private key (used only during build, never in final image)
+  nommie_ca_key:
+    file: ${NOMMIE_CA_KEY_PATH:-${HOME}/secrets/nommie-ca/ca.key}
+  # CA public certificate (used during build)
+  nommie_ca_crt:
+    file: ${NOMMIE_CA_CERT_PATH:-${HOME}/secrets/nommie-ca/ca.crt}
 
