@@ -2,10 +2,12 @@ use std::future::{ready, Ready};
 use std::time::Instant;
 
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
+use actix_web::http::StatusCode;
 use actix_web::Error as ActixError;
 use futures_util::future::LocalBoxFuture;
 use tracing::{error, info, warn};
 
+use crate::logging::security;
 use crate::web::trace_ctx;
 
 pub struct StructuredLogger;
@@ -65,6 +67,9 @@ where
 
             if status.is_server_error() {
                 error!(http.method=%method, url.path=%path, http.status_code=%status_code, duration_us=%duration_us, trace_id=%trace_id, message="request_completed");
+            } else if status_code == StatusCode::TOO_MANY_REQUESTS.as_u16() {
+                // Use security-specific logging for rate limits
+                security::rate_limit_hit(&path);
             } else if status.is_client_error() {
                 warn!(http.method=%method, url.path=%path, http.status_code=%status_code, duration_us=%duration_us, trace_id=%trace_id, message="request_completed");
             } else {
