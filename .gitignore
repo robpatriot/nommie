@@ -18,6 +18,15 @@ docs/env.example.txt
 docker/**/*.env
 !docker/**/*.env.example
 
+# TLS private keys and runtime CA certs (never commit these)
+# CA private keys should be stored outside the repository (e.g., ~/secrets/nommie-ca/)
+docker/**/certs/**/*.key
+docker/**/certs/**/*.srl
+# Runtime CA certs (docker/shared/ca.crt) are derived from your private CA and
+# should not be committed either.
+docker/shared/ca.crt
+
+
 # Postgres data
 postgres_data/
 

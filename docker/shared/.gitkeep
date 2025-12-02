@@ -1,0 +1,4 @@
+# This directory holds the shared CA public certificate (ca.crt)
+# The CA private key (ca.key) should be stored outside the repository
+# See docker/postgres-tls/README.md for setup instructions
+
