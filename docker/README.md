@@ -6,6 +6,14 @@ This directory contains environment configuration files for different deployment
 
 **Never commit `.env` files to git!** They contain sensitive secrets. Only `.env.example` files are tracked in version control.
 
+## 🔒 Postgres TLS
+
+All Postgres instances (dev-db and local-prod) use TLS encryption by default. See [`postgres-tls/README.md`](postgres-tls/README.md) for:
+- How to generate your private CA (one-time setup)
+- How to build the TLS-enabled Postgres image
+- Backend TLS configuration
+- Certificate expiry and rotation
+
 ## Setup Instructions
 
 ### For Local Development (`dev-db/`)

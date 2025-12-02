@@ -4,7 +4,12 @@ This document tracks the current work plan for building the Nommie UI on web (Ne
 
 ---
 
-# Security enhancements
+# Next Steps
+
+- Implement process for restricted users - security enhancement 1 below
+- Complete mobile design - Milestone 17
+
+## Security enhancements
 
 This section captures security-related issues and recommendations.
 
@@ -13,20 +18,9 @@ This section captures security-related issues and recommendations.
 **Issue:** During initial real-user testing, anyone who discovers the app could create an account, which is undesirable while the product and security posture are still stabilizing.
 
 **Recommendation:**
-- Gate signup to a controlled set of users (e.g., invite-only / email allowlist)
-- Consider disabling open self-signup entirely and creating accounts via:
-  - Admin-only endpoint or CLI
-  - One-time invite tokens
-- Add a clear toggle/flag in configuration to re-enable open signup later
+- Gate signup AND login to a controlled set of users
+- Use email allowlist env var - if exists then it applies
+- env var should be comma separated and allow globs like *@blah.com
+- If server starts and env var exists invalidate logins for all users not in the list 
 - Ensure error messaging for blocked signup does not leak whether a given email is already registered
-
-### 2. Database Security
-
-**Recommendations:**
-- Ensure database connections use TLS in production
-- Review database user permissions (least privilege principle)
-- Enable database audit logging
-- Regular database backups with encryption
-- Consider using connection pooling limits (already implemented ✓)
-
-
+- Note: will add an admin only toggle/flag to re-enable open signup later
