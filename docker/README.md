@@ -53,7 +53,10 @@ openssl rand -hex 16
 
 ## Important Notes
 
-- **JWT Secrets**: `BACKEND_JWT_SECRET` and `AUTH_SECRET` should be the same value (shared between backend and frontend)
+- **JWT Secrets**: `BACKEND_JWT_SECRET` (backend) and `AUTH_SECRET` (NextAuth/frontend) are separate secrets serving different purposes:
+  - `BACKEND_JWT_SECRET`: Used by the backend to sign/verify API authentication tokens
+  - `AUTH_SECRET`: Used by NextAuth to sign/verify frontend session tokens
+  - These do NOT need to match - they are independent systems
 - **Database Passwords**: Use strong, randomly generated passwords in production
 - **CORS Origins**: Only include trusted domains in `CORS_ALLOWED_ORIGINS`
 - **Google OAuth**: Get credentials from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
