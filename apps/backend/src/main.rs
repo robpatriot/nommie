@@ -58,6 +58,9 @@ async fn main() -> std::io::Result<()> {
 
     println!("✅ Database connected");
 
+    // Check TLS certificate expiry (logs warning if expiring soon)
+    backend::config::tls::check_postgres_cert_expiry();
+
     // Wrap AppState with web::Data before passing to HttpServer
     let data = web::Data::new(app_state);
 

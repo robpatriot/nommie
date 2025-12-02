@@ -313,7 +313,33 @@ pub fn make_conn_spec(
             let username = encode_userinfo(&username_raw);
             let password = encode_userinfo(&password_raw);
 
-            let url = format!("postgresql://{username}:{password}@{host}:{port}/{db_name}");
+            let mut url = format!("postgresql://{username}:{password}@{host}:{port}/{db_name}");
+
+            // TLS configuration for Postgres connections.
+            //
+            // POSTGRES_SSL_MODE:
+            //   - Defaults to "verify-full" when unset, enabling TLS with full verification.
+            //   - Set to "disable" explicitly to turn TLS off (no sslmode/sslrootcert appended).
+            //   - Any other value ("require", "verify-ca", etc.) is passed through directly.
+            //
+            // POSTGRES_SSL_ROOT_CERT:
+            //   - Absolute path to CA certificate inside the container.
+            //   - Required whenever TLS is enabled (i.e., sslmode != "disable").
+            let ssl_mode =
+                env::var("POSTGRES_SSL_MODE").unwrap_or_else(|_| "verify-full".to_string());
+
+            if !ssl_mode.eq_ignore_ascii_case("disable") {
+                let root_cert = must_var("POSTGRES_SSL_ROOT_CERT")?;
+
+                // Append query parameters, handling the (currently unlikely) case where
+                // a query string already exists on the URL.
+                let separator = if url.contains('?') { '&' } else { '?' };
+                url.push(separator);
+                url.push_str(&format!("sslmode={}", ssl_mode));
+                url.push_str("&sslrootcert=");
+                url.push_str(&root_cert);
+            }
+
             Ok(url)
         }
         DbKind::SqliteFile => {
