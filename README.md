@@ -187,6 +187,30 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 
 ### 🛡️ Protected Routes
 - `/dashboard/:path*` - User dashboard (requires auth)
+
+### 📧 Email Allowlist (Early Testing)
+
+During early testing, you can restrict signup and login to a controlled set of email addresses using the `ALLOWED_EMAILS` environment variable.
+
+**Configuration:**
+- Set `ALLOWED_EMAILS` in your **backend** environment (not the frontend)
+- Format: comma-separated list of email addresses or patterns
+- Supports glob patterns: `*@example.com`, `user@*.example.com`
+- Examples:
+  - `user1@example.com,user2@example.com` - exact emails
+  - `*@trusted.com` - all emails at trusted.com
+  - `user1@example.com,*@trusted.com` - mix of exact and patterns
+- If not set or empty, allowlist is disabled (all emails allowed)
+
+**Behavior:**
+- When enabled, restricts both signup (new account creation) and login
+- Existing sessions for non-allowlisted users are invalidated on next request after server restart
+- Error messages are generic to prevent information leakage
+
+**Storage (backend only):**
+- Local dev: set in `apps/backend/.env` (or your shell environment)
+- Local-prod Docker: set in `docker/local-prod/backend.env`
+- Do not commit the actual allowlist to the public git repository
 - `/api/private/:path*` - Private API endpoints (requires auth)
 
 ---

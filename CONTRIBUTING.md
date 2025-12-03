@@ -97,6 +97,7 @@ set -a; . ./.env; set +a
 - `NOMMIE_OWNER_USER`, `NOMMIE_OWNER_PASSWORD` - Owner role credentials
 - `APP_JWT_SECRET` - JWT signing secret
 - `CORS_ALLOWED_ORIGINS` - Allowed CORS origins
+- `ALLOWED_EMAILS` - (Optional) Comma-separated email allowlist for restricting signup/login. Supports glob patterns (e.g., `*@example.com`). If not set, all emails are allowed. Store in `.env.local` or deployment secrets (not committed).
 
 ## Code Conventions
 

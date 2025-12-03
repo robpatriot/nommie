@@ -7,6 +7,9 @@ This document tracks the current work plan for building the Nommie UI on web (Ne
 # Next Steps
 
 - Implement process for restricted users - security enhancement 1 below
+- Run lint and tests and commit
+- Fix eslint config
+- Fix initial load of lobby games list
 - Complete mobile design - Milestone 17
 
 ## Security enhancements
