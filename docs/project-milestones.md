@@ -32,7 +32,9 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - Docker Compose with Postgres (roles, DBs, grants).
 - Host-pnpm for speed; backend runs on host or in container.
-**Acceptance:** `pnpm start` starts frontend and backend; Postgres reachable; frontend communicates with backend.
+- **Postgres TLS/SSL Support:** Postgres connections use TLS with `verify-full` default; shared Postgres TLS image with build-time certificate generation; separate volume for certificates.
+**Progress:** TLS-enabled Postgres configured; certificates managed via shared volume; backend supports TLS connections with verify-full validation.  
+**Acceptance:** `pnpm start` starts frontend and backend; Postgres reachable with TLS; frontend communicates with backend.
 
 ---
 
@@ -208,21 +210,8 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 - Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.
 - Planned CI: GitHub Actions gates merges with lint, tests, and schema checks.
 - Security: Automated container image vulnerability scanning (e.g., Trivy, Snyk) for backend and frontend images.
-**Progress:** Local grep gates and lint/test guards complete; remote CI integration and image scanning pending.  
+**Progress:** Local grep gates and lint/test guards complete; container vulnerability scanning task defined; remote CI integration pending.  
 **Acceptance:** CI green gate required for merges; schema re-applies cleanly; image scans run on CI and block merges on critical vulnerabilities.
-
----
-
-### 🟨 **20. Documentation & Decision Log**
-**Dependencies:** 11  
-**Details:**
-- **README:** Setup and reset flow; architecture explanation.
-- **CONTRIBUTING:** Module layout, extractor policy, `_test` guard.
-- **DECISIONS.md:** Locked technical decisions.
-- **Inline Comments:** Add comments for complex logic (e.g., JWT refresh).
-- **JSDoc Documentation:** Add JSDoc for public APIs and complex functions.
-**Progress:** `.cursorrules` and roadmap current; README/CONTRIBUTING need refresh for layering and DTO policies.  
-**Acceptance:** New developers can onboard independently; architecture is documented; complex logic is explained inline; APIs have JSDoc comments.
 
 ---
 
@@ -232,8 +221,9 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 - **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id` when relevant.
 - **Frontend Trace Display:** Frontend displays `trace_id` on error surfaces.
 - **Health Endpoint:** Add `/health` route reporting DB connectivity and version info.
-**Progress:** Trace IDs active; enrichment and health route pending.  
-**Acceptance:** Logs actionable; trace ID visible end-to-end; endpoint returns up/down status with trace context.
+- **Security Logging:** Structured security logging for authentication failures and rate limit hits with appropriate log levels and context.
+**Progress:** Trace IDs active; structured security logging implemented for auth failures and rate limits; enrichment and health route pending.  
+**Acceptance:** Logs actionable; trace ID visible end-to-end; security events logged with appropriate detail; endpoint returns up/down status with trace context.
 
 ---
 
@@ -273,6 +263,57 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
+### ✅ **25. Email Allowlist & Access Control**
+**Dependencies:** 7  
+**Details:**
+- **Email Allowlist:** Implement email allowlist for signup and login to restrict access to authorized email addresses.
+- **Backend Implementation:** Allowlist validation in authentication flow with configurable allowlist via environment variables.
+- **Frontend Error Handling:** Frontend handles allowlist errors gracefully with sign-out flow when access is denied.
+- **StateBuilder Integration:** Allowlist ownership managed through StateBuilder for consistent configuration.
+- **Documentation:** Email allowlist configuration documented with environment variable setup.
+**Progress:** Email allowlist fully implemented in backend and frontend; configuration documented; tests updated to avoid env var dependencies.  
+**Acceptance:** Only emails on the allowlist can sign up or log in; denied access triggers appropriate error handling and sign-out; configuration is documented and testable.
+
+---
+
+### ✅ **26. Security Hardening**
+**Dependencies:** 2, 7  
+**Details:**
+- **Docker Image Hardening:** Non-root users and pinned base images for backend and frontend containers.
+- **Security Headers:** Content Security Policy (CSP), Permissions-Policy, and X-XSS-Protection headers implemented.
+- **Rate Limiting:** Rate limiting middleware with security-specific logging for rate limit hits.
+- **CORS Configuration:** Tightened CORS configuration for backend API.
+- **Environment Validation:** Startup validation for critical backend environment variables.
+- **Authentication Security:** JWT lifetime adjustments, NextAuth session lifetime shortened, NextAuth updated to address security vulnerabilities.
+- **Upload Limits:** Universal upload limits implemented.
+- **Error Security:** Avoid leaking user existence in forbidden user errors.
+- **Connection Security:** Postgres credentials percent-encoded in connection URLs.
+**Progress:** Docker images hardened; security headers implemented; rate limiting active; CORS tightened; environment validation in place; authentication lifetimes adjusted; upload limits enforced; error messages sanitized.  
+**Acceptance:** All security hardening measures implemented and tested; security headers present; rate limiting functional; no information leakage in errors; containers run as non-root.
+
+---
+
+### 🟨 **27. Documentation Maintenance (Ongoing)**
+**Dependencies:** 11  
+**Status:** Long-standing milestone — documentation is continuously maintained and updated as the project evolves.
+
+**Details:**
+- **README:** Setup and reset flow; architecture explanation (including layering and DTO policies).
+- **CONTRIBUTING:** Module layout, extractor policy, `_test` guard, layering guidelines, and DTO policies.
+- **Inline Comments:** Add comments for complex logic (e.g., JWT refresh, domain algorithms) as code evolves.
+- **JSDoc Documentation:** Add JSDoc for public APIs and complex functions as new features are added.
+- **Environment Variable Documentation:** Comprehensive documentation for all environment variables including security-related configuration.
+- **TLS Setup Documentation:** Documentation for Postgres TLS/SSL configuration and certificate management.
+- **Email Allowlist Documentation:** Configuration documentation for email allowlist feature.
+- **Architecture Documentation:** Keep architecture docs (`docs/architecture-*.md`) current with system changes.
+
+**Progress:** `.cursorrules` and roadmap current; environment variable documentation improved; TLS setup documented; email allowlist configuration documented; README and CONTRIBUTING updated with layering and DTO policies. JSDoc and inline comments are added incrementally as new code is written.  
+**Acceptance:** New developers can onboard independently; architecture is documented; documentation stays current with codebase changes; complex logic is explained inline; APIs have JSDoc comments; environment variables and security features are documented.
+
+**Note:** This milestone is never "complete" — it represents an ongoing commitment to maintain documentation quality as the project grows. Documentation should be updated alongside code changes, not as a separate phase.
+
+---
+
 ## Optional & Enhancement Track
 
 Independent improvements that enhance robustness, performance, and developer experience.
@@ -305,9 +346,9 @@ Independent improvements that enhance robustness, performance, and developer exp
 - **Data & Auth Hygiene:** Email normalization (trim, lowercase, Unicode NFKC), validation, username cleaning, skip redundant writes.  
 - **PII-Safe Logging:** Mask or hash sensitive identifiers in logs.  
 - **Error Code Catalog:** Centralize all SCREAMING_SNAKE error codes.  
-- **Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.  
+- ~~**Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.~~ ✅ **Completed:** Rate limiting middleware implemented with security-specific logging (see Milestone 26).
 
-*Progress:* Transactional harness and DTO structure already support deterministic time injection and data hygiene hooks. Rate limiting in place
+*Progress:* Transactional harness and DTO structure already support deterministic time injection and data hygiene hooks. Rate limiting implemented and active.
 
 ---
 
