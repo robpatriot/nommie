@@ -58,6 +58,19 @@ async fn main() -> std::io::Result<()> {
 
     println!("✅ Database connected");
 
+    // Log email allowlist status
+    match &app_state.email_allowlist {
+        Some(allowlist) => {
+            println!(
+                "🔒 Email allowlist enabled with {} pattern(s)",
+                allowlist.pattern_count()
+            );
+        }
+        None => {
+            println!("🔓 Email allowlist disabled (open signup/login)");
+        }
+    }
+
     // Check TLS certificate expiry (logs warning if expiring soon)
     backend::config::tls::check_postgres_cert_expiry();
 

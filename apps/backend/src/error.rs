@@ -161,6 +161,7 @@ impl AppError {
             AppError::UnauthorizedExpiredJwt => ErrorCode::UnauthorizedExpiredJwt,
             AppError::Forbidden { code, .. } => *code,
             AppError::ForbiddenUserNotFound => ErrorCode::ForbiddenUserNotFound,
+            // EmailNotAllowed is handled via Forbidden variant with EmailNotAllowed code
             AppError::BadRequest { code, .. } => *code,
             AppError::Internal { code, .. } => *code,
             AppError::Config { .. } => ErrorCode::ConfigError,
@@ -302,6 +303,14 @@ impl AppError {
 
     pub fn forbidden_user_not_found() -> Self {
         Self::ForbiddenUserNotFound
+    }
+
+    pub fn email_not_allowed() -> Self {
+        Self::Forbidden {
+            code: ErrorCode::EmailNotAllowed,
+            detail: "Access restricted. Please contact support if you believe this is an error."
+                .to_string(),
+        }
     }
 
     /// Create a configuration error with source

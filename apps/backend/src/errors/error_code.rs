@@ -28,6 +28,8 @@ pub enum ErrorCode {
     Forbidden,
     /// User not found in database
     ForbiddenUserNotFound,
+    /// Email not allowed by allowlist
+    EmailNotAllowed,
     /// User is not a member of the game
     NotAMember,
     /// User has insufficient role for this operation
@@ -150,6 +152,7 @@ impl ErrorCode {
             Self::UnauthorizedExpiredJwt => "UNAUTHORIZED_EXPIRED_JWT",
             Self::Forbidden => "FORBIDDEN",
             Self::ForbiddenUserNotFound => "FORBIDDEN_USER_NOT_FOUND",
+            Self::EmailNotAllowed => "EMAIL_NOT_ALLOWED",
             Self::NotAMember => "NOT_A_MEMBER",
             Self::InsufficientRole => "INSUFFICIENT_ROLE",
 

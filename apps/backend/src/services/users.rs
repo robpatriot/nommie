@@ -2,6 +2,7 @@ use sea_orm::DatabaseTransaction;
 use tracing::{debug, info, warn};
 use unicode_normalization::UnicodeNormalization;
 
+use crate::config::email_allowlist::EmailAllowlist;
 use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind, ValidationKind};
 use crate::logging::pii::Redacted;
 use crate::repos::user_options as user_options_repo;
@@ -107,6 +108,7 @@ impl UserService {
         email: &str,
         name: Option<&str>,
         google_sub: &str,
+        email_allowlist: Option<&EmailAllowlist>,
     ) -> Result<User, DomainError> {
         // Sanitize email: normalize (trim, lowercase, NFKC) and validate format
         let clean_email = sanitize_email(email)?;
@@ -171,6 +173,16 @@ impl UserService {
             }
             None => {
                 // User doesn't exist, create new user and credentials
+
+                // Check email allowlist before creating new user (defense in depth)
+                if let Some(allowlist) = email_allowlist {
+                    if !allowlist.is_allowed(&clean_email) {
+                        return Err(DomainError::validation(
+                            ValidationKind::InvalidEmail,
+                            "Access restricted. Please contact support if you believe this is an error.".to_string(),
+                        ));
+                    }
+                }
 
                 // Derive username from name or email local-part
                 let username = derive_username(name, &clean_email);

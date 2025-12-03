@@ -21,7 +21,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
             let test_google_sub = unique_str("google-sub");
             let service = UserService;
             let user1 = service
-                .ensure_user(txn, &test_email, Some("Alice"), &test_google_sub)
+                .ensure_user(txn, &test_email, Some("Alice"), &test_google_sub, None)
                 .await?;
 
             // Verify user was created with expected values
@@ -36,6 +36,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
                     &test_email,
                     Some("Alice Smith"), // Different name
                     &test_google_sub,    // Same google_sub
+                    None,
                 )
                 .await?;
 
@@ -99,7 +100,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 
             // Scenario 1: First login (no user/credential) → creates user + credentials, sets google_sub
             let user1 = service
-                .ensure_user(txn, &test_email, Some("Bob"), &original_google_sub)
+                .ensure_user(txn, &test_email, Some("Bob"), &original_google_sub, None)
                 .await?;
 
             // Verify user was created with expected values
@@ -132,6 +133,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
                     &test_email,
                     Some("Bob Smith"),    // Different name
                     &original_google_sub, // Same google_sub
+                    None,                 // No allowlist for tests
                 )
                 .await?;
 
@@ -152,7 +154,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 
             // Scenario 3: Repeat login (same email, credential has different google_sub) → expect 409 with GOOGLE_SUB_MISMATCH
             let error_result = service
-                .ensure_user(txn, &test_email, Some("Bob"), &different_google_sub)
+                .ensure_user(txn, &test_email, Some("Bob"), &different_google_sub, None)
                 .await;
 
             // Verify that the original credential remains unchanged
@@ -245,6 +247,7 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
                     &test_email,
                     Some("Charlie Brown"), // Different name
                     &google_sub,
+                    None,
                 )
                 .await?;
 
@@ -284,7 +287,13 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
 
             // Create user with uppercase email and surrounding whitespace
             let user1 = service
-                .ensure_user(txn, "  ALICE@EXAMPLE.COM  ", Some("Alice"), &google_sub)
+                .ensure_user(
+                    txn,
+                    "  ALICE@EXAMPLE.COM  ",
+                    Some("Alice"),
+                    &google_sub,
+                    None,
+                )
                 .await?;
 
             // Verify user was created
@@ -292,7 +301,7 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
 
             // Try to log in with lowercase email (should find the same user)
             let user2 = service
-                .ensure_user(txn, "alice@example.com", Some("Alice"), &google_sub)
+                .ensure_user(txn, "alice@example.com", Some("Alice"), &google_sub, None)
                 .await?;
 
             // Should be the same user
@@ -300,7 +309,7 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
 
             // Try with mixed case
             let user3 = service
-                .ensure_user(txn, "Alice@Example.Com", Some("Alice"), &google_sub)
+                .ensure_user(txn, "Alice@Example.Com", Some("Alice"), &google_sub, None)
                 .await?;
 
             // Should still be the same user
@@ -337,14 +346,14 @@ async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
             // Create user with composed Unicode (é as single character U+00E9)
             let email_composed = "café@example.com";
             let user1 = service
-                .ensure_user(txn, email_composed, Some("User"), &google_sub)
+                .ensure_user(txn, email_composed, Some("User"), &google_sub, None)
                 .await?;
 
             // Try to log in with decomposed Unicode (é as e + combining acute accent U+0065 U+0301)
             // This should normalize to the same value via NFKC
             let email_decomposed = "cafe\u{0301}@example.com";
             let user2 = service
-                .ensure_user(txn, email_decomposed, Some("User"), &google_sub)
+                .ensure_user(txn, email_decomposed, Some("User"), &google_sub, None)
                 .await?;
 
             // Should be the same user (NFKC normalization ensures this)
@@ -372,7 +381,7 @@ async fn test_email_validation_missing_at_symbol() -> Result<(), AppError> {
 
             // Try to create user with email missing @ symbol
             let result = service
-                .ensure_user(txn, "invalidemail.com", Some("User"), &google_sub)
+                .ensure_user(txn, "invalidemail.com", Some("User"), &google_sub, None)
                 .await;
 
             // Should fail with InvalidEmail error
@@ -404,7 +413,7 @@ async fn test_email_validation_multiple_at_symbols() -> Result<(), AppError> {
 
             // Try to create user with email having multiple @ symbols
             let result = service
-                .ensure_user(txn, "user@@example.com", Some("User"), &google_sub)
+                .ensure_user(txn, "user@@example.com", Some("User"), &google_sub, None)
                 .await;
 
             // Should fail with InvalidEmail error
@@ -436,7 +445,7 @@ async fn test_email_validation_empty_local_part() -> Result<(), AppError> {
 
             // Try to create user with email having empty local part
             let result = service
-                .ensure_user(txn, "@example.com", Some("User"), &google_sub)
+                .ensure_user(txn, "@example.com", Some("User"), &google_sub, None)
                 .await;
 
             // Should fail with InvalidEmail error
@@ -468,7 +477,7 @@ async fn test_email_validation_empty_domain() -> Result<(), AppError> {
 
             // Try to create user with email having empty domain part
             let result = service
-                .ensure_user(txn, "user@", Some("User"), &google_sub)
+                .ensure_user(txn, "user@", Some("User"), &google_sub, None)
                 .await;
 
             // Should fail with InvalidEmail error
@@ -500,7 +509,7 @@ async fn test_email_validation_whitespace_only() -> Result<(), AppError> {
 
             // Try to create user with email that becomes empty after trimming
             let result = service
-                .ensure_user(txn, "   ", Some("User"), &google_sub)
+                .ensure_user(txn, "   ", Some("User"), &google_sub, None)
                 .await;
 
             // Should fail with InvalidEmail error

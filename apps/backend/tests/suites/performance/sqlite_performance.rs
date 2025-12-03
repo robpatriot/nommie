@@ -29,7 +29,7 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
                 let email = unique_email(&format!("memory_user_{}", i));
                 let sub = unique_str(&format!("memory-sub-{}", i));
                 let _user = service
-                    .ensure_user(txn, &email, Some(&format!("Memory User {}", i)), &sub)
+                    .ensure_user(txn, &email, Some(&format!("Memory User {}", i)), &sub, None)
                     .await?;
             }
             Ok(())
@@ -53,7 +53,7 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
                 let email = unique_email(&format!("file_user_{}", i));
                 let sub = unique_str(&format!("file-sub-{}", i));
                 let _user = service
-                    .ensure_user(txn, &email, Some(&format!("File User {}", i)), &sub)
+                    .ensure_user(txn, &email, Some(&format!("File User {}", i)), &sub, None)
                     .await?;
             }
             Ok(())

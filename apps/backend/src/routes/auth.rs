@@ -47,10 +47,19 @@ async fn login(
         ));
     }
 
+    // Check email allowlist before proceeding (prevents both signup and login)
+    // The allowlist's is_allowed() method handles normalization internally
+    if let Some(allowlist) = &app_state.email_allowlist {
+        if !allowlist.is_allowed(&req.email) {
+            return Err(AppError::email_not_allowed());
+        }
+    }
+
     // Prepare owned values to move into the txn closure
     let email = req.email.clone();
     let name = req.name.clone();
     let google_sub = req.google_sub.clone();
+    let email_allowlist = app_state.email_allowlist.clone();
 
     // Own the transaction boundary here and pass a borrowed txn to the service
     let user = with_txn(Some(&http_req), &app_state, |txn| {
@@ -58,7 +67,13 @@ async fn login(
         Box::pin(async move {
             let service = UserService;
             Ok(service
-                .ensure_user(txn, &email, name.as_deref(), &google_sub)
+                .ensure_user(
+                    txn,
+                    &email,
+                    name.as_deref(),
+                    &google_sub,
+                    email_allowlist.as_ref(),
+                )
                 .await?)
         })
     })
