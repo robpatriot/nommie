@@ -240,6 +240,75 @@ During early testing, you can restrict signup and login to a controlled set of e
 
 👉 See [Architecture & Tech Stack](docs/architecture-overview.md) for details.
 
+### Backend Architecture Layers
+
+The backend follows a **three-layer architecture** that separates concerns and keeps domain logic pure:
+
+1. **Domain Layer** (`apps/backend/src/domain/`)
+   - Pure game logic with no database or framework dependencies
+   - Types: `GameState`, `Phase`, `Card`, `Trump`, `Bid`
+   - Functions: `place_bid()`, `play_card()`, `apply_round_scoring()`
+   - **Rule:** No SeaORM, no Actix Web, no database imports
+   - **Purpose:** Testable, reusable game logic independent of infrastructure
+
+2. **Orchestration Layer** (`apps/backend/src/services/`, `apps/backend/src/repos/`)
+   - Coordinates domain logic with database operations
+   - Repositories handle database access (SeaORM entities)
+   - Services orchestrate multi-step operations (e.g., `GameFlowService`, `UserService`)
+   - **Rule:** Can use SeaORM and domain types, but not Actix Web types
+   - **Purpose:** Business workflows that require database state
+
+3. **Routes Layer** (`apps/backend/src/routes/`)
+   - Thin HTTP adapters that extract request data and call orchestration
+   - Uses extractors (`CurrentUser`, `GameId`, `ValidatedJson<T>`) for validation
+   - Converts between HTTP types and domain/service types
+   - **Rule:** Minimal logic; delegate to services/repos
+   - **Purpose:** HTTP request/response handling
+
+**Example Flow:**
+```
+HTTP Request → Route (extract & validate) → Service (orchestrate) → Domain (pure logic) → Repository (persist)
+```
+
+### Data Transfer Objects (DTOs)
+
+DTOs are request/response types used at the HTTP boundary. They serve as a contract between the frontend and backend.
+
+**When to Use DTOs:**
+- **Request DTOs:** For all POST/PATCH/PUT request bodies (e.g., `LoginRequest`, `BidRequest`)
+- **Response DTOs:** For all JSON responses (e.g., `GameSnapshotResponse`, `LoginResponse`)
+- **Validation:** Use `ValidatedJson<T>` extractor to automatically convert JSON parse errors to Problem Details
+
+**DTO Policies:**
+- **Separation from Domain:** DTOs are separate from domain types (e.g., `BidRequest` vs domain `Bid`)
+- **Optimistic Locking:** Mutation request DTOs must include `lock_version: i32` for concurrent update safety
+- **Serialization:** Use `serde` derive macros; prefer `snake_case` for JSON field names
+- **Validation:** Validate in routes using extractors; domain logic validates business rules
+- **Transformation:** Convert between DTOs and domain types in the orchestration layer, not in routes
+
+**Example:**
+```rust
+// Request DTO (HTTP boundary)
+#[derive(Deserialize)]
+struct BidRequest {
+    bid: u8,
+    lock_version: i32,  // Required for optimistic locking
+}
+
+// Domain type (pure logic)
+pub struct Bid(pub u8);
+
+// Route converts DTO → domain type → service
+async fn submit_bid(
+    body: ValidatedJson<BidRequest>,  // Automatic JSON validation
+    // ... extractors ...
+) -> Result<HttpResponse, AppError> {
+    let domain_bid = Bid(body.bid);
+    service.place_bid(txn, game_id, seat, domain_bid, body.lock_version).await?;
+    // ...
+}
+```
+
 ## 📚 Documentation Index
 - Architecture & Context: `docs/architecture-overview.md` (stack baseline), `docs/architecture-game-context.md` (request-scoped context model)
 - Backend Operations: `docs/backend-error-handling.md` (RFC 7807 layers), `docs/backend-testing-guide.md` (DB harness & safeguards), `docs/backend-in-memory-game-engine.md` (AI simulation loop)
