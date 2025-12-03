@@ -4,6 +4,7 @@ import LobbyClient from '@/components/LobbyClient'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { getAvailableGames } from '@/lib/api'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
+import { handleAllowlistError } from '@/lib/auth/allowlist'
 
 export default async function LobbyPage() {
   const session = await auth()
@@ -16,11 +17,14 @@ export default async function LobbyPage() {
   // Fetch games, but handle backend startup gracefully
   // Error handling is centralized in fetchWithAuth - errors during startup
   // are suppressed automatically. Start with empty games list on error.
+  // If user is not allowed (403 EMAIL_NOT_ALLOWED), sign them out and
+  // redirect to an access denied page via handleAllowlistError.
   let allGames: Awaited<ReturnType<typeof getAvailableGames>> = []
   try {
     allGames = await getAvailableGames()
-  } catch {
-    // Silently handle errors - centralized error handling in fetchWithAuth
+  } catch (error) {
+    await handleAllowlistError(error)
+    // Silently handle other errors - centralized error handling in fetchWithAuth
     // will log appropriately based on startup window and backend status.
     // The client component can handle refresh once backend is available.
     // allGames remains empty array - client will show empty state and can retry

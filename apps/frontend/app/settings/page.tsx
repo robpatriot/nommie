@@ -4,6 +4,7 @@ import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { AppearanceSelector } from '@/components/AppearanceSelector'
 import { CardConfirmationToggle } from '@/components/CardConfirmationToggle'
 import { getUserOptions } from '@/lib/api/user-options'
+import { handleAllowlistError } from '@/lib/auth/allowlist'
 
 export default async function SettingsPage() {
   const session = await auth()
@@ -16,8 +17,9 @@ export default async function SettingsPage() {
   try {
     const options = await getUserOptions()
     requireCardConfirmation = options.require_card_confirmation
-  } catch {
-    // Swallow errors and fall back to default
+  } catch (error) {
+    await handleAllowlistError(error)
+    // Swallow other errors and fall back to default
   }
 
   return (

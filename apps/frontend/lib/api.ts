@@ -41,6 +41,15 @@ export async function fetchWithAuth(
     }
   } catch (error) {
     if (error instanceof BackendJwtError) {
+      // If the backend explicitly reports that this email is not allowed,
+      // surface a stable 403 EMAIL_NOT_ALLOWED signal to callers.
+      if (error.message === 'EMAIL_NOT_ALLOWED') {
+        throw new BackendApiError(
+          'Access restricted. Please contact support if you believe this is an error.',
+          403,
+          'EMAIL_NOT_ALLOWED'
+        )
+      }
       // During startup, if backend isn't ready, use 503 (Service Unavailable)
       // Otherwise, use 401 (Unauthorized) for actual auth issues
       if (isInStartupWindow() && error.message.includes('starting up')) {

@@ -13,6 +13,7 @@ import {
   shouldLogError,
   isInStartupWindow,
 } from '@/lib/server/backend-status'
+import { parseErrorResponse } from '@/lib/api/error-parsing'
 import * as jose from 'jose'
 
 const REFRESH_THRESHOLD_SECONDS = 300 // 5 minutes - refresh if expiring within this
@@ -142,6 +143,26 @@ async function fetchNewBackendJwt(): Promise<string | null> {
     if (!response.ok) {
       markBackendUp() // Got response, backend is up
 
+      // Special-case allowlist failures so callers can distinguish them.
+      if (response.status === 403) {
+        try {
+          const parsed = await parseErrorResponse(response)
+          if (parsed.code === 'EMAIL_NOT_ALLOWED') {
+            // Propagate a specific signal for allowlist rejection
+            throw new BackendJwtError('EMAIL_NOT_ALLOWED')
+          }
+        } catch (error) {
+          // Re-throw if it's our EMAIL_NOT_ALLOWED signal
+          if (
+            error instanceof BackendJwtError &&
+            error.message === 'EMAIL_NOT_ALLOWED'
+          ) {
+            throw error
+          }
+          // Fall through to generic handling if parsing fails
+        }
+      }
+
       if (response.status === 429) {
         // Rate limited - log but don't throw
         if (shouldLogError()) {
@@ -165,6 +186,16 @@ async function fetchNewBackendJwt(): Promise<string | null> {
 
     return null
   } catch (error) {
+    // Preserve explicit allowlist failures so callers can distinguish them.
+    if (
+      error instanceof BackendJwtError &&
+      error.message === 'EMAIL_NOT_ALLOWED'
+    ) {
+      // Let this propagate to ensureBackendJwt() / fetchWithAuth()
+      // where it will be surfaced as a 403 EMAIL_NOT_ALLOWED.
+      throw error
+    }
+
     const errorMessage =
       error instanceof Error ? error.message.toLowerCase() : ''
     const causeMessage =

@@ -4,10 +4,18 @@ import { PageContainer } from '@/components/PageContainer'
 import { SurfaceCard } from '@/components/SurfaceCard'
 import { StatCard } from '@/components/StatCard'
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ accessDenied?: string }>
+}) {
   const session = await auth()
+  const params = await searchParams
+  const showAccessDenied = params.accessDenied === 'true'
 
   // If authenticated, redirect to lobby
+  // (Note: if accessDenied=true is present, the user should have been signed out
+  //  by the Route Handler, so session should be null. But we check anyway.)
   if (session) {
     redirect('/lobby')
   }
@@ -16,6 +24,22 @@ export default async function Home() {
 
   return (
     <PageContainer className="flex-1 justify-center gap-0 pb-16 pt-10 sm:pt-16">
+      {/* Show access denied message if present */}
+      {showAccessDenied && (
+        <SurfaceCard
+          padding="lg"
+          tone="strong"
+          className="mb-6 max-w-4xl mx-auto"
+        >
+          <h2 className="text-xl font-semibold mb-2">Access restricted</h2>
+          <p className="text-sm text-muted">
+            Your account is not currently allowed to access Nommie. If you
+            believe this is a mistake, please contact the person who invited you
+            or the site administrator.
+          </p>
+        </SurfaceCard>
+      )}
+
       <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <SurfaceCard
           as="section"
