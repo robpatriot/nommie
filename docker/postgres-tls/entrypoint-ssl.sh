@@ -3,24 +3,24 @@ set -euo pipefail
 
 # Entrypoint script for Postgres TLS image.
 # This script:
-# 1. Copies baked server certificates from /opt/nommie/ssl/ into $PGDATA/ssl/
-#    on first run (so certs persist in the data volume)
+# 1. Copies baked server certificates from /opt/nommie/ssl/ into a separate SSL volume
+#    on first run (so certs persist across image rebuilds)
 # 2. Configures postgresql.conf with SSL settings
 # 3. Delegates to the official Postgres entrypoint
 
 BAKED_CERT_DIR="/opt/nommie/ssl"
-VOLUME_CERT_DIR="${PGDATA}/ssl"
+VOLUME_CERT_DIR="/var/lib/postgresql/ssl"
 SERVER_KEY="${VOLUME_CERT_DIR}/server.key"
 SERVER_CERT="${VOLUME_CERT_DIR}/server.crt"
 CA_CERT="${VOLUME_CERT_DIR}/ca.crt"
 
-# Ensure volume cert directory exists
+# Create SSL cert directory (in separate volume, doesn't affect $PGDATA)
 mkdir -p "${VOLUME_CERT_DIR}"
 
 # Copy server certificates from baked location to volume on first run
 # This ensures certs persist across image rebuilds
 if [ ! -f "${SERVER_KEY}" ] || [ ! -f "${SERVER_CERT}" ]; then
-    echo "Copying server certificates from image to data volume..."
+    echo "Copying server certificates from image to SSL volume..."
     
     if [ ! -f "${BAKED_CERT_DIR}/server.key" ] || [ ! -f "${BAKED_CERT_DIR}/server.crt" ]; then
         echo "ERROR: Baked server certificates not found in ${BAKED_CERT_DIR}" >&2
@@ -37,7 +37,7 @@ if [ ! -f "${SERVER_KEY}" ] || [ ! -f "${SERVER_CERT}" ]; then
     
     echo "Server certificates copied to ${VOLUME_CERT_DIR}"
 else
-    echo "Server certificates already exist in volume, reusing them"
+    echo "Server certificates already exist in SSL volume, reusing them"
 fi
 
 # Copy CA cert to volume (for reference, though we'll also use the baked one)
@@ -49,25 +49,28 @@ if [ ! -f "${CA_CERT}" ]; then
     fi
 fi
 
-# Configure SSL in postgresql.conf if not already configured
-if ! grep -q "^ssl[[:space:]]*=" "${PGDATA}/postgresql.conf" 2>/dev/null; then
-    echo "Configuring Postgres SSL in postgresql.conf..."
-    cat >> "${PGDATA}/postgresql.conf" <<EOF
+# Configure SSL in postgresql.conf (only if database is initialized)
+# We check for PG_VERSION to ensure postgresql.conf exists
+if [ -f "${PGDATA}/PG_VERSION" ]; then
+    if ! grep -q "^ssl[[:space:]]*=" "${PGDATA}/postgresql.conf" 2>/dev/null; then
+        echo "Configuring Postgres SSL in postgresql.conf..."
+        cat >> "${PGDATA}/postgresql.conf" <<EOF
 
 # SSL configuration (added by entrypoint-ssl.sh)
 ssl = on
 ssl_cert_file = '${SERVER_CERT}'
 ssl_key_file = '${SERVER_KEY}'
 EOF
-    
-    # Add CA cert if available (optional, but useful for client cert verification)
-    if [ -f "${CA_CERT}" ]; then
-        echo "ssl_ca_file = '${CA_CERT}'" >> "${PGDATA}/postgresql.conf"
+        
+        # Add CA cert if available (optional, but useful for client cert verification)
+        if [ -f "${CA_CERT}" ]; then
+            echo "ssl_ca_file = '${CA_CERT}'" >> "${PGDATA}/postgresql.conf"
+        fi
+        
+        echo "SSL configuration added to postgresql.conf"
+    else
+        echo "SSL already configured in postgresql.conf"
     fi
-    
-    echo "SSL configuration added to postgresql.conf"
-else
-    echo "SSL already configured in postgresql.conf"
 fi
 
 # Delegate to official Postgres entrypoint

@@ -84,3 +84,31 @@ ALTER DEFAULT PRIVILEGES FOR USER nommie_owner IN SCHEMA public
 GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO nommie_app;
 PSQL
 
+########################################
+# 4) Configure SSL in postgresql.conf (if not already configured)
+########################################
+echo "Configuring SSL in postgresql.conf..."
+PGDATA="${PGDATA:-/var/lib/postgresql/data}"
+SSL_CERT_DIR="/var/lib/postgresql/ssl"
+SERVER_CERT="${SSL_CERT_DIR}/server.crt"
+SERVER_KEY="${SSL_CERT_DIR}/server.key"
+CA_CERT="${SSL_CERT_DIR}/ca.crt"
+
+if [ -f "${PGDATA}/postgresql.conf" ] && ! grep -q "^ssl[[:space:]]*=" "${PGDATA}/postgresql.conf" 2>/dev/null; then
+    cat >> "${PGDATA}/postgresql.conf" <<EOF
+
+# SSL configuration (added by init.sh)
+ssl = on
+ssl_cert_file = '${SERVER_CERT}'
+ssl_key_file = '${SERVER_KEY}'
+EOF
+    
+    if [ -f "${CA_CERT}" ]; then
+        echo "ssl_ca_file = '${CA_CERT}'" >> "${PGDATA}/postgresql.conf"
+    fi
+    
+    echo "SSL configuration added to postgresql.conf"
+else
+    echo "SSL already configured in postgresql.conf or postgresql.conf not found"
+fi
+
