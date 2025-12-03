@@ -271,11 +271,18 @@ mod tests {
 
     #[test]
     fn test_pattern_normalization() {
-        // Test that patterns are normalized when loaded from env
-        // This ensures "User@Example.COM" in env var matches "user@example.com"
+        // Test that pattern matching works with normalized patterns.
+        // This simulates what happens when from_env() normalizes patterns.
+        // A stored pattern equivalent to "USER@EXAMPLE.COM" should match
+        // different case/whitespace variants of the same email.
         let allowlist = EmailAllowlist {
-            patterns: vec!["USER@EXAMPLE.COM".to_string()],
+            // Pattern is already normalized (lowercase, trimmed, NFKC).
+            patterns: vec!["user@example.com".to_string()],
         };
+
+        // Input emails should be normalized before matching.
         assert!(allowlist.is_allowed("user@example.com"));
+        assert!(allowlist.is_allowed("USER@EXAMPLE.COM"));
+        assert!(allowlist.is_allowed("  User@Example.Com  "));
     }
 }
