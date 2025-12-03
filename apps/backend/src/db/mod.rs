@@ -34,7 +34,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_db_without_db() {
         let security_config = SecurityConfig::default();
-        let app_state = AppState::new_without_db(security_config);
+        let app_state = AppState::new_without_db(security_config, None);
 
         let result = require_db(&app_state);
         assert!(result.is_err());
@@ -57,7 +57,7 @@ mod tests {
     #[tokio::test]
     async fn test_require_db_error_code() {
         let security_config = SecurityConfig::default();
-        let app_state = AppState::new_without_db(security_config);
+        let app_state = AppState::new_without_db(security_config, None);
 
         let result = require_db(&app_state);
         assert!(result.is_err());

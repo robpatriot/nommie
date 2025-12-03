@@ -27,14 +27,19 @@ impl AppState {
     }
 
     /// Create a new AppState with the given database connection and security config
-    pub fn new(db: DatabaseConnection, security: SecurityConfig) -> Self {
-        let email_allowlist = EmailAllowlist::from_env();
+    pub fn new(
+        db: DatabaseConnection,
+        security: SecurityConfig,
+        email_allowlist: Option<EmailAllowlist>,
+    ) -> Self {
         Self::new_inner(Some(db), security, email_allowlist)
     }
 
     /// Create a new AppState with no database connection
-    pub fn new_without_db(security: SecurityConfig) -> Self {
-        let email_allowlist = EmailAllowlist::from_env();
+    pub fn new_without_db(
+        security: SecurityConfig,
+        email_allowlist: Option<EmailAllowlist>,
+    ) -> Self {
         Self::new_inner(None, security, email_allowlist)
     }
 

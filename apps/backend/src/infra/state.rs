@@ -1,4 +1,5 @@
 use crate::config::db::{DbKind, RuntimeEnv};
+use crate::config::email_allowlist::EmailAllowlist;
 use crate::error::AppError;
 use crate::infra::db::bootstrap_db;
 use crate::state::app_state::AppState;
@@ -10,6 +11,7 @@ pub struct StateBuilder {
     security_config: SecurityConfig,
     env: Option<RuntimeEnv>,
     db_kind: Option<DbKind>,
+    email_allowlist: Option<EmailAllowlist>,
 }
 
 impl StateBuilder {
@@ -28,14 +30,28 @@ impl StateBuilder {
         self
     }
 
+    /// Set the email allowlist (None = disabled, Some = enabled)
+    /// If not called, allowlist defaults to None (disabled)
+    pub fn with_email_allowlist(mut self, allowlist: Option<EmailAllowlist>) -> Self {
+        self.email_allowlist = allowlist;
+        self
+    }
+
     pub async fn build(self) -> Result<AppState, AppError> {
         match (self.env, self.db_kind) {
             (Some(env), Some(db_kind)) => {
                 // Bootstrap database directly with env and db_kind
                 let conn = bootstrap_db(env, db_kind).await?;
-                Ok(AppState::new(conn, self.security_config))
+                Ok(AppState::new(
+                    conn,
+                    self.security_config,
+                    self.email_allowlist,
+                ))
             }
-            _ => Ok(AppState::new_without_db(self.security_config)),
+            _ => Ok(AppState::new_without_db(
+                self.security_config,
+                self.email_allowlist,
+            )),
         }
     }
 }

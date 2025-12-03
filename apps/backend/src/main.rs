@@ -2,6 +2,7 @@ use actix_extensible_rate_limit::backend::memory::InMemoryBackend;
 use actix_extensible_rate_limit::RateLimiter;
 use actix_web::{web, App, HttpServer};
 use backend::config::db::{DbKind, RuntimeEnv};
+use backend::config::email_allowlist::EmailAllowlist;
 use backend::infra::state::build_state;
 use backend::middleware::cors::cors_middleware;
 use backend::middleware::jwt_extract::JwtExtract;
@@ -46,6 +47,7 @@ async fn main() -> std::io::Result<()> {
         .with_env(RuntimeEnv::Prod)
         .with_db(DbKind::Postgres)
         .with_security(security_config)
+        .with_email_allowlist(EmailAllowlist::from_env())
         .build()
         .await
     {
