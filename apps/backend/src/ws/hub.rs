@@ -38,7 +38,7 @@ impl GameSessionRegistry {
 
     pub fn register(&self, game_id: i64, recipient: Recipient<SnapshotBroadcast>) -> Uuid {
         let token = Uuid::new_v4();
-        let entry = self.sessions.entry(game_id).or_insert_with(DashMap::new);
+        let entry = self.sessions.entry(game_id).or_default();
         entry.insert(token, recipient);
 
         let total = self.total_connections.fetch_add(1, Ordering::Relaxed) + 1;
@@ -78,7 +78,7 @@ impl GameSessionRegistry {
         trace!(game_id, broadcasts_total = total, "Broadcasting snapshot");
         if let Some(entry) = self.sessions.get(&game_id) {
             for recipient in entry.iter() {
-                let _ = recipient.value().do_send(message.clone());
+                recipient.value().do_send(message.clone());
             }
         }
     }
@@ -96,16 +96,7 @@ impl RealtimeBroker {
             source: Box::new(err),
         })?;
 
-        let conn = client
-            .get_async_connection()
-            .await
-            .map_err(|err| AppError::Internal {
-                code: ErrorCode::ConfigError,
-                detail: "Unable to connect to Redis for realtime sync".to_string(),
-                source: Box::new(err),
-            })?;
-
-        let manager = ConnectionManager::new(conn)
+        let manager = ConnectionManager::new(client.clone())
             .await
             .map_err(|err| AppError::Internal {
                 code: ErrorCode::ConfigError,
@@ -141,7 +132,7 @@ impl RealtimeBroker {
         })?;
         let channel = format!("game:{game_id}");
         publisher
-            .publish(channel, encoded)
+            .publish::<_, _, ()>(channel, encoded)
             .await
             .map_err(|err| AppError::Internal {
                 code: ErrorCode::InternalError,
@@ -170,7 +161,7 @@ async fn run_subscription_loop(
     client: Client,
     registry: Arc<GameSessionRegistry>,
 ) -> Result<(), AppError> {
-    let mut connection: Connection =
+    let connection: Connection =
         client
             .get_async_connection()
             .await
@@ -179,7 +170,7 @@ async fn run_subscription_loop(
                 detail: "Unable to connect to Redis for subscription".to_string(),
                 source: Box::new(err),
             })?;
-    let mut pubsub = connection.as_pubsub();
+    let mut pubsub = connection.into_pubsub();
     pubsub
         .psubscribe("game:*")
         .await
@@ -191,9 +182,9 @@ async fn run_subscription_loop(
 
     let mut stream = pubsub.on_message();
     while let Some(msg) = stream.next().await {
-        if let (Ok(channel), Ok(payload)) =
-            (msg.get_channel::<String>(), msg.get_payload::<String>())
-        {
+        let channel_result = msg.get_channel::<String>();
+        let payload_result = msg.get_payload::<String>();
+        if let (Ok(channel), Ok(payload)) = (channel_result, payload_result) {
             if let Some(game_id) = parse_channel(&channel) {
                 match serde_json::from_str::<RedisEnvelope>(&payload) {
                     Ok(envelope) => {

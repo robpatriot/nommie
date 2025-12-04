@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Web server framework
+actix = "0.13"
 actix-web = { version = "4", features = ["macros"] }
 actix-cors = "0.7"
 actix-http = "3"

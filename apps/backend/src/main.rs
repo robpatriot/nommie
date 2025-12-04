@@ -11,9 +11,8 @@ use backend::middleware::request_trace::RequestTrace;
 use backend::middleware::security_headers::SecurityHeaders;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
-use backend::routes;
 use backend::state::security_config::SecurityConfig;
-use backend::ws;
+use backend::{routes, ws};
 
 mod telemetry;
 
@@ -167,9 +166,17 @@ async fn main() -> std::io::Result<()> {
                 // User routes with general rate limiting (100 req/min) and security headers
                 web::scope("/api/user")
                     .wrap(SecurityHeaders)
-                    .wrap(api_limiter)
+                    .wrap(api_limiter.clone())
                     .wrap(JwtExtract)
                     .configure(routes::user_options::configure_routes),
+            )
+            .service(
+                // WebSocket token endpoint - issues short-lived tokens for WS connections
+                web::scope("/api/ws")
+                    .wrap(SecurityHeaders)
+                    .wrap(api_limiter.clone())
+                    .wrap(JwtExtract)
+                    .configure(routes::realtime::configure_routes),
             )
             // Health check route - security headers only, no rate limiting
             .service(
@@ -183,7 +190,7 @@ async fn main() -> std::io::Result<()> {
                     .wrap(SecurityHeaders)
                     .route("/", web::get().to(routes::health::root)),
             )
-            // WebSocket routes for real-time game updates
+            // WebSocket upgrade endpoint for real-time game updates
             .service(
                 web::scope("/ws").wrap(JwtExtract).service(
                     web::resource("/games/{game_id}").route(web::get().to(ws::game::upgrade)),

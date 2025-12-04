@@ -22,6 +22,7 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(40);
 
 #[derive(Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[allow(clippy::large_enum_variant)]
 enum OutgoingMessage {
     Snapshot {
         data: GameSnapshotResponse,
@@ -29,10 +30,6 @@ enum OutgoingMessage {
     },
     Ack {
         message: &'static str,
-    },
-    Error {
-        code: &'static str,
-        message: String,
     },
 }
 
@@ -76,7 +73,6 @@ pub struct GameWsSession {
     session_id: Uuid,
     game_id: i64,
     user_id: i64,
-    user_sub: String,
     current_user: CurrentUser,
     app_state: web::Data<AppState>,
     last_heartbeat: Instant,
@@ -99,7 +95,6 @@ impl GameWsSession {
             session_id: Uuid::new_v4(),
             game_id,
             user_id: current_user.id,
-            user_sub: current_user.sub,
             current_user,
             app_state,
             last_heartbeat: Instant::now(),

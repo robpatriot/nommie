@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::http::header;
+use actix_web::http::header::HeaderValue;
 use actix_web::{web, Error, HttpMessage};
 use futures_util::future::{ready, LocalBoxFuture, Ready};
 
@@ -117,9 +118,7 @@ where
     }
 }
 
-fn extract_bearer_from_header(
-    header_value: Option<&actix_web::http::HeaderValue>,
-) -> Result<Option<String>, Error> {
+fn extract_bearer_from_header(header_value: Option<&HeaderValue>) -> Result<Option<String>, Error> {
     let auth_value = match header_value {
         Some(value) => value,
         None => return Ok(None),

@@ -38,7 +38,7 @@ pub(crate) struct GameSnapshotResponse {
     viewer_hand: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     bid_constraints: Option<BidConstraintsResponse>,
-    lock_version: i32,
+    pub(crate) lock_version: i32,
 }
 
 #[derive(Clone, Serialize)]
@@ -52,6 +52,7 @@ pub(crate) async fn build_snapshot_response(
     game_id: i64,
     current_user: &CurrentUser,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
+    let current_user_id = current_user.id;
     let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
         with_txn(http_req, app_state, |txn| {
             Box::pin(async move {
@@ -123,7 +124,7 @@ pub(crate) async fn build_snapshot_response(
                                     host_seat = seat;
                                 }
 
-                                if user_id == current_user.id {
+                                if user_id == current_user_id {
                                     viewer_seat = Some(seat);
                                 }
                             }
@@ -1572,26 +1573,6 @@ fn trump_to_api_value(trump: Trump) -> &'static str {
         Trump::Spades => "SPADES",
         Trump::NoTrump => "NO_TRUMP",
     }
-}
-
-#[allow(dead_code)]
-async fn publish_snapshot_from_db(
-    app_state: &web::Data<AppState>,
-    game_id: i64,
-) -> Result<(), AppError> {
-    if app_state.realtime.is_none() {
-        return Ok(());
-    }
-
-    let lock_version = with_txn(None, app_state, |txn| {
-        Box::pin(async move {
-            let game = games_repo::require_game(txn, game_id).await?;
-            Ok::<i32, AppError>(game.lock_version)
-        })
-    })
-    .await?;
-
-    publish_snapshot_with_lock(app_state, game_id, lock_version).await
 }
 
 async fn publish_snapshot_with_lock(

@@ -5,14 +5,14 @@ import {
   type GameRoomSnapshotPayload,
 } from '@/app/actions/game-room-actions'
 import type { GameRoomError } from '@/app/game/[gameId]/_components/game-room-view.types'
-import type {
-  BidConstraints,
-  GameSnapshot,
-  Seat,
-} from '@/lib/game-room/types'
+import type { BidConstraints, GameSnapshot, Seat } from '@/lib/game-room/types'
 import { extractPlayerNames } from '@/utils/player-names'
 
-type ConnectionState = 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
+type ConnectionState =
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
 
 interface SnapshotEnvelopeFromWs {
   snapshot: GameSnapshot
@@ -39,7 +39,7 @@ type WsMessage = SnapshotMessage | ErrorMessage | Record<string, unknown>
 
 export interface UseGameSyncResult {
   snapshot: GameRoomSnapshotPayload
-  refreshSnapshot: (mode?: 'manual' | 'fallback') => Promise<void>
+  refreshSnapshot: () => Promise<void>
   connectionState: ConnectionState
   syncError: GameRoomError | null
   isRefreshing: boolean
@@ -72,7 +72,9 @@ export function useGameSync({
 
   const buildEtag = useCallback(
     (lockVersion?: number) =>
-      typeof lockVersion === 'number' ? `"game-${gameId}-v${lockVersion}"` : undefined,
+      typeof lockVersion === 'number'
+        ? `"game-${gameId}-v${lockVersion}"`
+        : undefined,
     [gameId]
   )
 
@@ -86,39 +88,36 @@ export function useGameSync({
     [buildEtag]
   )
 
-  const refreshSnapshot = useCallback(
-    async (mode: 'manual' | 'fallback' = 'manual') => {
-      setIsRefreshing(true)
-      try {
-        const result = await getGameRoomSnapshotAction({
-          gameId,
-          etag: etagRef.current,
-        })
+  const refreshSnapshot = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      const result = await getGameRoomSnapshotAction({
+        gameId,
+        etag: etagRef.current,
+      })
 
-        if (result.kind === 'ok') {
-          applySnapshot(result.data)
-        } else if (result.kind === 'not_modified') {
-          setSnapshot((prev) => ({
-            ...prev,
-            timestamp: new Date().toISOString(),
-          }))
-        } else {
-          setSyncError({ message: result.message, traceId: result.traceId })
-        }
-      } catch (error) {
-        console.error('Manual snapshot refresh failed', error)
-        setSyncError({
-          message:
-            error instanceof Error
-              ? error.message
-              : 'Unable to refresh game state',
-        })
-      } finally {
-        setIsRefreshing(false)
+      if (result.kind === 'ok') {
+        applySnapshot(result.data)
+      } else if (result.kind === 'not_modified') {
+        setSnapshot((prev) => ({
+          ...prev,
+          timestamp: new Date().toISOString(),
+        }))
+      } else {
+        setSyncError({ message: result.message, traceId: result.traceId })
       }
-    },
-    [applySnapshot, gameId]
-  )
+    } catch (error) {
+      console.error('Manual snapshot refresh failed', error)
+      setSyncError({
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Unable to refresh game state',
+      })
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [applySnapshot, gameId])
 
   const transformSnapshotMessage = useCallback(
     (message: SnapshotMessage): GameRoomSnapshotPayload => {
@@ -186,25 +185,22 @@ export function useGameSync({
     [handleSnapshotMessage]
   )
 
-  const scheduleReconnect = useCallback(
-    (connectFn: () => Promise<void>) => {
-      if (!shouldReconnectRef.current) {
-        return
-      }
+  const scheduleReconnect = useCallback((connectFn: () => Promise<void>) => {
+    if (!shouldReconnectRef.current) {
+      return
+    }
 
-      setConnectionState('reconnecting')
-      const delay = reconnectDelayRef.current
-      reconnectDelayRef.current = Math.min(
-        reconnectDelayRef.current * 2,
-        MAX_RECONNECT_DELAY_MS
-      )
+    setConnectionState('reconnecting')
+    const delay = reconnectDelayRef.current
+    reconnectDelayRef.current = Math.min(
+      reconnectDelayRef.current * 2,
+      MAX_RECONNECT_DELAY_MS
+    )
 
-      reconnectTimeoutRef.current = setTimeout(() => {
-        void connectFn()
-      }, delay)
-    },
-    []
-  )
+    reconnectTimeoutRef.current = setTimeout(() => {
+      void connectFn()
+    }, delay)
+  }, [])
 
   const fetchWsToken = useCallback(async () => {
     const response = await fetch('/api/ws-token', {
@@ -239,7 +235,7 @@ export function useGameSync({
     const wsBase = resolveWsUrl()
     shouldReconnectRef.current = true
     setConnectionState((state) =>
-    state === 'disconnected' ? 'reconnecting' : 'connecting'
+      state === 'disconnected' ? 'reconnecting' : 'connecting'
     )
 
     try {
@@ -277,7 +273,13 @@ export function useGameSync({
       })
       scheduleReconnect(connect)
     }
-  }, [fetchWsToken, gameId, handleMessageEvent, resolveWsUrl, scheduleReconnect])
+  }, [
+    fetchWsToken,
+    gameId,
+    handleMessageEvent,
+    resolveWsUrl,
+    scheduleReconnect,
+  ])
 
   useEffect(() => {
     void connect()
