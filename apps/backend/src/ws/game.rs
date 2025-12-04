@@ -181,14 +181,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for GameWsSession {
             Ok(ws::Message::Pong(_)) => {
                 self.last_heartbeat = Instant::now();
             }
-            Ok(ws::Message::Text(text)) => {
-                warn!(
-                    session_id = %self.session_id,
-                    game_id = self.game_id,
-                    user_id = self.user_id,
-                    text = %text,
-                    "Unexpected websocket text message"
-                );
+            Ok(ws::Message::Text(_)) => {
+                // Frontend doesn't send text messages, so this is unexpected but harmless
+                // Silently ignore
             }
             Ok(ws::Message::Binary(_)) => {}
             Ok(ws::Message::Close(reason)) => {

@@ -184,17 +184,19 @@ async fn main() -> std::io::Result<()> {
                     .wrap(SecurityHeaders)
                     .configure(routes::health::configure_routes),
             )
+            // WebSocket upgrade endpoint for real-time game updates
+            .service(
+                web::scope("/ws").wrap(JwtExtract).service(
+                    web::resource("/games/{game_id}")
+                        .route(web::get().to(ws::game::upgrade))
+                        .name("websocket_game_upgrade"),
+                ),
+            )
             // Root route - security headers (but no Cache-Control: no-store)
             .service(
                 web::scope("")
                     .wrap(SecurityHeaders)
                     .route("/", web::get().to(routes::health::root)),
-            )
-            // WebSocket upgrade endpoint for real-time game updates
-            .service(
-                web::scope("/ws").wrap(JwtExtract).service(
-                    web::resource("/games/{game_id}").route(web::get().to(ws::game::upgrade)),
-                ),
             )
     })
     .bind((host.as_str(), port))?
