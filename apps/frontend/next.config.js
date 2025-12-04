@@ -14,6 +14,46 @@ const nextConfig = {
     // Build Content-Security-Policy
     // Using balanced approach: allows 'unsafe-inline' for Next.js compatibility
     // while restricting external sources to only what's needed
+    
+    // Get backend URLs for CSP connect-src directive
+    const backendBaseUrl = process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+    const backendWsUrl = process.env.BACKEND_WS_URL || process.env.NEXT_PUBLIC_BACKEND_WS_URL
+    
+    // Build connect-src directive with backend URLs
+    const connectSrc = [
+      "'self'",
+      'https://accounts.google.com', // Google OAuth
+    ]
+    
+    if (backendBaseUrl) {
+      // Add HTTP/HTTPS backend URL
+      try {
+        const url = new URL(backendBaseUrl)
+        connectSrc.push(`${url.protocol}//${url.host}`)
+      } catch {
+        // Invalid URL, skip
+      }
+    }
+    
+    if (backendWsUrl) {
+      // Add WebSocket backend URL
+      try {
+        const url = new URL(backendWsUrl)
+        connectSrc.push(`${url.protocol}//${url.host}`)
+      } catch {
+        // Invalid URL, skip
+      }
+    } else if (backendBaseUrl) {
+      // Derive WebSocket URL from HTTP URL if not explicitly set
+      try {
+        const url = new URL(backendBaseUrl)
+        const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+        connectSrc.push(`${wsProtocol}//${url.host}`)
+      } catch {
+        // Invalid URL, skip
+      }
+    }
+    
     const csp = [
       // Default: only allow same-origin
       "default-src 'self'",
@@ -26,8 +66,8 @@ const nextConfig = {
       "img-src 'self' data:",
       // Fonts: allow self + Google Fonts (Next.js self-hosts, but include for fallback)
       "font-src 'self' https://fonts.gstatic.com data:",
-      // Connect (fetch/API): allow self + Google OAuth
-      "connect-src 'self' https://accounts.google.com",
+      // Connect (fetch/API/WebSocket): allow self + Google OAuth + backend URLs
+      `connect-src ${connectSrc.join(' ')}`,
       // Frames: allow Google OAuth popup
       "frame-src 'self' https://accounts.google.com",
       // Other resources
