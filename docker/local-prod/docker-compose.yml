@@ -64,6 +64,13 @@ services:
     expose:
       - "3000"
 
+  redis:
+    image: redis:7
+    command: ["redis-server", "--save", ""] # disable RDB for local-prod
+    restart: unless-stopped
+    expose:
+      - "6379"
+
   caddy:
     build: ./caddy
     restart: unless-stopped
