@@ -117,6 +117,48 @@ function createInitialData(
   }
 }
 
+// Helper to wait for WebSocket connection
+async function waitForWebSocketConnection() {
+  await waitFor(
+    () => {
+      expect(mockWebSocketInstances.length).toBeGreaterThan(0)
+      const ws = mockWebSocketInstances[0]
+      expect(ws.readyState).toBe(MockWebSocket.OPEN)
+    },
+    { timeout: 2000 }
+  )
+  return mockWebSocketInstances[0]
+}
+
+// Helper to send WebSocket snapshot message
+function sendWebSocketSnapshot(
+  ws: MockWebSocket,
+  snapshot: typeof initSnapshotFixture,
+  overrides?: {
+    viewerSeat?: number
+    lockVersion?: number
+    viewerHand?: string[]
+  }
+) {
+  const message = {
+    type: 'snapshot',
+    data: {
+      snapshot,
+      lock_version: overrides?.lockVersion ?? 1,
+      viewer_hand: overrides?.viewerHand ?? null,
+      bid_constraints: null,
+    },
+    viewer_seat: overrides?.viewerSeat ?? 0,
+  }
+  act(() => {
+    ws.onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify(message),
+      })
+    )
+  })
+}
+
 describe('GameRoomClient', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -227,7 +269,108 @@ describe('GameRoomClient', () => {
     })
   })
 
-  describe('Refresh logic', () => {
+  describe('WebSocket integration', () => {
+    it('updates snapshot when WebSocket receives message', async () => {
+      const initialData = createInitialData()
+
+      await act(async () => {
+        render(<GameRoomClient initialData={initialData} gameId={42} />)
+      })
+
+      // Wait for WebSocket to connect
+      const ws = await waitForWebSocketConnection()
+
+      // Send WebSocket message with updated snapshot
+      sendWebSocketSnapshot(ws, biddingSnapshotFixture, {
+        viewerSeat: 0,
+        lockVersion: 1,
+      })
+
+      // Verify snapshot updated
+      await waitFor(
+        () => {
+          expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+        },
+        { timeout: 2000 }
+      )
+    })
+
+    it('updates snapshot after action completes via WebSocket', async () => {
+      const initialData = createInitialData()
+
+      await act(async () => {
+        render(<GameRoomClient initialData={initialData} gameId={42} />)
+      })
+
+      // Wait for WebSocket to connect
+      const ws = await waitForWebSocketConnection()
+
+      // Mark ready
+      const readyButton = screen.getByRole('button', {
+        name: /Mark yourself as ready/i,
+      })
+      await userEvent.click(readyButton)
+
+      // Wait for ready action to complete
+      await waitFor(
+        () => {
+          expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42)
+        },
+        { timeout: 2000 }
+      )
+
+      // Simulate WebSocket message after action completes
+      sendWebSocketSnapshot(ws, biddingSnapshotFixture, {
+        viewerSeat: 0,
+        lockVersion: 1,
+      })
+
+      // Verify snapshot updated via WebSocket (no manual refresh needed)
+      await waitFor(
+        () => {
+          expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+        },
+        { timeout: 2000 }
+      )
+
+      // Verify no manual refresh was called
+      expect(mockGetGameRoomSnapshotAction).not.toHaveBeenCalled()
+    })
+
+    it('handles WebSocket error messages', async () => {
+      const initialData = createInitialData()
+
+      await act(async () => {
+        render(<GameRoomClient initialData={initialData} gameId={42} />)
+      })
+
+      // Wait for WebSocket to connect
+      const ws = await waitForWebSocketConnection()
+
+      // Send error message
+      act(() => {
+        ws.onmessage?.(
+          new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'error',
+              message: 'WebSocket error',
+              code: 'WS_ERROR',
+            }),
+          })
+        )
+      })
+
+      // Verify error is displayed
+      await waitFor(
+        () => {
+          expect(screen.getByText(/WebSocket error/i)).toBeInTheDocument()
+        },
+        { timeout: 2000 }
+      )
+    })
+  })
+
+  describe('Manual refresh', () => {
     it('updates snapshot on successful refresh', async () => {
       const initialData = createInitialData()
       const newSnapshot = { ...biddingSnapshotFixture }
@@ -345,7 +488,7 @@ describe('GameRoomClient', () => {
       // Trigger first refresh
       await userEvent.click(refreshButton)
 
-      // Wait a bit to ensure the first refresh has started and inflightRef is set
+      // Wait a bit to ensure the first refresh has started
       await waitFor(
         () => {
           expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
@@ -354,8 +497,6 @@ describe('GameRoomClient', () => {
       )
 
       // Trigger second refresh while first is in progress
-      // Note: If activity is already 'refreshing', the component returns early without queuing
-      // So we test that concurrent calls are prevented, not that they're queued
       await userEvent.click(refreshButton)
 
       // Second click should not trigger another call (concurrent prevention works)
@@ -368,54 +509,67 @@ describe('GameRoomClient', () => {
       })
 
       // After first completes, only one call should have been made
-      // (The component doesn't queue when already refreshing, it just ignores the second call)
       expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledTimes(1)
     })
 
-    it('queues manual refresh when action is in progress', async () => {
+    it('shows slow sync indicator when manual refresh takes longer than 1 second', async () => {
       const initialData = createInitialData()
+      vi.useFakeTimers()
+      mockShowToast.mockReturnValueOnce('slow-sync-id')
 
-      // Make mark ready action hang
-      let resolveReady: () => void
-      const readyPromise = new Promise<{ kind: 'ok' }>((resolve) => {
-        resolveReady = () => resolve({ kind: 'ok' })
+      // Make refresh slow (longer than 1 second)
+      let resolveRefresh: () => void
+      const refreshPromise = new Promise<{
+        kind: 'ok'
+        data: GameRoomSnapshotPayload
+      }>((resolve) => {
+        resolveRefresh = () =>
+          resolve({
+            kind: 'ok',
+            data: createInitialData(),
+          })
       })
-      mockMarkPlayerReadyAction.mockReturnValueOnce(readyPromise)
+      mockGetGameRoomSnapshotAction.mockReturnValueOnce(refreshPromise)
 
       await act(async () => {
         render(<GameRoomClient initialData={initialData} gameId={42} />)
       })
 
-      // Start ready action
-      const readyButton = screen.getByRole('button', {
-        name: /Mark yourself as ready/i,
-      })
-      fireEvent.click(readyButton)
-
-      // Try to refresh while action is in progress
+      // Trigger manual refresh
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
-      fireEvent.click(refreshButton)
-
-      // Refresh should not be called yet
-      expect(mockGetGameRoomSnapshotAction).not.toHaveBeenCalled()
-
-      // Resolve ready action
       await act(async () => {
-        resolveReady!()
-        await readyPromise
-        // Wait for promise to resolve
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        fireEvent.click(refreshButton)
+        // Advance time by 1 second - slow sync indicator should appear
+        await vi.advanceTimersByTimeAsync(1000)
       })
 
-      // Now refresh should execute
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+      // Check for slow sync indicator (toast)
+      expect(mockShowToast).toHaveBeenCalledWith(
+        'Updating game state…',
+        'warning'
+      )
+
+      // Resolve the refresh
+      await act(async () => {
+        resolveRefresh!()
+        await refreshPromise
+        await vi.advanceTimersByTimeAsync(0)
+      })
+
+      // Slow sync indicator should disappear
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      expect(mockHideToast).toHaveBeenCalledWith('slow-sync-id')
+
+      vi.useRealTimers()
     })
   })
 
   describe('Ready action', () => {
-    it('marks player ready and refreshes', async () => {
+    it('marks player ready', async () => {
       const initialData = createInitialData()
 
       await act(async () => {
@@ -430,15 +584,14 @@ describe('GameRoomClient', () => {
       // Wait for async operations
       await waitFor(
         () => {
-          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+          expect(mockMarkPlayerReadyAction).toHaveBeenCalled()
         },
         { timeout: 2000 }
       )
 
       expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42)
 
-      // Should refresh after ready
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+      // Note: No manual refresh expected - WebSocket will handle updates
     })
 
     it('prevents duplicate ready calls', async () => {
@@ -460,7 +613,7 @@ describe('GameRoomClient', () => {
       // Wait for async operations
       await waitFor(
         () => {
-          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+          expect(mockMarkPlayerReadyAction).toHaveBeenCalled()
         },
         { timeout: 2000 }
       )
@@ -487,7 +640,7 @@ describe('GameRoomClient', () => {
       })
       await userEvent.click(readyButton)
 
-      // Wait for error message to appear (ready action fails, so no refresh happens)
+      // Wait for error message to appear
       await waitFor(
         () => {
           expect(screen.getByText(/Already ready/i)).toBeInTheDocument()
@@ -522,28 +675,20 @@ describe('GameRoomClient', () => {
 
       expect(mockMarkPlayerReadyAction).toHaveBeenCalled()
 
-      // Simulate phase change to Bidding
-      const biddingData = createInitialData(biddingSnapshotFixture)
-      mockGetGameRoomSnapshotAction.mockResolvedValue({
-        kind: 'ok',
-        data: biddingData,
+      // Simulate phase change via WebSocket
+      const ws = await waitForWebSocketConnection()
+      sendWebSocketSnapshot(ws, biddingSnapshotFixture, {
+        viewerSeat: 0,
+        lockVersion: 1,
       })
 
-      const refreshButton = screen.getByRole('button', {
-        name: /Refresh game state/i,
-      })
-      await act(async () => {
-        fireEvent.click(refreshButton)
-      })
-
-      // Wait for refresh to complete (enough for promise to resolve)
-      await act(async () => {
-        // Wait for promise to resolve
-        await new Promise((resolve) => setTimeout(resolve, 50))
-      })
-
-      // Phase should change
-      expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+      // Wait for phase change
+      await waitFor(
+        () => {
+          expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+        },
+        { timeout: 2000 }
+      )
 
       // Ready button should not be marked as ready anymore (if it exists)
       // This tests the phase change effect
@@ -551,7 +696,7 @@ describe('GameRoomClient', () => {
   })
 
   describe('Bid action', () => {
-    it('submits bid and refreshes', async () => {
+    it('submits bid', async () => {
       const biddingData = createInitialData(biddingSnapshotFixture, {
         viewerSeat: 0,
         viewerHand: ['2H', '3C'],
@@ -603,7 +748,7 @@ describe('GameRoomClient', () => {
       expect(mockFetchAiRegistryAction).not.toHaveBeenCalled()
     })
 
-    it('adds AI seat and refreshes', async () => {
+    it('adds AI seat', async () => {
       const initialData = createInitialData(initSnapshotFixture, {
         viewerSeat: 0,
         hostSeat: 0,
@@ -753,8 +898,8 @@ describe('GameRoomClient', () => {
     })
   })
 
-  describe('Activity state coordination', () => {
-    it('only allows one activity at a time', async () => {
+  describe('Action coordination', () => {
+    it('prevents actions when another action is in progress', async () => {
       const initialData = createInitialData()
 
       // Make ready action slow
@@ -774,16 +919,11 @@ describe('GameRoomClient', () => {
       })
       await userEvent.click(readyButton)
 
-      // Try to refresh - should be queued
-      const refreshButton = screen.getByRole('button', {
-        name: /Refresh game state/i,
-      })
-      await act(async () => {
-        fireEvent.click(refreshButton)
-      })
+      // Try to click ready again while first is in progress
+      await userEvent.click(readyButton)
 
-      // Refresh should not execute yet
-      expect(mockGetGameRoomSnapshotAction).not.toHaveBeenCalled()
+      // Should only have been called once
+      expect(mockMarkPlayerReadyAction).toHaveBeenCalledTimes(1)
 
       // Resolve ready
       await act(async () => {
@@ -792,212 +932,48 @@ describe('GameRoomClient', () => {
         // Wait for promise to resolve
         await new Promise((resolve) => setTimeout(resolve, 50))
       })
-
-      // Now refresh should execute
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
     })
 
-    it('queues user action when sync is in progress and executes after sync completes', async () => {
+    it('allows manual refresh independently of actions', async () => {
       const initialData = createInitialData()
-      vi.useFakeTimers()
 
-      // Make poll slow so we can queue an action during it
-      let resolvePoll: () => void
-      const pollPromise = new Promise<{
-        kind: 'ok'
-        data: GameRoomSnapshotPayload
-      }>((resolve) => {
-        resolvePoll = () =>
-          resolve({
-            kind: 'ok',
-            data: createInitialData(),
-          })
+      // Make ready action slow
+      let resolveReady: () => void
+      const readyPromise = new Promise<{ kind: 'ok' }>((resolve) => {
+        resolveReady = () => resolve({ kind: 'ok' })
       })
-      mockGetGameRoomSnapshotAction.mockReturnValueOnce(pollPromise)
+      mockMarkPlayerReadyAction.mockReturnValueOnce(readyPromise)
 
       await act(async () => {
         render(<GameRoomClient initialData={initialData} gameId={42} />)
       })
 
-      // Trigger a poll
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000)
-      })
-
-      // While poll is in progress, try to mark ready (should be queued)
+      // Start ready action
       const readyButton = screen.getByRole('button', {
         name: /Mark yourself as ready/i,
       })
-      const readyCallCountBefore = mockMarkPlayerReadyAction.mock.calls.length
+      await userEvent.click(readyButton)
 
-      await act(async () => {
-        fireEvent.click(readyButton)
-      })
-
-      // Ready action should not execute yet (poll is in progress)
-      expect(mockMarkPlayerReadyAction.mock.calls.length).toBe(
-        readyCallCountBefore
-      )
-
-      // Set up mocks for after poll resolves
-      mockMarkPlayerReadyAction.mockResolvedValueOnce({ kind: 'ok' })
-      mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
-        kind: 'ok',
-        data: createInitialData(),
-      })
-
-      // Resolve the poll
-      await act(async () => {
-        resolvePoll!()
-        await pollPromise
-        await vi.advanceTimersByTimeAsync(0)
-      })
-
-      // Now the queued ready action should execute
-      await act(async () => {
-        await Promise.resolve()
-        await Promise.resolve()
-      })
-      expect(mockMarkPlayerReadyAction.mock.calls.length).toBe(
-        readyCallCountBefore + 1
-      )
-
-      // Ensure all async operations complete before test ends
-      await act(async () => {
-        await Promise.resolve()
-        await Promise.resolve()
-      })
-
-      vi.useRealTimers()
-    })
-
-    it('does nothing when manual refresh is clicked during automatic poll', async () => {
-      const initialData = createInitialData()
-      vi.useFakeTimers()
-
-      // Make poll slow
-      let resolvePoll: () => void
-      const pollPromise = new Promise<{
-        kind: 'ok'
-        data: GameRoomSnapshotPayload
-      }>((resolve) => {
-        resolvePoll = () =>
-          resolve({
-            kind: 'ok',
-            data: createInitialData(),
-          })
-      })
-      mockGetGameRoomSnapshotAction.mockReturnValueOnce(pollPromise)
-
-      await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
-      })
-
-      // Trigger a poll
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000)
-        // Wait multiple microtasks to ensure poll's executeRefresh has fully started
-        await Promise.resolve()
-        await Promise.resolve()
-        await Promise.resolve()
-      })
-
-      // Verify poll has started (one call should have been made)
-      const callCountBefore = mockGetGameRoomSnapshotAction.mock.calls.length
-      expect(callCountBefore).toBe(1) // Poll should have made one call
-
-      // While poll is in progress (pollPromise hasn't resolved), try manual refresh
+      // Try to refresh while action is in progress - should work independently
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
+      await userEvent.click(refreshButton)
 
-      await act(async () => {
-        fireEvent.click(refreshButton)
-        // Wait for any async operations to complete
-        await Promise.resolve()
-        await Promise.resolve()
-      })
-
-      // Manual refresh should not trigger another call (poll is already in progress)
-      // The call count should remain the same
-      expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
-        callCountBefore
+      // Refresh should execute independently
+      await waitFor(
+        () => {
+          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+        },
+        { timeout: 2000 }
       )
 
-      // Resolve the poll
+      // Resolve ready
       await act(async () => {
-        resolvePoll!()
-        await pollPromise
-        await vi.advanceTimersByTimeAsync(0)
+        resolveReady!()
+        await readyPromise
+        await new Promise((resolve) => setTimeout(resolve, 50))
       })
-
-      // Still should only have the one poll call
-      expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
-        callCountBefore
-      )
-
-      // Ensure all async operations complete before test ends
-      await act(async () => {
-        await Promise.resolve()
-        await Promise.resolve()
-      })
-
-      vi.useRealTimers()
-    })
-
-    it('shows slow sync indicator when refresh takes longer than 1 second', async () => {
-      const initialData = createInitialData()
-      vi.useFakeTimers()
-      mockShowToast.mockReturnValueOnce('slow-sync-id')
-
-      // Make poll slow (longer than 1 second)
-      let resolvePoll: () => void
-      const pollPromise = new Promise<{
-        kind: 'ok'
-        data: GameRoomSnapshotPayload
-      }>((resolve) => {
-        resolvePoll = () =>
-          resolve({
-            kind: 'ok',
-            data: createInitialData(),
-          })
-      })
-      mockGetGameRoomSnapshotAction.mockReturnValueOnce(pollPromise)
-
-      await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
-      })
-
-      // Trigger a poll
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000)
-      })
-
-      // Advance time by 1 second - slow sync indicator should appear
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1000)
-      })
-
-      // Check for slow sync indicator (toast)
-      expect(mockShowToast).toHaveBeenCalledWith(
-        'Updating game state…',
-        'warning'
-      )
-
-      // Resolve the poll
-      await act(async () => {
-        resolvePoll!()
-        await pollPromise
-        await vi.advanceTimersByTimeAsync(0)
-      })
-
-      // Slow sync indicator should disappear
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0)
-      })
-      expect(mockHideToast).toHaveBeenCalledWith('slow-sync-id')
-
-      vi.useRealTimers()
     })
   })
 })
