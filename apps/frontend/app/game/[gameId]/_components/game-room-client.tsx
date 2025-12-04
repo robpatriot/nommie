@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import {
@@ -56,6 +56,7 @@ export function GameRoomClient({
   const [isAiRegistryLoading, setIsAiRegistryLoading] = useState(false)
   const [aiRegistryError, setAiRegistryError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
+  const slowSyncToastIdRef = useRef<string | null>(null)
   const combinedError = actionError ?? syncError
   const isReadyPending = pendingAction === 'ready'
   const isBidPending = pendingAction === 'bid'
@@ -75,20 +76,35 @@ export function GameRoomClient({
     }
   }, [phaseName, hasMarkedReady])
 
+  // Show slow sync indicator when refresh takes longer than 1 second
+  useEffect(() => {
+    if (!syncIsRefreshing) {
+      // Hide toast when refresh completes
+      if (slowSyncToastIdRef.current) {
+        hideToast(slowSyncToastIdRef.current)
+        slowSyncToastIdRef.current = null
+      }
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      const toastId = showToast('Updating game state…', 'warning')
+      slowSyncToastIdRef.current = toastId
+    }, 1000)
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [syncIsRefreshing, showToast, hideToast])
+
   const executeApiAction = useApiAction({
     showToast,
     // Don't trigger refresh here - action handlers will do it after activity resets
   })
 
-  const finishAction = useCallback(async () => {
-    try {
-      await refreshSnapshot('manual')
-    } catch (error) {
-      console.error('Failed to refresh snapshot after action', error)
-    } finally {
-      setPendingAction(null)
-    }
-  }, [refreshSnapshot])
+  const finishAction = useCallback(() => {
+    setPendingAction(null)
+  }, [])
 
   const runExclusiveAction = useCallback(
     async (
@@ -103,7 +119,7 @@ export function GameRoomClient({
       try {
         await actionFn()
       } finally {
-        await finishAction()
+        finishAction()
       }
     },
     [finishAction, pendingAction]
@@ -124,8 +140,7 @@ export function GameRoomClient({
         setHasMarkedReady(true)
       } catch (err) {
         setActionError({
-          message:
-            err instanceof Error ? err.message : 'Unable to mark ready',
+          message: err instanceof Error ? err.message : 'Unable to mark ready',
         })
       }
     })
@@ -149,7 +164,7 @@ export function GameRoomClient({
             submitBidAction({
               gameId,
               bid,
-              lockVersion: snapshot.lockVersion,
+              lockVersion: snapshot.lockVersion!,
             }),
           {
             successMessage: 'Bid submitted',
@@ -184,7 +199,7 @@ export function GameRoomClient({
             selectTrumpAction({
               gameId,
               trump,
-              lockVersion: snapshot.lockVersion,
+              lockVersion: snapshot.lockVersion!,
             }),
           {
             successMessage: 'Trump selected',
@@ -219,7 +234,7 @@ export function GameRoomClient({
             submitPlayAction({
               gameId,
               card,
-              lockVersion: snapshot.lockVersion,
+              lockVersion: snapshot.lockVersion!,
             }),
           {
             successMessage: 'Card played',
@@ -541,7 +556,7 @@ export function GameRoomClient({
         playerNames={snapshot.playerNames}
         viewerSeat={snapshot.viewerSeat ?? undefined}
         viewerHand={snapshot.viewerHand}
-        onRefresh={() => void refreshSnapshot('manual')}
+        onRefresh={() => void refreshSnapshot()}
         isRefreshing={syncIsRefreshing}
         error={combinedError}
         status={{
