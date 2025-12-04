@@ -167,15 +167,16 @@ export function useGameSync({
     (event: MessageEvent<string>) => {
       try {
         const parsed = JSON.parse(event.data) as WsMessage
-        if (parsed.type === 'snapshot') {
-          handleSnapshotMessage(parsed)
+        if (parsed.type === 'snapshot' && 'data' in parsed) {
+          handleSnapshotMessage(parsed as SnapshotMessage)
           return
         }
 
-        if (parsed.type === 'error') {
+        if (parsed.type === 'error' && 'message' in parsed) {
+          const errorMsg = parsed as ErrorMessage
           setSyncError({
-            message: parsed.message ?? 'Realtime connection error',
-            traceId: parsed.code,
+            message: errorMsg.message ?? 'Realtime connection error',
+            traceId: errorMsg.code,
           })
         }
       } catch (error) {
@@ -224,7 +225,10 @@ export function useGameSync({
     }
     const httpBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
     if (httpBase) {
-      return httpBase.replace(/\/$/, '').replace(/^http/, 'ws')
+      // Convert http:// to ws:// and https:// to wss://
+      return httpBase
+        .replace(/\/$/, '')
+        .replace(/^https?/, (match) => (match === 'https' ? 'wss' : 'ws'))
     }
     throw new Error(
       'NEXT_PUBLIC_BACKEND_WS_URL or NEXT_PUBLIC_BACKEND_BASE_URL must be configured'
@@ -251,8 +255,11 @@ export function useGameSync({
 
       ws.onmessage = handleMessageEvent
 
-      ws.onerror = (event) => {
-        console.error('Realtime websocket error', event)
+      ws.onerror = () => {
+        setSyncError({
+          message: 'Websocket connection error',
+          traceId: undefined,
+        })
       }
 
       ws.onclose = () => {
