@@ -3,7 +3,7 @@
 
 import { cookies } from 'next/headers'
 
-const BACKEND_JWT_COOKIE_NAME = 'backend_jwt'
+export const BACKEND_JWT_COOKIE_NAME = 'backend_jwt'
 
 /**
  * Get the backend JWT from cookie.

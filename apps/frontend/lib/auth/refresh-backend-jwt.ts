@@ -1,11 +1,11 @@
 // Backend JWT refresh logic
-// Works from both Server Components and Server Actions
+// This file provides both pure functions (that never set cookies) and context-specific wrappers
 
 import { auth, getBackendBaseUrlOrThrow } from '@/auth'
 import { cookies } from 'next/headers'
 import {
   getBackendJwtFromCookie,
-  setBackendJwtInCookie,
+  BACKEND_JWT_COOKIE_NAME,
 } from './backend-jwt-cookie'
 import { checkBackendHealth } from '@/lib/server/backend-health'
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/lib/server/backend-status'
 import { parseErrorResponse } from '@/lib/api/error-parsing'
 import * as jose from 'jose'
+import type { NextRequest, NextResponse } from 'next/server'
 
 const REFRESH_THRESHOLD_SECONDS = 300 // 5 minutes - refresh if expiring within this
 
@@ -64,30 +65,98 @@ function isJwtExpiringSoon(token: string, thresholdSeconds: number): boolean {
 }
 
 /**
- * Fetch a new backend JWT from the backend
+ * Result of refreshing backend JWT
  */
-async function fetchNewBackendJwt(): Promise<string | null> {
-  const session = await auth()
+export interface RefreshBackendJwtResult {
+  token: string
+  refreshed: boolean
+}
 
-  if (!session?.user?.email) {
-    return null
+/**
+ * Pure function that refreshes backend JWT if needed.
+ * This function never sets cookies; cookie writes must be done by wrappers
+ * in server actions, route handlers, or proxy.
+ *
+ * @param getCookie - Callback to read the backend JWT cookie
+ * @param cookieHeader - Optional cookie header string (for proxy context)
+ * @returns Object with token and refreshed flag, or null if refresh failed
+ * @throws BackendJwtError if JWT cannot be obtained and no fallback exists
+ */
+export async function refreshBackendJwtIfNeeded(
+  getCookie: (name: string) => Promise<string | undefined>,
+  cookieHeader?: string
+): Promise<RefreshBackendJwtResult | null> {
+  // Get existing JWT from cookie
+  const existing = await getCookie(BACKEND_JWT_COOKIE_NAME)
+
+  // Check if existing JWT is valid
+  if (
+    existing &&
+    !isJwtExpired(existing) &&
+    !isJwtExpiringSoon(existing, REFRESH_THRESHOLD_SECONDS)
+  ) {
+    return { token: existing, refreshed: false }
   }
 
-  // Get user info from session
-  const email = session.user.email
-  const name = session.user.name || undefined
+  // Need to refresh - fetch new JWT
+  const newToken = await fetchNewBackendJwt(cookieHeader)
 
-  // Get googleSub from token (needed for backend auth)
-  const cookieStore = await cookies()
-  const cookieHeader = cookieStore
-    .getAll()
-    .map(({ name, value }) => `${name}=${value}`)
-    .join('; ')
+  if (!newToken) {
+    // Refresh failed
+    if (existing && !isJwtExpired(existing)) {
+      // Existing JWT is still valid (just expiring soon) - use it
+      return { token: existing, refreshed: false }
+    }
 
+    // No valid JWT available
+    if (isInStartupWindow()) {
+      const backendHealthy = await checkBackendHealth()
+      if (!backendHealthy) {
+        throw new BackendJwtError(
+          'Backend is starting up, please try again shortly'
+        )
+      }
+    }
+    throw new BackendJwtError('Authentication required')
+  }
+
+  return { token: newToken, refreshed: true }
+}
+
+/**
+ * Fetch a new backend JWT from the backend
+ * @param cookieHeader - Optional cookie header string (for proxy context)
+ */
+async function fetchNewBackendJwt(
+  cookieHeader?: string
+): Promise<string | null> {
+  // In proxy context, we can't use auth() or cookies() from next/headers
+  // So we need the cookie header passed in
   if (!cookieHeader) {
-    return null
+    // Try to get from next/headers (works in server actions/route handlers)
+    try {
+      const session = await auth()
+      if (!session?.user?.email) {
+        return null
+      }
+
+      // Get googleSub from token (needed for backend auth)
+      const cookieStore = await cookies()
+      cookieHeader = cookieStore
+        .getAll()
+        .map(({ name, value }) => `${name}=${value}`)
+        .join('; ')
+
+      if (!cookieHeader) {
+        return null
+      }
+    } catch {
+      // If auth() or cookies() fail (e.g., in proxy), return null
+      return null
+    }
   }
 
+  // Parse cookie header to get session info
   const headers = new Headers({ cookie: cookieHeader })
   const req: { headers: Headers } = { headers }
 
@@ -109,6 +178,16 @@ async function fetchNewBackendJwt(): Promise<string | null> {
     (token?.sub && typeof token.sub === 'string' ? token.sub : null)
 
   if (!googleSub) {
+    return null
+  }
+
+  // Get email and name from token
+  const email =
+    token?.email && typeof token.email === 'string' ? token.email : null
+  const name =
+    token?.name && typeof token.name === 'string' ? token.name : undefined
+
+  if (!email) {
     return null
   }
 
@@ -191,7 +270,7 @@ async function fetchNewBackendJwt(): Promise<string | null> {
       error instanceof BackendJwtError &&
       error.message === 'EMAIL_NOT_ALLOWED'
     ) {
-      // Let this propagate to ensureBackendJwt() / fetchWithAuth()
+      // Let this propagate to fetchWithAuth()
       // where it will be surfaced as a 403 EMAIL_NOT_ALLOWED.
       throw error
     }
@@ -223,47 +302,105 @@ async function fetchNewBackendJwt(): Promise<string | null> {
 }
 
 /**
- * Ensure we have a valid backend JWT.
- * Refreshes if needed. Works from both Server Components and Server Actions.
+ * Get cookie options for backend JWT cookie
+ */
+function getBackendJwtCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax' as const,
+    maxAge: 60 * 60 * 24, // 24 hours
+    path: '/',
+  }
+}
+
+/**
+ * Ensure we have a valid backend JWT for server actions and route handlers.
+ * Refreshes if needed and sets cookie if refreshed.
+ * Use this in server actions and route handlers (where cookies can be modified).
  *
  * @throws BackendJwtError if JWT cannot be obtained
  */
-export async function ensureBackendJwt(): Promise<string> {
-  // Get existing JWT from cookie
-  const existing = await getBackendJwtFromCookie()
-
-  // Check if existing JWT is valid
-  if (
-    existing &&
-    !isJwtExpired(existing) &&
-    !isJwtExpiringSoon(existing, REFRESH_THRESHOLD_SECONDS)
-  ) {
-    return existing
+export async function ensureBackendJwtForServerAction(): Promise<string> {
+  const cookieStore = await cookies()
+  const getCookie = async (name: string) => {
+    return cookieStore.get(name)?.value
   }
 
-  // Need to refresh - fetch new JWT
-  const newToken = await fetchNewBackendJwt()
+  // Get cookie header for fetchNewBackendJwt (optional, will use auth() if not provided)
+  const cookieHeader = cookieStore
+    .getAll()
+    .map(({ name, value }) => `${name}=${value}`)
+    .join('; ')
 
-  if (!newToken) {
-    // Refresh failed
-    if (existing && !isJwtExpired(existing)) {
-      // Existing JWT is still valid (just expiring soon) - use it
-      return existing
-    }
+  const result = await refreshBackendJwtIfNeeded(getCookie, cookieHeader)
 
-    // No valid JWT available
-    if (isInStartupWindow()) {
-      const backendHealthy = await checkBackendHealth()
-      if (!backendHealthy) {
-        throw new BackendJwtError(
-          'Backend is starting up, please try again shortly'
-        )
-      }
-    }
+  if (!result) {
     throw new BackendJwtError('Authentication required')
   }
 
-  // Save new JWT to cookie
-  await setBackendJwtInCookie(newToken)
-  return newToken
+  // If refreshed, set the cookie
+  if (result.refreshed) {
+    cookieStore.set(
+      BACKEND_JWT_COOKIE_NAME,
+      result.token,
+      getBackendJwtCookieOptions()
+    )
+  }
+
+  return result.token
+}
+
+/**
+ * Ensure we have a valid backend JWT for proxy.
+ * Refreshes if needed and sets cookie on response if refreshed.
+ * Use this in proxy (where cookies can be modified via NextResponse).
+ *
+ * @param request - Next.js request object
+ * @param response - Next.js response object (will be modified if refresh needed)
+ * @returns The backend JWT token, or null if not available
+ */
+export async function ensureBackendJwtForMiddleware(
+  request: NextRequest,
+  response: NextResponse
+): Promise<string | null> {
+  const getCookie = async (name: string) => {
+    return request.cookies.get(name)?.value
+  }
+
+  // Get cookie header for fetchNewBackendJwt (proxy can't use cookies() from next/headers)
+  const cookieHeader = request.headers.get('cookie') || undefined
+
+  try {
+    const result = await refreshBackendJwtIfNeeded(getCookie, cookieHeader)
+
+    if (!result) {
+      return null
+    }
+
+    // If refreshed, set the cookie on the response
+    if (result.refreshed) {
+      response.cookies.set(
+        BACKEND_JWT_COOKIE_NAME,
+        result.token,
+        getBackendJwtCookieOptions()
+      )
+    }
+
+    return result.token
+  } catch {
+    // In proxy, we don't throw - just return null
+    // The page/route handler will handle auth errors
+    return null
+  }
+}
+
+/**
+ * Get backend JWT without refreshing (read-only).
+ * Use this in Server Components where cookies cannot be modified.
+ *
+ * @returns The backend JWT token, or null if not available
+ */
+export async function getBackendJwtReadOnly(): Promise<string | null> {
+  return await getBackendJwtFromCookie()
 }

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 
 import { getBackendBaseUrlOrThrow } from '@/auth'
-import { ensureBackendJwt } from '@/lib/auth/refresh-backend-jwt'
+import { ensureBackendJwtForServerAction } from '@/lib/auth/refresh-backend-jwt'
 
 export async function GET() {
   try {
-    const jwt = await ensureBackendJwt()
+    const jwt = await ensureBackendJwtForServerAction()
     const backendBase = getBackendBaseUrlOrThrow()
 
     const response = await fetch(`${backendBase}/api/ws/token`, {

@@ -3,7 +3,7 @@
 'use server'
 
 import {
-  ensureBackendJwt,
+  getBackendJwtReadOnly,
   BackendJwtError,
 } from '@/lib/auth/refresh-backend-jwt'
 import { getBackendBaseUrlOrThrow } from '@/auth'
@@ -26,16 +26,21 @@ export type { ProblemDetails } from './api/error-parsing'
 /**
  * Make an authenticated API request to the backend.
  * Works from both Server Components and Server Actions.
- * Automatically refreshes JWT if needed.
+ * Reads JWT from cookie (does not refresh - middleware handles refresh).
  */
 export async function fetchWithAuth(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  // Get backend JWT (refreshes if needed)
+  // Get backend JWT from cookie (read-only - middleware handles refresh)
   let authHeaders: Record<string, string> = {}
   try {
-    const backendJwt = await ensureBackendJwt()
+    const backendJwt = await getBackendJwtReadOnly()
+    if (!backendJwt) {
+      // No JWT available - middleware should have refreshed it, but if not,
+      // this is an auth error
+      throw new BackendJwtError('Authentication required')
+    }
     authHeaders = {
       Authorization: `Bearer ${backendJwt}`,
     }
