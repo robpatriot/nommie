@@ -27,7 +27,7 @@ pub fn mint_access_token(
     now: SystemTime,
     security: &SecurityConfig,
 ) -> Result<String, AppError> {
-    mint_access_token_with_ttl(sub, email, now, 15 * 60, security)
+    mint_access_token_with_ttl(sub, email, now, 60 * 60, security)
 }
 
 pub fn mint_access_token_with_ttl(
