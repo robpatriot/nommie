@@ -45,7 +45,6 @@ export function GameRoomClient({
   const {
     snapshot,
     refreshSnapshot,
-    connectionState,
     syncError,
     isRefreshing: syncIsRefreshing,
   } = useGameSync({ initialData, gameId })
@@ -561,7 +560,6 @@ export function GameRoomClient({
         error={combinedError}
         status={{
           lastSyncedAt: snapshot.timestamp,
-          isPolling: connectionState !== 'connected',
         }}
         readyState={{
           canReady: canMarkReady,

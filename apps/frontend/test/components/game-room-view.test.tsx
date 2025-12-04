@@ -47,7 +47,6 @@ describe('GameRoomView', () => {
         viewerHand={['2H', '3C']}
         status={{
           lastSyncedAt: new Date('2025-01-06T15:04:05Z').toISOString(),
-          isPolling: false,
         }}
         onRefresh={() => undefined}
       />
@@ -60,7 +59,7 @@ describe('GameRoomView', () => {
     expect(screen.getByLabelText('Refresh game state')).toBeInTheDocument()
   })
 
-  it('surface errors and polling status', () => {
+  it('surfaces errors', () => {
     render(
       <GameRoomView
         gameId={42}
@@ -68,7 +67,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={[]}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: true }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
         error={{ message: 'Sync failed', traceId: 'abc123' }}
       />
     )
@@ -87,7 +86,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={1}
         viewerHand={[]}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
         biddingState={{
           viewerSeat: 1,
           isPending: false,
@@ -120,7 +119,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={[]}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
       />
     )
 
@@ -161,7 +160,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={[]}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
       />
     )
 
@@ -194,7 +193,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={['2H', 'KD', 'QC', 'AS']}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
         playState={{
           viewerSeat: 0,
           playable: playableCards,
@@ -231,7 +230,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={['2H', 'KD']}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
       />
     )
 
@@ -254,7 +253,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={['2H', 'KD', 'QC', 'AS']}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
         playState={{
           viewerSeat: 0,
           playable: playableCards,
@@ -287,7 +286,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={[]}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
         aiSeatState={{
           totalSeats: 4,
           availableSeats: 1,
@@ -386,7 +385,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={2}
         viewerHand={[]}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
       />
     )
 
@@ -409,7 +408,7 @@ describe('GameRoomView', () => {
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={[]}
-        status={{ lastSyncedAt: new Date().toISOString(), isPolling: false }}
+        status={{ lastSyncedAt: new Date().toISOString() }}
         aiSeatState={{
           totalSeats: 4,
           availableSeats: 1,

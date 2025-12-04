@@ -57,7 +57,6 @@ export interface GameRoomViewProps {
   aiSeatState?: AiSeatState
   status?: {
     lastSyncedAt?: string
-    isPolling?: boolean
   }
   requireCardConfirmation?: boolean
 }
