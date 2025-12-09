@@ -23,6 +23,12 @@ nommie-dev.blim.org {
 		reverse_proxy frontend:3000
 	}
 
+	# Frontend Next.js API route for websocket token → frontend
+	@ws_token path /api/ws-token
+	handle @ws_token {
+		reverse_proxy frontend:3000
+	}
+
 	# All other API routes → backend
 	@api path /api/*
 	handle @api {
@@ -32,6 +38,12 @@ nommie-dev.blim.org {
 	# Health endpoint → backend
 	@health path /health
 	handle @health {
+		reverse_proxy backend:3001
+	}
+
+	# WebSocket endpoint → backend
+	@ws path /ws/*
+	handle @ws {
 		reverse_proxy backend:3001
 	}
 
