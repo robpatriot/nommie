@@ -12,7 +12,7 @@ services:
       secrets:
         - nommie_ca_key
         - nommie_ca_crt
-    image: nommie-postgres-tls:latest
+    image: ${COMPOSE_PROJECT_NAME}-postgres:latest
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     env_file:
@@ -35,7 +35,10 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:8.2
+    build: 
+      context: ../shared
+      dockerfile: redis.Dockerfile
+    image: ${COMPOSE_PROJECT_NAME}-redis:8.2
     command: ["redis-server", "--save", ""] # disable RDB for dev
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
