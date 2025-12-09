@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 
-FROM rust:1.84 AS builder
+FROM rust:1.91.1 AS builder
 
 WORKDIR /app
 
@@ -38,7 +38,7 @@ COPY . .
 # Build the actual backend binary
 RUN cargo build --locked --release --manifest-path apps/backend/Cargo.toml
 
-FROM debian:bookworm-slim AS runtime
+FROM rust:1.91.1-slim AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 \
