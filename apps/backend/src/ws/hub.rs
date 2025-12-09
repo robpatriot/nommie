@@ -8,7 +8,7 @@ use redis::{AsyncCommands, Client};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
-use tracing::{error, info, trace};
+use tracing::{error, info, trace, warn};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -54,23 +54,44 @@ impl GameSessionRegistry {
     }
 
     pub fn unregister(&self, game_id: i64, token: Uuid) {
-        if let Some(entry) = self.sessions.get(&game_id) {
-            entry.remove(&token);
-            if entry.is_empty() {
-                self.sessions.remove(&game_id);
-            }
+        let active_before = self.active_connections.load(Ordering::Relaxed);
+
+        let (was_present, now_empty) = if let Some(entry) = self.sessions.get_mut(&game_id) {
+            // Acquire mutable guard - allows mutation of inner map
+            let was_present = entry.remove(&token).is_some();
+            let now_empty = entry.is_empty();
+            // Guard is dropped here when entry goes out of scope
+            (was_present, now_empty)
+        } else {
+            (false, false)
+        };
+
+        // Now that the guard is dropped, we can safely remove the outer map entry if needed
+        if now_empty {
+            self.sessions.remove(&game_id);
         }
 
-        let previous = self.active_connections.load(Ordering::Relaxed);
-        if previous > 0 {
-            self.active_connections.fetch_sub(1, Ordering::Relaxed);
+        if was_present {
+            let previous = self.active_connections.load(Ordering::Relaxed);
+            if previous > 0 {
+                self.active_connections.fetch_sub(1, Ordering::Relaxed);
+            }
+            let active_after = previous.saturating_sub(1);
+            info!(
+                game_id,
+                token = %token,
+                active_connections_before = active_before,
+                active_connections_after = active_after,
+                "[WS REGISTRY] Websocket session unregistered"
+            );
+        } else {
+            warn!(
+                game_id,
+                token = %token,
+                active_connections = active_before,
+                "[WS REGISTRY] Attempted to unregister session that was not found"
+            );
         }
-        let active = previous.saturating_sub(1);
-        info!(
-            game_id,
-            active_connections = active,
-            "Websocket session unregistered"
-        );
     }
 
     pub fn broadcast(&self, game_id: i64, message: SnapshotBroadcast) {
