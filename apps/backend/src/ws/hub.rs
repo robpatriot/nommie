@@ -8,7 +8,7 @@ use redis::{AsyncCommands, Client};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
-use tracing::{error, info, trace, warn};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::error::AppError;
@@ -22,8 +22,6 @@ pub struct SnapshotBroadcast {
 pub struct GameSessionRegistry {
     sessions: DashMap<i64, DashMap<Uuid, Recipient<SnapshotBroadcast>>>,
     active_connections: AtomicUsize,
-    total_connections: AtomicUsize,
-    broadcasts_total: AtomicUsize,
 }
 
 impl GameSessionRegistry {
@@ -31,8 +29,6 @@ impl GameSessionRegistry {
         Self {
             sessions: DashMap::new(),
             active_connections: AtomicUsize::new(0),
-            total_connections: AtomicUsize::new(0),
-            broadcasts_total: AtomicUsize::new(0),
         }
     }
 
@@ -41,12 +37,10 @@ impl GameSessionRegistry {
         let entry = self.sessions.entry(game_id).or_default();
         entry.insert(token, recipient);
 
-        let total = self.total_connections.fetch_add(1, Ordering::Relaxed) + 1;
         let active = self.active_connections.fetch_add(1, Ordering::Relaxed) + 1;
         info!(
             game_id,
             active_connections = active,
-            total_connections = total,
             "Websocket session registered"
         );
 
@@ -95,8 +89,6 @@ impl GameSessionRegistry {
     }
 
     pub fn broadcast(&self, game_id: i64, message: SnapshotBroadcast) {
-        let total = self.broadcasts_total.fetch_add(1, Ordering::Relaxed) + 1;
-        trace!(game_id, broadcasts_total = total, "Broadcasting snapshot");
         if let Some(entry) = self.sessions.get(&game_id) {
             for recipient in entry.iter() {
                 recipient.value().do_send(message.clone());

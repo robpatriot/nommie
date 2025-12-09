@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use actix_web::{HttpMessage, HttpRequest};
@@ -8,6 +9,10 @@ use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
 use super::{require_db, txn_policy};
 use crate::error::AppError;
 use crate::state::app_state::AppState;
+
+/// Global counter for active database transactions.
+/// Used for monitoring connection pool usage and detecting transaction leaks.
+pub(crate) static ACTIVE_TXNS: AtomicU64 = AtomicU64::new(0);
 
 /// A shared transaction wrapper that can be injected into request extensions
 #[derive(Clone)]
@@ -99,6 +104,10 @@ where
 
     // Real DB path: own the transaction lifecycle
     let txn = db.begin().await?;
+
+    // Increment active transaction counter
+    ACTIVE_TXNS.fetch_add(1, Ordering::SeqCst);
+
     let out = f(&txn).await;
 
     match out {
@@ -107,10 +116,12 @@ where
             match txn_policy::current() {
                 txn_policy::TxnPolicy::CommitOnOk => {
                     txn.commit().await?;
+                    ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
                     Ok(val)
                 }
                 txn_policy::TxnPolicy::RollbackOnOk => {
                     txn.rollback().await?;
+                    ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
                     Ok(val)
                 }
             }
@@ -118,6 +129,7 @@ where
         Err(err) => {
             // Best-effort rollback; preserve original error
             let _ = txn.rollback().await;
+            ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
             Err(err)
         }
     }
