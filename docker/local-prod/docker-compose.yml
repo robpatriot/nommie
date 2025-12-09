@@ -12,12 +12,13 @@ services:
       secrets:
         - nommie_ca_key
         - nommie_ca_crt
-    image: nommie-postgres-tls:latest
+    image: ${COMPOSE_PROJECT_NAME}-postgres:latest
     restart: unless-stopped
     env_file:
       - ./db.env
     volumes:
       - nommie_local_prod_db_data:/var/lib/postgresql/data
+      - nommie_local_prod_ssl:/var/lib/postgresql/ssl
       - ../postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -65,7 +66,10 @@ services:
       - "3000"
 
   redis:
-    image: redis:8.2
+    build: 
+      context: ../shared
+      dockerfile: redis.Dockerfile
+    image: ${COMPOSE_PROJECT_NAME}-redis:8.2
     command: ["redis-server", "--save", ""] # disable RDB for local-prod
     restart: unless-stopped
     expose:
@@ -89,6 +93,7 @@ services:
 
 volumes:
   nommie_local_prod_db_data:
+  nommie_local_prod_ssl:
   nommie_local_prod_caddy_data:
   nommie_local_prod_caddy_config:
 
