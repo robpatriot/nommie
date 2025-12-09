@@ -200,6 +200,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for GameWsSession {
                     error = %err,
                     "Websocket protocol error"
                 );
+                ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Error)));
                 ctx.stop();
             }
         }
