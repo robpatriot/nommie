@@ -1,5 +1,6 @@
 {
   "name": "nommie",
+  "packageManager": "pnpm@10.25.0",
   "version": "0.1.0",
   "description": "Web-based multiplayer version of Nomination Whist",
   "scripts": {
