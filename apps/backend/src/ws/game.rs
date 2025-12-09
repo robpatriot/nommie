@@ -182,17 +182,30 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for GameWsSession {
                 self.last_heartbeat = Instant::now();
             }
             Ok(ws::Message::Text(_)) => {
+                // Any received message confirms the connection is alive
+                self.last_heartbeat = Instant::now();
                 // Frontend doesn't send text messages, so this is unexpected but harmless
                 // Silently ignore
             }
-            Ok(ws::Message::Binary(_)) => {}
+            Ok(ws::Message::Binary(_)) => {
+                // Any received message confirms the connection is alive
+                self.last_heartbeat = Instant::now();
+            }
             Ok(ws::Message::Close(reason)) => {
+                // Don't update heartbeat on close - connection is terminating
                 ctx.close(reason);
                 ctx.stop();
             }
-            Ok(ws::Message::Continuation(_)) => {}
-            Ok(ws::Message::Nop) => {}
+            Ok(ws::Message::Continuation(_)) => {
+                // Any received message confirms the connection is alive
+                self.last_heartbeat = Instant::now();
+            }
+            Ok(ws::Message::Nop) => {
+                // Any received message confirms the connection is alive
+                self.last_heartbeat = Instant::now();
+            }
             Err(err) => {
+                // Don't update heartbeat on protocol errors
                 warn!(
                     session_id = %self.session_id,
                     game_id = self.game_id,
