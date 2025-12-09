@@ -10,7 +10,7 @@ actix-web = { version = "4", features = ["macros"] }
 actix-cors = "0.7"
 actix-http = "3"
 actix-web-actors = "4"
-redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.32", features = ["tokio-comp", "connection-manager"] }
 tokio-stream = "0.1"
 
 # Async runtime and utilities

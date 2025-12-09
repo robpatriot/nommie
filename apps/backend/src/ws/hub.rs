@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use actix::prelude::*;
 use dashmap::DashMap;
-use redis::aio::{Connection, ConnectionManager};
+use redis::aio::{ConnectionManager, PubSub};
 use redis::{AsyncCommands, Client};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -123,7 +123,7 @@ impl RealtimeBroker {
             publisher: Mutex::new(manager),
         });
 
-        spawn_subscriber(client, registry);
+        spawn_subscriber(redis_url, registry);
 
         Ok(broker)
     }
@@ -162,28 +162,61 @@ struct RedisEnvelope {
     lock_version: i32,
 }
 
-fn spawn_subscriber(client: Client, registry: Arc<GameSessionRegistry>) {
+fn spawn_subscriber(redis_url: &str, registry: Arc<GameSessionRegistry>) {
+    let redis_url = redis_url.to_string();
     tokio::spawn(async move {
-        if let Err(err) = run_subscription_loop(client, registry).await {
+        if let Err(err) = run_subscription_loop(&redis_url, registry).await {
             error!(error = %err, "Redis subscription loop exited");
         }
     });
 }
 
 async fn run_subscription_loop(
-    client: Client,
+    redis_url: &str,
     registry: Arc<GameSessionRegistry>,
 ) -> Result<(), AppError> {
-    let connection: Connection =
-        client
-            .get_async_connection()
+    // Create a client to get connection info
+    let client = Client::open(redis_url).map_err(|err| AppError::Internal {
+        code: ErrorCode::ConfigError,
+        detail: format!("Failed to create Redis client: {err}"),
+        source: Box::new(err),
+    })?;
+
+    let conn_info = client.get_connection_info();
+
+    // Create a TCP stream for pubsub
+    let addr = match &conn_info.addr {
+        redis::ConnectionAddr::Tcp(host, port) => (host.clone(), *port),
+        _ => {
+            return Err(AppError::Internal {
+                code: ErrorCode::ConfigError,
+                detail: "Only TCP protocol is supported for pubsub".to_string(),
+                source: Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "Non-TCP protocol",
+                )),
+            });
+        }
+    };
+
+    let stream = tokio::net::TcpStream::connect(addr)
+        .await
+        .map_err(|err| AppError::Internal {
+            code: ErrorCode::ConfigError,
+            detail: format!("Failed to connect to Redis for subscription: {err}"),
+            source: Box::new(err),
+        })?;
+
+    // Use the RedisConnectionInfo from ConnectionInfo
+    let mut pubsub =
+        PubSub::new(&conn_info.redis, stream)
             .await
             .map_err(|err| AppError::Internal {
                 code: ErrorCode::ConfigError,
-                detail: "Unable to connect to Redis for subscription".to_string(),
+                detail: format!("Failed to create Redis pubsub: {err}"),
                 source: Box::new(err),
             })?;
-    let mut pubsub = connection.into_pubsub();
+
     pubsub
         .psubscribe("game:*")
         .await
@@ -193,13 +226,13 @@ async fn run_subscription_loop(
             source: Box::new(err),
         })?;
 
-    let mut stream = pubsub.on_message();
+    let mut stream = pubsub.into_on_message();
     while let Some(msg) = stream.next().await {
         let channel_result = msg.get_channel::<String>();
         let payload_result = msg.get_payload::<String>();
         if let (Ok(channel), Ok(payload)) = (channel_result, payload_result) {
-            if let Some(game_id) = parse_channel(&channel) {
-                match serde_json::from_str::<RedisEnvelope>(&payload) {
+            if let Some(game_id) = parse_channel(channel.as_str()) {
+                match serde_json::from_str::<RedisEnvelope>(payload.as_str()) {
                     Ok(envelope) => {
                         registry.broadcast(
                             game_id,
