@@ -11,6 +11,7 @@ set -euo pipefail
 CA_KEY="/run/secrets/nommie_ca_key"
 CA_CERT="/run/secrets/nommie_ca_crt"
 OUTPUT_DIR="/opt/nommie/ssl"
+CA_RENEWAL_THRESHOLD_SECONDS="${CA_RENEWAL_THRESHOLD_SECONDS:-2592000}" # 30 days
 
 # Verify secrets are available
 if [ ! -f "${CA_KEY}" ]; then
@@ -23,6 +24,16 @@ if [ ! -f "${CA_CERT}" ]; then
     echo "ERROR: CA cert not found at ${CA_CERT}" >&2
     echo "Build must include --secret id=nommie_ca_crt,src=/path/to/ca.crt" >&2
     exit 1
+fi
+
+# Ensure CA certificate is valid and warn when close to expiry
+if ! openssl x509 -checkend 0 -noout -in "${CA_CERT}"; then
+    echo "ERROR: CA certificate supplied via secrets has expired" >&2
+    exit 1
+fi
+
+if ! openssl x509 -checkend "${CA_RENEWAL_THRESHOLD_SECONDS}" -noout -in "${CA_CERT}"; then
+    echo "WARNING: CA certificate will expire soon; refresh the CA before it lapses" >&2
 fi
 
 echo "Generating Postgres server certificate..."
@@ -60,6 +71,26 @@ rm -f "${OUTPUT_DIR}/server.csr" "${OUTPUT_DIR}/server.ext"
 # Set permissions
 chmod 600 "${OUTPUT_DIR}/server.key"
 chmod 644 "${OUTPUT_DIR}/server.crt"
+
+# Capture metadata for runtime refresh decisions
+SERVER_SERIAL=$(openssl x509 -in "${OUTPUT_DIR}/server.crt" -noout -serial | cut -d= -f2)
+SERVER_NOT_AFTER=$(openssl x509 -in "${OUTPUT_DIR}/server.crt" -noout -enddate | cut -d= -f2)
+SERVER_FINGERPRINT_SHA256=$(openssl x509 -in "${OUTPUT_DIR}/server.crt" -noout -fingerprint -sha256 | cut -d= -f2)
+CA_FINGERPRINT_SHA256=$(openssl x509 -in "${CA_CERT}" -noout -fingerprint -sha256 | cut -d= -f2)
+CA_SUBJECT=$(openssl x509 -in "${CA_CERT}" -noout -subject | sed 's/^subject= //')
+GENERATED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+cat > "${OUTPUT_DIR}/cert.meta" <<EOF
+# Metadata for TLS artifacts baked into the image
+GENERATED_AT=${GENERATED_AT}
+SERVER_SERIAL=${SERVER_SERIAL}
+SERVER_NOT_AFTER=${SERVER_NOT_AFTER}
+SERVER_FINGERPRINT_SHA256=${SERVER_FINGERPRINT_SHA256}
+CA_FINGERPRINT_SHA256=${CA_FINGERPRINT_SHA256}
+CA_SUBJECT=${CA_SUBJECT}
+EOF
+
+chmod 644 "${OUTPUT_DIR}/cert.meta"
 
 echo "Server certificate generated successfully:"
 echo "  - ${OUTPUT_DIR}/server.key"
