@@ -185,8 +185,8 @@ async fn run_subscription_loop(
     let conn_info = client.get_connection_info();
 
     // Create a TCP stream for pubsub
-    let addr = match &conn_info.addr {
-        redis::ConnectionAddr::Tcp(host, port) => (host.clone(), *port),
+    let addr = match conn_info.addr().clone() {
+        redis::ConnectionAddr::Tcp(host, port) => (host, port),
         _ => {
             return Err(AppError::Internal {
                 code: ErrorCode::ConfigError,
@@ -208,14 +208,13 @@ async fn run_subscription_loop(
         })?;
 
     // Use the RedisConnectionInfo from ConnectionInfo
-    let mut pubsub =
-        PubSub::new(&conn_info.redis, stream)
-            .await
-            .map_err(|err| AppError::Internal {
-                code: ErrorCode::ConfigError,
-                detail: format!("Failed to create Redis pubsub: {err}"),
-                source: Box::new(err),
-            })?;
+    let mut pubsub = PubSub::new(conn_info.redis_settings(), stream)
+        .await
+        .map_err(|err| AppError::Internal {
+            code: ErrorCode::ConfigError,
+            detail: format!("Failed to create Redis pubsub: {err}"),
+            source: Box::new(err),
+        })?;
 
     pubsub
         .psubscribe("game:*")
