@@ -6,11 +6,22 @@ apps/frontend/.next
 apps/frontend/node_modules
 apps/backend/target
 target
-docker/postgres/data
-docker/postgres/init.sh~*
 .env
 apps/frontend/.env
 apps/frontend/.env.local
 **/*.log
 **/*.swp
 **/*.swo
+
+# Documentation
+docs/
+
+# Build/deployment scripts
+scripts/
+
+# Docker compose files (not needed in images)
+docker/local-prod/
+docker/dev-db/
+
+# Docker shared files (ca.crt moved to postgres-tls, only redis.Dockerfile remains)
+docker/shared/
