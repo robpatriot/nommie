@@ -26,22 +26,21 @@ Before building the image, you must:
      -subj "/CN=Nommie CA/O=Nommie/C=US"
    ```
 
-2. **Copy CA public certificate** to the shared location:
+2. **Copy CA public certificate** to the postgres-tls directory:
    ```bash
-   mkdir -p docker/shared
-   cp ~/secrets/nommie-ca/ca.crt docker/shared/ca.crt
+   cp ~/secrets/nommie-ca/ca.crt docker/postgres-tls/ca.crt
    ```
    
    **Why two locations?**
    - `~/secrets/nommie-ca/ca.key` and `ca.crt` → Used during **build** (via Docker build secrets)
-   - `docker/shared/ca.crt` → Used at **runtime** (mounted into containers for TLS verification)
+   - `docker/postgres-tls/ca.crt` → Copied into postgres-tls and backend images during build (for TLS verification)
    
    Even though `ca.crt` is a public certificate, this repository treats it like
-   other deployment-specific secrets: you should create `docker/shared/ca.crt`
+   other deployment-specific secrets: you should create `docker/postgres-tls/ca.crt`
    locally and **not** commit it to git (it is gitignored).
    
    **Important:** Only copy `ca.crt` (the public certificate) into
-   `docker/shared/ca.crt` locally. Never commit `ca.key` or `ca.crt` to git.
+   `docker/postgres-tls/ca.crt` locally. Never commit `ca.key` or `ca.crt` to git.
 
 ## Building the Image
 
@@ -119,15 +118,9 @@ Both environments use the **same CA**, ensuring consistent TLS behavior.
 
 ## Backend Configuration
 
-Backend containers must have the CA cert mounted and configured:
+Backend containers have the CA cert baked into the image at `/etc/ssl/certs/nommie-ca.crt` (copied during build).
 
-1. **Mount CA cert** in `docker-compose.yml`:
-   ```yaml
-   volumes:
-     - ../shared/ca.crt:/etc/ssl/certs/nommie-ca.crt:ro
-   ```
-
-2. **Set environment variables** in `backend.env`:
+**Set environment variables** in `backend.env`:
    ```bash
    # TLS is enabled by default (verify-full)
    # POSTGRES_SSL_MODE=verify-full  # (default, can be omitted)
@@ -156,7 +149,7 @@ Backend containers must have the CA cert mounted and configured:
 **To check certificate expiry:**
 ```bash
 # Check CA cert
-openssl x509 -enddate -noout -in docker/shared/ca.crt
+openssl x509 -enddate -noout -in docker/postgres-tls/ca.crt
 
 # Check server cert (from inside container)
 docker compose -f docker/dev-db/docker-compose.yml exec postgres openssl x509 -enddate -noout -in /var/lib/postgresql/data/ssl/server.crt
@@ -166,7 +159,7 @@ docker compose -f docker/dev-db/docker-compose.yml exec postgres openssl x509 -e
 
 - **CA private key (`ca.key`):** Keep this secure and backed up. Store it outside the repository (e.g., `~/secrets/nommie-ca/`).
 - **Server private key:** Baked into the image but only accessible to the `postgres` user inside the container.
-- **CA public cert (`ca.crt`):** Safe to commit to git and share. It's already in `docker/shared/ca.crt`.
+- **CA public cert (`ca.crt`):** Safe to commit to git and share. It's in `docker/postgres-tls/ca.crt` (gitignored).
 
 ## Troubleshooting
 
