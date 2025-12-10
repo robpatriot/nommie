@@ -1,7 +1,7 @@
 use backend::config::db::RuntimeEnv;
 use backend::infra::db::{bootstrap_db, build_admin_pool};
 use futures::future::join_all;
-use migration::{count_applied_migrations, Migrator, MigratorTrait};
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectionTrait, DatabaseBackend};
 use tokio::time::{timeout, Duration};
 use {tracing, tracing_subscriber};
@@ -39,9 +39,10 @@ async fn contention_burst_all_ok_and_single_migrator() {
     let baseline_admin_pool = build_admin_pool(env, db_kind)
         .await
         .expect("baseline admin pool");
-    let baseline = count_applied_migrations(&baseline_admin_pool)
+    let baseline = Migrator::get_applied_migrations(&baseline_admin_pool)
         .await
-        .unwrap_or(0);
+        .unwrap_or_else(|_| vec![])
+        .len();
 
     // Determine the correct backend for database operations
     let backend = DatabaseBackend::from(db_kind);
@@ -69,9 +70,10 @@ async fn contention_burst_all_ok_and_single_migrator() {
     let after_admin_pool = build_admin_pool(env, db_kind)
         .await
         .expect("after admin pool");
-    let after = count_applied_migrations(&after_admin_pool)
+    let after = Migrator::get_applied_migrations(&after_admin_pool)
         .await
-        .unwrap_or(0);
+        .unwrap_or_else(|_| vec![])
+        .len();
 
     // Compute:
     //     applied = after - baseline
@@ -121,9 +123,10 @@ async fn contention_burst_all_ok_and_single_migrator() {
     let again_after_admin_pool = build_admin_pool(env, db_kind)
         .await
         .expect("again_after admin pool");
-    let again_after = count_applied_migrations(&again_after_admin_pool)
+    let again_after = Migrator::get_applied_migrations(&again_after_admin_pool)
         .await
-        .unwrap_or(0);
+        .unwrap_or_else(|_| vec![])
+        .len();
 
     // ASSERT: again_after == after
     assert_eq!(

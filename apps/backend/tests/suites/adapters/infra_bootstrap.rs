@@ -1,6 +1,6 @@
 use backend::config::db::{DbKind, RuntimeEnv};
-use backend::infra::db::bootstrap_db;
-use migration::count_applied_migrations;
+use backend::infra::db::{bootstrap_db, build_admin_pool};
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection};
 
 use crate::support::resolve_test_db_kind;
@@ -36,15 +36,31 @@ async fn owner_split_permissions_pg() {
 async fn migration_is_idempotent() {
     let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
 
-    let pool1 = bootstrap_db(RuntimeEnv::Test, db_kind)
+    let _pool1 = bootstrap_db(RuntimeEnv::Test, db_kind)
         .await
         .expect("bootstrap-1");
-    let before = count_applied_migrations(&pool1).await.unwrap_or(0);
 
-    let pool2 = bootstrap_db(RuntimeEnv::Test, db_kind)
+    // Use admin pool for accurate migration count
+    let before_admin_pool = build_admin_pool(RuntimeEnv::Test, db_kind)
+        .await
+        .expect("before admin pool");
+    let before = Migrator::get_applied_migrations(&before_admin_pool)
+        .await
+        .unwrap_or_else(|_| vec![])
+        .len();
+
+    let _pool2 = bootstrap_db(RuntimeEnv::Test, db_kind)
         .await
         .expect("bootstrap-2");
-    let after = count_applied_migrations(&pool2).await.unwrap_or(0);
+
+    // Use admin pool for accurate migration count
+    let after_admin_pool = build_admin_pool(RuntimeEnv::Test, db_kind)
+        .await
+        .expect("after admin pool");
+    let after = Migrator::get_applied_migrations(&after_admin_pool)
+        .await
+        .unwrap_or_else(|_| vec![])
+        .len();
 
     assert_eq!(before, after, "migration count changed on second bootstrap");
 }

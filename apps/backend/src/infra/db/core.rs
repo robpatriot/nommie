@@ -5,10 +5,7 @@ use std::str::FromStr;
 use std::time::{Duration, Instant};
 
 // External crate imports
-use migration::{
-    count_applied_migrations, get_latest_migration_version, migrate, MigrationCommand, Migrator,
-    MigratorTrait,
-};
+use migration::{migrate, MigrationCommand, Migrator, MigratorTrait};
 use rand::Rng;
 use sea_orm::{
     ConnectOptions, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, DbErr,
@@ -433,27 +430,19 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, AppEr
         .map(|m| m.name().to_string())
         .unwrap_or_default();
 
-    // Try to get current migration state using the new migration functions
-    let (current_count, current_last) = match count_applied_migrations(conn).await {
-        Ok(count) => {
+    // Use SeaORM directly since we're using admin pool (has CREATE permissions)
+    let (current_count, current_last) = match Migrator::get_applied_migrations(conn).await {
+        Ok(migrations) => {
+            let count = migrations.len();
+            let last = migrations.last().map(|m| m.name().to_string());
             debug!(
                 fastpath = "debug",
                 applied_count = count,
-                expected_count = expected_count
+                expected_count = expected_count,
+                current_last = %last.as_deref().unwrap_or("None"),
+                expected_last = %expected_last
             );
-            // Migration table exists, get the latest version
-            match get_latest_migration_version(conn).await {
-                Ok(last) => {
-                    debug!(fastpath = "debug", current_last = %last.as_deref().unwrap_or("None"), expected_last = %expected_last);
-                    (count, last)
-                }
-                Err(e) => {
-                    return Err(AppError::config(
-                        "failed to get latest migration version",
-                        e,
-                    ));
-                }
-            }
+            (count, last)
         }
         Err(DbErr::Exec(_)) => {
             // Migration table doesn't exist yet
@@ -461,7 +450,7 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, AppEr
             return Ok(false);
         }
         Err(e) => {
-            return Err(AppError::config("failed to count applied migrations", e));
+            return Err(AppError::config("failed to get applied migrations", e));
         }
     };
 
@@ -864,8 +853,12 @@ async fn migrate_with_guard_controlled(
     info!(migrator = "ran", env = ?env, db_kind = ?db_kind, elapsed_ms = start.elapsed().as_millis());
 
     // Post-check: Verify migrations match expected state based on command (still under lock)
+    // Use SeaORM directly since we're using admin pool (has CREATE permissions)
     let expected_count = Migrator::migrations().len();
-    let applied_count = count_applied_migrations(pool).await.unwrap_or(0);
+    let applied_count = match Migrator::get_applied_migrations(pool).await {
+        Ok(migrations) => migrations.len(),
+        Err(_) => 0, // Shouldn't happen after migration, but handle gracefully
+    };
     info!(
         migrate = "counts",
         expected_count = expected_count,

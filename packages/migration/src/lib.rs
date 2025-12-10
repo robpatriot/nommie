@@ -113,8 +113,9 @@ async fn get_db_diagnostics(db: &DatabaseConnection) -> Result<DbDiagnostics, se
         _ => "<unsupported>".to_string(),
     };
 
-    // Count applied migrations using the new public function
-    let applied_migrations_count = count_applied_migrations(db).await.unwrap_or(0);
+    // Use SeaORM directly since we're in migration context with admin pool
+    let applied_migrations = Migrator::get_applied_migrations(db).await?;
+    let applied_migrations_count = applied_migrations.len();
     let defined_migrations_count = Migrator::migrations().len();
 
     Ok(DbDiagnostics {
@@ -126,24 +127,41 @@ async fn get_db_diagnostics(db: &DatabaseConnection) -> Result<DbDiagnostics, se
 }
 
 /// Count the number of migrations that have been applied to the database.
-/// Uses SeaORM's built-in `get_applied_migrations()` method.
+/// Queries the seaql_migrations table directly to work with app-level database users
+/// that only have SELECT permissions (no CREATE required).
 /// Returns 0 if the migration table doesn't exist yet.
 pub async fn count_applied_migrations(db: &DatabaseConnection) -> Result<usize, DbErr> {
-    match Migrator::get_applied_migrations(db).await {
-        Ok(migrations) => Ok(migrations.len()),
-        Err(DbErr::Exec(_)) => Ok(0), // Migration table doesn't exist yet
+    let stmt = Statement::from_string(
+        db.get_database_backend(),
+        String::from("SELECT COUNT(*) AS cnt FROM seaql_migrations"),
+    );
+
+    match db.query_one(stmt).await {
+        Ok(Some(row)) => row.try_get::<i64>("", "cnt").map(|c| c as usize),
+        Ok(None) => Ok(0),              // Table exists but empty
+        Err(DbErr::Exec(_)) => Ok(0),   // Table doesn't exist yet
         Err(e) => Err(e),
     }
 }
 
 /// Get the version string of the latest applied migration.
+/// Queries the seaql_migrations table directly to work with app-level database users
+/// that only have SELECT permissions (no CREATE required).
 /// Returns None if no migrations have been applied or the migration table doesn't exist.
 pub async fn get_latest_migration_version(
     db: &DatabaseConnection,
 ) -> Result<Option<String>, DbErr> {
-    match Migrator::get_applied_migrations(db).await {
-        Ok(migrations) => Ok(migrations.last().map(|m| m.name().to_string())),
-        Err(DbErr::Exec(_)) => Ok(None), // Migration table doesn't exist yet
+    let stmt = Statement::from_string(
+        db.get_database_backend(),
+        String::from(
+            "SELECT version FROM seaql_migrations ORDER BY applied_at DESC LIMIT 1",
+        ),
+    );
+
+    match db.query_one(stmt).await {
+        Ok(Some(row)) => row.try_get::<String>("", "version").map(Some),
+        Ok(None) => Ok(None),           // Table exists but no rows
+        Err(DbErr::Exec(_)) => Ok(None),// Table doesn't exist yet
         Err(e) => Err(e),
     }
 }
