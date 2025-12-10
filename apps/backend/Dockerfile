@@ -58,5 +58,11 @@ EXPOSE ${PORT}
 
 COPY --from=builder /app/target/release/backend /usr/local/bin/backend
 
+# Copy CA certificate for Postgres TLS verification
+# The CA cert is public and safe to include in the image
+# /etc/ssl/certs/ exists in the base image (ca-certificates package creates it)
+COPY docker/postgres-tls/ca.crt /etc/ssl/certs/nommie-ca.crt
+RUN chmod 644 /etc/ssl/certs/nommie-ca.crt
+
 CMD ["backend"]
 

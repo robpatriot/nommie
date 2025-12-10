@@ -40,6 +40,10 @@ RUN --mount=type=secret,id=nommie_ca_crt \
 COPY entrypoint-ssl.sh /usr/local/bin/entrypoint-ssl.sh
 RUN chmod +x /usr/local/bin/entrypoint-ssl.sh
 
+# Copy database initialization script
+COPY init.sh /docker-entrypoint-initdb.d/00-init.sh
+RUN chmod +x /docker-entrypoint-initdb.d/00-init.sh
+
 # Set permissions on server certs (they'll be copied to volume on first run)
 RUN chown -R postgres:postgres /opt/nommie/ssl && \
     chmod 600 /opt/nommie/ssl/server.key && \

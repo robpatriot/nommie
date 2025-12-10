@@ -16,12 +16,18 @@ services:
     restart: unless-stopped
     env_file:
       - ./db.env
+    environment:
+      # SSL_RENEWAL_THRESHOLD_SECONDS can be set in shell environment for testing/configuration
+      # It will be passed to the container if set (used by entrypoint-ssl.sh)
+      # Defaults to 30 days (2592000 seconds) if not set
+      SSL_RENEWAL_THRESHOLD_SECONDS: ${SSL_RENEWAL_THRESHOLD_SECONDS:-}
     volumes:
       - nommie_local_prod_db_data:/var/lib/postgresql/data
       - nommie_local_prod_ssl:/var/lib/postgresql/ssl
-      - ../postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      # Use hardcoded defaults to avoid requiring shell env vars for compose file substitution
+      # The actual container env vars come from db.env via env_file
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 100ms
       timeout: 1s
       retries: 1
@@ -37,10 +43,6 @@ services:
     env_file:
       - ./backend.env
       - ./db.env
-    volumes:
-      # CA certificate used by backend for Postgres TLS verification
-      # This should be the public CA cert (safe to commit to git)
-      - ../shared/ca.crt:/etc/ssl/certs/nommie-ca.crt:ro
     depends_on:
       postgres:
         condition: service_started
@@ -87,7 +89,6 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - nommie_local_prod_caddy_data:/data
       - nommie_local_prod_caddy_config:/config
 
