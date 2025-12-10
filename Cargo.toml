@@ -13,3 +13,6 @@ edition = "2021"
 
 [workspace.dependencies]
 sea-orm = "1.1"
+
+[patch.crates-io]
+num-bigint-dig = { version = "0.8.6" }
