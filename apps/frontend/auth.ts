@@ -1,5 +1,6 @@
 // apps/frontend/auth.ts
 import NextAuth from 'next-auth'
+import type { NextAuthResult } from 'next-auth'
 import Google from 'next-auth/providers/google'
 
 export const BACKEND_BASE_URL_ERROR_MSG =
@@ -30,7 +31,7 @@ export function getBackendBaseUrlOrThrow(): string {
   }
 }
 
-export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
+const nextAuthResult = NextAuth({
   secret: process.env.AUTH_SECRET,
   trustHost: true, // Required when behind a reverse proxy like Caddy
 
@@ -102,3 +103,10 @@ export const { handlers, auth, signIn, signOut, unstable_update } = NextAuth({
     },
   },
 })
+
+export const handlers: NextAuthResult['handlers'] = nextAuthResult.handlers
+export const auth: NextAuthResult['auth'] = nextAuthResult.auth
+export const signIn: NextAuthResult['signIn'] = nextAuthResult.signIn
+export const signOut: NextAuthResult['signOut'] = nextAuthResult.signOut
+export const unstable_update: NextAuthResult['unstable_update'] =
+  nextAuthResult.unstable_update

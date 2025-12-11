@@ -1,4 +1,8 @@
-import { render as rtlRender, RenderOptions } from '@testing-library/react'
+import {
+  render as rtlRender,
+  type RenderOptions,
+  type RenderResult,
+} from '@testing-library/react'
 import { ReactElement } from 'react'
 
 // AllProviders wrapper - currently just renders children, ready for providers later
@@ -7,8 +11,10 @@ const AllProviders = ({ children }: { children: React.ReactNode }) => {
 }
 
 // Custom render function that wraps RTL's render
-const render = (ui: ReactElement, options?: Omit<RenderOptions, 'wrapper'>) =>
-  rtlRender(ui, { wrapper: AllProviders, ...options })
+const render = (
+  ui: ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>
+): RenderResult => rtlRender(ui, { wrapper: AllProviders, ...options })
 
 // Re-export commonly used testing utilities
 export * from '@testing-library/react'

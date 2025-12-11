@@ -1,4 +1,5 @@
 import { vi } from 'vitest'
+import type { Mock } from 'vitest'
 
 // Mock user type - adjust based on your actual User type
 export interface MockUser {
@@ -22,8 +23,8 @@ let mockStatus: 'loading' | 'authenticated' | 'unauthenticated' =
   'unauthenticated'
 
 // Mock functions
-export const mockSignIn = vi.fn()
-export const mockSignOut = vi.fn()
+export const mockSignIn: Mock = vi.fn()
+export const mockSignOut: Mock = vi.fn()
 
 // Helper functions to control session state
 export const mockUnauthenticated = () => {
