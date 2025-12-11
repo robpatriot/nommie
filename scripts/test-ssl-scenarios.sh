@@ -14,7 +14,6 @@ ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TEST_DIR="${SCRIPT_DIR}/.test-ssl"
 CA_DIR="${TEST_DIR}/ca"
 COMPOSE_FILE="${ROOT_DIR}/docker/dev-db/docker-compose.yml"
-SHARED_CA_CERT="${ROOT_DIR}/docker/shared/ca.crt"
 POSTGRES_TLS_CA_CERT="${ROOT_DIR}/docker/postgres-tls/ca.crt"
 
 # Colors for output
@@ -615,11 +614,7 @@ main() {
     log_info "Test directory: ${TEST_DIR}"
     log_info "Using compose file: ${COMPOSE_FILE}"
     
-    # Safety check: Warn if user has existing CA certs
-    if [ -f "${SHARED_CA_CERT}" ]; then
-        log_warning "Found existing docker/shared/ca.crt - it will be backed up and restored"
-    fi
-    
+    # Safety check: Inform user about real CA certs
     if [ -f "${HOME}/secrets/nommie-ca/ca.crt" ] || [ -f "${HOME}/secrets/nommie-ca/ca.key" ]; then
         log_info "Your real CA certs in ~/secrets/nommie-ca/ will NOT be touched"
         log_info "This test uses separate test CA certs"
