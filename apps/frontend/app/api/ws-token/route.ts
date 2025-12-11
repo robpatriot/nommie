@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server'
 
 import { getBackendBaseUrlOrThrow } from '@/auth'
 import { ensureBackendJwtForServerAction } from '@/lib/auth/refresh-backend-jwt'
+import {
+  shouldLogError,
+  isInStartupWindow,
+  markBackendUp,
+} from '@/lib/server/backend-status'
+import { isBackendStartupError } from '@/lib/server/connection-errors'
 
 export async function GET() {
   try {
@@ -17,8 +23,15 @@ export async function GET() {
       cache: 'no-store',
     })
 
+    // Mark backend as up if we got a response (even if error) - connection succeeded
+    // This helps differentiate startup failures from runtime failures
+    markBackendUp()
+
     if (!response.ok) {
-      console.error('Failed to fetch websocket token', response.status)
+      // Only log if we should (outside startup window or runtime failure)
+      if (shouldLogError()) {
+        console.error('Failed to fetch websocket token', response.status)
+      }
       return NextResponse.json(
         { error: 'Unable to issue websocket token' },
         { status: response.status }
@@ -28,10 +41,18 @@ export async function GET() {
     const payload = await response.json()
     return NextResponse.json(payload, { status: 200 })
   } catch (error) {
-    console.error('Unexpected websocket token error', error)
+    // Check if this is a backend startup error
+    const isStartupError = isBackendStartupError(error, isInStartupWindow)
+
+    // Only log if we should (outside startup window or runtime failure)
+    if (shouldLogError() && !isStartupError) {
+      console.error('Unexpected websocket token error', error)
+    }
+
+    // Return 503 for startup errors (retriable), 500 for other errors
     return NextResponse.json(
       { error: 'Unable to issue websocket token' },
-      { status: 500 }
+      { status: isStartupError ? 503 : 500 }
     )
   }
 }
