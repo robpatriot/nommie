@@ -13,6 +13,13 @@ use uuid::Uuid;
 
 use crate::error::AppError;
 use crate::errors::ErrorCode;
+use crate::ws::game::GameWsSession;
+
+/// Recipient + address for a single websocket session
+type SessionHandle = (Recipient<SnapshotBroadcast>, Addr<GameWsSession>);
+/// Map of session token to session handle for a specific game_id
+type SessionMap = DashMap<Uuid, SessionHandle>;
+
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct SnapshotBroadcast {
@@ -20,7 +27,7 @@ pub struct SnapshotBroadcast {
 }
 
 pub struct GameSessionRegistry {
-    sessions: DashMap<i64, DashMap<Uuid, Recipient<SnapshotBroadcast>>>,
+    sessions: DashMap<i64, SessionMap>,
     active_connections: AtomicUsize,
 }
 
@@ -32,10 +39,15 @@ impl GameSessionRegistry {
         }
     }
 
-    pub fn register(&self, game_id: i64, recipient: Recipient<SnapshotBroadcast>) -> Uuid {
+    pub fn register(
+        &self,
+        game_id: i64,
+        recipient: Recipient<SnapshotBroadcast>,
+        addr: Addr<GameWsSession>,
+    ) -> Uuid {
         let token = Uuid::new_v4();
         let entry = self.sessions.entry(game_id).or_default();
-        entry.insert(token, recipient);
+        entry.insert(token, (recipient, addr));
 
         let active = self.active_connections.fetch_add(1, Ordering::Relaxed) + 1;
         info!(
@@ -90,10 +102,40 @@ impl GameSessionRegistry {
 
     pub fn broadcast(&self, game_id: i64, message: SnapshotBroadcast) {
         if let Some(entry) = self.sessions.get(&game_id) {
-            for recipient in entry.iter() {
-                recipient.value().do_send(message.clone());
+            for recipient_tuple in entry.iter() {
+                recipient_tuple.value().0.do_send(message.clone());
             }
         }
+    }
+
+    /// Initiate shutdown for all active websocket connections
+    /// Returns a vector of futures that will resolve when each shutdown message is processed
+    pub fn close_all_connections(
+        &self,
+    ) -> Vec<actix::dev::Request<GameWsSession, crate::ws::game::Shutdown>> {
+        // Clone addrs first to drop DashMap guards before sending shutdowns, avoiding contention
+        let mut addrs = Vec::new();
+        for entry in self.sessions.iter() {
+            for session_entry in entry.value().iter() {
+                let (_, addr) = session_entry.value();
+                addrs.push(addr.clone());
+            }
+        }
+
+        addrs
+            .into_iter()
+            .map(|addr| addr.send(crate::ws::game::Shutdown))
+            .collect()
+    }
+
+    /// Check if all connections have been closed
+    pub fn all_connections_closed(&self) -> bool {
+        self.active_connections.load(Ordering::Relaxed) == 0
+    }
+
+    /// Get current number of active connections
+    pub fn active_connections_count(&self) -> usize {
+        self.active_connections.load(Ordering::Relaxed)
     }
 }
 
