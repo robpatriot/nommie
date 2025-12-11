@@ -22,9 +22,9 @@ docker/**/*.env
 # CA private keys should be stored outside the repository (e.g., ~/secrets/nommie-ca/)
 docker/**/certs/**/*.key
 docker/**/certs/**/*.srl
-# Runtime CA certs (docker/shared/ca.crt) are derived from your private CA and
-# should not be committed either.
+# Runtime CA certs are derived from your private CA and should not be committed
 docker/shared/ca.crt
+docker/postgres-tls/ca.crt
 
 
 # Postgres data

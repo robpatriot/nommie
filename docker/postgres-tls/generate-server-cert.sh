@@ -9,7 +9,7 @@ set -euo pipefail
 #   - /run/secrets/nommie_ca_crt   (CA public certificate)
 
 CA_KEY="/run/secrets/nommie_ca_key"
-CA_CERT="/run/secrets/nommie_ca_crt"
+CA_CERT="${CA_CERT_PATH:-/opt/nommie/ssl/ca.crt}"
 OUTPUT_DIR="/opt/nommie/ssl"
 CA_RENEWAL_THRESHOLD_SECONDS="${CA_RENEWAL_THRESHOLD_SECONDS:-2592000}" # 30 days
 

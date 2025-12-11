@@ -21,20 +21,18 @@ RUN apk add --no-cache openssl
 RUN mkdir -p /opt/nommie/ssl && \
     chmod 755 /opt/nommie/ssl
 
+# Copy the CA certificate from build context so changes bust cache
+COPY ca.crt /opt/nommie/ssl/ca.crt
+RUN chmod 644 /opt/nommie/ssl/ca.crt
+
 # Copy certificate generation script
 COPY generate-server-cert.sh /usr/local/bin/generate-server-cert.sh
 RUN chmod +x /usr/local/bin/generate-server-cert.sh
 
 # Generate server certificate during build (using build secrets)
-# This script reads CA key/cert from /run/secrets/ and generates server.key/server.crt
+# This script reads CA key from secrets and CA cert from the copied file
 RUN --mount=type=secret,id=nommie_ca_key \
-    --mount=type=secret,id=nommie_ca_crt \
     /usr/local/bin/generate-server-cert.sh
-
-# Copy CA public certificate into image (safe to include, it's public)
-RUN --mount=type=secret,id=nommie_ca_crt \
-    cp /run/secrets/nommie_ca_crt /opt/nommie/ssl/ca.crt && \
-    chmod 644 /opt/nommie/ssl/ca.crt
 
 # Copy entrypoint script that handles volume persistence
 COPY entrypoint-ssl.sh /usr/local/bin/entrypoint-ssl.sh
