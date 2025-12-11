@@ -45,7 +45,6 @@ dist/
 # Rust
 target/
 **/*.rs.bk
-Cargo.lock
 
 # Logs
 npm-debug.log*
