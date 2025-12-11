@@ -3,6 +3,7 @@
 
 import { getBackendBaseUrlOrThrow } from '@/auth'
 import { markBackendUp, shouldLogError } from './backend-status'
+import { isBackendConnectionError } from './connection-errors'
 
 /**
  * Checks if the backend is available by hitting the /health endpoint.
@@ -29,21 +30,7 @@ export async function checkBackendHealth(): Promise<boolean> {
     return false
   } catch (error) {
     // Check if this is a connection error
-    const errorMessage =
-      error instanceof Error ? error.message.toLowerCase() : ''
-    const causeMessage =
-      error instanceof Error && 'cause' in error && error.cause instanceof Error
-        ? error.cause.message.toLowerCase()
-        : ''
-
-    const isConnectionError =
-      error instanceof Error &&
-      (errorMessage.includes('econnrefused') ||
-        errorMessage.includes('fetch failed') ||
-        errorMessage.includes('connection') ||
-        errorMessage.includes('timeout') ||
-        causeMessage.includes('econnrefused') ||
-        causeMessage.includes('connect econnrefused'))
+    const isConnectionError = isBackendConnectionError(error)
 
     // Only log if we should (outside startup window or runtime failure)
     if (shouldLogError() && isConnectionError) {

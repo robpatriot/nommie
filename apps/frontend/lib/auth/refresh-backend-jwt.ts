@@ -13,6 +13,7 @@ import {
   shouldLogError,
   isInStartupWindow,
 } from '@/lib/server/backend-status'
+import { isBackendConnectionError } from '@/lib/server/connection-errors'
 import { parseErrorResponse } from '@/lib/api/error-parsing'
 import * as jose from 'jose'
 import type { NextRequest, NextResponse } from 'next/server'
@@ -275,20 +276,7 @@ async function fetchNewBackendJwt(
       throw error
     }
 
-    const errorMessage =
-      error instanceof Error ? error.message.toLowerCase() : ''
-    const causeMessage =
-      error instanceof Error && 'cause' in error && error.cause instanceof Error
-        ? error.cause.message.toLowerCase()
-        : ''
-
-    const isConnectionError =
-      error instanceof Error &&
-      (errorMessage.includes('econnrefused') ||
-        errorMessage.includes('fetch failed') ||
-        errorMessage.includes('connection') ||
-        causeMessage.includes('econnrefused') ||
-        causeMessage.includes('connect econnrefused'))
+    const isConnectionError = isBackendConnectionError(error)
 
     if (shouldLogError()) {
       if (isConnectionError) {

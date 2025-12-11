@@ -11,6 +11,7 @@ import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { getUserOptions } from '@/lib/api/user-options'
 import { BackendApiError } from '@/lib/api'
 import { isInStartupWindow } from '@/lib/server/backend-status'
+import { isBackendStartupError } from '@/lib/server/connection-errors'
 
 interface GamePageProps {
   params: Promise<{
@@ -41,11 +42,7 @@ export default async function GamePage({ params }: GamePageProps) {
     const isStartupError =
       (error instanceof BackendApiError &&
         (error.status === 503 || error.code === 'BACKEND_STARTING')) ||
-      (isInStartupWindow() &&
-        error instanceof Error &&
-        (error.message.includes('connection') ||
-          error.message.includes('fetch failed') ||
-          error.message.includes('ECONNREFUSED')))
+      isBackendStartupError(error, isInStartupWindow)
 
     if (isStartupError) {
       // Backend is starting up - redirect to lobby where user can retry

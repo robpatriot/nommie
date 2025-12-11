@@ -16,6 +16,7 @@ import {
   shouldLogError,
   isInStartupWindow,
 } from '@/lib/server/backend-status'
+import { isBackendConnectionError } from '@/lib/server/connection-errors'
 
 // Re-export BackendApiError for convenience (it's also available from ./errors)
 export { BackendApiError }
@@ -103,21 +104,7 @@ export async function fetchWithAuth(
     markBackendUp()
   } catch (error) {
     // Handle network errors - check if we should log
-    const errorMessage =
-      error instanceof Error ? error.message.toLowerCase() : ''
-    const causeMessage =
-      error instanceof Error && 'cause' in error && error.cause instanceof Error
-        ? error.cause.message.toLowerCase()
-        : ''
-
-    const isConnectionError =
-      error instanceof Error &&
-      (errorMessage.includes('econnrefused') ||
-        errorMessage.includes('fetch failed') ||
-        errorMessage.includes('connection') ||
-        errorMessage.includes('timeout') ||
-        causeMessage.includes('econnrefused') ||
-        causeMessage.includes('connect econnrefused'))
+    const isConnectionError = isBackendConnectionError(error)
 
     // Only log connection errors if we should (outside startup window or runtime failure)
     if (shouldLogError() && isConnectionError) {
