@@ -40,6 +40,7 @@ services:
       context: ../shared
       dockerfile: redis.Dockerfile
     image: ${COMPOSE_PROJECT_NAME}-redis:8.2
+    pull_policy: build  # Skip pull attempt for custom-named image, build directly (pulls base redis:8.2 during build)
     command: ["redis-server", "--save", ""] # disable RDB for dev
     ports:
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
