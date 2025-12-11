@@ -9,6 +9,8 @@ import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { getUserOptions } from '@/lib/api/user-options'
+import { BackendApiError } from '@/lib/api'
+import { isInStartupWindow } from '@/lib/server/backend-status'
 
 interface GamePageProps {
   params: Promise<{
@@ -28,7 +30,31 @@ export default async function GamePage({ params }: GamePageProps) {
   const numericGameId = Number(gameId)
   const resolvedGameId = Number.isNaN(numericGameId) ? 0 : numericGameId
 
-  const snapshotResult = await fetchGameSnapshot(resolvedGameId)
+  // Fetch game snapshot, but handle backend startup gracefully
+  // Error handling is centralized in fetchWithAuth - errors during startup
+  // are suppressed automatically. If backend is starting up, redirect to lobby.
+  let snapshotResult
+  try {
+    snapshotResult = await fetchGameSnapshot(resolvedGameId)
+  } catch (error) {
+    // Check if this is a backend startup error
+    const isStartupError =
+      (error instanceof BackendApiError &&
+        (error.status === 503 || error.code === 'BACKEND_STARTING')) ||
+      (isInStartupWindow() &&
+        error instanceof Error &&
+        (error.message.includes('connection') ||
+          error.message.includes('fetch failed') ||
+          error.message.includes('ECONNREFUSED')))
+
+    if (isStartupError) {
+      // Backend is starting up - redirect to lobby where user can retry
+      redirect('/lobby')
+    }
+
+    // For other errors (game not found, auth issues, etc.), let ErrorBoundary handle it
+    throw error
+  }
 
   if (snapshotResult.kind !== 'ok') {
     // 'not_modified' should not occur on initial page load without an ETag
