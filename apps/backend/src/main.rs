@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use actix_extensible_rate_limit::backend::memory::InMemoryBackend;
 use actix_extensible_rate_limit::RateLimiter;
 use actix_web::{web, App, HttpServer};
@@ -13,6 +15,10 @@ use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
 use backend::state::security_config::SecurityConfig;
 use backend::{routes, ws};
+use tokio::signal;
+#[cfg(unix)]
+use tokio::signal::unix::{signal as unix_signal, SignalKind};
+use tokio::time::timeout;
 
 mod telemetry;
 
@@ -87,7 +93,10 @@ async fn main() -> std::io::Result<()> {
     // Wrap AppState with web::Data before passing to HttpServer
     let data = web::Data::new(app_state);
 
-    HttpServer::new(move || {
+    // Clone registry for shutdown handler
+    let registry_for_shutdown = data.realtime.as_ref().map(|broker| broker.registry());
+
+    let server = HttpServer::new(move || {
         // Create rate limiters for different route groups (one per worker thread)
         let auth_backend = InMemoryBackend::builder().build();
         let auth_input = auth_rate_limit_config().build();
@@ -200,8 +209,69 @@ async fn main() -> std::io::Result<()> {
             )
     })
     .bind((host.as_str(), port))?
-    .run()
-    .await
+    .run();
+
+    let server_handle = server.handle();
+    let registry_clone = registry_for_shutdown.clone();
+
+    // Spawn task to handle shutdown signals
+    tokio::spawn(async move {
+        // Listen for both SIGINT (Ctrl+C) and SIGTERM
+        // Actix-web also listens for these, but we intercept them first to close websockets
+        #[cfg(unix)]
+        {
+            match unix_signal(SignalKind::terminate()) {
+                Ok(mut sigterm) => {
+                    tokio::select! {
+                        _ = signal::ctrl_c() => {}
+                        _ = sigterm.recv() => {}
+                    }
+                }
+                Err(_) => {
+                    let _ = signal::ctrl_c().await;
+                }
+            }
+        }
+
+        #[cfg(not(unix))]
+        {
+            let _ = signal::ctrl_c().await;
+        }
+
+        // Close all websocket connections and wait for shutdown messages to be processed
+        if let Some(registry) = registry_clone {
+            let shutdown_futures = registry.close_all_connections();
+            if !shutdown_futures.is_empty() {
+                let total = shutdown_futures.len();
+
+                match timeout(
+                    Duration::from_secs(2),
+                    futures::future::join_all(shutdown_futures),
+                )
+                .await
+                {
+                    Ok(results) => {
+                        let completed = results.iter().filter(|r| r.is_ok()).count();
+                        let failed = results.iter().filter(|r| r.is_err()).count();
+                        println!("[shutdown] websocket close_all completed: total={}, completed={}, failed={}",
+                            total, completed, failed
+                        );
+                    }
+                    Err(_) => {
+                        println!(
+                            "[shutdown] websocket close_all timed out after 2s (total={})",
+                            total
+                        );
+                    }
+                };
+            }
+        }
+
+        // Stop the HTTP server deterministically after websocket teardown
+        let _ = server_handle.stop(true).await;
+    });
+
+    server.await
 }
 
 /// Validate critical environment variables at startup and exit with a clear

@@ -20,6 +20,10 @@ use crate::ws::hub::{GameSessionRegistry, SnapshotBroadcast};
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(20);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(40);
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Shutdown;
+
 #[derive(Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
@@ -80,6 +84,7 @@ pub struct GameWsSession {
     registry: Option<Arc<GameSessionRegistry>>,
     registry_token: Option<Uuid>,
     last_lock_version: i32,
+    heartbeat_handle: Option<actix::SpawnHandle>,
 }
 
 impl GameWsSession {
@@ -102,11 +107,12 @@ impl GameWsSession {
             registry,
             registry_token: None,
             last_lock_version: initial_lock_version,
+            heartbeat_handle: None,
         }
     }
 
-    fn start_heartbeat(&self, ctx: &mut ws::WebsocketContext<Self>) {
-        ctx.run_interval(HEARTBEAT_INTERVAL, |actor, ctx| {
+    fn start_heartbeat(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
+        let handle = ctx.run_interval(HEARTBEAT_INTERVAL, |actor, ctx| {
             if Instant::now().duration_since(actor.last_heartbeat) > CLIENT_TIMEOUT {
                 warn!(
                     session_id = %actor.session_id,
@@ -121,6 +127,7 @@ impl GameWsSession {
 
             ctx.ping(b"keepalive");
         });
+        self.heartbeat_handle = Some(handle);
     }
 
     fn flush_pending(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
@@ -149,7 +156,9 @@ impl Actor for GameWsSession {
         );
 
         if let Some(registry) = &self.registry {
-            let token = registry.register(self.game_id, ctx.address().recipient());
+            let recipient = ctx.address().recipient();
+            let addr = ctx.address();
+            let token = registry.register(self.game_id, recipient, addr);
             self.registry_token = Some(token);
         }
 
@@ -158,15 +167,35 @@ impl Actor for GameWsSession {
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
+        let stopped_start = std::time::Instant::now();
         if let (Some(registry), Some(token)) = (&self.registry, self.registry_token) {
+            let before = registry.active_connections_count();
             registry.unregister(self.game_id, token);
+            let after = registry.active_connections_count();
+            info!(
+                session_id = %self.session_id,
+                game_id = self.game_id,
+                user_id = self.user_id,
+                before_count = before,
+                after_count = after,
+                "[WS SESSION] Actor stopped() - unregistered (fallback, token was still set)"
+            );
+        } else {
+            info!(
+                session_id = %self.session_id,
+                game_id = self.game_id,
+                user_id = self.user_id,
+                duration_ms = stopped_start.elapsed().as_millis(),
+                "[WS SESSION] Actor stopped() - already unregistered"
+            );
         }
 
         info!(
             session_id = %self.session_id,
             game_id = self.game_id,
             user_id = self.user_id,
-            "Websocket session stopped"
+            duration_ms = stopped_start.elapsed().as_millis(),
+            "[WS SESSION] Websocket session fully stopped"
         );
     }
 }
@@ -262,5 +291,27 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
                     }
                 }),
         );
+    }
+}
+
+impl Handler<Shutdown> for GameWsSession {
+    type Result = ();
+
+    fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) -> Self::Result {
+        // Immediately unregister from registry (the stopped() method will also try, but this ensures it happens)
+        if let (Some(registry), Some(token)) = (&self.registry, self.registry_token.take()) {
+            registry.unregister(self.game_id, token);
+        }
+
+        // Cancel heartbeat interval to prevent any further pings
+        if let Some(handle) = self.heartbeat_handle.take() {
+            ctx.cancel_future(handle);
+        }
+
+        // Stop the actor immediately - this will close the connection forcefully
+        // without waiting for client acknowledgment. We don't call ctx.close() first
+        // because that would send a graceful close frame and wait for acknowledgment,
+        // which can cause a 1-second delay during shutdown.
+        ctx.stop();
     }
 }
