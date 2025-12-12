@@ -13,7 +13,6 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "composite": true,
     "plugins": [
       {
         "name": "next"
