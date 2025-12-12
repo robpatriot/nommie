@@ -18,7 +18,7 @@ COPY apps apps
 COPY packages packages
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @nommie/frontend build
+RUN pnpm --filter @nommie/frontend exec next build
 
 FROM node:20-bookworm-slim AS runner
 
