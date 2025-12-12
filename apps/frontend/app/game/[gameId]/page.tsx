@@ -13,13 +13,11 @@ import { BackendApiError } from '@/lib/api'
 import { isInStartupWindow } from '@/lib/server/backend-status'
 import { isBackendStartupError } from '@/lib/server/connection-errors'
 
-interface GamePageProps {
-  params: Promise<{
-    gameId: string
-  }>
-}
-
-export default async function GamePage({ params }: GamePageProps) {
+export default async function GamePage({
+  params,
+}: {
+  params: { gameId: string }
+}) {
   const session = await auth()
 
   // Protect route: redirect to home if not authenticated
@@ -27,7 +25,7 @@ export default async function GamePage({ params }: GamePageProps) {
     redirect('/')
   }
 
-  const { gameId } = await params
+  const { gameId } = params
   const numericGameId = Number(gameId)
   const resolvedGameId = Number.isNaN(numericGameId) ? 0 : numericGameId
 

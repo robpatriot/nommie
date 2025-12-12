@@ -7,10 +7,10 @@ import { StatCard } from '@/components/StatCard'
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ accessDenied?: string }>
+  searchParams?: { accessDenied?: string }
 }) {
   const session = await auth()
-  const params = await searchParams
+  const params = searchParams ?? {}
   const showAccessDenied = params.accessDenied === 'true'
 
   // If authenticated, redirect to lobby

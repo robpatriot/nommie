@@ -16,7 +16,7 @@ import {
   type ThemeMode,
   type ResolvedTheme,
 } from '@/components/theme-provider'
-import { PerformanceMonitor } from '@/components/PerformanceMonitor'
+import PerformanceMonitorWrapper from '@/components/PerformanceMonitorWrapper'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -95,7 +95,7 @@ export default async function RootLayout({
           initialTheme={initialTheme}
           initialResolved={initialResolved}
         >
-          <PerformanceMonitor />
+          <PerformanceMonitorWrapper />
           <HeaderBreadcrumbProvider>
             <div className="tabletop-content">
               <Suspense fallback={null}>
