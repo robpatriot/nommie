@@ -109,6 +109,13 @@ dist
 tmp/
 temp/
 
+# Performance reports
+performance-reports/
+
+# Performance profiling cookies (contains sensitive auth tokens)
+cookies.txt
+scripts/cookies.txt
+
 # Editor directories and files
 .vscode/
 .idea/
