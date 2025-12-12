@@ -9,6 +9,7 @@ ENV BACKEND_BASE_URL=$BACKEND_BASE_URL
 
 ENV PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH" \
+    NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 
 RUN corepack enable
