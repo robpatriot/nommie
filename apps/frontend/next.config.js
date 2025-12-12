@@ -1,6 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // App Router is stable in Next.js 15, no need for experimental flag
+  
+  // Optimize bundle size and reduce unused JavaScript
+  compiler: {
+    // Remove console.log in production
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+  
+  // Optimize images
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
+  
   env: {
     NEXT_PUBLIC_BACKEND_BASE_URL: process.env.BACKEND_BASE_URL,
     NEXT_PUBLIC_BACKEND_WS_URL:
