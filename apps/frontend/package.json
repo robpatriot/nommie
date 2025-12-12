@@ -5,7 +5,7 @@
   "scripts": {
     "up": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node .next/standalone/apps/frontend/server.js",
     "lint": "eslint . --max-warnings=0",
     "lint:files": "eslint --max-warnings=0",
     "format": "prettier --write .",

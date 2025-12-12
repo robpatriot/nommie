@@ -28,7 +28,7 @@
     "fe:dev": "if [ -f .dev/fe.pid ] && kill -0 $(cat .dev/fe.pid) 2>/dev/null; then exit 1; fi; if lsof -ti :3000 >/dev/null 2>&1; then echo 'Port 3000 is already in use.'; exit 1; fi; pnpm --filter @nommie/frontend exec sh -lc 'exec next dev >> ../../.dev/dev.log 2>&1' & echo $! > .dev/fe.pid",
     "fe:down": "if [ -f .dev/fe.pid ]; then kill $(cat .dev/fe.pid) 2>/dev/null || true; rm -f .dev/fe.pid; fi",
     "fe:build": "pnpm --filter @nommie/frontend build",
-    "fe:start": "if [ -f .dev/fe.pid ] && kill -0 $(cat .dev/fe.pid) 2>/dev/null; then exit 1; fi; if lsof -ti :3000 >/dev/null 2>&1; then echo 'Port 3000 is already in use.'; exit 1; fi; if [ ! -d apps/frontend/.next ]; then echo 'Frontend not built. Run: pnpm fe:build'; exit 1; fi; pnpm --filter @nommie/frontend exec sh -lc 'exec next start >> ../../.dev/dev.log 2>&1' & echo $! > .dev/fe.pid",
+    "fe:start": "if [ -f .dev/fe.pid ] && kill -0 $(cat .dev/fe.pid) 2>/dev/null; then exit 1; fi; if lsof -ti :3000 >/dev/null 2>&1; then echo 'Port 3000 is already in use.'; exit 1; fi; [ ! -d apps/frontend/.next ] && { echo 'Frontend not built. Run: pnpm fe:build'; exit 1; }; R=\"$(pwd)\"; mkdir -p \"$R/.dev\"; S=\"apps/frontend/.next/standalone/apps/frontend\"; [ ! -e \"$S/.next/static\" ] && { mkdir -p \"$S/.next\"; ln -sfn ../../../../../.next/static \"$S/.next/static\"; }; [ ! -e \"$S/public\" ] && { mkdir -p \"$S\"; ln -sfn ../../../../public \"$S/public\"; }; (cd \"$S/../..\" && node apps/frontend/server.js >> \"$R/.dev/dev.log\" 2>&1) & echo $! > \"$R/.dev/fe.pid\"",
     "fe:lint": "pnpm --filter @nommie/frontend lint",
     "fe:lint:fix": "pnpm --filter @nommie/frontend exec eslint . --fix",
     "fe:format": "pnpm --filter @nommie/frontend format",
