@@ -75,6 +75,8 @@ tracing-timing = "0.7"
 # Internal test packages
 backend-test-support = { path = "../../packages/backend-test-support" }
 
+[lib]
+
 [[bin]]
 name = "backend"
 path = "src/main.rs"
