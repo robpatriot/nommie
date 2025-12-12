@@ -16,7 +16,7 @@ import { isBackendStartupError } from '@/lib/server/connection-errors'
 export default async function GamePage({
   params,
 }: {
-  params: { gameId: string }
+  params: Promise<{ gameId: string }>
 }) {
   const session = await auth()
 
@@ -25,7 +25,7 @@ export default async function GamePage({
     redirect('/')
   }
 
-  const { gameId } = params
+  const { gameId } = await params
   const numericGameId = Number(gameId)
   const resolvedGameId = Number.isNaN(numericGameId) ? 0 : numericGameId
 
