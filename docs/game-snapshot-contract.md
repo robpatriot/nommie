@@ -71,7 +71,7 @@ Canonical, read-only view of a game for the frontend. This is the single source 
 - Snapshot shape is intended to be stable during active FE development.
 - Additions may occur in non-breaking ways (new optional fields / new tagged variants).
 - Breaking changes will be called out in PRs and release notes.
-- (We may add an explicit `version` field later.)
+- A `version` field may be added in a future update to support explicit contract versioning.
 
 ---
 
@@ -84,7 +84,7 @@ Canonical, read-only view of a game for the frontend. This is the single source 
 
 ## Testing References
 
-- Golden JSON fixtures (coming soon) will illustrate representative states:
+- Golden JSON fixtures illustrate representative states:
   - `Init`
   - `Bidding`
   - `TrumpSelect (NO_TRUMP)`

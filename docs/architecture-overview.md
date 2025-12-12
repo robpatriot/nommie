@@ -85,4 +85,4 @@ split between frontend, backend, and database.
 - `backend-error-handling.md` — layered error strategy and RFC 7807 mapping.
 - `backend-testing-guide.md` — database harness, safety rails, and test layout.
 - `frontend-theme-system.md` & `../dev-roadmap.md` — client experience
-  strategy and roadmap (WIP).
+  strategy and roadmap.
