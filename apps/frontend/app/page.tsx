@@ -1,8 +1,9 @@
-import { auth, signIn } from '@/auth'
+import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { PageContainer } from '@/components/PageContainer'
 import { SurfaceCard } from '@/components/SurfaceCard'
 import { StatCard } from '@/components/StatCard'
+import { signInWithGoogleAction } from '@/app/actions/auth-actions'
 
 export default async function Home({
   searchParams,
@@ -59,13 +60,7 @@ export default async function Home({
             wherever your friends are seated.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <form
-              action={async () => {
-                'use server'
-                await signIn('google')
-              }}
-              className="sm:flex-1"
-            >
+            <form action={signInWithGoogleAction} className="sm:flex-1">
               <button
                 type="submit"
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
