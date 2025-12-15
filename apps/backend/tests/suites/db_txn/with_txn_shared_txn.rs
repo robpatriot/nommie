@@ -7,7 +7,7 @@ use actix_web::test;
 use backend::db::require_db;
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::SharedTxn;
+use backend::prelude::SharedTxn;
 use sea_orm::{EntityTrait, Set};
 
 use crate::support::build_test_state;
@@ -38,7 +38,7 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
             };
 
             let inserted = games::Entity::insert(game).exec(txn).await.map_err(|e| {
-                backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
             })?;
 
             // Confirm the row exists from within with_txn
@@ -46,11 +46,11 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
                 .one(txn)
                 .await
                 .map_err(|e| {
-                    backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                    backend::AppError::from(backend::infra::db_errors::map_db_err(e))
                 })?;
             assert!(found.is_some(), "insert should be visible within with_txn");
 
-            Ok::<_, backend::error::AppError>(inserted.last_insert_id)
+            Ok::<_, backend::AppError>(inserted.last_insert_id)
         })
     })
     .await?;
@@ -61,13 +61,13 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
         let id = inserted_id;
         Box::pin(async move {
             let found = games::Entity::find_by_id(id).one(txn).await.map_err(|e| {
-                backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
             })?;
             assert!(
                 found.is_some(),
                 "insert should persist within SharedTxn after with_txn returns"
             );
-            Ok::<_, backend::error::AppError>(())
+            Ok::<_, backend::AppError>(())
         })
     })
     .await?;

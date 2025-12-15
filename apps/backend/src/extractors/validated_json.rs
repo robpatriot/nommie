@@ -11,7 +11,7 @@ use tracing::{debug, warn};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::logging::pii::Redacted;
-use crate::web::trace_ctx;
+use crate::trace_ctx;
 
 /// Validated JSON extractor that provides standardized error handling for JSON parse/validation failures
 ///

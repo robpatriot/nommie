@@ -5,7 +5,6 @@ use sea_orm::{ConnectionTrait, DatabaseTransaction};
 use crate::adapters::memberships_sea as memberships_adapter;
 use crate::entities::game_players::PlayerKind;
 use crate::errors::domain::DomainError;
-use crate::repos::games;
 
 /// Game membership domain model
 #[derive(Debug, Clone, PartialEq)]
@@ -25,20 +24,6 @@ pub struct GameMembership {
 pub enum GameRole {
     /// Regular player in the game
     Player,
-    /// Spectator (can view but not participate)
-    Spectator,
-}
-
-impl GameRole {
-    /// Check if this role has at least the required level
-    pub fn has_at_least(&self, required: GameRole) -> bool {
-        match (self, required) {
-            (GameRole::Player, GameRole::Player) => true,
-            (GameRole::Player, GameRole::Spectator) => true,
-            (GameRole::Spectator, GameRole::Player) => false,
-            (GameRole::Spectator, GameRole::Spectator) => true,
-        }
-    }
 }
 
 // Free functions (generic) mirroring the previous trait methods
@@ -70,10 +55,6 @@ pub async fn create_membership(
     };
     let membership = memberships_adapter::create_membership(txn, dto).await?;
 
-    // Update game updated_at when membership changes (touch game timestamp)
-    let game = games::require_game(txn, game_id).await?;
-    games::update_round(txn, game_id, game.lock_version, None, None, None).await?;
-
     Ok(GameMembership {
         id: membership.id,
         game_id: membership.game_id,
@@ -103,10 +84,6 @@ pub async fn create_ai_membership(
         is_ready,
     };
     let membership = memberships_adapter::create_membership(txn, dto).await?;
-
-    // Update game updated_at when membership changes (touch game timestamp)
-    let game = games::require_game(txn, game_id).await?;
-    games::update_round(txn, game_id, game.lock_version, None, None, None).await?;
 
     Ok(GameMembership {
         id: membership.id,
@@ -170,15 +147,8 @@ pub async fn set_membership_ready(
     membership_id: i64,
     is_ready: bool,
 ) -> Result<GameMembership, DomainError> {
-    let dto = memberships_adapter::MembershipSetReady {
-        id: membership_id,
-        is_ready,
-    };
+    let dto = memberships_adapter::MembershipSetReady::new(membership_id, is_ready);
     let updated = memberships_adapter::set_membership_ready(txn, dto).await?;
-
-    // Update game updated_at when membership changes (touch game timestamp)
-    let game = games::require_game(txn, updated.game_id).await?;
-    games::update_round(txn, updated.game_id, game.lock_version, None, None, None).await?;
 
     Ok(GameMembership {
         id: updated.id,

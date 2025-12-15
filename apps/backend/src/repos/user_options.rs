@@ -1,6 +1,6 @@
 //! Repository layer for user options.
 
-use sea_orm::{ConnectionTrait, DatabaseTransaction};
+use sea_orm::DatabaseTransaction;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
@@ -49,14 +49,6 @@ pub struct UserOptions {
 pub struct UpdateUserOptions {
     pub appearance_mode: Option<AppearanceMode>,
     pub require_card_confirmation: Option<bool>,
-}
-
-pub async fn find_by_user_id<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    user_id: i64,
-) -> Result<Option<UserOptions>, DomainError> {
-    let model = adapter::find_by_user_id(conn, user_id).await?;
-    model.map(UserOptions::try_from).transpose()
 }
 
 pub async fn ensure_default_for_user(

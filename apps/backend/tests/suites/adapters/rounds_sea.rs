@@ -1,8 +1,9 @@
 use backend::adapters::games_sea::GameCreate;
 use backend::db::txn::with_txn;
-use backend::error::AppError;
+use backend::domain::Trump;
 use backend::repos::{games, rounds};
 use backend::utils::join_code::generate_join_code;
+use backend::AppError;
 
 use crate::support::build_test_state;
 
@@ -26,7 +27,7 @@ async fn test_create_round_and_find_by_id_roundtrip() -> Result<(), AppError> {
             assert_eq!(round.trump, None);
             assert_eq!(round.completed_at, None);
 
-            let found = rounds::find_by_id(txn, round.id).await?;
+            let found = rounds::find_by_game_and_round(txn, game.id, 1).await?;
             assert!(found.is_some(), "Round should be found");
             let found = found.unwrap();
             assert_eq!(found.id, round.id);
@@ -109,13 +110,13 @@ async fn test_update_trump() -> Result<(), AppError> {
 
             assert_eq!(round.trump, None);
 
-            let updated = rounds::update_trump(txn, round.id, rounds::Trump::Hearts).await?;
-            assert_eq!(updated.trump, Some(rounds::Trump::Hearts));
+            let updated = rounds::update_trump(txn, round.id, Trump::Hearts).await?;
+            assert_eq!(updated.trump, Some(Trump::Hearts));
             assert_eq!(updated.id, round.id);
 
-            let found = rounds::find_by_id(txn, round.id).await?;
+            let found = rounds::find_by_game_and_round(txn, game.id, 1).await?;
             assert!(found.is_some());
-            assert_eq!(found.unwrap().trump, Some(rounds::Trump::Hearts));
+            assert_eq!(found.unwrap().trump, Some(Trump::Hearts));
 
             Ok::<_, AppError>(())
         })
@@ -136,8 +137,8 @@ async fn test_update_trump_no_trump() -> Result<(), AppError> {
             let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
-            let updated = rounds::update_trump(txn, round.id, rounds::Trump::NoTrump).await?;
-            assert_eq!(updated.trump, Some(rounds::Trump::NoTrump));
+            let updated = rounds::update_trump(txn, round.id, Trump::NoTrumps).await?;
+            assert_eq!(updated.trump, Some(Trump::NoTrumps));
 
             Ok::<_, AppError>(())
         })
@@ -164,7 +165,7 @@ async fn test_complete_round() -> Result<(), AppError> {
             assert!(updated.completed_at.is_some(), "completed_at should be set");
             assert_eq!(updated.id, round.id);
 
-            let found = rounds::find_by_id(txn, round.id).await?;
+            let found = rounds::find_by_game_and_round(txn, game.id, 1).await?;
             assert!(found.is_some());
             assert!(found.unwrap().completed_at.is_some());
 

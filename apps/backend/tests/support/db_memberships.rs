@@ -1,7 +1,7 @@
 // Test helpers for game_players (memberships) table operations
 
 use backend::entities::game_players;
-use backend::error::AppError;
+use backend::AppError;
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
 
 /// Create a test game_player (membership) record

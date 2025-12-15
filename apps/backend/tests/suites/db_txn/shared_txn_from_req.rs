@@ -5,7 +5,7 @@
 
 use actix_web::test;
 use backend::db::require_db;
-use backend::SharedTxn;
+use backend::prelude::SharedTxn;
 
 use crate::support::build_test_state;
 

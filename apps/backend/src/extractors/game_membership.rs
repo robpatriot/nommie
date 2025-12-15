@@ -6,7 +6,7 @@ use crate::db::require_db;
 use crate::db::txn::SharedTxn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
-use crate::repos::memberships::{GameMembership as ServiceGameMembership, GameRole};
+use crate::repos::memberships::GameMembership as ServiceGameMembership;
 use crate::repos::users;
 use crate::services::memberships::MembershipService;
 use crate::state::app_state::AppState;
@@ -31,34 +31,6 @@ use crate::state::app_state::AppState;
 /// ```
 /// Re-export the service GameMembership as the extractor GameMembership
 pub type GameMembership = ServiceGameMembership;
-
-/// Role guard for membership validation
-#[derive(Debug, Clone, Copy)]
-pub enum RoleGuard {
-    /// Any member (no role restriction)
-    Any,
-    /// At least the specified role
-    AtLeast(GameRole),
-    /// Exactly the specified role
-    Exactly(GameRole),
-}
-
-impl RoleGuard {
-    /// Check if the membership satisfies this role guard
-    pub fn check(&self, membership: &ServiceGameMembership) -> bool {
-        match self {
-            RoleGuard::Any => true,
-            RoleGuard::AtLeast(required) => membership.role.has_at_least(*required),
-            RoleGuard::Exactly(required) => membership.role == *required,
-        }
-    }
-}
-
-/// GameMembership extractor with role guard
-pub struct GameMembershipWithGuard {
-    pub membership: GameMembership,
-    pub guard: RoleGuard,
-}
 
 async fn resolve_membership(req: HttpRequest) -> Result<GameMembership, AppError> {
     let claims = req
@@ -135,29 +107,5 @@ impl FromRequest for GameMembership {
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let req = req.clone();
         Box::pin(async move { resolve_membership(req).await })
-    }
-}
-
-impl FromRequest for GameMembershipWithGuard {
-    type Error = AppError;
-    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self, Self::Error>>>>;
-
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        let req = req.clone();
-
-        Box::pin(async move {
-            let membership = resolve_membership(req).await?;
-
-            let guard = RoleGuard::Any;
-
-            if !guard.check(&membership) {
-                return Err(AppError::forbidden_with_code(
-                    ErrorCode::InsufficientRole,
-                    "User does not have sufficient role for this operation",
-                ));
-            }
-
-            Ok(GameMembershipWithGuard { membership, guard })
-        })
     }
 }

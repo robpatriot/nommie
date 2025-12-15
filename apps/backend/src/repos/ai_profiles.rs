@@ -23,6 +23,9 @@ pub struct AiProfile {
 }
 
 /// Draft data for creating a new AI profile
+///
+/// Test-only helper used by `create_profile` for AI memory tests.
+#[allow(dead_code)] // Used in AI memory tests via create_profile
 #[derive(Debug, Clone, PartialEq)]
 pub struct AiProfileDraft {
     pub registry_name: String,
@@ -36,6 +39,8 @@ pub struct AiProfileDraft {
 }
 
 impl AiProfileDraft {
+    /// Test-only helper method
+    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn new(
         registry_name: impl Into<String>,
         registry_version: impl Into<String>,
@@ -54,21 +59,29 @@ impl AiProfileDraft {
         }
     }
 
+    /// Test-only helper method
+    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn with_playstyle(mut self, playstyle: impl Into<String>) -> Self {
         self.playstyle = Some(playstyle.into());
         self
     }
 
+    /// Test-only helper method
+    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn with_difficulty(mut self, difficulty: i32) -> Self {
         self.difficulty = Some(difficulty);
         self
     }
 
+    /// Test-only helper method
+    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn with_config(mut self, config: serde_json::Value) -> Self {
         self.config = Some(config);
         self
     }
 
+    /// Test-only helper method
+    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn with_memory_level(mut self, memory_level: i32) -> Self {
         self.memory_level = Some(memory_level);
         self
@@ -93,7 +106,8 @@ impl From<ai_profiles::Model> for AiProfile {
     }
 }
 
-/// Create a new AI profile in the catalog.
+/// Create a new AI profile in the catalog (test-only helper).
+#[allow(dead_code)] // Used in AI memory tests
 pub async fn create_profile(
     txn: &DatabaseTransaction,
     draft: AiProfileDraft,
@@ -146,6 +160,8 @@ pub async fn find_by_registry_variant<C: ConnectionTrait + Send + Sync>(
     Ok(profile.map(AiProfile::from))
 }
 
+/// List all AI profiles (test-only helper).
+#[allow(dead_code)] // Used in AI memory tests
 pub async fn list_all<C: ConnectionTrait + Send + Sync>(
     conn: &C,
 ) -> Result<Vec<AiProfile>, DomainError> {
@@ -169,7 +185,8 @@ pub async fn find_batch_by_ids<C: ConnectionTrait + Send + Sync>(
     Ok(profiles)
 }
 
-/// Update an AI profile's configuration.
+/// Update an AI profile's configuration (test-only helper).
+#[allow(dead_code)] // Used in AI memory tests
 pub async fn update_profile(
     txn: &DatabaseTransaction,
     profile: AiProfile,

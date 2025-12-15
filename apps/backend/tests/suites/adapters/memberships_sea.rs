@@ -1,6 +1,6 @@
 use backend::adapters::memberships_sea::{MembershipCreate, MembershipSetReady};
 use backend::db::txn::with_txn;
-use backend::error::AppError;
+use backend::AppError;
 
 use crate::support::build_test_state;
 use crate::support::factory::{create_test_game_with_options, create_test_user_with_randomization};

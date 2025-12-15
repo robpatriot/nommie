@@ -9,14 +9,6 @@ pub mod sqlite_diagnostics {
 
     use crate::error::AppError;
 
-    /// Generate a short random hex ID for pool/connection tracking
-    pub fn generate_short_id() -> String {
-        use rand::Rng;
-        let mut rng = rand::rng();
-        let bytes: u32 = rng.random();
-        format!("{:08x}", bytes)[..8].to_string()
-    }
-
     /// Get current process ID
     pub fn current_pid() -> u32 {
         process::id()
@@ -89,56 +81,6 @@ pub mod sqlite_diagnostics {
         }
 
         Ok(())
-    }
-
-    /// Redact SQL statement for logging (replace values with ?)
-    pub fn redact_sql_preview(sql: &str) -> String {
-        // Basic redaction - replace quoted strings and numbers with ?
-        let mut redacted = sql.to_string();
-
-        // Replace single-quoted strings
-        let mut chars: Vec<char> = redacted.chars().collect();
-        let mut i = 0;
-        while i < chars.len() {
-            if chars[i] == '\'' {
-                let start = i;
-                i += 1;
-                while i < chars.len() && chars[i] != '\'' {
-                    i += 1;
-                }
-                if i < chars.len() {
-                    for item in chars.iter_mut().take(i).skip(start + 1) {
-                        *item = '?';
-                    }
-                }
-            }
-            i += 1;
-        }
-
-        // Replace double-quoted strings
-        let redacted_str: String = chars.into_iter().collect();
-        redacted = redacted_str;
-
-        let mut chars: Vec<char> = redacted.chars().collect();
-        let mut i = 0;
-        while i < chars.len() {
-            if chars[i] == '"' {
-                let start = i;
-                i += 1;
-                while i < chars.len() && chars[i] != '"' {
-                    i += 1;
-                }
-                if i < chars.len() {
-                    for item in chars.iter_mut().take(i).skip(start + 1) {
-                        *item = '?';
-                    }
-                }
-            }
-            i += 1;
-        }
-
-        let result: String = chars.into_iter().collect();
-        result.chars().take(80).collect()
     }
 }
 

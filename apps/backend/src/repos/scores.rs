@@ -67,16 +67,6 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
     Ok(scores.into_iter().map(Score::from).collect())
 }
 
-/// Find score for a specific player in a round
-pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    round_id: i64,
-    player_seat: u8,
-) -> Result<Option<Score>, DomainError> {
-    let score = scores_adapter::find_by_round_and_seat(conn, round_id, player_seat).await?;
-    Ok(score.map(Score::from))
-}
-
 /// Get current total scores for all players in a game (latest round)
 /// Returns array of [seat0_total, seat1_total, seat2_total, seat3_total]
 pub async fn get_current_totals(

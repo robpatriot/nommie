@@ -8,5 +8,4 @@ mod tests_error_codes_unique;
 #[cfg(test)]
 mod tests_error_mapping;
 
-pub use domain::DomainError;
 pub use error_code::ErrorCode;

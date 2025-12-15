@@ -1,6 +1,7 @@
 use backend::adapters::games_sea::GameCreate;
 use backend::db::txn::with_txn;
-use backend::error::AppError;
+use backend::domain::Suit;
+use backend::AppError;
 use backend::repos::{games, plays, rounds, tricks};
 use backend::utils::join_code::generate_join_code;
 
@@ -16,7 +17,7 @@ async fn test_create_play_and_find_all() -> Result<(), AppError> {
             let join_code = generate_join_code();
             let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 3, 0).await?;
-            let trick = tricks::create_trick(txn, round.id, 0, tricks::Suit::Hearts, 0).await?;
+            let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Create plays
             let card1 = plays::Card {
@@ -62,7 +63,7 @@ async fn test_count_plays() -> Result<(), AppError> {
             let join_code = generate_join_code();
             let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 4, 0).await?;
-            let trick = tricks::create_trick(txn, round.id, 0, tricks::Suit::Hearts, 0).await?;
+            let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Initially 0 plays
             let count = plays::count_plays_by_trick(txn, trick.id).await?;
@@ -98,7 +99,7 @@ async fn test_complete_trick_with_four_plays() -> Result<(), AppError> {
             let join_code = generate_join_code();
             let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
-            let trick = tricks::create_trick(txn, round.id, 0, tricks::Suit::Spades, 1).await?;
+            let trick = tricks::create_trick(txn, round.id, 0, Suit::Spades, 1).await?;
 
             // Create 4 plays
             plays::create_play(
@@ -170,7 +171,7 @@ async fn test_unique_constraint_trick_seat() -> Result<(), AppError> {
             let join_code = generate_join_code();
             let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
-            let trick = tricks::create_trick(txn, round.id, 0, tricks::Suit::Hearts, 0).await?;
+            let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Create first play for seat 0
             plays::create_play(
@@ -225,7 +226,7 @@ async fn test_unique_constraint_trick_order() -> Result<(), AppError> {
             let join_code = generate_join_code();
             let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
-            let trick = tricks::create_trick(txn, round.id, 0, tricks::Suit::Hearts, 0).await?;
+            let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Create first play with order 0
             plays::create_play(
@@ -280,7 +281,7 @@ async fn test_plays_ordering() -> Result<(), AppError> {
             let join_code = generate_join_code();
             let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
             let round = rounds::create_round(txn, game.id, 1, 4, 0).await?;
-            let trick = tricks::create_trick(txn, round.id, 0, tricks::Suit::Hearts, 0).await?;
+            let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Create plays out of sequential order
             plays::create_play(

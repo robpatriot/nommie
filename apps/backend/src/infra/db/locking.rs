@@ -1,21 +1,15 @@
 // Standard library imports
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
 
 // External crate imports
 use async_trait::async_trait;
-use futures::Future;
-use rand::Rng;
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 use tracing::{debug, warn};
 use xxhash_rust::xxh3::xxh3_64;
 
 // Internal crate imports
 use crate::error::AppError;
-
-/// Migration timing constants - explicit and overridable via environment.
-const BACKOFF_JITTER_MS_MAX: u64 = 3;
 
 pub fn pg_lock_id(key: &str) -> i64 {
     xxh3_64(key.as_bytes()) as i64
@@ -253,71 +247,6 @@ impl SqliteFileLock {
             lock_path: lock_path.to_path_buf(),
         })
     }
-
-    /// Normalize a SQLite DSN or file path to a canonical lock file path.
-    /// All processes must resolve the same on-disk lock file for mutual exclusion.
-    pub fn normalize_lock_path(dsn_or_path: &str) -> Result<PathBuf, AppError> {
-        // Handle in-memory (shouldn't be called, but defensive)
-        if dsn_or_path.contains(":memory:") {
-            return Err(AppError::config_msg(
-                "in-memory database not supported",
-                "Cannot create file lock for in-memory database",
-            ));
-        }
-
-        // Strip sqlite:// prefix if present
-        let file_path = dsn_or_path
-            .strip_prefix("sqlite://")
-            .unwrap_or(dsn_or_path)
-            .strip_prefix("sqlite:")
-            .unwrap_or(dsn_or_path);
-
-        let db_path = Path::new(file_path);
-
-        // Derive lock file path: <db>.migrate.lock
-        let lock_path = if let Some(parent) = db_path.parent() {
-            let stem = db_path
-                .file_stem()
-                .unwrap_or_else(|| std::ffi::OsStr::new("nommie"));
-            parent.join(format!("{}.migrate.lock", stem.to_string_lossy()))
-        } else {
-            // No parent directory, use current directory
-            let stem = db_path
-                .file_stem()
-                .unwrap_or_else(|| std::ffi::OsStr::new("nommie"));
-            PathBuf::from(format!("{}.migrate.lock", stem.to_string_lossy()))
-        };
-
-        // Resolve to absolute path for consistency across processes
-        let canonical = if lock_path.exists() {
-            std::fs::canonicalize(&lock_path).map_err(|e| {
-                AppError::internal(
-                    crate::errors::ErrorCode::ConfigError,
-                    "failed to canonicalize lock path",
-                    e,
-                )
-            })?
-        } else {
-            // File doesn't exist yet, canonicalize parent and join filename
-            let parent = lock_path
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .canonicalize()
-                .map_err(|e| {
-                    AppError::internal(
-                        crate::errors::ErrorCode::ConfigError,
-                        "failed to canonicalize lock parent directory",
-                        e,
-                    )
-                })?;
-            let filename = lock_path.file_name().ok_or_else(|| {
-                AppError::config_msg("lock path has no filename", "lock path has no filename")
-            })?;
-            parent.join(filename)
-        };
-
-        Ok(canonical)
-    }
 }
 
 #[async_trait]
@@ -403,52 +332,5 @@ impl BootstrapLock for InMemoryLock {
         // We need to return Some(Guard) so the migration system doesn't timeout
 
         Ok(Some(Guard::in_memory()))
-    }
-}
-
-/// Backoff loop with exponential backoff and jitter for lock contention.
-/// Continuously checks the provided function until it returns true or timeout is reached.
-pub async fn backoff_loop<F, Fut>(mut check_fn: F, timeout_ms: u64) -> Result<(), AppError>
-where
-    F: FnMut() -> Fut,
-    Fut: Future<Output = Result<bool, AppError>>,
-{
-    let start = Instant::now();
-    let mut attempts: u32 = 0;
-
-    loop {
-        attempts += 1;
-
-        // Check timeout
-        if start.elapsed() >= Duration::from_millis(timeout_ms) {
-            return Err(AppError::config(
-                "migration lock acquisition timeout",
-                std::io::Error::other(format!(
-                    "migration lock timeout after {:?} ({} attempts)",
-                    start.elapsed(),
-                    attempts
-                )),
-            ));
-        }
-
-        // Backoff with jitter
-        let base_delay_ms = (5u64 << attempts.saturating_sub(1)).min(80);
-        let jitter_ms = rand::rng().random::<u64>() % (BACKOFF_JITTER_MS_MAX + 1);
-        let delay_ms = base_delay_ms + jitter_ms;
-
-        debug!(
-            lock = "backoff",
-            attempts = attempts,
-            delay_ms = delay_ms,
-            elapsed_ms = start.elapsed().as_millis()
-        );
-
-        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
-
-        // Fast-path check
-        if check_fn().await? {
-            debug!(fastpath = "hit", "Schema became ready during backoff");
-            return Ok(());
-        }
     }
 }

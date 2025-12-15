@@ -1,6 +1,6 @@
 use backend::adapters::games_sea::GameCreate;
 use backend::db::txn::with_txn;
-use backend::error::AppError;
+use backend::AppError;
 use backend::repos::{games, hands, rounds};
 use backend::utils::join_code::generate_join_code;
 

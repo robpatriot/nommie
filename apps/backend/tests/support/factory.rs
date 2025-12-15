@@ -1,6 +1,6 @@
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::entities::users::Model as User;
-use backend::error::AppError;
+use backend::AppError;
 use sea_orm::{ActiveModelTrait, ConnectionTrait, NotSet, Set};
 use time::OffsetDateTime;
 
@@ -182,7 +182,7 @@ pub async fn create_test_game_with_options(
         .await?
         .ok_or_else(|| {
             AppError::internal(
-                backend::errors::ErrorCode::InternalError,
+                backend::ErrorCode::InternalError,
                 "Failed to find just-created game".to_string(),
                 std::io::Error::new(
                     std::io::ErrorKind::NotFound,

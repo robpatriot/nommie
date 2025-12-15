@@ -70,6 +70,8 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
     Ok(game.map(Game::from))
 }
 
+/// Find game by join code (test-only helper)
+#[allow(dead_code)] // Used in adapter tests and test helpers
 pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     join_code: &str,
@@ -98,34 +100,25 @@ pub async fn require_game<C: ConnectionTrait + Send + Sync>(
     Ok(Game::from(game))
 }
 
-/// Update game state with optimistic locking.
+/// Update game with optimistic locking.
 ///
-/// Updates the game's state field and increments lock_version atomically.
-/// Returns the updated game model.
-pub async fn update_state(
+/// Updates any combination of state and round-related fields (current_round, starting_dealer_pos, current_trick_no)
+/// atomically with a single lock_version increment. Returns the updated game model.
+///
+/// `expected_lock_version` validates that the current lock_version matches before updating.
+pub async fn update_game(
     txn: &DatabaseTransaction,
     id: i64,
-    state: DbGameState,
-    current_lock_version: i32,
-) -> Result<Game, DomainError> {
-    let dto = games_adapter::GameUpdateState::new(id, state, current_lock_version);
-    let game = games_adapter::update_state(txn, dto).await?;
-    Ok(Game::from(game))
-}
-
-/// Update game round data with optimistic locking.
-///
-/// Updates round-related fields (current_round, starting_dealer_pos, current_trick_no)
-/// and increments lock_version atomically. Returns the updated game model.
-pub async fn update_round(
-    txn: &DatabaseTransaction,
-    id: i64,
-    current_lock_version: i32,
+    expected_lock_version: i32,
+    state: Option<DbGameState>,
     current_round: Option<u8>,
     starting_dealer_pos: Option<u8>,
     current_trick_no: Option<u8>,
 ) -> Result<Game, DomainError> {
-    let mut dto = games_adapter::GameUpdateRound::new(id, current_lock_version);
+    let mut dto = games_adapter::GameUpdate::new(id, expected_lock_version);
+    if let Some(s) = state {
+        dto = dto.with_state(s);
+    }
     if let Some(round) = current_round {
         dto = dto.with_current_round(round);
     }
@@ -135,8 +128,60 @@ pub async fn update_round(
     if let Some(trick_no) = current_trick_no {
         dto = dto.with_current_trick_no(trick_no);
     }
-    let game = games_adapter::update_round(txn, dto).await?;
+    let game = games_adapter::update_game(txn, dto).await?;
     Ok(Game::from(game))
+}
+
+/// Touch game to increment lock_version without changing any game fields.
+///
+/// This is useful when membership or other related data changes that affect the game snapshot
+/// but don't require updating any fields on the games table itself. Increments lock_version
+/// and updates updated_at to trigger websocket broadcasts.
+///
+/// `expected_lock_version` validates that the current lock_version matches before updating.
+pub async fn touch_game(
+    txn: &DatabaseTransaction,
+    id: i64,
+    expected_lock_version: i32,
+) -> Result<Game, DomainError> {
+    update_game(txn, id, expected_lock_version, None, None, None, None).await
+}
+
+/// Delete game with optimistic locking.
+///
+/// `expected_lock_version` validates that the current lock_version matches before deleting.
+pub async fn delete_game(
+    txn: &DatabaseTransaction,
+    id: i64,
+    expected_lock_version: i32,
+) -> Result<(), DomainError> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    use crate::entities::games;
+
+    let delete_result = games::Entity::delete_many()
+        .filter(games::Column::Id.eq(id))
+        .filter(games::Column::LockVersion.eq(expected_lock_version))
+        .exec(txn)
+        .await?;
+
+    if delete_result.rows_affected == 0 {
+        // Check if game exists to distinguish between NotFound and OptimisticLock
+        let game = games_adapter::find_by_id(txn, id).await?;
+        if let Some(game) = game {
+            // Lock version mismatch
+            return Err(DomainError::conflict(
+                crate::errors::domain::ConflictKind::OptimisticLock,
+                format!(
+                    "Game lock version mismatch: expected {}, but game has version {}",
+                    expected_lock_version, game.lock_version
+                ),
+            ));
+        }
+        // Game doesn't exist - that's fine for delete (idempotent)
+    }
+
+    Ok(())
 }
 
 /// Convert database game state to domain phase.

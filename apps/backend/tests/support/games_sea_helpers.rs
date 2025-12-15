@@ -1,8 +1,8 @@
 // Helper functions for testing games_sea adapter
 
-use backend::adapters::games_sea::{self, GameCreate, GameUpdateState};
+use backend::adapters::games_sea::{self, GameCreate, GameUpdate};
 use backend::entities::games::{GameState, GameVisibility};
-use backend::error::AppError;
+use backend::AppError;
 use sea_orm::DatabaseTransaction;
 
 /// GameProbe: sanitized game state for equivalence comparison.
@@ -97,8 +97,9 @@ pub async fn run_game_flow(
     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
     // 3. First update: change state to Bidding
-    let update_dto = GameUpdateState::new(created.id, GameState::Bidding, created.lock_version);
-    let updated1 = games_sea::update_state(txn, update_dto)
+    let update_dto =
+        GameUpdate::new(created.id, created.lock_version).with_state(GameState::Bidding);
+    let updated1 = games_sea::update_game(txn, update_dto)
         .await
         .map_err(|e| AppError::db("failed to update game state", e))?;
 
@@ -121,8 +122,9 @@ pub async fn run_game_flow(
     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
     // 4. Second update: change state to TrickPlay
-    let update_dto2 = GameUpdateState::new(created.id, GameState::TrickPlay, updated1.lock_version);
-    let updated2 = games_sea::update_state(txn, update_dto2)
+    let update_dto2 =
+        GameUpdate::new(created.id, updated1.lock_version).with_state(GameState::TrickPlay);
+    let updated2 = games_sea::update_game(txn, update_dto2)
         .await
         .map_err(|e| AppError::db("failed to update game state", e))?;
 
@@ -144,29 +146,25 @@ pub async fn run_game_flow(
 
     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
-    // 5. Third update: change metadata (name)
-    let update_meta = games_sea::GameUpdateMetadata::new(
-        created.id,
-        Some("UpdatedName"),
-        updated2.visibility,
-        updated2.lock_version,
-    );
-    let updated3 = games_sea::update_metadata(txn, update_meta)
+    // 5. Third update: change state to Scoring (to test timestamp behavior)
+    let update_dto3 =
+        GameUpdate::new(created.id, updated2.lock_version).with_state(GameState::Scoring);
+    let updated3 = games_sea::update_game(txn, update_dto3)
         .await
-        .map_err(|e| AppError::db("failed to update game metadata", e))?;
+        .map_err(|e| AppError::db("failed to update game state", e))?;
 
     assert_eq!(
         updated3.created_at, original_created_at,
-        "created_at should remain unchanged after metadata update"
+        "created_at should remain unchanged after third update"
     );
     assert!(
         updated3.updated_at >= second_updated_at,
-        "updated_at should advance or stay same after metadata update"
+        "updated_at should advance or stay same after third update"
     );
     assert_eq!(
-        updated3.name,
-        Some("UpdatedName".to_string()),
-        "name should be updated"
+        updated3.state,
+        GameState::Scoring,
+        "state should be updated to Scoring"
     );
 
     // 6. Return probe with final state

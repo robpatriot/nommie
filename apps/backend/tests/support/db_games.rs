@@ -1,6 +1,6 @@
 use backend::db::require_db;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::error::AppError;
+use backend::AppError;
 use backend::infra::db_errors::map_db_err;
 use backend::state::app_state::AppState;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};

@@ -1,8 +1,9 @@
 // Unit tests for error mapping - pure domain logic without HTTP or database dependencies
+use crate::error::AppError;
 use crate::errors::domain::{
     ConflictKind, DomainError, InfraErrorKind, NotFoundKind, ValidationKind,
 };
-use crate::{AppError, ErrorCode};
+use crate::errors::ErrorCode;
 
 #[test]
 fn maps_validation_to_422() {
@@ -74,10 +75,10 @@ fn maps_infra() {
 fn domain_purity_check() {
     // This test verifies that domain modules can be used without HTTP/SeaORM imports
     // by creating DomainError instances and converting them to AppError
+    use crate::error::AppError;
     use crate::errors::domain::{
         ConflictKind, DomainError, InfraErrorKind, NotFoundKind, ValidationKind,
     };
-    use crate::AppError;
 
     // Test that we can create domain errors without HTTP imports
     let validation =

@@ -23,8 +23,8 @@ use super::locking::{BootstrapLock, Guard, InMemoryLock, PgAdvisoryLock, SqliteF
 use super::{DbKind, DbOwner, RuntimeEnv};
 // Internal crate imports
 use crate::config::db::{
-    build_connection_settings, make_conn_spec, sqlite_file_spec, validate_db_config,
-    ConnectionSettings, DbSettings, PoolPurpose,
+    build_connection_settings, make_conn_spec, validate_db_config, ConnectionSettings, DbSettings,
+    PoolPurpose,
 };
 use crate::db::shared_pool_cache::get_or_create_shared_pool;
 use crate::error::AppError;
@@ -92,15 +92,6 @@ where
         )
     });
     Err(final_error)
-}
-
-/// Helper function to create AppError with preserved error context
-/// This provides better error context preservation than simple string formatting
-pub fn config_error_with_context<E: std::error::Error + Send + Sync + 'static>(
-    context: &str,
-    source: E,
-) -> AppError {
-    AppError::config(context, source)
 }
 
 /// Build ordered session-level SQL statements for the given database kind and settings.
@@ -488,6 +479,9 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, AppEr
 
 /// Orchestrate migration: builds admin pool and delegates to internal function.
 /// Handles all database types (Postgres, SQLite file, InMemory).
+///
+/// Used by migration-cli binary, not by the backend binary itself.
+#[allow(dead_code)]
 pub async fn orchestrate_migration(
     env: RuntimeEnv,
     db_kind: DbKind,
@@ -571,9 +565,7 @@ async fn orchestrate_migration_internal(
 
         DbKind::SqliteFile => {
             // Create file lock
-            // Get file spec for lock file
-            let file_spec = sqlite_file_spec(db_kind, env)?;
-            let lock_path = std::path::Path::new(&file_spec).with_extension("migrate.lock");
+            let lock_path = crate::config::db::sqlite_lock_path(db_kind, env)?;
             let lock = SqliteFileLock::new(&lock_path)?;
 
             migrate_with_lock(

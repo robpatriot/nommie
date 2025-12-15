@@ -8,10 +8,10 @@ use backend::auth::claims::BackendClaims;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::extractors::current_user::CurrentUser;
-use backend::extractors::game_id::GameId;
+use backend::CurrentUser;
+use backend::GameId;
 use backend::state::security_config::SecurityConfig;
-use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
 use time::OffsetDateTime;
 

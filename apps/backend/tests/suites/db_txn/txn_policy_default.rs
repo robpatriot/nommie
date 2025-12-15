@@ -16,8 +16,8 @@ fn init_logging() {
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, set_txn_policy, TxnPolicy};
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::error::AppError;
-use backend::errors::ErrorCode;
+use backend::AppError;
+use backend::ErrorCode;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use ulid::Ulid;
 
@@ -69,7 +69,7 @@ async fn test_default_commit_policy_persists_then_cleans_up(
         let name = name.clone();
         Box::pin(async move {
             insert_minimal_game_for_test(txn, &name).await?;
-            Ok::<_, backend::error::AppError>(())
+            Ok::<_, backend::AppError>(())
         })
     })
     .await?;
@@ -82,7 +82,7 @@ async fn test_default_commit_policy_persists_then_cleans_up(
         let name = name.clone();
         Box::pin(async move {
             delete_games_by_name(txn, &name).await?;
-            Ok::<_, backend::error::AppError>(())
+            Ok::<_, backend::AppError>(())
         })
     })
     .await?;
@@ -109,8 +109,8 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
         let name = name.clone();
         Box::pin(async move {
             insert_minimal_game_for_test(txn, &name).await?;
-            Err::<(), _>(backend::error::AppError::internal(
-                backend::errors::ErrorCode::InternalError,
+            Err::<(), _>(backend::AppError::internal(
+                backend::ErrorCode::InternalError,
                 "test error triggered",
                 std::io::Error::other("test error for rollback verification"),
             ))

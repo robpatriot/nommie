@@ -3,6 +3,7 @@
 use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::rounds_sea as rounds_adapter;
+use crate::domain::Trump;
 use crate::entities::game_rounds;
 use crate::errors::domain::DomainError;
 
@@ -19,16 +20,6 @@ pub struct Round {
     pub completed_at: Option<time::OffsetDateTime>,
 }
 
-/// Trump selection for a round (domain type)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Trump {
-    Clubs,
-    Diamonds,
-    Hearts,
-    Spades,
-    NoTrump,
-}
-
 // Free functions (generic) for round operations
 
 /// Find a round by game_id and round_no
@@ -38,15 +29,6 @@ pub async fn find_by_game_and_round<C: ConnectionTrait + Send + Sync>(
     round_no: u8,
 ) -> Result<Option<Round>, DomainError> {
     let round = rounds_adapter::find_by_game_and_round(conn, game_id, round_no).await?;
-    Ok(round.map(Round::from))
-}
-
-/// Find a round by its ID
-pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    round_id: i64,
-) -> Result<Option<Round>, DomainError> {
-    let round = rounds_adapter::find_by_id(conn, round_id).await?;
     Ok(round.map(Round::from))
 }
 
@@ -124,7 +106,7 @@ impl From<game_rounds::CardTrump> for Trump {
             game_rounds::CardTrump::Diamonds => Trump::Diamonds,
             game_rounds::CardTrump::Hearts => Trump::Hearts,
             game_rounds::CardTrump::Spades => Trump::Spades,
-            game_rounds::CardTrump::NoTrump => Trump::NoTrump,
+            game_rounds::CardTrump::NoTrump => Trump::NoTrumps,
         }
     }
 }
@@ -136,7 +118,7 @@ impl From<Trump> for game_rounds::CardTrump {
             Trump::Diamonds => game_rounds::CardTrump::Diamonds,
             Trump::Hearts => game_rounds::CardTrump::Hearts,
             Trump::Spades => game_rounds::CardTrump::Spades,
-            Trump::NoTrump => game_rounds::CardTrump::NoTrump,
+            Trump::NoTrumps => game_rounds::CardTrump::NoTrump,
         }
     }
 }

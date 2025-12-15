@@ -1,8 +1,8 @@
 use backend::db::txn::with_txn;
-use backend::error::AppError;
+use backend::AppError;
 use backend::errors::domain::{ConflictKind, DomainError};
 use backend::repos::users;
-use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::unique_helpers::{unique_email, unique_str};
 
 use crate::support::build_test_state;
 

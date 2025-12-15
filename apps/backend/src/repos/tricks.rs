@@ -3,6 +3,7 @@
 use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::tricks_sea as tricks_adapter;
+use crate::domain::Suit;
 use crate::entities::round_tricks;
 use crate::errors::domain::DomainError;
 
@@ -15,15 +16,6 @@ pub struct Trick {
     pub lead_suit: Suit,
     pub winner_seat: u8,
     pub created_at: time::OffsetDateTime,
-}
-
-/// Suit representation (domain type)
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Suit {
-    Clubs,
-    Diamonds,
-    Hearts,
-    Spades,
 }
 
 // Free functions (generic) for trick operations
@@ -63,15 +55,6 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
 ) -> Result<Vec<Trick>, DomainError> {
     let tricks = tricks_adapter::find_all_by_round(conn, round_id).await?;
     Ok(tricks.into_iter().map(Trick::from).collect())
-}
-
-/// Count completed tricks for a round
-pub async fn count_tricks_by_round<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    round_id: i64,
-) -> Result<u64, DomainError> {
-    let count = tricks_adapter::count_tricks_by_round(conn, round_id).await?;
-    Ok(count)
 }
 
 /// Update trick winner

@@ -7,7 +7,7 @@ use tracing::{error, warn};
 
 use crate::errors::domain::{ConflictKind, DomainError, InfraErrorKind, NotFoundKind};
 use crate::logging::pii::Redacted;
-use crate::web::trace_ctx;
+use crate::trace_ctx;
 
 fn mentions_sqlstate(msg: &str, code: &str) -> bool {
     msg.contains(code) || msg.contains(&format!("SQLSTATE({code})"))

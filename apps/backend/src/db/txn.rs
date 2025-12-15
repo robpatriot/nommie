@@ -23,6 +23,11 @@ impl SharedTxn {
     ///
     /// This method creates a new transaction that can be shared across multiple operations.
     /// The caller is responsible for managing the transaction lifecycle (commit/rollback).
+    ///
+    /// # Test-only utility
+    /// This method is primarily used in integration tests. It cannot be marked `#[cfg(test)]`
+    /// because integration tests are in a separate crate.
+    #[allow(dead_code)]
     pub async fn open(conn: &DatabaseConnection) -> Result<Self, sea_orm::DbErr> {
         let txn = conn.begin().await?;
         Ok(SharedTxn(Arc::new(txn)))
@@ -36,6 +41,11 @@ impl SharedTxn {
     /// Inject this SharedTxn into the request extensions.
     ///
     /// This allows the transaction to be used by with_txn() in handlers.
+    ///
+    /// # Test-only utility
+    /// This method is primarily used in integration tests. It cannot be marked `#[cfg(test)]`
+    /// because integration tests are in a separate crate.
+    #[allow(dead_code)]
     pub fn inject(&self, req: &mut HttpRequest) {
         req.extensions_mut().insert(self.clone());
     }
@@ -48,19 +58,14 @@ impl SharedTxn {
         req.extensions().get::<SharedTxn>().cloned()
     }
 
-    /// Commit this shared transaction.
-    ///
-    /// The caller owns the transaction lifecycle - with_txn() will not auto-commit when SharedTxn is present.
-    pub async fn commit(self) -> Result<(), sea_orm::DbErr> {
-        let txn = Arc::try_unwrap(self.0).map_err(|_| {
-            sea_orm::DbErr::Custom("Cannot commit: transaction is still shared".to_string())
-        })?;
-        txn.commit().await
-    }
-
     /// Rollback this shared transaction.
     ///
     /// The caller owns the transaction lifecycle - with_txn() will not auto-commit when SharedTxn is present.
+    ///
+    /// # Test-only utility
+    /// This method is primarily used in integration tests. It cannot be marked `#[cfg(test)]`
+    /// because integration tests are in a separate crate.
+    #[allow(dead_code)]
     pub async fn rollback(self) -> Result<(), sea_orm::DbErr> {
         let txn = Arc::try_unwrap(self.0).map_err(|_| {
             sea_orm::DbErr::Custom("Cannot rollback: transaction is still shared".to_string())
@@ -119,7 +124,8 @@ where
                     ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
                     Ok(val)
                 }
-                txn_policy::TxnPolicy::RollbackOnOk => {
+                _ => {
+                    // RollbackOnOk (test-only policy) - rollback on success
                     txn.rollback().await?;
                     ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
                     Ok(val)

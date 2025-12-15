@@ -30,7 +30,7 @@ async fn test_rollback_policy() -> Result<(), Box<dyn std::error::Error>> {
         Box::pin(async move {
             insert_minimal_game_for_test(txn, &name).await?;
             debug!("inserted games row inside txn");
-            Ok::<_, backend::error::AppError>(())
+            Ok::<_, backend::AppError>(())
         })
     })
     .await?;
@@ -62,8 +62,8 @@ async fn test_rollback_policy_on_error() -> Result<(), Box<dyn std::error::Error
             insert_minimal_game_for_test(txn, &name).await?;
             debug!("inserted games row inside txn before error");
 
-            Err::<(), _>(backend::error::AppError::internal(
-                backend::errors::ErrorCode::InternalError,
+            Err::<(), _>(backend::AppError::internal(
+                backend::ErrorCode::InternalError,
                 "test error triggered",
                 std::io::Error::other("test error for rollback verification"),
             ))

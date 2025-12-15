@@ -3,7 +3,7 @@
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::entities::{game_rounds, round_bids};
-use backend::error::AppError;
+use backend::AppError;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
 use crate::support::build_test_state;

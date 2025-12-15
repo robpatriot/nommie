@@ -6,6 +6,7 @@ pub enum TxnPolicy {
     /// Commit the transaction when the operation succeeds (default behavior)
     CommitOnOk,
     /// Rollback the transaction when the operation succeeds (for testing)
+    #[allow(dead_code)] // Only constructed in test code, but needed for match exhaustiveness
     RollbackOnOk,
 }
 

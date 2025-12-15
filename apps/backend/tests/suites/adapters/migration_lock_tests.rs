@@ -14,7 +14,6 @@ use backend::config::db::{DbKind, RuntimeEnv};
 use backend::infra::db::build_admin_pool;
 use backend::infra::db::locking::{BootstrapLock, PgAdvisoryLock, SqliteFileLock};
 use migration::{migrate, MigrationCommand};
-use tempfile::TempDir;
 use tokio::sync::Barrier;
 
 use crate::support::resolve_test_db_kind;
@@ -92,7 +91,7 @@ impl TestLock {
 
     async fn try_acquire(
         &mut self,
-    ) -> Result<Option<backend::infra::db::locking::Guard>, backend::error::AppError> {
+    ) -> Result<Option<backend::infra::db::locking::Guard>, backend::AppError> {
         match self {
             TestLock::Postgres { lock, .. } => BootstrapLock::try_acquire(lock).await,
             TestLock::SqliteFile { lock, .. } => BootstrapLock::try_acquire(lock).await,
@@ -541,7 +540,7 @@ async fn release_idempotence() {
 
 #[tokio::test]
 async fn path_normalization_sqlite_file() {
-    // Test that normalize_lock_path correctly handles various path formats
+    // Test that sqlite_file_spec + lock_path composition produce a canonical lock path
 
     let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
 
@@ -554,14 +553,12 @@ async fn path_normalization_sqlite_file() {
         return;
     }
 
-    let temp_dir = TempDir::new().expect("Should create temp dir");
-    let db_path = temp_dir.path().join("test.db");
-
-    // Create the DB file so canonicalize works
-    std::fs::File::create(&db_path).expect("Should create test DB file");
-
-    let dsn = format!("sqlite:{}", db_path.display());
-    let lock_path = SqliteFileLock::normalize_lock_path(&dsn).expect("Should normalize path");
+    // Use the same helper as production code to derive the SQLite lock path
+    let lock_path = backend::config::db::sqlite_lock_path(
+        db_kind,
+        backend::config::db::RuntimeEnv::Test,
+    )
+    .expect("sqlite_lock_path should succeed for SqliteFile/Test");
 
     // Should end with .migrate.lock
     assert!(
@@ -572,14 +569,14 @@ async fn path_normalization_sqlite_file() {
     // Should be absolute
     assert!(
         lock_path.is_absolute(),
-        "Normalized lock path should be absolute"
+        "Lock path should be absolute"
     );
 
     // Should be canonical (no .. or . components)
     let lock_path_str = lock_path.to_string_lossy();
     assert!(
         !lock_path_str.contains("..") && !lock_path_str.contains("/./"),
-        "Normalized lock path should be canonical"
+        "Lock path should be canonical"
     );
 }
 

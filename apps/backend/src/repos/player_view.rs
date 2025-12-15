@@ -4,7 +4,7 @@ use sea_orm::ConnectionTrait;
 
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::player_view::{CurrentRoundInfo, GameHistory, RoundHistory, RoundScoreDetail};
-use crate::domain::{Card, Trump};
+use crate::domain::Card;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
@@ -86,14 +86,8 @@ pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
         }
     }
 
-    // Load trump
-    let trump = round.trump.map(|t| match t {
-        rounds::Trump::Clubs => Trump::Clubs,
-        rounds::Trump::Diamonds => Trump::Diamonds,
-        rounds::Trump::Hearts => Trump::Hearts,
-        rounds::Trump::Spades => Trump::Spades,
-        rounds::Trump::NoTrump => Trump::NoTrump,
-    });
+    // Load trump (already domain type, no conversion needed)
+    let trump = round.trump;
 
     // Convert database state to domain phase
     let db_state = game.state;
@@ -182,14 +176,8 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
             None
         };
 
-        // Convert trump
-        let trump = round.trump.map(|t| match t {
-            rounds::Trump::Clubs => Trump::Clubs,
-            rounds::Trump::Diamonds => Trump::Diamonds,
-            rounds::Trump::Hearts => Trump::Hearts,
-            rounds::Trump::Spades => Trump::Spades,
-            rounds::Trump::NoTrump => Trump::NoTrump,
-        });
+        // Load trump (already domain type, no conversion needed)
+        let trump = round.trump;
 
         // Load scores for this round (if the round is completed)
         let score_records = scores::find_all_by_round(conn, round.id).await?;

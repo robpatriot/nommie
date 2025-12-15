@@ -1,6 +1,7 @@
 use backend::adapters::games_sea::GameCreate;
+use backend::adapters::scores_sea;
 use backend::db::txn::with_txn;
-use backend::error::AppError;
+use backend::AppError;
 use backend::repos::{games, rounds, scores};
 use backend::utils::join_code::generate_join_code;
 
@@ -44,8 +45,8 @@ async fn test_create_score_and_find() -> Result<(), AppError> {
             assert_eq!(score.round_score, 15);
             assert_eq!(score.total_score_after, 15);
 
-            // Find by round and seat
-            let found = scores::find_by_round_and_seat(txn, round.id, 0).await?;
+            // Find by round and seat (using adapter directly)
+            let found = scores_sea::find_by_round_and_seat(txn, round.id, 0).await?;
             assert!(found.is_some());
             let found = found.unwrap();
             assert_eq!(found.id, score.id);
