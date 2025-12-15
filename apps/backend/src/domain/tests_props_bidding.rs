@@ -9,7 +9,7 @@
 
 use proptest::prelude::*;
 
-use crate::domain::bidding::{legal_bids_for_hand_size, place_bid, Bid};
+use crate::domain::bidding::{legal_bids, place_bid, Bid};
 use crate::domain::state::Phase;
 use crate::domain::test_prelude;
 use crate::errors::domain::{DomainError, ValidationKind};
@@ -28,7 +28,7 @@ proptest! {
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
 
-        let legal = legal_bids_for_hand_size(state.hand_size);
+        let legal = legal_bids(&state, 0);
 
         // Should have hand_size + 1 bids (0 through hand_size inclusive)
         prop_assert_eq!(legal.len(), (hand_size + 1) as usize,
@@ -60,7 +60,7 @@ proptest! {
         state.phase = Phase::Bidding;
         state.turn = 0;
 
-        let result = place_bid(&mut state, 0, Bid(invalid_bid), None);
+        let result = place_bid(&mut state, 0, Bid(invalid_bid));
 
         prop_assert!(result.is_err(),
             "Bid {invalid_bid} should be rejected for hand_size {hand_size}");
@@ -93,7 +93,7 @@ proptest! {
         state.turn_start = 0;
 
         // First bid succeeds
-        let result = place_bid(&mut state, 0, Bid(first_bid), None);
+        let result = place_bid(&mut state, 0, Bid(first_bid));
         prop_assert!(result.is_ok(),
             "First bid should succeed");
 
@@ -103,7 +103,7 @@ proptest! {
         // Let's test the explicit check: if we try to set player 0 back in turn
         // and they already have a bid, it should fail
         state.turn = 0;
-        let result = place_bid(&mut state, 0, Bid(second_bid), None);
+        let result = place_bid(&mut state, 0, Bid(second_bid));
 
         prop_assert!(result.is_err(),
             "Player cannot bid twice");
@@ -132,7 +132,7 @@ proptest! {
         state.turn = 0; // Player 0's turn
 
         // Try to bid as a different player
-        let result = place_bid(&mut state, wrong_player, Bid(bid_value), None);
+        let result = place_bid(&mut state, wrong_player, Bid(bid_value));
 
         prop_assert!(result.is_err(),
             "Out of turn bid should be rejected");
@@ -159,7 +159,7 @@ fn test_valid_bids_table() {
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
 
-        let legal = legal_bids_for_hand_size(state.hand_size);
+        let legal = legal_bids(&state, 0);
         let values: Vec<u8> = legal.iter().map(|b| b.value()).collect();
 
         assert_eq!(
@@ -186,7 +186,7 @@ fn test_invalid_bids_table() {
             state.phase = Phase::Bidding;
             state.turn = 0;
 
-            let result = place_bid(&mut state, 0, Bid(bid_value), None);
+            let result = place_bid(&mut state, 0, Bid(bid_value));
 
             assert!(
                 result.is_err(),
@@ -212,7 +212,7 @@ fn test_bid_wrong_phase() {
     state.phase = Phase::Init; // Not Bidding
     state.turn = 0;
 
-    let result = place_bid(&mut state, 0, Bid(3), None);
+    let result = place_bid(&mut state, 0, Bid(3));
 
     assert!(result.is_err(), "Bid in wrong phase should be rejected");
 
@@ -235,19 +235,19 @@ fn test_turn_order_sequence() {
     state.turn_start = 0;
 
     // Player 0 bids
-    assert!(place_bid(&mut state, 0, Bid(2), None).is_ok());
+    assert!(place_bid(&mut state, 0, Bid(2)).is_ok());
     assert_eq!(state.turn, 1, "Turn should advance to player 1");
 
     // Player 1 bids
-    assert!(place_bid(&mut state, 1, Bid(3), None).is_ok());
+    assert!(place_bid(&mut state, 1, Bid(3)).is_ok());
     assert_eq!(state.turn, 2, "Turn should advance to player 2");
 
     // Player 2 bids
-    assert!(place_bid(&mut state, 2, Bid(1), None).is_ok());
+    assert!(place_bid(&mut state, 2, Bid(1)).is_ok());
     assert_eq!(state.turn, 3, "Turn should advance to player 3");
 
     // Player 3 bids
-    assert!(place_bid(&mut state, 3, Bid(4), None).is_ok());
+    assert!(place_bid(&mut state, 3, Bid(4)).is_ok());
 
     // After all bids, should transition to TrumpSelect phase
     assert_eq!(
@@ -275,10 +275,10 @@ fn test_bid_tie_resolution() {
     state.turn_start = 0;
 
     // All players bid the same amount
-    assert!(place_bid(&mut state, 0, Bid(3), None).is_ok());
-    assert!(place_bid(&mut state, 1, Bid(3), None).is_ok());
-    assert!(place_bid(&mut state, 2, Bid(3), None).is_ok());
-    assert!(place_bid(&mut state, 3, Bid(3), None).is_ok());
+    assert!(place_bid(&mut state, 0, Bid(3)).is_ok());
+    assert!(place_bid(&mut state, 1, Bid(3)).is_ok());
+    assert!(place_bid(&mut state, 2, Bid(3)).is_ok());
+    assert!(place_bid(&mut state, 3, Bid(3)).is_ok());
 
     // Earliest bidder (player 0) should win
     assert_eq!(
@@ -300,10 +300,10 @@ fn test_highest_bidder_wins() {
     state.turn = 0;
     state.turn_start = 0;
 
-    assert!(place_bid(&mut state, 0, Bid(1), None).is_ok());
-    assert!(place_bid(&mut state, 1, Bid(5), None).is_ok()); // Highest
-    assert!(place_bid(&mut state, 2, Bid(2), None).is_ok());
-    assert!(place_bid(&mut state, 3, Bid(3), None).is_ok());
+    assert!(place_bid(&mut state, 0, Bid(1)).is_ok());
+    assert!(place_bid(&mut state, 1, Bid(5)).is_ok()); // Highest
+    assert!(place_bid(&mut state, 2, Bid(2)).is_ok());
+    assert!(place_bid(&mut state, 3, Bid(3)).is_ok());
 
     assert_eq!(
         state.round.winning_bidder,
@@ -318,10 +318,10 @@ fn test_highest_bidder_wins() {
     state.turn = 0;
     state.turn_start = 0;
 
-    assert!(place_bid(&mut state, 0, Bid(2), None).is_ok());
-    assert!(place_bid(&mut state, 1, Bid(3), None).is_ok());
-    assert!(place_bid(&mut state, 2, Bid(1), None).is_ok());
-    assert!(place_bid(&mut state, 3, Bid(4), None).is_ok()); // Highest
+    assert!(place_bid(&mut state, 0, Bid(2)).is_ok());
+    assert!(place_bid(&mut state, 1, Bid(3)).is_ok());
+    assert!(place_bid(&mut state, 2, Bid(1)).is_ok());
+    assert!(place_bid(&mut state, 3, Bid(4)).is_ok()); // Highest
 
     assert_eq!(
         state.round.winning_bidder,

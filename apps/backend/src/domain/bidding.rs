@@ -28,15 +28,13 @@ impl Bid {
     }
 }
 
-/// Compute legal bids for a given hand size.
-///
-/// This is the core domain logic for determining valid bid values.
-/// Returns all possible bids (0 to hand_size inclusive) as `Vec<Bid>`.
-///
-/// Note: This does not check phase, turn order, or dealer restrictions.
-/// Those are handled by higher-level functions like `CurrentRoundInfo::legal_bids()`.
-pub fn legal_bids_for_hand_size(hand_size: u8) -> Vec<Bid> {
-    valid_bid_range(hand_size).map(Bid).collect()
+/// Compute legal bids for a player. If phase is not Bidding, returns empty.
+/// This function does not enforce turn order; `place_bid` does.
+pub fn legal_bids(state: &GameState, _who: PlayerId) -> Vec<Bid> {
+    if state.phase != Phase::Bidding {
+        return Vec::new();
+    }
+    valid_bid_range(state.hand_size).map(Bid).collect()
 }
 
 /// Place a bid for `who`. Requires Bidding phase and being in turn.
@@ -45,12 +43,10 @@ pub fn legal_bids_for_hand_size(hand_size: u8) -> Vec<Bid> {
 /// * `state` - Current game state
 /// * `who` - Player placing the bid
 /// * `bid` - Bid value
-/// * `history` - Optional game history for validating consecutive zero bids rule
 pub fn place_bid(
     state: &mut GameState,
     who: PlayerId,
     bid: Bid,
-    history: Option<&GameHistory>,
 ) -> Result<PlaceBidResult, DomainError> {
     if state.phase != Phase::Bidding {
         return Err(DomainError::validation(
@@ -77,13 +73,6 @@ pub fn place_bid(
             ValidationKind::InvalidBid,
             "Invalid bid",
         ));
-    }
-
-    // Validate consecutive zero bids rule (if bidding 0)
-    if bid.0 == 0 {
-        if let Some(hist) = history {
-            validate_consecutive_zero_bids(hist, who, state.round_no)?;
-        }
     }
 
     // Dealer bid restriction: if this is the 4th (final) bid, check dealer rule

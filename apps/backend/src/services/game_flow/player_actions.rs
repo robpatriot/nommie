@@ -55,6 +55,48 @@ impl GameFlowService {
     ) -> Result<Game, AppError> {
         debug!(game_id, player_seat, bid_value, "Submitting bid");
 
+        // Load game to get current round and hand size for validation
+        let game = games::require_game(txn, game_id).await?;
+
+        if game.state != DbGameState::Bidding {
+            return Err(DomainError::validation(
+                ValidationKind::PhaseMismatch,
+                "Not in bidding phase",
+            )
+            .into());
+        }
+
+        let hand_size = game.hand_size().ok_or_else(|| {
+            DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
+        })?;
+
+        // Find the current round (needed for validation)
+        let current_round_no = game.current_round.ok_or_else(|| {
+            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
+        })?;
+
+        // Validate bid range using domain logic
+        let bid = Bid(bid_value);
+        let valid_range = crate::domain::rules::valid_bid_range(hand_size);
+        if !valid_range.contains(&bid.value()) {
+            return Err(DomainError::validation(
+                ValidationKind::InvalidBid,
+                format!("Bid must be in range {valid_range:?}"),
+            )
+            .into());
+        }
+
+        // Validate consecutive zero bids rule (if bidding 0)
+        if bid_value == 0 {
+            // Load game history for validation (service owns its validation data)
+            let history = player_view::load_game_history(txn, game_id).await?;
+            crate::domain::bidding::validate_consecutive_zero_bids(
+                &history,
+                player_seat,
+                current_round_no,
+            )?;
+        }
+
         // Load GameState and apply domain logic
         let mut state = {
             use crate::services::games::GameService;
@@ -62,16 +104,8 @@ impl GameFlowService {
             service.load_game_state(txn, game_id).await?
         };
 
-        // Load game history for domain validation (needed for consecutive zero bids rule)
-        let history = player_view::load_game_history(txn, game_id).await?;
-
         // Apply domain logic (includes all game rule validations)
-        let bid = Bid(bid_value);
-        let result =
-            crate::domain::bidding::place_bid(&mut state, player_seat, bid, Some(&history))?;
-
-        // Get current round for persistence
-        let current_round_no = state.round_no;
+        let result = crate::domain::bidding::place_bid(&mut state, player_seat, bid)?;
         let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {

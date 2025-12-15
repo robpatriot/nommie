@@ -35,10 +35,10 @@ fn happy_path_round_small() {
     let h3 = parse_cards(&["9S", "7H", "8C"]);
     let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
     // Bidding: p1 wins with 2 against ties by order
-    place_bid(&mut state, 0, Bid(1), None).unwrap();
-    place_bid(&mut state, 1, Bid(2), None).unwrap();
-    place_bid(&mut state, 2, Bid(2), None).unwrap();
-    place_bid(&mut state, 3, Bid(1), None).unwrap();
+    place_bid(&mut state, 0, Bid(1)).unwrap();
+    place_bid(&mut state, 1, Bid(2)).unwrap();
+    place_bid(&mut state, 2, Bid(2)).unwrap();
+    place_bid(&mut state, 3, Bid(1)).unwrap();
     assert_eq!(state.round.winning_bidder, Some(1));
     set_trump(&mut state, 1, Trump::Hearts).unwrap();
     // Trick 1: player 0 leads (dealer + 1)

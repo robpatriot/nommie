@@ -35,7 +35,7 @@ fn legal_moves_follow_lead() {
     let h3 = parse_cards(&["9S", "7H", "8C"]);
     let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
     for p in 0..4 {
-        assert!(place_bid(&mut state, p, Bid(0), None).is_ok());
+        assert!(place_bid(&mut state, p, Bid(0)).is_ok());
     }
     set_trump(&mut state, 0, Trump::Hearts).unwrap();
     // First to play can play any
@@ -64,7 +64,7 @@ fn play_card_errors_and_trick_resolution() {
     let h3 = parse_cards(&["9S", "7H", "8C"]);
     let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
     for p in 0..4 {
-        place_bid(&mut state, p, Bid(0), None).unwrap();
+        place_bid(&mut state, p, Bid(0)).unwrap();
     }
     set_trump(&mut state, 0, Trump::Hearts).unwrap();
     // Out of turn

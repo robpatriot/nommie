@@ -123,10 +123,10 @@ fn trump_select_snapshot() {
 
     // Place bids: player 1 bids 0, player 2 bids 1, player 3 bids 0, player 0 bids 0
     // Player 2 should win with bid of 1
-    place_bid(&mut state, 1, Bid(0), None).unwrap();
-    place_bid(&mut state, 2, Bid(1), None).unwrap();
-    place_bid(&mut state, 3, Bid(0), None).unwrap();
-    place_bid(&mut state, 0, Bid(0), None).unwrap();
+    place_bid(&mut state, 1, Bid(0)).unwrap();
+    place_bid(&mut state, 2, Bid(1)).unwrap();
+    place_bid(&mut state, 3, Bid(0)).unwrap();
+    place_bid(&mut state, 0, Bid(0)).unwrap();
 
     assert_eq!(state.phase, Phase::TrumpSelect);
 
@@ -158,10 +158,10 @@ fn trick_snapshot_legals() {
     let mut state = start_round(1, hands);
 
     // Complete bidding: player 2 wins with bid of 2
-    place_bid(&mut state, 1, Bid(0), None).unwrap();
-    place_bid(&mut state, 2, Bid(2), None).unwrap();
-    place_bid(&mut state, 3, Bid(0), None).unwrap();
-    place_bid(&mut state, 0, Bid(0), None).unwrap();
+    place_bid(&mut state, 1, Bid(0)).unwrap();
+    place_bid(&mut state, 2, Bid(2)).unwrap();
+    place_bid(&mut state, 3, Bid(0)).unwrap();
+    place_bid(&mut state, 0, Bid(0)).unwrap();
 
     // Select trump
     set_trump(&mut state, 2, Trump::Spades).unwrap();
@@ -242,11 +242,11 @@ fn trick_snapshot_second_trick_turn_rotation() {
     let mut state = start_round(1, hands);
 
     // Bidding: player 1 wins and selects Spades as trump
-    place_bid(&mut state, 1, Bid(2), None).unwrap();
-    place_bid(&mut state, 2, Bid(0), None).unwrap();
-    place_bid(&mut state, 3, Bid(0), None).unwrap();
+    place_bid(&mut state, 1, Bid(2)).unwrap();
+    place_bid(&mut state, 2, Bid(0)).unwrap();
+    place_bid(&mut state, 3, Bid(0)).unwrap();
     // Dealer's bid must not make the sum equal hand_size (2), so bid 1 instead of 0.
-    place_bid(&mut state, 0, Bid(1), None).unwrap();
+    place_bid(&mut state, 0, Bid(1)).unwrap();
     set_trump(&mut state, 1, Trump::Spades).unwrap();
 
     // First trick: player 1 leads diamonds, player 3 wins with spade (trump)
@@ -332,10 +332,10 @@ fn scoring_snapshot() {
     let mut state = start_round(1, hands);
 
     // Bidding: player 1 bids 1, others bid 0
-    place_bid(&mut state, 1, Bid(1), None).unwrap();
-    place_bid(&mut state, 2, Bid(0), None).unwrap();
-    place_bid(&mut state, 3, Bid(0), None).unwrap();
-    place_bid(&mut state, 0, Bid(0), None).unwrap();
+    place_bid(&mut state, 1, Bid(1)).unwrap();
+    place_bid(&mut state, 2, Bid(0)).unwrap();
+    place_bid(&mut state, 3, Bid(0)).unwrap();
+    place_bid(&mut state, 0, Bid(0)).unwrap();
 
     // Trump selection
     set_trump(&mut state, 1, Trump::Diamonds).unwrap();
@@ -448,11 +448,11 @@ fn complete_and_gameover_snapshots() {
     let mut state = start_round(1, hands);
 
     // Complete bidding, trump, and single trick
-    place_bid(&mut state, 1, Bid(0), None).unwrap();
-    place_bid(&mut state, 2, Bid(0), None).unwrap();
-    place_bid(&mut state, 3, Bid(1), None).unwrap();
+    place_bid(&mut state, 1, Bid(0)).unwrap();
+    place_bid(&mut state, 2, Bid(0)).unwrap();
+    place_bid(&mut state, 3, Bid(1)).unwrap();
     // Dealer's bid must not make the sum equal hand_size (1), so bid 1 instead of 0.
-    place_bid(&mut state, 0, Bid(1), None).unwrap();
+    place_bid(&mut state, 0, Bid(1)).unwrap();
 
     set_trump(&mut state, 3, Trump::NoTrumps).unwrap();
 

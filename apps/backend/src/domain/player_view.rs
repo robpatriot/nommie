@@ -199,9 +199,8 @@ impl CurrentRoundInfo {
         }
 
         // Use domain function to get base legal bids
-        use crate::domain::bidding::legal_bids_for_hand_size;
-        let domain_bids = legal_bids_for_hand_size(self.hand_size);
-        let mut legal: Vec<u8> = domain_bids.iter().map(|b| b.0).collect();
+        use crate::domain::rules::valid_bid_range;
+        let mut legal: Vec<u8> = valid_bid_range(self.hand_size).collect();
 
         // Dealer restriction: if last to bid, cannot make sum equal hand_size
         if bid_count == 3 {
