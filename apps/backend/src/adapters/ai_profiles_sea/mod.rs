@@ -65,6 +65,12 @@ pub async fn list_all<C: ConnectionTrait + Send + Sync>(
     ai_profiles::Entity::find().all(conn).await
 }
 
+/// Update an AI profile in the database.
+///
+/// # Test-only utility
+/// This function is only used by the test-only `repos::ai_profiles::update_profile` function.
+/// It cannot be marked `#[cfg(test)]` because integration tests are in a separate crate.
+#[allow(dead_code)]
 pub async fn update_profile(
     txn: &DatabaseTransaction,
     dto: AiProfileUpdate,

@@ -48,7 +48,7 @@ use serde_json::Value as JsonValue;
 /// ```rust,ignore
 /// let config = AiConfig::from_json(profile.config.as_ref());
 /// let seed = config.seed();
-/// let custom_field = config.get_custom("aggression");
+/// let custom_field = config.custom.get("aggression");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiConfig {
@@ -97,7 +97,7 @@ impl AiConfig {
     /// let json = serde_json::json!({"seed": 123, "difficulty": 5});
     /// let config = AiConfig::from_json(Some(&json));
     /// assert_eq!(config.seed, Some(123));
-    /// assert_eq!(config.get_custom("difficulty"), Some(&json!(5)));
+    /// assert_eq!(config.custom.get("difficulty"), Some(&json!(5)));
     /// ```
     pub fn from_json(config: Option<&JsonValue>) -> Self {
         match config {
@@ -129,37 +129,10 @@ impl AiConfig {
         self.memory_recency.unwrap_or(false)
     }
 
-    /// Get a custom configuration field by key.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let difficulty = config.get_custom("difficulty")
-    ///     .and_then(|v| v.as_i64())
-    ///     .unwrap_or(5);
-    /// ```
-    pub fn get_custom(&self, key: &str) -> Option<&JsonValue> {
-        self.custom.get(key)
-    }
-
-    /// Get a custom configuration field as string.
-    pub fn get_custom_str(&self, key: &str) -> Option<&str> {
-        self.custom.get(key)?.as_str()
-    }
-
     /// Create an empty configuration (no seed, no custom fields).
     pub fn empty() -> Self {
         Self {
             seed: None,
-            memory_recency: None,
-            custom: JsonValue::Object(serde_json::Map::new()),
-        }
-    }
-
-    /// Create a configuration with just a seed.
-    pub fn with_seed(seed: u64) -> Self {
-        Self {
-            seed: Some(seed),
             memory_recency: None,
             custom: JsonValue::Object(serde_json::Map::new()),
         }
@@ -196,8 +169,8 @@ mod tests {
         let config = AiConfig::from_json(Some(&json));
 
         assert_eq!(config.seed(), Some(67890));
-        assert_eq!(config.get_custom("difficulty"), Some(&json!(7)));
-        assert_eq!(config.get_custom("playstyle"), Some(&json!("aggressive")));
+        assert_eq!(config.custom.get("difficulty"), Some(&json!(7)));
+        assert_eq!(config.custom.get("playstyle"), Some(&json!("aggressive")));
     }
 
     #[test]
@@ -205,7 +178,7 @@ mod tests {
         let config = AiConfig::from_json(None);
 
         assert_eq!(config.seed(), None);
-        assert!(config.get_custom("anything").is_none());
+        assert!(config.custom.get("anything").is_none());
     }
 
     #[test]
@@ -214,12 +187,12 @@ mod tests {
         let config = AiConfig::from_json(Some(&json));
 
         assert_eq!(config.seed(), None);
-        assert_eq!(config.get_custom("difficulty"), Some(&json!(5)));
+        assert_eq!(config.custom.get("difficulty"), Some(&json!(5)));
     }
 
     #[test]
     fn test_with_seed() {
-        let config = AiConfig::with_seed(99999);
+        let config = AiConfig::from_json(Some(&json!({"seed": 99999})));
 
         assert_eq!(config.seed(), Some(99999));
     }
@@ -229,6 +202,6 @@ mod tests {
         let config = AiConfig::empty();
 
         assert_eq!(config.seed(), None);
-        assert!(config.get_custom("anything").is_none());
+        assert!(config.custom.get("anything").is_none());
     }
 }

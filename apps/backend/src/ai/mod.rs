@@ -80,18 +80,9 @@ mod trait_def;
 
 pub use chatgpt_heuristic::HeuristicV1;
 pub use config::AiConfig;
-pub use memory::{apply_memory_degradation, get_round_card_plays, MemoryMode, TrickPlays};
+pub use memory::MemoryMode;
 pub use random::RandomPlayer;
 pub use trait_def::{AiError, AiPlayer};
-
-/// AI failure mode - how to handle AI errors/timeouts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AiFailureMode {
-    /// Panic on errors (for tests)
-    Panic,
-    /// Fall back to random play (for production)
-    FallbackRandom,
-}
 
 /// Create an AI player from ai_type string and configuration.
 ///

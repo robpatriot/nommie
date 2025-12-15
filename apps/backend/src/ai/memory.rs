@@ -38,6 +38,9 @@ impl MemoryMode {
     }
 
     /// Convert to database value.
+    ///
+    /// Used for database storage of AI memory mode settings.
+    #[allow(dead_code)]
     pub fn to_db_value(self) -> Option<i32> {
         match self {
             MemoryMode::Full => Some(100),
@@ -82,6 +85,7 @@ pub struct TrickPlays {
 /// * `round_id` - ID of the round to load tricks from
 /// * `memory_mode` - Memory level (0-100)
 /// * `ai_seed` - Optional seed for deterministic degradation
+/// * `use_recency` - Whether to apply recency bias (better memory for recent tricks)
 ///
 /// # Returns
 ///
@@ -92,6 +96,7 @@ pub async fn get_round_card_plays<C: ConnectionTrait + Send + Sync>(
     round_id: i64,
     memory_mode: MemoryMode,
     ai_seed: Option<u64>,
+    use_recency: bool,
 ) -> Result<Vec<TrickMemory>, AppError> {
     // No memory mode - return empty
     if matches!(memory_mode, MemoryMode::None) {
@@ -118,12 +123,12 @@ pub async fn get_round_card_plays<C: ConnectionTrait + Send + Sync>(
         });
     }
 
-    // Apply memory degradation based on mode and seed (no recency bias in this helper)
+    // Apply memory degradation based on mode, seed, and recency bias
     Ok(apply_memory_degradation(
         raw_plays,
         memory_mode,
         ai_seed,
-        false,
+        use_recency,
     ))
 }
 

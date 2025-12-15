@@ -267,11 +267,11 @@ pub trait AiPlayer: Send + Sync {
     ///     let (best_trump, best_count) = suit_counts.iter()
     ///         .max_by_key(|(_, count)| count)
     ///         .copied()
-    ///         .unwrap_or((Trump::NoTrump, 0));
+    ///         .unwrap_or((Trump::NoTrumps, 0));
     ///     
     ///     // If weak in all suits, choose NoTrump
     ///     if best_count < 3 {
-    ///         Ok(Trump::NoTrump)
+    ///         Ok(Trump::NoTrumps)
     ///     } else {
     ///         Ok(best_trump)
     ///     }

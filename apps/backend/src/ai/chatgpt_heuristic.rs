@@ -38,14 +38,6 @@ impl HeuristicV1 {
     pub const NAME: &'static str = "HeuristicV1";
     pub const VERSION: &'static str = "1.0.0";
 
-    pub const fn name() -> &'static str {
-        Self::NAME
-    }
-
-    pub const fn version() -> &'static str {
-        Self::VERSION
-    }
-
     pub fn new(seed: Option<u64>) -> Self {
         Self { _seed: seed }
     }
@@ -73,7 +65,7 @@ impl HeuristicV1 {
 
     fn trump_suit(trump: Trump) -> Option<Suit> {
         match trump {
-            Trump::NoTrump => None,
+            Trump::NoTrumps => None,
             Trump::Clubs => Some(Suit::Clubs),
             Trump::Diamonds => Some(Suit::Diamonds),
             Trump::Hearts => Some(Suit::Hearts),
@@ -334,11 +326,11 @@ impl AiPlayer for HeuristicV1 {
         let hand = state.hand.clone();
 
         // If NoTrump is legal and the hand is balanced with some top cards, consider it.
-        let no_trump_legal = legal.iter().any(|t| matches!(t, Trump::NoTrump));
+        let no_trump_legal = legal.iter().any(|t| matches!(t, Trump::NoTrumps));
         let want_nt = no_trump_legal && Self::prefer_no_trump(&hand);
 
         if want_nt {
-            return Ok(Trump::NoTrump);
+            return Ok(Trump::NoTrumps);
         }
 
         // Score each legal suit and pick the best.
@@ -349,7 +341,7 @@ impl AiPlayer for HeuristicV1 {
                 Trump::Diamonds => Self::trump_score_for_suit(&hand, Suit::Diamonds),
                 Trump::Hearts => Self::trump_score_for_suit(&hand, Suit::Hearts),
                 Trump::Spades => Self::trump_score_for_suit(&hand, Suit::Spades),
-                Trump::NoTrump => continue,
+                Trump::NoTrumps => continue,
             };
             match best {
                 None => best = Some((score, t)),
@@ -372,7 +364,7 @@ impl AiPlayer for HeuristicV1 {
             return Err(AiError::InvalidMove("No legal plays".into()));
         }
 
-        let trump = state.trump.unwrap_or(Trump::NoTrump);
+        let trump = state.trump.unwrap_or(Trump::NoTrumps);
         let lead = state.current_trick_plays.first().map(|&(_, c)| c.suit);
 
         let choice = match state.current_trick_plays.len() {

@@ -63,14 +63,6 @@ impl RandomPlayer {
     pub const NAME: &'static str = "RandomPlayer";
     pub const VERSION: &'static str = "1.0.0";
 
-    pub const fn name() -> &'static str {
-        Self::NAME
-    }
-
-    pub const fn version() -> &'static str {
-        Self::VERSION
-    }
-
     /// Create a new `RandomPlayer`.
     ///
     /// # Arguments

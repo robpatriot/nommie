@@ -32,16 +32,6 @@ impl AiProfileCreate {
         }
     }
 
-    pub fn with_variant(mut self, variant: impl Into<String>) -> Self {
-        self.variant = variant.into();
-        self
-    }
-
-    pub fn with_display_name(mut self, display_name: impl Into<String>) -> Self {
-        self.display_name = display_name.into();
-        self
-    }
-
     pub fn with_playstyle(mut self, playstyle: impl Into<String>) -> Self {
         self.playstyle = Some(playstyle.into());
         self
