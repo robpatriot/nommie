@@ -9,7 +9,7 @@ use crate::entities::games;
 
 pub mod dto;
 
-pub use dto::{GameCreate, GameUpdateMetadata, GameUpdateRound, GameUpdateState};
+pub use dto::{GameCreate, GameUpdate};
 
 // Adapter functions return DbErr; repos layer maps to DomainError via From<DbErr>.
 
@@ -17,7 +17,7 @@ pub use dto::{GameCreate, GameUpdateMetadata, GameUpdateRound, GameUpdateState};
 ///
 /// This consolidates the repetitive pattern:
 /// - Adds lock_version increment and updated_at to the update
-/// - Filters by id and current_lock_version
+/// - Filters by id and expected_lock_version for optimistic locking
 /// - Checks rows_affected to distinguish NotFound vs OptimisticLock
 /// - Refetches and returns the updated model
 ///
@@ -25,7 +25,7 @@ pub use dto::{GameCreate, GameUpdateMetadata, GameUpdateRound, GameUpdateState};
 async fn optimistic_update_then_fetch<F>(
     txn: &DatabaseTransaction,
     id: i64,
-    current_lock_version: i32,
+    expected_lock_version: i32,
     configure_update: F,
 ) -> Result<games::Model, sea_orm::DbErr>
 where
@@ -43,19 +43,18 @@ where
             Expr::col(games::Column::LockVersion).add(1),
         )
         .filter(games::Column::Id.eq(id))
-        .filter(games::Column::LockVersion.eq(current_lock_version))
+        .filter(games::Column::LockVersion.eq(expected_lock_version))
         .exec(txn)
         .await?;
 
     if result.rows_affected == 0 {
-        // Either the game doesn't exist or the lock version doesn't match
         // Check if game exists to distinguish between NotFound and OptimisticLock
         let game = games::Entity::find_by_id(id).one(txn).await?;
         if let Some(game) = game {
             // Lock version mismatch - build structured payload
             let payload = format!(
                 "OPTIMISTIC_LOCK:{{\"expected\":{},\"actual\":{}}}",
-                current_lock_version, game.lock_version
+                expected_lock_version, game.lock_version
             );
             return Err(sea_orm::DbErr::Custom(payload));
         } else {
@@ -142,63 +141,29 @@ pub async fn create_game(
     game_active.insert(txn).await
 }
 
-pub async fn update_state(
+pub async fn update_game(
     txn: &DatabaseTransaction,
-    dto: GameUpdateState,
+    dto: GameUpdate,
 ) -> Result<games::Model, sea_orm::DbErr> {
     use sea_orm::sea_query::{Alias, Expr};
 
-    optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |update| {
-        // Runtime dispatch based on database backend
-        let state_expr = match txn.get_database_backend() {
-            sea_orm::DatabaseBackend::Postgres => {
-                // PostgreSQL needs explicit cast to enum type
-                Expr::val(dto.state).cast_as(Alias::new("game_state"))
-            }
-            _ => {
-                // SQLite and others - just use string value
-                Expr::val(dto.state).into()
-            }
-        };
-        update.col_expr(games::Column::State, state_expr)
-    })
-    .await
-}
+    optimistic_update_then_fetch(txn, dto.id, dto.expected_lock_version, |mut update| {
+        // Update state if provided
+        if let Some(state) = dto.state {
+            let state_expr = match txn.get_database_backend() {
+                sea_orm::DatabaseBackend::Postgres => {
+                    // PostgreSQL needs explicit cast to enum type
+                    Expr::val(state).cast_as(Alias::new("game_state"))
+                }
+                _ => {
+                    // SQLite and others - just use string value
+                    Expr::val(state).into()
+                }
+            };
+            update = update.col_expr(games::Column::State, state_expr);
+        }
 
-pub async fn update_metadata(
-    txn: &DatabaseTransaction,
-    dto: GameUpdateMetadata,
-) -> Result<games::Model, sea_orm::DbErr> {
-    use sea_orm::sea_query::{Alias, Expr};
-
-    optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |update| {
-        // Runtime dispatch for visibility enum
-        let visibility_expr = match txn.get_database_backend() {
-            sea_orm::DatabaseBackend::Postgres => {
-                // PostgreSQL needs explicit cast to enum type
-                Expr::val(dto.visibility).cast_as(Alias::new("game_visibility"))
-            }
-            _ => {
-                // SQLite and others - just use string value
-                Expr::val(dto.visibility).into()
-            }
-        };
-
-        update
-            .col_expr(games::Column::Name, Expr::val(dto.name).into())
-            .col_expr(games::Column::Visibility, visibility_expr)
-    })
-    .await
-}
-
-pub async fn update_round(
-    txn: &DatabaseTransaction,
-    dto: GameUpdateRound,
-) -> Result<games::Model, sea_orm::DbErr> {
-    use sea_orm::sea_query::Expr;
-
-    optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |mut update| {
-        // Apply optional field updates
+        // Update round-related fields if provided
         if let Some(round) = dto.current_round {
             update = update.col_expr(
                 games::Column::CurrentRound,
@@ -217,6 +182,7 @@ pub async fn update_round(
                 Expr::val(trick_no as i16).into(),
             );
         }
+
         update
     })
     .await

@@ -41,11 +41,6 @@ impl CredentialsCreate {
         self.google_sub = Some(google_sub.into());
         self
     }
-
-    pub fn with_password_hash(mut self, password_hash: impl Into<String>) -> Self {
-        self.password_hash = Some(password_hash.into());
-        self
-    }
 }
 
 /// DTO for updating existing user credentials.

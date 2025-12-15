@@ -3,9 +3,10 @@
 // Tests both successful login flows and validation errors.
 
 use actix_web::test;
+use backend::auth::jwt::verify_access_token;
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
-use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::unique_helpers::{unique_email, unique_str};
 use serde_json::json;
 
 use crate::common::assert_problem_details_structure;
@@ -52,8 +53,7 @@ async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::
     let token = body["token"].as_str().unwrap();
     assert!(!token.is_empty());
 
-    let decoded =
-        backend::verify_access_token(token, &security_config).expect("JWT should be valid");
+    let decoded = verify_access_token(token, &security_config).expect("JWT should be valid");
     assert_eq!(decoded.email, test_email);
 
     let first_user_sub = decoded.sub;
@@ -78,8 +78,7 @@ async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::
     let body2: serde_json::Value = test::read_body_json(resp2).await;
     let token2 = body2["token"].as_str().unwrap();
 
-    let decoded2 =
-        backend::verify_access_token(token2, &security_config).expect("JWT should be valid");
+    let decoded2 = verify_access_token(token2, &security_config).expect("JWT should be valid");
 
     assert_eq!(decoded2.sub, first_user_sub);
     assert_eq!(decoded2.email, test_email);

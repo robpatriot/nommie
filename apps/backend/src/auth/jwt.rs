@@ -163,12 +163,12 @@ mod tests {
     use actix_web::http::StatusCode;
     use actix_web::ResponseError;
     use backend_test_support::problem_details::assert_problem_details_from_http_response;
+    use backend_test_support::unique_helpers::{unique_email, unique_str};
     use jsonwebtoken::{encode, EncodingKey, Header};
     use serde_json::json;
 
     use super::{extract_sub_for_logging, mint_access_token, verify_access_token};
     use crate::state::security_config::SecurityConfig;
-    use crate::utils::unique::{unique_email, unique_str};
 
     #[tokio::test]
     async fn test_mint_and_verify_roundtrip() {

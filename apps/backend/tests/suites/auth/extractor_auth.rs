@@ -5,11 +5,11 @@ use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::error::AppError;
-use backend::extractors::current_user::CurrentUser;
+use backend::AppError;
+use backend::CurrentUser;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::state::security_config::SecurityConfig;
-use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::unique_helpers::{unique_email, unique_str};
 use serde::Serialize;
 use serde_json::Value;
 

@@ -19,7 +19,7 @@ use tracing::{error, warn};
 
 use crate::errors::ErrorCode;
 // use crate::logging::pii::Redacted; // not used in this module
-use crate::web::trace_ctx;
+use crate::trace_ctx;
 
 /// Boxed error type for storage in AppError variants
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -28,12 +28,6 @@ type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
 #[derive(Debug, Error)]
 #[error("{0}")]
 pub struct Sentinel(pub &'static str);
-
-/// Convenience helper to create a boxed Sentinel error
-#[inline]
-pub fn src(msg: &'static str) -> BoxError {
-    Box::new(Sentinel(msg))
-}
 
 /// Helper to convert DomainError detail strings into error sources
 #[derive(Debug)]

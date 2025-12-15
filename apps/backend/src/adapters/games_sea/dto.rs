@@ -37,68 +37,37 @@ impl GameCreate {
     }
 }
 
-/// DTO for updating game state.
+/// Unified DTO for updating game fields with optimistic locking.
+///
+/// Can update any combination of state, round-related fields (current_round, starting_dealer_pos, current_trick_no).
+/// All updates are atomic with a single lock_version increment.
+///
+/// `expected_lock_version` validates that the current lock_version matches before updating.
 #[derive(Debug, Clone)]
-pub struct GameUpdateState {
+pub struct GameUpdate {
     pub id: i64,
-    pub state: GameState,
-    pub current_lock_version: i32,
-}
-
-impl GameUpdateState {
-    pub fn new(id: i64, state: GameState, current_lock_version: i32) -> Self {
-        Self {
-            id,
-            state,
-            current_lock_version,
-        }
-    }
-}
-
-/// DTO for updating game metadata.
-#[derive(Debug, Clone)]
-pub struct GameUpdateMetadata {
-    pub id: i64,
-    pub name: Option<String>,
-    pub visibility: GameVisibility,
-    pub current_lock_version: i32,
-}
-
-impl GameUpdateMetadata {
-    pub fn new(
-        id: i64,
-        name: Option<impl Into<String>>,
-        visibility: GameVisibility,
-        current_lock_version: i32,
-    ) -> Self {
-        Self {
-            id,
-            name: name.map(|n| n.into()),
-            visibility,
-            current_lock_version,
-        }
-    }
-}
-
-/// DTO for updating game round data.
-#[derive(Debug, Clone)]
-pub struct GameUpdateRound {
-    pub id: i64,
+    pub state: Option<GameState>,
     pub current_round: Option<u8>,
     pub starting_dealer_pos: Option<u8>,
     pub current_trick_no: Option<u8>,
-    pub current_lock_version: i32,
+    pub expected_lock_version: i32,
 }
 
-impl GameUpdateRound {
-    pub fn new(id: i64, current_lock_version: i32) -> Self {
+impl GameUpdate {
+    pub fn new(id: i64, expected_lock_version: i32) -> Self {
         Self {
             id,
+            state: None,
             current_round: None,
             starting_dealer_pos: None,
             current_trick_no: None,
-            current_lock_version,
+            expected_lock_version,
         }
+    }
+
+    pub fn with_state(mut self, state: GameState) -> Self {
+        self.state = Some(state);
+        self
     }
 
     pub fn with_current_round(mut self, round: u8) -> Self {

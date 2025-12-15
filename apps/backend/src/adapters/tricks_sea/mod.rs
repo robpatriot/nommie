@@ -37,6 +37,10 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Count tricks for a round
+/// Count tricks for a round.
+///
+/// Test-only utility. Not used in production binary.
+#[allow(dead_code)]
 pub async fn count_tricks_by_round<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     round_id: i64,

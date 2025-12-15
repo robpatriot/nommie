@@ -8,7 +8,7 @@ use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::infra::state::build_state;
 use backend::services::users::UserService;
-use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::unique_helpers::{unique_email, unique_str};
 use tracing::info;
 
 #[tokio::test]

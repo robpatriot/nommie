@@ -24,6 +24,10 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
 }
 
 /// Find score for a specific player in a round
+/// Find a score by round and seat.
+///
+/// Test-only utility. Not used in production binary.
+#[allow(dead_code)]
 pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     round_id: i64,
