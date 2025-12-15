@@ -105,17 +105,17 @@ pub async fn require_game<C: ConnectionTrait + Send + Sync>(
 /// Updates any combination of state and round-related fields (current_round, starting_dealer_pos, current_trick_no)
 /// atomically with a single lock_version increment. Returns the updated game model.
 ///
-/// `expected_lock_version` validates that the current lock_version matches before updating.
+/// `current_lock_version` validates that the current lock_version matches before updating.
 pub async fn update_game(
     txn: &DatabaseTransaction,
     id: i64,
-    expected_lock_version: i32,
+    current_lock_version: i32,
     state: Option<DbGameState>,
     current_round: Option<u8>,
     starting_dealer_pos: Option<u8>,
     current_trick_no: Option<u8>,
 ) -> Result<Game, DomainError> {
-    let mut dto = games_adapter::GameUpdate::new(id, expected_lock_version);
+    let mut dto = games_adapter::GameUpdate::new(id, current_lock_version);
     if let Some(s) = state {
         dto = dto.with_state(s);
     }
@@ -138,22 +138,22 @@ pub async fn update_game(
 /// but don't require updating any fields on the games table itself. Increments lock_version
 /// and updates updated_at to trigger websocket broadcasts.
 ///
-/// `expected_lock_version` validates that the current lock_version matches before updating.
+/// `current_lock_version` validates that the current lock_version matches before updating.
 pub async fn touch_game(
     txn: &DatabaseTransaction,
     id: i64,
-    expected_lock_version: i32,
+    current_lock_version: i32,
 ) -> Result<Game, DomainError> {
-    update_game(txn, id, expected_lock_version, None, None, None, None).await
+    update_game(txn, id, current_lock_version, None, None, None, None).await
 }
 
 /// Delete game with optimistic locking.
 ///
-/// `expected_lock_version` validates that the current lock_version matches before deleting.
+/// `current_lock_version` validates that the current lock_version matches before deleting.
 pub async fn delete_game(
     txn: &DatabaseTransaction,
     id: i64,
-    expected_lock_version: i32,
+    current_lock_version: i32,
 ) -> Result<(), DomainError> {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
@@ -161,7 +161,7 @@ pub async fn delete_game(
 
     let delete_result = games::Entity::delete_many()
         .filter(games::Column::Id.eq(id))
-        .filter(games::Column::LockVersion.eq(expected_lock_version))
+        .filter(games::Column::LockVersion.eq(current_lock_version))
         .exec(txn)
         .await?;
 
@@ -174,7 +174,7 @@ pub async fn delete_game(
                 crate::errors::domain::ConflictKind::OptimisticLock,
                 format!(
                     "Game lock version mismatch: expected {}, but game has version {}",
-                    expected_lock_version, game.lock_version
+                    current_lock_version, game.lock_version
                 ),
             ));
         }

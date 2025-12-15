@@ -17,7 +17,7 @@ pub use dto::{GameCreate, GameUpdate};
 ///
 /// This consolidates the repetitive pattern:
 /// - Adds lock_version increment and updated_at to the update
-/// - Filters by id and expected_lock_version for optimistic locking
+/// - Filters by id and current_lock_version for optimistic locking
 /// - Checks rows_affected to distinguish NotFound vs OptimisticLock
 /// - Refetches and returns the updated model
 ///
@@ -25,7 +25,7 @@ pub use dto::{GameCreate, GameUpdate};
 async fn optimistic_update_then_fetch<F>(
     txn: &DatabaseTransaction,
     id: i64,
-    expected_lock_version: i32,
+    current_lock_version: i32,
     configure_update: F,
 ) -> Result<games::Model, sea_orm::DbErr>
 where
@@ -43,7 +43,7 @@ where
             Expr::col(games::Column::LockVersion).add(1),
         )
         .filter(games::Column::Id.eq(id))
-        .filter(games::Column::LockVersion.eq(expected_lock_version))
+        .filter(games::Column::LockVersion.eq(current_lock_version))
         .exec(txn)
         .await?;
 
@@ -54,7 +54,7 @@ where
             // Lock version mismatch - build structured payload
             let payload = format!(
                 "OPTIMISTIC_LOCK:{{\"expected\":{},\"actual\":{}}}",
-                expected_lock_version, game.lock_version
+                current_lock_version, game.lock_version
             );
             return Err(sea_orm::DbErr::Custom(payload));
         } else {
@@ -147,7 +147,7 @@ pub async fn update_game(
 ) -> Result<games::Model, sea_orm::DbErr> {
     use sea_orm::sea_query::{Alias, Expr};
 
-    optimistic_update_then_fetch(txn, dto.id, dto.expected_lock_version, |mut update| {
+    optimistic_update_then_fetch(txn, dto.id, dto.current_lock_version, |mut update| {
         // Update state if provided
         if let Some(state) = dto.state {
             let state_expr = match txn.get_database_backend() {

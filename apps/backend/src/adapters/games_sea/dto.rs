@@ -42,7 +42,7 @@ impl GameCreate {
 /// Can update any combination of state, round-related fields (current_round, starting_dealer_pos, current_trick_no).
 /// All updates are atomic with a single lock_version increment.
 ///
-/// `expected_lock_version` validates that the current lock_version matches before updating.
+/// `current_lock_version` validates that the current lock_version matches before updating.
 #[derive(Debug, Clone)]
 pub struct GameUpdate {
     pub id: i64,
@@ -50,18 +50,18 @@ pub struct GameUpdate {
     pub current_round: Option<u8>,
     pub starting_dealer_pos: Option<u8>,
     pub current_trick_no: Option<u8>,
-    pub expected_lock_version: i32,
+    pub current_lock_version: i32,
 }
 
 impl GameUpdate {
-    pub fn new(id: i64, expected_lock_version: i32) -> Self {
+    pub fn new(id: i64, current_lock_version: i32) -> Self {
         Self {
             id,
             state: None,
             current_round: None,
             starting_dealer_pos: None,
             current_trick_no: None,
-            expected_lock_version,
+            current_lock_version,
         }
     }
 
