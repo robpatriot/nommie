@@ -67,6 +67,25 @@ export function GameRoomClient({
   const phaseName = phase.phase
   const canMarkReady = phaseName === 'Init'
 
+  // Initialize hasMarkedReady from snapshot on mount and when snapshot updates
+  const viewerSeatForReady = typeof snapshot.viewerSeat === 'number' ? snapshot.viewerSeat : null
+  useEffect(() => {
+    if (viewerSeatForReady !== null && canMarkReady) {
+      const viewerSeatAssignment = snapshot.snapshot.game.seating.find(
+        (seat, index) => {
+          const seatIndex =
+            typeof seat.seat === 'number' && !Number.isNaN(seat.seat)
+              ? seat.seat
+              : index
+          return seatIndex === viewerSeatForReady
+        }
+      )
+      if (viewerSeatAssignment) {
+        setHasMarkedReady(viewerSeatAssignment.is_ready)
+      }
+    }
+  }, [snapshot.snapshot.game.seating, viewerSeatForReady, canMarkReady])
+
   // Reset hasMarkedReady when phase changes away from Init.
   // Use phase directly (not canMarkReady) to avoid race conditions on rapid phase changes.
   useEffect(() => {

@@ -195,8 +195,10 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ### 🟨 **18. Architecture & Reliability**
 **Details:**
-- **WebSockets / Server Push:** Replace polling with WebSockets or SSE.  
-  *Acceptance:* Real-time updates replace polling.
+- **WebSockets / Server Push & Architecture:** Replace polling with WebSockets or SSE and decide on the long‑term WebSocket architecture and testing strategy.  
+  - Add end-to-end WebSocket integration tests for game sessions (connect, snapshots, broadcasts, shutdown).  
+  - Decide whether to split `ws` concerns into reusable realtime infrastructure (e.g., broker/registries) vs. binary-only handlers (e.g., route wiring), and document the rationale.  
+  *Acceptance:* Real-time updates replace polling; WebSocket architecture and testing strategy are documented and enforced via automated tests.
 - **Deployment Stub:** Minimal production-style environment including FE, BE, DB, and observability stubs.  
   *Acceptance:* Application runs in minimal production configuration.
 - **Race-Safe `ensure_user`:** Handle concurrent insertions safely by re-fetching on unique violations.  

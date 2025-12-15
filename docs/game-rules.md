@@ -65,9 +65,13 @@ These rules are **locked** — all game logic, extractors, tests, and UI must co
 ---
 
 ## Scoring
+// Scoring is intentionally simple and **only** uses the following two mechanisms.
+// No other bonuses, penalties, or adjustments are allowed.
 - Each trick won = **+1 point**.
 - If a player wins **exactly as many tricks as they bid**, they gain a **+10 bonus**.
   - Applies even to a bid of 0 (if they take no tricks).
+- There are **no negative scores** at the trick or round level:
+  - Missing your bid means you simply **don’t receive** the +10 bonus; you never lose points.
 - Scores are cumulative across all 26 rounds.
 
 ---
