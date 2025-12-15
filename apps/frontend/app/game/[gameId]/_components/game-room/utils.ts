@@ -108,7 +108,7 @@ export function formatTrump(trump: RoundPublic['trump']): string {
       return 'Hearts'
     case 'SPADES':
       return 'Spades'
-    case 'NO_TRUMP':
+    case 'NO_TRUMPS':
       return 'No Trump'
     default:
       return trump

@@ -215,7 +215,7 @@ fn snapshot_bidding(state: &GameState) -> PhaseSnapshot {
 fn snapshot_trump_select(state: &GameState) -> PhaseSnapshot {
     let round = build_round_public(state);
     let to_act = state.round.winning_bidder.unwrap_or(0);
-    // All trump options including NO_TRUMP are allowed
+    // All trump options including NO_TRUMPS are allowed
     let allowed_trumps = vec![
         Trump::Clubs,
         Trump::Diamonds,

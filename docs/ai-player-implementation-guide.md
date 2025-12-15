@@ -49,7 +49,7 @@ critical rules the AI must honour; the full canonical source lives in
 - **Trump selection:** highest bid wins; ties → earliest bidder in order.
 
 ### Trump Selection
-- Winner chooses one of **Clubs / Diamonds / Hearts / Spades / NoTrump**.
+- Winner chooses one of **Clubs / Diamonds / Hearts / Spades / NoTrumps**.
 
 ### Trick Play
 - **Lead:** player to the **left of the dealer** leads trick 1; thereafter, the **previous trick winner** leads.
@@ -168,7 +168,7 @@ Your AI implements three methods, each receiving **read‑only** views:
 
 ### Helpers (always prefer these)
 - `legal_bids() -> Vec<u8>` — sorted 0..=hand_size; returns empty if not your turn
-- `legal_trumps() -> Vec<Trump>` — all 5 options (Clubs, Diamonds, Hearts, Spades, NoTrump)
+- `legal_trumps() -> Vec<Trump>` — all 5 options (Clubs, Diamonds, Hearts, Spades, NoTrumps)
 - `legal_plays() -> Vec<Card>` — arbitrary order; returns empty if not your turn
 
 **Note:** The engine calls AIs only when it's their turn, so `legal_*` should never be empty. If needed, advance with `(seat + 1) % 4`.
@@ -213,7 +213,7 @@ Your AI implements three methods, each receiving **read‑only** views:
 
 - **Card** `{ suit: Suit, rank: Rank }` — `Ord` is for sorting only; trick resolution is engine‑driven by lead/trump.
 - **Suit** `Clubs|Diamonds|Hearts|Spades`
-- **Trump** `Clubs|Diamonds|Hearts|Spades|NoTrump`
+- **Trump** `Clubs|Diamonds|Hearts|Spades|NoTrumps`
 - **Rank** `Two..Ace`
 - **GameState** `Bidding|TrumpSelection|TrickPlay`
 - **AiError** `Timeout|Internal(String)|InvalidMove(String)`
@@ -398,7 +398,7 @@ mod tests {
 2. Zero‑bid streak (3 consecutives ⇒ 0 becomes illegal).  
 3. Must‑follow suit with only one legal card.  
 4. Hand sizes: 13 and 2 cards.  
-5. NoTrump vs suit trumps.  
+5. NoTrumps vs suit trumps.  
 6. Score pressure (e.g., conservative vs aggressive modes).
 
 ---

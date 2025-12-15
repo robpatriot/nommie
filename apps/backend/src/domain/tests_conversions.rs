@@ -16,7 +16,7 @@ fn trump_conversions() {
     assert_eq!(Trump::Hearts.try_into(), Ok(Suit::Hearts));
     assert_eq!(Trump::Spades.try_into(), Ok(Suit::Spades));
 
-    // TryFrom<Trump> for Suit - NoTrump fails
+    // TryFrom<Trump> for Suit - NoTrumps fails
     let result: Result<Suit, _> = Trump::NoTrumps.try_into();
     assert_eq!(
         result,
@@ -39,7 +39,7 @@ fn trump_serde() {
     assert_eq!(serde_json::to_string(&Trump::Spades).unwrap(), "\"SPADES\"");
     assert_eq!(
         serde_json::to_string(&Trump::NoTrumps).unwrap(),
-        "\"NO_TRUMP\""
+        "\"NO_TRUMPS\""
     );
 
     // Test deserialization
@@ -60,7 +60,7 @@ fn trump_serde() {
         Trump::Spades
     );
     assert_eq!(
-        serde_json::from_str::<Trump>("\"NO_TRUMP\"").unwrap(),
+        serde_json::from_str::<Trump>("\"NO_TRUMPS\"").unwrap(),
         Trump::NoTrumps
     );
 }

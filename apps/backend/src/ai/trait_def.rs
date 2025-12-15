@@ -230,11 +230,11 @@ pub trait AiPlayer: Send + Sync {
     /// Choose trump after winning the bid.
     ///
     /// Called when the AI has the highest bid and must select trump for the round.
-    /// Can choose from the four suits (Clubs, Diamonds, Hearts, Spades) or NoTrump.
+    /// Can choose from the four suits (Clubs, Diamonds, Hearts, Spades) or NoTrumps.
     ///
     /// # Returns
     ///
-    /// * `Ok(Trump)` - The chosen trump (one of 4 suits or NoTrump)
+    /// * `Ok(Trump)` - The chosen trump (one of 4 suits or NoTrumps)
     /// * `Err(AiError)` - Internal error in trump selection
     ///
     /// # Important
@@ -263,13 +263,13 @@ pub trait AiPlayer: Send + Sync {
     ///         suit_counts[idx].1 += 1;
     ///     }
     ///     
-    ///     // Choose suit with most cards (or NoTrump if weak hand)
+    ///     // Choose suit with most cards (or NoTrumps if weak hand)
     ///     let (best_trump, best_count) = suit_counts.iter()
     ///         .max_by_key(|(_, count)| count)
     ///         .copied()
     ///         .unwrap_or((Trump::NoTrumps, 0));
     ///     
-    ///     // If weak in all suits, choose NoTrump
+    ///     // If weak in all suits, choose NoTrumps
     ///     if best_count < 3 {
     ///         Ok(Trump::NoTrumps)
     ///     } else {

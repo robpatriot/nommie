@@ -299,13 +299,13 @@ impl CurrentRoundInfo {
         legal
     }
 
-    /// Get legal trump choices (all suits + NoTrump).
+    /// Get legal trump choices (all suits + NoTrumps).
     ///
     /// Returns all valid trump options. All 5 choices are always legal.
     ///
     /// # Returns
     ///
-    /// Always returns `[Clubs, Diamonds, Hearts, Spades, NoTrump]`
+    /// Always returns `[Clubs, Diamonds, Hearts, Spades, NoTrumps]`
     ///
     /// # For AI Developers
     ///
@@ -326,7 +326,7 @@ impl CurrentRoundInfo {
     ///     suit_counts[idx] += 1;
     /// }
     ///
-    /// // Choose suit with most cards, or NoTrump if weak
+    /// // Choose suit with most cards, or NoTrumps if weak
     /// let max_count = *suit_counts.iter().max().unwrap();
     /// if max_count >= 4 {
     ///     Trump::Clubs // (or whichever suit has max_count)

@@ -152,7 +152,7 @@ impl AiPlayer for RandomPlayer {
         state: &CurrentRoundInfo,
         _context: &GameContext,
     ) -> Result<Trump, AiError> {
-        // Pattern 1: Get all legal trump options (5 choices including NoTrump)
+        // Pattern 1: Get all legal trump options (5 choices including NoTrumps)
         let legal_trumps = state.legal_trumps();
 
         // Pattern 2: Validate we have options (should always have 5)
@@ -167,7 +167,7 @@ impl AiPlayer for RandomPlayer {
             .map_err(|e| AiError::Internal(format!("RNG lock poisoned: {e}")))?;
 
         // Pattern 4: No unwrap - use ok_or_else
-        // Choose randomly from all 5 trump options (4 suits + NoTrump)
+        // Choose randomly from all 5 trump options (4 suits + NoTrumps)
         let choice = legal_trumps
             .choose(&mut *rng)
             .copied()

@@ -1,6 +1,6 @@
 export type Seat = 0 | 1 | 2 | 3
 
-export type Trump = 'CLUBS' | 'DIAMONDS' | 'HEARTS' | 'SPADES' | 'NO_TRUMP'
+export type Trump = 'CLUBS' | 'DIAMONDS' | 'HEARTS' | 'SPADES' | 'NO_TRUMPS'
 
 export type Card = string
 

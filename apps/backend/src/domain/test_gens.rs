@@ -16,7 +16,7 @@ pub fn suit() -> impl Strategy<Value = Suit> {
     ]
 }
 
-/// Generate a random Trump (including NO_TRUMP)
+/// Generate a random Trump (including NO_TRUMPS)
 pub fn trump() -> impl Strategy<Value = Trump> {
     prop_oneof![
         Just(Trump::Clubs),
@@ -27,7 +27,7 @@ pub fn trump() -> impl Strategy<Value = Trump> {
     ]
 }
 
-/// Generate a random Trump excluding NO_TRUMP
+/// Generate a random Trump excluding NO_TRUMPS
 pub fn trump_suit() -> impl Strategy<Value = Trump> {
     prop_oneof![
         Just(Trump::Clubs),

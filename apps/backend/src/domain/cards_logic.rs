@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_card_beats_notrump_lead_wins_over_offsuit() {
-        // "NoTrump: lead wins over off-suit": lead=Hearts, trump=NO_TRUMP; (A♠) must NOT beat (2♥)
+        // "NoTrumps: lead wins over off-suit": lead=Hearts, trump=NO_TRUMPS; (A♠) must NOT beat (2♥)
         let ace_spades = Card {
             suit: Suit::Spades,
             rank: Rank::Ace,

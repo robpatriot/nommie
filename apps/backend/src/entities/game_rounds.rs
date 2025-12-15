@@ -13,8 +13,8 @@ pub enum CardTrump {
     Hearts,
     #[sea_orm(string_value = "SPADES")]
     Spades,
-    #[sea_orm(string_value = "NO_TRUMP")]
-    NoTrump,
+    #[sea_orm(string_value = "NO_TRUMPS")]
+    NoTrumps,
 }
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]

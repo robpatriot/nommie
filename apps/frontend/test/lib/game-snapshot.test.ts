@@ -64,7 +64,7 @@ describe('GameSnapshot contract', () => {
       throw new Error('Fixture must be scoring variant')
     }
 
-    expect(phase.data.round.trump).toBe('NO_TRUMP')
+    expect(phase.data.round.trump).toBe('NO_TRUMPS')
     expect(
       phase.data.round.tricks_won.reduce((sum, value) => sum + value, 0)
     ).toBeGreaterThan(0)

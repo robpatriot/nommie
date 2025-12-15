@@ -69,7 +69,7 @@ export function TrumpSelectPanel({
         return '♥'
       case 'SPADES':
         return '♠'
-      case 'NO_TRUMP':
+      case 'NO_TRUMPS':
         return 'NT'
       default:
         return ''
@@ -85,7 +85,7 @@ export function TrumpSelectPanel({
       case 'CLUBS':
       case 'SPADES':
         return 'text-slate-900'
-      case 'NO_TRUMP':
+      case 'NO_TRUMPS':
         return 'text-accent-contrast'
       default:
         return ''
@@ -93,8 +93,8 @@ export function TrumpSelectPanel({
   }
 
   // Separate suits from no trump
-  const suits = allowedTrumps.filter((t) => t !== 'NO_TRUMP').reverse()
-  const hasNoTrump = allowedTrumps.includes('NO_TRUMP')
+  const suits = allowedTrumps.filter((t) => t !== 'NO_TRUMPS').reverse()
+  const hasNoTrump = allowedTrumps.includes('NO_TRUMPS')
 
   return (
     <section className="flex w-full flex-col gap-4 rounded-3xl border border-accent/50 bg-accent/15 p-5 text-accent-contrast shadow-[0_30px_90px_rgba(94,234,212,0.25)]">
@@ -170,12 +170,12 @@ export function TrumpSelectPanel({
                     return
                   }
                   setSelectedTrump(
-                    selectedTrump === 'NO_TRUMP' ? null : 'NO_TRUMP'
+                    selectedTrump === 'NO_TRUMPS' ? null : 'NO_TRUMPS'
                   )
                 }}
                 disabled={!canSelect || isPending}
                 className={`flex items-center justify-center rounded-2xl border px-4 py-3 text-center transition ${
-                  selectedTrump === 'NO_TRUMP'
+                  selectedTrump === 'NO_TRUMPS'
                     ? 'border-accent bg-accent/30 text-accent-contrast shadow-md shadow-accent/30'
                     : canSelect
                       ? 'border-accent/40 bg-surface text-accent-contrast hover:border-accent hover:bg-accent/15'
@@ -185,8 +185,8 @@ export function TrumpSelectPanel({
                     ? 'cursor-not-allowed opacity-60'
                     : 'cursor-pointer'
                 }`}
-                aria-label={`Select ${formatTrump('NO_TRUMP')} as trump${selectedTrump === 'NO_TRUMP' ? ', currently selected' : ''}`}
-                aria-pressed={selectedTrump === 'NO_TRUMP'}
+                aria-label={`Select ${formatTrump('NO_TRUMPS')} as trump${selectedTrump === 'NO_TRUMPS' ? ', currently selected' : ''}`}
+                aria-pressed={selectedTrump === 'NO_TRUMPS'}
               >
                 <span className="text-xl font-semibold text-accent-contrast">
                   No Trumps

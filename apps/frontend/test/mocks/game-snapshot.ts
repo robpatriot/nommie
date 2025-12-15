@@ -138,7 +138,7 @@ export const scoringSnapshotFixture: GameSnapshot = {
         ...baseRound,
         hand_size: 5,
         bid_winner: 0,
-        trump: 'NO_TRUMP',
+        trump: 'NO_TRUMPS',
         tricks_won: [3, 1, 0, 1],
       },
       round_scores: [12, -3, -5, 4],

@@ -19,7 +19,7 @@ Canonical, read-only view of a game for the frontend. This is the single source 
 - **`PhaseSnapshot`** (discriminated union): exactly one active phase at any time:
   - `Init`
   - `Bidding`
-  - `TrumpSelect` (may include `NO_TRUMP`)
+  - `TrumpSelect` (may include `NO_TRUMPS`)
   - `Trick`
   - `Scoring`
   - `Complete`
@@ -42,8 +42,8 @@ Canonical, read-only view of a game for the frontend. This is the single source 
 ## Conventions
 
 - **Trick numbering:** `trick_no` is **1-based**. The first trick in a round has `trick_no = 1`.
-- **Trump semantics:** `Trump` can be any suit or `NO_TRUMP`.
-  - When `NO_TRUMP`, trick winners are decided purely by lead suit
+- **Trump semantics:** `Trump` can be any suit or `NO_TRUMPS`.
+  - When `NO_TRUMPS`, trick winners are decided purely by lead suit
     (highest of lead suit wins if no trumps are present).
 - **Follow-suit rule:**
   - If a player can follow the lead suit, they must.
@@ -87,7 +87,7 @@ Canonical, read-only view of a game for the frontend. This is the single source 
 - Golden JSON fixtures illustrate representative states:
   - `Init`
   - `Bidding`
-  - `TrumpSelect (NO_TRUMP)`
+  - `TrumpSelect (NO_TRUMPS)`
   - `Trick`
   - `Scoring`
   - `Complete`
@@ -145,7 +145,7 @@ Canonical, read-only view of a game for the frontend. This is the single source 
   "data": {
     "round": { "hand_size": 11, "leader": 0, "bid_winner": 0, "trump": null, "tricks_won": [0, 0, 0, 0] },
     "to_act": 0,
-    "allowed_trumps": ["Clubs", "Diamonds", "Hearts", "Spades", "NO_TRUMP"]
+    "allowed_trumps": ["Clubs", "Diamonds", "Hearts", "Spades", "NO_TRUMPS"]
   }
 }
 ```

@@ -7,7 +7,7 @@ use crate::domain::{test_gens, test_prelude, Suit, Trump};
 proptest! {
     #![proptest_config(test_prelude::proptest_config())]
 
-    /// Property: Trick winner with NO_TRUMP
+    /// Property: Trick winner with NO_TRUMPS
     /// In a fully played trick with no trump, the winner must be the highest-ranked card
     /// of the lead suit. Off-suit cards cannot win.
     #[test]
@@ -34,7 +34,7 @@ proptest! {
         let oracle_winner_id = plays[oracle_idx].0;
 
         prop_assert_eq!(winner_id, oracle_winner_id,
-            "Domain winner {:?} must match oracle winner {:?} for NO_TRUMP. Lead={:?}, plays={:?}",
+            "Domain winner {:?} must match oracle winner {:?} for NO_TRUMPS. Lead={:?}, plays={:?}",
             winner_id, oracle_winner_id, lead, plays);
 
         // Verify winner has lead suit (when any lead suit cards played)
@@ -43,7 +43,7 @@ proptest! {
 
         if !lead_cards.is_empty() {
             prop_assert_eq!(winner_card.suit, lead,
-                "NO_TRUMP winner must be of lead suit when lead cards are played");
+                "NO_TRUMPS winner must be of lead suit when lead cards are played");
 
             // Verify it's the highest rank of lead suit
             for (_, card) in &lead_cards {
@@ -61,7 +61,7 @@ proptest! {
         trick_data in prop::strategy::Strategy::prop_flat_map(
             test_gens::complete_trick(),
             |(lead, plays, _trump, leader)| {
-                // Replace trump with a non-NoTrump value
+                // Replace trump with a non-NoTrumps value
                 (Just((lead, plays, leader)), test_gens::trump_suit())
                     .prop_map(|((lead, plays, leader), trump)| (lead, plays, trump, leader))
             }
@@ -69,7 +69,7 @@ proptest! {
     ) {
         let (_, plays, trump, _) = trick_data;
 
-        // trump is guaranteed to NOT be NoTrump by construction
+        // trump is guaranteed to NOT be NoTrumps by construction
 
         let lead = plays[0].1.suit;
 

@@ -1384,7 +1384,7 @@ async fn select_trump(
         "DIAMONDS" => crate::domain::Trump::Diamonds,
         "HEARTS" => crate::domain::Trump::Hearts,
         "SPADES" => crate::domain::Trump::Spades,
-        "NO_TRUMP" => crate::domain::Trump::NoTrumps,
+        "NO_TRUMPS" => crate::domain::Trump::NoTrumps,
         _ => {
             return Err(AppError::bad_request(
                 ErrorCode::ValidationError,
@@ -1544,7 +1544,7 @@ fn trump_to_api_value(trump: Trump) -> &'static str {
         Trump::Diamonds => "DIAMONDS",
         Trump::Hearts => "HEARTS",
         Trump::Spades => "SPADES",
-        Trump::NoTrumps => "NO_TRUMP",
+        Trump::NoTrumps => "NO_TRUMPS",
     }
 }
 

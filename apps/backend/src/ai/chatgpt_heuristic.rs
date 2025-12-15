@@ -21,7 +21,7 @@
 //! - Uses only public, common-sense fields (`state.hand`, `state.trump`, `state.current_trick_plays`)
 //!   plus the `legal_*()` helpers; adjust import paths or names as needed.
 //! - `Card` is assumed to expose `suit: Suit` and implement `Ord` among same-suit ranks.
-//! - `Trump` is one of the five enum variants (`Clubs`, `Diamonds`, `Hearts`, `Spades`, `NoTrump`).
+//! - `Trump` is one of the five enum variants (`Clubs`, `Diamonds`, `Hearts`, `Spades`, `NoTrumps`).
 //!
 //! Determinism:
 //! - No randomness used. `seed` is stored for future extensions (e.g., tie-breaking knobs).
@@ -325,7 +325,7 @@ impl AiPlayer for HeuristicV1 {
 
         let hand = state.hand.clone();
 
-        // If NoTrump is legal and the hand is balanced with some top cards, consider it.
+        // If NoTrumps is legal and the hand is balanced with some top cards, consider it.
         let no_trump_legal = legal.iter().any(|t| matches!(t, Trump::NoTrumps));
         let want_nt = no_trump_legal && Self::prefer_no_trump(&hand);
 
@@ -350,7 +350,7 @@ impl AiPlayer for HeuristicV1 {
             }
         }
 
-        // If only NoTrump was legal or no suit evaluated, default to first legal.
+        // If only NoTrumps was legal or no suit evaluated, default to first legal.
         if let Some((_, t)) = best {
             Ok(t)
         } else {

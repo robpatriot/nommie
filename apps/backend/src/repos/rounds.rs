@@ -106,7 +106,7 @@ impl From<game_rounds::CardTrump> for Trump {
             game_rounds::CardTrump::Diamonds => Trump::Diamonds,
             game_rounds::CardTrump::Hearts => Trump::Hearts,
             game_rounds::CardTrump::Spades => Trump::Spades,
-            game_rounds::CardTrump::NoTrump => Trump::NoTrumps,
+            game_rounds::CardTrump::NoTrumps => Trump::NoTrumps,
         }
     }
 }
@@ -118,7 +118,7 @@ impl From<Trump> for game_rounds::CardTrump {
             Trump::Diamonds => game_rounds::CardTrump::Diamonds,
             Trump::Hearts => game_rounds::CardTrump::Hearts,
             Trump::Spades => game_rounds::CardTrump::Spades,
-            Trump::NoTrumps => game_rounds::CardTrump::NoTrump,
+            Trump::NoTrumps => game_rounds::CardTrump::NoTrumps,
         }
     }
 }

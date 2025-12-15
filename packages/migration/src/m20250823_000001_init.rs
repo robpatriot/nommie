@@ -434,7 +434,7 @@ impl MigrationTrait for Migration {
                         .create_type(
                             PgType::create()
                                 .as_enum(CardTrumpEnum::Type)
-                                .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES", "NO_TRUMP"])
+                                .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES", "NO_TRUMPS"])
                                 .to_owned(),
                         )
                         .await?;

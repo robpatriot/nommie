@@ -382,7 +382,7 @@ fn resolve_trick_multiple_trumps_highest_trump_wins() {
 #[test]
 fn resolve_trick_notrump_only_lead_matters() {
     // "NoTrumps: only lead matters even if off-suit ranks are higher": lead=Clubs,
-    // trump=NO_TRUMP; only one clubs card vs three off-suits; the lone clubs card wins
+    // trump=NO_TRUMPS; only one clubs card vs three off-suits; the lone clubs card wins
     let mut r = RoundState::empty();
     r.trump = Some(Trump::NoTrumps);
     r.trick_lead = Some(Suit::Clubs);

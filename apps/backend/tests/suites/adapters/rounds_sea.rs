@@ -126,7 +126,7 @@ async fn test_update_trump() -> Result<(), AppError> {
     Ok(())
 }
 
-/// Test: update_trump with NoTrump
+/// Test: update_trump with NoTrumps
 #[tokio::test]
 async fn test_update_trump_no_trump() -> Result<(), AppError> {
     let state = build_test_state().await?;
