@@ -1,11 +1,12 @@
 use std::ops::RangeInclusive;
 
 pub const PLAYERS: usize = 4;
+pub const MAX_ROUNDS: u8 = 26;
 
 // Hand-size schedule: 13 → 12 → ... → 2 (FOUR rounds at 2) → 3 → ... → 13
 // Total 26 rounds.
 pub fn hand_size_for_round(round_no: u8) -> Option<u8> {
-    if round_no == 0 || round_no > 26 {
+    if round_no == 0 || round_no > MAX_ROUNDS {
         return None;
     }
     // Rounds 1..=11: 13 down to 3 (11 steps)

@@ -14,8 +14,14 @@ use crate::ai::memory::MemoryMode;
 #[derive(Debug, Clone)]
 pub struct RoundMemory {
     /// The memory mode that produced this data
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub mode: MemoryMode,
     /// Completed tricks with potentially degraded card information
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub tricks: Vec<TrickMemory>,
 }
 
@@ -24,24 +30,20 @@ impl RoundMemory {
     pub fn new(mode: MemoryMode, tricks: Vec<TrickMemory>) -> Self {
         Self { mode, tricks }
     }
-
-    /// Check if this memory is empty (no completed tricks yet).
-    pub fn is_empty(&self) -> bool {
-        self.tricks.is_empty()
-    }
-
-    /// Get the number of completed tricks remembered.
-    pub fn len(&self) -> usize {
-        self.tricks.len()
-    }
 }
 
 /// What an AI remembers about a single completed trick.
 #[derive(Debug, Clone)]
 pub struct TrickMemory {
     /// Trick number (1 to hand_size)
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub trick_no: u8,
     /// What the AI remembers about each play (seat, card memory)
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub plays: Vec<(u8, PlayMemory)>,
 }
 
@@ -78,16 +80,25 @@ pub enum PlayMemory {
 
 impl PlayMemory {
     /// Check if this memory is exact (not degraded).
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn is_exact(&self) -> bool {
         matches!(self, PlayMemory::Exact(_))
     }
 
     /// Check if this play is completely forgotten.
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn is_forgotten(&self) -> bool {
         matches!(self, PlayMemory::Forgotten)
     }
 
     /// Get the exact card if memory is perfect, None otherwise.
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn exact_card(&self) -> Option<Card> {
         match self {
             PlayMemory::Exact(card) => Some(*card),
@@ -164,12 +175,12 @@ mod tests {
     #[test]
     fn test_round_memory_empty() {
         let memory = RoundMemory::new(MemoryMode::Full, vec![]);
-        assert!(memory.is_empty());
-        assert_eq!(memory.len(), 0);
+        assert!(memory.tricks.is_empty());
+        assert_eq!(memory.tricks.len(), 0);
 
         let memory_with_tricks =
             RoundMemory::new(MemoryMode::Full, vec![TrickMemory::new(0u8, vec![])]);
-        assert!(!memory_with_tricks.is_empty());
-        assert_eq!(memory_with_tricks.len(), 1);
+        assert!(!memory_with_tricks.tricks.is_empty());
+        assert_eq!(memory_with_tricks.tricks.len(), 1);
     }
 }

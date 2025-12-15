@@ -6,15 +6,17 @@ pub mod cards_parsing;
 pub mod cards_serde;
 pub mod cards_types;
 pub mod dealing;
-pub mod fixtures;
 pub mod game_context;
 pub mod player_view;
 pub mod round_memory;
+
 pub mod rules;
 pub mod scoring;
 pub mod seed_derivation;
 pub mod snapshot;
 pub mod state;
+#[cfg(test)]
+mod test_state_helpers;
 pub mod tricks;
 
 #[cfg(test)]
@@ -53,13 +55,10 @@ mod tests_snapshot_phases;
 mod tests_tricks;
 
 // Re-exports for ergonomics
-pub use bidding::set_trump;
 pub use cards_logic::{card_beats, hand_has_suit};
 pub use cards_types::{Card, Rank, Suit, Trump};
 pub use dealing::deal_hands;
 pub use game_context::GameContext;
-pub use round_memory::{PlayMemory, RankCategory, RoundMemory, TrickMemory};
-pub use rules::{hand_size_for_round, valid_bid_range, PLAYERS};
+pub use round_memory::RoundMemory;
+pub use rules::hand_size_for_round;
 pub use seed_derivation::{derive_dealing_seed, derive_memory_seed};
-pub use snapshot::{GameSnapshot, PhaseSnapshot};
-pub use state::{GameState, Phase, PlayerId, RoundState, Seat};

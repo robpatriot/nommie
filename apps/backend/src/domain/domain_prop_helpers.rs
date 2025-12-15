@@ -1,6 +1,7 @@
 //! Helper functions for domain property-based tests
 
-use crate::domain::{hand_has_suit, Card, PlayerId, Rank, Suit, Trump};
+use crate::domain::state::PlayerId;
+use crate::domain::{hand_has_suit, Card, Rank, Suit, Trump};
 
 /// Independent oracle for trick winner to cross-check domain logic.
 /// Returns the index (0-3) of the winning play.
@@ -17,7 +18,7 @@ pub fn oracle_trick_winner(plays: &[(PlayerId, Card)], trump: Trump) -> usize {
         Trump::Diamonds => Some(Suit::Diamonds),
         Trump::Hearts => Some(Suit::Hearts),
         Trump::Spades => Some(Suit::Spades),
-        Trump::NoTrump => None,
+        Trump::NoTrumps => None,
     };
 
     // Independent rank ordering (highest first). Adjust to your game's rank order.

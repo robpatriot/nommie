@@ -49,6 +49,9 @@ use crate::errors::domain::{DomainError, ValidationKind};
 #[derive(Debug, Clone)]
 pub struct GameContext {
     /// Game ID
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub game_id: i64,
 
     /// Complete game history (all rounds, bids, scores)
@@ -61,6 +64,9 @@ pub struct GameContext {
     ///
     /// Only available when context is loaded for a specific player.
     /// Used by HTTP handlers to render UI and by services for player actions.
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     round_info: Option<CurrentRoundInfo>,
 
     /// AI's memory of completed tricks in the current round
@@ -88,6 +94,9 @@ impl GameContext {
     }
 
     /// Builder: Add player round info.
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn with_round_info(mut self, round_info: CurrentRoundInfo) -> Self {
         self.round_info = Some(round_info);
         self
@@ -102,6 +111,9 @@ impl GameContext {
     /// Access game history (for validation, UI, AI strategy).
     ///
     /// Returns `None` if game hasn't started yet (lobby state).
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn game_history(&self) -> Option<&GameHistory> {
         self.history.as_ref()
     }
@@ -109,6 +121,9 @@ impl GameContext {
     /// Require game history or return error.
     ///
     /// Use this in contexts where history must be present (e.g., mid-game actions).
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn require_history(&self) -> Result<&GameHistory, DomainError> {
         self.history.as_ref().ok_or_else(|| {
             DomainError::validation(
@@ -121,6 +136,9 @@ impl GameContext {
     /// Access player's current round info.
     ///
     /// Returns `None` if context wasn't loaded for a specific player.
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn round_info(&self) -> Option<&CurrentRoundInfo> {
         self.round_info.as_ref()
     }
@@ -128,6 +146,9 @@ impl GameContext {
     /// Require round info or return error.
     ///
     /// Use this in contexts where round info must be present (e.g., player actions).
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn require_round_info(&self) -> Result<&CurrentRoundInfo, DomainError> {
         self.round_info.as_ref().ok_or_else(|| {
             DomainError::validation(
@@ -179,6 +200,9 @@ impl GameContext {
     ///     }
     /// }
     /// ```
+    ///
+    /// Part of the public API for AI players.
+    #[allow(dead_code)]
     pub fn round_memory(&self) -> Option<&RoundMemory> {
         self.round_memory.as_ref()
     }

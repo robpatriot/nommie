@@ -3,6 +3,19 @@ use crate::domain::state::{advance_turn, GameState, Phase, PlayerId, RoundState}
 use crate::domain::{card_beats, hand_has_suit, Card, Trump};
 use crate::errors::domain::{DomainError, ValidationKind};
 
+/// Result of playing a card, describing what state changes occurred.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlayCardResult {
+    /// Whether a trick was completed (4 cards played).
+    pub trick_completed: bool,
+    /// Winner of the completed trick, if one was completed.
+    pub trick_winner: Option<PlayerId>,
+    /// Trick number after this play (may have incremented if trick completed).
+    pub trick_no_after: u8,
+    /// Phase transitioned to, if any (None means still in Trick phase).
+    pub phase_transitioned: Option<Phase>,
+}
+
 /// Compute legal cards the player may play, independent of turn enforcement.
 pub fn legal_moves(state: &GameState, who: PlayerId) -> Vec<Card> {
     // If not in Trick phase, the set is empty.
@@ -26,9 +39,16 @@ pub fn legal_moves(state: &GameState, who: PlayerId) -> Vec<Card> {
 }
 
 /// Play a card into the current trick, enforcing turn, suit-following, and phase.
-pub fn play_card(state: &mut GameState, who: PlayerId, card: Card) -> Result<(), DomainError> {
+pub fn play_card(
+    state: &mut GameState,
+    who: PlayerId,
+    card: Card,
+) -> Result<PlayCardResult, DomainError> {
     // Phase check
-    let Phase::Trick { .. } = state.phase else {
+    let Phase::Trick {
+        trick_no: trick_no_before,
+    } = state.phase
+    else {
         return Err(DomainError::validation(
             ValidationKind::PhaseMismatch,
             "Phase mismatch",
@@ -65,26 +85,40 @@ pub fn play_card(state: &mut GameState, who: PlayerId, card: Card) -> Result<(),
         state.round.trick_plays.push((who, removed));
         // Advance turn
         advance_turn(state);
+
+        // Track result based on what happens
+        let trick_completed = state.round.trick_plays.len() == 4;
+        let mut result = PlayCardResult {
+            trick_completed,
+            trick_winner: None,
+            trick_no_after: trick_no_before,
+            phase_transitioned: None,
+        };
+
         // If 4 plays, resolve
-        if state.round.trick_plays.len() == 4 {
+        if trick_completed {
             if let Some(winner) = resolve_current_trick(&state.round) {
                 state.round.tricks_won[winner as usize] += 1;
                 state.leader = winner;
                 state.turn = winner;
+                result.trick_winner = Some(winner);
             }
             // Prepare next trick
             state.round.trick_plays.clear();
             state.round.trick_lead = None;
             state.trick_no += 1;
+            result.trick_no_after = state.trick_no;
             if state.trick_no > state.hand_size {
                 state.phase = Phase::Scoring;
+                result.phase_transitioned = Some(Phase::Scoring);
             } else {
                 state.phase = Phase::Trick {
                     trick_no: state.trick_no,
                 };
             }
         }
-        Ok(())
+
+        Ok(result)
     } else {
         Err(DomainError::validation(
             ValidationKind::CardNotInHand,
@@ -115,7 +149,7 @@ pub fn resolve_current_trick(state: &RoundState) -> Option<PlayerId> {
         let (_, card_best) = state.trick_plays[best_idx];
         let trump_for_comparison = match trump {
             Some(tr) => tr,
-            None => Trump::NoTrump, // No trump chosen yet: treat as NoTrump
+            None => Trump::NoTrumps, // No trump chosen yet: treat as NoTrumps
         };
         let better = card_beats(card_i, card_best, lead, trump_for_comparison);
         if better {

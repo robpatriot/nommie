@@ -8,7 +8,7 @@
 //! and [`crate::repos::player_view::load_game_history`].
 
 use crate::domain::state::Phase;
-use crate::domain::{valid_bid_range, Card, Trump};
+use crate::domain::{Card, Trump};
 
 /// Helper function to determine who should lead a trick.
 ///
@@ -80,6 +80,9 @@ pub fn determine_trick_leader(
 #[derive(Debug, Clone)]
 pub struct CurrentRoundInfo {
     /// Game ID (for loading additional data like [`crate::domain::player_view::GameHistory`])
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub game_id: i64,
 
     /// Your seat position (0-3), determines turn order
@@ -89,6 +92,9 @@ pub struct CurrentRoundInfo {
     pub game_state: Phase,
 
     /// Current round number (0-25, there are 26 rounds total)
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub current_round: u8,
 
     /// Number of cards each player has this round (varies: 13→2→2→2→3→13)
@@ -120,6 +126,9 @@ pub struct CurrentRoundInfo {
     /// Current trick number (1 to hand_size)
     ///
     /// Each round has exactly `hand_size` tricks.
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub trick_no: u8,
 
     /// Cards played in the current trick so far
@@ -134,6 +143,9 @@ pub struct CurrentRoundInfo {
     /// Cumulative scores for all players (indexed by seat 0-3)
     ///
     /// Scores from all completed rounds. Current round score not yet included.
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub scores: [i16; 4],
 
     /// Player who should lead the current trick
@@ -186,7 +198,10 @@ impl CurrentRoundInfo {
             return Vec::new();
         }
 
-        let mut legal = valid_bid_range(self.hand_size).collect::<Vec<_>>();
+        // Use domain function to get base legal bids
+        use crate::domain::bidding::legal_bids_for_hand_size;
+        let domain_bids = legal_bids_for_hand_size(self.hand_size);
+        let mut legal: Vec<u8> = domain_bids.iter().map(|b| b.0).collect();
 
         // Dealer restriction: if last to bid, cannot make sum equal hand_size
         if bid_count == 3 {
@@ -294,7 +309,7 @@ impl CurrentRoundInfo {
     ///
     /// # For AI Developers
     ///
-    /// All 5 trump options are always valid, including `Trump::NoTrump`.
+    /// All 5 trump options are always valid, including `Trump::NoTrumps`.
     /// The [`crate::ai::AiPlayer::choose_trump`] method returns a `Trump`,
     /// so you can choose any of these options.
     ///
@@ -316,7 +331,7 @@ impl CurrentRoundInfo {
     /// if max_count >= 4 {
     ///     Trump::Clubs // (or whichever suit has max_count)
     /// } else {
-    ///     Trump::NoTrump
+    ///     Trump::NoTrumps
     /// }
     /// ```
     pub fn legal_trumps(&self) -> Vec<Trump> {
@@ -325,7 +340,7 @@ impl CurrentRoundInfo {
             Trump::Diamonds,
             Trump::Hearts,
             Trump::Spades,
-            Trump::NoTrump,
+            Trump::NoTrumps,
         ]
     }
 }
@@ -404,6 +419,9 @@ pub struct RoundHistory {
 #[derive(Debug, Clone, Copy)]
 pub struct RoundScoreDetail {
     /// Points earned this round (+1 per trick, +10 bonus for exact bid)
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    #[allow(dead_code)]
     pub round_score: u8,
 
     /// Total score after this round (cumulative)

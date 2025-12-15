@@ -92,11 +92,6 @@ pub struct GameState {
     pub round: RoundState,
 }
 
-/// Return the current player to act.
-pub fn current_player(state: &GameState) -> PlayerId {
-    state.turn
-}
-
 /// Next player in fixed order, wrapping 0..=3.
 pub fn next_player(p: PlayerId) -> PlayerId {
     ((p as usize + 1) % PLAYERS) as u8
@@ -105,43 +100,4 @@ pub fn next_player(p: PlayerId) -> PlayerId {
 /// Advance the `turn` to the next player in order.
 pub fn advance_turn(state: &mut GameState) {
     state.turn = next_player(state.turn);
-}
-
-/// Check if a phase transition is valid.
-pub fn can_transition_to(from: Phase, to: Phase) -> bool {
-    use Phase::*;
-    matches!(
-        (from, to),
-        (Init, Bidding)
-            | (Bidding, TrumpSelect)
-            | (TrumpSelect, Trick { .. })
-            | (Trick { .. }, Trick { .. })
-            | (Trick { .. }, Scoring)
-            | (Scoring, Complete)
-            | (Complete, Bidding) // Next round
-            | (Complete, GameOver)
-    )
-}
-
-/// Initialize a new round's GameState.
-pub fn init_round(
-    round_no: u8,
-    hand_size: u8,
-    hands: [Vec<crate::domain::Card>; PLAYERS],
-    dealer: PlayerId,
-    scores_total: [i16; PLAYERS],
-) -> GameState {
-    let turn_start = next_player(dealer);
-    GameState {
-        phase: Phase::Bidding,
-        round_no,
-        hand_size,
-        hands,
-        turn_start,
-        turn: turn_start,
-        leader: turn_start,
-        trick_no: 0,
-        scores_total,
-        round: RoundState::empty(),
-    }
 }

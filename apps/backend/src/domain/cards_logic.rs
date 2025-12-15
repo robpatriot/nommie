@@ -8,7 +8,7 @@ pub fn hand_has_suit(hand: &[Card], suit: Suit) -> bool {
 
 pub fn card_beats(a: Card, b: Card, lead: Suit, trump: Trump) -> bool {
     match trump {
-        Trump::NoTrump => {
+        Trump::NoTrumps => {
             // No trump: only lead-suit cards can beat others
             let a_follows = a.suit == lead;
             let b_follows = b.suit == lead;
@@ -29,7 +29,7 @@ pub fn card_beats(a: Card, b: Card, lead: Suit, trump: Trump) -> bool {
                 Trump::Diamonds => Suit::Diamonds,
                 Trump::Hearts => Suit::Hearts,
                 Trump::Spades => Suit::Spades,
-                Trump::NoTrump => unreachable!(), // This arm is already handled above
+                Trump::NoTrumps => unreachable!(), // This arm is already handled above
             };
             let a_trump = a.suit == trump_suit;
             let b_trump = b.suit == trump_suit;
@@ -104,7 +104,7 @@ mod tests {
         use Rank::*;
         use Suit::*;
         let lead = Hearts;
-        let trump = Trump::NoTrump;
+        let trump = Trump::NoTrumps;
         let ah = Card {
             suit: Hearts,
             rank: Ace,
@@ -168,7 +168,7 @@ mod tests {
             ace_spades,
             two_hearts,
             Suit::Hearts,
-            Trump::NoTrump
+            Trump::NoTrumps
         ));
     }
 

@@ -16,7 +16,7 @@ pub enum Trump {
     Diamonds,
     Hearts,
     Spades,
-    NoTrump,
+    NoTrumps,
 }
 
 impl From<Suit> for Trump {
@@ -39,9 +39,9 @@ impl TryFrom<Trump> for Suit {
             Trump::Diamonds => Ok(Suit::Diamonds),
             Trump::Hearts => Ok(Suit::Hearts),
             Trump::Spades => Ok(Suit::Spades),
-            Trump::NoTrump => Err(DomainError::validation(
+            Trump::NoTrumps => Err(DomainError::validation(
                 ValidationKind::InvalidTrumpConversion,
-                "Cannot convert NoTrump to Suit",
+                "Cannot convert NoTrumps to Suit",
             )),
         }
     }

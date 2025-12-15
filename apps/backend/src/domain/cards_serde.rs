@@ -47,7 +47,7 @@ impl Serialize for Trump {
             Trump::Diamonds => "DIAMONDS",
             Trump::Hearts => "HEARTS",
             Trump::Spades => "SPADES",
-            Trump::NoTrump => "NO_TRUMP",
+            Trump::NoTrumps => "NO_TRUMP",
         };
         serializer.serialize_str(s)
     }
@@ -64,7 +64,7 @@ impl<'de> Deserialize<'de> for Trump {
             "DIAMONDS" => Ok(Trump::Diamonds),
             "HEARTS" => Ok(Trump::Hearts),
             "SPADES" => Ok(Trump::Spades),
-            "NO_TRUMP" => Ok(Trump::NoTrump),
+            "NO_TRUMP" => Ok(Trump::NoTrumps),
             _ => Err(serde::de::Error::custom(format!("Invalid trump: {s}"))),
         }
     }
@@ -175,7 +175,7 @@ mod tests {
         assert_eq!(serde_json::to_string(&Trump::Hearts).unwrap(), "\"HEARTS\"");
         assert_eq!(serde_json::to_string(&Trump::Spades).unwrap(), "\"SPADES\"");
         assert_eq!(
-            serde_json::to_string(&Trump::NoTrump).unwrap(),
+            serde_json::to_string(&Trump::NoTrumps).unwrap(),
             "\"NO_TRUMP\""
         );
 
@@ -198,7 +198,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::from_str::<Trump>("\"NO_TRUMP\"").unwrap(),
-            Trump::NoTrump
+            Trump::NoTrumps
         );
     }
 }

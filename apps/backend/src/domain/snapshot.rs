@@ -221,7 +221,7 @@ fn snapshot_trump_select(state: &GameState) -> PhaseSnapshot {
         Trump::Diamonds,
         Trump::Hearts,
         Trump::Spades,
-        Trump::NoTrump,
+        Trump::NoTrumps,
     ];
 
     PhaseSnapshot::TrumpSelect(TrumpSelectSnapshot {

@@ -3,7 +3,8 @@
 
 use proptest::prelude::*;
 
-use crate::domain::{Card, PlayerId, Rank, Suit, Trump};
+use crate::domain::state::PlayerId;
+use crate::domain::{Card, Rank, Suit, Trump};
 
 /// Generate a random Suit
 pub fn suit() -> impl Strategy<Value = Suit> {
@@ -22,7 +23,7 @@ pub fn trump() -> impl Strategy<Value = Trump> {
         Just(Trump::Diamonds),
         Just(Trump::Hearts),
         Just(Trump::Spades),
-        Just(Trump::NoTrump),
+        Just(Trump::NoTrumps),
     ]
 }
 

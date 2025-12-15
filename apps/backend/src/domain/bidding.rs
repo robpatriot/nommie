@@ -3,26 +3,49 @@ use crate::domain::rules::{valid_bid_range, PLAYERS};
 use crate::domain::state::{advance_turn, GameState, Phase, PlayerId};
 use crate::errors::domain::{DomainError, ValidationKind};
 
+/// Result of placing a bid, describing what state changes occurred.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlaceBidResult {
+    /// Phase transitioned to, if bidding completed (None means still in Bidding phase).
+    pub phase_transitioned: Option<Phase>,
+    /// Winning bidder determined, if bidding completed.
+    pub winning_bidder: Option<PlayerId>,
+}
+
+/// Result of setting trump, describing what state changes occurred.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SetTrumpResult {
+    /// Trick number that play starts at (always 1 when trump is set).
+    pub trick_no: u8,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Bid(pub u8);
 
-impl Bid {
-    pub fn value(self) -> u8 {
-        self.0
-    }
-}
-
-/// Compute legal bids for a player. If phase is not Bidding, returns empty.
-/// This function does not enforce turn order; `place_bid` does.
-pub fn legal_bids(state: &GameState, _who: PlayerId) -> Vec<Bid> {
-    if state.phase != Phase::Bidding {
-        return Vec::new();
-    }
-    valid_bid_range(state.hand_size).map(Bid).collect()
+/// Compute legal bids for a given hand size.
+///
+/// This is the core domain logic for determining valid bid values.
+/// Returns all possible bids (0 to hand_size inclusive) as `Vec<Bid>`.
+///
+/// Note: This does not check phase, turn order, or dealer restrictions.
+/// Those are handled by higher-level functions like `CurrentRoundInfo::legal_bids()`.
+pub fn legal_bids_for_hand_size(hand_size: u8) -> Vec<Bid> {
+    valid_bid_range(hand_size).map(Bid).collect()
 }
 
 /// Place a bid for `who`. Requires Bidding phase and being in turn.
-pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), DomainError> {
+///
+/// # Arguments
+/// * `state` - Current game state
+/// * `who` - Player placing the bid
+/// * `bid` - Bid value
+/// * `history` - Optional game history for validating consecutive zero bids rule
+pub fn place_bid(
+    state: &mut GameState,
+    who: PlayerId,
+    bid: Bid,
+    history: Option<&GameHistory>,
+) -> Result<PlaceBidResult, DomainError> {
     if state.phase != Phase::Bidding {
         return Err(DomainError::validation(
             ValidationKind::PhaseMismatch,
@@ -49,9 +72,40 @@ pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), D
             "Invalid bid",
         ));
     }
+
+    // Validate consecutive zero bids rule (if bidding 0)
+    if bid.0 == 0 {
+        if let Some(hist) = history {
+            validate_consecutive_zero_bids(hist, who, state.round_no)?;
+        }
+    }
+
+    // Dealer bid restriction: if this is the 4th (final) bid, check dealer rule
+    let bids_count = state.round.bids.iter().filter(|b| b.is_some()).count();
+    if bids_count == 3 {
+        // This is the dealer's bid - sum of all bids cannot equal hand_size
+        let existing_sum: u8 = state.round.bids.iter().flatten().sum();
+        let proposed_sum = existing_sum + bid.0;
+
+        if proposed_sum == state.hand_size {
+            return Err(DomainError::validation(
+                ValidationKind::InvalidBid,
+                format!(
+                    "Dealer cannot bid {}: sum would be {} = hand_size",
+                    bid.0, proposed_sum
+                ),
+            ));
+        }
+    }
+
     state.round.bids[idx] = Some(bid.0);
     // Advance turn regardless; if all bids are set, determine winner and advance phase
     advance_turn(state);
+
+    let mut result = PlaceBidResult {
+        phase_transitioned: None,
+        winning_bidder: None,
+    };
 
     if state.round.bids.iter().all(|b| b.is_some()) {
         // Determine winning bidder: highest bid; ties resolved by earliest from turn_start
@@ -80,9 +134,11 @@ pub fn place_bid(state: &mut GameState, who: PlayerId, bid: Bid) -> Result<(), D
         }
         state.round.winning_bidder = winner;
         state.phase = Phase::TrumpSelect;
+        result.phase_transitioned = Some(Phase::TrumpSelect);
+        result.winning_bidder = winner;
     }
 
-    Ok(())
+    Ok(result)
 }
 
 /// Set trump; only the winning bidder can call in TrumpSelect phase.
@@ -90,7 +146,7 @@ pub fn set_trump(
     state: &mut GameState,
     who: PlayerId,
     trump: crate::domain::Trump,
-) -> Result<(), DomainError> {
+) -> Result<SetTrumpResult, DomainError> {
     if state.phase != Phase::TrumpSelect {
         return Err(DomainError::validation(
             ValidationKind::PhaseMismatch,
@@ -109,7 +165,9 @@ pub fn set_trump(
             state.phase = Phase::Trick {
                 trick_no: state.trick_no,
             };
-            Ok(())
+            Ok(SetTrumpResult {
+                trick_no: state.trick_no,
+            })
         }
         _ => Err(DomainError::validation(
             ValidationKind::OutOfTurn,

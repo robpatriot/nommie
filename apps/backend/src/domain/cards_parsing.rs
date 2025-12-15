@@ -60,19 +60,6 @@ impl FromStr for Card {
     }
 }
 
-/// Non-panicking helper to parse card tokens (e.g., "AS", "2C") into Card instances.
-/// Returns Result<Vec<Card>, DomainError> if any token is invalid.
-pub fn try_parse_cards<I, S>(tokens: I) -> Result<Vec<Card>, DomainError>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<str>,
-{
-    tokens
-        .into_iter()
-        .map(|s| s.as_ref().parse::<Card>())
-        .collect()
-}
-
 /// Parse card from stored JSONB format (e.g., suit="CLUBS", rank="TWO").
 /// This is used when reconstructing cards from database storage.
 pub fn from_stored_format(suit_str: &str, rank_str: &str) -> Result<Card, DomainError> {
@@ -201,7 +188,10 @@ mod tests {
     #[test]
     fn test_try_parse_cards() {
         // Test successful parsing
-        let result = try_parse_cards(["AS", "TD", "9C"]);
+        let result: Result<Vec<Card>, _> = ["AS", "TD", "9C"]
+            .iter()
+            .map(|t| t.parse::<Card>())
+            .collect();
         assert!(result.is_ok());
         let cards = result.unwrap();
         assert_eq!(cards.len(), 3);
@@ -228,7 +218,10 @@ mod tests {
         );
 
         // Test parsing failure
-        let result = try_parse_cards(["AS", "1H", "9C"]);
+        let result: Result<Vec<Card>, _> = ["AS", "1H", "9C"]
+            .iter()
+            .map(|t| t.parse::<Card>())
+            .collect();
         assert!(result.is_err());
     }
 
