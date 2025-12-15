@@ -38,7 +38,7 @@ proptest! {
                 Trump::Diamonds => Some(Suit::Diamonds),
                 Trump::Hearts => Some(Suit::Hearts),
                 Trump::Spades => Some(Suit::Spades),
-                Trump::NoTrump => None,
+                Trump::NoTrumps => None,
             };
 
             let a_trump = trump_suit == Some(card_a.suit);

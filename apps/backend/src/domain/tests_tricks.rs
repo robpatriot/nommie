@@ -1,9 +1,15 @@
-use super::*;
-use crate::domain::bidding::{place_bid, Bid};
-use crate::domain::fixtures::CardFixtures;
+use crate::domain::bidding::{place_bid, set_trump, Bid};
+use crate::domain::state::{GameState, Phase, PlayerId, RoundState};
 use crate::domain::tricks::{legal_moves, play_card, resolve_current_trick};
 use crate::domain::{Card, Rank, Suit, Trump};
 use crate::errors::domain::{DomainError, ValidationKind};
+
+fn parse_cards(tokens: &[&str]) -> Vec<Card> {
+    tokens
+        .iter()
+        .map(|t| t.parse::<Card>().expect("hardcoded valid card token"))
+        .collect()
+}
 
 fn make_state_with_hands(hands: [Vec<Card>; 4], hand_size: u8, turn_start: PlayerId) -> GameState {
     GameState {
@@ -23,15 +29,15 @@ fn make_state_with_hands(hands: [Vec<Card>; 4], hand_size: u8, turn_start: Playe
 #[test]
 fn legal_moves_follow_lead() {
     // Hands for a small test
-    let h0 = CardFixtures::parse_hardcoded(&["AS", "KH", "2C"]);
-    let h1 = CardFixtures::parse_hardcoded(&["TS", "3H", "4C"]);
-    let h2 = CardFixtures::parse_hardcoded(&["QS", "5D", "6C"]);
-    let h3 = CardFixtures::parse_hardcoded(&["9S", "7H", "8C"]);
+    let h0 = parse_cards(&["AS", "KH", "2C"]);
+    let h1 = parse_cards(&["TS", "3H", "4C"]);
+    let h2 = parse_cards(&["QS", "5D", "6C"]);
+    let h3 = parse_cards(&["9S", "7H", "8C"]);
     let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
     for p in 0..4 {
-        assert!(place_bid(&mut state, p, Bid(0)).is_ok());
+        assert!(place_bid(&mut state, p, Bid(0), None).is_ok());
     }
-    crate::domain::set_trump(&mut state, 0, Trump::Hearts).unwrap();
+    set_trump(&mut state, 0, Trump::Hearts).unwrap();
     // First to play can play any
     let lm0 = legal_moves(&state, 0);
     assert_eq!(lm0.len(), 3);
@@ -52,15 +58,15 @@ fn legal_moves_follow_lead() {
 
 #[test]
 fn play_card_errors_and_trick_resolution() {
-    let h0 = CardFixtures::parse_hardcoded(&["AS", "KH", "2C"]);
-    let h1 = CardFixtures::parse_hardcoded(&["TS", "3H", "4C"]);
-    let h2 = CardFixtures::parse_hardcoded(&["QS", "5D", "6C"]);
-    let h3 = CardFixtures::parse_hardcoded(&["9S", "7H", "8C"]);
+    let h0 = parse_cards(&["AS", "KH", "2C"]);
+    let h1 = parse_cards(&["TS", "3H", "4C"]);
+    let h2 = parse_cards(&["QS", "5D", "6C"]);
+    let h3 = parse_cards(&["9S", "7H", "8C"]);
     let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
     for p in 0..4 {
-        place_bid(&mut state, p, Bid(0)).unwrap();
+        place_bid(&mut state, p, Bid(0), None).unwrap();
     }
-    crate::domain::set_trump(&mut state, 0, Trump::Hearts).unwrap();
+    set_trump(&mut state, 0, Trump::Hearts).unwrap();
     // Out of turn
     assert_eq!(
         play_card(
@@ -208,9 +214,9 @@ fn resolve_trick_multiple_cases() {
 
 #[test]
 fn trick_resolution_no_trump() {
-    // With NoTrump, only the lead suit matters
+    // With NoTrumps, only the lead suit matters
     let mut r = RoundState::empty();
-    r.trump = Some(Trump::NoTrump);
+    r.trump = Some(Trump::NoTrumps);
     r.trick_lead = Some(Suit::Diamonds);
     r.trick_plays = vec![
         (
@@ -247,7 +253,7 @@ fn trick_resolution_no_trump() {
 
     // Another case: all follow lead suit
     let mut r2 = RoundState::empty();
-    r2.trump = Some(Trump::NoTrump);
+    r2.trump = Some(Trump::NoTrumps);
     r2.trick_lead = Some(Suit::Clubs);
     r2.trick_plays = vec![
         (
@@ -375,10 +381,10 @@ fn resolve_trick_multiple_trumps_highest_trump_wins() {
 
 #[test]
 fn resolve_trick_notrump_only_lead_matters() {
-    // "NoTrump: only lead matters even if off-suit ranks are higher": lead=Clubs,
+    // "NoTrumps: only lead matters even if off-suit ranks are higher": lead=Clubs,
     // trump=NO_TRUMP; only one clubs card vs three off-suits; the lone clubs card wins
     let mut r = RoundState::empty();
-    r.trump = Some(Trump::NoTrump);
+    r.trump = Some(Trump::NoTrumps);
     r.trick_lead = Some(Suit::Clubs);
     r.trick_plays = vec![
         (

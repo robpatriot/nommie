@@ -3,7 +3,7 @@ use std::env::VarError;
 use std::str::FromStr;
 
 use backend::config::db::{DbKind, RuntimeEnv};
-use backend::error::AppError;
+use backend::AppError;
 use backend::infra::state::{build_state, StateBuilder};
 use backend::state::app_state::AppState;
 

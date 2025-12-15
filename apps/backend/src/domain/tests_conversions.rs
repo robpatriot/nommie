@@ -17,12 +17,12 @@ fn trump_conversions() {
     assert_eq!(Trump::Spades.try_into(), Ok(Suit::Spades));
 
     // TryFrom<Trump> for Suit - NoTrump fails
-    let result: Result<Suit, _> = Trump::NoTrump.try_into();
+    let result: Result<Suit, _> = Trump::NoTrumps.try_into();
     assert_eq!(
         result,
         Err(DomainError::validation(
             ValidationKind::InvalidTrumpConversion,
-            "Cannot convert NoTrump to Suit"
+            "Cannot convert NoTrumps to Suit"
         ))
     );
 }
@@ -38,7 +38,7 @@ fn trump_serde() {
     assert_eq!(serde_json::to_string(&Trump::Hearts).unwrap(), "\"HEARTS\"");
     assert_eq!(serde_json::to_string(&Trump::Spades).unwrap(), "\"SPADES\"");
     assert_eq!(
-        serde_json::to_string(&Trump::NoTrump).unwrap(),
+        serde_json::to_string(&Trump::NoTrumps).unwrap(),
         "\"NO_TRUMP\""
     );
 
@@ -61,6 +61,6 @@ fn trump_serde() {
     );
     assert_eq!(
         serde_json::from_str::<Trump>("\"NO_TRUMP\"").unwrap(),
-        Trump::NoTrump
+        Trump::NoTrumps
     );
 }

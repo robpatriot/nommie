@@ -1,12 +1,18 @@
 //! Snapshot API tests covering all game phases.
 
 use crate::domain::bidding::{place_bid, set_trump, Bid};
-use crate::domain::fixtures::CardFixtures;
 use crate::domain::rules::PLAYERS;
 use crate::domain::snapshot::{snapshot, PhaseSnapshot, SeatPublic};
 use crate::domain::state::{GameState, Phase, RoundState};
 use crate::domain::tricks::play_card;
 use crate::domain::{Card, Rank, Suit, Trump};
+
+fn parse_cards(tokens: &[&str]) -> Vec<Card> {
+    tokens
+        .iter()
+        .map(|t| t.parse::<Card>().expect("hardcoded valid card token"))
+        .collect()
+}
 
 /// Build a minimal GameState in Init phase.
 fn build_init_state() -> GameState {
@@ -76,16 +82,16 @@ fn init_snapshot_smoke() {
 fn bidding_snapshot_legals() {
     // Round 1: dealer=0, turn_start=1 (left-of-dealer), hand_size=13
     let hands = [
-        CardFixtures::parse_hardcoded(&[
+        parse_cards(&[
             "AC", "2C", "3C", "4C", "5C", "6C", "7C", "8C", "9C", "TC", "JC", "QC", "KC",
         ]),
-        CardFixtures::parse_hardcoded(&[
+        parse_cards(&[
             "AD", "2D", "3D", "4D", "5D", "6D", "7D", "8D", "9D", "TD", "JD", "QD", "KD",
         ]),
-        CardFixtures::parse_hardcoded(&[
+        parse_cards(&[
             "AH", "2H", "3H", "4H", "5H", "6H", "7H", "8H", "9H", "TH", "JH", "QH", "KH",
         ]),
-        CardFixtures::parse_hardcoded(&[
+        parse_cards(&[
             "AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "TS", "JS", "QS", "KS",
         ]),
     ];
@@ -108,19 +114,19 @@ fn bidding_snapshot_legals() {
 fn trump_select_snapshot() {
     // Start round and complete bidding
     let hands = [
-        CardFixtures::parse_hardcoded(&["AC", "2C", "3C"]),
-        CardFixtures::parse_hardcoded(&["AD", "2D", "3D"]),
-        CardFixtures::parse_hardcoded(&["AH", "2H", "3H"]),
-        CardFixtures::parse_hardcoded(&["AS", "2S", "3S"]),
+        parse_cards(&["AC", "2C", "3C"]),
+        parse_cards(&["AD", "2D", "3D"]),
+        parse_cards(&["AH", "2H", "3H"]),
+        parse_cards(&["AS", "2S", "3S"]),
     ];
     let mut state = start_round(1, hands);
 
     // Place bids: player 1 bids 0, player 2 bids 1, player 3 bids 0, player 0 bids 0
     // Player 2 should win with bid of 1
-    place_bid(&mut state, 1, Bid(0)).unwrap();
-    place_bid(&mut state, 2, Bid(1)).unwrap();
-    place_bid(&mut state, 3, Bid(0)).unwrap();
-    place_bid(&mut state, 0, Bid(0)).unwrap();
+    place_bid(&mut state, 1, Bid(0), None).unwrap();
+    place_bid(&mut state, 2, Bid(1), None).unwrap();
+    place_bid(&mut state, 3, Bid(0), None).unwrap();
+    place_bid(&mut state, 0, Bid(0), None).unwrap();
 
     assert_eq!(state.phase, Phase::TrumpSelect);
 
@@ -134,7 +140,7 @@ fn trump_select_snapshot() {
             assert!(t.allowed_trumps.contains(&Trump::Diamonds));
             assert!(t.allowed_trumps.contains(&Trump::Hearts));
             assert!(t.allowed_trumps.contains(&Trump::Spades));
-            assert!(t.allowed_trumps.contains(&Trump::NoTrump));
+            assert!(t.allowed_trumps.contains(&Trump::NoTrumps));
         }
         _ => panic!("Expected TrumpSelect phase"),
     }
@@ -144,18 +150,18 @@ fn trump_select_snapshot() {
 fn trick_snapshot_legals() {
     // Start round, complete bidding, select trump, play some cards
     let hands = [
-        CardFixtures::parse_hardcoded(&["AC", "2C", "3C"]),
-        CardFixtures::parse_hardcoded(&["AD", "2D", "3D"]),
-        CardFixtures::parse_hardcoded(&["AH", "2H", "3H"]),
-        CardFixtures::parse_hardcoded(&["AS", "2S", "3S"]),
+        parse_cards(&["AC", "2C", "3C"]),
+        parse_cards(&["AD", "2D", "3D"]),
+        parse_cards(&["AH", "2H", "3H"]),
+        parse_cards(&["AS", "2S", "3S"]),
     ];
     let mut state = start_round(1, hands);
 
     // Complete bidding: player 2 wins with bid of 2
-    place_bid(&mut state, 1, Bid(0)).unwrap();
-    place_bid(&mut state, 2, Bid(2)).unwrap();
-    place_bid(&mut state, 3, Bid(0)).unwrap();
-    place_bid(&mut state, 0, Bid(0)).unwrap();
+    place_bid(&mut state, 1, Bid(0), None).unwrap();
+    place_bid(&mut state, 2, Bid(2), None).unwrap();
+    place_bid(&mut state, 3, Bid(0), None).unwrap();
+    place_bid(&mut state, 0, Bid(0), None).unwrap();
 
     // Select trump
     set_trump(&mut state, 2, Trump::Spades).unwrap();
@@ -227,19 +233,20 @@ fn trick_snapshot_legals() {
 fn trick_snapshot_second_trick_turn_rotation() {
     // Hands configured so player 3 wins first trick with trump and leads the second trick
     let hands = [
-        CardFixtures::parse_hardcoded(&["3D", "4C"]),
-        CardFixtures::parse_hardcoded(&["AD", "5C"]),
-        CardFixtures::parse_hardcoded(&["2D", "6C"]),
-        CardFixtures::parse_hardcoded(&["AS", "7C"]),
+        parse_cards(&["3D", "4C"]),
+        parse_cards(&["AD", "5C"]),
+        parse_cards(&["2D", "6C"]),
+        parse_cards(&["AS", "7C"]),
     ];
 
     let mut state = start_round(1, hands);
 
     // Bidding: player 1 wins and selects Spades as trump
-    place_bid(&mut state, 1, Bid(2)).unwrap();
-    place_bid(&mut state, 2, Bid(0)).unwrap();
-    place_bid(&mut state, 3, Bid(0)).unwrap();
-    place_bid(&mut state, 0, Bid(0)).unwrap();
+    place_bid(&mut state, 1, Bid(2), None).unwrap();
+    place_bid(&mut state, 2, Bid(0), None).unwrap();
+    place_bid(&mut state, 3, Bid(0), None).unwrap();
+    // Dealer's bid must not make the sum equal hand_size (2), so bid 1 instead of 0.
+    place_bid(&mut state, 0, Bid(1), None).unwrap();
     set_trump(&mut state, 1, Trump::Spades).unwrap();
 
     // First trick: player 1 leads diamonds, player 3 wins with spade (trump)
@@ -317,18 +324,18 @@ fn trick_snapshot_second_trick_turn_rotation() {
 fn scoring_snapshot() {
     // Complete a full round with 2 cards per player
     let hands = [
-        CardFixtures::parse_hardcoded(&["AC", "2C"]),
-        CardFixtures::parse_hardcoded(&["AD", "2D"]),
-        CardFixtures::parse_hardcoded(&["AH", "2H"]),
-        CardFixtures::parse_hardcoded(&["AS", "2S"]),
+        parse_cards(&["AC", "2C"]),
+        parse_cards(&["AD", "2D"]),
+        parse_cards(&["AH", "2H"]),
+        parse_cards(&["AS", "2S"]),
     ];
     let mut state = start_round(1, hands);
 
     // Bidding: player 1 bids 1, others bid 0
-    place_bid(&mut state, 1, Bid(1)).unwrap();
-    place_bid(&mut state, 2, Bid(0)).unwrap();
-    place_bid(&mut state, 3, Bid(0)).unwrap();
-    place_bid(&mut state, 0, Bid(0)).unwrap();
+    place_bid(&mut state, 1, Bid(1), None).unwrap();
+    place_bid(&mut state, 2, Bid(0), None).unwrap();
+    place_bid(&mut state, 3, Bid(0), None).unwrap();
+    place_bid(&mut state, 0, Bid(0), None).unwrap();
 
     // Trump selection
     set_trump(&mut state, 1, Trump::Diamonds).unwrap();
@@ -433,20 +440,21 @@ fn scoring_snapshot() {
 fn complete_and_gameover_snapshots() {
     // Create a state in Complete phase
     let hands = [
-        CardFixtures::parse_hardcoded(&["AC"]),
-        CardFixtures::parse_hardcoded(&["AD"]),
-        CardFixtures::parse_hardcoded(&["AH"]),
-        CardFixtures::parse_hardcoded(&["AS"]),
+        parse_cards(&["AC"]),
+        parse_cards(&["AD"]),
+        parse_cards(&["AH"]),
+        parse_cards(&["AS"]),
     ];
     let mut state = start_round(1, hands);
 
     // Complete bidding, trump, and single trick
-    place_bid(&mut state, 1, Bid(0)).unwrap();
-    place_bid(&mut state, 2, Bid(0)).unwrap();
-    place_bid(&mut state, 3, Bid(1)).unwrap();
-    place_bid(&mut state, 0, Bid(0)).unwrap();
+    place_bid(&mut state, 1, Bid(0), None).unwrap();
+    place_bid(&mut state, 2, Bid(0), None).unwrap();
+    place_bid(&mut state, 3, Bid(1), None).unwrap();
+    // Dealer's bid must not make the sum equal hand_size (1), so bid 1 instead of 0.
+    place_bid(&mut state, 0, Bid(1), None).unwrap();
 
-    set_trump(&mut state, 3, Trump::NoTrump).unwrap();
+    set_trump(&mut state, 3, Trump::NoTrumps).unwrap();
 
     // Play single trick - player 1 leads (dealer+1)
     play_card(

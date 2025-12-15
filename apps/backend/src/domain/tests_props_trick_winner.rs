@@ -1,9 +1,8 @@
 use proptest::prelude::*;
 
 use crate::domain::domain_prop_helpers::oracle_trick_winner;
-use crate::domain::{test_gens, test_prelude};
-/// Property-based tests for trick winner resolution
-use crate::domain::{RoundState, Suit, Trump};
+use crate::domain::state::RoundState;
+use crate::domain::{test_gens, test_prelude, Suit, Trump};
 
 proptest! {
     #![proptest_config(test_prelude::proptest_config())]
@@ -17,7 +16,7 @@ proptest! {
     ) {
         let (_leader, plays, _, _) = trick_data;
         let lead = plays[0].1.suit;
-        let trump = Trump::NoTrump;
+        let trump = Trump::NoTrumps;
 
         // Build RoundState
         let mut state = RoundState::empty();
@@ -99,7 +98,7 @@ proptest! {
             Trump::Diamonds => Suit::Diamonds,
             Trump::Hearts => Suit::Hearts,
             Trump::Spades => Suit::Spades,
-            Trump::NoTrump => unreachable!(),
+            Trump::NoTrumps => unreachable!(),
         };
 
         let winner_card = plays.iter().find(|(id, _)| *id == winner_id).unwrap().1;

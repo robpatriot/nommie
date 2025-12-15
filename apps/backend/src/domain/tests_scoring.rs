@@ -1,5 +1,6 @@
-use super::*;
 use crate::domain::scoring::apply_round_scoring;
+use crate::domain::state::{GameState, Phase, PlayerId, RoundState};
+use crate::domain::{Card, Trump};
 
 fn make_state_with_hands(hands: [Vec<Card>; 4], hand_size: u8, turn_start: PlayerId) -> GameState {
     GameState {
@@ -24,7 +25,7 @@ fn scoring_bonus_only_on_exact_bid() {
     state.round.tricks_won = [2, 1, 0, 0]; // Sum = 3, matches hand_size = 3
     state.round.bids = [Some(2), Some(0), Some(1), Some(0)];
     state.phase = Phase::Scoring;
-    apply_round_scoring(&mut state);
+    let _result = apply_round_scoring(&mut state);
     assert_eq!(state.scores_total, [12, 1, 0, 10]);
     assert_eq!(state.phase, Phase::Complete);
 }
@@ -42,7 +43,7 @@ fn scoring_exact_bid_bonus_applied_once() {
     let tricks_sum: u8 = state.round.tricks_won.iter().sum();
     assert_eq!(tricks_sum, state.hand_size);
 
-    apply_round_scoring(&mut state);
+    let _result = apply_round_scoring(&mut state);
 
     // Expected: [3+10, 2+10, 7+0, 1+10] = [13, 12, 7, 11]
     assert_eq!(state.scores_total, [13, 12, 7, 11]);
@@ -51,19 +52,19 @@ fn scoring_exact_bid_bonus_applied_once() {
 
 #[test]
 fn scoring_notrump_does_not_affect_scoring_math() {
-    // "NoTrump does not affect scoring math": bids [0,5,8,0], tricks [0,5,8,0] → totals [10,15,18,10]
+    // "NoTrumps does not affect scoring math": bids [0,5,8,0], tricks [0,5,8,0] → totals [10,15,18,10]
     let hands = [Vec::new(), Vec::new(), Vec::new(), Vec::new()];
     let mut state = make_state_with_hands(hands, 13, 0);
     state.round.bids = [Some(0), Some(5), Some(8), Some(0)];
     state.round.tricks_won = [0, 5, 8, 0];
-    state.round.trump = Some(Trump::NoTrump); // NoTrump setting
+    state.round.trump = Some(Trump::NoTrumps); // NoTrumps setting
     state.phase = Phase::Scoring;
 
     // Verify sum-of-tricks invariant before scoring
     let tricks_sum: u8 = state.round.tricks_won.iter().sum();
     assert_eq!(tricks_sum, state.hand_size);
 
-    apply_round_scoring(&mut state);
+    let _result = apply_round_scoring(&mut state);
 
     // Expected: [0+10, 5+10, 8+10, 0+10] = [10, 15, 18, 10]
     assert_eq!(state.scores_total, [10, 15, 18, 10]);
@@ -85,12 +86,12 @@ fn scoring_idempotence_scoring_applies_once_only() {
     assert_eq!(tricks_sum, state.hand_size);
 
     // First scoring call
-    apply_round_scoring(&mut state);
+    let _result1 = apply_round_scoring(&mut state);
     let scores_after_first = state.scores_total;
     assert_eq!(state.phase, Phase::Complete);
 
     // Second scoring call should be no-op
-    apply_round_scoring(&mut state);
+    let _result2 = apply_round_scoring(&mut state);
     assert_eq!(state.scores_total, scores_after_first);
     assert_eq!(state.phase, Phase::Complete);
 }
@@ -116,7 +117,7 @@ fn scoring_sum_of_tricks_invariant_violation_release_variant() {
     // In non-debug (release) builds, scoring should not panic and produce deterministic totals
     #[cfg(not(debug_assertions))]
     {
-        apply_round_scoring(&mut state);
+        let _result = apply_round_scoring(&mut state);
         assert_eq!(state.scores_total, [13, 11, 12, 10]);
     }
 }
@@ -137,5 +138,5 @@ fn scoring_sum_of_tricks_invariant_violation_debug_variant() {
     assert_ne!(tricks_sum, state.hand_size);
 
     // In debug builds, this should panic due to the internal debug assertion
-    apply_round_scoring(&mut state);
+    let _result = apply_round_scoring(&mut state);
 }

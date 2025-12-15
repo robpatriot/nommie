@@ -9,7 +9,7 @@
 
 use proptest::prelude::*;
 
-use crate::domain::bidding::{legal_bids, place_bid, Bid};
+use crate::domain::bidding::{legal_bids_for_hand_size, place_bid, Bid};
 use crate::domain::state::Phase;
 use crate::domain::test_prelude;
 use crate::errors::domain::{DomainError, ValidationKind};
@@ -22,14 +22,13 @@ proptest! {
     #[test]
     fn prop_legal_bids_match_hand_size(
         hand_size in 2u8..=13u8,
-        player in 0u8..=3u8,
     ) {
-        use crate::domain::state::init_round;
+        use crate::domain::test_state_helpers::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
 
-        let legal = legal_bids(&state, player);
+        let legal = legal_bids_for_hand_size(state.hand_size);
 
         // Should have hand_size + 1 bids (0 through hand_size inclusive)
         prop_assert_eq!(legal.len(), (hand_size + 1) as usize,
@@ -37,12 +36,12 @@ proptest! {
 
         // All values should be in range [0..=hand_size]
         for bid in &legal {
-            prop_assert!(bid.value() <= hand_size,
+            prop_assert!(bid.0 <= hand_size,
                 "Bid {bid:?} must be <= hand_size {hand_size}");
         }
 
         // Should include 0 and hand_size
-        let values: Vec<u8> = legal.iter().map(|b| b.value()).collect();
+        let values: Vec<u8> = legal.iter().map(|b| b.0).collect();
         prop_assert!(values.contains(&0), "Should include bid of 0");
         prop_assert!(values.contains(&hand_size),
             "Should include bid of {hand_size}");
@@ -55,13 +54,13 @@ proptest! {
         hand_size in 2u8..=13u8,
         invalid_bid in 14u8..=255u8, // Well outside valid range
     ) {
-        use crate::domain::state::init_round;
+        use crate::domain::test_state_helpers::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
         state.turn = 0;
 
-        let result = place_bid(&mut state, 0, Bid(invalid_bid));
+        let result = place_bid(&mut state, 0, Bid(invalid_bid), None);
 
         prop_assert!(result.is_err(),
             "Bid {invalid_bid} should be rejected for hand_size {hand_size}");
@@ -86,7 +85,7 @@ proptest! {
     ) {
         // Bids are generated based on hand_size, so they're always valid
 
-        use crate::domain::state::init_round;
+        use crate::domain::test_state_helpers::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
@@ -94,7 +93,7 @@ proptest! {
         state.turn_start = 0;
 
         // First bid succeeds
-        let result = place_bid(&mut state, 0, Bid(first_bid));
+        let result = place_bid(&mut state, 0, Bid(first_bid), None);
         prop_assert!(result.is_ok(),
             "First bid should succeed");
 
@@ -104,7 +103,7 @@ proptest! {
         // Let's test the explicit check: if we try to set player 0 back in turn
         // and they already have a bid, it should fail
         state.turn = 0;
-        let result = place_bid(&mut state, 0, Bid(second_bid));
+        let result = place_bid(&mut state, 0, Bid(second_bid), None);
 
         prop_assert!(result.is_err(),
             "Player cannot bid twice");
@@ -126,14 +125,14 @@ proptest! {
     ) {
         // bid_value is generated based on hand_size, so it's always valid
 
-        use crate::domain::state::init_round;
+        use crate::domain::test_state_helpers::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
         state.turn = 0; // Player 0's turn
 
         // Try to bid as a different player
-        let result = place_bid(&mut state, wrong_player, Bid(bid_value));
+        let result = place_bid(&mut state, wrong_player, Bid(bid_value), None);
 
         prop_assert!(result.is_err(),
             "Out of turn bid should be rejected");
@@ -155,13 +154,13 @@ fn test_valid_bids_table() {
     ];
 
     for (hand_size, expected_values) in test_cases {
-        use crate::domain::state::init_round;
+        use crate::domain::test_state_helpers::init_round;
         let hands = [vec![], vec![], vec![], vec![]];
         let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
         state.phase = Phase::Bidding;
 
-        let legal = legal_bids(&state, 0);
-        let values: Vec<u8> = legal.iter().map(|b| b.value()).collect();
+        let legal = legal_bids_for_hand_size(state.hand_size);
+        let values: Vec<u8> = legal.iter().map(|b| b.0).collect();
 
         assert_eq!(
             values, expected_values,
@@ -181,13 +180,13 @@ fn test_invalid_bids_table() {
 
     for (hand_size, invalid_bids) in test_cases {
         for &bid_value in &invalid_bids {
-            use crate::domain::state::init_round;
+            use crate::domain::test_state_helpers::init_round;
             let hands = [vec![], vec![], vec![], vec![]];
             let mut state = init_round(1, hand_size, hands, 0, [0; 4]);
             state.phase = Phase::Bidding;
             state.turn = 0;
 
-            let result = place_bid(&mut state, 0, Bid(bid_value));
+            let result = place_bid(&mut state, 0, Bid(bid_value), None);
 
             assert!(
                 result.is_err(),
@@ -207,13 +206,13 @@ fn test_invalid_bids_table() {
 /// Test: Bid in wrong phase is rejected
 #[test]
 fn test_bid_wrong_phase() {
-    use crate::domain::state::init_round;
+    use crate::domain::test_state_helpers::init_round;
     let hands = [vec![], vec![], vec![], vec![]];
     let mut state = init_round(1, 5, hands, 0, [0; 4]);
     state.phase = Phase::Init; // Not Bidding
     state.turn = 0;
 
-    let result = place_bid(&mut state, 0, Bid(3));
+    let result = place_bid(&mut state, 0, Bid(3), None);
 
     assert!(result.is_err(), "Bid in wrong phase should be rejected");
 
@@ -228,7 +227,7 @@ fn test_bid_wrong_phase() {
 /// Test: Turn order is respected in sequence
 #[test]
 fn test_turn_order_sequence() {
-    use crate::domain::state::init_round;
+    use crate::domain::test_state_helpers::init_round;
     let hands = [vec![], vec![], vec![], vec![]];
     let mut state = init_round(1, 5, hands, 0, [0; 4]);
     state.phase = Phase::Bidding;
@@ -236,19 +235,19 @@ fn test_turn_order_sequence() {
     state.turn_start = 0;
 
     // Player 0 bids
-    assert!(place_bid(&mut state, 0, Bid(2)).is_ok());
+    assert!(place_bid(&mut state, 0, Bid(2), None).is_ok());
     assert_eq!(state.turn, 1, "Turn should advance to player 1");
 
     // Player 1 bids
-    assert!(place_bid(&mut state, 1, Bid(3)).is_ok());
+    assert!(place_bid(&mut state, 1, Bid(3), None).is_ok());
     assert_eq!(state.turn, 2, "Turn should advance to player 2");
 
     // Player 2 bids
-    assert!(place_bid(&mut state, 2, Bid(1)).is_ok());
+    assert!(place_bid(&mut state, 2, Bid(1), None).is_ok());
     assert_eq!(state.turn, 3, "Turn should advance to player 3");
 
     // Player 3 bids
-    assert!(place_bid(&mut state, 3, Bid(4)).is_ok());
+    assert!(place_bid(&mut state, 3, Bid(4), None).is_ok());
 
     // After all bids, should transition to TrumpSelect phase
     assert_eq!(
@@ -268,7 +267,7 @@ fn test_turn_order_sequence() {
 /// Test: Tie in bids goes to earliest bidder
 #[test]
 fn test_bid_tie_resolution() {
-    use crate::domain::state::init_round;
+    use crate::domain::test_state_helpers::init_round;
     let hands = [vec![], vec![], vec![], vec![]];
     let mut state = init_round(1, 5, hands, 0, [0; 4]);
     state.phase = Phase::Bidding;
@@ -276,10 +275,10 @@ fn test_bid_tie_resolution() {
     state.turn_start = 0;
 
     // All players bid the same amount
-    assert!(place_bid(&mut state, 0, Bid(3)).is_ok());
-    assert!(place_bid(&mut state, 1, Bid(3)).is_ok());
-    assert!(place_bid(&mut state, 2, Bid(3)).is_ok());
-    assert!(place_bid(&mut state, 3, Bid(3)).is_ok());
+    assert!(place_bid(&mut state, 0, Bid(3), None).is_ok());
+    assert!(place_bid(&mut state, 1, Bid(3), None).is_ok());
+    assert!(place_bid(&mut state, 2, Bid(3), None).is_ok());
+    assert!(place_bid(&mut state, 3, Bid(3), None).is_ok());
 
     // Earliest bidder (player 0) should win
     assert_eq!(
@@ -292,7 +291,7 @@ fn test_bid_tie_resolution() {
 /// Test: Highest bidder wins with different start positions
 #[test]
 fn test_highest_bidder_wins() {
-    use crate::domain::state::init_round;
+    use crate::domain::test_state_helpers::init_round;
 
     // Test case 1: Clear winner
     let hands = [vec![], vec![], vec![], vec![]];
@@ -301,10 +300,10 @@ fn test_highest_bidder_wins() {
     state.turn = 0;
     state.turn_start = 0;
 
-    assert!(place_bid(&mut state, 0, Bid(1)).is_ok());
-    assert!(place_bid(&mut state, 1, Bid(5)).is_ok()); // Highest
-    assert!(place_bid(&mut state, 2, Bid(2)).is_ok());
-    assert!(place_bid(&mut state, 3, Bid(3)).is_ok());
+    assert!(place_bid(&mut state, 0, Bid(1), None).is_ok());
+    assert!(place_bid(&mut state, 1, Bid(5), None).is_ok()); // Highest
+    assert!(place_bid(&mut state, 2, Bid(2), None).is_ok());
+    assert!(place_bid(&mut state, 3, Bid(3), None).is_ok());
 
     assert_eq!(
         state.round.winning_bidder,
@@ -319,10 +318,10 @@ fn test_highest_bidder_wins() {
     state.turn = 0;
     state.turn_start = 0;
 
-    assert!(place_bid(&mut state, 0, Bid(2)).is_ok());
-    assert!(place_bid(&mut state, 1, Bid(3)).is_ok());
-    assert!(place_bid(&mut state, 2, Bid(1)).is_ok());
-    assert!(place_bid(&mut state, 3, Bid(4)).is_ok()); // Highest
+    assert!(place_bid(&mut state, 0, Bid(2), None).is_ok());
+    assert!(place_bid(&mut state, 1, Bid(3), None).is_ok());
+    assert!(place_bid(&mut state, 2, Bid(1), None).is_ok());
+    assert!(place_bid(&mut state, 3, Bid(4), None).is_ok()); // Highest
 
     assert_eq!(
         state.round.winning_bidder,
