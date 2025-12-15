@@ -4,7 +4,7 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState};
-use backend::error::AppError;
+use backend::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
 use backend::state::security_config::SecurityConfig;

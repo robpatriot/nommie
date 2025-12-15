@@ -5,8 +5,9 @@
 
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState as DbGameState};
-use backend::error::AppError;
+use backend::repos::games as games_repo;
 use backend::services::game_flow::GameFlowService;
+use backend::AppError;
 use sea_orm::EntityTrait;
 
 use crate::support::build_test_state;
@@ -80,7 +81,10 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
 
             // Step 2: Submit a bid
             let lock_before_bid = game_after_deal.lock_version;
-            service.submit_bid(txn, game_id, 1, 5, None).await?;
+            let game = backend::repos::games::require_game(txn, game_id).await?;
+            service
+                .submit_bid(txn, game_id, 1, 5, game.lock_version)
+                .await?;
 
             let game_after_bid = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
             assert!(
@@ -158,10 +162,12 @@ async fn test_deterministic_first_trick() -> Result<(), AppError> {
 
             // Submit bids for all 4 players in turn order (dealer=0, so turn order is 1,2,3,0)
             // Valid bids for hand_size=13
-            service.submit_bid(txn, game_id, 1, 6, None).await?;
-            service.submit_bid(txn, game_id, 2, 3, None).await?;
-            service.submit_bid(txn, game_id, 3, 4, None).await?;
-            service.submit_bid(txn, game_id, 0, 5, None).await?; // Dealer bids last
+            for (seat, bid) in [(1u8, 6u8), (2, 3), (3, 4), (0, 5)] {
+                let game = backend::repos::games::require_game(txn, game_id).await?;
+                service
+                    .submit_bid(txn, game_id, seat, bid, game.lock_version)
+                    .await?;
+            }
 
             // After bidding, should be in TrumpSelection phase
             let game = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
@@ -208,10 +214,12 @@ async fn test_granular_round_progression() -> Result<(), AppError> {
             state_history.push(game.state);
 
             // Submit bids in turn order (dealer=0, so turn order is 1,2,3,0)
-            service.submit_bid(txn, game_id, 1, 5, None).await?;
-            service.submit_bid(txn, game_id, 2, 3, None).await?;
-            service.submit_bid(txn, game_id, 3, 2, None).await?;
-            service.submit_bid(txn, game_id, 0, 4, None).await?; // Dealer bids last
+            for (seat, bid) in [(1u8, 5u8), (2, 3), (3, 2), (0, 4)] {
+                let game = backend::repos::games::require_game(txn, game_id).await?;
+                service
+                    .submit_bid(txn, game_id, seat, bid, game.lock_version)
+                    .await?;
+            }
 
             let game = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
             state_history.push(game.state);
@@ -279,8 +287,8 @@ async fn test_deterministic_dealing_reproducible() -> Result<(), AppError> {
             service.deal_round(txn, game_id2).await?;
 
             // Both should be in Bidding state
-            let game1 = games::Entity::find_by_id(game_id1).one(txn).await?.unwrap();
-            let game2 = games::Entity::find_by_id(game_id2).one(txn).await?.unwrap();
+            let game1 = games_repo::find_by_id(txn, game_id1).await?.unwrap();
+            let game2 = games_repo::find_by_id(txn, game_id2).await?.unwrap();
 
             assert_eq!(game1.state, DbGameState::Bidding);
             assert_eq!(game2.state, DbGameState::Bidding);
@@ -317,13 +325,16 @@ async fn test_invalid_bid_fails() -> Result<(), AppError> {
             service.deal_round(txn, game_id).await?;
 
             // Try to submit an invalid bid (> hand_size)
-            let result = service.submit_bid(txn, game_id, 1, 100, None).await;
+            let game = backend::repos::games::require_game(txn, game_id).await?;
+            let result = service
+                .submit_bid(txn, game_id, 1, 100, game.lock_version)
+                .await;
 
             assert!(result.is_err(), "Invalid bid should fail");
 
             // Check error code
             if let Err(e) = result {
-                use backend::errors::ErrorCode;
+                use backend::ErrorCode;
                 assert_eq!(
                     e.code(),
                     ErrorCode::InvalidBid,
@@ -356,14 +367,17 @@ async fn test_out_of_turn_bid_fails() -> Result<(), AppError> {
 
             // Try to submit a bid for player 2 when it's player 0's turn
             // (Assuming turn starts at player 0 or dealer+1)
-            let result = service.submit_bid(txn, game_id, 2, 5, None).await;
+            let game = backend::repos::games::require_game(txn, game_id).await?;
+            let result = service
+                .submit_bid(txn, game_id, 2, 5, game.lock_version)
+                .await;
 
             // This should fail (assuming turn order enforcement is implemented)
             // If not yet implemented, this test will fail and guide implementation
             assert!(result.is_err(), "Out of turn bid should fail");
 
             if let Err(e) = result {
-                use backend::errors::ErrorCode;
+                use backend::ErrorCode;
                 // Should be OutOfTurn error
                 assert_eq!(
                     e.code(),
@@ -393,12 +407,15 @@ async fn test_bid_in_wrong_phase_fails() -> Result<(), AppError> {
             let service = GameFlowService;
 
             // Try to bid without dealing first (still in Lobby)
-            let result = service.submit_bid(txn, game_id, 1, 5, None).await;
+            let game = backend::repos::games::require_game(txn, game_id).await?;
+            let result = service
+                .submit_bid(txn, game_id, 1, 5, game.lock_version)
+                .await;
 
             assert!(result.is_err(), "Bid in Lobby phase should fail");
 
             if let Err(e) = result {
-                use backend::errors::ErrorCode;
+                use backend::ErrorCode;
                 assert_eq!(
                     e.code(),
                     ErrorCode::PhaseMismatch,

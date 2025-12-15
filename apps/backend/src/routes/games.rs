@@ -15,7 +15,7 @@ use crate::domain::bidding::validate_consecutive_zero_bids;
 use crate::domain::snapshot::{GameSnapshot, SeatAiProfilePublic, SeatPublic};
 use crate::domain::state::Seat;
 use crate::domain::{Card, Rank, Suit, Trump};
-use crate::entities::games::{self, GameState, GameVisibility};
+use crate::entities::games::{GameState, GameVisibility};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
@@ -25,7 +25,7 @@ use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
 use crate::repos::players::{friendly_ai_name, resolve_display_name_for_membership};
-use crate::repos::{ai_overrides, ai_profiles, games as games_repo, player_view, rounds, users};
+use crate::repos::{ai_overrides, ai_profiles, games as games_repo, player_view, users};
 use crate::services::ai::{AiInstanceOverrides, AiService};
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
@@ -1057,13 +1057,16 @@ async fn add_ai_seat(
                 config: override_config,
             };
 
-            // add_ai_to_game automatically updates game updated_at via create_ai_membership
             ai_service
                 .add_ai_to_game(txn, id, ai_profile.id, seat_to_fill, Some(overrides))
                 .await
                 .map_err(AppError::from)?;
 
-            let updated_game = games_repo::require_game(txn, id).await?;
+            // Touch game to increment lock_version so websocket clients receive the update
+            let game = games_repo::require_game(txn, id).await?;
+            let updated_game = games_repo::touch_game(txn, id, game.lock_version)
+                .await
+                .map_err(AppError::from)?;
             Ok(updated_game.lock_version)
         })
     })
@@ -1178,11 +1181,10 @@ async fn remove_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            games_repo::update_round(txn, id, game.lock_version, None, None, None)
+            let game = games_repo::require_game(txn, id).await?;
+            let updated_game = games_repo::touch_game(txn, id, game.lock_version)
                 .await
                 .map_err(AppError::from)?;
-
-            let updated_game = games_repo::require_game(txn, id).await?;
             Ok(updated_game.lock_version)
         })
     })
@@ -1314,11 +1316,10 @@ async fn update_ai_seat(
                 }
             }
 
-            games_repo::update_round(txn, id, game.lock_version, None, None, None)
+            let game = games_repo::require_game(txn, id).await?;
+            let updated_game = games_repo::touch_game(txn, id, game.lock_version)
                 .await
                 .map_err(AppError::from)?;
-
-            let updated_game = games_repo::require_game(txn, id).await?;
             Ok(updated_game.lock_version)
         })
     })
@@ -1350,7 +1351,7 @@ async fn submit_bid(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .submit_bid(txn, id, seat, bid_value, Some(body.lock_version))
+                .submit_bid(txn, id, seat, bid_value, body.lock_version)
                 .await
         })
     })
@@ -1379,11 +1380,11 @@ async fn select_trump(
     let normalized = payload.trump.trim().to_uppercase();
 
     let trump = match normalized.as_str() {
-        "CLUBS" => rounds::Trump::Clubs,
-        "DIAMONDS" => rounds::Trump::Diamonds,
-        "HEARTS" => rounds::Trump::Hearts,
-        "SPADES" => rounds::Trump::Spades,
-        "NO_TRUMP" => rounds::Trump::NoTrump,
+        "CLUBS" => crate::domain::Trump::Clubs,
+        "DIAMONDS" => crate::domain::Trump::Diamonds,
+        "HEARTS" => crate::domain::Trump::Hearts,
+        "SPADES" => crate::domain::Trump::Spades,
+        "NO_TRUMP" => crate::domain::Trump::NoTrumps,
         _ => {
             return Err(AppError::bad_request(
                 ErrorCode::ValidationError,
@@ -1396,7 +1397,7 @@ async fn select_trump(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .set_trump(txn, id, seat, trump, Some(payload.lock_version))
+                .set_trump(txn, id, seat, trump, payload.lock_version)
                 .await
         })
     })
@@ -1438,7 +1439,7 @@ async fn play_card(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .play_card(txn, id, seat, card, Some(payload.lock_version))
+                .play_card(txn, id, seat, card, payload.lock_version)
                 .await
         })
     })
@@ -1481,39 +1482,11 @@ async fn delete_game(
                 ));
             }
 
-            // Validate optimistic lock version
-            if game.lock_version != lock_version {
-                return Err(AppError::conflict(
-                    ErrorCode::OptimisticLock,
-                    format!(
-                        "Game lock version mismatch: expected {}, but game has version {}",
-                        lock_version, game.lock_version
-                    ),
-                ));
-            }
-
-            // Delete the game with optimistic locking (filter by lock_version)
+            // Delete the game with optimistic locking
             // Cascade delete will handle related records automatically
-            use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-            let delete_result = games::Entity::delete_many()
-                .filter(games::Column::Id.eq(id))
-                .filter(games::Column::LockVersion.eq(lock_version))
-                .exec(txn)
+            games_repo::delete_game(txn, id, lock_version)
                 .await
                 .map_err(AppError::from)?;
-
-            if delete_result.rows_affected == 0 {
-                // This should not happen if lock version matched, but handle it gracefully
-                // It could happen if the game was deleted by another transaction between
-                // the load above and the delete here
-                return Err(AppError::conflict(
-                    ErrorCode::OptimisticLock,
-                    format!(
-                        "Game lock version mismatch: expected version {}, but game was modified or deleted",
-                        lock_version
-                    ),
-                ));
-            }
 
             Ok(())
         })
@@ -1571,7 +1544,7 @@ fn trump_to_api_value(trump: Trump) -> &'static str {
         Trump::Diamonds => "DIAMONDS",
         Trump::Hearts => "HEARTS",
         Trump::Spades => "SPADES",
-        Trump::NoTrump => "NO_TRUMP",
+        Trump::NoTrumps => "NO_TRUMP",
     }
 }
 

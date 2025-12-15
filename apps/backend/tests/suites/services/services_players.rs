@@ -1,7 +1,7 @@
 use backend::ai::RandomPlayer;
 use backend::db::txn::with_txn;
-use backend::error::AppError;
-use backend::errors::ErrorCode;
+use backend::AppError;
+use backend::ErrorCode;
 use backend::repos::ai_profiles;
 use backend::services::players::PlayerService;
 

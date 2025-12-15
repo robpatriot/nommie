@@ -33,16 +33,11 @@ impl GameFlowService {
 
         // Determine next round number
         let next_round = game.current_round.unwrap_or(0) + 1;
-        if next_round > 26 {
-            return Err(DomainError::validation(
+        let hand_size = hand_size_for_round(next_round).ok_or_else(|| {
+            DomainError::validation(
                 ValidationKind::Other("MAX_ROUNDS".into()),
                 "All rounds complete",
             )
-            .into());
-        }
-
-        let hand_size = hand_size_for_round(next_round).ok_or_else(|| {
-            DomainError::validation(ValidationKind::InvalidHandSize, "Invalid round number")
         })?;
 
         // Derive deterministic dealing seed from game seed
@@ -60,22 +55,20 @@ impl GameFlowService {
         let dealt_hands = deal_hands(4, hand_size, dealing_seed)?;
 
         // Update DB: state and round number
-        let updated_game =
-            games::update_state(txn, game_id, DbGameState::Bidding, game.lock_version).await?;
-
-        // On first round, set starting_dealer_pos (defaults to 0)
         let starting_dealer_pos = if next_round == 1 { Some(0) } else { None };
-        let updated_game = games::update_round(
+        games::update_game(
             txn,
             game_id,
-            updated_game.lock_version,
+            game.lock_version,
+            Some(DbGameState::Bidding),
             Some(next_round),
             starting_dealer_pos,
             None,
         )
         .await?;
 
-        // Compute current dealer (hand_size and dealer_pos are now computed)
+        // Reload game to get updated values for hand_size and dealer_pos computation
+        let updated_game = games::require_game(txn, game_id).await?;
         let computed_hand_size = updated_game.hand_size().unwrap_or(0);
         let computed_dealer_pos = updated_game.dealer_pos().unwrap_or(0);
 
@@ -119,10 +112,12 @@ impl GameFlowService {
         Ok(())
     }
 
-    /// Score the round: calculate final scores for all players and persist.
+    /// Score the current round for a game by id.
     ///
-    /// Counts tricks won, applies domain scoring logic, and saves to round_scores.
-    /// Transitions game to Scoring phase and marks round as complete.
+    /// This is a public entrypoint that loads the game and delegates to the internal
+    /// scorer. In production flows, scoring is typically driven indirectly via
+    /// `play_card`, but this helper is useful for tests and maintenance tasks.
+    #[allow(dead_code)]
     pub async fn score_round(
         &self,
         txn: &DatabaseTransaction,
@@ -154,7 +149,22 @@ impl GameFlowService {
                 )
             })?;
 
-        // Load all bids for this round
+        // Load GameState and apply domain scoring logic
+        let mut state = {
+            use crate::services::games::GameService;
+            let service = GameService;
+            service.load_game_state(txn, game_id).await?
+        };
+        // Force Scoring phase for this explicit scoring entrypoint. The domain
+        // function is idempotent and will be a no-op if scoring was already applied.
+        state.phase = crate::domain::state::Phase::Scoring;
+
+        // Apply domain scoring logic
+        let _result = crate::domain::scoring::apply_round_scoring(&mut state);
+
+        // Load bids and tricks from the database to materialize round_scores rows.
+        // Domain state (bids, tricks_won, scores_total) is the source of truth for
+        // scoring; the DB rows are a persisted projection.
         let all_bids = bids::find_all_by_round(txn, round.id).await?;
         if all_bids.len() != 4 {
             return Err(DomainError::validation(
@@ -164,58 +174,40 @@ impl GameFlowService {
             .into());
         }
 
-        // Load all tricks to count wins per player
         let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
-
-        // Count tricks won by each player
         let mut tricks_won = [0u8; 4];
         for trick in &all_tricks {
             if trick.winner_seat < 4 {
                 tricks_won[trick.winner_seat as usize] += 1;
+            } else {
+                return Err(DomainError::validation(
+                    ValidationKind::Other("INVALID_TRICK_WINNER".into()),
+                    format!(
+                        "Trick winner_seat {} out of range 0..3 for round {}",
+                        trick.winner_seat, round.id
+                    ),
+                )
+                .into());
             }
         }
 
-        // Get previous totals (for cumulative scoring)
-        let previous_totals = if current_round_no > 1 {
-            // Find previous round and get its scores
-            let prev_round_no = current_round_no - 1;
-            let prev_round = rounds::find_by_game_and_round(txn, game_id, prev_round_no)
-                .await?
-                .ok_or_else(|| {
-                    DomainError::validation(
-                        ValidationKind::Other("PREV_ROUND_NOT_FOUND".into()),
-                        "Previous round not found",
-                    )
-                })?;
-
-            let prev_scores = scores::find_all_by_round(txn, prev_round.id).await?;
-            let mut totals = [0i16; 4];
-            for score in prev_scores {
-                if score.player_seat < 4 {
-                    totals[score.player_seat as usize] = score.total_score_after;
-                }
-            }
-            totals
-        } else {
-            [0, 0, 0, 0]
-        };
-
-        // Calculate and persist scores for all 4 players
+        // Persist scores for all 4 players
         for seat in 0..4u8 {
             let bid = all_bids
                 .iter()
                 .find(|b| b.player_seat == seat)
                 .map(|b| b.bid_value)
                 .unwrap_or(0);
-
             let tricks = tricks_won[seat as usize];
             let bid_met = bid == tricks;
 
-            // Domain scoring formula: tricks + 10 if bid met
-            let base_score = tricks;
-            let bonus = if bid_met { 10 } else { 0 };
-            let round_score = base_score + bonus;
-            let total_after = previous_totals[seat as usize] + round_score as i16;
+            // Scoring rules:
+            // - base_score = tricks won (0..hand_size)
+            // - bonus = 10 iff bid_met, else 0
+            // - round_score = base_score + bonus
+            let bonus = if bid_met { 10u8 } else { 0u8 };
+            let base_score_u8 = tricks;
+            let round_score_u8 = base_score_u8 + bonus;
 
             scores::create_score(
                 txn,
@@ -225,10 +217,10 @@ impl GameFlowService {
                     bid_value: bid,
                     tricks_won: tricks,
                     bid_met,
-                    base_score,
+                    base_score: base_score_u8,
                     bonus,
-                    round_score,
-                    total_score_after: total_after,
+                    round_score: round_score_u8,
+                    total_score_after: state.scores_total[seat as usize],
                 },
             )
             .await?;
@@ -237,65 +229,43 @@ impl GameFlowService {
         // Mark round as complete
         rounds::complete_round(txn, round.id).await?;
 
-        // Transition to Scoring phase
-        games::update_state(txn, game_id, DbGameState::Scoring, game.lock_version).await?;
-
-        info!(
-            game_id,
-            round = current_round_no,
-            "Round scored and completed"
-        );
-
-        Ok(())
-    }
-
-    /// Advance to the next round after scoring completes.
-    ///
-    /// Transitions from Scoring -> BetweenRounds or Completed.
-    pub async fn advance_to_next_round(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-    ) -> Result<(), AppError> {
-        let game = games::require_game(txn, game_id).await?;
-        self.advance_to_next_round_internal(txn, &game).await
-    }
-
-    /// Internal version that accepts game object to avoid redundant loads.
-    pub(super) async fn advance_to_next_round_internal(
-        &self,
-        txn: &DatabaseTransaction,
-        game: &games::Game,
-    ) -> Result<(), AppError> {
-        let game_id = game.id;
-        info!(game_id, "Advancing to next round");
-
-        if game.state != DbGameState::Scoring {
-            return Err(DomainError::validation(
-                ValidationKind::PhaseMismatch,
-                "Not in scoring phase",
-            )
-            .into());
-        }
-
-        let current_round = game.current_round.unwrap_or(0);
-        if current_round >= 26 {
-            // All rounds complete
-            games::update_state(txn, game_id, DbGameState::Completed, game.lock_version).await?;
-            info!(game_id, rounds_played = current_round, "Game completed");
-            debug!(game_id, "Transition: Scoring -> Completed");
+        // Determine next phase based on whether next round is valid (action-driven pattern)
+        // Use domain function to check if we can continue to next round
+        let is_game_complete = hand_size_for_round(current_round_no + 1).is_none();
+        let next_state = if is_game_complete {
+            // No more valid rounds - game over
+            DbGameState::Completed
         } else {
-            // More rounds to play - transition to BetweenRounds and reset trick counter
-            let updated_game =
-                games::update_state(txn, game_id, DbGameState::BetweenRounds, game.lock_version)
-                    .await?;
+            // More rounds to play - transition to Bidding (next round will be dealt)
+            DbGameState::Bidding
+        };
 
-            // Reset current_trick_no to 0 (no active trick between rounds)
-            games::update_round(txn, game_id, updated_game.lock_version, None, None, Some(0))
-                .await?;
+        games::update_game(
+            txn,
+            game_id,
+            game.lock_version,
+            Some(next_state),
+            None,
+            None,
+            None,
+        )
+        .await?;
 
-            info!(game_id, current_round, "Advanced to BetweenRounds");
-            debug!(game_id, "Transition: Scoring -> BetweenRounds");
+        if is_game_complete {
+            info!(
+                game_id,
+                round = current_round_no,
+                "Round scored, game completed"
+            );
+        } else {
+            info!(
+                game_id,
+                round = current_round_no,
+                "Round scored, transitioning to next round"
+            );
+            // Deal the next round immediately (action-driven pattern)
+            let updated_game = games::require_game(txn, game_id).await?;
+            self.deal_round_internal(txn, &updated_game).await?;
         }
 
         Ok(())

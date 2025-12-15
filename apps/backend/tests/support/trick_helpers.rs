@@ -3,7 +3,8 @@
 // This module provides helpers for creating tricks with known winners,
 // reducing boilerplate in tests that need to simulate complete rounds.
 
-use backend::error::AppError;
+use backend::AppError;
+use backend::domain::Suit;
 use backend::repos::tricks;
 use sea_orm::DatabaseTransaction;
 
@@ -45,10 +46,10 @@ pub async fn create_tricks_with_winners(
 
         // Use a default suit based on winner to have some variety
         let suit = match winner_seat % 4 {
-            0 => tricks::Suit::Hearts,
-            1 => tricks::Suit::Spades,
-            2 => tricks::Suit::Clubs,
-            _ => tricks::Suit::Diamonds,
+            0 => Suit::Hearts,
+            1 => Suit::Spades,
+            2 => Suit::Clubs,
+            _ => Suit::Diamonds,
         };
 
         let trick = tricks::create_trick(txn, round_id, trick_no, suit, winner_seat).await?;

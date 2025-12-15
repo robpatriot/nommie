@@ -209,7 +209,7 @@ async fn test_error_with_trace_id_from_context() -> Result<(), AppError> {
 /// Test that trace_ctx::trace_id() returns "unknown" outside of request context
 #[actix_web::test]
 async fn test_trace_ctx_outside_context() {
-    use backend::web::trace_ctx;
+    use backend::trace_ctx;
 
     // Outside of a request context, should return "unknown"
     assert_eq!(trace_ctx::trace_id(), "unknown");

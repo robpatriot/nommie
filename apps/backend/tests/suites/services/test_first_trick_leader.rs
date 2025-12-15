@@ -5,13 +5,14 @@
 
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;
-use backend::error::AppError;
-use backend::repos::rounds;
+use backend::domain::Trump;
 use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
+use backend::AppError;
 
 use crate::support::build_test_state;
-use crate::support::game_phases::setup_game_in_trick_play_phase;
+use crate::support::game_phases::{score_round, setup_game_in_trick_play_phase};
+use crate::support::state_helpers::init_round;
 use crate::support::trick_helpers::create_tricks_by_winner_counts;
 
 /// Test: Verify the first trick leader rotates with dealer position across rounds.
@@ -39,7 +40,7 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
                 txn,
                 "first_trick_leader1",
                 [4, 5, 3, 0],
-                rounds::Trump::Hearts,
+                Trump::Hearts,
             )
             .await?;
 
@@ -62,40 +63,81 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
             );
 
             // Complete Round 1: create all tricks and score
-            // Hand size for round 1 is 13, so we need 13 tricks
-            // Winners: [5, 4, 3, 0] to match bids exactly (everyone gets bonus)
-            create_tricks_by_winner_counts(txn, setup.round_id, [5, 4, 3, 0]).await?;
-            flow_service.score_round(txn, setup.game_id).await?;
+            // Hand size for round 1 is 13, so we need 13 tricks total.
+            // Winners by seat: [5, 4, 3, 1] = 13 tricks.
+            create_tricks_by_winner_counts(txn, setup.round_id, [5, 4, 3, 1]).await?;
+            score_round(txn, setup.game_id).await?;
 
             // === ROUND 2: Deal and progress to trick play ===
-            flow_service.deal_round(txn, setup.game_id).await?;
-
+            // `score_round` has already advanced the game and dealt the next round.
             // Round 2 has hand_size=12, dealer should be (0+1)%4=1
             // Submit bids in turn order (starting at dealer+1 = seat 2)
             // Bids: seat 2→3, seat 3→4, seat 0→2, seat 1(dealer)→2
             // Winner: seat 3 with bid=4
             flow_service
-                .submit_bid(txn, setup.game_id, 2, 3, None)
+                .submit_bid(
+                    txn,
+                    setup.game_id,
+                    2,
+                    3,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
             flow_service
-                .submit_bid(txn, setup.game_id, 3, 4, None)
+                .submit_bid(
+                    txn,
+                    setup.game_id,
+                    3,
+                    4,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
             flow_service
-                .submit_bid(txn, setup.game_id, 0, 2, None)
+                .submit_bid(
+                    txn,
+                    setup.game_id,
+                    0,
+                    2,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
             flow_service
-                .submit_bid(txn, setup.game_id, 1, 2, None)
+                .submit_bid(
+                    txn,
+                    setup.game_id,
+                    1,
+                    2,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
 
             // Set trump (winning bidder is seat 3)
             flow_service
-                .set_trump(txn, setup.game_id, 3, rounds::Trump::Spades, None)
+                .set_trump(
+                    txn,
+                    setup.game_id,
+                    3,
+                    Trump::Spades,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
 
             // === ROUND 2: Verify dealer=1, first player=2 ===
             let loaded_state2 = game_service.load_game_state(txn, setup.game_id).await?;
 
-            let game2 = backend::adapters::games_sea::require_game(txn, setup.game_id).await?;
+            let game2 = backend::repos::games::find_by_id(txn, setup.game_id)
+                .await?
+                .expect("Game should exist");
             let dealer2 = game2.dealer_pos().expect("Round 2 should have dealer");
 
             assert_eq!(
@@ -136,7 +178,7 @@ async fn test_turn_start_consistency_domain_vs_db() -> Result<(), AppError> {
                 txn,
                 "first_trick_leader2",
                 [3, 3, 4, 2],
-                rounds::Trump::Spades,
+                Trump::Spades,
             )
             .await?;
 
@@ -144,7 +186,6 @@ async fn test_turn_start_consistency_domain_vs_db() -> Result<(), AppError> {
             let loaded_from_db = game_service.load_game_state(txn, setup.game_id).await?;
 
             // Create equivalent state via domain init
-            use backend::domain::state::init_round;
             let hands = [vec![], vec![], vec![], vec![]]; // Empty hands for this test
             let domain_state = init_round(1, 13, hands, 0, [0, 0, 0, 0]);
 

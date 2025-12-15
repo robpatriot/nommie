@@ -5,7 +5,7 @@
 
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::error::AppError;
+use backend::AppError;
 use sea_orm::{ActiveModelTrait, Set};
 use time::OffsetDateTime;
 

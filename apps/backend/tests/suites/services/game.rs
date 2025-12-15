@@ -1,6 +1,6 @@
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::error::AppError;
+use backend::AppError;
 use sea_orm::{EntityTrait, Set};
 
 use crate::support::build_test_state;
@@ -23,7 +23,7 @@ async fn insert_defaults_and_fetch() -> Result<(), AppError> {
             };
 
             let inserted_game = games::Entity::insert(game).exec(txn).await.map_err(|e| {
-                backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
             })?;
 
             // Assert id > 0
@@ -34,7 +34,7 @@ async fn insert_defaults_and_fetch() -> Result<(), AppError> {
                 .one(txn)
                 .await
                 .map_err(|e| {
-                    backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                    backend::AppError::from(backend::infra::db_errors::map_db_err(e))
                 })?
                 .expect("should have game row");
 

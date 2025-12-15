@@ -5,7 +5,7 @@ use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryO
 use crate::adapters::games_sea::GameCreate;
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::state::{GameState, Phase, PreviousRound, RoundState};
-use crate::domain::{Card, Suit, Trump};
+use crate::domain::Card;
 use crate::entities::game_players;
 use crate::entities::games::{self, GameState as DbGameState, GameVisibility};
 use crate::error::AppError;
@@ -100,14 +100,8 @@ impl GameService {
             None
         };
 
-        // 7. Load trump
-        let trump = round.trump.map(|t| match t {
-            rounds::Trump::Clubs => Trump::Clubs,
-            rounds::Trump::Diamonds => Trump::Diamonds,
-            rounds::Trump::Hearts => Trump::Hearts,
-            rounds::Trump::Spades => Trump::Spades,
-            rounds::Trump::NoTrump => Trump::NoTrump,
-        });
+        // 7. Load trump (already domain type, no conversion needed)
+        let trump = round.trump;
 
         // 8. Count tricks won
         let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
@@ -227,12 +221,8 @@ impl GameService {
                     })
                     .collect::<Result<Vec<_>, DomainError>>()?;
 
-                let lead = match current_trick.lead_suit {
-                    tricks::Suit::Clubs => Suit::Clubs,
-                    tricks::Suit::Diamonds => Suit::Diamonds,
-                    tricks::Suit::Hearts => Suit::Hearts,
-                    tricks::Suit::Spades => Suit::Spades,
-                };
+                // lead_suit is already domain type, no conversion needed
+                let lead = current_trick.lead_suit;
 
                 (plays, Some(lead))
             } else {

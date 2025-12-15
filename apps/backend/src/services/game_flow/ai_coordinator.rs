@@ -222,46 +222,26 @@ impl GameFlowService {
                         )
                     })?;
 
-                // Load all completed tricks for this round
-                let all_tricks = tricks::find_all_by_round(txn, round.id).await?;
-                let mut raw_plays = Vec::new();
+                // Load and degrade memory using the shared helper function
+                let memory_mode =
+                    crate::ai::MemoryMode::from_db_value(Some(effective_memory_level));
 
-                for trick in all_tricks {
-                    let play_records = plays::find_all_by_trick(txn, trick.id).await?;
-                    let mut trick_plays = Vec::new();
+                // Derive deterministic memory seed from game seed (not AI config seed)
+                // This ensures memory is stable within a round and unique per player
+                let memory_seed = game.rng_seed.map(|game_seed| {
+                    crate::domain::derive_memory_seed(game_seed, current_round_no, player_seat)
+                });
 
-                    for play in play_records {
-                        let card = crate::domain::cards_parsing::from_stored_format(
-                            &play.card.suit,
-                            &play.card.rank,
-                        )?;
-                        trick_plays.push((play.player_seat, card));
-                    }
+                let degraded_tricks = crate::ai::memory::get_round_card_plays(
+                    txn,
+                    round.id,
+                    memory_mode,
+                    memory_seed,
+                    use_memory_recency,
+                )
+                .await?;
 
-                    raw_plays.push(crate::ai::TrickPlays {
-                        trick_no: trick.trick_no,
-                        plays: trick_plays,
-                    });
-                }
-
-                // Apply memory degradation
-                if !raw_plays.is_empty() {
-                    let memory_mode =
-                        crate::ai::MemoryMode::from_db_value(Some(effective_memory_level));
-
-                    // Derive deterministic memory seed from game seed (not AI config seed)
-                    // This ensures memory is stable within a round and unique per player
-                    let memory_seed = game.rng_seed.map(|game_seed| {
-                        crate::domain::derive_memory_seed(game_seed, current_round_no, player_seat)
-                    });
-
-                    let degraded_tricks = crate::ai::apply_memory_degradation(
-                        raw_plays,
-                        memory_mode,
-                        memory_seed,
-                        use_memory_recency,
-                    );
-
+                if !degraded_tricks.is_empty() {
                     Some(crate::domain::RoundMemory::new(
                         memory_mode,
                         degraded_tricks,
@@ -291,27 +271,25 @@ impl GameFlowService {
                     let bid = ai.choose_bid(&state, &game_context)?;
                     // Use internal version to avoid recursion (loop handles processing)
                     // Service loads its own validation data (trust boundary)
-                    self.submit_bid_internal(txn, game.id, player_seat, bid, None)
+                    self.submit_bid_internal(txn, game.id, player_seat, bid, game.lock_version)
                         .await
                 }
                 ActionType::Trump => {
                     let trump_choice = ai.choose_trump(&state, &game_context)?;
-                    // Convert domain::Trump to rounds::Trump
-                    let trump = match trump_choice {
-                        crate::domain::Trump::Clubs => rounds::Trump::Clubs,
-                        crate::domain::Trump::Diamonds => rounds::Trump::Diamonds,
-                        crate::domain::Trump::Hearts => rounds::Trump::Hearts,
-                        crate::domain::Trump::Spades => rounds::Trump::Spades,
-                        crate::domain::Trump::NoTrump => rounds::Trump::NoTrump,
-                    };
                     // Use internal version to avoid recursion (loop handles processing)
-                    self.set_trump_internal(txn, game.id, player_seat, trump, None)
-                        .await
+                    self.set_trump_internal(
+                        txn,
+                        game.id,
+                        player_seat,
+                        trump_choice,
+                        game.lock_version,
+                    )
+                    .await
                 }
                 ActionType::Play => {
                     let card = ai.choose_play(&state, &game_context)?;
                     // Use internal version to avoid recursion (loop handles processing)
-                    self.play_card_internal(txn, game.id, player_seat, card, None)
+                    self.play_card_internal(txn, game.id, player_seat, card, game.lock_version)
                         .await
                 }
             };

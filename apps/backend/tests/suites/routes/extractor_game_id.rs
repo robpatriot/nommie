@@ -2,7 +2,7 @@ use actix_web::{test, web, HttpMessage, Responder};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::extractors::game_id::GameId;
+use backend::GameId;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
 use time::OffsetDateTime;

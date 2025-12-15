@@ -1,7 +1,7 @@
 use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::ai::RandomPlayer;
-use backend::error::AppError;
+use backend::AppError;
 use backend::repos::ai_profiles;
 use backend::routes::games::configure_routes;
 

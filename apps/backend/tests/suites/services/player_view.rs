@@ -5,7 +5,7 @@
 
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::error::AppError;
+use backend::AppError;
 use backend::repos::player_view;
 
 use crate::support::build_test_state;

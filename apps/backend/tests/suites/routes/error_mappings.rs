@@ -4,8 +4,8 @@
 // and ensures HTTP responses follow RFC 7807 Problem Details format.
 
 use actix_web::{test, web, App, HttpResponse, Result};
-use backend::error::AppError;
-use backend::errors::ErrorCode;
+use backend::AppError;
+use backend::ErrorCode;
 
 /// Test handler that returns a specific AppError for testing
 async fn test_handler(error: AppError) -> Result<HttpResponse, AppError> {

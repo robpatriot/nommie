@@ -5,15 +5,18 @@
 // outcomes and proper state transitions.
 
 use backend::db::txn::with_txn;
+use backend::domain::{Suit, Trump};
 use backend::entities::games::{self, GameState};
-use backend::error::AppError;
 use backend::repos::{bids, games as games_repo, rounds, scores, tricks};
 use backend::services::game_flow::GameFlowService;
+use backend::AppError;
 use sea_orm::EntityTrait;
 use tracing::info;
 
 use crate::support::build_test_state;
-use crate::support::game_phases::{setup_game_in_bidding_phase, setup_game_in_trick_play_phase};
+use crate::support::game_phases::{
+    score_round, setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
+};
 use crate::support::game_setup::setup_game_with_players;
 use crate::support::trick_helpers::{create_tricks_by_winner_counts, create_tricks_with_winners};
 
@@ -29,8 +32,7 @@ async fn test_deal_round_transitions_to_bidding() -> Result<(), AppError> {
             let service = GameFlowService;
             service.deal_round(txn, game_id).await?;
 
-            let game = games::Entity::find_by_id(game_id)
-                .one(txn)
+            let game = games_repo::find_by_id(txn, game_id)
                 .await?
                 .expect("game should exist");
 
@@ -92,7 +94,10 @@ async fn test_submit_bid_succeeds_after_deal() -> Result<(), AppError> {
             let service = GameFlowService;
             service.deal_round(txn, game_id).await?;
 
-            let result = service.submit_bid(txn, game_id, 1, 5, None).await;
+            let game = backend::repos::games::require_game(txn, game_id).await?;
+            let result = service
+                .submit_bid(txn, game_id, 1, 5, game.lock_version)
+                .await;
 
             assert!(result.is_ok());
 
@@ -113,17 +118,21 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
             let setup = setup_game_in_bidding_phase(txn, "bidding_happy_path").await?;
             let service = GameFlowService;
 
-            let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
+            let round = rounds::find_by_game_and_round(txn, setup.game_id, 1)
+                .await?
+                .unwrap();
             assert_eq!(round.round_no, 1);
             assert_eq!(round.hand_size, 13);
             assert_eq!(round.completed_at, None);
 
             // Submit bids: Round 1, dealer at seat 0, bidding starts at seat 1
             // Bids: 4 + 3 + 0 + 5 = 12 (not 13, so dealer rule OK)
-            service.submit_bid(txn, setup.game_id, 1, 4, None).await?;
-            service.submit_bid(txn, setup.game_id, 2, 3, None).await?;
-            service.submit_bid(txn, setup.game_id, 3, 0, None).await?;
-            service.submit_bid(txn, setup.game_id, 0, 5, None).await?;
+            for (seat, bid) in [(1u8, 4u8), (2, 3), (3, 0), (0, 5)] {
+                let game = backend::repos::games::require_game(txn, setup.game_id).await?;
+                service
+                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .await?;
+            }
 
             let all_bids = bids::find_all_by_round(txn, setup.round_id).await?;
             assert_eq!(all_bids.len(), 4);
@@ -133,7 +142,7 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
             // Simulate tricks: P0 wins 5, P1 wins 4, P2 wins 3, P3 wins 1
             create_tricks_by_winner_counts(txn, setup.round_id, [5, 4, 3, 1]).await?;
 
-            service.score_round(txn, setup.game_id).await?;
+            score_round(txn, setup.game_id).await?;
 
             let all_scores = scores::find_all_by_round(txn, setup.round_id).await?;
             assert_eq!(all_scores.len(), 4);
@@ -168,7 +177,9 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
             assert!(!all_scores[3].bid_met);
             assert_eq!(all_scores[3].round_score, 1);
 
-            let updated_round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
+            let updated_round = rounds::find_by_game_and_round(txn, setup.game_id, 1)
+                .await?
+                .unwrap();
             assert!(updated_round.completed_at.is_some());
 
             let updated_game = games_repo::find_by_id(txn, setup.game_id).await?.unwrap();
@@ -193,14 +204,16 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
 
             // Round 1: dealer at seat 0, bidding starts at seat 1
             // Bids: 3 + 2 + 0 + 7 = 12 (not 13, dealer rule OK)
-            service.submit_bid(txn, setup.game_id, 1, 3, None).await?;
-            service.submit_bid(txn, setup.game_id, 2, 2, None).await?;
-            service.submit_bid(txn, setup.game_id, 3, 0, None).await?;
-            service.submit_bid(txn, setup.game_id, 0, 7, None).await?;
+            for (seat, bid) in [(1u8, 3u8), (2, 2), (3, 0), (0, 7)] {
+                let game = backend::repos::games::require_game(txn, setup.game_id).await?;
+                service
+                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .await?;
+            }
 
             create_tricks_by_winner_counts(txn, setup.round_id, [7, 3, 2, 1]).await?;
 
-            service.score_round(txn, setup.game_id).await?;
+            score_round(txn, setup.game_id).await?;
 
             let totals1 = scores::get_current_totals(txn, setup.game_id).await?;
             // P0: bid 7, won 7, met -> 7+10=17
@@ -209,22 +222,23 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
             // P3: bid 0, won 1, not met -> 1+0=1
             assert_eq!(totals1, [17, 13, 12, 1]);
 
-            service.advance_to_next_round(txn, setup.game_id).await?;
-            service.deal_round(txn, setup.game_id).await?;
+            // score_round already advanced to next round and dealt it automatically
             let round2 = rounds::find_by_game_and_round(txn, setup.game_id, 2)
                 .await?
                 .unwrap();
 
             // Round 2: dealer at seat 1, bidding starts at seat 2
             // Bids: 2 + 0 + 5 + 4 = 11 (not 12, dealer rule OK)
-            service.submit_bid(txn, setup.game_id, 2, 2, None).await?;
-            service.submit_bid(txn, setup.game_id, 3, 0, None).await?;
-            service.submit_bid(txn, setup.game_id, 0, 5, None).await?;
-            service.submit_bid(txn, setup.game_id, 1, 4, None).await?;
+            for (seat, bid) in [(2u8, 2u8), (3, 0), (0, 5), (1, 4)] {
+                let game = backend::repos::games::require_game(txn, setup.game_id).await?;
+                service
+                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .await?;
+            }
 
             create_tricks_by_winner_counts(txn, round2.id, [5, 4, 2, 1]).await?;
 
-            service.score_round(txn, setup.game_id).await?;
+            score_round(txn, setup.game_id).await?;
 
             let totals2 = scores::get_current_totals(txn, setup.game_id).await?;
             // P0: 17 + (5+10) = 32
@@ -252,18 +266,19 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
                 txn,
                 "trick_play_happy",
                 [3, 3, 4, 2],
-                rounds::Trump::Hearts,
+                Trump::Hearts,
             )
             .await?;
-            let service = GameFlowService;
 
             let game_after_setup = games_repo::find_by_id(txn, setup.game_id).await?.unwrap();
             assert_eq!(game_after_setup.id, setup.game_id);
 
-            let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
+            let round = rounds::find_by_game_and_round(txn, setup.game_id, 1)
+                .await?
+                .unwrap();
 
             use backend::repos::plays;
-            let trick0 = tricks::create_trick(txn, round.id, 1, tricks::Suit::Hearts, 0).await?;
+            let trick0 = tricks::create_trick(txn, round.id, 1, Suit::Hearts, 0).await?;
 
             plays::create_play(
                 txn,
@@ -310,13 +325,11 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
             )
             .await?;
 
-            service.resolve_trick(txn, setup.game_id).await?;
-
             // P0 wins tricks 2-3 (2 total), P1 wins 4-6 (3 total), P2 wins 7-10 (4 total), P3 wins 11-13 (3 total)
             create_tricks_with_winners(txn, round.id, &[0, 0, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3], 2)
                 .await?;
 
-            service.score_round(txn, setup.game_id).await?;
+            score_round(txn, setup.game_id).await?;
 
             let all_scores = scores::find_all_by_round(txn, round.id).await?;
             assert_eq!(all_scores.len(), 4);
@@ -333,7 +346,7 @@ async fn test_end_to_end_one_round() -> Result<(), AppError> {
             assert!(all_scores[2].bid_met);
             assert_eq!(all_scores[2].round_score, 14);
 
-            service.advance_to_next_round(txn, setup.game_id).await?;
+            // score_round already advanced to next round and dealt it automatically
 
             info!("End-to-end test completed successfully");
 
@@ -356,8 +369,7 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
                     .await?;
             let service = GameFlowService;
 
-            let game = games::Entity::find_by_id(setup.game_id)
-                .one(txn)
+            let game = games_repo::find_by_id(txn, setup.game_id)
                 .await?
                 .expect("game should exist");
             assert_eq!(game.state, GameState::BetweenRounds);
@@ -367,10 +379,7 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
             // Deal round 26 (the final round with 13 cards per player)
             service.deal_round(txn, setup.game_id).await?;
 
-            let game = games::Entity::find_by_id(setup.game_id)
-                .one(txn)
-                .await?
-                .unwrap();
+            let game = games_repo::find_by_id(txn, setup.game_id).await?.unwrap();
             assert_eq!(game.state, GameState::Bidding);
             assert_eq!(game.current_round, Some(26));
             assert_eq!(game.hand_size(), Some(13));
@@ -382,22 +391,32 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
 
             // Submit bids: Round 26, dealer at seat 1, bidding starts at seat 2
             // Bids: 3 + 3 + 4 + 2 = 12 (not 13, dealer rule OK)
-            service.submit_bid(txn, setup.game_id, 2, 3, None).await?;
-            service.submit_bid(txn, setup.game_id, 3, 3, None).await?;
-            service.submit_bid(txn, setup.game_id, 0, 4, None).await?;
-            service.submit_bid(txn, setup.game_id, 1, 2, None).await?;
+            for (seat, bid) in [(2u8, 3u8), (3, 3), (0, 4), (1, 2)] {
+                let game = backend::repos::games::require_game(txn, setup.game_id).await?;
+                service
+                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .await?;
+            }
 
             let all_bids = bids::find_all_by_round(txn, round.id).await?;
             assert_eq!(all_bids.len(), 4);
 
             service
-                .set_trump(txn, setup.game_id, 0, rounds::Trump::Hearts, None)
+                .set_trump(
+                    txn,
+                    setup.game_id,
+                    0,
+                    Trump::Hearts,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
 
             // Simulate 13 tricks: P0 wins 4, P1 wins 2, P2 wins 3, P3 wins 4
             create_tricks_by_winner_counts(txn, round.id, [4, 2, 3, 4]).await?;
 
-            service.score_round(txn, setup.game_id).await?;
+            score_round(txn, setup.game_id).await?;
 
             let round_scores = scores::find_all_by_round(txn, round.id).await?;
             assert_eq!(round_scores.len(), 4);
@@ -407,7 +426,7 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
             assert!(round_scores[0].bid_met);
             assert_eq!(round_scores[0].round_score, 14);
 
-            service.advance_to_next_round(txn, setup.game_id).await?;
+            // score_round already advanced to next round and dealt it automatically
 
             let final_game = games::Entity::find_by_id(setup.game_id)
                 .one(txn)

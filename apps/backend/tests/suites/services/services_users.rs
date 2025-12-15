@@ -2,10 +2,10 @@ use actix_web::http::StatusCode;
 use actix_web::ResponseError;
 use backend::db::txn::with_txn;
 use backend::entities::user_credentials;
-use backend::error::AppError;
-use backend::errors::ErrorCode;
+use backend::AppError;
+use backend::ErrorCode;
 use backend::services::users::UserService;
-use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 
 use crate::support::build_test_state;
@@ -64,7 +64,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
                 .one(txn)
                 .await
                 .map_err(|e| {
-                    backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                    backend::AppError::from(backend::infra::db_errors::map_db_err(e))
                 })?
                 .expect("should have credential row");
 
@@ -116,7 +116,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
                 .one(txn)
                 .await
                 .map_err(|e| {
-                    backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                    backend::AppError::from(backend::infra::db_errors::map_db_err(e))
                 })?
                 .expect("should have credential row");
 
@@ -220,7 +220,7 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
             };
 
             let user = user_active.insert(txn).await.map_err(|e| {
-                backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
             })?;
 
             // Create credential with NULL google_sub
@@ -237,7 +237,7 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
             };
 
             credential_active.insert(txn).await.map_err(|e| {
-                backend::error::AppError::from(backend::infra::db_errors::map_db_err(e))
+                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
             })?;
 
             // Scenario 4: Repeat login (email exists, google_sub NULL) → sets google_sub to incoming, succeeds

@@ -1,15 +1,16 @@
-use backend::adapters::games_sea::{self, GameCreate, GameUpdateRound};
+use backend::adapters::games_sea::{self, GameCreate, GameUpdate};
 use backend::db::txn::with_txn;
 use backend::domain::state::Phase;
-use backend::error::AppError;
+use backend::domain::{Suit, Trump};
 use backend::repos::{games, rounds, tricks};
 use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
 use backend::utils::join_code::generate_join_code;
+use backend::AppError;
 
 use crate::support::build_test_state;
 use crate::support::game_phases::{
-    setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
+    score_round, setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
     setup_game_in_trump_selection_phase,
 };
 use crate::support::trick_helpers::create_tricks_by_winner_counts;
@@ -92,7 +93,7 @@ async fn test_load_state_after_trump() -> Result<(), AppError> {
                 txn,
                 "state_load_trick1",
                 [4, 5, 3, 0],
-                rounds::Trump::Hearts,
+                Trump::Hearts,
             )
             .await?;
             let game_service = GameService;
@@ -130,16 +131,20 @@ async fn test_load_state_mid_trick() -> Result<(), AppError> {
                 txn,
                 "state_load_trick2",
                 [3, 3, 4, 2],
-                rounds::Trump::Spades,
+                Trump::Spades,
             )
             .await?;
             let game_service = GameService;
 
             // Manually create trick with 2 plays to test mid-trick state loading
-            let round = rounds::find_by_id(txn, setup.round_id).await?.unwrap();
+            let game = games::require_game(txn, setup.game_id).await?;
+            let round_no = game.current_round.expect("Game should have current round") as u8;
+            let round = rounds::find_by_game_and_round(txn, setup.game_id, round_no)
+                .await?
+                .unwrap();
 
             use backend::repos::plays;
-            let trick = tricks::create_trick(txn, round.id, 1, tricks::Suit::Hearts, 0).await?;
+            let trick = tricks::create_trick(txn, round.id, 1, Suit::Hearts, 0).await?;
             plays::create_play(
                 txn,
                 trick.id,
@@ -204,27 +209,28 @@ async fn test_load_state_second_trick_turn_advances() -> Result<(), AppError> {
                 txn,
                 "state_load_second_trick_turn",
                 [4, 5, 3, 0],
-                rounds::Trump::Hearts,
+                Trump::Hearts,
             )
             .await?;
             let game_service = GameService;
 
             // Create completed trick #1 with winner at seat 3
-            let round = rounds::find_by_id(txn, setup.round_id)
+            let game = games::require_game(txn, setup.game_id).await?;
+            let round_no = game.current_round.expect("Game should have current round") as u8;
+            let round = rounds::find_by_game_and_round(txn, setup.game_id, round_no)
                 .await?
                 .expect("round should exist");
 
-            tricks::create_trick(txn, round.id, 1, tricks::Suit::Spades, 3).await?;
+            tricks::create_trick(txn, round.id, 1, Suit::Spades, 3).await?;
 
             // Advance DB state to trick #2
             let game = games_sea::require_game(txn, setup.game_id).await?;
             let update_round =
-                GameUpdateRound::new(setup.game_id, game.lock_version).with_current_trick_no(2);
-            games_sea::update_round(txn, update_round).await?;
+                GameUpdate::new(setup.game_id, game.lock_version).with_current_trick_no(2);
+            games_sea::update_game(txn, update_round).await?;
 
             // Create trick #2 with first play by seat 3 (winner of trick #1)
-            let trick_two =
-                tricks::create_trick(txn, round.id, 2, tricks::Suit::Hearts, u8::MAX).await?;
+            let trick_two = tricks::create_trick(txn, round.id, 2, Suit::Hearts, u8::MAX).await?;
 
             use backend::repos::plays;
             plays::create_play(
@@ -272,7 +278,7 @@ async fn test_load_state_removes_played_cards_from_hands() -> Result<(), AppErro
                 txn,
                 "state_load_hand_trim",
                 [4, 5, 3, 0],
-                rounds::Trump::Hearts,
+                Trump::Hearts,
             )
             .await?;
             let game_service = GameService;
@@ -283,7 +289,15 @@ async fn test_load_state_removes_played_cards_from_hands() -> Result<(), AppErro
             let card_to_play = initial_state.hands[acting_seat as usize][0];
 
             flow_service
-                .play_card(txn, setup.game_id, acting_seat, card_to_play, None)
+                .play_card(
+                    txn,
+                    setup.game_id,
+                    acting_seat,
+                    card_to_play,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
 
             let updated_state = game_service.load_game_state(txn, setup.game_id).await?;
@@ -321,29 +335,69 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
 
             // Complete one full round (Round 1: dealer at seat 0, bidding starts at seat 1)
             flow_service
-                .submit_bid(txn, setup.game_id, 1, 3, None)
+                .submit_bid(
+                    txn,
+                    setup.game_id,
+                    1,
+                    3,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
             flow_service
-                .submit_bid(txn, setup.game_id, 2, 2, None)
+                .submit_bid(
+                    txn,
+                    setup.game_id,
+                    2,
+                    2,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
             flow_service
-                .submit_bid(txn, setup.game_id, 3, 0, None)
+                .submit_bid(
+                    txn,
+                    setup.game_id,
+                    3,
+                    0,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?;
             flow_service
-                .submit_bid(txn, setup.game_id, 0, 7, None)
+                .submit_bid(
+                    txn,
+                    setup.game_id,
+                    0,
+                    7,
+                    backend::repos::games::require_game(txn, setup.game_id)
+                        .await?
+                        .lock_version,
+                )
                 .await?; // Dealer
 
             // Tricks: P0 wins 7, P1 wins 3, P2 wins 2, P3 wins 1
             create_tricks_by_winner_counts(txn, setup.round_id, [7, 3, 2, 1]).await?;
 
-            flow_service.score_round(txn, setup.game_id).await?;
+            score_round(txn, setup.game_id).await?;
 
             let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
             // P0: 7+10=17, P1: 3+10=13, P2: 2+10=12, P3: 1+0=1 (didn't meet bid 0)
+            // After scoring, the game has advanced to the next round, so:
+            // - `scores_total` reflects the completed round's cumulative totals.
+            // - `round.tricks_won` is for the *current* round (which has not started yet).
+            // - The completed round's tricks are exposed via `previous_round`.
             assert_eq!(loaded_state.scores_total, [17, 13, 12, 1]);
 
-            assert_eq!(loaded_state.round.tricks_won, [7, 3, 2, 1]);
+            let previous_round = loaded_state
+                .round
+                .previous_round
+                .expect("previous round summary should be present after scoring");
+            assert_eq!(previous_round.tricks_won, [7, 3, 2, 1]);
 
             Ok::<_, AppError>(())
         })

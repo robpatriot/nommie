@@ -3,7 +3,7 @@
 use backend::ai::memory::{get_round_card_plays, MemoryMode};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::error::AppError;
+use backend::AppError;
 use uuid::Uuid;
 
 use crate::support::build_test_state;
@@ -75,16 +75,16 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
     .await?;
 
     // Test with Full mode - should return empty vec (no plays yet)
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full, None).await?;
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full, None, false).await?;
     assert!(plays.is_empty());
 
     // Test with None mode - should return empty vec
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::None, None).await?;
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::None, None, false).await?;
     assert!(plays.is_empty());
 
     // Test with Partial mode - should return empty vec
     let plays =
-        get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42)).await?;
+        get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42), false).await?;
     assert!(plays.is_empty());
 
     // Rollback the transaction immediately after last DB access
@@ -203,7 +203,7 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     }
 
     // Test Full mode - should return all tricks with Exact memory
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full, None).await?;
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::Full, None, false).await?;
     assert_eq!(plays.len(), 2);
     assert_eq!(plays[0].trick_no, 1);
     assert_eq!(plays[0].plays.len(), 4);
@@ -216,12 +216,12 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     }
 
     // Test None mode - should return empty
-    let plays = get_round_card_plays(txn, round.id, MemoryMode::None, None).await?;
+    let plays = get_round_card_plays(txn, round.id, MemoryMode::None, None, false).await?;
     assert!(plays.is_empty());
 
     // Test Partial mode with seed - should return degraded memory
     let plays_partial =
-        get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42)).await?;
+        get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42), false).await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;

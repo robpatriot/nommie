@@ -1,10 +1,9 @@
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::{games, round_bids};
-use backend::error::AppError;
-use backend::errors::ErrorCode;
 use backend::services::game_flow::GameFlowService;
 use backend::state::security_config::SecurityConfig;
+use backend::{AppError, ErrorCode};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::support::game_phases::setup_game_in_bidding_phase;
@@ -26,8 +25,18 @@ async fn submit_bid_success() -> Result<(), AppError> {
     let actor_seat = ((dealer_pos + 1) % 4) as u8;
 
     let service = GameFlowService;
+    let game = games::Entity::find_by_id(setup.game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
     service
-        .submit_bid(shared.transaction(), setup.game_id, actor_seat, 1, None)
+        .submit_bid(
+            shared.transaction(),
+            setup.game_id,
+            actor_seat,
+            1,
+            game.lock_version,
+        )
         .await?;
 
     let stored_bid = round_bids::Entity::find()
@@ -64,8 +73,18 @@ async fn submit_bid_out_of_turn_rejected() -> Result<(), AppError> {
     let actor_seat = dealer_pos; // Dealer should bid last
 
     let service = GameFlowService;
+    let game = games::Entity::find_by_id(setup.game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
     let result = service
-        .submit_bid(shared.transaction(), setup.game_id, actor_seat, 1, None)
+        .submit_bid(
+            shared.transaction(),
+            setup.game_id,
+            actor_seat,
+            1,
+            game.lock_version,
+        )
         .await;
 
     let err = result.expect_err("expected out-of-turn error");

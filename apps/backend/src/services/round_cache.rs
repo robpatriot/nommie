@@ -95,14 +95,8 @@ impl RoundCache {
             }
         }
 
-        // Load trump
-        let trump = round.trump.map(|t| match t {
-            rounds::Trump::Clubs => Trump::Clubs,
-            rounds::Trump::Diamonds => Trump::Diamonds,
-            rounds::Trump::Hearts => Trump::Hearts,
-            rounds::Trump::Spades => Trump::Spades,
-            rounds::Trump::NoTrump => Trump::NoTrump,
-        });
+        // Load trump (already domain type, no conversion needed)
+        let trump = round.trump;
 
         // Load cumulative scores from completed rounds
         use crate::repos::scores;
@@ -163,19 +157,6 @@ impl RoundCache {
     /// Get AI profile for an AI membership.
     pub fn get_ai_profile(&self, ai_profile_id: i64) -> Option<&ai_profiles::Model> {
         self.ai_profiles.get(&ai_profile_id)
-    }
-
-    /// Check if a player is AI.
-    pub fn is_player_ai(&self, seat: u8) -> bool {
-        if seat >= 4 {
-            return false;
-        }
-
-        self.players
-            .iter()
-            .find(|p| p.turn_order == seat)
-            .map(|p| p.player_kind == crate::entities::game_players::PlayerKind::Ai)
-            .unwrap_or(false)
     }
 
     /// Build CurrentRoundInfo for a player using cached data.

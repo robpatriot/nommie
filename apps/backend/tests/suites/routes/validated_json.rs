@@ -1,6 +1,7 @@
 use actix_web::test;
+use backend::auth::jwt::verify_access_token;
 use backend::state::security_config::SecurityConfig;
-use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::unique_helpers::{unique_email, unique_str};
 use serde_json::json;
 
 use crate::common::assert_problem_details_structure;
@@ -159,8 +160,7 @@ async fn test_valid_json_happy_path_unchanged() -> Result<(), Box<dyn std::error
     assert!(!token.is_empty());
 
     // Verify the JWT can be decoded
-    let decoded =
-        backend::verify_access_token(token, &security_config).expect("JWT should be valid");
+    let decoded = verify_access_token(token, &security_config).expect("JWT should be valid");
     assert_eq!(decoded.email, test_email);
 
     Ok(())

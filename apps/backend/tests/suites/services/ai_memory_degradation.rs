@@ -3,7 +3,7 @@
 use backend::ai::memory::{get_round_card_plays, MemoryMode};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::error::AppError;
+use backend::AppError;
 
 use crate::support::build_test_state;
 use crate::support::test_utils::{test_seed, test_seed_u64};
@@ -25,6 +25,7 @@ async fn test_memory_degradation_determinism() -> Result<(), AppError> {
         round_id,
         MemoryMode::Partial { level: 50 },
         Some(test_seed_val),
+        false,
     )
     .await?;
     let plays2 = get_round_card_plays(
@@ -32,6 +33,7 @@ async fn test_memory_degradation_determinism() -> Result<(), AppError> {
         round_id,
         MemoryMode::Partial { level: 50 },
         Some(test_seed_val),
+        false,
     )
     .await?;
 
@@ -55,6 +57,7 @@ async fn test_memory_degradation_determinism() -> Result<(), AppError> {
         round_id,
         MemoryMode::Partial { level: 50 },
         Some(different_seed),
+        false,
     )
     .await?;
 
@@ -88,11 +91,11 @@ async fn test_memory_levels() -> Result<(), AppError> {
     let (round_id, _game_id) = create_test_round_with_plays(txn).await?;
 
     // Level 0 (None) - no memory
-    let plays = get_round_card_plays(txn, round_id, MemoryMode::None, Some(42)).await?;
+    let plays = get_round_card_plays(txn, round_id, MemoryMode::None, Some(42), false).await?;
     assert!(plays.is_empty());
 
     // Level 100 (Full) - perfect memory
-    let plays = get_round_card_plays(txn, round_id, MemoryMode::Full, Some(42)).await?;
+    let plays = get_round_card_plays(txn, round_id, MemoryMode::Full, Some(42), false).await?;
     assert!(!plays.is_empty());
     for trick in &plays {
         for (_seat, play_memory) in &trick.plays {
@@ -105,7 +108,7 @@ async fn test_memory_levels() -> Result<(), AppError> {
 
     // Level 10 - very poor memory (should forget most)
     let plays =
-        get_round_card_plays(txn, round_id, MemoryMode::Partial { level: 10 }, Some(42)).await?;
+        get_round_card_plays(txn, round_id, MemoryMode::Partial { level: 10 }, Some(42), false).await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;
@@ -139,12 +142,12 @@ async fn test_partial_memory_types() -> Result<(), AppError> {
 
     // Level 50 - moderate memory (should have mix of types)
     let plays =
-        get_round_card_plays(txn, round_id, MemoryMode::Partial { level: 50 }, Some(42)).await?;
+        get_round_card_plays(txn, round_id, MemoryMode::Partial { level: 50 }, Some(42), false).await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;
 
-    use backend::domain::PlayMemory;
+    use backend::domain::round_memory::PlayMemory;
 
     let mut exact_count = 0;
     let mut suit_count = 0;

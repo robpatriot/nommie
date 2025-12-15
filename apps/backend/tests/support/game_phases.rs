@@ -3,9 +3,9 @@
 // This module provides helpers for setting up games in specific phases
 // (Bidding, TrumpSelection, TrickPlay) to reduce boilerplate in tests.
 
-use backend::error::AppError;
-use backend::repos::rounds::Trump;
+use backend::domain::Trump;
 use backend::services::game_flow::GameFlowService;
+use backend::AppError;
 use sea_orm::DatabaseTransaction;
 
 use super::game_setup::setup_game_with_players;
@@ -46,12 +46,9 @@ pub async fn setup_game_in_bidding_phase(
     // Deal the round
     service.deal_round(txn, game_setup.game_id).await?;
 
-    // Get round info
-    let game = backend::adapters::games_sea::require_game(txn, game_setup.game_id).await?;
-    let round_no: u8 = game
-        .current_round
-        .and_then(|value| value.try_into().ok())
-        .expect("Game should have current round");
+    // Get round info using the repository model, which exposes helper methods
+    let game = backend::repos::games::require_game(txn, game_setup.game_id).await?;
+    let round_no: u8 = game.current_round.expect("Game should have current round");
     let dealer_pos = game.dealer_pos().expect("Game should have dealer position");
 
     let round = backend::repos::rounds::find_by_game_and_round(txn, game_setup.game_id, round_no)
@@ -93,13 +90,20 @@ pub async fn setup_game_in_trump_selection_phase(
     let phase_setup = setup_game_in_bidding_phase(txn, test_name).await?;
     let service = GameFlowService;
 
-    // Submit all bids in dealer order
+    // Submit all bids in dealer order, using the current lock_version for each mutation
     // Bidding starts at (dealer_pos + 1) % 4
     let first_bidder = ((phase_setup.dealer_pos + 1) % 4) as usize;
     for i in 0..4 {
         let seat = (first_bidder + i) % 4;
+        let game = backend::repos::games::require_game(txn, phase_setup.game_id).await?;
         service
-            .submit_bid(txn, phase_setup.game_id, seat as u8, bids[seat], None)
+            .submit_bid(
+                txn,
+                phase_setup.game_id,
+                seat as u8,
+                bids[seat],
+                game.lock_version,
+            )
             .await?;
     }
 
@@ -138,9 +142,16 @@ pub async fn setup_game_in_trick_play_phase(
     // Determine winning bidder (highest bid, ties go to earliest bidder)
     let winning_bidder = find_winning_bidder(&bids, phase_setup.dealer_pos);
 
-    // Set trump
+    // Set trump, using the current lock_version for this mutation
+    let game = backend::repos::games::require_game(txn, phase_setup.game_id).await?;
     service
-        .set_trump(txn, phase_setup.game_id, winning_bidder, trump, None)
+        .set_trump(
+            txn,
+            phase_setup.game_id,
+            winning_bidder,
+            trump,
+            game.lock_version,
+        )
         .await?;
 
     Ok(phase_setup)
@@ -353,4 +364,13 @@ pub async fn setup_game_at_round(
             0u8
         },
     })
+}
+
+/// Score a round for testing purposes.
+///
+/// This is a test helper that loads the game and scores the current round.
+/// In production, scoring happens automatically when the last trick is resolved.
+pub async fn score_round(txn: &DatabaseTransaction, game_id: i64) -> Result<(), AppError> {
+    let service = GameFlowService;
+    service.score_round(txn, game_id).await
 }

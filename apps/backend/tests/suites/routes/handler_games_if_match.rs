@@ -16,10 +16,10 @@ use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games;
-use backend::error::AppError;
 use backend::http::etag::game_etag;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games as games_routes;
+use backend::AppError;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::support::app_builder::create_test_app;
@@ -127,12 +127,19 @@ async fn setup_play_test(
         shared.transaction(),
         test_name,
         [3, 3, 4, 2],
-        backend::repos::rounds::Trump::Hearts,
+        backend::domain::Trump::Hearts,
     )
     .await?;
 
-    // First player to play in trick
-    let first_player = 0i32;
+    // Determine the current player to act from the domain game state
+    let game_state = {
+        use backend::services::games::GameService;
+        let service = GameService;
+        service
+            .load_game_state(shared.transaction(), setup.game_id)
+            .await?
+    };
+    let current_player = game_state.turn as i32;
 
     let user_sub = format!("{test_name}_user");
     let user_email = format!("{test_name}@example.com");
@@ -142,7 +149,7 @@ async fn setup_play_test(
     use backend::entities::game_players;
     let membership = game_players::Entity::find()
         .filter(game_players::Column::GameId.eq(setup.game_id))
-        .filter(game_players::Column::TurnOrder.eq(first_player))
+        .filter(game_players::Column::TurnOrder.eq(current_player))
         .one(shared.transaction())
         .await?
         .expect("membership should exist");
@@ -164,7 +171,7 @@ async fn setup_play_test(
     )
     .await?
     .expect("round should exist");
-    let hand = hands::find_by_round_and_seat(shared.transaction(), round.id, first_player as u8)
+    let hand = hands::find_by_round_and_seat(shared.transaction(), round.id, current_player as u8)
         .await?
         .expect("player should have a hand");
     let first_card = backend::domain::cards_parsing::from_stored_format(

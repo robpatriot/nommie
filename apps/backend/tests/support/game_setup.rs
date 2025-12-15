@@ -4,7 +4,7 @@
 
 use backend::entities::games::{self, GameState, GameVisibility};
 use backend::entities::users;
-use backend::error::AppError;
+use backend::AppError;
 use backend::infra::db_errors::map_db_err;
 use sea_orm::{ActiveModelTrait, ConnectionTrait, EntityTrait, NotSet, Set};
 use time::OffsetDateTime;

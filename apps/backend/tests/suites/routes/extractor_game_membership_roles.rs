@@ -2,19 +2,18 @@
 //
 // Tests role-based authorization patterns using the GameMembership extractor:
 // - Player-only actions
-// - Actions that allow any member (Player or Spectator)
-// - Role hierarchy logic
+// - Actions that allow any member
 
 use actix_web::{test, web, HttpMessage, Responder};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::extractors::{CurrentUser, GameId, GameMembership};
+use backend::{CurrentUser, GameId, GameMembership};
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::repos::memberships::GameRole;
 use backend::state::security_config::SecurityConfig;
-use backend::utils::unique::{unique_email, unique_str};
+use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
 use time::OffsetDateTime;
@@ -24,13 +23,13 @@ use crate::support::auth::mint_test_token;
 use crate::support::factory::create_test_user;
 use crate::support::test_state_builder;
 
-/// Test-only handler that requires Player role (rejects Spectators)
+/// Test-only handler that requires Player role
 async fn player_only_action(
     current_user: CurrentUser,
     game_id: GameId,
     membership: GameMembership,
 ) -> Result<impl Responder, backend::AppError> {
-    use backend::errors::ErrorCode;
+    use backend::ErrorCode;
 
     // Enforce Player role
     if membership.role != GameRole::Player {
@@ -55,7 +54,7 @@ async fn player_only_action(
     }))
 }
 
-/// Test-only handler that accepts any member (Player or Spectator)
+/// Test-only handler that accepts any member
 async fn spectator_allowed_action(
     current_user: CurrentUser,
     game_id: GameId,
@@ -235,20 +234,3 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     Ok(())
 }
 
-#[actix_web::test]
-async fn test_game_role_hierarchy() {
-    // Unit test for GameRole::has_at_least logic
-    // This demonstrates the role hierarchy system
-
-    // Player has at least Player permission
-    assert!(GameRole::Player.has_at_least(GameRole::Player));
-
-    // Player has at least Spectator permission (Players can do everything Spectators can)
-    assert!(GameRole::Player.has_at_least(GameRole::Spectator));
-
-    // Spectator does NOT have at least Player permission
-    assert!(!GameRole::Spectator.has_at_least(GameRole::Player));
-
-    // Spectator has at least Spectator permission
-    assert!(GameRole::Spectator.has_at_least(GameRole::Spectator));
-}

@@ -5,7 +5,7 @@ use super::GameFlowService;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
-use crate::repos::{bids, games, memberships, player_view, plays, rounds, tricks};
+use crate::repos::{games, memberships, player_view};
 
 impl GameFlowService {
     /// Check if all players are ready and start the game if conditions are met.
@@ -111,9 +111,8 @@ impl GameFlowService {
     /// Process game state after any action or transition.
     ///
     /// This is the core orchestrator that:
-    /// 1. Checks if a state transition is needed and applies it
-    /// 2. Checks if an AI player needs to act and executes the action
-    /// 3. Loops until no more transitions or AI actions are needed
+    /// 1. Checks if an AI player needs to act and executes the action
+    /// 2. Loops until no more AI actions are needed
     ///
     /// This is a loop-based approach to avoid deep recursion and stack overflow.
     ///
@@ -163,15 +162,6 @@ impl GameFlowService {
             // player who abandoned the game)
             if game.state == DbGameState::Completed || game.state == DbGameState::Abandoned {
                 return Ok(());
-            }
-
-            // Priority 1: Check if we need a state transition
-            let transition_applied = self.check_and_apply_transition_internal(txn, &game).await?;
-            if transition_applied {
-                // Transition happened - reload game to get updated state and lock_version
-                game = games::require_game(txn, game_id).await?;
-                // Loop again - completion will be caught at line 138 on next iteration
-                continue;
             }
 
             // Check if we need cache and if it needs refreshing
@@ -252,171 +242,5 @@ impl GameFlowService {
                 "process_game_state exceeded max iterations {MAX_ITERATIONS}"
             )),
         ))
-    }
-
-    /// Check if current game state requires a transition and apply it.
-    ///
-    /// Returns true if a transition was applied.
-    /// Does NOT call process_game_state - the caller loops instead.
-    pub(super) async fn check_and_apply_transition_internal(
-        &self,
-        txn: &DatabaseTransaction,
-        game: &games::Game,
-    ) -> Result<bool, AppError> {
-        match game.state {
-            DbGameState::Bidding => {
-                // Check if all 4 bids are in -> transition to TrumpSelection
-                let current_round_no = game.current_round.ok_or_else(|| {
-                    DomainError::validation(
-                        ValidationKind::Other("NO_ROUND".into()),
-                        "No current round",
-                    )
-                })?;
-                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
-                    .await?
-                    .ok_or_else(|| {
-                        DomainError::validation(
-                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
-                            "Round not found",
-                        )
-                    })?;
-
-                let bid_count = bids::count_bids_by_round(txn, round.id).await?;
-                if bid_count == 4 {
-                    // All bids placed - transition to Trump Selection
-                    games::update_state(
-                        txn,
-                        game.id,
-                        DbGameState::TrumpSelection,
-                        game.lock_version,
-                    )
-                    .await?;
-                    info!(game.id, "All bids placed, transitioning to Trump Selection");
-                    debug!(game.id, "Transition: Bidding -> TrumpSelection");
-                    return Ok(true);
-                }
-            }
-            DbGameState::TrumpSelection => {
-                // Check if trump is set -> transition to TrickPlay
-                let current_round_no = game.current_round.ok_or_else(|| {
-                    DomainError::validation(
-                        ValidationKind::Other("NO_ROUND".into()),
-                        "No current round",
-                    )
-                })?;
-                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
-                    .await?
-                    .ok_or_else(|| {
-                        DomainError::validation(
-                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
-                            "Round not found",
-                        )
-                    })?;
-
-                if round.trump.is_some() {
-                    // Trump is set - transition to TrickPlay and initialize to trick 1
-                    // Use the game object passed in instead of reloading
-                    let updated_game = games::update_state(
-                        txn,
-                        game.id,
-                        DbGameState::TrickPlay,
-                        game.lock_version,
-                    )
-                    .await?;
-
-                    // Initialize current_trick_no to 1 (first trick)
-                    games::update_round(
-                        txn,
-                        game.id,
-                        updated_game.lock_version,
-                        None,
-                        None,
-                        Some(1),
-                    )
-                    .await?;
-
-                    info!(game.id, "Trump set, transitioning to Trick Play");
-                    debug!(game.id, "Transition: TrumpSelection -> TrickPlay");
-                    return Ok(true);
-                }
-            }
-            DbGameState::TrickPlay => {
-                // Check if current trick is complete (4 plays) -> resolve trick
-                let current_round_no = game.current_round.ok_or_else(|| {
-                    DomainError::validation(
-                        ValidationKind::Other("NO_ROUND".into()),
-                        "No current round",
-                    )
-                })?;
-                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
-                    .await?
-                    .ok_or_else(|| {
-                        DomainError::validation(
-                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
-                            "Round not found",
-                        )
-                    })?;
-
-                if let Some(trick) =
-                    tricks::find_by_round_and_trick(txn, round.id, game.current_trick_no).await?
-                {
-                    let play_count = plays::count_plays_by_trick(txn, trick.id).await?;
-                    if play_count == 4 {
-                        // Trick complete - resolve it
-                        debug!(
-                            game.id,
-                            trick_no = game.current_trick_no,
-                            "Trick complete, resolving"
-                        );
-                        self.resolve_trick_internal(txn, game).await?;
-                        // State modified; caller's loop will continue processing
-                        return Ok(true);
-                    }
-                }
-            }
-            DbGameState::Scoring => {
-                // Check if round is scored (completed_at set) -> advance to next round
-                let current_round_no = game.current_round.ok_or_else(|| {
-                    DomainError::validation(
-                        ValidationKind::Other("NO_ROUND".into()),
-                        "No current round",
-                    )
-                })?;
-                let round = rounds::find_by_game_and_round(txn, game.id, current_round_no)
-                    .await?
-                    .ok_or_else(|| {
-                        DomainError::validation(
-                            ValidationKind::Other("ROUND_NOT_FOUND".into()),
-                            "Round not found",
-                        )
-                    })?;
-
-                if round.completed_at.is_some() {
-                    // Round scored - advance to next round
-                    self.advance_to_next_round_internal(txn, game).await?;
-                    // State modified; caller's loop will continue processing
-                    return Ok(true);
-                } else {
-                    // Need to score the round first
-                    self.score_round_internal(txn, game).await?;
-                    // State modified; caller's loop will continue processing
-                    return Ok(true);
-                }
-            }
-            DbGameState::BetweenRounds => {
-                // Automatically deal next round
-                self.deal_round_internal(txn, game).await?;
-                // State modified; caller's loop will continue processing
-                return Ok(true);
-            }
-            DbGameState::Lobby
-            | DbGameState::Dealing
-            | DbGameState::Completed
-            | DbGameState::Abandoned => {
-                // No automatic transitions
-            }
-        }
-
-        Ok(false)
     }
 }

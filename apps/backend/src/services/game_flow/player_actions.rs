@@ -2,12 +2,11 @@ use sea_orm::DatabaseTransaction;
 use tracing::{debug, info};
 
 use super::GameFlowService;
-use crate::domain::bidding::{validate_consecutive_zero_bids, Bid};
-use crate::domain::cards_parsing::from_stored_format;
-use crate::domain::{card_beats, Card, Suit};
+use crate::domain::bidding::Bid;
+use crate::domain::Card;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
-use crate::errors::domain::{ConflictKind, DomainError, ValidationKind};
+use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::games::Game;
 use crate::repos::{bids, games, player_view, plays, rounds, tricks};
 
@@ -17,8 +16,7 @@ impl GameFlowService {
     /// Public method that records the bid and processes game state (transitions + AI).
     ///
     /// # Parameters
-    /// - `expected_lock_version`: If provided, validates that the game's current lock_version matches
-    ///   this value. If not provided, uses the lock_version from the database (backward compatibility).
+    /// - `expected_lock_version`: Validates that the game's current lock_version matches this value.
     ///
     /// # Returns
     /// Returns the updated game model with the new lock_version after the mutation.
@@ -28,7 +26,7 @@ impl GameFlowService {
         game_id: i64,
         player_seat: u8,
         bid_value: u8,
-        expected_lock_version: Option<i32>,
+        expected_lock_version: i32,
     ) -> Result<Game, AppError> {
         self.submit_bid_internal(txn, game_id, player_seat, bid_value, expected_lock_version)
             .await?;
@@ -53,62 +51,27 @@ impl GameFlowService {
         game_id: i64,
         player_seat: u8,
         bid_value: u8,
-        expected_lock_version: Option<i32>,
+        expected_lock_version: i32,
     ) -> Result<Game, AppError> {
         debug!(game_id, player_seat, bid_value, "Submitting bid");
 
-        // Load game
-        let game = games::require_game(txn, game_id).await?;
+        // Load GameState and apply domain logic
+        let mut state = {
+            use crate::services::games::GameService;
+            let service = GameService;
+            service.load_game_state(txn, game_id).await?
+        };
 
-        // Validate lock version if provided (optimistic locking)
-        if let Some(expected_version) = expected_lock_version {
-            if game.lock_version != expected_version {
-                return Err(DomainError::conflict(
-                    ConflictKind::OptimisticLock,
-                    format!(
-                        "Resource was modified concurrently (expected version {}, actual version {}). Please refresh and retry.",
-                        expected_version, game.lock_version
-                    ),
-                )
-                .into());
-            }
-        }
+        // Load game history for domain validation (needed for consecutive zero bids rule)
+        let history = player_view::load_game_history(txn, game_id).await?;
 
-        if game.state != DbGameState::Bidding {
-            return Err(DomainError::validation(
-                ValidationKind::PhaseMismatch,
-                "Not in bidding phase",
-            )
-            .into());
-        }
-
-        let hand_size = game.hand_size().ok_or_else(|| {
-            DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
-        })?;
-
-        // Find the current round (needed for validation)
-        let current_round_no = game.current_round.ok_or_else(|| {
-            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
-        })?;
-
-        // Validate bid range using domain logic
+        // Apply domain logic (includes all game rule validations)
         let bid = Bid(bid_value);
-        let valid_range = crate::domain::valid_bid_range(hand_size);
-        if !valid_range.contains(&bid.0) {
-            return Err(DomainError::validation(
-                ValidationKind::InvalidBid,
-                format!("Bid must be in range {valid_range:?}"),
-            )
-            .into());
-        }
+        let result =
+            crate::domain::bidding::place_bid(&mut state, player_seat, bid, Some(&history))?;
 
-        // Validate consecutive zero bids rule (if bidding 0)
-        if bid_value == 0 {
-            // Load game history for validation (service owns its validation data)
-            let history = player_view::load_game_history(txn, game_id).await?;
-            validate_consecutive_zero_bids(&history, player_seat, current_round_no)?;
-        }
-
+        // Get current round for persistence
+        let current_round_no = state.round_no;
         let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
@@ -121,43 +84,6 @@ impl GameFlowService {
         // Determine bid_order (how many bids have been placed already)
         let bid_order = bids::count_bids_by_round(txn, round.id).await?;
 
-        // Turn order validation: bidding starts at dealer+1, then proceeds clockwise
-        let dealer_pos = game.dealer_pos().ok_or_else(|| {
-            DomainError::validation(
-                ValidationKind::Other("NO_DEALER".into()),
-                "Dealer position not set",
-            )
-        })?;
-
-        let expected_seat = (dealer_pos + 1 + bid_order as u8) % 4;
-        if player_seat != expected_seat {
-            return Err(DomainError::validation(
-                ValidationKind::OutOfTurn,
-                format!(
-                    "Not your turn to bid. Expected player {expected_seat} (seat {expected_seat}), got player {player_seat}"
-                ),
-            )
-            .into());
-        }
-
-        // Dealer bid restriction: if this is the 4th (final) bid, check dealer rule
-        if bid_order == 3 {
-            // This is the dealer's bid - sum of all bids cannot equal hand_size
-            let existing_bids = bids::find_all_by_round(txn, round.id).await?;
-            let existing_sum: u8 = existing_bids.iter().map(|b| b.bid_value).sum();
-            let proposed_sum = existing_sum + bid_value;
-
-            if proposed_sum == hand_size {
-                return Err(DomainError::validation(
-                    ValidationKind::InvalidBid,
-                    format!(
-                        "Dealer cannot bid {bid_value}: sum would be {proposed_sum} = hand_size"
-                    ),
-                )
-                .into());
-            }
-        }
-
         // Persist the bid
         bids::create_bid(txn, round.id, player_seat, bid_value, bid_order as u8).await?;
 
@@ -166,12 +92,22 @@ impl GameFlowService {
             player_seat, bid_value, bid_order, "Bid persisted successfully"
         );
 
-        // Bump lock_version on game to reflect bid state change
-        // This ensures each bid increments the version, not just state transitions
-        // Use expected_lock_version if provided, otherwise use the current lock_version from the game
-        let lock_version_to_use = expected_lock_version.unwrap_or(game.lock_version);
-        let updated_game =
-            games::update_round(txn, game_id, lock_version_to_use, None, None, None).await?;
+        // Update game state if phase transitioned to TrumpSelect
+        let state_update = result
+            .phase_transitioned
+            .filter(|phase| matches!(phase, crate::domain::state::Phase::TrumpSelect))
+            .map(|_| DbGameState::TrumpSelection);
+
+        let updated_game = games::update_game(
+            txn,
+            game_id,
+            expected_lock_version,
+            state_update,
+            None,
+            None,
+            None,
+        )
+        .await?;
 
         Ok(updated_game)
     }
@@ -181,8 +117,7 @@ impl GameFlowService {
     /// Public method that sets trump and processes game state (transitions + AI).
     ///
     /// # Parameters
-    /// - `expected_lock_version`: If provided, validates that the game's current lock_version matches
-    ///   this value. If not provided, uses the lock_version from the database (backward compatibility).
+    /// - `expected_lock_version`: Validates that the game's current lock_version matches this value.
     ///
     /// # Returns
     /// Returns the updated game model with the new lock_version after the mutation and state transitions.
@@ -191,8 +126,8 @@ impl GameFlowService {
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: u8,
-        trump: rounds::Trump,
-        expected_lock_version: Option<i32>,
+        trump: crate::domain::Trump,
+        expected_lock_version: i32,
     ) -> Result<Game, AppError> {
         self.set_trump_internal(txn, game_id, player_seat, trump, expected_lock_version)
             .await?;
@@ -210,41 +145,23 @@ impl GameFlowService {
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: u8,
-        trump: rounds::Trump,
-        expected_lock_version: Option<i32>,
+        trump: crate::domain::Trump,
+        expected_lock_version: i32,
     ) -> Result<Game, AppError> {
         info!(game_id, player_seat, trump = ?trump, "Setting trump");
 
-        // Load game
-        let game = games::require_game(txn, game_id).await?;
+        // Load GameState and apply domain logic
+        let mut state = {
+            use crate::services::games::GameService;
+            let service = GameService;
+            service.load_game_state(txn, game_id).await?
+        };
 
-        // Validate lock version if provided (optimistic locking)
-        if let Some(expected_version) = expected_lock_version {
-            if game.lock_version != expected_version {
-                return Err(DomainError::conflict(
-                    ConflictKind::OptimisticLock,
-                    format!(
-                        "Resource was modified concurrently (expected version {}, actual version {}). Please refresh and retry.",
-                        expected_version, game.lock_version
-                    ),
-                )
-                .into());
-            }
-        }
+        // Apply domain logic
+        let result = crate::domain::bidding::set_trump(&mut state, player_seat, trump)?;
 
-        if game.state != DbGameState::TrumpSelection {
-            return Err(DomainError::validation(
-                ValidationKind::PhaseMismatch,
-                "Not in trump selection phase",
-            )
-            .into());
-        }
-
-        // Get current round
-        let current_round_no = game.current_round.ok_or_else(|| {
-            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
-        })?;
-
+        // Get current round for persistence
+        let current_round_no = state.round_no;
         let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
@@ -254,28 +171,7 @@ impl GameFlowService {
                 )
             })?;
 
-        // Determine winning bidder and validate
-        let winning_bid = bids::find_winning_bid(txn, round.id)
-            .await?
-            .ok_or_else(|| {
-                DomainError::validation(
-                    ValidationKind::Other("NO_WINNING_BID".into()),
-                    "No winning bid found",
-                )
-            })?;
-
-        if winning_bid.player_seat != player_seat {
-            return Err(DomainError::validation(
-                ValidationKind::OutOfTurn,
-                format!(
-                    "Only the winning bidder (seat {}) can choose trump, not seat {}",
-                    winning_bid.player_seat, player_seat
-                ),
-            )
-            .into());
-        }
-
-        // Set trump on the round
+        // Persist trump (conversion handled by rounds::update_trump)
         rounds::update_trump(txn, round.id, trump).await?;
 
         info!(
@@ -285,8 +181,18 @@ impl GameFlowService {
             "Trump set by winning bidder"
         );
 
-        // Return the game (lock_version may be updated by state transition)
-        let updated_game = games::require_game(txn, game_id).await?;
+        // Update game state: set_trump always transitions to Trick phase
+        let updated_game = games::update_game(
+            txn,
+            game_id,
+            expected_lock_version,
+            Some(DbGameState::TrickPlay),
+            None,
+            None,
+            Some(result.trick_no),
+        )
+        .await?;
+
         Ok(updated_game)
     }
 
@@ -295,8 +201,7 @@ impl GameFlowService {
     /// Public method that records the card play and processes game state (transitions + AI).
     ///
     /// # Parameters
-    /// - `expected_lock_version`: If provided, validates that the game's current lock_version matches
-    ///   this value. If not provided, uses the lock_version from the database (backward compatibility).
+    /// - `expected_lock_version`: Validates that the game's current lock_version matches this value.
     ///
     /// # Returns
     /// Returns the updated game model with the new lock_version after the mutation.
@@ -306,7 +211,7 @@ impl GameFlowService {
         game_id: i64,
         player_seat: u8,
         card: Card,
-        expected_lock_version: Option<i32>,
+        expected_lock_version: i32,
     ) -> Result<Game, AppError> {
         self.play_card_internal(txn, game_id, player_seat, card, expected_lock_version)
             .await?;
@@ -325,40 +230,19 @@ impl GameFlowService {
         game_id: i64,
         player_seat: u8,
         card: Card,
-        expected_lock_version: Option<i32>,
+        expected_lock_version: i32,
     ) -> Result<Game, AppError> {
         debug!(game_id, player_seat, "Playing card");
 
-        // Load game
-        let game = games::require_game(txn, game_id).await?;
+        // Load GameState and apply domain logic
+        let mut state = {
+            use crate::services::games::GameService;
+            let service = GameService;
+            service.load_game_state(txn, game_id).await?
+        };
 
-        // Validate lock version if provided (optimistic locking)
-        if let Some(expected_version) = expected_lock_version {
-            if game.lock_version != expected_version {
-                return Err(DomainError::conflict(
-                    ConflictKind::OptimisticLock,
-                    format!(
-                        "Resource was modified concurrently (expected version {}, actual version {}). Please refresh and retry.",
-                        expected_version, game.lock_version
-                    ),
-                )
-                .into());
-            }
-        }
-
-        if game.state != DbGameState::TrickPlay {
-            return Err(DomainError::validation(
-                ValidationKind::PhaseMismatch,
-                "Not in trick play phase",
-            )
-            .into());
-        }
-
-        // Get current round
-        let current_round_no = game.current_round.ok_or_else(|| {
-            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
-        })?;
-
+        // Get current round for persistence
+        let current_round_no = state.round_no;
         let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
@@ -368,237 +252,101 @@ impl GameFlowService {
                 )
             })?;
 
-        // SECURITY: Validate the card is in the player's remaining hand
-        // This prevents cheating by playing cards they don't have or already played
-        let player_state = player_view::load_current_round_info(txn, game_id, player_seat).await?;
-
-        if !player_state.hand.contains(&card) {
+        // Track trick number before domain function call (to identify which trick to persist to)
+        let trick_no_before = if let crate::domain::state::Phase::Trick { trick_no } = state.phase {
+            trick_no
+        } else {
             return Err(DomainError::validation(
-                ValidationKind::CardNotInHand,
-                format!(
-                    "Card {:?} of {:?} is not in player's hand",
-                    card.rank, card.suit
-                ),
+                ValidationKind::PhaseMismatch,
+                "Not in trick play phase",
             )
             .into());
-        }
-
-        // Also validate it's a legal play (suit following rules)
-        let legal_plays = player_state.legal_plays();
-        if !legal_plays.contains(&card) {
-            return Err(DomainError::validation(
-                ValidationKind::MustFollowSuit,
-                "Must follow suit if possible",
-            )
-            .into());
-        }
-
-        // Get current trick number
-        let current_trick_no = game.current_trick_no;
+        };
+        let trick_plays_before = state.round.trick_plays.len();
 
         // Find or create the current trick
-        // Lead suit is determined from the first play.
-        // Winner is set to 0 initially and determined by resolve_trick() after all 4 plays.
         let trick = if let Some(existing) =
-            tricks::find_by_round_and_trick(txn, round.id, current_trick_no).await?
+            tricks::find_by_round_and_trick(txn, round.id, trick_no_before).await?
         {
             existing
         } else {
             // First play in this trick - create trick record
-            // Use card's suit as lead suit
-            let lead_suit = match card.suit {
-                crate::domain::Suit::Clubs => tricks::Suit::Clubs,
-                crate::domain::Suit::Diamonds => tricks::Suit::Diamonds,
-                crate::domain::Suit::Hearts => tricks::Suit::Hearts,
-                crate::domain::Suit::Spades => tricks::Suit::Spades,
-            };
-
-            // Winner placeholder - use sentinel 255 (u8::MAX) until resolve_trick determines the winner
-            tricks::create_trick(txn, round.id, current_trick_no, lead_suit, u8::MAX).await?
+            // Domain function will set trick_lead to card.suit on first play
+            // Winner placeholder - use sentinel 255 (u8::MAX) until trick is resolved
+            tricks::create_trick(txn, round.id, trick_no_before, card.suit, u8::MAX).await?
         };
 
-        // Determine play_order (how many plays already in this trick)
-        let play_order = plays::count_plays_by_trick(txn, trick.id).await?;
+        // Apply domain logic
+        let result = crate::domain::tricks::play_card(&mut state, player_seat, card)?;
 
-        // Convert domain Card to repo Card
+        // Persist the play that was just added
         let card_for_storage = plays::Card {
             suit: format!("{:?}", card.suit).to_uppercase(),
             rank: format!("{:?}", card.rank).to_uppercase(),
         };
-
-        // Persist the play
-        plays::create_play(
-            txn,
-            trick.id,
-            player_seat,
-            card_for_storage,
-            play_order as u8,
-        )
-        .await?;
+        let play_order = trick_plays_before as u8;
+        plays::create_play(txn, trick.id, player_seat, card_for_storage, play_order).await?;
 
         info!(
             game_id,
             player_seat,
-            trick_no = current_trick_no,
+            trick_no = trick_no_before,
             play_order,
             "Card play persisted successfully"
         );
 
-        // Bump lock_version on game to reflect card play state change
-        // This ensures each card play increments the version (consistent with bid behavior)
-        // Use expected_lock_version if provided, otherwise use the current lock_version from the game
-        let lock_version_to_use = expected_lock_version.unwrap_or(game.lock_version);
-        let updated_game =
-            games::update_round(txn, game_id, lock_version_to_use, None, None, None).await?;
-
-        Ok(updated_game)
-    }
-
-    /// Resolve a completed trick: determine winner and advance to next trick.
-    ///
-    /// Loads the 4 plays, uses domain logic to determine winner based on trump/lead,
-    /// updates the trick with winner, and advances current_trick_no or transitions to Scoring.
-    pub async fn resolve_trick(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-    ) -> Result<(), AppError> {
-        let game = games::require_game(txn, game_id).await?;
-        self.resolve_trick_internal(txn, &game).await
-    }
-
-    /// Internal version that accepts game object to avoid redundant loads.
-    pub(super) async fn resolve_trick_internal(
-        &self,
-        txn: &DatabaseTransaction,
-        game: &games::Game,
-    ) -> Result<(), AppError> {
-        let game_id = game.id;
-        debug!(game_id, "Resolving trick");
-
-        if game.state != DbGameState::TrickPlay {
-            return Err(DomainError::validation(
-                ValidationKind::PhaseMismatch,
-                "Not in trick play phase",
-            )
-            .into());
-        }
-
-        // Get current round and trick
-        let current_round_no = game.current_round.ok_or_else(|| {
-            DomainError::validation(ValidationKind::Other("NO_ROUND".into()), "No current round")
-        })?;
-
-        let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
-            .await?
-            .ok_or_else(|| {
+        // If trick was completed, persist trick winner
+        if result.trick_completed {
+            let winner = result.trick_winner.ok_or_else(|| {
                 DomainError::validation(
-                    ValidationKind::Other("ROUND_NOT_FOUND".into()),
-                    "Round not found",
+                    ValidationKind::Other("NO_WINNER".into()),
+                    "Trick completed but no winner found in result",
                 )
             })?;
 
-        let current_trick_no = game.current_trick_no;
-        let hand_size = game.hand_size().ok_or_else(|| {
-            DomainError::validation(ValidationKind::InvalidHandSize, "Hand size not set")
-        })?;
-
-        // Verify trick exists and has 4 plays
-        let trick = tricks::find_by_round_and_trick(txn, round.id, current_trick_no)
-            .await?
-            .ok_or_else(|| {
-                DomainError::validation(
-                    ValidationKind::Other("TRICK_NOT_FOUND".into()),
-                    "Trick not found",
-                )
-            })?;
-
-        let all_plays = plays::find_all_by_trick(txn, trick.id).await?;
-        if all_plays.len() != 4 {
-            return Err(DomainError::validation(
-                ValidationKind::Other("INCOMPLETE_TRICK".into()),
-                format!("Trick has {} plays, need 4", all_plays.len()),
-            )
-            .into());
+            tricks::update_winner(txn, trick.id, winner).await?;
+            info!(
+                game_id,
+                trick_no = trick_no_before,
+                winner,
+                "Trick winner persisted"
+            );
         }
 
-        // Trump must be set by this point
-        let trump_domain = round
-            .trump
-            .ok_or_else(|| {
-                DomainError::validation(ValidationKind::Other("NO_TRUMP".into()), "Trump not set")
-            })
-            .map(|t| match t {
-                rounds::Trump::Clubs => crate::domain::Trump::Clubs,
-                rounds::Trump::Diamonds => crate::domain::Trump::Diamonds,
-                rounds::Trump::Hearts => crate::domain::Trump::Hearts,
-                rounds::Trump::Spades => crate::domain::Trump::Spades,
-                rounds::Trump::NoTrump => crate::domain::Trump::NoTrump,
-            })?;
-
-        // Determine winner using domain logic
-        let lead_suit_domain = match trick.lead_suit {
-            tricks::Suit::Clubs => Suit::Clubs,
-            tricks::Suit::Diamonds => Suit::Diamonds,
-            tricks::Suit::Hearts => Suit::Hearts,
-            tricks::Suit::Spades => Suit::Spades,
+        // Update game state based on phase transition
+        let trick_no_update = if result.trick_no_after != trick_no_before {
+            Some(result.trick_no_after)
+        } else {
+            None
         };
 
-        // Parse all plays into domain cards and determine winner
-        let mut winner_seat = all_plays[0].player_seat;
-        let mut winner_card = from_stored_format(&all_plays[0].card.suit, &all_plays[0].card.rank)?;
+        let state_update =
+            if result.phase_transitioned == Some(crate::domain::state::Phase::Scoring) {
+                Some(DbGameState::Scoring)
+            } else {
+                None
+            };
 
-        // Compare each subsequent card to the current winner
-        for play in &all_plays[1..] {
-            let challenger_card = from_stored_format(&play.card.suit, &play.card.rank)?;
-
-            // Check if challenger beats current winner
-            if card_beats(challenger_card, winner_card, lead_suit_domain, trump_domain) {
-                winner_seat = play.player_seat;
-                winner_card = challenger_card; // Update winner card
-            }
-        }
-
-        info!(
+        let updated_game = games::update_game(
+            txn,
             game_id,
-            trick_no = current_trick_no,
-            winner_seat,
-            "Trick winner determined"
-        );
+            expected_lock_version,
+            state_update,
+            None,
+            None,
+            trick_no_update,
+        )
+        .await?;
 
-        // Update trick with winner
-        tricks::update_winner(txn, trick.id, winner_seat).await?;
-
-        // Advance to next trick or Scoring phase
-        let next_trick_no = current_trick_no + 1;
-        if next_trick_no > hand_size {
-            // All tricks complete - transition to Scoring
-            info!(
-                game_id,
-                trick_no = current_trick_no,
-                "All tricks complete, transitioning to Scoring"
-            );
-            games::update_state(txn, game_id, DbGameState::Scoring, game.lock_version).await?;
-        } else {
-            // Advance to next trick
-            games::update_round(
-                txn,
-                game_id,
-                game.lock_version,
-                None,
-                None,
-                Some(next_trick_no),
-            )
-            .await?;
-            info!(
-                game_id,
-                trick_no = current_trick_no,
-                next_trick_no,
-                winner_seat,
-                "Trick resolved, advanced to next trick"
-            );
+        // If phase transitioned to Scoring, score the round immediately (action-driven pattern)
+        if result.phase_transitioned == Some(crate::domain::state::Phase::Scoring) {
+            // Score the round, which will determine next phase (Bidding or GameOver) and deal next round if needed
+            self.score_round_internal(txn, &updated_game).await?;
+            // Reload game to get updated state after scoring
+            let final_game = games::require_game(txn, game_id).await?;
+            return Ok(final_game);
         }
 
-        Ok(())
+        Ok(updated_game)
     }
 }

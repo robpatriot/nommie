@@ -4,7 +4,7 @@ use backend::ai::{HeuristicV1, RandomPlayer};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::{ai_profiles, game_players, games};
-use backend::error::AppError;
+use backend::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
 use backend::state::security_config::SecurityConfig;

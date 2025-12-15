@@ -10,7 +10,7 @@ use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::error::AppError;
+use backend::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games;
 use backend::state::app_state::AppState;

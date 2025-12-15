@@ -1,6 +1,6 @@
 use backend::config::db::RuntimeEnv;
 use backend::db::txn::with_txn;
-use backend::error::AppError;
+use backend::AppError;
 use backend::infra::state::build_state;
 
 use crate::support::resolve_test_db_kind;
