@@ -128,11 +128,6 @@ impl GameSessionRegistry {
             .collect()
     }
 
-    /// Check if all connections have been closed
-    pub fn all_connections_closed(&self) -> bool {
-        self.active_connections.load(Ordering::Relaxed) == 0
-    }
-
     /// Get current number of active connections
     pub fn active_connections_count(&self) -> usize {
         self.active_connections.load(Ordering::Relaxed)

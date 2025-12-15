@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use sea_orm::DatabaseConnection;
 
-use crate::ws::hub::RealtimeBroker;
-
 use super::security_config::SecurityConfig;
 use crate::config::email_allowlist::EmailAllowlist;
+use crate::ws::hub::RealtimeBroker;
 
 /// Application state containing shared resources
 pub struct AppState {

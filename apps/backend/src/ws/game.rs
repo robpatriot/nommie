@@ -27,6 +27,7 @@ pub struct Shutdown;
 #[derive(Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[allow(clippy::large_enum_variant)]
+#[allow(dead_code)]
 enum OutgoingMessage {
     Snapshot {
         data: GameSnapshotResponse,
@@ -37,6 +38,7 @@ enum OutgoingMessage {
     },
 }
 
+#[allow(dead_code)]
 pub async fn upgrade(
     req: HttpRequest,
     stream: web::Payload,
@@ -88,6 +90,7 @@ pub struct GameWsSession {
 }
 
 impl GameWsSession {
+    #[allow(dead_code)]
     fn new(
         app_state: web::Data<AppState>,
         registry: Option<Arc<GameSessionRegistry>>,

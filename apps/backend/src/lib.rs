@@ -1,3 +1,8 @@
+//! Nommie Backend Library
+//!
+//! This crate provides both a library API for integration testing and a binary entry point.
+//! The library exposes all modules needed for testing and programmatic use.
+
 #![cfg_attr(
     not(test),
     deny(
@@ -9,9 +14,11 @@
     )
 )]
 
+// Public modules - these are accessible to both the binary and integration tests
 pub mod adapters;
 pub mod ai;
 pub mod auth;
+pub mod bin_support;
 pub mod config;
 pub mod db;
 pub mod domain;
@@ -27,28 +34,38 @@ pub mod repos;
 pub mod routes;
 pub mod services;
 pub mod state;
+pub mod telemetry;
+pub mod trace_ctx;
 pub mod utils;
-pub mod web;
 pub mod ws;
 
-// Re-exports for public API
-pub use auth::claims::BackendClaims;
-pub use auth::jwt::{mint_access_token, verify_access_token, Claims, JwtClaims};
-pub use config::db::DbOwner;
-pub use db::txn::{with_txn, SharedTxn};
-pub use db::txn_policy::{set_txn_policy, TxnPolicy};
+// Re-export commonly used types for easier imports
 pub use error::AppError;
 pub use errors::ErrorCode;
-pub use extractors::auth_token::AuthToken;
 pub use extractors::current_user::CurrentUser;
 pub use extractors::game_id::GameId;
-pub use infra::db::bootstrap_db;
-pub use middleware::cors::cors_middleware;
-pub use middleware::request_trace::RequestTrace;
-pub use middleware::structured_logger::StructuredLogger;
-pub use middleware::trace_span::TraceSpan;
-pub use state::app_state::AppState;
-pub use state::security_config::SecurityConfig;
+pub use extractors::game_membership::GameMembership;
+pub use extractors::ValidatedJson;
+
+// Prelude module for convenient imports
+// Usage: `use backend::prelude::*;`
+pub mod prelude {
+    // Error types
+    // Database utilities
+    pub use super::db::require_db;
+    pub use super::db::txn::{with_txn, SharedTxn};
+    pub use super::error::AppError;
+    pub use super::errors::ErrorCode;
+    // Extractors
+    pub use super::extractors::current_user::CurrentUser;
+    pub use super::extractors::game_id::GameId;
+    pub use super::extractors::game_membership::GameMembership;
+    pub use super::extractors::ValidatedJson;
+    // State building
+    pub use super::infra::state::build_state;
+    pub use super::state::security_config::SecurityConfig;
+}
+
 // Auto-initialize logging for unit tests
 #[cfg(test)]
 #[ctor::ctor]

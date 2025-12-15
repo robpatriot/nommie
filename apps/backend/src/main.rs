@@ -1,78 +1,56 @@
+//! Nommie Backend Binary Entry Point
+//!
+//! This is the main entry point for the backend server. It uses the backend library
+//! to configure and run the HTTP server.
+//!
+//! In a binary+lib setup, `lib.rs` owns the modules and `main.rs` is a thin wrapper
+//! that calls into the library. This avoids duplicating tests across targets.
+
+use std::sync::Arc;
 use std::time::Duration;
 
 use actix_extensible_rate_limit::backend::memory::InMemoryBackend;
 use actix_extensible_rate_limit::RateLimiter;
-use actix_web::{web, App, HttpServer};
-use backend::config::db::{DbKind, RuntimeEnv};
-use backend::config::email_allowlist::EmailAllowlist;
-use backend::infra::state::build_state;
-use backend::middleware::cors::cors_middleware;
-use backend::middleware::jwt_extract::JwtExtract;
-use backend::middleware::rate_limit::{api_rate_limit_config, auth_rate_limit_config};
-use backend::middleware::request_trace::RequestTrace;
-use backend::middleware::security_headers::SecurityHeaders;
-use backend::middleware::structured_logger::StructuredLogger;
-use backend::middleware::trace_span::TraceSpan;
-use backend::state::security_config::SecurityConfig;
-use backend::{routes, ws};
+use actix_web::{App, HttpServer};
 use tokio::signal;
 #[cfg(unix)]
 use tokio::signal::unix::{signal as unix_signal, SignalKind};
 use tokio::time::timeout;
 
-mod telemetry;
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    telemetry::init_tracing();
+    backend::telemetry::init_tracing();
+
+    // Set transaction policy to CommitOnOk for production
+    backend::db::txn_policy::set_txn_policy(backend::db::txn_policy::TxnPolicy::CommitOnOk);
 
     // Environment variables must be set by the runtime environment:
-    // - Docker: Set via docker-compose env_file or docker run --env-file
-    // - Local dev: Source env files manually (e.g., set -a; . ./.env; set +a)
-    //
-    // Validate critical environment variables up front and fail fast with
-    // clear, human-friendly messages if anything is misconfigured.
-    validate_env_or_exit();
+    // Load and validate configuration, converting AppError to io::Error for main()
+    let config = backend::bin_support::config_app::Config::from_env()
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("❌ {}", e)))?;
 
-    let host = std::env::var("BACKEND_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
-    let port = std::env::var("BACKEND_PORT")
-        .unwrap_or_else(|_| "3001".to_string())
-        .parse::<u16>()
-        .unwrap_or_else(|_| {
-            eprintln!("❌ BACKEND_PORT must be a valid port number");
-            std::process::exit(1);
-        });
-
-    println!("🚀 Starting Nommie Backend on http://{}:{}", host, port);
-
-    let jwt = std::env::var("BACKEND_JWT_SECRET").unwrap_or_else(|_| {
-        eprintln!("❌ BACKEND_JWT_SECRET must be set");
-        std::process::exit(1);
-    });
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| {
-        eprintln!("❌ REDIS_URL must be set");
-        std::process::exit(1);
-    });
-    let security_config = SecurityConfig::new(jwt.as_bytes());
+    println!(
+        "🚀 Starting Nommie Backend on http://{}:{}",
+        config.host, config.port
+    );
+    let security_config =
+        backend::state::security_config::SecurityConfig::new(config.jwt_secret.as_bytes());
 
     // Create application state using unified builder
-    let app_state = match build_state()
-        .with_env(RuntimeEnv::Prod)
-        .with_db(DbKind::Postgres)
+    let app_state = backend::infra::state::build_state()
+        .with_env(config.runtime_env)
+        .with_db(config.db_kind)
         .with_security(security_config)
-        .with_email_allowlist(EmailAllowlist::from_env())
-        .with_redis_url(Some(redis_url))
+        .with_email_allowlist(config.email_allowlist)
+        .with_redis_url(Some(config.redis_url.clone()))
         .build()
         .await
-    {
-        Ok(state) => state,
-        Err(e) => {
-            eprintln!("❌ Failed to build application state: {e}");
-            std::process::exit(1);
-        }
-    };
+        .map_err(|e| std::io::Error::other(format!("❌ Failed to build application state: {e}")))?;
 
     println!("✅ Database connected");
+
+    // Check TLS certificate expiry (logs warning if expiring soon)
+    backend::bin_support::tls_checks::check_postgres_cert_expiry();
 
     // Log email allowlist status
     match &app_state.email_allowlist {
@@ -87,134 +65,156 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
-    // Check TLS certificate expiry (logs warning if expiring soon)
-    backend::config::tls::check_postgres_cert_expiry();
-
     // Wrap AppState with web::Data before passing to HttpServer
-    let data = web::Data::new(app_state);
+    let data = actix_web::web::Data::new(app_state);
 
     // Clone registry for shutdown handler
     let registry_for_shutdown = data.realtime.as_ref().map(|broker| broker.registry());
 
+    // Extract host and port for server binding
+    let host = config.host.clone();
+    let port = config.port;
+
+    // Capture payload limits for use in closure
+    let max_json_payload_size = config.max_json_payload_size;
+    let max_payload_size = config.max_payload_size;
+
     let server = HttpServer::new(move || {
+        let data_clone = data.clone();
         // Create rate limiters for different route groups (one per worker thread)
         let auth_backend = InMemoryBackend::builder().build();
-        let auth_input = auth_rate_limit_config().build();
+        let auth_input = backend::middleware::rate_limit::auth_rate_limit_config().build();
         let auth_limiter = RateLimiter::builder(auth_backend, auth_input)
             .add_headers()
             .build();
 
         let api_backend = InMemoryBackend::builder().build();
-        let api_input = api_rate_limit_config().build();
+        let api_input = backend::middleware::rate_limit::api_rate_limit_config().build();
         let api_limiter = RateLimiter::builder(api_backend, api_input)
             .add_headers()
             .build();
 
-        // Configure request body size limits to prevent DoS attacks
-        // 1MB limit for JSON payloads (sufficient for game actions)
-        let json_config = web::JsonConfig::default()
-            .limit(1024 * 1024) // 1MB
-            .error_handler(|err, _req| {
-                use actix_web::error::JsonPayloadError;
-                use actix_web::HttpResponse;
-
-                let (status, detail) = match err {
-                    JsonPayloadError::Overflow { limit: _ } => (
-                        actix_web::http::StatusCode::PAYLOAD_TOO_LARGE,
-                        "Payload too large. Maximum size is 1MB.",
-                    ),
-                    JsonPayloadError::ContentType => (
-                        actix_web::http::StatusCode::BAD_REQUEST,
-                        "Content type error",
-                    ),
-                    _ => (
-                        actix_web::http::StatusCode::BAD_REQUEST,
-                        "Invalid JSON payload",
-                    ),
-                };
-
-                actix_web::error::InternalError::from_response(
-                    err,
-                    HttpResponse::build(status).json(serde_json::json!({
-                        "type": "https://tools.ietf.org/html/rfc7231#section-6.5.11",
-                        "title": "Payload Too Large",
-                        "status": status.as_u16(),
-                        "detail": detail,
-                    })),
-                )
-                .into()
-            });
-
-        // 1MB limit for form data and other payloads
-        let payload_config = web::PayloadConfig::default().limit(1024 * 1024); // 1MB
+        let json_config = create_json_config(max_json_payload_size);
+        let payload_config = actix_web::web::PayloadConfig::default().limit(max_payload_size);
 
         App::new()
-            .wrap(cors_middleware())
-            .wrap(StructuredLogger)
-            .wrap(TraceSpan)
-            .wrap(RequestTrace)
-            .app_data(data.clone())
+            .wrap(backend::middleware::cors::cors_middleware())
+            .wrap(backend::middleware::structured_logger::StructuredLogger)
+            .wrap(backend::middleware::trace_span::TraceSpan)
+            .wrap(backend::middleware::request_trace::RequestTrace)
+            .app_data(data_clone)
             .app_data(json_config)
             .app_data(payload_config)
             .service(
                 // Auth routes with strict rate limiting (5 req/min) and security headers
-                web::scope("/api/auth")
-                    .wrap(SecurityHeaders)
+                actix_web::web::scope("/api/auth")
+                    .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .wrap(auth_limiter)
-                    .configure(routes::auth::configure_routes),
+                    .configure(backend::routes::auth::configure_routes),
             )
             .service(
                 // Games routes with general rate limiting (100 req/min) and security headers
-                web::scope("/api/games")
-                    .wrap(SecurityHeaders)
+                actix_web::web::scope("/api/games")
+                    .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .wrap(api_limiter.clone())
-                    .wrap(JwtExtract)
-                    .configure(routes::games::configure_routes),
+                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .configure(backend::routes::games::configure_routes),
             )
             .service(
                 // User routes with general rate limiting (100 req/min) and security headers
-                web::scope("/api/user")
-                    .wrap(SecurityHeaders)
+                actix_web::web::scope("/api/user")
+                    .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .wrap(api_limiter.clone())
-                    .wrap(JwtExtract)
-                    .configure(routes::user_options::configure_routes),
+                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .configure(backend::routes::user_options::configure_routes),
             )
             .service(
                 // WebSocket token endpoint - issues short-lived tokens for WS connections
-                web::scope("/api/ws")
-                    .wrap(SecurityHeaders)
+                actix_web::web::scope("/api/ws")
+                    .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .wrap(api_limiter.clone())
-                    .wrap(JwtExtract)
-                    .configure(routes::realtime::configure_routes),
+                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .configure(backend::routes::realtime::configure_routes),
             )
             // Health check route - security headers only, no rate limiting
             .service(
-                web::scope("/health")
-                    .wrap(SecurityHeaders)
-                    .configure(routes::health::configure_routes),
+                actix_web::web::scope("/health")
+                    .wrap(backend::middleware::security_headers::SecurityHeaders)
+                    .configure(backend::routes::health::configure_routes),
             )
             // WebSocket upgrade endpoint for real-time game updates
             .service(
-                web::scope("/ws").wrap(JwtExtract).service(
-                    web::resource("/games/{game_id}")
-                        .route(web::get().to(ws::game::upgrade))
-                        .name("websocket_game_upgrade"),
-                ),
+                actix_web::web::scope("/ws")
+                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .service(
+                        actix_web::web::resource("/games/{game_id}")
+                            .route(actix_web::web::get().to(backend::ws::game::upgrade))
+                            .name("websocket_game_upgrade"),
+                    ),
             )
             // Root route - security headers (but no Cache-Control: no-store)
             .service(
-                web::scope("")
-                    .wrap(SecurityHeaders)
-                    .route("/", web::get().to(routes::health::root)),
+                actix_web::web::scope("")
+                    .wrap(backend::middleware::security_headers::SecurityHeaders)
+                    .route("/", actix_web::web::get().to(backend::routes::health::root)),
             )
     })
     .bind((host.as_str(), port))?
     .run();
 
     let server_handle = server.handle();
-    let registry_clone = registry_for_shutdown.clone();
+    spawn_shutdown_handler(
+        server_handle,
+        registry_for_shutdown,
+        config.websocket_timeout_secs,
+    );
 
-    // Spawn task to handle shutdown signals
+    server.await
+}
+
+/// Create JSON payload configuration with size limits and error handling
+fn create_json_config(max_size: usize) -> actix_web::web::JsonConfig {
+    let max_size_mb = max_size / (1024 * 1024);
+    actix_web::web::JsonConfig::default()
+        .limit(max_size)
+        .error_handler(move |err, _req| {
+            use actix_web::error::JsonPayloadError;
+            use actix_web::HttpResponse;
+
+            let (status, detail) = match err {
+                JsonPayloadError::Overflow { limit: _ } => {
+                    let msg = format!("Payload too large. Maximum size is {}MB.", max_size_mb);
+                    (actix_web::http::StatusCode::PAYLOAD_TOO_LARGE, msg)
+                }
+                JsonPayloadError::ContentType => (
+                    actix_web::http::StatusCode::BAD_REQUEST,
+                    "Content type error".to_string(),
+                ),
+                _ => (
+                    actix_web::http::StatusCode::BAD_REQUEST,
+                    "Invalid JSON payload".to_string(),
+                ),
+            };
+
+            actix_web::error::InternalError::from_response(
+                err,
+                HttpResponse::build(status).json(serde_json::json!({
+                    "type": "https://tools.ietf.org/html/rfc7231#section-6.5.11",
+                    "title": "Payload Too Large",
+                    "status": status.as_u16(),
+                    "detail": detail,
+                })),
+            )
+            .into()
+        })
+}
+
+/// Spawn a task to handle graceful shutdown signals
+fn spawn_shutdown_handler(
+    server_handle: actix_web::dev::ServerHandle,
+    registry: Option<Arc<backend::ws::hub::GameSessionRegistry>>,
+    timeout_secs: u64,
+) {
     tokio::spawn(async move {
         // Listen for both SIGINT (Ctrl+C) and SIGTERM
         // Actix-web also listens for these, but we intercept them first to close websockets
@@ -239,13 +239,13 @@ async fn main() -> std::io::Result<()> {
         }
 
         // Close all websocket connections and wait for shutdown messages to be processed
-        if let Some(registry) = registry_clone {
+        if let Some(registry) = registry {
             let shutdown_futures = registry.close_all_connections();
             if !shutdown_futures.is_empty() {
                 let total = shutdown_futures.len();
 
                 match timeout(
-                    Duration::from_secs(2),
+                    Duration::from_secs(timeout_secs),
                     futures::future::join_all(shutdown_futures),
                 )
                 .await
@@ -253,14 +253,25 @@ async fn main() -> std::io::Result<()> {
                     Ok(results) => {
                         let completed = results.iter().filter(|r| r.is_ok()).count();
                         let failed = results.iter().filter(|r| r.is_err()).count();
+                        tracing::info!(
+                            total_connections = total,
+                            completed = completed,
+                            failed = failed,
+                            "websocket shutdown completed: all connections closed gracefully"
+                        );
                         println!("[shutdown] websocket close_all completed: total={}, completed={}, failed={}",
                             total, completed, failed
                         );
                     }
                     Err(_) => {
+                        tracing::warn!(
+                            total_connections = total,
+                            timeout_secs = timeout_secs,
+                            "websocket shutdown timeout: some connections did not close gracefully within timeout period"
+                        );
                         println!(
-                            "[shutdown] websocket close_all timed out after 2s (total={})",
-                            total
+                            "[shutdown] websocket close_all timed out after {}s (total={})",
+                            timeout_secs, total
                         );
                     }
                 };
@@ -270,42 +281,4 @@ async fn main() -> std::io::Result<()> {
         // Stop the HTTP server deterministically after websocket teardown
         let _ = server_handle.stop(true).await;
     });
-
-    server.await
-}
-
-/// Validate critical environment variables at startup and exit with a clear
-/// error message if any required values are missing or obviously invalid.
-fn validate_env_or_exit() {
-    use std::env;
-
-    // BACKEND_JWT_SECRET: required, non-empty, minimum length
-    match env::var("BACKEND_JWT_SECRET") {
-        Ok(secret) if secret.len() >= 32 => {}
-        Ok(_) => {
-            eprintln!(
-                "❌ BACKEND_JWT_SECRET is too short. It should be at least 32 characters for security."
-            );
-            std::process::exit(1);
-        }
-        Err(_) => {
-            eprintln!("❌ BACKEND_JWT_SECRET must be set.");
-            std::process::exit(1);
-        }
-    }
-
-    // Database environment for production: basic presence checks
-    // (detailed validation still happens in db config errors).
-    if cfg!(not(test)) {
-        if let Ok(runtime_env) = env::var("RUNTIME_ENV") {
-            if runtime_env.eq_ignore_ascii_case("prod") {
-                for name in &["PROD_DB", "APP_DB_USER", "APP_DB_PASSWORD"] {
-                    if env::var(name).is_err() {
-                        eprintln!("❌ {name} must be set when RUNTIME_ENV=prod.");
-                        std::process::exit(1);
-                    }
-                }
-            }
-        }
-    }
 }

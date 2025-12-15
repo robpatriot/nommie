@@ -4,7 +4,7 @@ use actix_web::HttpMessage;
 use futures_util::future::{ready, LocalBoxFuture, Ready};
 use uuid::Uuid;
 
-use crate::web::trace_ctx;
+use crate::trace_ctx;
 
 pub struct RequestTrace;
 

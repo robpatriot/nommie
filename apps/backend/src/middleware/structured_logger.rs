@@ -8,7 +8,7 @@ use futures_util::future::LocalBoxFuture;
 use tracing::{error, info, warn};
 
 use crate::logging::security;
-use crate::web::trace_ctx;
+use crate::trace_ctx;
 
 pub struct StructuredLogger;
 

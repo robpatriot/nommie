@@ -49,16 +49,9 @@ impl StateBuilder {
             (Some(env), Some(db_kind)) => {
                 // Bootstrap database directly with env and db_kind
                 let conn = bootstrap_db(env, db_kind).await?;
-                AppState::new(
-                    conn,
-                    self.security_config,
-                    self.email_allowlist,
-                )
+                AppState::new(conn, self.security_config, self.email_allowlist)
             }
-            _ => AppState::new_without_db(
-                self.security_config,
-                self.email_allowlist,
-            ),
+            _ => AppState::new_without_db(self.security_config, self.email_allowlist),
         };
 
         if let Some(redis_url) = self.redis_url {

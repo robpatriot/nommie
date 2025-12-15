@@ -1,7 +1,7 @@
 use tracing::warn;
 
 use crate::logging::pii::Redacted;
-use crate::web::trace_ctx;
+use crate::trace_ctx;
 
 /// Log a security-relevant login failure event.
 pub fn login_failed(reason: &str, email: Option<&str>) {

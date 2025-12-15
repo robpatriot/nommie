@@ -13,6 +13,10 @@ pub enum RuntimeEnv {
     /// Production environment
     Prod,
     /// Test environment
+    ///
+    /// This variant is only constructed in test code, but must be handled in production
+    /// match statements since `StateBuilder` can receive it as a parameter.
+    #[allow(dead_code)]
     Test,
 }
 
@@ -272,6 +276,15 @@ pub fn sqlite_file_spec(db_kind: DbKind, env: RuntimeEnv) -> Result<String, AppE
             "sqlite_file_spec only works with SqliteFile database kind",
         )),
     }
+}
+
+/// Get the SQLite lock file path (`<db>.migrate.lock`) for the given database kind and env.
+///
+/// This composes `sqlite_file_spec` with the lock file naming convention used by the
+/// migration system, ensuring all callers share a single normalization pipeline.
+pub fn sqlite_lock_path(db_kind: DbKind, env: RuntimeEnv) -> Result<std::path::PathBuf, AppError> {
+    let file_spec = sqlite_file_spec(db_kind, env)?;
+    Ok(std::path::Path::new(&file_spec).with_extension("migrate.lock"))
 }
 
 /// Create connection string from environment, database kind, and database owner
