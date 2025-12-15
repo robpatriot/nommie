@@ -22,6 +22,12 @@ pub struct SetTrumpResult {
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct Bid(pub u8);
 
+impl Bid {
+    pub fn value(self) -> u8 {
+        self.0
+    }
+}
+
 /// Compute legal bids for a given hand size.
 ///
 /// This is the core domain logic for determining valid bid values.

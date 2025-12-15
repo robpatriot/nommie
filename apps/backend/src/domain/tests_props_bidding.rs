@@ -36,12 +36,12 @@ proptest! {
 
         // All values should be in range [0..=hand_size]
         for bid in &legal {
-            prop_assert!(bid.0 <= hand_size,
+            prop_assert!(bid.value() <= hand_size,
                 "Bid {bid:?} must be <= hand_size {hand_size}");
         }
 
         // Should include 0 and hand_size
-        let values: Vec<u8> = legal.iter().map(|b| b.0).collect();
+        let values: Vec<u8> = legal.iter().map(|b| b.value()).collect();
         prop_assert!(values.contains(&0), "Should include bid of 0");
         prop_assert!(values.contains(&hand_size),
             "Should include bid of {hand_size}");
@@ -160,7 +160,7 @@ fn test_valid_bids_table() {
         state.phase = Phase::Bidding;
 
         let legal = legal_bids_for_hand_size(state.hand_size);
-        let values: Vec<u8> = legal.iter().map(|b| b.0).collect();
+        let values: Vec<u8> = legal.iter().map(|b| b.value()).collect();
 
         assert_eq!(
             values, expected_values,
