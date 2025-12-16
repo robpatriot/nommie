@@ -15,12 +15,12 @@ export function SeatCard({
   const { orientation, name, isViewer, tricksWon, isActive, bid } = summary
 
   const positionStyles: Record<SeatSummary['orientation'], string> = {
-    top: 'lg:col-start-2 lg:row-start-1 lg:justify-self-center lg:self-center',
-    left: 'lg:col-start-1 lg:row-start-2 lg:justify-self-center lg:self-center',
+    top: 'sm:col-start-2 sm:row-start-1 sm:justify-self-center sm:self-center',
+    left: 'sm:col-start-1 sm:row-start-2 sm:justify-self-center sm:self-center',
     right:
-      'lg:col-start-3 lg:row-start-2 lg:justify-self-center lg:self-center',
+      'sm:col-start-3 sm:row-start-2 sm:justify-self-center sm:self-center',
     bottom:
-      'lg:col-start-2 lg:row-start-3 lg:justify-self-center lg:self-center',
+      'sm:col-start-2 sm:row-start-3 sm:justify-self-center sm:self-center',
   }
 
   const badge =
@@ -33,7 +33,7 @@ export function SeatCard({
   const baseClasses =
     variant === 'table'
       ? 'w-fit items-center text-center'
-      : 'max-w-none text-left sm:flex-row sm:items-center sm:justify-between'
+      : 'w-full max-w-none text-left sm:flex-row sm:items-center sm:justify-between'
 
   return (
     <div

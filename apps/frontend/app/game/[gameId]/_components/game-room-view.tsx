@@ -432,10 +432,10 @@ export function GameRoomView(props: GameRoomViewProps) {
               </div>
             ) : null}
             <div
-              className="hidden gap-3 lg:grid"
+              className="hidden gap-3 sm:grid"
               style={{
                 gridTemplateColumns:
-                  'minmax(140px,1fr) minmax(0,2.2fr) minmax(140px,1fr)',
+                  'minmax(140px,1fr) minmax(260px,2.2fr) minmax(140px,1fr)',
                 gridTemplateRows: 'auto 1fr auto',
               }}
             >
@@ -453,16 +453,17 @@ export function GameRoomView(props: GameRoomViewProps) {
                 className="col-start-2 row-start-2 h-full w-full min-h-[280px]"
               />
             </div>
-            <div className="flex flex-col gap-3 lg:hidden">
-              {mobileSeatSummaries.map((summary) => (
-                <SeatCard
-                  key={`mobile-${summary.seat}`}
-                  summary={summary}
-                  variant="list"
-                />
-              ))}
-            </div>
-            <div className="lg:hidden">
+            <div className="flex flex-col gap-3 sm:hidden">
+              <div className="grid grid-cols-2 gap-3">
+                {mobileSeatSummaries.map((summary) => (
+                  <SeatCard
+                    key={`mobile-${summary.seat}`}
+                    summary={summary}
+                    variant="list"
+                    className="w-full"
+                  />
+                ))}
+              </div>
               <TrickArea
                 trickMap={trickMap}
                 getSeatName={seatDisplayName}
