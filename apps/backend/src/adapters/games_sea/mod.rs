@@ -98,6 +98,7 @@ pub async fn require_game<C: ConnectionTrait + Send + Sync>(
         .ok_or_else(|| sea_orm::DbErr::Custom(format!("GAME_NOT_FOUND:{}", game_id)))
 }
 
+#[allow(dead_code)] // Will be used when join-by-code feature is implemented
 pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     join_code: &str,
