@@ -8,10 +8,10 @@ import { signInWithGoogleAction } from '@/app/actions/auth-actions'
 export default async function Home({
   searchParams,
 }: {
-  searchParams?: { accessDenied?: string }
+  searchParams?: Promise<{ accessDenied?: string }>
 }) {
   const session = await auth()
-  const params = searchParams ?? {}
+  const params = (await searchParams) ?? {}
   const showAccessDenied = params.accessDenied === 'true'
 
   // If authenticated, redirect to lobby
