@@ -228,11 +228,16 @@ export function PlayerHand({
                       : 'Select a card to play'
                 }
               >
-                {playState.isPending
-                  ? 'Playing…'
-                  : viewerTurn
-                    ? 'Play selected card'
-                    : `Waiting for ${waitingOnName ?? 'next player'}`}
+                {playState.isPending ? (
+                  'Playing…'
+                ) : viewerTurn ? (
+                  <>
+                    <span className="sm:hidden">Play card</span>
+                    <span className="hidden sm:inline">Play selected card</span>
+                  </>
+                ) : (
+                  `Waiting for ${waitingOnName ?? 'next player'}`
+                )}
               </button>
             ) : (
               <span className="rounded-full border border-white/15 bg-surface px-4 py-1 text-xs font-semibold text-subtle">
@@ -248,7 +253,8 @@ export function PlayerHand({
             {playState.playable.length > 0 ? (
               <div className="rounded-lg border border-white/15 bg-surface/60 px-2 py-1">
                 <span className="text-xs font-medium text-muted">
-                  Legal cards:
+                  <span className="sm:hidden">Legal:</span>
+                  <span className="hidden sm:inline">Legal cards:</span>
                 </span>
                 <span className="ml-1.5 text-xs font-medium text-foreground">
                   {playState.playable.length === viewerHand.length &&

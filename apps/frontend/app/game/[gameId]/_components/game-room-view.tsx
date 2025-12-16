@@ -395,7 +395,7 @@ export function GameRoomView(props: GameRoomViewProps) {
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="relative flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
             {onRefresh ? (
-              <div className="pointer-events-auto absolute right-6 top-6 z-10">
+              <div className="pointer-events-auto absolute right-6 top-6 z-10 hidden sm:block">
                 <button
                   type="button"
                   onClick={onRefresh}
@@ -451,6 +451,8 @@ export function GameRoomView(props: GameRoomViewProps) {
                 lastTrick={lastTrick}
                 showPreviousRoundPosition={showPreviousRoundPosition}
                 className="col-start-2 row-start-2 h-full w-full min-h-[280px]"
+                onRefresh={onRefresh}
+                isRefreshing={isRefreshing}
               />
             </div>
             <div className="flex flex-col gap-3 sm:hidden">
@@ -472,6 +474,8 @@ export function GameRoomView(props: GameRoomViewProps) {
                 viewerSeat={effectiveViewerSeat ?? 0}
                 lastTrick={lastTrick}
                 showPreviousRoundPosition={showPreviousRoundPosition}
+                onRefresh={onRefresh}
+                isRefreshing={isRefreshing}
               />
             </div>
             <PlayerHand

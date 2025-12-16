@@ -86,14 +86,21 @@ export function PlayPanel({
                   : `Waiting for ${activeName} to play`
           }
         >
-          {play.isPending
-            ? 'Playing…'
-            : isViewerTurn
-              ? 'Play selected card'
-              : `Waiting for ${activeName}`}
+          {play.isPending ? (
+            'Playing…'
+          ) : isViewerTurn ? (
+            <>
+              <span className="sm:hidden">Play card</span>
+              <span className="hidden sm:inline">Play selected card</span>
+            </>
+          ) : (
+            `Waiting for ${activeName}`
+          )}
         </button>
         <p className="text-xs text-muted">
-          Legal cards: {play.playable.length ? play.playable.join(', ') : '—'}
+          <span className="sm:hidden">Legal:</span>
+          <span className="hidden sm:inline">Legal cards:</span>{' '}
+          {play.playable.length ? play.playable.join(', ') : '—'}
         </p>
       </form>
     </section>

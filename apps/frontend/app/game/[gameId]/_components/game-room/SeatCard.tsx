@@ -48,9 +48,11 @@ export function SeatCard({
       )}
     >
       <div className="flex flex-col gap-0.5 text-center sm:text-left">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.4em] text-subtle">
-          {badge}
-        </span>
+        {!isViewer ? (
+          <span className="hidden text-[10px] font-semibold uppercase tracking-[0.4em] text-subtle sm:inline">
+            {badge}
+          </span>
+        ) : null}
         <span className="text-sm font-semibold text-foreground">{name}</span>
       </div>
 
@@ -68,7 +70,7 @@ export function SeatCard({
       </div>
 
       {isViewer ? (
-        <span className="self-center rounded-full bg-success/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success-contrast">
+        <span className="hidden self-center rounded-full bg-success/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success-contrast sm:inline">
           You
         </span>
       ) : null}

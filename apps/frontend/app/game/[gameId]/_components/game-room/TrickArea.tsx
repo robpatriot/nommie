@@ -14,6 +14,8 @@ interface TrickAreaProps {
   lastTrick?: Array<[Seat, Card]> | null
   showPreviousRoundPosition?: boolean
   className?: string
+  onRefresh?: () => void
+  isRefreshing?: boolean
 }
 
 export function TrickArea({
@@ -25,6 +27,8 @@ export function TrickArea({
   lastTrick,
   showPreviousRoundPosition,
   className = '',
+  onRefresh,
+  isRefreshing = false,
 }: TrickAreaProps) {
   const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
     seat,
@@ -63,6 +67,36 @@ export function TrickArea({
         className
       )}
     >
+      {onRefresh ? (
+        <div className="pointer-events-auto absolute right-4 top-4 z-10 sm:hidden">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-primary/60 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label={
+              isRefreshing ? 'Refreshing game state' : 'Refresh game state'
+            }
+          >
+            <span>Sync</span>
+            <svg
+              aria-hidden="true"
+              className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.8}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 2v6h-6" />
+              <path d="M3 22v-6h6" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8" />
+              <path d="M20.49 15a9 9 0 0 1-14.85 3.36L3 16" />
+            </svg>
+          </button>
+        </div>
+      ) : null}
       {showLastTrick ? (
         <>
           <div className="flex w-full flex-col gap-4">
