@@ -7,7 +7,7 @@ pub mod sqlite_diagnostics {
     use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
     use tracing::info;
 
-    use crate::error::AppError;
+    use crate::error::DbInfraError;
 
     /// Get current process ID
     pub fn current_pid() -> u32 {
@@ -31,7 +31,7 @@ pub mod sqlite_diagnostics {
     pub async fn log_pragma_snapshot<C: ConnectionTrait>(
         conn: &C,
         pool_type: &str,
-    ) -> Result<(), AppError> {
+    ) -> Result<(), DbInfraError> {
         let pid = current_pid();
 
         // Infer database type from connection
@@ -39,10 +39,10 @@ pub mod sqlite_diagnostics {
             DatabaseBackend::Sqlite => "sqlite",
             DatabaseBackend::Postgres => "postgres",
             DatabaseBackend::MySql => {
-                return Err(AppError::config_msg(
-                    "MySQL not supported",
-                    "MySQL database backend is not supported, only SQLite and PostgreSQL are supported",
-                ));
+                return Err(DbInfraError::Config {
+                    message: "MySQL database backend is not supported, only SQLite and PostgreSQL are supported"
+                        .to_string(),
+                });
             }
         };
 

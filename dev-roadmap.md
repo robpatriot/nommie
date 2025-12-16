@@ -6,12 +6,9 @@ This document tracks the current work plan for building the Nommie UI on web (Ne
 
 # Next Steps
 
-- Complete clean up of issues now main is a binary and not a library - Note: this will mean migration-cli cannot compile till separation is completed
-    - Run all tests including full game
-    - Test with UI. Issues found so far:
-        - UI doesn't update on adding AI
-        - Marking I'm ready and then reloading page shows not ready (may be true on main as well)
 - Separate migration code from backend and put in shared library which migrate-cli can depend on
-- Review all dead_code items and determine solution
+- The test test_rate_limit_resets_after_window in be:test is 1.Xs - what is it?
 - Complete mobile design - Milestone 17
+- Review all dead_code items and and other annoying attributes (like allow) and determine solution
+- Consider performance via pnpm be:test:full test_full_game_with_ai_players
 

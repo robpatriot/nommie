@@ -1,0 +1,12 @@
+---
+description: Always read and adhere to all rules in the .cursor directory
+globs: ["**/*"]
+alwaysApply: true
+---
+
+Read and adhere to all rules defined in the `.cursor/rules/` directory, including:
+- `.cursor/rules/global.yaml` - Workspace-wide rules
+- `.cursor/rules/backend.yaml` - Rules scoped to `apps/backend/**`
+- Any other rule files in this directory
+
+These rules take precedence and must be followed for all code changes and operations in this project.

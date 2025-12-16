@@ -93,8 +93,8 @@ impl TestLock {
         &mut self,
     ) -> Result<Option<backend::infra::db::locking::Guard>, backend::AppError> {
         match self {
-            TestLock::Postgres { lock, .. } => BootstrapLock::try_acquire(lock).await,
-            TestLock::SqliteFile { lock, .. } => BootstrapLock::try_acquire(lock).await,
+            TestLock::Postgres { lock, .. } => Ok(BootstrapLock::try_acquire(lock).await?),
+            TestLock::SqliteFile { lock, .. } => Ok(BootstrapLock::try_acquire(lock).await?),
         }
     }
 }
@@ -554,11 +554,9 @@ async fn path_normalization_sqlite_file() {
     }
 
     // Use the same helper as production code to derive the SQLite lock path
-    let lock_path = backend::config::db::sqlite_lock_path(
-        db_kind,
-        backend::config::db::RuntimeEnv::Test,
-    )
-    .expect("sqlite_lock_path should succeed for SqliteFile/Test");
+    let lock_path =
+        backend::config::db::sqlite_lock_path(db_kind, backend::config::db::RuntimeEnv::Test)
+            .expect("sqlite_lock_path should succeed for SqliteFile/Test");
 
     // Should end with .migrate.lock
     assert!(
@@ -567,10 +565,7 @@ async fn path_normalization_sqlite_file() {
     );
 
     // Should be absolute
-    assert!(
-        lock_path.is_absolute(),
-        "Lock path should be absolute"
-    );
+    assert!(lock_path.is_absolute(), "Lock path should be absolute");
 
     // Should be canonical (no .. or . components)
     let lock_path_str = lock_path.to_string_lossy();

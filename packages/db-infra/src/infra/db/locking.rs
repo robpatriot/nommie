@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 use xxhash_rust::xxh3::xxh3_64;
 
 // Internal crate imports
-use crate::error::AppError;
+use crate::error::DbInfraError;
 
 pub fn pg_lock_id(key: &str) -> i64 {
     xxh3_64(key.as_bytes()) as i64
@@ -65,7 +65,7 @@ impl Guard {
     }
 
     /// Release the lock by checking out from admin pool, unlocking, then dropping checkout.
-    pub async fn release(mut self) -> Result<(), AppError> {
+    pub async fn release(mut self) -> Result<(), DbInfraError> {
         if self.released {
             return Ok(());
         }
@@ -122,9 +122,9 @@ impl Guard {
 
         match result {
             Ok(Some(row)) => {
-                let unlocked: bool = row
-                    .try_get("", "unlocked")
-                    .map_err(|e| AppError::config("failed to read unlock result", e))?;
+                let unlocked: bool = row.try_get("", "unlocked").map_err(|e| DbInfraError::Config {
+                    message: format!("failed to read unlock result: {e}"),
+                })?;
 
                 if !unlocked {
                     warn!(
@@ -160,7 +160,7 @@ impl Guard {
 pub trait BootstrapLock {
     /// Try to acquire the lock (non-blocking).
     /// Returns Some(Guard) if acquired, None if already held by another process.
-    async fn try_acquire(&mut self) -> Result<Option<Guard>, AppError>;
+    async fn try_acquire(&mut self) -> Result<Option<Guard>, DbInfraError>;
 }
 
 /// PostgreSQL advisory lock using admin pool
@@ -188,7 +188,7 @@ impl PgAdvisoryLock {
 
 #[async_trait]
 impl BootstrapLock for PgAdvisoryLock {
-    async fn try_acquire(&mut self) -> Result<Option<Guard>, AppError> {
+    async fn try_acquire(&mut self) -> Result<Option<Guard>, DbInfraError> {
         use sea_orm::{DatabaseBackend, Statement};
 
         // Step 1: Try to acquire advisory lock
@@ -202,17 +202,18 @@ impl BootstrapLock for PgAdvisoryLock {
             .admin_pool
             .query_one(lock_stmt)
             .await
-            .map_err(|e| AppError::config("failed to acquire advisory lock", e))?;
+            .map_err(|e| DbInfraError::Config {
+                message: format!("failed to acquire advisory lock: {e}"),
+            })?;
 
         let locked: bool = match result {
-            Some(row) => row
-                .try_get("", "locked")
-                .map_err(|e| AppError::config("failed to read lock result", e))?,
+            Some(row) => row.try_get("", "locked").map_err(|e| DbInfraError::Config {
+                message: format!("failed to read lock result: {e}"),
+            })?,
             None => {
-                return Err(AppError::config_msg(
-                    "advisory lock query returned no result",
-                    "pg_try_advisory_lock returned no row",
-                ))
+                return Err(DbInfraError::Config {
+                    message: "pg_try_advisory_lock returned no row".to_string(),
+                })
             }
         };
 
@@ -242,7 +243,7 @@ pub struct SqliteFileLock {
 impl SqliteFileLock {
     /// Create a new SQLite file lock.
     /// Takes a normalized lock file path (all processes must resolve the same on-disk lock file).
-    pub fn new(lock_path: &Path) -> Result<Self, AppError> {
+    pub fn new(lock_path: &Path) -> Result<Self, DbInfraError> {
         Ok(Self {
             lock_path: lock_path.to_path_buf(),
         })
@@ -251,17 +252,13 @@ impl SqliteFileLock {
 
 #[async_trait]
 impl BootstrapLock for SqliteFileLock {
-    async fn try_acquire(&mut self) -> Result<Option<Guard>, AppError> {
+    async fn try_acquire(&mut self) -> Result<Option<Guard>, DbInfraError> {
         use fs4::fs_std::FileExt;
 
         // Ensure parent directory exists
         if let Some(parent) = self.lock_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                AppError::internal(
-                    crate::errors::ErrorCode::SqliteLockError,
-                    "failed to create lock file parent directory",
-                    e,
-                )
+            std::fs::create_dir_all(parent).map_err(|e| DbInfraError::Config {
+                message: format!("failed to create lock file parent directory: {e}"),
             })?;
         }
 
@@ -273,12 +270,8 @@ impl BootstrapLock for SqliteFileLock {
             .read(true)
             .write(true)
             .open(&self.lock_path)
-            .map_err(|e| {
-                AppError::internal(
-                    crate::errors::ErrorCode::SqliteLockError,
-                    "failed to open lock file",
-                    e,
-                )
+            .map_err(|e| DbInfraError::Config {
+                message: format!("failed to open lock file: {e}"),
             })?;
 
         // Try to acquire exclusive lock (non-blocking)
@@ -311,11 +304,9 @@ impl BootstrapLock for SqliteFileLock {
             }
             Err(e) => {
                 // Other I/O error (permission denied, etc.)
-                Err(AppError::internal(
-                    crate::errors::ErrorCode::SqliteLockError,
-                    "failed to acquire SQLite file lock",
-                    e,
-                ))
+                Err(DbInfraError::Config {
+                    message: format!("failed to acquire SQLite file lock: {e}"),
+                })
             }
         }
     }
@@ -327,7 +318,7 @@ pub struct InMemoryLock;
 
 #[async_trait]
 impl BootstrapLock for InMemoryLock {
-    async fn try_acquire(&mut self) -> Result<Option<Guard>, AppError> {
+    async fn try_acquire(&mut self) -> Result<Option<Guard>, DbInfraError> {
         // InMemory databases don't need locking - return a no-op Guard
         // We need to return Some(Guard) so the migration system doesn't timeout
 

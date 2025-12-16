@@ -63,6 +63,7 @@ fs4 = "0.13"
 
 # Internal packages
 migration = { path = "../../packages/migration" }
+db-infra = { path = "../../packages/db-infra" }
 
 [dev-dependencies]
 # Testing

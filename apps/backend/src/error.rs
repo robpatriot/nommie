@@ -444,6 +444,12 @@ impl From<std::env::VarError> for AppError {
     }
 }
 
+impl From<db_infra::DbInfraError> for AppError {
+    fn from(e: db_infra::DbInfraError) -> Self {
+        AppError::config_msg(e.to_string(), "database configuration error")
+    }
+}
+
 impl From<sea_orm::DbErr> for AppError {
     fn from(e: sea_orm::DbErr) -> Self {
         // Delegate to infra adapter, then into AppError via DomainError mapping

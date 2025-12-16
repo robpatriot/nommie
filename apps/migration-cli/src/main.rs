@@ -1,6 +1,6 @@
-use backend::config::db::{DbKind, RuntimeEnv};
-use backend::infra::db::orchestrate_migration;
 use clap::{Parser, ValueEnum};
+use db_infra::config::db::{DbKind, RuntimeEnv};
+use db_infra::infra::db::orchestrate_migration;
 use migration::MigrationCommand;
 
 #[derive(Clone, ValueEnum)]

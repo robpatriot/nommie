@@ -3,7 +3,7 @@ members = [
     "apps/backend",
     "apps/migration-cli",
     "packages/migration",
-    "packages/backend-test-support",
+    "packages/backend-test-support", "packages/db-infra",
 ]
 resolver = "2"
 
