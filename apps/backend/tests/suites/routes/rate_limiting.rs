@@ -76,9 +76,9 @@ async fn test_rate_limit_enforces_limit() -> Result<(), Box<dyn std::error::Erro
 
 #[actix_web::test]
 async fn test_rate_limit_resets_after_window() -> Result<(), Box<dyn std::error::Error>> {
-    // Use a limit of 1 request with a 1-second window
+    // Use a limit of 1 request with a very short window to keep the test fast
     let backend = InMemoryBackend::builder().build();
-    let input = SimpleInputFunctionBuilder::new(Duration::from_secs(1), 1)
+    let input = SimpleInputFunctionBuilder::new(Duration::from_millis(10), 1)
         .path_key()
         .build();
     let rate_limiter = RateLimiter::builder(backend, input).add_headers().build();
@@ -103,8 +103,8 @@ async fn test_rate_limit_resets_after_window() -> Result<(), Box<dyn std::error:
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status().as_u16(), 429);
 
-    // Wait for the rate limit window to expire
-    tokio::time::sleep(Duration::from_millis(1100)).await;
+    // Wait for the rate limit window to expire (with a small buffer)
+    tokio::time::sleep(Duration::from_millis(25)).await;
 
     // Request after window should succeed again
     let req = test::TestRequest::get().uri("/test").to_request();
