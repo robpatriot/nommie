@@ -1,12 +1,6 @@
 'use client'
 
-import {
-  startTransition,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
@@ -23,6 +17,64 @@ interface PlayerHandProps {
   onPlayCard?: (card: Card) => Promise<void> | void
   className?: string
   requireCardConfirmation?: boolean
+}
+
+const CARD_WIDTH = CARD_DIMENSIONS.md.width
+const CARD_HEIGHT = CARD_DIMENSIONS.md.height
+const CARD_PADDING = 8 // padding + border
+const EFFECTIVE_CARD_WIDTH = CARD_WIDTH + CARD_PADDING
+
+const MIN_OVERLAP = 4
+// Allow more aggressive overlap: keep only a very small portion of the top-left corner visible
+const MAX_OVERLAP = CARD_WIDTH - 17
+const AESTHETIC_OVERLAP = 8
+const BLEND_THRESHOLD = 20 // Pixels of remaining space before we start blending
+
+function calculateOverlap(
+  viewportWidth: number,
+  cardCount: number
+): { overlap: number; needsScroll: boolean } {
+  if (cardCount <= 1) {
+    return { overlap: 0, needsScroll: false }
+  }
+
+  const totalWidthNeeded = EFFECTIVE_CARD_WIDTH * cardCount
+
+  // Calculate minimum possible width with maximum overlap
+  // This is the absolute minimum space the cards can occupy
+  const minWidthWithMaxOverlap =
+    EFFECTIVE_CARD_WIDTH +
+    (cardCount - 1) * (EFFECTIVE_CARD_WIDTH - MAX_OVERLAP)
+
+  // Only enable scroll if viewport is below the absolute minimum
+  // This prevents scrollbar from appearing during intermediate resize states
+  const needsScroll = viewportWidth < minWidthWithMaxOverlap
+
+  const spaceRemaining = viewportWidth - totalWidthNeeded
+
+  if (spaceRemaining >= BLEND_THRESHOLD) {
+    // Plenty of space: use aesthetic overlap
+    return { overlap: AESTHETIC_OVERLAP, needsScroll }
+  }
+
+  if (spaceRemaining > 0) {
+    // Tight but fits: blend between aesthetic and calculated
+    const overlapNeeded = (totalWidthNeeded - viewportWidth) / (cardCount - 1)
+    const calculatedOverlap = Math.max(
+      MIN_OVERLAP,
+      Math.min(MAX_OVERLAP, overlapNeeded)
+    )
+    const blend = 1 - spaceRemaining / BLEND_THRESHOLD
+    const overlap =
+      AESTHETIC_OVERLAP + (calculatedOverlap - AESTHETIC_OVERLAP) * blend
+    return { overlap, needsScroll }
+  }
+
+  // Doesn't fit: calculate required overlap
+  const overlapNeeded = (totalWidthNeeded - viewportWidth) / (cardCount - 1)
+  const overlap = Math.max(MIN_OVERLAP, Math.min(MAX_OVERLAP, overlapNeeded))
+
+  return { overlap, needsScroll }
 }
 
 export function PlayerHand({
@@ -65,93 +117,49 @@ export function PlayerHand({
     handStatus = 'Tap a legal card to play immediately.'
   }
 
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [overlapAmount, setOverlapAmount] = useState(16) // Default -ml-4 (16px)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const [needsScroll, setNeedsScroll] = useState(false)
+  const [baseOffset, setBaseOffset] = useState(0)
+  const [cardStep, setCardStep] = useState(
+    EFFECTIVE_CARD_WIDTH - AESTHETIC_OVERLAP
+  )
+  const [minHeight, setMinHeight] = useState(CARD_HEIGHT + 16)
 
   useLayoutEffect(() => {
-    if (!containerRef.current || viewerHand.length === 0) {
-      if (viewerHand.length === 0) {
-        // Use startTransition for layout-related state updates to avoid cascading renders
-        startTransition(() => {
-          setOverlapAmount(16) // Reset to default when empty
-        })
-      }
+    const viewport = viewportRef.current
+    if (!viewport) {
       return
     }
 
-    const updateOverlap = () => {
-      const container = containerRef.current
-      if (!container) return
+    const updateLayout = () => {
+      const width = viewport.clientWidth
+      const { overlap: newOverlap, needsScroll: newNeedsScroll } =
+        calculateOverlap(width, viewerHand.length)
+      setNeedsScroll(newNeedsScroll)
 
-      // Measure container width (accounting for padding)
-      const containerWidth = container.clientWidth
+      const newCardStep = EFFECTIVE_CARD_WIDTH - newOverlap
+      setCardStep(newCardStep)
+      setMinHeight(CARD_HEIGHT + (newNeedsScroll ? 24 : 16))
 
-      const cardWidth = CARD_DIMENSIONS.md.width + 8 // includes padding & border
-      const cardCount = viewerHand.length
-
-      if (cardCount <= 1) {
-        setOverlapAmount(0)
-        return
+      // Calculate baseOffset for centering cards when not scrolling
+      if (!newNeedsScroll && viewerHand.length > 0) {
+        const stripWidth =
+          EFFECTIVE_CARD_WIDTH + (viewerHand.length - 1) * newCardStep
+        setBaseOffset((width - stripWidth) / 2)
+      } else {
+        setBaseOffset(0)
       }
-
-      // Calculate how much space we need
-      const totalWidthNeeded = cardWidth * cardCount
-      const availableWidth = containerWidth
-
-      // If cards already fit, use minimal overlap
-      if (totalWidthNeeded <= availableWidth) {
-        setOverlapAmount(16) // Default overlap
-        return
-      }
-
-      // Calculate overlap needed: we want the last card to fit
-      // Total visible width = cardWidth + (cardCount - 1) * (cardWidth - overlap)
-      // We want: cardWidth + (cardCount - 1) * (cardWidth - overlap) <= availableWidth
-      // Solving for overlap: overlap >= (totalWidthNeeded - availableWidth) / (cardCount - 1)
-      const overlapNeeded =
-        (totalWidthNeeded - availableWidth) / (cardCount - 1)
-
-      // Ensure overlap is at least a minimum (so cards are still distinct)
-      // and at most cardWidth - some visible portion (we want to see at least rank/suit)
-      const minOverlap = 4
-      const maxOverlap = cardWidth - 40 // Ensure at least 40px of each card is visible
-
-      const newOverlap = Math.max(
-        minOverlap,
-        Math.min(maxOverlap, overlapNeeded)
-      )
-      setOverlapAmount(newOverlap)
     }
 
-    updateOverlap()
+    updateLayout()
 
-    let resizeObserver: ResizeObserver | null = null
-    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
-      resizeObserver = new ResizeObserver(() => {
-        updateOverlap()
-      })
-      resizeObserver.observe(containerRef.current)
-    }
-
-    let rafId: number | null = null
-
-    // Also handle window resize
-    const handleResize = () => {
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId)
-      }
-      rafId = requestAnimationFrame(() => {
-        updateOverlap()
-      })
-    }
-    window.addEventListener('resize', handleResize)
+    const resizeObserver = new ResizeObserver(() => {
+      updateLayout()
+    })
+    resizeObserver.observe(viewport)
 
     return () => {
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId)
-      }
-      resizeObserver?.disconnect()
-      window.removeEventListener('resize', handleResize)
+      resizeObserver.disconnect()
     }
   }, [viewerHand.length])
 
@@ -175,8 +183,6 @@ export function PlayerHand({
 
     onSelectCard(selectedCard === card ? null : card)
   }
-
-  const sidePadding = Math.max(24, overlapAmount + 12)
 
   return (
     <section
@@ -262,72 +268,79 @@ export function PlayerHand({
           <div />
         )}
       </header>
+
       <div
-        ref={containerRef}
-        className="flex justify-center overflow-x-visible overflow-y-visible pb-2 pt-4"
-        style={{
-          paddingLeft: sidePadding,
-          paddingRight: sidePadding,
-        }}
+        ref={viewportRef}
+        className={cn(
+          'relative w-full pb-2 pt-4 overflow-y-hidden',
+          needsScroll ? 'overflow-x-auto' : 'overflow-x-hidden'
+        )}
+        style={{ minHeight }}
       >
         {viewerHand.length === 0 ? (
-          <span className="text-sm text-subtle">
-            Hand will appear once available.
-          </span>
+          <div className="flex h-full items-center justify-center">
+            <span className="text-sm text-subtle">
+              Hand will appear once available.
+            </span>
+          </div>
         ) : (
-          viewerHand.map((card, index) => {
-            const isPlayable = playableCards.has(card)
-            const isSelected = selectedCard === card
-            const isDisabled =
-              !isTrickPhase ||
-              !playState ||
-              !isPlayable ||
-              !viewerTurn ||
-              playState.isPending
+          <div className="relative flex h-full items-center">
+            {viewerHand.map((card, index) => {
+              const isPlayable = playableCards.has(card)
+              const isSelected = selectedCard === card
+              const isDisabled =
+                !isTrickPhase ||
+                !playState ||
+                !isPlayable ||
+                !viewerTurn ||
+                playState.isPending
 
-            const cardLabel = isPlayable
-              ? `${card}, ${isSelected ? 'selected' : 'playable'}`
-              : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
-            return (
-              <button
-                key={card}
-                type="button"
-                onClick={() => handleCardClick(card)}
-                disabled={isDisabled}
-                style={{
-                  marginLeft: index === 0 ? 0 : -overlapAmount,
-                  transitionProperty: 'transform, scale, z-index',
-                  transitionDuration: '300ms',
-                  transitionTimingFunction: 'ease-out',
-                }}
-                className={cn(
-                  'relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed',
-                  'hover:z-10 hover:translate-y-[-4px] hover:scale-105',
-                  isSelected
-                    ? 'z-20 translate-y-[-8px] scale-110'
-                    : isPlayable && viewerTurn
-                      ? 'z-0'
-                      : ''
-                )}
-                aria-label={cardLabel}
-                aria-pressed={isSelected}
-              >
-                <div
+              const cardLabel = isPlayable
+                ? `${card}, ${isSelected ? 'selected' : 'playable'}`
+                : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
+
+              return (
+                <button
+                  key={card}
+                  type="button"
+                  onClick={() => handleCardClick(card)}
+                  disabled={isDisabled}
                   className={cn(
-                    'rounded-[1.45rem] border-2 p-[2px] transition-all',
-                    isSelected ? 'border-primary' : 'border-transparent'
+                    'absolute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed',
+                    'transition-[transform,scale,z-index] duration-300 ease-out',
+                    'hover:z-10 hover:-translate-y-1 hover:scale-105',
+                    isSelected
+                      ? 'z-20 -translate-y-2 scale-110'
+                      : isPlayable && viewerTurn
+                        ? 'z-0'
+                        : ''
                   )}
+                  style={{
+                    left: baseOffset + index * cardStep,
+                    transform: isSelected
+                      ? `translateY(-8px) scale(1.1)`
+                      : undefined,
+                  }}
+                  aria-label={cardLabel}
+                  aria-pressed={isSelected}
                 >
-                  <PlayingCard
-                    card={card}
-                    size="md"
-                    isDimmed={isDisabled && !isSelected}
-                    isSelected={isSelected}
-                  />
-                </div>
-              </button>
-            )
-          })
+                  <div
+                    className={cn(
+                      'rounded-[1.45rem] border-2 p-[2px] transition-all',
+                      isSelected ? 'border-primary' : 'border-transparent'
+                    )}
+                  >
+                    <PlayingCard
+                      card={card}
+                      size="md"
+                      isDimmed={isDisabled && !isSelected}
+                      isSelected={isSelected}
+                    />
+                  </div>
+                </button>
+              )
+            })}
+          </div>
         )}
       </div>
     </section>
