@@ -280,9 +280,10 @@ pub async fn orchestrate_migration_internal(
     };
 
     if let Err(ref e) = result {
-        let error_msg = format!("{}", match e {
+        let error_msg = match e {
             DbInfraError::Config { message } => message,
-        });
+        }
+        .to_string();
         if error_msg.contains("database is locked") || error_msg.contains("SQLITE_BUSY") {
             migration_counters::busy_event();
             error!("sqlite_busy op=migrate err={:?}", e);
