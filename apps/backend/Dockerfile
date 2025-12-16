@@ -15,10 +15,12 @@ COPY apps/backend/Cargo.toml apps/backend/Cargo.toml
 COPY apps/migration-cli/Cargo.toml apps/migration-cli/Cargo.toml
 COPY packages/migration/Cargo.toml packages/migration/Cargo.toml
 COPY packages/backend-test-support/Cargo.toml packages/backend-test-support/Cargo.toml
+COPY packages/db-infra/Cargo.toml packages/db-infra/Cargo.toml
 
 # Copy library package sources (they're dependencies, need real code)
 COPY packages/migration/src packages/migration/src
 COPY packages/backend-test-support/src packages/backend-test-support/src
+COPY packages/db-infra/src packages/db-infra/src
 
 # Create dummy source files only for binaries to cache dependency compilation
 RUN mkdir -p apps/backend/src \
