@@ -391,7 +391,7 @@ export function GameRoomView(props: GameRoomViewProps) {
 
   return (
     <div className="flex flex-col text-foreground">
-      <PageContainer className="pb-16">
+      <PageContainer className="pb-16 overflow-x-hidden">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
           <section className="relative flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
             {onRefresh ? (
