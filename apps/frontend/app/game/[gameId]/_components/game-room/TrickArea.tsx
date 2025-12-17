@@ -18,6 +18,7 @@ interface TrickAreaProps {
   className?: string
   onRefresh?: () => void
   isRefreshing?: boolean
+  cardScale?: number
 }
 
 export function TrickArea({
@@ -31,6 +32,7 @@ export function TrickArea({
   className = '',
   onRefresh,
   isRefreshing = false,
+  cardScale = 1,
 }: TrickAreaProps) {
   const orderedCards = useMemo(() => {
     const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
@@ -110,25 +112,42 @@ export function TrickArea({
       ) : (
         <>
           {/* Cards positioned inside a bounded fan area */}
-          <div className="relative flex max-w-[280px] flex-wrap items-center justify-center gap-0 overflow-visible px-2">
+          <div className="relative flex items-center justify-center gap-0 overflow-visible px-2">
             {orderedCards.map(({ seat, card, label, orientation }, index) => {
-              const offsetClass =
-                orientation === 'top'
-                  ? '-translate-y-3'
-                  : orientation === 'bottom'
-                    ? 'translate-y-3'
-                    : orientation === 'left'
-                      ? '-translate-x-2'
-                      : 'translate-x-2'
+              // Calculate offset transforms based on orientation
+              const offsetTransforms: string[] = []
+              if (orientation === 'top') {
+                offsetTransforms.push('translateY(-12px)')
+              } else if (orientation === 'bottom') {
+                offsetTransforms.push('translateY(12px)')
+              } else if (orientation === 'left') {
+                offsetTransforms.push('translateX(-8px)')
+              } else {
+                offsetTransforms.push('translateX(8px)')
+              }
+
+              // Apply scale transform from prop
+              if (cardScale !== 1) {
+                offsetTransforms.push(`scale(${cardScale})`)
+              }
+
+              const combinedTransform =
+                offsetTransforms.length > 0
+                  ? offsetTransforms.join(' ')
+                  : undefined
+
               return (
                 <div
                   key={seat}
                   className={cn(
                     'relative flex flex-col items-center gap-2 transition-all duration-300',
-                    index > 0 ? '-ml-8' : '',
-                    offsetClass
+                    index > 0 ? '-ml-8' : ''
                   )}
-                  style={{ zIndex: 20 + index }}
+                  style={{
+                    zIndex: 20 + index,
+                    transform: combinedTransform,
+                    transformOrigin: 'center center',
+                  }}
                 >
                   <PlayingCard card={card} size="md" />
                   <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-foreground">

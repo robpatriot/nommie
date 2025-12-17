@@ -4,6 +4,7 @@ import type {
   RoundPublic,
   Seat,
 } from '@/lib/game-room/types'
+import { CARD_DIMENSIONS } from './PlayingCard'
 
 export interface SeatSummary {
   seat: Seat
@@ -256,4 +257,112 @@ export function buildSeatSummaries(params: {
       isActive,
     }
   })
+}
+
+// Scaling constants - matching PlayerHand scaling logic
+const CARD_WIDTH = CARD_DIMENSIONS.md.width
+const CARD_PADDING = 8
+const EFFECTIVE_CARD_WIDTH = CARD_WIDTH + CARD_PADDING
+const MIN_OVERLAP = 4
+const MAX_OVERLAP = CARD_WIDTH - 17
+const AESTHETIC_OVERLAP = 8
+const BLEND_THRESHOLD = 20
+const MIN_SCALE = 0.75
+
+// Calculate overlap for a single row given viewport width and card count
+function calculateOverlapForRow(
+  viewportWidth: number,
+  cardCount: number
+): number {
+  if (cardCount <= 1) {
+    return 0
+  }
+
+  const totalWidthNeeded = EFFECTIVE_CARD_WIDTH * cardCount
+  const spaceRemaining = viewportWidth - totalWidthNeeded
+
+  if (spaceRemaining >= BLEND_THRESHOLD) {
+    return AESTHETIC_OVERLAP
+  }
+
+  if (spaceRemaining > 0) {
+    const overlapNeeded = (totalWidthNeeded - viewportWidth) / (cardCount - 1)
+    const calculatedOverlap = Math.max(
+      MIN_OVERLAP,
+      Math.min(MAX_OVERLAP, overlapNeeded)
+    )
+    const blend = 1 - spaceRemaining / BLEND_THRESHOLD
+    return AESTHETIC_OVERLAP + (calculatedOverlap - AESTHETIC_OVERLAP) * blend
+  }
+
+  const overlapNeeded = (totalWidthNeeded - viewportWidth) / (cardCount - 1)
+  return Math.max(MIN_OVERLAP, Math.min(MAX_OVERLAP, overlapNeeded))
+}
+
+// Calculate the minimum width needed for a row to reach max overlap
+function calculateMinWidthForMaxOverlap(cardCount: number): number {
+  if (cardCount <= 1) {
+    return EFFECTIVE_CARD_WIDTH
+  }
+  return (
+    EFFECTIVE_CARD_WIDTH +
+    (cardCount - 1) * (EFFECTIVE_CARD_WIDTH - MAX_OVERLAP)
+  )
+}
+
+// Check if cards fit in one row with acceptable overlap
+function canFitInOneRow(viewportWidth: number, cardCount: number): boolean {
+  if (cardCount <= 1) {
+    return true
+  }
+  return viewportWidth >= calculateMinWidthForMaxOverlap(cardCount)
+}
+
+/**
+ * Calculate card scale factor based on viewport width and card count.
+ * This matches the logic used in PlayerHand's ScaledLayoutStrategy.
+ * Returns a scale factor between MIN_SCALE (0.75) and 1.0.
+ */
+export function calculateCardScale(
+  viewportWidth: number,
+  cardCount: number
+): number {
+  if (cardCount === 0) {
+    return 1
+  }
+
+  // Check if we can fit in one row
+  if (canFitInOneRow(viewportWidth, cardCount)) {
+    return 1 // Single row mode: no scaling
+  }
+
+  // Two-row mode: check if scaling is needed
+  const topRowCount = Math.ceil(cardCount / 2)
+  const bottomRowCount = cardCount - topRowCount
+
+  // Check overlaps with actual viewport to determine if max overlap is reached
+  const topOverlap = calculateOverlapForRow(viewportWidth, topRowCount)
+  const bottomOverlap =
+    bottomRowCount > 0
+      ? calculateOverlapForRow(viewportWidth, bottomRowCount)
+      : 0
+
+  const topRowAtMaxOverlap =
+    topRowCount > 1 && Math.abs(topOverlap - MAX_OVERLAP) < 0.1
+  const bottomRowAtMaxOverlap =
+    bottomRowCount > 1 && Math.abs(bottomOverlap - MAX_OVERLAP) < 0.1
+  const eitherRowAtMaxOverlap = topRowAtMaxOverlap || bottomRowAtMaxOverlap
+
+  // Calculate the width where max overlap would be reached
+  const minWidthForTwoRowMaxOverlap = Math.max(
+    calculateMinWidthForMaxOverlap(topRowCount),
+    calculateMinWidthForMaxOverlap(bottomRowCount)
+  )
+
+  // Determine scale: only scale when max overlap is reached and viewport is below threshold
+  if (eitherRowAtMaxOverlap && viewportWidth < minWidthForTwoRowMaxOverlap) {
+    return Math.max(MIN_SCALE, viewportWidth / minWidthForTwoRowMaxOverlap)
+  }
+
+  return 1
 }

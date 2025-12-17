@@ -21,6 +21,7 @@ interface PlayerHandProps {
   className?: string
   requireCardConfirmation?: boolean
   layoutVariant?: LayoutVariant
+  viewportRef?: React.RefObject<HTMLDivElement | null>
 }
 
 const CARD_WIDTH = CARD_DIMENSIONS.md.width
@@ -343,6 +344,7 @@ export function PlayerHand({
   className,
   requireCardConfirmation = true,
   layoutVariant = 'default',
+  viewportRef: externalViewportRef,
 }: PlayerHandProps) {
   const isTrickPhase = phase.phase === 'Trick' && !!playState
   const viewerTurn = isTrickPhase && phase.data.to_act === playState!.viewerSeat
@@ -401,7 +403,8 @@ export function PlayerHand({
     return 'all'
   }, [isTrickPhase, playState, viewerTurn, phase, viewerHand])
 
-  const viewportRef = useRef<HTMLDivElement>(null)
+  const internalViewportRef = useRef<HTMLDivElement | null>(null)
+  const viewportRef = externalViewportRef ?? internalViewportRef
   const [layout, setLayout] = useState<LayoutResult>({
     mode: 'singleRow',
     positions: [],
@@ -432,7 +435,7 @@ export function PlayerHand({
     return () => {
       resizeObserver.disconnect()
     }
-  }, [viewerHand.length, layoutVariant])
+  }, [viewerHand.length, layoutVariant, viewportRef])
 
   const handleCardClick = useCallback(
     (card: Card) => {

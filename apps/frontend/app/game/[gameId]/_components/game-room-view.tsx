@@ -4,13 +4,16 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
 import { getPlayerDisplayName } from '@/utils/player-names'
 import {
   buildSeatSummaries,
+  calculateCardScale,
   getActiveSeat,
   getCurrentTrickMap,
   getRound,
@@ -243,6 +246,34 @@ export function GameRoomView(props: GameRoomViewProps) {
     setIsHistoryOpen(false)
   }, [])
 
+  // Track PlayerHand viewport width for card scaling
+  const playerHandViewportRef = useRef<HTMLDivElement>(null)
+  const [cardScale, setCardScale] = useState(1)
+
+  useLayoutEffect(() => {
+    const viewport = playerHandViewportRef.current
+    if (!viewport) {
+      return
+    }
+
+    const updateScale = () => {
+      const width = viewport.clientWidth
+      const scale = calculateCardScale(width, viewerHand.length)
+      setCardScale(scale)
+    }
+
+    updateScale()
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateScale()
+    })
+    resizeObserver.observe(viewport)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [viewerHand.length])
+
   if (isPreGame) {
     return (
       <div className="flex flex-col text-foreground">
@@ -444,6 +475,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 className="col-start-2 row-start-2 w-full"
                 onRefresh={onRefresh}
                 isRefreshing={isRefreshing}
+                cardScale={cardScale}
               />
             </div>
             <div className="flex flex-col gap-3 sm:hidden">
@@ -467,6 +499,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 showPreviousRoundPosition={showPreviousRoundPosition}
                 onRefresh={onRefresh}
                 isRefreshing={isRefreshing}
+                cardScale={cardScale}
               />
             </div>
             <PlayerHand
@@ -481,6 +514,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               requireCardConfirmation={requireCardConfirmation}
               className="bg-black/40"
               layoutVariant="scaled"
+              viewportRef={playerHandViewportRef}
             />
           </section>
 
