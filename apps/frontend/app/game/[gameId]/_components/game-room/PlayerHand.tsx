@@ -6,6 +6,8 @@ import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
 import { PlayingCard, CARD_DIMENSIONS } from './PlayingCard'
 
+export type LayoutVariant = 'default' | 'scaled'
+
 interface PlayerHandProps {
   viewerHand: Card[]
   phase: PhaseSnapshot
@@ -17,6 +19,7 @@ interface PlayerHandProps {
   onPlayCard?: (card: Card) => Promise<void> | void
   className?: string
   requireCardConfirmation?: boolean
+  layoutVariant?: LayoutVariant
 }
 
 const CARD_WIDTH = CARD_DIMENSIONS.md.width
@@ -29,32 +32,41 @@ const MIN_OVERLAP = 4
 const MAX_OVERLAP = CARD_WIDTH - 17
 const AESTHETIC_OVERLAP = 8
 const BLEND_THRESHOLD = 20 // Pixels of remaining space before we start blending
+// Second row overlaps top row by 25% of card height
+// Increased to account for card shadows that create visual gap
+const ROW_OVERLAP = CARD_HEIGHT * 0.4
+const SELECTED_CARD_LIFT = 8 // How much selected card lifts (translateY)
 
-function calculateOverlap(
+type LayoutMode = 'singleRow' | 'twoRow'
+
+interface CardPosition {
+  left: number
+  top: number
+  zIndex: number
+}
+
+interface LayoutResult {
+  mode: LayoutMode
+  positions: CardPosition[]
+  minHeight: number
+  scale?: number // Optional scale factor for card scaling
+}
+
+// Calculate overlap for a single row given viewport width and card count
+function calculateOverlapForRow(
   viewportWidth: number,
   cardCount: number
-): { overlap: number; needsScroll: boolean } {
+): number {
   if (cardCount <= 1) {
-    return { overlap: 0, needsScroll: false }
+    return 0
   }
 
   const totalWidthNeeded = EFFECTIVE_CARD_WIDTH * cardCount
-
-  // Calculate minimum possible width with maximum overlap
-  // This is the absolute minimum space the cards can occupy
-  const minWidthWithMaxOverlap =
-    EFFECTIVE_CARD_WIDTH +
-    (cardCount - 1) * (EFFECTIVE_CARD_WIDTH - MAX_OVERLAP)
-
-  // Only enable scroll if viewport is below the absolute minimum
-  // This prevents scrollbar from appearing during intermediate resize states
-  const needsScroll = viewportWidth < minWidthWithMaxOverlap
-
   const spaceRemaining = viewportWidth - totalWidthNeeded
 
   if (spaceRemaining >= BLEND_THRESHOLD) {
     // Plenty of space: use aesthetic overlap
-    return { overlap: AESTHETIC_OVERLAP, needsScroll }
+    return AESTHETIC_OVERLAP
   }
 
   if (spaceRemaining > 0) {
@@ -65,16 +77,257 @@ function calculateOverlap(
       Math.min(MAX_OVERLAP, overlapNeeded)
     )
     const blend = 1 - spaceRemaining / BLEND_THRESHOLD
-    const overlap =
-      AESTHETIC_OVERLAP + (calculatedOverlap - AESTHETIC_OVERLAP) * blend
-    return { overlap, needsScroll }
+    return AESTHETIC_OVERLAP + (calculatedOverlap - AESTHETIC_OVERLAP) * blend
   }
 
   // Doesn't fit: calculate required overlap
   const overlapNeeded = (totalWidthNeeded - viewportWidth) / (cardCount - 1)
-  const overlap = Math.max(MIN_OVERLAP, Math.min(MAX_OVERLAP, overlapNeeded))
+  return Math.max(MIN_OVERLAP, Math.min(MAX_OVERLAP, overlapNeeded))
+}
 
-  return { overlap, needsScroll }
+// Calculate the minimum width needed for a row to reach max overlap
+function calculateMinWidthForMaxOverlap(cardCount: number): number {
+  if (cardCount <= 1) {
+    return EFFECTIVE_CARD_WIDTH
+  }
+  return (
+    EFFECTIVE_CARD_WIDTH +
+    (cardCount - 1) * (EFFECTIVE_CARD_WIDTH - MAX_OVERLAP)
+  )
+}
+
+// Check if cards fit in one row with acceptable overlap
+function canFitInOneRow(viewportWidth: number, cardCount: number): boolean {
+  if (cardCount <= 1) {
+    return true
+  }
+  // If viewport is below absolute minimum, we need two rows
+  return viewportWidth >= calculateMinWidthForMaxOverlap(cardCount)
+}
+
+/**
+ * Layout strategy interface for PlayerHand layouts.
+ * Each strategy computes card positions, dimensions, and optional scaling.
+ */
+interface LayoutStrategy {
+  computeLayout(viewportWidth: number, cardCount: number): LayoutResult
+}
+
+/**
+ * Layout engine for PlayerHand that avoids horizontal scrolling entirely.
+ *
+ * Layout modes:
+ * - singleRow: Cards arranged in one centered row with overlap. Used when cards
+ *   fit within viewport width using acceptable overlap (respects MAX_OVERLAP ceiling).
+ * - twoRow: Cards split into two balanced rows when single-row would exceed overlap
+ *   limits. Each row is independently centered and uses its own overlap calculation.
+ *
+ * Design principles:
+ * - No horizontal scrolling: overflow-x is always hidden. When cards don't fit in one
+ *   row, we switch to two-row layout rather than enabling scrolling.
+ * - Deterministic positioning: All positions computed from viewport width and card
+ *   count, avoiding DOM measurement jitter during resize/rotation.
+ * - Visual effects preserved: Drop shadows and selected-card lift/scale are not
+ *   clipped by using overflow-hidden (not overflow-y-hidden) and adequate minHeight.
+ * - Stable z-index: Selected cards render above neighbors (including across rows)
+ *   via deterministic z-index boost.
+ */
+class DefaultLayoutStrategy implements LayoutStrategy {
+  computeLayout(viewportWidth: number, cardCount: number): LayoutResult {
+    if (cardCount === 0) {
+      return {
+        mode: 'singleRow',
+        positions: [],
+        minHeight: CARD_HEIGHT + 16,
+      }
+    }
+
+    // Check if we can fit in one row
+    if (canFitInOneRow(viewportWidth, cardCount)) {
+      // Single row layout
+      const overlap = calculateOverlapForRow(viewportWidth, cardCount)
+      const cardStep = EFFECTIVE_CARD_WIDTH - overlap
+      const stripWidth = EFFECTIVE_CARD_WIDTH + (cardCount - 1) * cardStep
+      const baseOffset = (viewportWidth - stripWidth) / 2
+
+      const positions: CardPosition[] = []
+      for (let i = 0; i < cardCount; i++) {
+        positions.push({
+          left: baseOffset + i * cardStep,
+          top: 0,
+          zIndex: i, // Base z-index by index
+        })
+      }
+
+      return {
+        mode: 'singleRow',
+        positions,
+        minHeight: CARD_HEIGHT + 16 + SELECTED_CARD_LIFT,
+      }
+    }
+
+    // Two row layout
+    // Split cards into two rows (balanced by count)
+    const topRowCount = Math.ceil(cardCount / 2)
+    const bottomRowCount = cardCount - topRowCount
+
+    // Calculate overlap for each row independently
+    const topOverlap = calculateOverlapForRow(viewportWidth, topRowCount)
+    const bottomOverlap =
+      bottomRowCount > 0
+        ? calculateOverlapForRow(viewportWidth, bottomRowCount)
+        : 0
+
+    const topCardStep = EFFECTIVE_CARD_WIDTH - topOverlap
+    const bottomCardStep =
+      bottomRowCount > 0 ? EFFECTIVE_CARD_WIDTH - bottomOverlap : 0
+
+    // Center each row
+    const topStripWidth = EFFECTIVE_CARD_WIDTH + (topRowCount - 1) * topCardStep
+    const bottomStripWidth =
+      bottomRowCount > 0
+        ? EFFECTIVE_CARD_WIDTH + (bottomRowCount - 1) * bottomCardStep
+        : 0
+
+    const topBaseOffset = (viewportWidth - topStripWidth) / 2
+    const bottomBaseOffset = (viewportWidth - bottomStripWidth) / 2
+
+    const topRowY = 0
+    const bottomRowY = CARD_HEIGHT - ROW_OVERLAP
+
+    const positions: CardPosition[] = []
+    for (let i = 0; i < cardCount; i++) {
+      const isTopRow = i < topRowCount
+      const rowIndex = isTopRow ? i : i - topRowCount
+
+      // Z-index strategy: bottom row cards render above top row cards in overlap area
+      // Within each row, later cards have higher z-index (for horizontal overlap)
+      // Bottom row gets base 100, top row gets base 0
+      const zIndex = isTopRow
+        ? rowIndex // Top row: 0-99 range
+        : 100 + rowIndex // Bottom row: 100-199 range
+
+      positions.push({
+        left: isTopRow
+          ? topBaseOffset + rowIndex * topCardStep
+          : bottomBaseOffset + rowIndex * bottomCardStep,
+        top: isTopRow ? topRowY : bottomRowY,
+        zIndex,
+      })
+    }
+
+    return {
+      mode: 'twoRow',
+      positions,
+      minHeight:
+        CARD_HEIGHT + (CARD_HEIGHT - ROW_OVERLAP) + 16 + SELECTED_CARD_LIFT,
+    }
+  }
+}
+
+/**
+ * Scaled layout strategy that applies card scaling below a threshold width.
+ * When viewport is narrow, cards scale down to fit better while maintaining readability.
+ * Maintains the same overlap ratio as full-size cards by scaling overlap proportionally.
+ */
+class ScaledLayoutStrategy implements LayoutStrategy {
+  private readonly MIN_SCALE = 0.75 // Don't scale below this factor
+  private readonly baseStrategy = new DefaultLayoutStrategy()
+
+  computeLayout(viewportWidth: number, cardCount: number): LayoutResult {
+    const baseLayout = this.baseStrategy.computeLayout(viewportWidth, cardCount)
+
+    // Single row mode: no scaling, return base layout
+    if (baseLayout.mode === 'singleRow') {
+      return {
+        ...baseLayout,
+        scale: 1,
+      }
+    }
+
+    // Two-row mode: check if scaling is needed
+    const topRowCount = Math.ceil(cardCount / 2)
+    const bottomRowCount = cardCount - topRowCount
+
+    // Check overlaps with actual viewport to determine if max overlap is reached
+    const topOverlap = calculateOverlapForRow(viewportWidth, topRowCount)
+    const bottomOverlap =
+      bottomRowCount > 0
+        ? calculateOverlapForRow(viewportWidth, bottomRowCount)
+        : 0
+
+    const topRowAtMaxOverlap =
+      topRowCount > 1 && Math.abs(topOverlap - MAX_OVERLAP) < 0.1
+    const bottomRowAtMaxOverlap =
+      bottomRowCount > 1 && Math.abs(bottomOverlap - MAX_OVERLAP) < 0.1
+    const eitherRowAtMaxOverlap = topRowAtMaxOverlap || bottomRowAtMaxOverlap
+
+    // Calculate the width where max overlap would be reached
+    const minWidthForTwoRowMaxOverlap = Math.max(
+      calculateMinWidthForMaxOverlap(topRowCount),
+      calculateMinWidthForMaxOverlap(bottomRowCount)
+    )
+
+    // Determine scale: only scale when max overlap is reached and viewport is below threshold
+    let scale = 1
+    if (eitherRowAtMaxOverlap && viewportWidth < minWidthForTwoRowMaxOverlap) {
+      scale = Math.max(
+        this.MIN_SCALE,
+        viewportWidth / minWidthForTwoRowMaxOverlap
+      )
+    }
+
+    // If no scaling needed, return base layout
+    if (scale === 1) {
+      return {
+        ...baseLayout,
+        scale: 1,
+      }
+    }
+
+    // Calculate positions using effective viewport width to maintain overlap ratio
+    // Then scale positions back to actual viewport coordinates
+    const effectiveViewportWidth = viewportWidth / scale
+    const scaledLayout = this.baseStrategy.computeLayout(
+      effectiveViewportWidth,
+      cardCount
+    )
+
+    // Scale positions to actual viewport coordinates
+    const scaledCardHeight = CARD_HEIGHT * scale
+    const scaledSelectedLift = SELECTED_CARD_LIFT * scale
+    const scaledRowOverlap = ROW_OVERLAP * scale
+
+    // Determine which row each card is in for proper top position scaling
+    const positions: CardPosition[] = scaledLayout.positions.map(
+      (pos, index) => {
+        const isTopRow = index < topRowCount
+        return {
+          ...pos,
+          left: pos.left * scale,
+          // Top row stays at 0, bottom row uses scaled overlap
+          top: isTopRow ? 0 : scaledCardHeight - scaledRowOverlap,
+        }
+      }
+    )
+
+    return {
+      mode: scaledLayout.mode,
+      positions,
+      minHeight:
+        scaledCardHeight +
+        (scaledCardHeight - scaledRowOverlap) +
+        16 +
+        scaledSelectedLift,
+      scale,
+    }
+  }
+}
+
+// Strategy registry
+const layoutStrategies: Record<LayoutVariant, LayoutStrategy> = {
+  default: new DefaultLayoutStrategy(),
+  scaled: new ScaledLayoutStrategy(),
 }
 
 export function PlayerHand({
@@ -88,18 +341,15 @@ export function PlayerHand({
   onPlayCard,
   className,
   requireCardConfirmation = true,
+  layoutVariant = 'default',
 }: PlayerHandProps) {
   const isTrickPhase = phase.phase === 'Trick' && !!playState
-  const viewerTurn =
-    isTrickPhase &&
-    playState &&
-    phase.phase === 'Trick' &&
-    phase.data.to_act === playState.viewerSeat
+  const viewerTurn = isTrickPhase && phase.data.to_act === playState!.viewerSeat
   const playableCards = useMemo(
     () => new Set(playState?.playable ?? []),
     [playState]
   )
-  const waitingOnSeat = phase.phase === 'Trick' ? phase.data.to_act : null
+  const waitingOnSeat = isTrickPhase ? phase.data.to_act : null
   const waitingOnName =
     waitingOnSeat === null
       ? null
@@ -113,17 +363,16 @@ export function PlayerHand({
     handStatus = 'Hand will appear once the game starts.'
   } else if (isTrickPhase && !viewerTurn) {
     handStatus = `Waiting for ${waitingOnName ?? 'next player'}`
-  } else if (viewerTurn && isTrickPhase && !requireCardConfirmation) {
+  } else if (viewerTurn && !requireCardConfirmation) {
     handStatus = 'Tap a legal card to play immediately.'
   }
 
   const viewportRef = useRef<HTMLDivElement>(null)
-  const [needsScroll, setNeedsScroll] = useState(false)
-  const [baseOffset, setBaseOffset] = useState(0)
-  const [cardStep, setCardStep] = useState(
-    EFFECTIVE_CARD_WIDTH - AESTHETIC_OVERLAP
-  )
-  const [minHeight, setMinHeight] = useState(CARD_HEIGHT + 16)
+  const [layout, setLayout] = useState<LayoutResult>({
+    mode: 'singleRow',
+    positions: [],
+    minHeight: CARD_HEIGHT + 16,
+  })
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current
@@ -131,24 +380,12 @@ export function PlayerHand({
       return
     }
 
+    const strategy = layoutStrategies[layoutVariant] ?? layoutStrategies.default
+
     const updateLayout = () => {
       const width = viewport.clientWidth
-      const { overlap: newOverlap, needsScroll: newNeedsScroll } =
-        calculateOverlap(width, viewerHand.length)
-      setNeedsScroll(newNeedsScroll)
-
-      const newCardStep = EFFECTIVE_CARD_WIDTH - newOverlap
-      setCardStep(newCardStep)
-      setMinHeight(CARD_HEIGHT + (newNeedsScroll ? 24 : 16))
-
-      // Calculate baseOffset for centering cards when not scrolling
-      if (!newNeedsScroll && viewerHand.length > 0) {
-        const stripWidth =
-          EFFECTIVE_CARD_WIDTH + (viewerHand.length - 1) * newCardStep
-        setBaseOffset((width - stripWidth) / 2)
-      } else {
-        setBaseOffset(0)
-      }
+      const newLayout = strategy.computeLayout(width, viewerHand.length)
+      setLayout(newLayout)
     }
 
     updateLayout()
@@ -161,7 +398,7 @@ export function PlayerHand({
     return () => {
       resizeObserver.disconnect()
     }
-  }, [viewerHand.length])
+  }, [viewerHand.length, layoutVariant])
 
   const handleCardClick = (card: Card) => {
     if (!isTrickPhase || !playState) {
@@ -277,11 +514,8 @@ export function PlayerHand({
 
       <div
         ref={viewportRef}
-        className={cn(
-          'relative w-full pb-2 pt-4 overflow-y-hidden',
-          needsScroll ? 'overflow-x-auto' : 'overflow-x-hidden'
-        )}
-        style={{ minHeight }}
+        className="relative w-full pb-2 pt-4 overflow-visible"
+        style={{ minHeight: layout.minHeight }}
       >
         {viewerHand.length === 0 ? (
           <div className="flex h-full items-center justify-center">
@@ -290,7 +524,7 @@ export function PlayerHand({
             </span>
           </div>
         ) : (
-          <div className="relative flex h-full items-center">
+          <div className="relative w-full h-full">
             {viewerHand.map((card, index) => {
               const isPlayable = playableCards.has(card)
               const isSelected = selectedCard === card
@@ -305,6 +539,21 @@ export function PlayerHand({
                 ? `${card}, ${isSelected ? 'selected' : 'playable'}`
                 : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
 
+              const position = layout.positions[index]
+              if (!position) {
+                return null
+              }
+
+              // Selected card gets z-index boost to render above neighbors (including across rows)
+              const baseZIndex = position.zIndex
+              const zIndex = isSelected ? baseZIndex + 1000 : baseZIndex
+
+              // Apply scale if present in layout result
+              const scale = layout.scale ?? 1
+              const baseTransform = `scale(${scale})`
+              const selectedTransform = `translateY(-${SELECTED_CARD_LIFT * scale}px) scale(${scale * 1.1})`
+              const hoverTransform = `translateY(-${1 * scale}px) scale(${scale * 1.05})`
+
               return (
                 <button
                   key={card}
@@ -313,19 +562,26 @@ export function PlayerHand({
                   disabled={isDisabled}
                   className={cn(
                     'absolute focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed',
-                    'transition-[transform,scale,z-index] duration-300 ease-out',
-                    'hover:z-10 hover:-translate-y-1 hover:scale-105',
-                    isSelected
-                      ? 'z-20 -translate-y-2 scale-110'
-                      : isPlayable && viewerTurn
-                        ? 'z-0'
-                        : ''
+                    'transition-[transform] duration-300 ease-out'
                   )}
                   style={{
-                    left: baseOffset + index * cardStep,
-                    transform: isSelected
-                      ? `translateY(-8px) scale(1.1)`
-                      : undefined,
+                    left: position.left,
+                    top: position.top,
+                    zIndex,
+                    transform: isSelected ? selectedTransform : baseTransform,
+                    transformOrigin: 'top left',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.zIndex = String(baseZIndex + 50)
+                      e.currentTarget.style.transform = hoverTransform
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.zIndex = String(baseZIndex)
+                      e.currentTarget.style.transform = baseTransform
+                    }
                   }}
                   aria-label={cardLabel}
                   aria-pressed={isSelected}
