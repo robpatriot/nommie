@@ -67,24 +67,30 @@ export function GameRoomClient({
   const phaseName = phase.phase
   const canMarkReady = phaseName === 'Init'
 
+  // Calculate viewer seat once and reuse
+  const viewerSeatForInteractions = useMemo(
+    () =>
+      typeof snapshot.viewerSeat === 'number' ? snapshot.viewerSeat : null,
+    [snapshot.viewerSeat]
+  )
+
   // Initialize hasMarkedReady from snapshot on mount and when snapshot updates
-  const viewerSeatForReady = typeof snapshot.viewerSeat === 'number' ? snapshot.viewerSeat : null
   useEffect(() => {
-    if (viewerSeatForReady !== null && canMarkReady) {
+    if (viewerSeatForInteractions !== null && canMarkReady) {
       const viewerSeatAssignment = snapshot.snapshot.game.seating.find(
         (seat, index) => {
           const seatIndex =
             typeof seat.seat === 'number' && !Number.isNaN(seat.seat)
               ? seat.seat
               : index
-          return seatIndex === viewerSeatForReady
+          return seatIndex === viewerSeatForInteractions
         }
       )
       if (viewerSeatAssignment) {
         setHasMarkedReady(viewerSeatAssignment.is_ready)
       }
     }
-  }, [snapshot.snapshot.game.seating, viewerSeatForReady, canMarkReady])
+  }, [snapshot.snapshot.game.seating, viewerSeatForInteractions, canMarkReady])
 
   // Reset hasMarkedReady when phase changes away from Init.
   // Use phase directly (not canMarkReady) to avoid race conditions on rapid phase changes.
@@ -268,9 +274,6 @@ export function GameRoomClient({
       snapshot.lockVersion,
     ]
   )
-
-  const viewerSeatForInteractions =
-    typeof snapshot.viewerSeat === 'number' ? snapshot.viewerSeat : null
 
   const biddingControls = useMemo(() => {
     if (

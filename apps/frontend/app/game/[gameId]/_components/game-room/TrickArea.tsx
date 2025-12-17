@@ -1,9 +1,17 @@
+import { useMemo } from 'react'
 import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
 import type { Card } from '@/lib/game-room/types'
 import { getOrientation } from './utils'
 import { PlayingCard } from './PlayingCard'
 import { LastTrickCards } from './LastTrickCards'
 import { cn } from '@/lib/cn'
+
+const ORIENTATION_ORDER: Array<'bottom' | 'right' | 'top' | 'left'> = [
+  'left',
+  'top',
+  'right',
+  'bottom',
+]
 
 interface TrickAreaProps {
   trickMap: Map<Seat, Card>
@@ -30,44 +38,40 @@ export function TrickArea({
   onRefresh,
   isRefreshing = false,
 }: TrickAreaProps) {
-  const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
-    seat,
-    card,
-    label: getSeatName(seat),
-    orientation: getOrientation(viewerSeat, seat),
-  }))
-
-  const orientationOrder: Array<'bottom' | 'right' | 'top' | 'left'> = [
-    'left',
-    'top',
-    'right',
-    'bottom',
-  ]
-  const orderedCards = cards
-    .slice()
-    .sort(
-      (a, b) =>
-        orientationOrder.indexOf(a.orientation) -
-        orientationOrder.indexOf(b.orientation)
-    )
+  const orderedCards = useMemo(() => {
+    const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
+      seat,
+      card,
+      label: getSeatName(seat),
+      orientation: getOrientation(viewerSeat, seat),
+    }))
+    return cards
+      .slice()
+      .sort(
+        (a, b) =>
+          ORIENTATION_ORDER.indexOf(a.orientation) -
+          ORIENTATION_ORDER.indexOf(b.orientation)
+      )
+  }, [trickMap, getSeatName, viewerSeat])
 
   // Show last trick during bidding/trump selection (previous round's final trick)
   // when there's no current trick being played
   const isBetweenRounds =
     phase.phase === 'Bidding' || phase.phase === 'TrumpSelect'
   const showLastTrick =
-    (showPreviousRoundPosition ?? (isBetweenRounds && cards.length === 0)) &&
+    (showPreviousRoundPosition ??
+      (isBetweenRounds && orderedCards.length === 0)) &&
     lastTrick &&
     lastTrick.length > 0
 
   // Calculate minimum height based on number of cards played
-  // Card height (112px) + label (~20px) + gap (8px) + padding (40px top + 16px bottom)
+  // Card height (112px) + label (~20px) + gap (8px) + padding (60px top + 16px bottom)
   const CARD_HEIGHT = 112
   const LABEL_HEIGHT = 20
   const GAP = 8
-  const VERTICAL_PADDING = 56 // pt-10 (40px) + pb-4 (16px)
+  const VERTICAL_PADDING = 76 // pt-[60px] (60px) + pb-4 (16px)
 
-  const hasCards = cards.length > 0
+  const hasCards = orderedCards.length > 0
   const minHeight = hasCards
     ? CARD_HEIGHT + LABEL_HEIGHT + GAP + VERTICAL_PADDING
     : 100 // Smaller when empty
@@ -75,7 +79,7 @@ export function TrickArea({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-[32px] border border-white/10 bg-black/25 px-4 pt-10 pb-4 text-center text-sm text-muted shadow-[0_35px_90px_rgba(0,0,0,0.4)] backdrop-blur',
+        'relative flex items-center justify-center rounded-[32px] border border-white/10 bg-black/25 px-4 pt-[60px] pb-4 text-center text-sm text-muted shadow-[0_35px_90px_rgba(0,0,0,0.4)] backdrop-blur',
         className
       )}
       style={{ minHeight }}
@@ -121,7 +125,7 @@ export function TrickArea({
             />
           </div>
         </>
-      ) : cards.length === 0 ? (
+      ) : orderedCards.length === 0 ? (
         <>
           <div className="flex flex-col items-center gap-2">
             <span className="text-sm font-medium text-subtle">

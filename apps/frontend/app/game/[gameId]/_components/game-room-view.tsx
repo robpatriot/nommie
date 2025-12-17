@@ -4,6 +4,7 @@ import {
   startTransition,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -23,7 +24,16 @@ import { PlayerActions } from './game-room/PlayerActions'
 import { ScoreSidebar } from './game-room/ScoreSidebar'
 import { ScoreHistoryDialog } from './game-room/ScoreHistoryDialog'
 import { AiSeatManager } from './game-room/AiSeatManager'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { cn } from '@/lib/cn'
 import { ReadyPanel } from './game-room/ReadyPanel'
+
+const ORIENTATION_ORDER: SeatSummary['orientation'][] = [
+  'bottom',
+  'right',
+  'top',
+  'left',
+]
 import { SetupSeatList } from './game-room/SetupSeatList'
 import { PageHero } from '@/components/PageHero'
 import { PageContainer } from '@/components/PageContainer'
@@ -95,32 +105,45 @@ export function GameRoomView(props: GameRoomViewProps) {
   const activeName =
     typeof activeSeat === 'number' ? seatDisplayName(activeSeat) : 'Waiting'
 
-  const setupSeatEntries = snapshot.game.seating
-    .map((assignment, index) => {
-      const seatIndex =
-        typeof assignment.seat === 'number' && !Number.isNaN(assignment.seat)
-          ? (assignment.seat as Seat)
-          : (index as Seat)
+  const setupSeatEntries = useMemo(
+    () =>
+      snapshot.game.seating
+        .map((assignment, index) => {
+          const seatIndex =
+            typeof assignment.seat === 'number' &&
+            !Number.isNaN(assignment.seat)
+              ? (assignment.seat as Seat)
+              : (index as Seat)
 
-      return {
-        seat: seatIndex,
-        seatNumber: seatIndex + 1,
-        name: seatDisplayName(seatIndex),
-        isAi: Boolean(assignment.is_ai),
-        isReady: Boolean(assignment.is_ready),
-        // Treat both humans and AI as occupying a seat for setup stats
-        isOccupied: Boolean(assignment.user_id) || Boolean(assignment.is_ai),
-        isViewer: effectiveViewerSeat === seatIndex,
-      }
-    })
-    .sort((a, b) => a.seat - b.seat)
+          return {
+            seat: seatIndex,
+            seatNumber: seatIndex + 1,
+            name: seatDisplayName(seatIndex),
+            isAi: Boolean(assignment.is_ai),
+            isReady: Boolean(assignment.is_ready),
+            // Treat both humans and AI as occupying a seat for setup stats
+            isOccupied:
+              Boolean(assignment.user_id) || Boolean(assignment.is_ai),
+            isViewer: effectiveViewerSeat === seatIndex,
+          }
+        })
+        .sort((a, b) => a.seat - b.seat),
+    [snapshot.game.seating, seatDisplayName, effectiveViewerSeat]
+  )
 
   const totalSeatCount = setupSeatEntries.length
-  const filledSeatCount = setupSeatEntries.filter(
-    (seat) => seat.isOccupied
-  ).length
-  const aiSeatCount = setupSeatEntries.filter((seat) => seat.isAi).length
-  const readySeatCount = setupSeatEntries.filter((seat) => seat.isReady).length
+  const { filledSeatCount, aiSeatCount, readySeatCount } = useMemo(
+    () =>
+      setupSeatEntries.reduce(
+        (acc, seat) => ({
+          filledSeatCount: acc.filledSeatCount + (seat.isOccupied ? 1 : 0),
+          aiSeatCount: acc.aiSeatCount + (seat.isAi ? 1 : 0),
+          readySeatCount: acc.readySeatCount + (seat.isReady ? 1 : 0),
+        }),
+        { filledSeatCount: 0, aiSeatCount: 0, readySeatCount: 0 }
+      ),
+    [setupSeatEntries]
+  )
 
   const trickMap = getCurrentTrickMap(phase)
   const historicalStats =
@@ -142,22 +165,21 @@ export function GameRoomView(props: GameRoomViewProps) {
     actualViewerSeat: effectiveViewerSeat, // Pass actual viewer seat separately for isViewer check
     historicalStats,
   })
-  const orientationOrder: SeatSummary['orientation'][] = [
-    'bottom',
-    'right',
-    'top',
-    'left',
-  ]
-  const mobileSeatSummaries = seatSummaries
-    .slice()
-    .sort(
-      (a, b) =>
-        orientationOrder.indexOf(a.orientation) -
-        orientationOrder.indexOf(b.orientation)
-    )
+  const mobileSeatSummaries = useMemo(
+    () =>
+      seatSummaries
+        .slice()
+        .sort(
+          (a, b) =>
+            ORIENTATION_ORDER.indexOf(a.orientation) -
+            ORIENTATION_ORDER.indexOf(b.orientation)
+        ),
+    [seatSummaries]
+  )
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const showCardWrapper = useMediaQuery('(min-width: 640px)')
   const {
     history,
     isLoading: isHistoryLoading,
@@ -393,7 +415,13 @@ export function GameRoomView(props: GameRoomViewProps) {
     <div className="flex flex-col text-foreground">
       <PageContainer className="pb-16 overflow-x-hidden">
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="relative flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
+          <section
+            className={cn(
+              'relative flex flex-col gap-6',
+              showCardWrapper &&
+                'rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] px-6 pt-[44px] pb-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]'
+            )}
+          >
             {onRefresh ? (
               <div className="pointer-events-auto absolute right-6 top-6 z-10 hidden sm:block">
                 <button
