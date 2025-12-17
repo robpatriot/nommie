@@ -78,14 +78,20 @@ export function BiddingPanel({
     [layoutSeat, phase.bids, playerNames, viewerSeat]
   )
 
-  const remainingNullBids = phase.bids.filter((bid) => bid === null).length
+  const { remainingNullBids, sumOfOtherBids } = useMemo(() => {
+    const remainingNullBids = phase.bids.filter((bid) => bid === null).length
+    const sumOfOtherBids = phase.bids.reduce<number>(
+      (total, bid, seatIndex) => {
+        if (seatIndex === viewerSeat) {
+          return total
+        }
+        return total + (bid ?? 0)
+      },
+      0
+    )
+    return { remainingNullBids, sumOfOtherBids }
+  }, [phase.bids, viewerSeat])
   const isFinalBid = remainingNullBids === 1
-  const sumOfOtherBids = phase.bids.reduce<number>((total, bid, seatIndex) => {
-    if (seatIndex === viewerSeat) {
-      return total
-    }
-    return total + (bid ?? 0)
-  }, 0)
 
   const parsedBid =
     bidInput.trim() === '' ? null : Number.parseInt(bidInput, 10)
