@@ -87,7 +87,7 @@ export function ScoreSidebar({
         className="rounded-2xl border border-border/60 bg-surface/70"
         open
       >
-        <summary className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-surface">
+        <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-surface">
           <span>Scoreboard</span>
           {onShowHistory ? (
             <button

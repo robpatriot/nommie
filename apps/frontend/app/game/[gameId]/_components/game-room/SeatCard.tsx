@@ -64,7 +64,7 @@ export function SeatCard({
         ) : null}
         {typeof tricksWon === 'number' ? (
           <span className="rounded-full bg-black/20 px-2 py-0.5 font-semibold text-foreground">
-            Tricks {tricksWon}
+            Won {tricksWon}
           </span>
         ) : null}
       </div>

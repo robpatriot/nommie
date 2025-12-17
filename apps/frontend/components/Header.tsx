@@ -73,7 +73,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
             <span className="text-2xl" role="img" aria-hidden>
               🃏
             </span>
-            <span className="tracking-tight">Nommie</span>
+            <span className="hidden tracking-tight sm:inline">Nommie</span>
           </Link>
           {hasBreadcrumbs ? (
             <nav
