@@ -435,7 +435,7 @@ export function PlayerHand({
     return () => {
       resizeObserver.disconnect()
     }
-  }, [viewerHand.length, layoutVariant, viewportRef])
+  }, [viewerHand.length, layoutVariant]) // eslint-disable-line react-hooks/exhaustive-deps -- viewportRef is a stable ref object
 
   const handleCardClick = useCallback(
     (card: Card) => {
