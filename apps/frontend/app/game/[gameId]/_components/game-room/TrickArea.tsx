@@ -60,12 +60,25 @@ export function TrickArea({
     lastTrick &&
     lastTrick.length > 0
 
+  // Calculate minimum height based on number of cards played
+  // Card height (112px) + label (~20px) + gap (8px) + padding (40px top + 16px bottom)
+  const CARD_HEIGHT = 112
+  const LABEL_HEIGHT = 20
+  const GAP = 8
+  const VERTICAL_PADDING = 56 // pt-10 (40px) + pb-4 (16px)
+
+  const hasCards = cards.length > 0
+  const minHeight = hasCards
+    ? CARD_HEIGHT + LABEL_HEIGHT + GAP + VERTICAL_PADDING
+    : 100 // Smaller when empty
+
   return (
     <div
       className={cn(
-        'relative flex h-full min-h-[280px] items-center justify-center rounded-[32px] border border-white/10 bg-black/25 p-4 text-center text-sm text-muted shadow-[0_35px_90px_rgba(0,0,0,0.4)] backdrop-blur',
+        'relative flex items-center justify-center rounded-[32px] border border-white/10 bg-black/25 px-4 pt-10 pb-4 text-center text-sm text-muted shadow-[0_35px_90px_rgba(0,0,0,0.4)] backdrop-blur',
         className
       )}
+      style={{ minHeight }}
     >
       {onRefresh ? (
         <div className="pointer-events-auto absolute right-4 top-4 z-10 sm:hidden">

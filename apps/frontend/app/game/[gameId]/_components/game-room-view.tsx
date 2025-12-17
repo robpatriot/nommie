@@ -392,7 +392,7 @@ export function GameRoomView(props: GameRoomViewProps) {
   return (
     <div className="flex flex-col text-foreground">
       <PageContainer className="pb-16 overflow-x-hidden">
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section className="relative flex flex-col gap-6 rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] p-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]">
             {onRefresh ? (
               <div className="pointer-events-auto absolute right-6 top-6 z-10 hidden sm:block">
@@ -435,7 +435,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               className="hidden gap-3 sm:grid"
               style={{
                 gridTemplateColumns:
-                  'minmax(140px,1fr) minmax(260px,2.2fr) minmax(140px,1fr)',
+                  'minmax(0,1fr) minmax(0,2.2fr) minmax(0,1fr)',
                 gridTemplateRows: 'auto 1fr auto',
               }}
             >
@@ -450,7 +450,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 viewerSeat={effectiveViewerSeat ?? 0}
                 lastTrick={lastTrick}
                 showPreviousRoundPosition={showPreviousRoundPosition}
-                className="col-start-2 row-start-2 h-full w-full min-h-[280px]"
+                className="col-start-2 row-start-2 w-full"
                 onRefresh={onRefresh}
                 isRefreshing={isRefreshing}
               />
@@ -489,10 +489,11 @@ export function GameRoomView(props: GameRoomViewProps) {
               onPlayCard={handlePlayCard}
               requireCardConfirmation={requireCardConfirmation}
               className="bg-black/40"
+              layoutVariant="scaled"
             />
           </section>
 
-          <aside className="flex flex-col gap-4 xl:sticky xl:top-6">
+          <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
             <PlayerActions
               phase={phase}
               viewerSeat={effectiveViewerSeat ?? 0}
