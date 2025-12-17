@@ -15,8 +15,8 @@ import {
   getActiveSeat,
   getCurrentTrickMap,
   getRound,
+  ORIENTATION_ORDER_MOBILE,
 } from './game-room/utils'
-import type { SeatSummary } from './game-room/utils'
 import { SeatCard } from './game-room/SeatCard'
 import { TrickArea } from './game-room/TrickArea'
 import { PlayerHand } from './game-room/PlayerHand'
@@ -24,16 +24,10 @@ import { PlayerActions } from './game-room/PlayerActions'
 import { ScoreSidebar } from './game-room/ScoreSidebar'
 import { ScoreHistoryDialog } from './game-room/ScoreHistoryDialog'
 import { AiSeatManager } from './game-room/AiSeatManager'
+import { SyncButton } from './game-room/SyncButton'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { ReadyPanel } from './game-room/ReadyPanel'
-
-const ORIENTATION_ORDER: SeatSummary['orientation'][] = [
-  'bottom',
-  'right',
-  'top',
-  'left',
-]
 import { SetupSeatList } from './game-room/SetupSeatList'
 import { PageHero } from '@/components/PageHero'
 import { PageContainer } from '@/components/PageContainer'
@@ -171,8 +165,8 @@ export function GameRoomView(props: GameRoomViewProps) {
         .slice()
         .sort(
           (a, b) =>
-            ORIENTATION_ORDER.indexOf(a.orientation) -
-            ORIENTATION_ORDER.indexOf(b.orientation)
+            ORIENTATION_ORDER_MOBILE.indexOf(a.orientation) -
+            ORIENTATION_ORDER_MOBILE.indexOf(b.orientation)
         ),
     [seatSummaries]
   )
@@ -424,34 +418,7 @@ export function GameRoomView(props: GameRoomViewProps) {
           >
             {onRefresh ? (
               <div className="pointer-events-auto absolute right-6 top-6 z-10 hidden sm:block">
-                <button
-                  type="button"
-                  onClick={onRefresh}
-                  disabled={isRefreshing}
-                  className="flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-primary/60 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-                  aria-label={
-                    isRefreshing
-                      ? 'Refreshing game state'
-                      : 'Refresh game state'
-                  }
-                >
-                  <span>Sync</span>
-                  <svg
-                    aria-hidden="true"
-                    className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21 2v6h-6" />
-                    <path d="M3 22v-6h6" />
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8" />
-                    <path d="M20.49 15a9 9 0 0 1-14.85 3.36L3 16" />
-                  </svg>
-                </button>
+                <SyncButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
               </div>
             ) : null}
             {showPreviousRoundPosition ? (

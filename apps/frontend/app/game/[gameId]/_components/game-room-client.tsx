@@ -580,9 +580,6 @@ export function GameRoomClient({
         onRefresh={() => void refreshSnapshot()}
         isRefreshing={syncIsRefreshing}
         error={combinedError}
-        status={{
-          lastSyncedAt: snapshot.timestamp,
-        }}
         readyState={{
           canReady: canMarkReady,
           isPending: isReadyPending,

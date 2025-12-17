@@ -1,17 +1,11 @@
 import { useMemo } from 'react'
 import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
 import type { Card } from '@/lib/game-room/types'
-import { getOrientation } from './utils'
+import { getOrientation, ORIENTATION_ORDER_TRICK } from './utils'
 import { PlayingCard } from './PlayingCard'
 import { LastTrickCards } from './LastTrickCards'
+import { SyncButton } from './SyncButton'
 import { cn } from '@/lib/cn'
-
-const ORIENTATION_ORDER: Array<'bottom' | 'right' | 'top' | 'left'> = [
-  'left',
-  'top',
-  'right',
-  'bottom',
-]
 
 interface TrickAreaProps {
   trickMap: Map<Seat, Card>
@@ -49,8 +43,8 @@ export function TrickArea({
       .slice()
       .sort(
         (a, b) =>
-          ORIENTATION_ORDER.indexOf(a.orientation) -
-          ORIENTATION_ORDER.indexOf(b.orientation)
+          ORIENTATION_ORDER_TRICK.indexOf(a.orientation) -
+          ORIENTATION_ORDER_TRICK.indexOf(b.orientation)
       )
   }, [trickMap, getSeatName, viewerSeat])
 
@@ -86,32 +80,7 @@ export function TrickArea({
     >
       {onRefresh ? (
         <div className="pointer-events-auto absolute right-4 top-4 z-10 sm:hidden">
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            className="flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-primary/60 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-            aria-label={
-              isRefreshing ? 'Refreshing game state' : 'Refresh game state'
-            }
-          >
-            <span>Sync</span>
-            <svg
-              aria-hidden="true"
-              className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={1.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21 2v6h-6" />
-              <path d="M3 22v-6h6" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L21 8" />
-              <path d="M20.49 15a9 9 0 0 1-14.85 3.36L3 16" />
-            </svg>
-          </button>
+          <SyncButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
         </div>
       ) : null}
       {showLastTrick ? (

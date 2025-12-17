@@ -17,6 +17,25 @@ export interface SeatSummary {
   bid?: number | null
 }
 
+/**
+ * Order for sorting seat summaries by orientation (for mobile display).
+ * Bottom (viewer) first, then right, top, left.
+ */
+export const ORIENTATION_ORDER_MOBILE: SeatSummary['orientation'][] = [
+  'bottom',
+  'right',
+  'top',
+  'left',
+]
+
+/**
+ * Order for sorting cards in trick area by orientation.
+ * Left, top, right, bottom (play order around the table).
+ */
+export const ORIENTATION_ORDER_TRICK: Array<
+  'bottom' | 'right' | 'top' | 'left'
+> = ['left', 'top', 'right', 'bottom']
+
 export function getOrientation(
   viewerSeat: Seat,
   seat: Seat
