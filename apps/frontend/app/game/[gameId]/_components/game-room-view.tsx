@@ -5,7 +5,6 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
@@ -49,7 +48,7 @@ export interface GameRoomViewProps {
   gameId: number
   snapshot: GameSnapshot
   playerNames: [string, string, string, string]
-  viewerSeat?: Seat
+  viewerSeat?: Seat | null
   viewerHand?: Card[]
   onRefresh?: () => void
   isRefreshing?: boolean
@@ -180,7 +179,6 @@ export function GameRoomView(props: GameRoomViewProps) {
     error: historyError,
     fetchHistory,
   } = useGameHistory(gameId)
-  const prevPhaseRef = useRef(phase.phase)
 
   // Reset and validate selectedCard when phase or playState changes
   // Use startTransition to mark as non-urgent update to avoid cascading renders
@@ -202,8 +200,6 @@ export function GameRoomView(props: GameRoomViewProps) {
         return current
       })
     })
-
-    prevPhaseRef.current = currentPhase
   }, [phase, playState])
 
   useEffect(() => {

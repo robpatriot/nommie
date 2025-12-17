@@ -575,7 +575,7 @@ export function GameRoomClient({
         gameId={gameId}
         snapshot={snapshot.snapshot}
         playerNames={snapshot.playerNames}
-        viewerSeat={snapshot.viewerSeat ?? undefined}
+        viewerSeat={snapshot.viewerSeat ?? null}
         viewerHand={snapshot.viewerHand}
         onRefresh={() => void refreshSnapshot()}
         isRefreshing={syncIsRefreshing}
