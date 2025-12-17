@@ -5,6 +5,7 @@ import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
 import { PlayingCard, CARD_DIMENSIONS } from './PlayingCard'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 export type LayoutVariant = 'default' | 'scaled'
 
@@ -367,6 +368,10 @@ export function PlayerHand({
     handStatus = 'Tap a legal card to play immediately.'
   }
 
+  // Responsive visibility: hide title below 400px, legal plays below 320px
+  const showTitle = useMediaQuery('(min-width: 400px)')
+  const showLegalPlays = useMediaQuery('(min-width: 320px)')
+
   const viewportRef = useRef<HTMLDivElement>(null)
   const [layout, setLayout] = useState<LayoutResult>({
     mode: 'singleRow',
@@ -428,11 +433,13 @@ export function PlayerHand({
         className
       )}
     >
-      <header className="grid grid-cols-3 items-center gap-3">
-        <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-            Your hand
-          </span>
+      <header className="flex items-center gap-3">
+        <div className="flex flex-col gap-1 flex-shrink-0">
+          {showTitle && (
+            <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+              Your hand
+            </span>
+          )}
           {handStatus !== 'Read-only preview' && (
             <p className="text-xs text-muted" aria-live="polite">
               {handStatus}
@@ -440,7 +447,7 @@ export function PlayerHand({
           )}
         </div>
         {isTrickPhase && playState ? (
-          <div className="flex justify-center">
+          <div className="flex justify-center flex-1">
             {requireCardConfirmation ? (
               <button
                 type="button"
@@ -482,22 +489,40 @@ export function PlayerHand({
               </span>
             )}
           </div>
-        ) : (
-          <div />
-        )}
-        {isTrickPhase && playState ? (
-          <div className="flex items-center justify-end gap-2">
-            {playState.playable.length > 0 ? (
+        ) : null}
+        {isTrickPhase && playState && showLegalPlays ? (
+          <div className="flex items-center justify-end gap-2 flex-shrink-0">
+            {playState.playable.length > 0 && viewerTurn ? (
               <div className="rounded-lg border border-white/15 bg-surface/60 px-2 py-1">
                 <span className="text-xs font-medium text-muted">
                   <span className="sm:hidden">Legal:</span>
                   <span className="hidden sm:inline">Legal cards:</span>
                 </span>
                 <span className="ml-1.5 text-xs font-medium text-foreground">
-                  {playState.playable.length === viewerHand.length &&
-                  viewerHand.every((card) => playState.playable.includes(card))
-                    ? 'all'
-                    : playState.playable.join(', ')}
+                  {(() => {
+                    // Get lead card if trick has started
+                    const leadCard =
+                      phase.phase === 'Trick' &&
+                      phase.data.current_trick.length > 0
+                        ? phase.data.current_trick[0][1]
+                        : null
+
+                    if (leadCard) {
+                      // Rule 2: If player has cards matching lead suit, only that suit is legal
+                      const leadSuit = leadCard.slice(-1).toUpperCase()
+                      const hasLeadSuit = viewerHand.some(
+                        (card) => card.slice(-1).toUpperCase() === leadSuit
+                      )
+
+                      if (hasLeadSuit) {
+                        // Only one suit is legal (the lead suit)
+                        return leadSuit
+                      }
+                    }
+
+                    // Rule 3: No lead card or player doesn't have lead suit - all cards are legal
+                    return 'all'
+                  })()}
                 </span>
               </div>
             ) : null}
