@@ -54,9 +54,11 @@ describe('GameRoomView', () => {
 
     expect(screen.getByText('Bidding Round')).toBeInTheDocument()
     expect(screen.getAllByText('Alex').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Tricks/)[0].textContent).toContain('2')
+    expect(screen.getAllByText(/Won/)[0].textContent).toContain('2')
     expect(screen.getAllByText('Bid 2').length).toBeGreaterThan(0)
-    expect(screen.getByLabelText('Refresh game state')).toBeInTheDocument()
+    expect(
+      screen.getAllByLabelText('Refresh game state').length
+    ).toBeGreaterThan(0)
   })
 
   it('surfaces errors', () => {
@@ -123,7 +125,7 @@ describe('GameRoomView', () => {
       />
     )
 
-    expect(screen.getAllByText('Tricks 2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Won 2').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Bid 3').length).toBeGreaterThan(0)
     expect(screen.getByText("Last round's final position")).toBeInTheDocument()
   })

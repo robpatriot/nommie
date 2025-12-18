@@ -380,28 +380,8 @@ export function PlayerHand({
       return null
     }
 
-    // Get lead card if trick has started
-    const leadCard =
-      phase.phase === 'Trick' && phase.data.current_trick.length > 0
-        ? phase.data.current_trick[0][1]
-        : null
-
-    if (leadCard) {
-      // Rule 2: If player has cards matching lead suit, only that suit is legal
-      const leadSuit = leadCard.slice(-1).toUpperCase()
-      const hasLeadSuit = viewerHand.some(
-        (card) => card.slice(-1).toUpperCase() === leadSuit
-      )
-
-      if (hasLeadSuit) {
-        // Only one suit is legal (the lead suit)
-        return leadSuit
-      }
-    }
-
-    // Rule 3: No lead card or player doesn't have lead suit - all cards are legal
-    return 'all'
-  }, [isTrickPhase, playState, viewerTurn, phase, viewerHand])
+    return playState.playable.length ? playState.playable.join(', ') : '—'
+  }, [isTrickPhase, playState, viewerTurn])
 
   const internalViewportRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = externalViewportRef ?? internalViewportRef
