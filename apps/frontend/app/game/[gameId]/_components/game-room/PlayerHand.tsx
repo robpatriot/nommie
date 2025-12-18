@@ -491,7 +491,7 @@ export function PlayerHand({
           )}
         </div>
         {isTrickPhase && playState ? (
-          <div className="flex justify-center flex-1">
+          <div className="flex justify-center flex-1 min-w-0">
             {requireCardConfirmation ? (
               <button
                 type="button"
@@ -535,16 +535,19 @@ export function PlayerHand({
           </div>
         ) : null}
         {isTrickPhase && playState && showLegalPlays ? (
-          <div className="flex items-center justify-end gap-2 flex-shrink-0">
+          <div
+            className="flex items-center justify-end gap-2 flex-shrink-0"
+            style={{ minWidth: 'max-content' }}
+          >
             {playState.playable.length > 0 &&
             viewerTurn &&
             legalCardsDisplay ? (
-              <div className="rounded-lg border border-white/15 bg-surface/60 px-2 py-1">
-                <span className="text-xs font-medium text-muted">
+              <div className="rounded-full bg-black/20 px-3 py-1">
+                <span className="text-sm font-medium text-muted">
                   <span className="sm:hidden">Legal:</span>
                   <span className="hidden sm:inline">Legal cards:</span>
                 </span>
-                <span className="ml-1.5 text-xs font-medium text-foreground">
+                <span className="ml-1.5 text-sm font-medium text-foreground">
                   {legalCardsDisplay}
                 </span>
               </div>
