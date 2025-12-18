@@ -13,3 +13,6 @@ mod support;
 
 #[path = "suites/db_txn/txn_policy_default.rs"]
 mod txn_policy_default;
+
+#[path = "suites/services/ensure_user_unique_retry_commit.rs"]
+mod ensure_user_unique_retry_commit;

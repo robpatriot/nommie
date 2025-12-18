@@ -196,14 +196,20 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ### 🟨 **18. Architecture & Reliability**
 **Details:**
-- **WebSockets / Server Push & Architecture:** Replace polling with WebSockets or SSE and decide on the long‑term WebSocket architecture and testing strategy.  
-  - Add end-to-end WebSocket integration tests for game sessions (connect, snapshots, broadcasts, shutdown).  
-  - Decide whether to split `ws` concerns into reusable realtime infrastructure (e.g., broker/registries) vs. binary-only handlers (e.g., route wiring), and document the rationale.  
-  *Acceptance:* Real-time updates replace polling; WebSocket architecture and testing strategy are documented and enforced via automated tests.
-- **Deployment Stub:** Minimal production-style environment including FE, BE, DB, and observability stubs.  
-  *Acceptance:* Application runs in minimal production configuration.
-- **Race-Safe `ensure_user`:** Handle concurrent insertions safely by re-fetching on unique violations.  
-  *Acceptance:* No duplicate users under concurrency.
+- **WebSockets / Server Push & Architecture:** Replace polling with WebSockets (or SSE) and decide on the long‑term realtime architecture and testing strategy.  
+  - Add end-to-end WebSocket integration tests for game sessions (connect, initial snapshot, broadcasts, shutdown).  
+  - Document the chosen realtime architecture (registry/broker split, Redis pub/sub fan-out) and how it is tested.  
+  *Status:* ✅ WebSocket infrastructure implemented and deployed; polling replaced. Frontend uses `useGameSync` hook; backend publishes snapshots via Redis after mutations.  
+  *Remaining:* Add end-to-end backend integration tests covering multi-client broadcast, reconnect, and shutdown behavior.  
+  *Acceptance:* WebSocket sync is the primary update mechanism for active game clients; the architecture and testing strategy are documented and enforced via automated tests.
+- **Deployment Stub:** Minimal production-style environment including FE, BE, DB, and Redis.  
+  *Status:* ✅ Complete. Application runs in `docker/local-prod` with TLS, Caddy reverse proxy, and all services containerized.  
+  *Acceptance:* Application runs in a minimal production-style configuration.
+- **Race-Safe `ensure_user`:** Handle concurrent insertions safely using non-aborting upserts (`ON CONFLICT DO NOTHING`) with follow-up SELECT.  
+  *Status:* ✅ Complete. Concurrent OAuth logins for same email succeed without duplicate users/credentials or transaction aborts.  
+  *Implementation:* `ensure_user_by_sub()` and `ensure_credentials_by_email()` adapters prevent transaction-aborting unique violations; cleanup logic ensures no orphan users on email ownership conflicts.  
+  *Test coverage:* Concurrency regression test proves correctness under parallel first-login scenarios.  
+  *Acceptance:* No duplicate users/credentials under concurrency.
 
 ---
 

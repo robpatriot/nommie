@@ -50,6 +50,17 @@ pub async fn create_user(
     Ok(User::from(user))
 }
 
+pub async fn ensure_user_by_sub(
+    txn: &DatabaseTransaction,
+    sub: &str,
+    username: &str,
+    is_ai: bool,
+) -> Result<(User, bool), DomainError> {
+    let dto = users_adapter::UserCreate::new(sub, username, is_ai);
+    let (user, inserted) = users_adapter::ensure_user_by_sub(txn, dto).await?;
+    Ok((User::from(user), inserted))
+}
+
 pub async fn create_credentials(
     txn: &DatabaseTransaction,
     user_id: i64,
@@ -62,6 +73,20 @@ pub async fn create_credentials(
     }
     let credential = users_adapter::create_credentials(txn, dto).await?;
     Ok(UserCredentials::from(credential))
+}
+
+pub async fn ensure_credentials_by_email(
+    txn: &DatabaseTransaction,
+    user_id: i64,
+    email: &str,
+    google_sub: Option<&str>,
+) -> Result<(UserCredentials, bool), DomainError> {
+    let mut dto = users_adapter::CredentialsCreate::new(user_id, email);
+    if let Some(sub) = google_sub {
+        dto = dto.with_google_sub(sub);
+    }
+    let (credential, inserted) = users_adapter::ensure_credentials_by_email(txn, dto).await?;
+    Ok((UserCredentials::from(credential), inserted))
 }
 
 pub async fn update_credentials(
@@ -100,6 +125,11 @@ pub async fn find_user_by_sub<C: ConnectionTrait + Send + Sync>(
 ) -> Result<Option<User>, DomainError> {
     let user = users_adapter::find_user_by_sub(conn, sub).await?;
     Ok(user.map(User::from))
+}
+
+pub async fn delete_user(txn: &DatabaseTransaction, user_id: i64) -> Result<(), DomainError> {
+    users_adapter::delete_user(txn, user_id).await?;
+    Ok(())
 }
 
 // Conversions between SeaORM models and domain models
