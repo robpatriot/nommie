@@ -121,6 +121,10 @@
     color: rgb(var(--color-text));
   }
 
+  html {
+    min-width: 220px;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     min-height: 100vh;
