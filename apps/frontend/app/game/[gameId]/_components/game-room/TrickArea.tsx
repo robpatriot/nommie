@@ -114,6 +114,18 @@ export function TrickArea({
           {/* Cards positioned inside a bounded fan area */}
           <div className="relative flex items-center justify-center gap-0 overflow-visible px-2">
             {orderedCards.map(({ seat, card, label, orientation }, index) => {
+              // Base margin for overlap
+              const baseMargin = 32
+              const baseMarginLeft = index > 0 ? -baseMargin : 0
+
+              // Calculate overlap adjustment - move cards closer together as they scale down
+              // Apply to all cards (not just index > 0) so they all move toward center
+              // Make it much more pronounced to see the effect
+              const overlapAdjustment =
+                cardScale < 1
+                  ? baseMargin * (1 - cardScale) * 3 // Multiply by 3 to make it very pronounced
+                  : 0
+
               // Calculate offset transforms based on orientation
               const offsetTransforms: string[] = []
               if (orientation === 'top') {
@@ -121,12 +133,18 @@ export function TrickArea({
               } else if (orientation === 'bottom') {
                 offsetTransforms.push('translateY(12px)')
               } else if (orientation === 'left') {
-                offsetTransforms.push('translateX(-8px)')
+                // Combine orientation offset with overlap adjustment
+                // Left card should move RIGHT (more positive) to get closer to center
+                const totalX = -8 + overlapAdjustment
+                offsetTransforms.push(`translateX(${totalX}px)`)
               } else {
-                offsetTransforms.push('translateX(8px)')
+                // Combine orientation offset with overlap adjustment
+                // Right card should move LEFT (more negative) to get closer to center
+                const totalX = 8 - overlapAdjustment
+                offsetTransforms.push(`translateX(${totalX}px)`)
               }
 
-              // Apply scale transform from prop
+              // Apply scale transform from prop (applied last)
               if (cardScale !== 1) {
                 offsetTransforms.push(`scale(${cardScale})`)
               }
@@ -136,17 +154,24 @@ export function TrickArea({
                   ? offsetTransforms.join(' ')
                   : undefined
 
+              // Increase gap between card and label as cards scale down (2x more pronounced)
+              // At scale 1.0: gap = 8px (gap-2)
+              // At scale 0.8: gap = 20px (8 / 0.8 * 2)
+              // At scale 0.75: gap = 21.33px (8 / 0.75 * 2)
+              const baseGap = 8 // gap-2 = 8px
+              const scaledGap =
+                cardScale < 1 ? (baseGap / cardScale) * 2 : baseGap
+
               return (
                 <div
                   key={seat}
-                  className={cn(
-                    'relative flex flex-col items-center gap-2 transition-all duration-300',
-                    index > 0 ? '-ml-8' : ''
-                  )}
+                  className="relative flex flex-col items-center transition-all duration-300"
                   style={{
                     zIndex: 20 + index,
                     transform: combinedTransform,
                     transformOrigin: 'center center',
+                    marginLeft: baseMarginLeft,
+                    gap: `${scaledGap}px`,
                   }}
                 >
                   <PlayingCard card={card} size="md" />
