@@ -34,6 +34,26 @@ export function PerformanceMonitor() {
 
     if (!isEnabled) return
 
+    // Store LCP entry collected via PerformanceObserver
+    let lcpEntry: LargestContentfulPaint | null = null
+
+    // Set up PerformanceObserver for LCP (replaces deprecated getEntriesByType)
+    let lcpObserver: PerformanceObserver | null = null
+    if ('PerformanceObserver' in window) {
+      try {
+        lcpObserver = new PerformanceObserver((list) => {
+          const entries = list.getEntries()
+          // The last entry is the final LCP value
+          if (entries.length > 0) {
+            lcpEntry = entries[entries.length - 1] as LargestContentfulPaint
+          }
+        })
+        lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] })
+      } catch {
+        // LCP observer not supported - silently ignore
+      }
+    }
+
     // Wait for page to fully load
     const logPerformanceMetrics = () => {
       console.group('🚀 Performance Metrics')
@@ -153,33 +173,25 @@ export function PerformanceMonitor() {
         console.groupEnd()
       }
 
-      // Web Vitals (if available)
-      if ('PerformanceObserver' in window) {
-        // Check for LCP
-        try {
-          const lcpEntries = performance.getEntriesByType(
-            'largest-contentful-paint'
-          ) as PerformanceEntry[]
-          if (lcpEntries.length > 0) {
-            const lcp = lcpEntries[lcpEntries.length - 1]
-            // LCP entries have renderTime or loadTime as number properties
-            const lcpValue =
-              (lcp as { renderTime?: number; loadTime?: number }).renderTime ??
-              (lcp as { renderTime?: number; loadTime?: number }).loadTime ??
-              0
-            if (lcpValue > 0) {
-              const rating = getLcpRating(lcpValue)
-              console.log(
-                `${rating} Largest Contentful Paint (LCP): ${lcpValue.toFixed(2)} ms`
-              )
-            }
-          }
-        } catch {
-          // LCP not available - silently ignore (expected in some browsers/contexts)
+      // Web Vitals - LCP (using PerformanceObserver instead of deprecated getEntriesByType)
+      if (lcpEntry) {
+        // LargestContentfulPaint has renderTime or loadTime
+        const lcpValue =
+          lcpEntry.renderTime ?? lcpEntry.loadTime ?? lcpEntry.startTime ?? 0
+        if (lcpValue > 0) {
+          const rating = getLcpRating(lcpValue)
+          console.log(
+            `${rating} Largest Contentful Paint (LCP): ${lcpValue.toFixed(2)} ms`
+          )
         }
       }
 
       console.groupEnd()
+
+      // Clean up observer
+      if (lcpObserver) {
+        lcpObserver.disconnect()
+      }
     }
 
     // Log immediately if already loaded, otherwise wait for load
@@ -190,6 +202,13 @@ export function PerformanceMonitor() {
       window.addEventListener('load', () => {
         setTimeout(logPerformanceMetrics, 100)
       })
+    }
+
+    // Cleanup function
+    return () => {
+      if (lcpObserver) {
+        lcpObserver.disconnect()
+      }
     }
   }, [])
 
