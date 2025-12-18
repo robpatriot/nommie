@@ -3,9 +3,9 @@
 // This module provides helpers for creating tricks with known winners,
 // reducing boilerplate in tests that need to simulate complete rounds.
 
-use backend::AppError;
 use backend::domain::Suit;
 use backend::repos::tricks;
+use backend::AppError;
 use sea_orm::DatabaseTransaction;
 
 /// Create multiple tricks with specified winners.

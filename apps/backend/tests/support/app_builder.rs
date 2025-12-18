@@ -2,12 +2,11 @@ use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{test, web, App, Error};
-use backend::AppError;
 use backend::middleware::request_trace::RequestTrace;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
-use backend::routes;
 use backend::state::app_state::AppState;
+use backend::{routes, AppError};
 
 /// Type alias for route configuration functions
 type RouteConfigFn = Box<dyn Fn(&mut web::ServiceConfig) + Send + Sync>;

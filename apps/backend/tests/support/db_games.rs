@@ -1,8 +1,8 @@
 use backend::db::require_db;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::AppError;
 use backend::infra::db_errors::map_db_err;
 use backend::state::app_state::AppState;
+use backend::AppError;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 
 // Insert a minimal valid games row using txn-aware connection

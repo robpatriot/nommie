@@ -16,8 +16,7 @@ fn init_logging() {
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, set_txn_policy, TxnPolicy};
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::AppError;
-use backend::ErrorCode;
+use backend::{AppError, ErrorCode};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use ulid::Ulid;
 

@@ -33,5 +33,3 @@ pub fn init_round(
 fn next_player(p: PlayerId) -> PlayerId {
     ((p as usize + 1) % PLAYERS) as u8
 }
-
-

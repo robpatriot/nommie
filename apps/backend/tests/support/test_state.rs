@@ -3,9 +3,9 @@ use std::env::VarError;
 use std::str::FromStr;
 
 use backend::config::db::{DbKind, RuntimeEnv};
-use backend::AppError;
 use backend::infra::state::{build_state, StateBuilder};
 use backend::state::app_state::AppState;
+use backend::AppError;
 
 fn read_env_db_kind() -> Result<Option<String>, AppError> {
     match env::var("NOMMIE_TEST_DB_KIND") {
