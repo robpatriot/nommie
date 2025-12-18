@@ -495,6 +495,7 @@ export function PlayerHand({
             {requireCardConfirmation ? (
               <button
                 type="button"
+                data-selected-card-exempt
                 onClick={async () => {
                   if (onPlayCard && selectedCard && viewerTurn) {
                     await onPlayCard(selectedCard)
@@ -609,6 +610,7 @@ export function PlayerHand({
                 <button
                   key={card}
                   type="button"
+                  data-selected-card-exempt
                   onClick={() => handleCardClick(card)}
                   disabled={isDisabled}
                   className={cn(

@@ -183,6 +183,28 @@ export function GameRoomView(props: GameRoomViewProps) {
     fetchHistory,
   } = useGameHistory(gameId)
 
+  useEffect(() => {
+    if (!selectedCard) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null
+      if (!target) {
+        return
+      }
+
+      if (target.closest('[data-selected-card-exempt]')) {
+        return
+      }
+
+      setSelectedCard(null)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [selectedCard])
+
   // Reset and validate selectedCard when phase or playState changes
   // Use startTransition to mark as non-urgent update to avoid cascading renders
   useEffect(() => {

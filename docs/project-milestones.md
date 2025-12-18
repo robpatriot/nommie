@@ -182,13 +182,14 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **17. Mobile Design & UI Implementation**
+### ✅ **17. Mobile Design & UI Implementation**
 **Dependencies:** 11, 15, 16  
 **Details:**
 - **Design System Parity:** Define a mobile-specific design kit (spacing, typography, colors, components) that mirrors the web experience while honoring native platform conventions and accessibility.  
 - **Expo App Foundations:** Scaffold the `apps/mobile` Expo client with navigation (stack + modal flows), theming, and auth hand-off using the existing backend JWT flow.  
 - **End-to-End Screens:** Implement lobby list, game configuration, and in-game play surfaces (bidding, trump select, trick play, last-trick review) with responsive layouts, gestures, and haptics.  
 - **State & Sync:** Reuse shared types/API wrapper, add optimistic interactions for bid/play actions, and support offline/foreground-resume states with snapshot hydration.  
+**Progress:** Mobile UX parity delivered—Expo app foundations, theming/auth hand-off, core screens (lobby, config, play), and sync/resume flows are complete.  
 **Acceptance:** Mobile users can authenticate, configure games, and play full rounds with UX parity to the web client; navigation, theming, and interactions feel native; the app handles reconnects and snapshot refreshes gracefully.
 
 ---
