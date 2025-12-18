@@ -2,6 +2,7 @@ import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
 import { formatTrump, getPhaseLabel } from './utils'
 import { PhaseFact } from './PhaseFact'
 import { StatCard } from '@/components/StatCard'
+import { cn } from '@/lib/cn'
 
 interface ScoreSidebarProps {
   gameId: number
@@ -32,11 +33,14 @@ export function ScoreSidebar({
   error,
   onShowHistory,
   isHistoryLoading = false,
-  className = '',
+  className,
 }: ScoreSidebarProps) {
   return (
     <aside
-      className={`flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur ${className}`}
+      className={cn(
+        'flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur',
+        className
+      )}
     >
       <header className="space-y-3 rounded-2xl p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">

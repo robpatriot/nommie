@@ -88,8 +88,6 @@
     --color-primary: 255 176 111;
     --color-primary-foreground: 46 26 12;
     --color-primary-contrast: 255 249 240;
-    --color-primary: 255 176 111;
-    --color-primary-foreground: 46 26 12;
     --color-accent: 98 220 189;
     --color-accent-foreground: 11 30 24;
     --color-accent-contrast: 236 252 247;
@@ -126,7 +124,7 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply text-foreground antialiased;
     min-height: 100vh;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'liga', 'kern';
     background-color: rgb(var(--color-bg));

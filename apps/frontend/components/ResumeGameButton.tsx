@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/cn'
 
 interface ResumeGameButtonProps {
   className?: string
@@ -20,7 +21,10 @@ export default function ResumeGameButton({
   return (
     <button
       onClick={() => router.push(`/game/${lastActiveGameId}`)}
-      className={`rounded bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 ${className || ''}`}
+      className={cn(
+        'rounded bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90',
+        className
+      )}
     >
       {/* Arrow only - shown below 275px */}
       <span className="min-[275px]:hidden">▶</span>

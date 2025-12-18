@@ -512,7 +512,6 @@ export function GameRoomView(props: GameRoomViewProps) {
               onSelectCard={setSelectedCard}
               onPlayCard={handlePlayCard}
               requireCardConfirmation={requireCardConfirmation}
-              className="bg-black/40"
               layoutVariant="scaled"
               viewportRef={playerHandViewportRef}
             />

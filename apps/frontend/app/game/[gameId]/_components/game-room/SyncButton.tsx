@@ -1,3 +1,5 @@
+import { cn } from '@/lib/cn'
+
 interface SyncButtonProps {
   onRefresh: () => void
   isRefreshing: boolean
@@ -11,14 +13,17 @@ interface SyncButtonProps {
 export function SyncButton({
   onRefresh,
   isRefreshing,
-  className = '',
+  className,
 }: SyncButtonProps) {
   return (
     <button
       type="button"
       onClick={onRefresh}
       disabled={isRefreshing}
-      className={`flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-primary/60 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={cn(
+        'flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-primary/60 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60',
+        className
+      )}
       aria-label={isRefreshing ? 'Refreshing game state' : 'Refresh game state'}
     >
       <span>Sync</span>
