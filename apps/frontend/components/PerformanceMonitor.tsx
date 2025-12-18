@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 // Performance thresholds (in milliseconds)
 const THRESHOLDS = {
@@ -23,6 +23,9 @@ const THRESHOLDS = {
  * <PerformanceMonitor />
  */
 export function PerformanceMonitor() {
+  // Use ref to track if metrics have already been logged (prevents duplicate logging)
+  const hasLoggedRef = useRef(false)
+
   useEffect(() => {
     // Only run in browser
     if (typeof window === 'undefined') return
@@ -33,6 +36,10 @@ export function PerformanceMonitor() {
       process.env.NEXT_PUBLIC_PERF_MONITOR === 'true'
 
     if (!isEnabled) return
+
+    // Prevent duplicate logging (e.g., from React StrictMode double mount)
+    if (hasLoggedRef.current) return
+    hasLoggedRef.current = true
 
     // Store LCP entry collected via PerformanceObserver
     let lcpEntry: LargestContentfulPaint | null = null
@@ -194,18 +201,22 @@ export function PerformanceMonitor() {
       }
     }
 
+    // Set up load event listener
+    const handleLoad = () => {
+      setTimeout(logPerformanceMetrics, 100)
+    }
+
     // Log immediately if already loaded, otherwise wait for load
     if (document.readyState === 'complete') {
       // Use setTimeout to ensure all performance entries are available
       setTimeout(logPerformanceMetrics, 100)
     } else {
-      window.addEventListener('load', () => {
-        setTimeout(logPerformanceMetrics, 100)
-      })
+      window.addEventListener('load', handleLoad)
     }
 
     // Cleanup function
     return () => {
+      window.removeEventListener('load', handleLoad)
       if (lcpObserver) {
         lcpObserver.disconnect()
       }
