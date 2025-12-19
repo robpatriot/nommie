@@ -9,15 +9,15 @@ import { PageHero } from './PageHero'
 import { PageContainer } from './PageContainer'
 import { StatCard } from './StatCard'
 import { useToast } from '@/hooks/useToast'
-import { useApiAction } from '@/hooks/useApiAction'
-import { BackendApiError } from '@/lib/errors'
+import { useAvailableGames } from '@/hooks/queries/useGames'
 import {
-  createGameAction,
-  deleteGameAction,
-  joinGameAction,
-  refreshGamesListAction,
-} from '@/app/actions/game-actions'
+  useCreateGame,
+  useJoinGame,
+  useDeleteGame,
+} from '@/hooks/mutations/useGameMutations'
 import type { Game } from '@/lib/types'
+import { toQueryError } from '@/lib/queries/query-error-handler'
+import { logBackendError } from '@/lib/logging/error-logger'
 
 const sortByUpdatedAtDesc = (a: Game, b: Game) => {
   const aTime = Date.parse(a.updated_at)
@@ -48,15 +48,33 @@ export default function LobbyClient({
 }: LobbyClientProps) {
   const router = useRouter()
   const { toasts, showToast, hideToast } = useToast()
-  const [refreshing, setRefreshing] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
-  const executeApiAction = useApiAction({
-    showToast,
-  })
+  // Use query hook with initial data from server
+  const initialAllGames = [...initialJoinable, ...initialInProgress]
+  const {
+    data: allGames = initialAllGames,
+    refetch: refetchGames,
+    isFetching: isRefreshing,
+  } = useAvailableGames(initialAllGames)
 
-  const joinableGames = initialJoinable
-  const inProgressGames = initialInProgress
+  // Mutations
+  const createGameMutation = useCreateGame()
+  const joinGameMutation = useJoinGame()
+  const deleteGameMutation = useDeleteGame()
+
+  // Split games into joinable and in-progress
+  const joinableGames = useMemo(() => {
+    return allGames.filter(
+      (game) => game.state === 'LOBBY' && game.player_count < game.max_players
+    )
+  }, [allGames])
+
+  const inProgressGames = useMemo(() => {
+    return allGames.filter(
+      (game) => game.state !== 'LOBBY' || game.player_count >= game.max_players
+    )
+  }, [allGames])
 
   const filteredJoinableGames = useMemo(() => {
     const openGames = joinableGames.filter(
@@ -84,21 +102,12 @@ export default function LobbyClient({
   }, [inProgressGames])
 
   const handleRefresh = async () => {
-    setRefreshing(true)
     try {
-      // Use Server Action to refresh games list (can refresh JWT if needed)
-      const result = await refreshGamesListAction()
-      if (result.kind === 'ok') {
-        // Refresh the page to show updated games
-        router.refresh()
-      } else {
-        showToast(result.message || 'Failed to refresh games list', 'error')
-      }
-    } catch {
-      showToast('Failed to refresh games list', 'error')
-    } finally {
-      // Reset refreshing state after a short delay
-      setTimeout(() => setRefreshing(false), 500)
+      await refetchGames()
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to refresh games list'
+      showToast(message, 'error')
     }
   }
 
@@ -107,54 +116,44 @@ export default function LobbyClient({
     const defaultName = `${creatorName}'s game`
     const gameName = name.trim() || defaultName
 
-    const result = await createGameAction({ name: gameName })
-
-    if (result.kind === 'error') {
-      const error = new BackendApiError(
-        result.message || 'Failed to create game',
-        result.status,
-        result.code,
-        result.traceId
-      )
-      showToast(result.message || 'Failed to create game', 'error', error)
-      if (process.env.NODE_ENV === 'development' && result.traceId) {
-        console.error('Create game error traceId:', result.traceId)
-      }
+    try {
+      const game = await createGameMutation.mutateAsync({ name: gameName })
+      showToast('Game created successfully!', 'success')
+      router.push(`/game/${game.id}`)
+    } catch (error) {
+      const backendError = toQueryError(error, 'Failed to create game')
+      showToast(backendError.message, 'error', backendError)
+      logBackendError('Create game failed', backendError, {
+        action: 'createGame',
+      })
       throw error // Re-throw so modal can handle it
     }
-
-    showToast('Game created successfully!', 'success')
-    router.refresh()
-    router.push(`/game/${result.data.id}`)
   }
 
   const handleJoin = async (gameId: number) => {
-    await executeApiAction(
-      async () => {
-        const result = await joinGameAction(gameId)
-        if (result.kind === 'error') {
-          // Customize error message for validation errors
-          if (result.status === 400 && result.code === 'VALIDATION_ERROR') {
-            router.refresh()
-            return {
-              kind: 'error' as const,
-              message: 'That game just filled up. Please choose another one.',
-              status: result.status,
-              code: result.code,
-              traceId: result.traceId,
-            }
-          }
-        }
-        return result
-      },
-      {
-        successMessage: 'Joined game successfully!',
-        errorMessage: 'Failed to join game',
-        onSuccess: () => {
-          router.push(`/game/${gameId}`)
-        },
+    try {
+      await joinGameMutation.mutateAsync(gameId)
+      showToast('Joined game successfully!', 'success')
+      router.push(`/game/${gameId}`)
+    } catch (error) {
+      const backendError = toQueryError(error, 'Failed to join game')
+
+      // Customize error message for validation errors
+      let message = backendError.message
+      if (
+        backendError.status === 400 &&
+        backendError.code === 'VALIDATION_ERROR'
+      ) {
+        message = 'That game just filled up. Please choose another one.'
+        router.refresh()
       }
-    )
+
+      showToast(message, 'error', backendError)
+      logBackendError('Join game failed', backendError, {
+        action: 'joinGame',
+        gameId,
+      })
+    }
   }
 
   const handleRejoin = (gameId: number) => {
@@ -170,38 +169,30 @@ export default function LobbyClient({
       return
     }
 
-    // deleteGameAction will fetch the ETag automatically if not provided
-    await executeApiAction(
-      async () => {
-        const result = await deleteGameAction(gameId)
-        if (result.kind === 'error') {
-          // Customize error messages for specific status codes
-          let message = result.message || 'Failed to delete game'
-          if (result.status === 428) {
-            message =
-              'Cannot delete game: missing version information. Please try again.'
-          } else if (result.status === 409) {
-            message =
-              'Cannot delete game: game was modified. Please refresh and try again.'
-          }
-          return {
-            kind: 'error' as const,
-            message,
-            status: result.status,
-            code: result.code,
-            traceId: result.traceId,
-          }
-        }
-        return result
-      },
-      {
-        successMessage: 'Game deleted successfully',
-        errorMessage: 'Failed to delete game',
-        onSuccess: () => {
-          router.refresh()
-        },
+    try {
+      // deleteGameAction will fetch the ETag automatically if not provided
+      await deleteGameMutation.mutateAsync({ gameId })
+      showToast('Game deleted successfully', 'success')
+      router.refresh()
+    } catch (error) {
+      const backendError = toQueryError(error, 'Failed to delete game')
+
+      // Customize error messages for specific status codes
+      let message = backendError.message
+      if (backendError.status === 428) {
+        message =
+          'Cannot delete game: missing version information. Please try again.'
+      } else if (backendError.status === 409) {
+        message =
+          'Cannot delete game: game was modified. Please refresh and try again.'
       }
-    )
+
+      showToast(message, 'error', backendError)
+      logBackendError('Delete game failed', backendError, {
+        action: 'deleteGame',
+        gameId,
+      })
+    }
   }
 
   const openSeatCount = filteredJoinableGames.reduce((total, game) => {
@@ -262,11 +253,11 @@ export default function LobbyClient({
               </button>
               <button
                 onClick={handleRefresh}
-                disabled={refreshing}
+                disabled={isRefreshing}
                 className="inline-flex w-full items-center justify-center rounded-2xl border border-border/60 bg-surface px-5 py-3 font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 aria-live="polite"
               >
-                {refreshing ? 'Refreshing…' : 'Refresh list'}
+                {isRefreshing ? 'Refreshing…' : 'Refresh list'}
               </button>
             </div>
           }

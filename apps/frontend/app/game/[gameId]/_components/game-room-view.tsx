@@ -34,7 +34,9 @@ import { SetupSeatList } from './game-room/SetupSeatList'
 import { PageHero } from '@/components/PageHero'
 import { PageContainer } from '@/components/PageContainer'
 import { StatCard } from '@/components/StatCard'
-import { useGameHistory } from '@/hooks/useGameHistory'
+import { useGameHistory } from '@/hooks/queries/useGames'
+import { mapGameHistory } from '@/lib/game-room/history-mapping'
+import type { GameHistorySummary } from '@/lib/game-room/types'
 import type {
   AiSeatState,
   BiddingState,
@@ -176,12 +178,32 @@ export function GameRoomView(props: GameRoomViewProps) {
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const showCardWrapper = useMediaQuery('(min-width: 640px)')
+
+  // Use query hook directly
   const {
-    history,
+    data: rawHistory,
     isLoading: isHistoryLoading,
-    error: historyError,
-    fetchHistory,
+    error: historyQueryError,
+    refetch: refetchHistory,
   } = useGameHistory(gameId)
+
+  // Map the raw API response to the expected format
+  const history: GameHistorySummary | null = useMemo(() => {
+    if (!rawHistory) {
+      return null
+    }
+    return mapGameHistory(rawHistory)
+  }, [rawHistory])
+
+  // Convert query error to string for compatibility
+  const historyError = useMemo<string | null>(() => {
+    if (!historyQueryError) {
+      return null
+    }
+    return historyQueryError instanceof Error
+      ? historyQueryError.message
+      : 'Unable to load score history'
+  }, [historyQueryError])
 
   useEffect(() => {
     if (!selectedCard) {
@@ -231,8 +253,8 @@ export function GameRoomView(props: GameRoomViewProps) {
     if (!isHistoryOpen) {
       return
     }
-    void fetchHistory()
-  }, [isHistoryOpen, fetchHistory])
+    void refetchHistory()
+  }, [isHistoryOpen, refetchHistory])
 
   // Get last trick from backend snapshot
   // - In Trick phase: last trick from current round
