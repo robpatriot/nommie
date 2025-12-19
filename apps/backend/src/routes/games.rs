@@ -46,6 +46,152 @@ pub(crate) struct BidConstraintsResponse {
     zero_bid_locked: bool,
 }
 
+async fn build_snapshot_parts(
+    txn: &sea_orm::DatabaseTransaction,
+    game_id: i64,
+    current_user_id: i64,
+) -> Result<
+    (
+        GameSnapshot,
+        i32,
+        Option<Seat>,
+        Option<Vec<String>>,
+        Option<BidConstraintsResponse>,
+    ),
+    AppError,
+> {
+    // Fetch game from database to get lock_version
+    let game = games_repo::require_game(txn, game_id).await?;
+
+    // Create game service and load game state
+    let game_service = crate::services::games::GameService;
+    let state = game_service.load_game_state(txn, game_id).await?;
+
+    let memberships = memberships::find_all_by_game(txn, game_id)
+        .await
+        .map_err(AppError::from)?;
+
+    let mut viewer_seat: Option<Seat> = None;
+    // Produce the snapshot via the domain function
+    let mut snap = crate::domain::snapshot::snapshot(&state);
+
+    let mut seating = [
+        SeatPublic::empty(0),
+        SeatPublic::empty(1),
+        SeatPublic::empty(2),
+        SeatPublic::empty(3),
+    ];
+
+    let mut host_seat: Seat = 0;
+    let creator_user_id = game.created_by;
+
+    for membership in memberships {
+        let seat_idx = membership.turn_order;
+        if !(0..4).contains(&seat_idx) {
+            continue;
+        }
+
+        let seat = seat_idx;
+        let mut seat_public = SeatPublic::empty(seat);
+        seat_public.is_ready = membership.is_ready;
+
+        // Use consolidated function to resolve display name (with final fallback)
+        let display_name = resolve_display_name_for_membership(txn, &membership, seat, true)
+            .await
+            .map_err(AppError::from)?;
+
+        seat_public.display_name = Some(display_name);
+
+        // Build additional SeatPublic fields
+        match membership.player_kind {
+            crate::entities::game_players::PlayerKind::Human => {
+                if let Some(user_id) = membership.user_id {
+                    seat_public.user_id = Some(user_id);
+                    let user = users::find_user_by_id(txn, user_id)
+                        .await
+                        .map_err(AppError::from)?
+                        .ok_or_else(|| {
+                            AppError::not_found(
+                                ErrorCode::UserNotFound,
+                                format!("User {user_id} not found"),
+                            )
+                        })?;
+
+                    seat_public.is_ai = user.is_ai;
+
+                    if creator_user_id == Some(user_id) {
+                        host_seat = seat;
+                    }
+
+                    if user_id == current_user_id {
+                        viewer_seat = Some(seat);
+                    }
+                }
+            }
+            crate::entities::game_players::PlayerKind::Ai => {
+                seat_public.is_ai = true;
+                if let Some(profile_id) = membership.ai_profile_id {
+                    let profile = ai_profiles::find_by_id(txn, profile_id)
+                        .await
+                        .map_err(AppError::from)?;
+
+                    if let Some(profile) = profile.as_ref() {
+                        seat_public.ai_profile = Some(SeatAiProfilePublic {
+                            name: profile.registry_name.clone(),
+                            version: profile.registry_version.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        seating[seat_idx as usize] = seat_public;
+    }
+
+    snap.game.seating = seating;
+    snap.game.host_seat = host_seat;
+
+    let viewer_hand = if let Some(seat) = viewer_seat {
+        if state.round_no == 0 {
+            None
+        } else {
+            match player_view::load_current_round_info(txn, game_id, seat).await {
+                Ok(info) => Some(info.hand.into_iter().map(format_card).collect::<Vec<_>>()),
+                Err(err) => {
+                    warn!(game_id = game_id, seat, error = %err, "Failed to load viewer hand");
+                    None
+                }
+            }
+        }
+    } else {
+        None
+    };
+
+    let mut bid_constraints: Option<BidConstraintsResponse> = None;
+    if matches!(
+        &snap.phase,
+        crate::domain::snapshot::PhaseSnapshot::Bidding(_)
+    ) {
+        if let Some(current_round_no) = game.current_round {
+            if let Some(viewer_seat_value) = viewer_seat {
+                let history = player_view::load_game_history(txn, game_id).await?;
+                let zero_bid_locked =
+                    validate_consecutive_zero_bids(&history, viewer_seat_value, current_round_no)
+                        .is_err();
+                bid_constraints = Some(BidConstraintsResponse { zero_bid_locked });
+            }
+        }
+    }
+
+    Ok((
+        snap,
+        game.lock_version,
+        viewer_seat,
+        viewer_hand,
+        bid_constraints,
+    ))
+}
+
 pub(crate) async fn build_snapshot_response(
     http_req: Option<&HttpRequest>,
     app_state: &web::Data<AppState>,
@@ -55,155 +201,27 @@ pub(crate) async fn build_snapshot_response(
     let current_user_id = current_user.id;
     let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
         with_txn(http_req, app_state, |txn| {
-            Box::pin(async move {
-                // Fetch game from database to get lock_version
-                let game = games_repo::require_game(txn, game_id).await?;
-
-                // Create game service and load game state
-                let game_service = crate::services::games::GameService;
-                let state = game_service.load_game_state(txn, game_id).await?;
-
-                let memberships = memberships::find_all_by_game(txn, game_id)
-                    .await
-                    .map_err(AppError::from)?;
-
-                let mut viewer_seat: Option<Seat> = None;
-                // Produce the snapshot via the domain function
-                let mut snap = crate::domain::snapshot::snapshot(&state);
-
-                let mut seating = [
-                    SeatPublic::empty(0),
-                    SeatPublic::empty(1),
-                    SeatPublic::empty(2),
-                    SeatPublic::empty(3),
-                ];
-
-                let mut host_seat: Seat = 0;
-                let creator_user_id = game.created_by;
-
-                for membership in memberships {
-                    let seat_idx = membership.turn_order;
-                    if !(0..4).contains(&seat_idx) {
-                        continue;
-                    }
-
-                    let seat = seat_idx;
-                    let mut seat_public = SeatPublic::empty(seat);
-                    seat_public.is_ready = membership.is_ready;
-
-                    // Use consolidated function to resolve display name (with final fallback)
-                    let display_name = resolve_display_name_for_membership(
-                        txn,
-                        &membership,
-                        seat,
-                        true, // with_final_fallback = true for snapshot
-                    )
-                    .await
-                    .map_err(AppError::from)?;
-
-                    seat_public.display_name = Some(display_name);
-
-                    // Build additional SeatPublic fields
-                    match membership.player_kind {
-                        crate::entities::game_players::PlayerKind::Human => {
-                            if let Some(user_id) = membership.user_id {
-                                seat_public.user_id = Some(user_id);
-                                let user = users::find_user_by_id(txn, user_id)
-                                    .await
-                                    .map_err(AppError::from)?
-                                    .ok_or_else(|| {
-                                        AppError::not_found(
-                                            ErrorCode::UserNotFound,
-                                            format!("User {user_id} not found"),
-                                        )
-                                    })?;
-
-                                seat_public.is_ai = user.is_ai;
-
-                                if creator_user_id == Some(user_id) {
-                                    host_seat = seat;
-                                }
-
-                                if user_id == current_user_id {
-                                    viewer_seat = Some(seat);
-                                }
-                            }
-                        }
-                        crate::entities::game_players::PlayerKind::Ai => {
-                            seat_public.is_ai = true;
-                            if let Some(profile_id) = membership.ai_profile_id {
-                                let profile = ai_profiles::find_by_id(txn, profile_id)
-                                    .await
-                                    .map_err(AppError::from)?;
-
-                                if let Some(profile) = profile.as_ref() {
-                                    seat_public.ai_profile = Some(SeatAiProfilePublic {
-                                        name: profile.registry_name.clone(),
-                                        version: profile.registry_version.clone(),
-                                    });
-                                }
-                            }
-                        }
-                    }
-
-                    seating[seat_idx as usize] = seat_public;
-                }
-
-                snap.game.seating = seating;
-                snap.game.host_seat = host_seat;
-
-                let viewer_hand = if let Some(seat) = viewer_seat {
-                    if state.round_no == 0 {
-                        None
-                    } else {
-                        match player_view::load_current_round_info(txn, game_id, seat).await {
-                            Ok(info) => {
-                                Some(info.hand.into_iter().map(format_card).collect::<Vec<_>>())
-                            }
-                            Err(err) => {
-                                warn!(
-                                    game_id = game_id,
-                                    seat,
-                                    error = %err,
-                                    "Failed to load viewer hand"
-                                );
-                                None
-                            }
-                        }
-                    }
-                } else {
-                    None
-                };
-
-                let mut bid_constraints: Option<BidConstraintsResponse> = None;
-                if matches!(
-                    &snap.phase,
-                    crate::domain::snapshot::PhaseSnapshot::Bidding(_)
-                ) {
-                    if let Some(current_round_no) = game.current_round {
-                        if let Some(viewer_seat_value) = viewer_seat {
-                            let history = player_view::load_game_history(txn, game_id).await?;
-                            let zero_bid_locked = validate_consecutive_zero_bids(
-                                &history,
-                                viewer_seat_value,
-                                current_round_no,
-                            )
-                            .is_err();
-                            bid_constraints = Some(BidConstraintsResponse { zero_bid_locked });
-                        }
-                    }
-                }
-
-                Ok((
-                    snap,
-                    game.lock_version,
-                    viewer_seat,
-                    viewer_hand,
-                    bid_constraints,
-                ))
-            })
+            Box::pin(async move { build_snapshot_parts(txn, game_id, current_user_id).await })
         })
         .await?;
+
+    let response = GameSnapshotResponse {
+        snapshot,
+        viewer_hand,
+        bid_constraints,
+        lock_version,
+    };
+
+    Ok((response, viewer_seat))
+}
+
+pub(crate) async fn build_snapshot_response_in_txn(
+    txn: &sea_orm::DatabaseTransaction,
+    game_id: i64,
+    current_user_id: i64,
+) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
+    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
+        build_snapshot_parts(txn, game_id, current_user_id).await?;
 
     let response = GameSnapshotResponse {
         snapshot,
