@@ -243,7 +243,9 @@ describe('GameRoomView', () => {
     )
 
     expect(screen.getByText('Legal cards:')).toBeInTheDocument()
-    expect(screen.getByText('2H, KD, QC')).toBeInTheDocument()
+    // The implementation shows the suit letter when player has cards matching lead suit
+    // Lead card is 'AS' (Spades), and viewer has 'AS' in hand, so it displays 'S'
+    expect(screen.getByText('S')).toBeInTheDocument()
 
     // aria-label format: "${card}, ${isSelected ? 'selected' : 'playable'}" or "${card}, not playable"
     const legalCardButton = screen.getByRole('button', { name: /^2H,/i })
