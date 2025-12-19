@@ -52,7 +52,7 @@ impl TestLock {
 
         match db_kind {
             DbKind::Postgres => {
-                let admin_pool = build_admin_pool(RuntimeEnv::Test, DbKind::Postgres)
+                let admin_pool = build_admin_pool(RuntimeEnv::Test, db_kind)
                     .await
                     .expect("Failed to build admin pool");
 
