@@ -8,6 +8,7 @@ import {
   markBackendUp,
 } from '@/lib/server/backend-status'
 import { isBackendStartupError } from '@/lib/server/connection-errors'
+import { logError } from '@/lib/logging/error-logger'
 
 export async function GET() {
   try {
@@ -30,7 +31,14 @@ export async function GET() {
     if (!response.ok) {
       // Only log if we should (outside startup window or runtime failure)
       if (shouldLogError()) {
-        console.error('Failed to fetch websocket token', response.status)
+        logError(
+          'Failed to fetch websocket token',
+          new Error(`Status: ${response.status}`),
+          {
+            action: 'fetchWsToken',
+            status: response.status,
+          }
+        )
       }
       return NextResponse.json(
         { error: 'Unable to issue websocket token' },
@@ -46,7 +54,9 @@ export async function GET() {
 
     // Only log if we should (outside startup window or runtime failure)
     if (shouldLogError() && !isStartupError) {
-      console.error('Unexpected websocket token error', error)
+      logError('Unexpected websocket token error', error, {
+        action: 'fetchWsToken',
+      })
     }
 
     // Return 503 for startup errors (retriable), 500 for other errors

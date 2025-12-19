@@ -87,7 +87,10 @@ const nextAuthResult = NextAuth({
             }
           }
         } catch (error) {
-          console.error('Failed to get backend JWT on initial login:', error)
+          const { logError } = await import('@/lib/logging/error-logger')
+          logError('Failed to get backend JWT on initial login', error, {
+            action: 'initialLogin',
+          })
           // Don't fail the login if backend JWT fetch fails
         }
       }

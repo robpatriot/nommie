@@ -47,7 +47,8 @@ export default function CreateGameModal({
       setName('')
       onClose()
     } catch (error) {
-      console.error('Failed to create game:', error)
+      const { logError } = await import('@/lib/logging/error-logger')
+      logError('Failed to create game', error, { action: 'createGame' })
     } finally {
       setIsSubmitting(false)
     }
