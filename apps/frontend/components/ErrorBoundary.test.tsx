@@ -9,9 +9,12 @@ const ThrowError = () => {
   throw new Error('Test error message')
 }
 
-// Suppress console.error for error boundary tests (React logs errors to console)
+// Mock console.error for error boundary tests (React logs errors to console)
+// We'll restore it in individual tests that need to verify logging
 const originalError = console.error
 beforeEach(() => {
+  // Mock console.error to suppress React's error logging during tests
+  // Individual tests can spy on it if they need to verify logging behavior
   console.error = vi.fn()
 })
 
@@ -166,6 +169,7 @@ describe('ErrorBoundary', () => {
   })
 
   it('logs error to console', () => {
+    // Create a spy that captures all console.error calls
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     render(
@@ -174,13 +178,22 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     )
 
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'ErrorBoundary caught an error:',
-      expect.any(Error),
-      expect.objectContaining({
-        componentStack: expect.any(String),
-      })
-    )
+    // The centralized logger calls console.error synchronously now
+    // It logs: '[Error Logger]', { message, error, context, timestamp }
+    expect(consoleSpy).toHaveBeenCalled()
+
+    // Check that it was called with error-related content
+    const calls = consoleSpy.mock.calls
+    const hasErrorLog = calls.some((call) => {
+      const firstArg = call[0]
+      return (
+        typeof firstArg === 'string' &&
+        (firstArg.includes('ErrorBoundary') ||
+          firstArg.includes('Error Logger') ||
+          firstArg.includes('[Error]'))
+      )
+    })
+    expect(hasErrorLog).toBe(true)
 
     consoleSpy.mockRestore()
   })

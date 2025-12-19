@@ -18,11 +18,48 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-// Mock server actions
-const mockGetGameHistoryAction = vi.fn()
+// Mock server actions - hoist to make available in mocks
+const { mockGetGameHistoryAction, mockHistoryDataRef } = vi.hoisted(() => {
+  const mockGetGameHistoryAction = vi.fn()
+  const mockHistoryDataRef = { current: undefined as unknown }
+  return { mockGetGameHistoryAction, mockHistoryDataRef }
+})
 
 vi.mock('@/app/actions/game-actions', () => ({
   getGameHistoryAction: (gameId: number) => mockGetGameHistoryAction(gameId),
+}))
+
+// Mock useGameHistory query hook
+vi.mock('@/hooks/queries/useGames', () => ({
+  useGameHistory: (gameId?: number) => {
+    const refetchFn = vi.fn(async () => {
+      if (gameId) {
+        const result = await mockGetGameHistoryAction(gameId)
+        if (result?.kind === 'ok') {
+          mockHistoryDataRef.current = result.data
+        }
+      }
+      return { data: mockHistoryDataRef.current }
+    })
+
+    // Call the server action when the hook is used with a gameId
+    // Make sure it returns a promise
+    if (gameId) {
+      const promise = Promise.resolve(mockGetGameHistoryAction(gameId))
+      void promise.then((result) => {
+        if (result?.kind === 'ok') {
+          mockHistoryDataRef.current = result.data
+        }
+      })
+    }
+
+    return {
+      data: mockHistoryDataRef.current,
+      isLoading: false,
+      error: null,
+      refetch: refetchFn,
+    }
+  },
 }))
 
 afterEach(() => {
