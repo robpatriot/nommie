@@ -17,6 +17,7 @@ import {
   type ResolvedTheme,
 } from '@/components/theme-provider'
 import PerformanceMonitorWrapper from '@/components/PerformanceMonitorWrapper'
+import { AppQueryClientProvider } from '@/lib/providers/query-client-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -95,15 +96,20 @@ export default async function RootLayout({
           initialTheme={initialTheme}
           initialResolved={initialResolved}
         >
-          <PerformanceMonitorWrapper />
-          <HeaderBreadcrumbProvider>
-            <div className="tabletop-content">
-              <Suspense fallback={null}>
-                <Header session={session} lastActiveGameId={lastActiveGameId} />
-              </Suspense>
-              {children}
-            </div>
-          </HeaderBreadcrumbProvider>
+          <AppQueryClientProvider>
+            <PerformanceMonitorWrapper />
+            <HeaderBreadcrumbProvider>
+              <div className="tabletop-content">
+                <Suspense fallback={null}>
+                  <Header
+                    session={session}
+                    lastActiveGameId={lastActiveGameId}
+                  />
+                </Suspense>
+                {children}
+              </div>
+            </HeaderBreadcrumbProvider>
+          </AppQueryClientProvider>
         </ThemeProvider>
       </body>
     </html>
