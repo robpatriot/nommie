@@ -72,6 +72,19 @@ impl SharedTxn {
         })?;
         txn.rollback().await
     }
+
+    /// Get the number of strong references to this shared transaction.
+    ///
+    /// This is primarily used in test teardown to wait for all clones to be dropped
+    /// before attempting rollback.
+    ///
+    /// # Test-only utility
+    /// This method is primarily used in integration tests. It cannot be marked `#[cfg(test)]`
+    /// because integration tests are in a separate crate.
+    #[allow(dead_code)]
+    pub fn strong_count(&self) -> usize {
+        Arc::strong_count(&self.0)
+    }
 }
 
 /// Execute a closure with a database transaction.
@@ -93,11 +106,8 @@ where
         + Send,
 {
     // Extract any SharedTxn out of request extensions *before* awaiting to avoid holding a RefCell borrow.
-    let shared_txn: Option<SharedTxn> = if let Some(r) = req {
-        r.extensions().get::<SharedTxn>().cloned()
-    } else {
-        None
-    };
+    let shared_txn: Option<SharedTxn> =
+        req.and_then(|r| r.extensions().get::<SharedTxn>().cloned());
 
     if let Some(shared) = shared_txn {
         // Use the provided shared transaction; no commit/rollback here.
