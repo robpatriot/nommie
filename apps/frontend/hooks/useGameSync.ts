@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { resolveWebSocketUrl } from '@/lib/config/env-validation'
+import { logError } from '@/lib/logging/error-logger'
 
 import {
   getGameRoomSnapshotAction,
@@ -7,6 +10,7 @@ import {
 import type { GameRoomError } from '@/app/game/[gameId]/_components/game-room-view.types'
 import type { BidConstraints, GameSnapshot, Seat } from '@/lib/game-room/types'
 import { extractPlayerNames } from '@/utils/player-names'
+import { queryKeys } from '@/lib/queries/query-keys'
 
 type ConnectionState =
   | 'connecting'
@@ -38,7 +42,6 @@ interface ErrorMessage {
 type WsMessage = SnapshotMessage | ErrorMessage | Record<string, unknown>
 
 export interface UseGameSyncResult {
-  snapshot: GameRoomSnapshotPayload
   refreshSnapshot: () => Promise<void>
   connectionState: ConnectionState
   syncError: GameRoomError | null
@@ -57,7 +60,7 @@ export function useGameSync({
   initialData,
   gameId,
 }: UseGameSyncOptions): UseGameSyncResult {
-  const [snapshot, setSnapshot] = useState<GameRoomSnapshotPayload>(initialData)
+  const queryClient = useQueryClient()
   const [connectionState, setConnectionState] =
     useState<ConnectionState>('connecting')
   const [syncError, setSyncError] = useState<GameRoomError | null>(null)
@@ -69,6 +72,21 @@ export function useGameSync({
   const shouldReconnectRef = useRef(true)
   const etagRef = useRef<string | undefined>(initialData.etag)
   const lockVersionRef = useRef<number | undefined>(initialData.lockVersion)
+  const initializedRef = useRef(false)
+  // Store initial data in ref to avoid dependency on object reference
+  const initialDataRef = useRef(initialData)
+
+  // Initialize query cache with initial data on mount (only once)
+  // Using ref to avoid re-running when initialData object reference changes
+  useEffect(() => {
+    if (!initializedRef.current) {
+      queryClient.setQueryData(
+        queryKeys.games.snapshot(gameId),
+        initialDataRef.current
+      )
+      initializedRef.current = true
+    }
+  }, [gameId, queryClient])
 
   const buildEtag = useCallback(
     (lockVersion?: number) =>
@@ -82,10 +100,12 @@ export function useGameSync({
     (payload: GameRoomSnapshotPayload) => {
       etagRef.current = payload.etag ?? buildEtag(payload.lockVersion)
       lockVersionRef.current = payload.lockVersion ?? lockVersionRef.current
-      setSnapshot(payload)
       setSyncError(null)
+      // Update query cache - this is the single source of truth
+      // Components using useGameRoomSnapshot will automatically re-render
+      queryClient.setQueryData(queryKeys.games.snapshot(gameId), payload)
     },
-    [buildEtag]
+    [buildEtag, gameId, queryClient]
   )
 
   const refreshSnapshot = useCallback(async () => {
@@ -99,15 +119,21 @@ export function useGameSync({
       if (result.kind === 'ok') {
         applySnapshot(result.data)
       } else if (result.kind === 'not_modified') {
-        setSnapshot((prev) => ({
-          ...prev,
-          timestamp: new Date().toISOString(),
-        }))
+        // For not_modified, update timestamp in cache if data exists
+        const cachedData = queryClient.getQueryData<GameRoomSnapshotPayload>(
+          queryKeys.games.snapshot(gameId)
+        )
+        if (cachedData) {
+          queryClient.setQueryData(queryKeys.games.snapshot(gameId), {
+            ...cachedData,
+            timestamp: new Date().toISOString(),
+          })
+        }
       } else {
         setSyncError({ message: result.message, traceId: result.traceId })
       }
     } catch (error) {
-      console.error('Manual snapshot refresh failed', error)
+      logError('Manual snapshot refresh failed', error, { gameId })
       setSyncError({
         message:
           error instanceof Error
@@ -117,7 +143,7 @@ export function useGameSync({
     } finally {
       setIsRefreshing(false)
     }
-  }, [applySnapshot, gameId])
+  }, [applySnapshot, gameId, queryClient])
 
   const transformSnapshotMessage = useCallback(
     (message: SnapshotMessage): GameRoomSnapshotPayload => {
@@ -180,10 +206,10 @@ export function useGameSync({
           })
         }
       } catch (error) {
-        console.error('Failed to parse websocket payload', error)
+        logError('Failed to parse websocket payload', error, { gameId })
       }
     },
-    [handleSnapshotMessage]
+    [handleSnapshotMessage, gameId]
   )
 
   const scheduleReconnect = useCallback((connectFn: () => Promise<void>) => {
@@ -219,20 +245,8 @@ export function useGameSync({
   }, [])
 
   const resolveWsUrl = useCallback(() => {
-    const explicitBase = process.env.NEXT_PUBLIC_BACKEND_WS_URL
-    if (explicitBase) {
-      return explicitBase.replace(/\/$/, '')
-    }
-    const httpBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
-    if (httpBase) {
-      // Convert http:// to ws:// and https:// to wss://
-      return httpBase
-        .replace(/\/$/, '')
-        .replace(/^https?/, (match) => (match === 'https' ? 'wss' : 'ws'))
-    }
-    throw new Error(
-      'NEXT_PUBLIC_BACKEND_WS_URL or NEXT_PUBLIC_BACKEND_BASE_URL must be configured'
-    )
+    // Use the centralized resolver (validation happens at app startup)
+    return resolveWebSocketUrl()
   }, [])
 
   const connect = useCallback(async () => {
@@ -271,7 +285,7 @@ export function useGameSync({
         scheduleReconnect(connect)
       }
     } catch (error) {
-      console.error('Failed to establish realtime connection', error)
+      logError('Failed to establish realtime connection', error, { gameId })
       setSyncError({
         message:
           error instanceof Error
@@ -301,7 +315,6 @@ export function useGameSync({
   }, [connect])
 
   return {
-    snapshot,
     refreshSnapshot,
     connectionState,
     syncError,

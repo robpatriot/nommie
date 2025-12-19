@@ -3,24 +3,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
-import {
-  markPlayerReadyAction,
-  submitBidAction,
-  selectTrumpAction,
-  submitPlayAction,
-  addAiSeatAction,
-  updateAiSeatAction,
-  removeAiSeatAction,
-  fetchAiRegistryAction,
-} from '@/app/actions/game-room-actions'
 import Toast from '@/components/Toast'
-import { useApiAction } from '@/hooks/useApiAction'
 import { useToast } from '@/hooks/useToast'
 import { useGameSync } from '@/hooks/useGameSync'
+import { useGameRoomSnapshot } from '@/hooks/queries/useGameRoomSnapshot'
 import type { Seat, Trump } from '@/lib/game-room/types'
 
 import { GameRoomView, type AiSeatSelection } from './game-room-view'
 import type { GameRoomError } from './game-room-view.types'
+import { useAiRegistry } from '@/hooks/queries/useAi'
+import {
+  useMarkPlayerReady,
+  useSubmitBid,
+  useSelectTrump,
+  useSubmitPlay,
+  useAddAiSeat,
+  useUpdateAiSeat,
+  useRemoveAiSeat,
+} from '@/hooks/mutations/useGameRoomMutations'
+import {
+  getGameRoomError,
+  toQueryError,
+} from '@/lib/queries/query-error-handler'
 
 const DEFAULT_AI_NAME = 'HeuristicV1'
 
@@ -42,30 +46,34 @@ export function GameRoomClient({
   gameId,
   requireCardConfirmation = true,
 }: GameRoomClientProps) {
+  // Read snapshot from TanStack Query cache (single source of truth)
+  // WebSocket updates will automatically update the cache and trigger re-renders
   const {
-    snapshot,
+    data: snapshot = initialData,
+    error: queryError,
+    isFetching: isSnapshotFetching,
+  } = useGameRoomSnapshot(gameId, {
+    initialData,
+    etag: initialData.etag,
+  })
+
+  // Get WebSocket connection state and refresh function
+  const {
     refreshSnapshot,
     syncError,
     isRefreshing: syncIsRefreshing,
   } = useGameSync({ initialData, gameId })
+
   const [actionError, setActionError] = useState<GameRoomError | null>(null)
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
   const { toasts, showToast, hideToast } = useToast()
-  const [aiRegistry, setAiRegistry] = useState<AiRegistryEntryState[]>([])
-  const [isAiRegistryLoading, setIsAiRegistryLoading] = useState(false)
-  const [aiRegistryError, setAiRegistryError] = useState<string | null>(null)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
-  const slowSyncToastIdRef = useRef<string | null>(null)
-  const combinedError = actionError ?? syncError
-  const isReadyPending = pendingAction === 'ready'
-  const isBidPending = pendingAction === 'bid'
-  const isTrumpPending = pendingAction === 'trump'
-  const isPlayPending = pendingAction === 'play'
-  const isAiPending = pendingAction === 'ai'
 
-  const phase = snapshot.snapshot.phase
-  const phaseName = phase.phase
-  const canMarkReady = phaseName === 'Init'
+  // Combine errors from query, WebSocket, and actions
+  const combinedError = actionError ?? syncError ?? getGameRoomError(queryError)
+
+  // Combine loading/refreshing states
+  const isRefreshing = syncIsRefreshing || isSnapshotFetching
 
   // Calculate viewer seat once and reuse
   const viewerSeatForInteractions = useMemo(
@@ -73,6 +81,52 @@ export function GameRoomClient({
       typeof snapshot.viewerSeat === 'number' ? snapshot.viewerSeat : null,
     [snapshot.viewerSeat]
   )
+
+  const phase = snapshot.snapshot.phase
+  const phaseName = phase.phase
+  const canMarkReady = phaseName === 'Init'
+
+  // AI registry query - only enabled when AI manager is visible
+  const hostSeat: Seat = snapshot.hostSeat
+  const viewerIsHost = viewerSeatForInteractions === hostSeat
+  const canViewAiManager = viewerIsHost && phaseName === 'Init'
+
+  const {
+    data: aiRegistryData = [],
+    isLoading: isAiRegistryLoading,
+    error: aiRegistryQueryError,
+  } = useAiRegistry(canViewAiManager)
+
+  // Convert query error to string for compatibility
+  const aiRegistryError = aiRegistryQueryError
+    ? aiRegistryQueryError instanceof Error
+      ? aiRegistryQueryError.message
+      : 'Failed to load AI registry'
+    : null
+
+  // Convert AI registry data to expected format
+  const aiRegistry: AiRegistryEntryState[] = aiRegistryData
+
+  // Mutations
+  const markPlayerReadyMutation = useMarkPlayerReady()
+  const submitBidMutation = useSubmitBid()
+  const selectTrumpMutation = useSelectTrump()
+  const submitPlayMutation = useSubmitPlay()
+  const addAiSeatMutation = useAddAiSeat()
+  const updateAiSeatMutation = useUpdateAiSeat()
+  const removeAiSeatMutation = useRemoveAiSeat()
+  const slowSyncToastIdRef = useRef<string | null>(null)
+  const isReadyPending =
+    pendingAction === 'ready' || markPlayerReadyMutation.isPending
+  const isBidPending = pendingAction === 'bid' || submitBidMutation.isPending
+  const isTrumpPending =
+    pendingAction === 'trump' || selectTrumpMutation.isPending
+  const isPlayPending = pendingAction === 'play' || submitPlayMutation.isPending
+  const isAiPending =
+    pendingAction === 'ai' ||
+    addAiSeatMutation.isPending ||
+    updateAiSeatMutation.isPending ||
+    removeAiSeatMutation.isPending
 
   // Initialize hasMarkedReady from snapshot on mount and when snapshot updates
   useEffect(() => {
@@ -102,7 +156,7 @@ export function GameRoomClient({
 
   // Show slow sync indicator when refresh takes longer than 1 second
   useEffect(() => {
-    if (!syncIsRefreshing) {
+    if (!isRefreshing) {
       // Hide toast when refresh completes
       if (slowSyncToastIdRef.current) {
         hideToast(slowSyncToastIdRef.current)
@@ -119,12 +173,7 @@ export function GameRoomClient({
     return () => {
       clearTimeout(timeoutId)
     }
-  }, [syncIsRefreshing, showToast, hideToast])
-
-  const executeApiAction = useApiAction({
-    showToast,
-    // Don't trigger refresh here - action handlers will do it after activity resets
-  })
+  }, [isRefreshing, showToast, hideToast])
 
   const finishAction = useCallback(() => {
     setPendingAction(null)
@@ -156,19 +205,26 @@ export function GameRoomClient({
 
     await runExclusiveAction('ready', async () => {
       try {
-        const result = await markPlayerReadyAction(gameId)
-        if (result.kind === 'error') {
-          setActionError({ message: result.message, traceId: result.traceId })
-          return
-        }
+        await markPlayerReadyMutation.mutateAsync(gameId)
         setHasMarkedReady(true)
       } catch (err) {
+        const backendError = toQueryError(err, 'Unable to mark ready')
         setActionError({
-          message: err instanceof Error ? err.message : 'Unable to mark ready',
+          message: backendError.message,
+          traceId: backendError.traceId,
         })
+        showToast(backendError.message, 'error', backendError)
       }
     })
-  }, [canMarkReady, gameId, hasMarkedReady, isReadyPending, runExclusiveAction])
+  }, [
+    canMarkReady,
+    gameId,
+    hasMarkedReady,
+    isReadyPending,
+    runExclusiveAction,
+    markPlayerReadyMutation,
+    showToast,
+  ])
 
   const handleSubmitBid = useCallback(
     async (bid: number) => {
@@ -183,25 +239,26 @@ export function GameRoomClient({
           })
           return
         }
-        await executeApiAction(
-          () =>
-            submitBidAction({
-              gameId,
-              bid,
-              lockVersion: snapshot.lockVersion!,
-            }),
-          {
-            successMessage: 'Bid submitted',
-          }
-        )
+        try {
+          await submitBidMutation.mutateAsync({
+            gameId,
+            bid,
+            lockVersion: snapshot.lockVersion!,
+          })
+          showToast('Bid submitted', 'success')
+        } catch (err) {
+          const backendError = toQueryError(err, 'Failed to submit bid')
+          showToast(backendError.message, 'error', backendError)
+        }
       })
     },
     [
       gameId,
       isBidPending,
-      executeApiAction,
       runExclusiveAction,
       snapshot.lockVersion,
+      submitBidMutation,
+      showToast,
     ]
   )
 
@@ -218,25 +275,26 @@ export function GameRoomClient({
           })
           return
         }
-        await executeApiAction(
-          () =>
-            selectTrumpAction({
-              gameId,
-              trump,
-              lockVersion: snapshot.lockVersion!,
-            }),
-          {
-            successMessage: 'Trump selected',
-          }
-        )
+        try {
+          await selectTrumpMutation.mutateAsync({
+            gameId,
+            trump,
+            lockVersion: snapshot.lockVersion!,
+          })
+          showToast('Trump selected', 'success')
+        } catch (err) {
+          const backendError = toQueryError(err, 'Failed to select trump')
+          showToast(backendError.message, 'error', backendError)
+        }
       })
     },
     [
       gameId,
       isTrumpPending,
-      executeApiAction,
       runExclusiveAction,
       snapshot.lockVersion,
+      selectTrumpMutation,
+      showToast,
     ]
   )
 
@@ -253,25 +311,26 @@ export function GameRoomClient({
           })
           return
         }
-        await executeApiAction(
-          () =>
-            submitPlayAction({
-              gameId,
-              card,
-              lockVersion: snapshot.lockVersion!,
-            }),
-          {
-            successMessage: 'Card played',
-          }
-        )
+        try {
+          await submitPlayMutation.mutateAsync({
+            gameId,
+            card,
+            lockVersion: snapshot.lockVersion!,
+          })
+          showToast('Card played', 'success')
+        } catch (err) {
+          const backendError = toQueryError(err, 'Failed to play card')
+          showToast(backendError.message, 'error', backendError)
+        }
       })
     },
     [
       gameId,
       isPlayPending,
-      executeApiAction,
       runExclusiveAction,
       snapshot.lockVersion,
+      submitPlayMutation,
+      showToast,
     ]
   )
 
@@ -375,60 +434,11 @@ export function GameRoomClient({
   const aiSeats = seatInfo.filter((seat) => seat.isAi).length
   const availableSeats = totalSeats - occupiedSeats
 
-  const hostSeat: Seat = snapshot.hostSeat
-  const viewerIsHost = viewerSeatForInteractions === hostSeat
-  const canViewAiManager = viewerIsHost && phase.phase === 'Init'
+  // hostSeat, viewerIsHost, and canViewAiManager are already declared above
   const aiControlsEnabled = canViewAiManager
 
-  // AI registry fetch effect: Loads AI registry when AI manager is visible
-  // Cleanup: Cancels pending fetch on unmount or when canViewAiManager changes to prevent memory leaks
-  useEffect(() => {
-    if (!canViewAiManager) {
-      setAiRegistry([])
-      setAiRegistryError(null)
-      setIsAiRegistryLoading(false)
-      return
-    }
-
-    let cancelled = false
-    setIsAiRegistryLoading(true)
-    setAiRegistryError(null)
-
-    void fetchAiRegistryAction()
-      .then((result) => {
-        // Check cancelled flag before updating state to prevent state updates on unmounted component
-        if (cancelled) {
-          return
-        }
-
-        if (result.kind === 'ok') {
-          setAiRegistry(result.data)
-        } else {
-          setAiRegistryError(result.message)
-        }
-      })
-      .catch((err) => {
-        // Check cancelled flag before updating state to prevent state updates on unmounted component
-        if (cancelled) {
-          return
-        }
-
-        const message =
-          err instanceof Error ? err.message : 'Failed to load AI registry'
-        setAiRegistryError(message)
-      })
-      .finally(() => {
-        // Only update loading state if not cancelled to prevent state updates on unmounted component
-        if (!cancelled) {
-          setIsAiRegistryLoading(false)
-        }
-      })
-
-    // Cleanup: Set cancelled flag to prevent state updates after component unmounts
-    return () => {
-      cancelled = true
-    }
-  }, [canViewAiManager])
+  // AI registry is now managed by useAiRegistry query hook
+  // The query is enabled/disabled based on canViewAiManager
 
   const handleAddAi = useCallback(
     async (selection?: AiSeatSelection) => {
@@ -445,19 +455,18 @@ export function GameRoomClient({
           selection?.registryVersion ??
           aiRegistry.find((entry) => entry.name === registryName)?.version
 
-        await executeApiAction(
-          () =>
-            addAiSeatAction({
-              gameId,
-              registryName,
-              registryVersion,
-              seed: selection?.seed,
-            }),
-          {
-            successMessage: 'AI seat added',
-            errorMessage: 'Failed to add AI seat',
-          }
-        )
+        try {
+          await addAiSeatMutation.mutateAsync({
+            gameId,
+            registryName,
+            registryVersion,
+            seed: selection?.seed,
+          })
+          showToast('AI seat added', 'success')
+        } catch (err) {
+          const backendError = toQueryError(err, 'Failed to add AI seat')
+          showToast(backendError.message, 'error', backendError)
+        }
       })
     },
     [
@@ -465,8 +474,9 @@ export function GameRoomClient({
       aiControlsEnabled,
       gameId,
       isAiPending,
-      executeApiAction,
       runExclusiveAction,
+      addAiSeatMutation,
+      showToast,
     ]
   )
 
@@ -477,18 +487,22 @@ export function GameRoomClient({
       }
 
       await runExclusiveAction('ai', async () => {
-        await executeApiAction(() => removeAiSeatAction({ gameId, seat }), {
-          successMessage: 'AI seat removed',
-          errorMessage: 'Failed to remove AI seat',
-        })
+        try {
+          await removeAiSeatMutation.mutateAsync({ gameId, seat })
+          showToast('AI seat removed', 'success')
+        } catch (err) {
+          const backendError = toQueryError(err, 'Failed to remove AI seat')
+          showToast(backendError.message, 'error', backendError)
+        }
       })
     },
     [
       aiControlsEnabled,
       gameId,
       isAiPending,
-      executeApiAction,
       runExclusiveAction,
+      removeAiSeatMutation,
+      showToast,
     ]
   )
 
@@ -499,28 +513,28 @@ export function GameRoomClient({
       }
 
       await runExclusiveAction('ai', async () => {
-        await executeApiAction(
-          () =>
-            updateAiSeatAction({
-              gameId,
-              seat,
-              registryName: selection.registryName,
-              registryVersion: selection.registryVersion,
-              seed: selection.seed,
-            }),
-          {
-            successMessage: 'AI seat updated',
-            errorMessage: 'Failed to update AI seat',
-          }
-        )
+        try {
+          await updateAiSeatMutation.mutateAsync({
+            gameId,
+            seat,
+            registryName: selection.registryName,
+            registryVersion: selection.registryVersion,
+            seed: selection.seed,
+          })
+          showToast('AI seat updated', 'success')
+        } catch (err) {
+          const backendError = toQueryError(err, 'Failed to update AI seat')
+          showToast(backendError.message, 'error', backendError)
+        }
       })
     },
     [
       aiControlsEnabled,
       gameId,
       isAiPending,
-      executeApiAction,
       runExclusiveAction,
+      updateAiSeatMutation,
+      showToast,
     ]
   )
 
@@ -578,7 +592,7 @@ export function GameRoomClient({
         viewerSeat={snapshot.viewerSeat ?? null}
         viewerHand={snapshot.viewerHand}
         onRefresh={() => void refreshSnapshot()}
-        isRefreshing={syncIsRefreshing}
+        isRefreshing={isRefreshing}
         error={combinedError}
         readyState={{
           canReady: canMarkReady,
