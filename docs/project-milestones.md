@@ -194,14 +194,13 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **18. Architecture & Reliability**
+### 🟩 **18. Architecture & Reliability**
 **Details:**
 - **WebSockets / Server Push & Architecture:** Replace polling with WebSockets (or SSE) and decide on the long‑term realtime architecture and testing strategy.  
   - Add end-to-end WebSocket integration tests for game sessions (connect, initial snapshot, broadcasts, shutdown).  
   - Document the chosen realtime architecture (registry/broker split, Redis pub/sub fan-out) and how it is tested.  
-  *Status:* ✅ WebSocket infrastructure implemented and deployed; polling replaced. Frontend uses `useGameSync` hook; backend publishes snapshots via Redis after mutations.  
-  *Remaining:* Add end-to-end backend integration tests covering multi-client broadcast, reconnect, and shutdown behavior.  
-  *Acceptance:* WebSocket sync is the primary update mechanism for active game clients; the architecture and testing strategy are documented and enforced via automated tests.
+  *Status:* ✅ Complete. WebSocket infrastructure implemented and deployed; polling replaced. Frontend uses `useGameSync` hook; backend publishes snapshots via Redis after mutations. End-to-end backend integration tests added covering connection (JWT auth, initial ack, initial snapshot), multi-client broadcast (all clients, game isolation), reconnect behavior, and shutdown (registry cleanup). Tests use in-memory registry for concurrency safety and transaction-per-test isolation. Architecture documented in `docs/websocket-design.md`.  
+  *Acceptance:* ✅ WebSocket sync is the primary update mechanism for active game clients; the architecture and testing strategy are documented and enforced via automated tests.
 - **Deployment Stub:** Minimal production-style environment including FE, BE, DB, and Redis.  
   *Status:* ✅ Complete. Application runs in `docker/local-prod` with TLS, Caddy reverse proxy, and all services containerized.  
   *Acceptance:* Application runs in a minimal production-style configuration.

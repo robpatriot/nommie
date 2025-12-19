@@ -89,17 +89,26 @@ The current client does not send application messages. Any client traffic is tre
   - `NEXT_PUBLIC_BACKEND_WS_URL` (optional explicit WS base)
   - `NEXT_PUBLIC_BACKEND_BASE_URL` (fallback; converted `http(s) -> ws(s)` by the client)
 
-## Testing Strategy (Desired vs Current)
+## Testing Strategy
 
-### Frontend (Current)
+### Frontend
 - Unit/component tests mock the browser `WebSocket` API and validate UI updates and error handling.
 
-### Backend (Gap)
-We should add backend integration tests that cover:
-- websocket connect + initial snapshot delivery
-- broadcast fan-out across multiple websocket connections
-- Redis pub/sub integration (publish on mutation, receive on subscriber, notify sessions)
-- shutdown behavior (server closes active sockets cleanly)
+### Backend (✅ Complete)
+Backend integration tests cover:
+- **Connection tests**: WebSocket connect with JWT authentication, initial ack message, and initial snapshot delivery
+- **Broadcast tests**: Multi-client broadcast fan-out (all connected clients receive updates, game isolation ensures broadcasts only reach same-game clients)
+- **Reconnect tests**: Client reconnection receives latest snapshot, multiple disconnect/reconnect cycles
+- **Shutdown tests**: Registry cleanup and connection count management
+
+**Test Implementation Details:**
+- Tests use **in-memory `GameSessionRegistry`** (not Redis) for concurrency safety and deterministic test execution
+- Each test uses **transaction-per-test isolation** via `SharedTxn` injection into request extensions
+- Tests run against a **real HTTP server** (not `test::init_service()`) to support WebSocket upgrade
+- Test infrastructure includes `TestTxnInjector` middleware, `WebSocketClient` wrapper, and connection count polling helpers
+- Tests are located in `apps/backend/tests/suites/websocket/`
+
+**Note:** Redis pub/sub is not tested directly (we assume Redis and the library work correctly). Tests focus on **our use** of WebSockets: connection lifecycle, broadcast delivery, and session management.
 
 ## Operational Notes
 - Websocket payloads use full snapshots (not diffs). This is intentional: snapshots are idempotent and simplify correctness.
