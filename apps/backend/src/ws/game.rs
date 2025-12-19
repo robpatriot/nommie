@@ -9,11 +9,14 @@ use serde_json::to_string;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::db::txn::SharedTxn;
 use crate::domain::state::Seat;
 use crate::extractors::current_user::CurrentUser;
 use crate::extractors::game_id::GameId;
 use crate::extractors::game_membership::GameMembership;
-use crate::routes::games::{build_snapshot_response, GameSnapshotResponse};
+use crate::routes::games::{
+    build_snapshot_response, build_snapshot_response_in_txn, GameSnapshotResponse,
+};
 use crate::state::app_state::AppState;
 use crate::ws::hub::{GameSessionRegistry, SnapshotBroadcast};
 
@@ -52,14 +55,16 @@ pub async fn upgrade(
             .await
             .map_err(Error::from)?;
 
-    let registry = app_state.realtime.as_ref().map(|broker| broker.registry());
+    let registry = app_state.websocket_registry();
     let initial_lock_version = snapshot_response.lock_version;
+    let shared_txn = SharedTxn::from_req(&req);
 
     let session = GameWsSession::new(
         app_state.clone(),
         registry,
         game_id.0,
         current_user,
+        shared_txn,
         vec![
             OutgoingMessage::Ack {
                 message: "connected",
@@ -81,6 +86,7 @@ pub struct GameWsSession {
     user_id: i64,
     current_user: CurrentUser,
     app_state: web::Data<AppState>,
+    shared_txn: Option<SharedTxn>,
     last_heartbeat: Instant,
     pending_messages: Vec<OutgoingMessage>,
     registry: Option<Arc<GameSessionRegistry>>,
@@ -96,6 +102,7 @@ impl GameWsSession {
         registry: Option<Arc<GameSessionRegistry>>,
         game_id: i64,
         current_user: CurrentUser,
+        shared_txn: Option<SharedTxn>,
         pending_messages: Vec<OutgoingMessage>,
         initial_lock_version: i32,
     ) -> Self {
@@ -105,6 +112,7 @@ impl GameWsSession {
             user_id: current_user.id,
             current_user,
             app_state,
+            shared_txn,
             last_heartbeat: Instant::now(),
             pending_messages,
             registry,
@@ -263,36 +271,44 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
         let app_state = self.app_state.clone();
         let current_user = self.current_user.clone();
         let game_id = self.game_id;
+        let shared_txn = self.shared_txn.clone();
 
         ctx.spawn(
-            async move { build_snapshot_response(None, &app_state, game_id, &current_user).await }
-                .into_actor(self)
-                .map(|result, actor, ctx| match result {
-                    Ok((snapshot, viewer_seat)) => {
-                        actor.last_lock_version = snapshot.lock_version;
-                        let outgoing = OutgoingMessage::Snapshot {
-                            data: snapshot,
-                            viewer_seat,
-                        };
-                        match to_string(&outgoing) {
-                            Ok(serialized) => ctx.text(serialized),
-                            Err(err) => warn!(
-                                session_id = %actor.session_id,
-                                game_id = actor.game_id,
-                                error = %err,
-                                "Failed to serialize broadcast snapshot"
-                            ),
-                        }
-                    }
-                    Err(err) => {
-                        warn!(
+            async move {
+                if let Some(shared) = shared_txn.as_ref() {
+                    build_snapshot_response_in_txn(shared.transaction(), game_id, current_user.id)
+                        .await
+                } else {
+                    build_snapshot_response(None, &app_state, game_id, &current_user).await
+                }
+            }
+            .into_actor(self)
+            .map(|result, actor, ctx| match result {
+                Ok((snapshot, viewer_seat)) => {
+                    actor.last_lock_version = snapshot.lock_version;
+                    let outgoing = OutgoingMessage::Snapshot {
+                        data: snapshot,
+                        viewer_seat,
+                    };
+                    match to_string(&outgoing) {
+                        Ok(serialized) => ctx.text(serialized),
+                        Err(err) => warn!(
                             session_id = %actor.session_id,
                             game_id = actor.game_id,
                             error = %err,
-                            "Failed to build snapshot for websocket client"
-                        );
+                            "Failed to serialize broadcast snapshot"
+                        ),
                     }
-                }),
+                }
+                Err(err) => {
+                    warn!(
+                        session_id = %actor.session_id,
+                        game_id = actor.game_id,
+                        error = %err,
+                        "Failed to build snapshot for websocket client"
+                    );
+                }
+            }),
         );
     }
 }

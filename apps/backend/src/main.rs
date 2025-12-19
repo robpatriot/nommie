@@ -69,7 +69,7 @@ async fn main() -> std::io::Result<()> {
     let data = actix_web::web::Data::new(app_state);
 
     // Clone registry for shutdown handler
-    let registry_for_shutdown = data.realtime.as_ref().map(|broker| broker.registry());
+    let registry_for_shutdown = data.websocket_registry();
 
     // Extract host and port for server binding
     let host = config.host.clone();
