@@ -11,8 +11,12 @@ pub mod game_setup;
 pub mod games_sea_helpers;
 pub mod snapshot_helpers;
 pub mod state_helpers;
+pub mod test_middleware;
 pub mod test_state;
 pub mod test_utils;
 pub mod trick_helpers;
+pub mod txn_helpers;
+pub mod websocket;
+pub mod websocket_client;
 
 pub use test_state::{build_test_state, resolve_test_db_kind, test_state_builder};

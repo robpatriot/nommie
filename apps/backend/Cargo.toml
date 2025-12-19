@@ -72,6 +72,7 @@ serial_test = "3.2.0"
 proptest = "1.9"
 tempfile = "3.8"
 tracing-timing = "0.7"
+tokio-tungstenite = "0.24"
 
 # Internal test packages
 backend-test-support = { path = "../../packages/backend-test-support" }
