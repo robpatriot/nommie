@@ -393,19 +393,20 @@ describe('GameRoomClient', () => {
       })
       await userEvent.click(readyButton)
 
-      // Wait for error message to appear
+      // Wait for error toast to be shown (errors are now shown via toast, not UI text)
       await waitFor(
         () => {
-          expect(screen.getByText(/Already ready/i)).toBeInTheDocument()
+          expect(mockShowToast).toHaveBeenCalledWith(
+            expect.stringContaining('Already ready'),
+            'error',
+            expect.anything()
+          )
         },
         { timeout: 2000 }
       )
 
       // Ready action should have been called
       expect(mockMarkPlayerReadyAction).toHaveBeenCalled()
-      // Note: useGameSync might call getGameRoomSnapshotAction during initialization,
-      // so we just verify the error is displayed
-      expect(screen.getByText(/Already ready/i)).toBeInTheDocument()
     })
 
     it('resets hasMarkedReady when phase changes', async () => {
