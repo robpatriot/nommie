@@ -10,6 +10,7 @@ import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
  * Query hook to fetch and transform game room snapshot.
  * Uses the getGameRoomSnapshotAction server action which handles transformation.
  * Handles the 'not_modified' case (304 response) by returning the cached data directly.
+ * Disables refetch on window focus since WebSocket handles real-time updates.
  */
 export function useGameRoomSnapshot(
   gameId: number,
@@ -72,5 +73,7 @@ export function useGameRoomSnapshot(
     },
     enabled: options?.enabled !== false && !!gameId,
     initialData: options?.initialData,
+    // Disable refetch on window focus since WebSocket handles real-time updates
+    refetchOnWindowFocus: false,
   })
 }
