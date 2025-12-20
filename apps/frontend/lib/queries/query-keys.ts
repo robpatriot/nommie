@@ -13,8 +13,14 @@ export const queryKeys = {
   games: {
     all: ['games'] as const,
     lists: () => [...queryKeys.games.all, 'list'] as const,
-    list: (filters?: { state?: string; viewerIsMember?: boolean }) =>
-      [...queryKeys.games.lists(), filters] as const,
+    list: (filters?: { state?: string; viewerIsMember?: boolean }) => {
+      // Normalize filters: only include in key if filters exist and have values
+      // This ensures consistent keys regardless of how filters are passed
+      if (!filters || Object.keys(filters).length === 0) {
+        return [...queryKeys.games.lists()] as const
+      }
+      return [...queryKeys.games.lists(), filters] as const
+    },
     details: () => [...queryKeys.games.all, 'detail'] as const,
     detail: (id: number) => [...queryKeys.games.details(), id] as const,
     snapshot: (id: number) =>
