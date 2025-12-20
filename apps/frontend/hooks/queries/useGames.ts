@@ -37,12 +37,19 @@ export function useAvailableGames(initialData?: Game[]) {
 /**
  * Query hook to fetch the last active game ID.
  * Uses the getLastActiveGame server function.
+ * Errors are handled consistently through toQueryError.
  */
 export function useLastActiveGame() {
   return useQuery({
     queryKey: queryKeys.games.lastActive(),
     queryFn: async () => {
-      return await getLastActiveGame()
+      try {
+        return await getLastActiveGame()
+      } catch (error) {
+        // Ensure consistent error handling - fetchWithAuth throws BackendApiError,
+        // but wrap in toQueryError for consistency with other queries
+        throw toQueryError(error, 'Failed to fetch last active game')
+      }
     },
   })
 }
