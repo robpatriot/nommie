@@ -198,7 +198,12 @@ function sendWebSocketSnapshot(
   const lockVersion = overrides?.lockVersion ?? 1
   const viewerSeat = overrides?.viewerSeat ?? 0
   const viewerHand = overrides?.viewerHand ?? []
-  const playerNames = ['Alex', 'Bailey', 'Casey', 'Dakota'] // Simplified for tests
+  const playerNames: [string, string, string, string] = [
+    'Alex',
+    'Bailey',
+    'Casey',
+    'Dakota',
+  ] // Simplified for tests
 
   const payload: GameRoomSnapshotPayload = {
     snapshot,

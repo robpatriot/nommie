@@ -268,17 +268,27 @@ describe('GameRoomClient', () => {
   describe('Bid action', () => {
     it('submits bid', async () => {
       // Create a bidding snapshot where viewer (seat 0) hasn't bid yet
+      // biddingSnapshotFixture.phase is 'Bidding' phase, so we can safely assert the type
+      if (biddingSnapshotFixture.phase.phase !== 'Bidding') {
+        throw new Error('Expected biddingSnapshotFixture to have Bidding phase')
+      }
+      const biddingPhase = biddingSnapshotFixture.phase
       const biddingSnapshotWithNoBid = {
         ...biddingSnapshotFixture,
         phase: {
-          ...biddingSnapshotFixture.phase,
+          ...biddingPhase,
           data: {
-            ...biddingSnapshotFixture.phase.data,
-            bids: [null, null, null, null], // Viewer hasn't bid yet
+            ...biddingPhase.data,
+            bids: [null, null, null, null] as [
+              number | null,
+              number | null,
+              number | null,
+              number | null,
+            ], // Viewer hasn't bid yet
             to_act: 0, // It's the viewer's turn
           },
         },
-      }
+      } as typeof biddingSnapshotFixture
       const biddingData = createInitialData(biddingSnapshotWithNoBid, {
         viewerSeat: 0,
         viewerHand: ['2H', '3C'],

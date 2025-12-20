@@ -7,7 +7,10 @@ import {
 } from '@/app/actions/game-actions'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { getLastActiveGame } from '@/lib/api'
-import { handleActionResultError } from '@/lib/queries/query-error-handler'
+import {
+  handleActionResultError,
+  toQueryError,
+} from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
 import type { Game } from '@/lib/types'
 import type { GameSnapshotResult } from '@/lib/api/game-room'

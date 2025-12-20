@@ -394,16 +394,14 @@ describe('GameRoomClient', () => {
       )
 
       // Wait for refresh button to appear - try multiple ways to find it
-      let refreshButton: HTMLElement
-      await waitFor(
+      const refreshButton = await waitFor(
         () => {
           // Try by aria-label first
           const buttons = screen.queryAllByRole('button', {
             name: /Refresh game state/i,
           })
           if (buttons.length > 0) {
-            refreshButton = buttons[0]
-            return
+            return buttons[0]
           }
           // Fallback: try by text content
           const buttonsByText = screen
@@ -414,8 +412,7 @@ describe('GameRoomClient', () => {
                 btn.textContent?.includes('Manual sync')
             )
           if (buttonsByText.length > 0) {
-            refreshButton = buttonsByText[0]
-            return
+            return buttonsByText[0]
           }
           throw new Error('Refresh button not found')
         },
@@ -492,16 +489,14 @@ describe('GameRoomClient', () => {
       )
 
       // Wait for refresh button to appear - try multiple ways to find it
-      let refreshButton: HTMLElement
-      await waitFor(
+      const refreshButton = await waitFor(
         () => {
           // Try by aria-label first
           const buttons = screen.queryAllByRole('button', {
             name: /Refresh game state/i,
           })
           if (buttons.length > 0) {
-            refreshButton = buttons[0]
-            return
+            return buttons[0]
           }
           // Fallback: try by text content
           const buttonsByText = screen
@@ -512,8 +507,7 @@ describe('GameRoomClient', () => {
                 btn.textContent?.includes('Manual sync')
             )
           if (buttonsByText.length > 0) {
-            refreshButton = buttonsByText[0]
-            return
+            return buttonsByText[0]
           }
           throw new Error('Refresh button not found')
         },
