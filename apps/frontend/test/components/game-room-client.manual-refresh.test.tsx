@@ -5,7 +5,7 @@ import {
   waitFor,
   act,
   fireEvent,
-  getTestQueryClient,
+  createTestQueryClient,
 } from '../utils'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
@@ -373,13 +373,13 @@ describe('GameRoomClient', () => {
       const initialData = createInitialData()
 
       // Initialize query cache before rendering to ensure data is available immediately
-      const queryClient = getTestQueryClient()
-      if (queryClient) {
-        queryClient.setQueryData(queryKeys.games.snapshot(42), initialData)
-      }
+      const queryClient = createTestQueryClient()
+      queryClient.setQueryData(queryKeys.games.snapshot(42), initialData)
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialData={initialData} gameId={42} />, {
+          queryClient,
+        })
       })
 
       // Wait for WebSocket to connect
@@ -471,13 +471,13 @@ describe('GameRoomClient', () => {
       mockShowToast.mockReturnValueOnce('slow-sync-id')
 
       // Initialize query cache BEFORE rendering to ensure data is available immediately
-      const queryClient = getTestQueryClient()
-      if (queryClient) {
-        queryClient.setQueryData(queryKeys.games.snapshot(42), initialData)
-      }
+      const queryClient = createTestQueryClient()
+      queryClient.setQueryData(queryKeys.games.snapshot(42), initialData)
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialData={initialData} gameId={42} />, {
+          queryClient,
+        })
       })
 
       // Wait for WebSocket to connect

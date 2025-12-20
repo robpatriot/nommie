@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, act, getTestQueryClient } from '../utils'
+import { render, screen, waitFor, act } from '../utils'
+import { QueryClient } from '@tanstack/react-query'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { queryKeys } from '@/lib/queries/query-keys'
@@ -185,6 +186,7 @@ function sendWebSocketSnapshot(
   ws: MockWebSocket,
   snapshot: typeof initSnapshotFixture,
   gameId: number,
+  queryClient: QueryClient,
   overrides?: {
     viewerSeat?: number
     lockVersion?: number
@@ -211,10 +213,7 @@ function sendWebSocketSnapshot(
   }
 
   // Update the real query cache (simulating what useGameSync does)
-  const queryClient = getTestQueryClient()
-  if (queryClient) {
-    queryClient.setQueryData(queryKeys.games.snapshot(gameId), payload)
-  }
+  queryClient.setQueryData(queryKeys.games.snapshot(gameId), payload)
 
   const message = {
     type: 'snapshot',
@@ -325,15 +324,15 @@ describe('GameRoomClient', () => {
     it('updates snapshot when WebSocket receives message', async () => {
       const initialData = createInitialData()
 
-      await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+      const { queryClient } = await act(async () => {
+        return render(<GameRoomClient initialData={initialData} gameId={42} />)
       })
 
       // Wait for WebSocket to connect
       const ws = await waitForWebSocketConnection()
 
       // Send WebSocket message with updated snapshot
-      sendWebSocketSnapshot(ws, biddingSnapshotFixture, 42, {
+      sendWebSocketSnapshot(ws, biddingSnapshotFixture, 42, queryClient, {
         viewerSeat: 0,
         lockVersion: 1,
       })
@@ -350,8 +349,8 @@ describe('GameRoomClient', () => {
     it('updates snapshot after action completes via WebSocket', async () => {
       const initialData = createInitialData()
 
-      await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+      const { queryClient } = await act(async () => {
+        return render(<GameRoomClient initialData={initialData} gameId={42} />)
       })
 
       // Wait for WebSocket to connect
@@ -372,7 +371,7 @@ describe('GameRoomClient', () => {
       )
 
       // Simulate WebSocket message after action completes
-      sendWebSocketSnapshot(ws, biddingSnapshotFixture, 42, {
+      sendWebSocketSnapshot(ws, biddingSnapshotFixture, 42, queryClient, {
         viewerSeat: 0,
         lockVersion: 1,
       })
@@ -395,7 +394,9 @@ describe('GameRoomClient', () => {
       const initialData = createInitialData()
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        const { queryClient: _ } = render(
+          <GameRoomClient initialData={initialData} gameId={42} />
+        )
       })
 
       // Wait for WebSocket to connect

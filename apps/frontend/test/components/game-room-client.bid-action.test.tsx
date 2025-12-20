@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, act, getTestQueryClient } from '../utils'
+import { render, screen, waitFor, act, createTestQueryClient } from '../utils'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { queryKeys } from '@/lib/queries/query-keys'
@@ -286,10 +286,8 @@ describe('GameRoomClient', () => {
       })
 
       // Initialize query cache with bidding data BEFORE rendering
-      const queryClient = getTestQueryClient()
-      if (queryClient) {
-        queryClient.setQueryData(queryKeys.games.snapshot(42), biddingData)
-      }
+      const queryClient = createTestQueryClient()
+      queryClient.setQueryData(queryKeys.games.snapshot(42), biddingData)
 
       // Override the default mock to return bidding data for this test
       // This ensures if the query fetches, it returns the correct data
@@ -299,7 +297,9 @@ describe('GameRoomClient', () => {
       })
 
       await act(async () => {
-        render(<GameRoomClient initialData={biddingData} gameId={42} />)
+        render(<GameRoomClient initialData={biddingData} gameId={42} />, {
+          queryClient,
+        })
       })
 
       // Wait for WebSocket to connect
