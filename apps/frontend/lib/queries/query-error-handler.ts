@@ -21,6 +21,15 @@ type ActionErrorResult =
 export function handleActionResultError(
   errorResult: ActionErrorResult
 ): BackendApiError {
+  // Runtime validation - defensive programming
+  // TypeScript ensures this at compile time, but runtime check prevents issues
+  // if the function is called incorrectly (e.g., type assertion bugs, JS interop)
+  if (errorResult.kind !== 'error') {
+    throw new Error(
+      `handleActionResultError called with non-error result. Expected kind: 'error', got: '${errorResult.kind}'`
+    )
+  }
+
   return new BackendApiError(
     errorResult.message,
     errorResult.status,
