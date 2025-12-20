@@ -2,9 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { useState, useEffect } from 'react'
-import { validateWebSocketConfig } from '@/lib/config/env-validation'
-import { logError } from '@/lib/logging/error-logger'
+import { useState } from 'react'
 
 /**
  * QueryClientProvider wrapper with default configuration.
@@ -40,23 +38,6 @@ export function AppQueryClientProvider({
         },
       })
   )
-
-  // Validate environment variables at app startup
-  useEffect(() => {
-    try {
-      validateWebSocketConfig()
-    } catch (error) {
-      logError('Environment variable validation failed', error, {
-        component: 'AppQueryClientProvider',
-      })
-      // In development, throw to make the issue obvious
-      if (process.env.NODE_ENV === 'development') {
-        throw error
-      }
-      // In production, log but don't crash the app
-      // The error will surface when WebSocket connection is attempted
-    }
-  }, [])
 
   return (
     <QueryClientProvider client={queryClient}>

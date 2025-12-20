@@ -7,7 +7,7 @@
 /**
  * Validates WebSocket URL environment variables.
  * Throws an error with a clear message if configuration is missing.
- * This should be called at app startup, not at connection time.
+ * Called when establishing WebSocket connections to provide clear error messages.
  */
 export function validateWebSocketConfig(): void {
   const explicitBase = process.env.NEXT_PUBLIC_BACKEND_WS_URL

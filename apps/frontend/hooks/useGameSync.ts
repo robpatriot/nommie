@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { resolveWebSocketUrl } from '@/lib/config/env-validation'
+import {
+  resolveWebSocketUrl,
+  validateWebSocketConfig,
+} from '@/lib/config/env-validation'
 import { logError } from '@/lib/logging/error-logger'
 
 import {
@@ -245,9 +248,20 @@ export function useGameSync({
   }, [])
 
   const resolveWsUrl = useCallback(() => {
-    // Use the centralized resolver (validation happens at app startup)
+    // Validate WebSocket config before resolving URL
+    // This ensures we fail early with a clear error if configuration is missing
+    try {
+      validateWebSocketConfig()
+    } catch (error) {
+      logError('WebSocket configuration validation failed', error, { gameId })
+      // In development, throw to make the issue obvious
+      if (process.env.NODE_ENV === 'development') {
+        throw error
+      }
+      // In production, log but allow connection attempt (will fail with clear error)
+    }
     return resolveWebSocketUrl()
-  }, [])
+  }, [gameId])
 
   const connect = useCallback(async () => {
     const wsBase = resolveWsUrl()
