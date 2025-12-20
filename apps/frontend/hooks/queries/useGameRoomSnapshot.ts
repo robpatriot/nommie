@@ -45,7 +45,23 @@ export function useGameRoomSnapshot(
           return options.initialData
         }
 
-        throw new Error('Not modified but no cached data available')
+        // Last resort: re-fetch without ETag to get fresh data
+        // This handles the edge case where cache was cleared but we got 304
+        const freshResult = await getGameRoomSnapshotAction({
+          gameId,
+          etag: undefined, // Force fresh fetch
+        })
+
+        if (freshResult.kind === 'error') {
+          throw handleActionResultError(freshResult)
+        }
+
+        if (freshResult.kind === 'not_modified') {
+          // Still not modified even without ETag - this is an error state
+          throw new Error('Game snapshot data not available')
+        }
+
+        return freshResult.data
       }
 
       if (result.kind === 'error') {
