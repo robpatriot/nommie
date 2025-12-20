@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    setupFiles: ['setupTests.ts'],
+    setupFiles: ['setupGameRoomActionsMock.ts', 'setupTests.ts'],
     globals: true,
     include: ['**/*.{test,spec}.{ts,tsx}'],
     passWithNoTests: true,

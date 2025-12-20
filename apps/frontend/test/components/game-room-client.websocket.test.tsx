@@ -10,30 +10,17 @@ import {
   initSnapshotFixture,
   biddingSnapshotFixture,
 } from '../mocks/game-snapshot'
-
-// Mock server actions
-const mockGetGameRoomSnapshotAction = vi.fn()
-const mockMarkPlayerReadyAction = vi.fn()
-const mockSubmitBidAction = vi.fn()
-const mockSelectTrumpAction = vi.fn()
-const mockSubmitPlayAction = vi.fn()
-const mockAddAiSeatAction = vi.fn()
-const mockUpdateAiSeatAction = vi.fn()
-const mockRemoveAiSeatAction = vi.fn()
-const mockFetchAiRegistryAction = vi.fn()
-
-vi.mock('@/app/actions/game-room-actions', () => ({
-  getGameRoomSnapshotAction: (request: unknown) =>
-    mockGetGameRoomSnapshotAction(request),
-  markPlayerReadyAction: (gameId: number) => mockMarkPlayerReadyAction(gameId),
-  submitBidAction: (request: unknown) => mockSubmitBidAction(request),
-  selectTrumpAction: (request: unknown) => mockSelectTrumpAction(request),
-  submitPlayAction: (request: unknown) => mockSubmitPlayAction(request),
-  addAiSeatAction: (request: unknown) => mockAddAiSeatAction(request),
-  updateAiSeatAction: (request: unknown) => mockUpdateAiSeatAction(request),
-  removeAiSeatAction: (request: unknown) => mockRemoveAiSeatAction(request),
-  fetchAiRegistryAction: () => mockFetchAiRegistryAction(),
-}))
+import {
+  mockGetGameRoomSnapshotAction,
+  mockMarkPlayerReadyAction,
+  mockSubmitBidAction,
+  mockSelectTrumpAction,
+  mockSubmitPlayAction,
+  mockAddAiSeatAction,
+  mockUpdateAiSeatAction,
+  mockRemoveAiSeatAction,
+  mockFetchAiRegistryAction,
+} from '../../setupGameRoomActionsMock'
 
 // Mock hooks
 const mockShowToast = vi.fn()
