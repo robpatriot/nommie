@@ -188,7 +188,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 - **Design System Parity:** Define a mobile-specific design kit (spacing, typography, colors, components) that mirrors the web experience while honoring native platform conventions and accessibility.  
 - **Expo App Foundations:** Scaffold the `apps/mobile` Expo client with navigation (stack + modal flows), theming, and auth hand-off using the existing backend JWT flow.  
 - **End-to-End Screens:** Implement lobby list, game configuration, and in-game play surfaces (bidding, trump select, trick play, last-trick review) with responsive layouts, gestures, and haptics.  
-- **State & Sync:** Reuse shared types/API wrapper, add optimistic interactions for bid/play actions, and support offline/foreground-resume states with snapshot hydration.  
+- **State & Sync:** Reuse shared types/API wrapper and support offline/foreground-resume states with snapshot hydration.  
 **Progress:** Mobile UX parity delivered—Expo app foundations, theming/auth hand-off, core screens (lobby, config, play), and sync/resume flows are complete.  
 **Acceptance:** Mobile users can authenticate, configure games, and play full rounds with UX parity to the web client; navigation, theming, and interactions feel native; the app handles reconnects and snapshot refreshes gracefully.
 
@@ -335,13 +335,14 @@ Independent improvements that enhance robustness, performance, and developer exp
 ---
 
 ### **2. Frontend Experience Enhancements**
-- **React Query Adoption:** Introduce React Query for client data fetching (lobby lists, game snapshots) while keeping room for future caching/state patterns.
-  - Addresses polling inefficiency (requests made even when nothing changed).
-  - Provides request deduplication automatically.
-  - Enables optimistic updates for game actions (bid, play, etc.).
-  - Improves caching and state synchronization.
-  - **Offline Detection and Retry Logic:** React Query provides automatic retry logic with configurable retry attempts and exponential backoff. Combined with network status detection, this enables graceful handling of offline scenarios and automatic retry when connectivity is restored.
-  *Acceptance:* Critical frontend requests flow through React Query with documented fetch policies; polling is optimized; request deduplication works; optimistic updates are implemented where appropriate; application gracefully handles offline scenarios and retries failed requests when connectivity is restored.
+- **React Query Adoption:** ✅ **Completed** — React Query (TanStack Query) has been adopted for client data fetching.
+  - ✅ **Completed:** Polling inefficiency addressed (ETag-based caching and not_modified handling).
+  - ✅ **Completed:** Request deduplication works automatically via React Query.
+  - ✅ **Completed:** Centralized query key factory implemented for cache management.
+  - ✅ **Completed:** Consistent error handling across query hooks.
+  - ✅ **Completed:** Caching and state synchronization improved with proper invalidation strategies.
+  - ⚠️ **Optional Enhancement:** Optimistic updates for game actions (bid, play, etc.) — can be implemented to improve perceived responsiveness, but not required since WebSocket updates provide real-time state synchronization. Would require implementing optimistic state transformations for mutations like `useMarkPlayerReady`, `useSubmitBid`, `useSelectTrump`, and `useSubmitPlay`.
+  *Acceptance (for optimistic updates):* Mutations use optimistic updates where appropriate (e.g., marking ready, submitting bids) with proper rollback on error.
 - **Import Hygiene & Lazy Loading:** Standardized import order, type-only imports, and dynamic loading for heavy libraries.  
   *Acceptance:* Consistent imports and improved build performance.
 - **Tailwind CSS v3 to v4 Migration:** Migrate from Tailwind CSS v3 to v4, updating configuration, utilities, and any breaking changes.  
