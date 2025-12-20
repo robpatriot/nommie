@@ -11,6 +11,13 @@ import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
  * Uses the getGameRoomSnapshotAction server action which handles transformation.
  * Handles the 'not_modified' case (304 response) by returning the cached data directly.
  * Disables refetch on window focus since WebSocket handles real-time updates.
+ *
+ * **ETag handling**: The `etag` option is used for HTTP conditional requests
+ * (If-None-Match header) but is NOT included in the query key. This ensures
+ * a single cache entry per game, which is updated via WebSocket messages or
+ * manual refresh calls. ETag changes do not trigger automatic refetches - the
+ * system relies on WebSocket updates or explicit refresh calls for real-time
+ * synchronization.
  */
 export function useGameRoomSnapshot(
   gameId: number,
