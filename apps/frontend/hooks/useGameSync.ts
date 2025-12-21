@@ -75,21 +75,6 @@ export function useGameSync({
   const shouldReconnectRef = useRef(true)
   const etagRef = useRef<string | undefined>(initialData.etag)
   const lockVersionRef = useRef<number | undefined>(initialData.lockVersion)
-  const initializedRef = useRef(false)
-  // Store initial data in ref to avoid dependency on object reference
-  const initialDataRef = useRef(initialData)
-
-  // Initialize query cache with initial data on mount (only once)
-  // Using ref to avoid re-running when initialData object reference changes
-  useEffect(() => {
-    if (!initializedRef.current) {
-      queryClient.setQueryData(
-        queryKeys.games.snapshot(gameId),
-        initialDataRef.current
-      )
-      initializedRef.current = true
-    }
-  }, [gameId, queryClient])
 
   const buildEtag = useCallback(
     (lockVersion?: number) =>
