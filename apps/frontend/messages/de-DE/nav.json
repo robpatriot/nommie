@@ -13,6 +13,13 @@
     "signOut": "Abmelden"
   },
   "auth": {
-    "signInWithGoogle": "Mit Google anmelden"
+    "signInWithGoogle": "Mit Google anmelden",
+    "signIn": "Anmelden",
+    "signOut": "Abmelden",
+    "loading": "Lädt…",
+    "statusAria": "Anmeldestatus",
+    "signInAria": "Anmelden",
+    "signOutAria": "Abmelden",
+    "loadingAria": "Anmeldung wird geladen"
   }
 }

@@ -49,6 +49,36 @@
   "labels": {
     "fullTable": "Table complète"
   },
+  "gameList": {
+    "search": {
+      "ariaLabel": "Rechercher des parties",
+      "placeholder": "Rechercher par nom ou ID"
+    },
+    "noMatches": "Aucune partie ne correspond à votre recherche",
+    "gameStates": {
+      "LOBBY": "Salon",
+      "DEALING": "Distribution",
+      "BIDDING": "Annonces",
+      "TRUMP_SELECTION": "Choix de l'atout",
+      "TRICK_PLAY": "Jeu des plis",
+      "SCORING": "Calcul des scores",
+      "BETWEEN_ROUNDS": "Entre les manches",
+      "COMPLETED": "Terminée",
+      "ABANDONED": "Abandonnée"
+    },
+    "fields": {
+      "players": "Joueurs",
+      "seatsOpen": "Places libres",
+      "updated": "Mis à jour"
+    },
+    "time": {
+      "unknown": "Inconnu",
+      "justNow": "à l'instant",
+      "minutesAgo": "il y a {minutes} min",
+      "hoursAgo": "il y a {hours} h",
+      "daysAgo": "il y a {days} j"
+    }
+  },
   "you": "Vous",
   "createGame": {
     "defaultName": "Partie de {name}"

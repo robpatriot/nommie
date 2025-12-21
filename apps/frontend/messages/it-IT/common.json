@@ -36,6 +36,10 @@
       "deviceSwap": "Cambio dispositivo",
       "deviceSwapValue": "Cambia dispositivo a metà mano e resta nel gioco.",
       "footer": "si gioca"
+    },
+    "resumeGame": {
+      "lastGame": "▶ Ultima partita",
+      "mostRecentGame": "▶ Partita più recente"
     }
   }
 }

@@ -2,7 +2,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import LobbyClient from '@/components/LobbyClient'
-import ErrorBoundary from '@/components/ErrorBoundary'
+import ErrorBoundaryWithTranslations from '@/components/ErrorBoundaryWithTranslations'
 import { getAvailableGames } from '@/lib/api'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { handleAllowlistError } from '@/lib/auth/allowlist'
@@ -50,13 +50,13 @@ export default async function LobbyPage() {
   const creatorName = session.user?.name || t('you')
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundaryWithTranslations>
       <BreadcrumbSetter crumbs={[{ label: t('breadcrumbs.lobby') }]} />
       <LobbyClient
         joinableGames={joinableGames}
         inProgressGames={inProgressGames}
         creatorName={creatorName}
       />
-    </ErrorBoundary>
+    </ErrorBoundaryWithTranslations>
   )
 }

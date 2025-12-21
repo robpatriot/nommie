@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
+import { useTranslations } from 'next-intl'
 import type { Game } from '@/lib/types'
 import { SurfaceCard } from './SurfaceCard'
 
@@ -10,18 +11,6 @@ interface GameListProps {
   emptyMessage: string
   actionsLabel?: string
   renderActions?: (game: Game) => ReactNode
-}
-
-const stateLabels: Record<Game['state'], string> = {
-  LOBBY: 'Lobby',
-  DEALING: 'Dealing',
-  BIDDING: 'Bidding',
-  TRUMP_SELECTION: 'Picking trump',
-  TRICK_PLAY: 'Trick play',
-  SCORING: 'Scoring',
-  BETWEEN_ROUNDS: 'Between rounds',
-  COMPLETED: 'Completed',
-  ABANDONED: 'Abandoned',
 }
 
 const stateClassNames: Record<Game['state'], string> = {
@@ -36,30 +25,39 @@ const stateClassNames: Record<Game['state'], string> = {
   ABANDONED: 'bg-danger/15 text-danger-foreground',
 }
 
-const formatRelativeTime = (value: string) => {
-  const timestamp = Date.parse(value)
-  if (Number.isNaN(timestamp)) {
-    return 'Unknown'
-  }
-
-  const diff = Date.now() - timestamp
-  const minutes = Math.round(diff / (1000 * 60))
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.round(hours / 24)
-  return `${days}d ago`
-}
-
 export default function GameList({
   games,
   title,
   emptyMessage,
-  actionsLabel = 'Actions',
+  actionsLabel,
   renderActions,
 }: GameListProps) {
+  const t = useTranslations('lobby.gameList')
+  const tLobby = useTranslations('lobby')
   const [searchQuery, setSearchQuery] = useState('')
+
+  const getStateLabel = (state: Game['state']): string => {
+    return t(`gameStates.${state}`)
+  }
+
+  const formatRelativeTime = useMemo(() => {
+    return (value: string): string => {
+      const timestamp = Date.parse(value)
+      if (Number.isNaN(timestamp)) {
+        return t('time.unknown')
+      }
+
+      const now = Date.now()
+      const diff = now - timestamp
+      const minutes = Math.round(diff / (1000 * 60))
+      if (minutes < 1) return t('time.justNow')
+      if (minutes < 60) return t('time.minutesAgo', { minutes })
+      const hours = Math.round(minutes / 60)
+      if (hours < 24) return t('time.hoursAgo', { hours })
+      const days = Math.round(hours / 24)
+      return t('time.daysAgo', { days })
+    }
+  }, [t])
 
   const filteredGames = useMemo(() => {
     if (!searchQuery.trim()) return games
@@ -87,12 +85,12 @@ export default function GameList({
             <span role="img" aria-hidden>
               🔍
             </span>
-            <span className="sr-only">Search games</span>
+            <span className="sr-only">{t('search.ariaLabel')}</span>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or ID"
+              placeholder={t('search.placeholder')}
               className="w-full bg-transparent text-sm text-foreground placeholder:text-muted focus-visible:outline-none"
             />
           </label>
@@ -105,12 +103,12 @@ export default function GameList({
         </div>
       ) : filteredGames.length === 0 ? (
         <div className="mt-6 rounded-2xl border border-dashed border-border/60 bg-surface px-4 py-8 text-center text-muted">
-          No games match your search
+          {t('noMatches')}
         </div>
       ) : (
         <div className="mt-6 grid gap-4">
           {filteredGames.map((game) => {
-            const stateLabel = stateLabels[game.state] ?? game.state
+            const stateLabel = getStateLabel(game.state)
             const stateClass =
               stateClassNames[game.state] ?? 'bg-surface text-subtle'
             const actions = renderActions?.(game)
@@ -141,7 +139,7 @@ export default function GameList({
                 <dl className="mt-4 grid gap-3 text-sm text-muted sm:grid-cols-3">
                   <div className="rounded-2xl bg-surface-strong/70 px-3 py-2">
                     <dt className="text-xs uppercase tracking-wide text-subtle">
-                      Players
+                      {t('fields.players')}
                     </dt>
                     <dd className="text-base font-semibold text-foreground">
                       {game.player_count} / {game.max_players}
@@ -149,7 +147,7 @@ export default function GameList({
                   </div>
                   <div className="rounded-2xl bg-surface-strong/70 px-3 py-2">
                     <dt className="text-xs uppercase tracking-wide text-subtle">
-                      Seats open
+                      {t('fields.seatsOpen')}
                     </dt>
                     <dd className="text-base font-semibold text-foreground">
                       {seatsOpen}
@@ -157,7 +155,7 @@ export default function GameList({
                   </div>
                   <div className="rounded-2xl bg-surface-strong/70 px-3 py-2">
                     <dt className="text-xs uppercase tracking-wide text-subtle">
-                      Updated
+                      {t('fields.updated')}
                     </dt>
                     <dd className="text-base font-semibold text-foreground">
                       {relativeUpdated}
@@ -168,7 +166,7 @@ export default function GameList({
                 {showActions && actions ? (
                   <div
                     className="mt-5 flex flex-wrap gap-2 text-sm"
-                    aria-label={actionsLabel}
+                    aria-label={actionsLabel ?? tLobby('lists.actionsLabel')}
                   >
                     {actions}
                   </div>

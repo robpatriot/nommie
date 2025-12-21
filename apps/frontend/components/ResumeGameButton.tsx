@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/cn'
 
 interface ResumeGameButtonProps {
@@ -13,6 +14,7 @@ export default function ResumeGameButton({
   lastActiveGameId,
 }: ResumeGameButtonProps) {
   const router = useRouter()
+  const t = useTranslations('common.home.resumeGame')
 
   if (!lastActiveGameId) {
     return null
@@ -29,9 +31,11 @@ export default function ResumeGameButton({
       {/* Arrow only - shown below 275px */}
       <span className="min-[275px]:hidden">▶</span>
       {/* "Last Game" - shown between 275px and sm (640px) */}
-      <span className="hidden min-[275px]:inline sm:hidden">▶ Last Game</span>
+      <span className="hidden min-[275px]:inline sm:hidden">
+        {t('lastGame')}
+      </span>
       {/* "Most Recent Game" - shown at sm (640px) and above */}
-      <span className="hidden sm:inline">▶ Most Recent Game</span>
+      <span className="hidden sm:inline">{t('mostRecentGame')}</span>
     </button>
   )
 }

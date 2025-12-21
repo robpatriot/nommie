@@ -36,6 +36,10 @@
       "deviceSwap": "Device swap",
       "deviceSwapValue": "Swap devices mid-round and stay with the play.",
       "footer": "play on"
+    },
+    "resumeGame": {
+      "lastGame": "▶ Last Game",
+      "mostRecentGame": "▶ Most Recent Game"
     }
   }
 }

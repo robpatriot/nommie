@@ -49,6 +49,36 @@
   "labels": {
     "fullTable": "Full table"
   },
+  "gameList": {
+    "search": {
+      "ariaLabel": "Search games",
+      "placeholder": "Search by name or ID"
+    },
+    "noMatches": "No games match your search",
+    "gameStates": {
+      "LOBBY": "Lobby",
+      "DEALING": "Dealing",
+      "BIDDING": "Bidding",
+      "TRUMP_SELECTION": "Picking trump",
+      "TRICK_PLAY": "Trick play",
+      "SCORING": "Scoring",
+      "BETWEEN_ROUNDS": "Between rounds",
+      "COMPLETED": "Completed",
+      "ABANDONED": "Abandoned"
+    },
+    "fields": {
+      "players": "Players",
+      "seatsOpen": "Seats open",
+      "updated": "Updated"
+    },
+    "time": {
+      "unknown": "Unknown",
+      "justNow": "just now",
+      "minutesAgo": "{minutes}m ago",
+      "hoursAgo": "{hours}h ago",
+      "daysAgo": "{days}d ago"
+    }
+  },
   "you": "You",
   "createGame": {
     "defaultName": "{name}'s game"

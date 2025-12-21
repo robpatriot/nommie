@@ -1,5 +1,6 @@
 'use server'
 
+import { getTranslations } from 'next-intl/server'
 import { deleteGame, fetchWithAuth, getAvailableGames } from '@/lib/api'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { toErrorResult } from '@/lib/api/action-helpers'
@@ -80,16 +81,15 @@ export async function deleteGameAction(
         ) {
           finalLockVersion = snapshotResult.lockVersion
         } else {
+          const t = await getTranslations('errors.actions')
           return toErrorResult(
             new Error('Failed to get lock version from game snapshot'),
-            'Failed to delete game: could not determine game version'
+            t('failedToDeleteGameNoVersion')
           )
         }
       } catch (error) {
-        return toErrorResult(
-          error,
-          'Failed to delete game: could not fetch game snapshot'
-        )
+        const t = await getTranslations('errors.actions')
+        return toErrorResult(error, t('failedToDeleteGameNoSnapshot'))
       }
     }
 

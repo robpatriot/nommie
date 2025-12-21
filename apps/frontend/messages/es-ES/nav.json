@@ -13,6 +13,13 @@
     "signOut": "Cerrar sesión"
   },
   "auth": {
-    "signInWithGoogle": "Iniciar sesión con Google"
+    "signInWithGoogle": "Iniciar sesión con Google",
+    "signIn": "Iniciar sesión",
+    "signOut": "Cerrar sesión",
+    "loading": "Cargando…",
+    "statusAria": "Estado de autenticación",
+    "signInAria": "Iniciar sesión",
+    "signOutAria": "Cerrar sesión",
+    "loadingAria": "Cargando autenticación"
   }
 }

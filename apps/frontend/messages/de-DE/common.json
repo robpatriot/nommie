@@ -36,6 +36,10 @@
       "deviceSwap": "Gerätewechsel",
       "deviceSwapValue": "Wechsle mitten in der Runde das Gerät und bleib im Spiel.",
       "footer": "weiter spielen"
+    },
+    "resumeGame": {
+      "lastGame": "▶ Letztes Spiel",
+      "mostRecentGame": "▶ Neuestes Spiel"
     }
   }
 }

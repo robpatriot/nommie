@@ -1,5 +1,7 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+
 interface AuthControlProps {
   state: 'unauthenticated' | 'authenticated' | 'loading'
   onLogin?: () => void
@@ -11,11 +13,13 @@ export default function AuthControl({
   onLogin,
   onLogout,
 }: AuthControlProps) {
+  const t = useTranslations('nav')
+
   if (state === 'loading') {
     return (
-      <div role="status" aria-label="Authentication status">
-        <button disabled aria-label="Loading authentication">
-          Loading...
+      <div role="status" aria-label={t('auth.statusAria')}>
+        <button disabled aria-label={t('auth.loadingAria')}>
+          {t('auth.loading')}
         </button>
       </div>
     )
@@ -23,9 +27,9 @@ export default function AuthControl({
 
   if (state === 'authenticated') {
     return (
-      <div role="status" aria-label="Authentication status">
-        <button onClick={onLogout} aria-label="Sign out">
-          Sign Out
+      <div role="status" aria-label={t('auth.statusAria')}>
+        <button onClick={onLogout} aria-label={t('auth.signOutAria')}>
+          {t('auth.signOut')}
         </button>
       </div>
     )
@@ -33,9 +37,9 @@ export default function AuthControl({
 
   // unauthenticated state
   return (
-    <div role="status" aria-label="Authentication status">
-      <button onClick={onLogin} aria-label="Sign in">
-        Sign In
+    <div role="status" aria-label={t('auth.statusAria')}>
+      <button onClick={onLogin} aria-label={t('auth.signInAria')}>
+        {t('auth.signIn')}
       </button>
     </div>
   )

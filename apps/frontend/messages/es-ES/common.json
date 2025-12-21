@@ -36,6 +36,10 @@
       "deviceSwap": "Cambio de dispositivo",
       "deviceSwapValue": "Cambia de dispositivo a mitad de mano sin perder el ritmo.",
       "footer": "a jugar"
+    },
+    "resumeGame": {
+      "lastGame": "▶ Última partida",
+      "mostRecentGame": "▶ Partida más reciente"
     }
   }
 }

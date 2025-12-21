@@ -1,6 +1,7 @@
 'use client'
 
 import { startTransition, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import { BackendApiError } from '@/lib/errors'
 
 export interface ToastMessage {
@@ -55,6 +56,7 @@ function ToastItem({
   toast: ToastMessage
   onClose: () => void
 }) {
+  const t = useTranslations('errors.toast')
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
@@ -103,18 +105,24 @@ function ToastItem({
               {expanded && (
                 <div className="space-y-1 text-xs text-danger/80">
                   <p>
-                    <span className="font-semibold">Status:</span>{' '}
+                    <span className="font-semibold">
+                      {t('details.statusLabel')}:
+                    </span>{' '}
                     {toast.error.status}
                   </p>
                   {toast.error.code && (
                     <p>
-                      <span className="font-semibold">Code:</span>{' '}
+                      <span className="font-semibold">
+                        {t('details.codeLabel')}:
+                      </span>{' '}
                       {toast.error.code}
                     </p>
                   )}
                   {hasTraceId && (
                     <p className="font-mono text-xs break-all">
-                      <span className="font-semibold">Trace ID:</span>{' '}
+                      <span className="font-semibold">
+                        {t('details.traceIdLabel')}:
+                      </span>{' '}
                       {toast.error.traceId}
                     </p>
                   )}
@@ -125,7 +133,8 @@ function ToastItem({
                   onClick={() => setExpanded(!expanded)}
                   className="mt-1 text-xs text-danger/90 hover:text-danger underline"
                 >
-                  {expanded ? 'Hide' : 'Show'} details
+                  {expanded ? t('details.hide') : t('details.show')}{' '}
+                  {t('details.details')}
                 </button>
               )}
             </div>
@@ -140,7 +149,7 @@ function ToastItem({
                 ? 'text-warning-foreground dark:text-warning hover:text-warning-foreground/80 dark:hover:text-warning/80'
                 : 'text-success-foreground dark:text-success-contrast hover:text-success-foreground/80 dark:hover:text-success-contrast/80'
           }`}
-          aria-label="Close"
+          aria-label={t('closeAria')}
         >
           ×
         </button>

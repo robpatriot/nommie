@@ -13,6 +13,13 @@
     "signOut": "Sign out"
   },
   "auth": {
-    "signInWithGoogle": "Sign in with Google"
+    "signInWithGoogle": "Sign in with Google",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "loading": "Loading...",
+    "statusAria": "Authentication status",
+    "signInAria": "Sign in",
+    "signOutAria": "Sign out",
+    "loadingAria": "Loading authentication"
   }
 }

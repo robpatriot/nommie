@@ -36,6 +36,10 @@
       "deviceSwap": "Changement d’appareil",
       "deviceSwapValue": "Changez d’appareil en cours de manche et restez dans le jeu.",
       "footer": "à vous de jouer"
+    },
+    "resumeGame": {
+      "lastGame": "▶ Dernière partie",
+      "mostRecentGame": "▶ Partie la plus récente"
     }
   }
 }

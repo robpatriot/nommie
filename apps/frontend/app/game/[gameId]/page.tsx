@@ -1,8 +1,9 @@
+import { getTranslations } from 'next-intl/server'
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 
 import { GameRoomClient } from './_components/game-room-client'
-import ErrorBoundary from '@/components/ErrorBoundary'
+import ErrorBoundaryWithTranslations from '@/components/ErrorBoundaryWithTranslations'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
@@ -53,7 +54,8 @@ export default async function GamePage({
 
   if (snapshotResult.kind !== 'ok') {
     // 'not_modified' should not occur on initial page load without an ETag
-    throw new Error('Failed to load game snapshot: unexpected response')
+    const t = await getTranslations('errors.page')
+    throw new Error(t('failedToLoadGameSnapshot'))
   }
 
   const seating = snapshotResult.snapshot.game.seating
@@ -89,7 +91,7 @@ export default async function GamePage({
   const gameName = `Game ${resolvedGameId}`
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundaryWithTranslations>
       <BreadcrumbSetter
         crumbs={[{ label: 'Lobby', href: '/lobby' }, { label: gameName }]}
       />
@@ -98,6 +100,6 @@ export default async function GamePage({
         gameId={resolvedGameId}
         requireCardConfirmation={requireCardConfirmation}
       />
-    </ErrorBoundary>
+    </ErrorBoundaryWithTranslations>
   )
 }

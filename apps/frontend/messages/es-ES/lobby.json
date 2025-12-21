@@ -49,6 +49,36 @@
   "labels": {
     "fullTable": "Mesa completa"
   },
+  "gameList": {
+    "search": {
+      "ariaLabel": "Buscar partidas",
+      "placeholder": "Buscar por nombre o ID"
+    },
+    "noMatches": "No hay partidas que coincidan con tu búsqueda",
+    "gameStates": {
+      "LOBBY": "Sala",
+      "DEALING": "Repartiendo",
+      "BIDDING": "Pujas",
+      "TRUMP_SELECTION": "Elegir triunfo",
+      "TRICK_PLAY": "Juego de bazas",
+      "SCORING": "Puntuación",
+      "BETWEEN_ROUNDS": "Entre rondas",
+      "COMPLETED": "Completada",
+      "ABANDONED": "Abandonada"
+    },
+    "fields": {
+      "players": "Jugadores",
+      "seatsOpen": "Asientos libres",
+      "updated": "Actualizado"
+    },
+    "time": {
+      "unknown": "Desconocido",
+      "justNow": "ahora mismo",
+      "minutesAgo": "hace {minutes} min",
+      "hoursAgo": "hace {hours} h",
+      "daysAgo": "hace {days} d"
+    }
+  },
   "you": "Tú",
   "createGame": {
     "defaultName": "Partida de {name}"

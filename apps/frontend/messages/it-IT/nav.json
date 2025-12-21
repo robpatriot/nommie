@@ -13,6 +13,13 @@
     "signOut": "Esci"
   },
   "auth": {
-    "signInWithGoogle": "Accedi con Google"
+    "signInWithGoogle": "Accedi con Google",
+    "signIn": "Accedi",
+    "signOut": "Esci",
+    "loading": "Caricamento…",
+    "statusAria": "Stato autenticazione",
+    "signInAria": "Accedi",
+    "signOutAria": "Esci",
+    "loadingAria": "Caricamento autenticazione"
   }
 }

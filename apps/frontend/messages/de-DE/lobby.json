@@ -49,6 +49,36 @@
   "labels": {
     "fullTable": "Tisch voll"
   },
+  "gameList": {
+    "search": {
+      "ariaLabel": "Spiele suchen",
+      "placeholder": "Nach Name oder ID suchen"
+    },
+    "noMatches": "Keine Spiele entsprechen deiner Suche",
+    "gameStates": {
+      "LOBBY": "Wartezimmer",
+      "DEALING": "Geben",
+      "BIDDING": "Gebote",
+      "TRUMP_SELECTION": "Trumpf wählen",
+      "TRICK_PLAY": "Stichspiel",
+      "SCORING": "Punkte zählen",
+      "BETWEEN_ROUNDS": "Zwischen Runden",
+      "COMPLETED": "Abgeschlossen",
+      "ABANDONED": "Abgebrochen"
+    },
+    "fields": {
+      "players": "Spieler",
+      "seatsOpen": "Freie Plätze",
+      "updated": "Aktualisiert"
+    },
+    "time": {
+      "unknown": "Unbekannt",
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {minutes} Min",
+      "hoursAgo": "vor {hours} Std",
+      "daysAgo": "vor {days} T"
+    }
+  },
   "you": "Du",
   "createGame": {
     "defaultName": "Spiel von {name}"
