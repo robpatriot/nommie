@@ -1052,7 +1052,9 @@ async fn add_ai_seat(
                 )
             })?;
 
-            let base_name = friendly_ai_name(ai_profile.id, seat_index as usize);
+            // Generate a random seed for name generation to ensure names vary between games
+            let name_seed = random::<u64>() as i64;
+            let base_name = friendly_ai_name(name_seed, seat_index as usize);
             let unique_name = unique_ai_display_name(&existing_display_names, &base_name);
             existing_display_names.insert(unique_name.clone());
 
