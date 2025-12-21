@@ -48,27 +48,6 @@ export function getOrientation(
   return 'right'
 }
 
-export function getPhaseLabel(phase: PhaseSnapshot): string {
-  switch (phase.phase) {
-    case 'Init':
-      return 'Initializing'
-    case 'Bidding':
-      return 'Bidding Round'
-    case 'TrumpSelect':
-      return 'Select Trump'
-    case 'Trick':
-      return 'Trick Play'
-    case 'Scoring':
-      return 'Round Scoring'
-    case 'Complete':
-      return 'Round Complete'
-    case 'GameOver':
-      return 'Game Over'
-    default:
-      return 'Unknown Phase'
-  }
-}
-
 export function getRound(phase: PhaseSnapshot): RoundPublic | null {
   switch (phase.phase) {
     case 'Bidding':
@@ -112,27 +91,6 @@ export function getBidForSeat(
     return round.bids[seat]
   }
   return undefined
-}
-
-export function formatTrump(trump: RoundPublic['trump']): string {
-  if (!trump) {
-    return 'Undeclared'
-  }
-
-  switch (trump) {
-    case 'CLUBS':
-      return 'Clubs'
-    case 'DIAMONDS':
-      return 'Diamonds'
-    case 'HEARTS':
-      return 'Hearts'
-    case 'SPADES':
-      return 'Spades'
-    case 'NO_TRUMPS':
-      return 'No Trump'
-    default:
-      return trump
-  }
 }
 
 /**
