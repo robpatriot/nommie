@@ -293,7 +293,11 @@ export function TrickArea({
       ) : orderedCards.length === 0 ? (
         <div className="flex flex-col items-center gap-2">
           <span className="text-sm font-medium text-subtle">
-            Waiting for lead…
+            {phase.phase === 'Bidding'
+              ? 'Waiting for bidding to complete…'
+              : phase.phase === 'TrumpSelect'
+                ? 'Waiting for trumps to be chosen…'
+                : 'Waiting for lead…'}
           </span>
           {phase.phase === 'Trick' ? (
             <span className="text-xs text-muted">
