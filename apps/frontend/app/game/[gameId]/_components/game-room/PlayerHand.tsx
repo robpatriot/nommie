@@ -38,6 +38,7 @@ const BLEND_THRESHOLD = 20 // Pixels of remaining space before we start blending
 // Increased to account for card shadows that create visual gap
 const ROW_OVERLAP = CARD_HEIGHT * 0.4
 const SELECTED_CARD_LIFT = 8 // How much selected card lifts (translateY)
+const MAX_CARDS_PER_ROW = 7 // Maximum cards allowed in a single row
 
 type LayoutMode = 'singleRow' | 'twoRow'
 
@@ -53,6 +54,31 @@ interface LayoutResult {
   minHeight: number
   scale?: number // Optional scale factor for card scaling
 }
+
+// Suit-aware layout types
+interface SuitGroup {
+  suit: string
+  cards: Card[]
+  count: number
+}
+
+interface TwoRowSplit {
+  topRow: Card[]
+  bottomRow: Card[]
+  splitSuit: string | null
+  splitTopCount: number | null
+}
+
+interface LayoutSignature {
+  handHash: string
+  topRowSuits: { suit: string; count: number }[]
+  bottomRowSuits: { suit: string; count: number }[]
+  splitSuit: string | null
+  splitTopCount: number | null
+}
+
+// Export types for testing
+export type { LayoutSignature, TwoRowSplit, SuitGroup }
 
 // Calculate overlap for a single row given viewport width and card count
 function calculateOverlapForRow(
@@ -107,12 +133,389 @@ function canFitInOneRow(viewportWidth: number, cardCount: number): boolean {
   return viewportWidth >= calculateMinWidthForMaxOverlap(cardCount)
 }
 
+// Suit-aware layout helper functions
+function getCardSuit(card: Card): string {
+  return card.slice(-1).toUpperCase()
+}
+
+function computeHandHash(cards: Card[]): string {
+  // Create deterministic hash from sorted card list
+  return [...cards].sort().join(',')
+}
+
+function groupCardsBySuit(cards: Card[]): SuitGroup[] {
+  const groups = new Map<string, Card[]>()
+
+  // Group cards by suit, preserving original order within each suit
+  for (const card of cards) {
+    const suit = getCardSuit(card)
+    if (!groups.has(suit)) {
+      groups.set(suit, [])
+    }
+    groups.get(suit)!.push(card)
+  }
+
+  // Convert to array format
+  return Array.from(groups.entries()).map(([suit, cards]) => ({
+    suit,
+    cards,
+    count: cards.length,
+  }))
+}
+
+function scoreCombination(combo: TwoRowSplit): number {
+  let score = 0
+
+  // Priority 1: Prefer balanced rows (same size)
+  const rowDiff = Math.abs(combo.topRow.length - combo.bottomRow.length)
+  score += 1000 - rowDiff * 100 // Higher score for smaller difference
+
+  // Tie-breaker: Among equally balanced options, prefer keeping more suits together
+  // Count how many suits are split across rows (fewer is better)
+  if (rowDiff === 0) {
+    const topSuits = new Set(combo.topRow.map((c) => getCardSuit(c)))
+    const bottomSuits = new Set(combo.bottomRow.map((c) => getCardSuit(c)))
+    const splitSuits = Array.from(topSuits).filter((suit) =>
+      bottomSuits.has(suit)
+    )
+    score += 20 - splitSuits.length * 5 // Bonus for fewer split suits
+  }
+
+  return score
+}
+
+function generateValidCombinations(
+  suitGroups: SuitGroup[],
+  maxCardsPerRow: number
+): TwoRowSplit[] {
+  const combinations: TwoRowSplit[] = []
+  const n = suitGroups.length
+
+  // Generate all possible ways to assign suits to rows (2^n combinations)
+  for (let i = 0; i < Math.pow(2, n); i++) {
+    const topRow: Card[] = []
+    const bottomRow: Card[] = []
+
+    for (let j = 0; j < n; j++) {
+      const isTopRow = (i & (1 << j)) !== 0
+      const suitGroup = suitGroups[j]
+
+      if (isTopRow) {
+        topRow.push(...suitGroup.cards)
+      } else {
+        bottomRow.push(...suitGroup.cards)
+      }
+    }
+
+    // Check constraints: no row exceeds maxCardsPerRow
+    if (topRow.length <= maxCardsPerRow && bottomRow.length <= maxCardsPerRow) {
+      combinations.push({
+        topRow,
+        bottomRow,
+        splitSuit: null,
+        splitTopCount: null,
+      })
+    }
+  }
+
+  return combinations
+}
+
+function computePerfectLayout(suitGroups: SuitGroup[]): TwoRowSplit | null {
+  const validCombinations = generateValidCombinations(
+    suitGroups,
+    MAX_CARDS_PER_ROW
+  )
+
+  if (validCombinations.length === 0) {
+    return null
+  }
+
+  // Score each combination
+  let bestScore = -Infinity
+  let bestSolution: TwoRowSplit | null = null
+
+  for (const combo of validCombinations) {
+    const score = scoreCombination(combo)
+    if (score > bestScore) {
+      bestScore = score
+      bestSolution = combo
+    }
+  }
+
+  return bestSolution
+}
+
+function computeBestSplitLayout(
+  suitGroups: SuitGroup[],
+  suitToSplit: SuitGroup
+): TwoRowSplit {
+  const otherSuits = suitGroups.filter((sg) => sg.suit !== suitToSplit.suit)
+  let bestScore = -Infinity
+  let bestSolution: TwoRowSplit | null = null
+
+  // Try all ways to split the suit that must be split
+  for (let topCount = 1; topCount < suitToSplit.count; topCount++) {
+    const bottomCount = suitToSplit.count - topCount
+
+    // Check if this split is valid (both parts fit in rows)
+    if (topCount > MAX_CARDS_PER_ROW || bottomCount > MAX_CARDS_PER_ROW) {
+      continue
+    }
+
+    // Try all ways to assign other suits
+    const otherCombinations = generateValidCombinations(
+      otherSuits,
+      MAX_CARDS_PER_ROW
+    )
+
+    for (const otherCombo of otherCombinations) {
+      const topRow = [
+        ...suitToSplit.cards.slice(0, topCount),
+        ...otherCombo.topRow,
+      ]
+      const bottomRow = [
+        ...suitToSplit.cards.slice(topCount),
+        ...otherCombo.bottomRow,
+      ]
+
+      // Check constraints
+      if (
+        topRow.length <= MAX_CARDS_PER_ROW &&
+        bottomRow.length <= MAX_CARDS_PER_ROW
+      ) {
+        const combo: TwoRowSplit = {
+          topRow,
+          bottomRow,
+          splitSuit: suitToSplit.suit,
+          splitTopCount: topCount,
+        }
+
+        const score = scoreCombination(combo)
+        if (score > bestScore) {
+          bestScore = score
+          bestSolution = combo
+        }
+      }
+    }
+  }
+
+  // Fallback: if no valid split found, use balanced split
+  if (!bestSolution) {
+    const topCount = Math.ceil(suitToSplit.count / 2)
+    const topRow = suitToSplit.cards.slice(0, topCount)
+    const bottomRow = suitToSplit.cards.slice(topCount)
+
+    // Distribute other suits
+    const otherTop: Card[] = []
+    const otherBottom: Card[] = []
+
+    for (const otherSuit of otherSuits) {
+      if (otherTop.length + topRow.length <= MAX_CARDS_PER_ROW) {
+        otherTop.push(...otherSuit.cards)
+      } else {
+        otherBottom.push(...otherSuit.cards)
+      }
+    }
+
+    return {
+      topRow: [...topRow, ...otherTop],
+      bottomRow: [...bottomRow, ...otherBottom],
+      splitSuit: suitToSplit.suit,
+      splitTopCount: topCount,
+    }
+  }
+
+  return bestSolution
+}
+
+function computeOptimalLayout(cards: Card[]): TwoRowSplit {
+  const suitGroups = groupCardsBySuit(cards)
+
+  // Check if any suit > 7 (must be split)
+  const suitOver7 = suitGroups.find((sg) => sg.count > MAX_CARDS_PER_ROW)
+
+  if (suitOver7) {
+    // Must split this suit
+    return computeBestSplitLayout(suitGroups, suitOver7)
+  }
+
+  // Try perfect layout (all suits together)
+  const perfect = computePerfectLayout(suitGroups)
+  if (perfect) {
+    return perfect
+  }
+
+  // Fallback: balanced split (shouldn't happen with max 13 cards, but safety)
+  const topCount = Math.ceil(cards.length / 2)
+  return {
+    topRow: cards.slice(0, topCount),
+    bottomRow: cards.slice(topCount),
+    splitSuit: null,
+    splitTopCount: null,
+  }
+}
+
+// Export for testing - helper to create signatures for test fixtures
+export function createSignature(
+  cards: Card[],
+  split: TwoRowSplit
+): LayoutSignature {
+  const topRowSuits = groupCardsBySuit(split.topRow).map((sg) => ({
+    suit: sg.suit,
+    count: sg.count,
+  }))
+  const bottomRowSuits = groupCardsBySuit(split.bottomRow).map((sg) => ({
+    suit: sg.suit,
+    count: sg.count,
+  }))
+
+  return {
+    handHash: computeHandHash(cards),
+    topRowSuits,
+    bottomRowSuits,
+    splitSuit: split.splitSuit,
+    splitTopCount: split.splitTopCount,
+  }
+}
+
+function maintainPattern(
+  cards: Card[],
+  previous: LayoutSignature
+): TwoRowSplit {
+  const suitGroups = groupCardsBySuit(cards)
+  const topRow: Card[] = []
+  const bottomRow: Card[] = []
+
+  // Assign suits to rows based on previous pattern
+  for (const suitGroup of suitGroups) {
+    const wasOnTop = previous.topRowSuits.some((s) => s.suit === suitGroup.suit)
+
+    if (wasOnTop) {
+      topRow.push(...suitGroup.cards)
+    } else {
+      bottomRow.push(...suitGroup.cards)
+    }
+  }
+
+  // Verify constraints (should always pass since pattern is maintainable)
+  if (
+    topRow.length > MAX_CARDS_PER_ROW ||
+    bottomRow.length > MAX_CARDS_PER_ROW
+  ) {
+    // Fallback to optimal if somehow invalid
+    return computeOptimalLayout(cards)
+  }
+
+  return {
+    topRow,
+    bottomRow,
+    splitSuit: null,
+    splitTopCount: null,
+  }
+}
+
+function maintainSplitPattern(
+  cards: Card[],
+  previous: LayoutSignature
+): TwoRowSplit {
+  const suitGroups = groupCardsBySuit(cards)
+  const topRow: Card[] = []
+  const bottomRow: Card[] = []
+
+  // Assign suits based on previous pattern
+  for (const suitGroup of suitGroups) {
+    if (suitGroup.suit === previous.splitSuit) {
+      // Split this suit the same way
+      const splitPoint = previous.splitTopCount!
+      topRow.push(...suitGroup.cards.slice(0, splitPoint))
+      bottomRow.push(...suitGroup.cards.slice(splitPoint))
+    } else {
+      // Keep suit together based on previous pattern
+      const wasOnTop = previous.topRowSuits.some(
+        (s) => s.suit === suitGroup.suit
+      )
+      if (wasOnTop) {
+        topRow.push(...suitGroup.cards)
+      } else {
+        bottomRow.push(...suitGroup.cards)
+      }
+    }
+  }
+
+  // Verify constraints (should always pass)
+  if (
+    topRow.length > MAX_CARDS_PER_ROW ||
+    bottomRow.length > MAX_CARDS_PER_ROW
+  ) {
+    // Fallback to optimal if somehow invalid
+    return computeOptimalLayout(cards)
+  }
+
+  return {
+    topRow,
+    bottomRow,
+    splitSuit: previous.splitSuit,
+    splitTopCount: previous.splitTopCount,
+  }
+}
+
+// Export for testing - main layout algorithm entry point
+export function getTwoRowLayout(
+  cards: Card[],
+  previousSignature: LayoutSignature | null
+): TwoRowSplit {
+  const currentHash = computeHandHash(cards)
+
+  // Hand unchanged - use previous layout exactly
+  if (previousSignature && previousSignature.handHash === currentHash) {
+    // Rebuild from signature
+    if (previousSignature.splitSuit === null) {
+      return maintainPattern(cards, previousSignature)
+    } else {
+      return maintainSplitPattern(cards, previousSignature)
+    }
+  }
+
+  // Compute optimal for current hand
+  const optimal = computeOptimalLayout(cards)
+
+  // No previous state - use optimal
+  if (!previousSignature) {
+    return optimal
+  }
+
+  // Previous was perfect - maintain pattern
+  if (previousSignature.splitSuit === null) {
+    return maintainPattern(cards, previousSignature)
+  }
+
+  // Previous had split - check for improvement
+  if (previousSignature.splitSuit !== null) {
+    const canBePerfect = optimal.splitSuit === null
+
+    if (canBePerfect) {
+      // Improvement! Use new perfect layout
+      return optimal
+    } else {
+      // Maintain previous split pattern
+      return maintainSplitPattern(cards, previousSignature)
+    }
+  }
+
+  return optimal
+}
+
 /**
  * Layout strategy interface for PlayerHand layouts.
  * Each strategy computes card positions, dimensions, and optional scaling.
  */
 interface LayoutStrategy {
-  computeLayout(viewportWidth: number, cardCount: number): LayoutResult
+  computeLayout(
+    viewportWidth: number,
+    cards: Card[],
+    previousSignature: LayoutSignature | null
+  ): LayoutResult
 }
 
 /**
@@ -135,7 +538,13 @@ interface LayoutStrategy {
  *   via deterministic z-index boost.
  */
 class DefaultLayoutStrategy implements LayoutStrategy {
-  computeLayout(viewportWidth: number, cardCount: number): LayoutResult {
+  computeLayout(
+    viewportWidth: number,
+    cards: Card[],
+    previousSignature: LayoutSignature | null
+  ): LayoutResult {
+    const cardCount = cards.length
+
     if (cardCount === 0) {
       return {
         mode: 'singleRow',
@@ -168,10 +577,10 @@ class DefaultLayoutStrategy implements LayoutStrategy {
       }
     }
 
-    // Two row layout
-    // Split cards into two rows (balanced by count)
-    const topRowCount = Math.ceil(cardCount / 2)
-    const bottomRowCount = cardCount - topRowCount
+    // Two row layout - use suit-aware algorithm
+    const twoRowSplit = getTwoRowLayout(cards, previousSignature)
+    const topRowCount = twoRowSplit.topRow.length
+    const bottomRowCount = twoRowSplit.bottomRow.length
 
     // Calculate overlap for each row independently
     const topOverlap = calculateOverlapForRow(viewportWidth, topRowCount)
@@ -197,10 +606,35 @@ class DefaultLayoutStrategy implements LayoutStrategy {
     const topRowY = 0
     const bottomRowY = CARD_HEIGHT - ROW_OVERLAP
 
+    // Create a map from card to its position in the split
+    const cardToRowMap = new Map<
+      Card,
+      { row: 'top' | 'bottom'; index: number }
+    >()
+    twoRowSplit.topRow.forEach((card, index) => {
+      cardToRowMap.set(card, { row: 'top', index })
+    })
+    twoRowSplit.bottomRow.forEach((card, index) => {
+      cardToRowMap.set(card, { row: 'bottom', index })
+    })
+
     const positions: CardPosition[] = []
     for (let i = 0; i < cardCount; i++) {
-      const isTopRow = i < topRowCount
-      const rowIndex = isTopRow ? i : i - topRowCount
+      const card = cards[i]
+      const rowInfo = cardToRowMap.get(card)
+
+      if (!rowInfo) {
+        // Fallback (shouldn't happen)
+        positions.push({
+          left: 0,
+          top: 0,
+          zIndex: i,
+        })
+        continue
+      }
+
+      const { row, index: rowIndex } = rowInfo
+      const isTopRow = row === 'top'
 
       // Z-index strategy: bottom row cards render above top row cards in overlap area
       // Within each row, later cards have higher z-index (for horizontal overlap)
@@ -236,8 +670,16 @@ class ScaledLayoutStrategy implements LayoutStrategy {
   private readonly MIN_SCALE = 0.75 // Don't scale below this factor
   private readonly baseStrategy = new DefaultLayoutStrategy()
 
-  computeLayout(viewportWidth: number, cardCount: number): LayoutResult {
-    const baseLayout = this.baseStrategy.computeLayout(viewportWidth, cardCount)
+  computeLayout(
+    viewportWidth: number,
+    cards: Card[],
+    previousSignature: LayoutSignature | null
+  ): LayoutResult {
+    const baseLayout = this.baseStrategy.computeLayout(
+      viewportWidth,
+      cards,
+      previousSignature
+    )
 
     // Single row mode: no scaling, return base layout
     if (baseLayout.mode === 'singleRow') {
@@ -248,8 +690,10 @@ class ScaledLayoutStrategy implements LayoutStrategy {
     }
 
     // Two-row mode: check if scaling is needed
-    const topRowCount = Math.ceil(cardCount / 2)
-    const bottomRowCount = cardCount - topRowCount
+    // Get row counts from the actual split (not just cardCount / 2)
+    const twoRowSplit = getTwoRowLayout(cards, previousSignature)
+    const topRowCount = twoRowSplit.topRow.length
+    const bottomRowCount = twoRowSplit.bottomRow.length
 
     // Check overlaps with actual viewport to determine if max overlap is reached
     const topOverlap = calculateOverlapForRow(viewportWidth, topRowCount)
@@ -292,7 +736,8 @@ class ScaledLayoutStrategy implements LayoutStrategy {
     const effectiveViewportWidth = viewportWidth / scale
     const scaledLayout = this.baseStrategy.computeLayout(
       effectiveViewportWidth,
-      cardCount
+      cards,
+      previousSignature
     )
 
     // Scale positions to actual viewport coordinates
@@ -301,9 +746,18 @@ class ScaledLayoutStrategy implements LayoutStrategy {
     const scaledRowOverlap = ROW_OVERLAP * scale
 
     // Determine which row each card is in for proper top position scaling
+    const cardToRowMap = new Map<Card, 'top' | 'bottom'>()
+    twoRowSplit.topRow.forEach((card) => {
+      cardToRowMap.set(card, 'top')
+    })
+    twoRowSplit.bottomRow.forEach((card) => {
+      cardToRowMap.set(card, 'bottom')
+    })
+
     const positions: CardPosition[] = scaledLayout.positions.map(
       (pos, index) => {
-        const isTopRow = index < topRowCount
+        const card = cards[index]
+        const isTopRow = cardToRowMap.get(card) === 'top'
         return {
           ...pos,
           left: pos.left * scale,
@@ -409,6 +863,7 @@ export function PlayerHand({
 
   const internalViewportRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = externalViewportRef ?? internalViewportRef
+  const layoutSignatureRef = useRef<LayoutSignature | null>(null)
   const [layout, setLayout] = useState<LayoutResult>({
     mode: 'singleRow',
     positions: [],
@@ -425,7 +880,29 @@ export function PlayerHand({
 
     const updateLayout = () => {
       const width = viewport.clientWidth
-      const newLayout = strategy.computeLayout(width, viewerHand.length)
+      const cardCount = viewerHand.length
+
+      // Compute layout using previous signature
+      const newLayout = strategy.computeLayout(
+        width,
+        viewerHand,
+        layoutSignatureRef.current
+      )
+
+      // Update signature after computing layout (for next render)
+      const needsTwoRows = cardCount > 0 && !canFitInOneRow(width, cardCount)
+      if (needsTwoRows) {
+        // Compute the split that was actually used (strategy computed it internally)
+        const twoRowSplit = getTwoRowLayout(
+          viewerHand,
+          layoutSignatureRef.current
+        )
+        layoutSignatureRef.current = createSignature(viewerHand, twoRowSplit)
+      } else {
+        // Reset signature for single-row layouts
+        layoutSignatureRef.current = null
+      }
+
       setLayout(newLayout)
     }
 
@@ -439,7 +916,7 @@ export function PlayerHand({
     return () => {
       resizeObserver.disconnect()
     }
-  }, [viewerHand.length, layoutVariant]) // eslint-disable-line react-hooks/exhaustive-deps -- viewportRef is a stable ref object
+  }, [viewerHand, layoutVariant]) // eslint-disable-line react-hooks/exhaustive-deps -- viewportRef is a stable ref object
 
   const handleCardClick = useCallback(
     (card: Card) => {
