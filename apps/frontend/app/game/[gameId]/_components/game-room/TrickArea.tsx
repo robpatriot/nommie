@@ -18,7 +18,6 @@ const BASE_MARGIN = 32
 const OVERLAP_MULTIPLIER = 3
 const GAP_MULTIPLIER = 2
 const PADDING_INCREASE_MULTIPLIER = 0.75
-const EMPTY_STATE_HEIGHT = 100
 const Z_INDEX_BASE = 20
 
 // Orientation offset constants
@@ -154,18 +153,13 @@ function calculateScaledDimensions(
  *
  * Height = card height + label height + gap + top padding + bottom padding
  *
+ * Always returns the height based on card dimensions to prevent layout jumps
+ * when cards are added or removed.
+ *
  * @param scaledDimensions - Scaled dimension values
- * @param hasCards - Whether there are cards to display
- * @returns Calculated height in pixels, or EMPTY_STATE_HEIGHT if no cards
+ * @returns Calculated height in pixels based on card dimensions
  */
-function calculateContainerHeight(
-  scaledDimensions: ScaledDimensions,
-  hasCards: boolean
-): number {
-  if (!hasCards) {
-    return EMPTY_STATE_HEIGHT
-  }
-
+function calculateContainerHeight(scaledDimensions: ScaledDimensions): number {
   return (
     scaledDimensions.cardHeight +
     scaledDimensions.labelHeight +
@@ -265,8 +259,8 @@ export function TrickArea({
     lastTrick
   )
 
-  // Calculate container height
-  const calculatedHeight = calculateContainerHeight(scaledDimensions, hasCards)
+  // Calculate container height - always based on card dimensions to prevent layout jumps
+  const calculatedHeight = calculateContainerHeight(scaledDimensions)
 
   return (
     <div
@@ -275,8 +269,7 @@ export function TrickArea({
         className
       )}
       style={{
-        height: hasCards ? `${calculatedHeight}px` : 'auto',
-        minHeight: hasCards ? `${calculatedHeight}px` : EMPTY_STATE_HEIGHT,
+        height: `${calculatedHeight}px`,
         paddingTop: `${scaledDimensions.topPadding}px`,
         paddingBottom: `${scaledDimensions.bottomPadding}px`,
       }}
