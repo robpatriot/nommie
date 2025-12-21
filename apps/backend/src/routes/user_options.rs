@@ -1,6 +1,7 @@
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use serde_with::rust::double_option;
 
 use crate::db::txn::with_txn;
 use crate::error::AppError;
@@ -37,8 +38,12 @@ pub struct UpdateUserOptionsRequest {
     pub appearance_mode: Option<AppearanceMode>,
     #[serde(default)]
     pub require_card_confirmation: Option<bool>,
-    #[serde(default)]
-    pub locale: Option<UserLocale>,
+    // Option<Option<UserLocale>> allows distinguishing:
+    // - None = field not provided (don't update)
+    // - Some(None) = field provided as null (explicitly unset)
+    // - Some(Some(locale)) = field provided with value
+    #[serde(default, with = "double_option")]
+    pub locale: Option<Option<UserLocale>>,
 }
 
 async fn get_user_options(
@@ -68,18 +73,23 @@ async fn update_user_options(
     let user_id = current_user.id;
     let payload = body.into_inner();
 
-    if let Some(locale) = payload.locale {
+    if let Some(Some(locale)) = payload.locale {
         tracing::info!(
             user_id = user_id,
             locale = locale.as_str(),
             "user_options.locale_updated"
         );
+    } else if payload.locale.is_some() {
+        tracing::info!(user_id = user_id, "user_options.locale_unset");
     }
 
-    if payload.appearance_mode.is_none()
-        && payload.require_card_confirmation.is_none()
-        && payload.locale.is_none()
-    {
+    // Allow request if any field is provided (including locale explicitly set to null)
+    // For locale: None = not provided, Some(None) = explicitly set to null, Some(Some(_)) = set to value
+    let has_any_option = payload.appearance_mode.is_some()
+        || payload.require_card_confirmation.is_some()
+        || payload.locale.is_some(); // is_some() is true for both Some(None) and Some(Some(_))
+
+    if !has_any_option {
         return Err(AppError::Validation {
             code: ErrorCode::ValidationError,
             detail: "At least one option must be provided".to_string(),

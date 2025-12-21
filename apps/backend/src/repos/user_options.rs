@@ -90,7 +90,11 @@ pub struct UserOptions {
 pub struct UpdateUserOptions {
     pub appearance_mode: Option<AppearanceMode>,
     pub require_card_confirmation: Option<bool>,
-    pub locale: Option<UserLocale>,
+    // Option<Option<UserLocale>> allows distinguishing:
+    // - None = field not provided (don't update)
+    // - Some(None) = field provided as null (explicitly unset)
+    // - Some(Some(locale)) = field provided with value
+    pub locale: Option<Option<UserLocale>>,
 }
 
 pub async fn ensure_default_for_user(
@@ -106,12 +110,15 @@ pub async fn update_options(
     user_id: i64,
     options: UpdateUserOptions,
 ) -> Result<UserOptions, DomainError> {
+    // Convert Option<Option<UserLocale>> to Option<Option<&str>> for the adapter
+    let locale_for_adapter = options.locale.map(|opt| opt.map(|l| l.as_str()));
+
     let model = adapter::update_options(
         txn,
         user_id,
         options.appearance_mode.map(|mode| mode.as_str()),
         options.require_card_confirmation,
-        options.locale.map(|locale| locale.as_str()),
+        locale_for_adapter,
     )
     .await?;
     UserOptions::try_from(model)

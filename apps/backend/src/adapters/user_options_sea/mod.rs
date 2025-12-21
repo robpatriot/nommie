@@ -45,7 +45,11 @@ pub async fn update_options(
     user_id: i64,
     appearance_mode: Option<&str>,
     require_card_confirmation: Option<bool>,
-    locale: Option<&str>,
+    // Option<Option<&str>> allows distinguishing:
+    // - None = field not provided (don't update)
+    // - Some(None) = field provided as null (explicitly unset to null)
+    // - Some(Some(str)) = field provided with value
+    locale: Option<Option<&str>>,
 ) -> Result<user_options::Model, sea_orm::DbErr> {
     let existing = ensure_default_for_user(txn, user_id).await?;
 
@@ -60,8 +64,9 @@ pub async fn update_options(
     if let Some(require_confirmation) = require_card_confirmation {
         active.require_card_confirmation = Set(require_confirmation);
     }
-    if let Some(locale_str) = locale {
-        active.locale = Set(Some(locale_str.to_string()));
+    // Handle locale: Some(None) = set to null, Some(Some(str)) = set to value
+    if let Some(locale_opt) = locale {
+        active.locale = Set(locale_opt.map(|s| s.to_string()));
     }
     active.updated_at = Set(OffsetDateTime::now_utc());
     active.update(txn).await
