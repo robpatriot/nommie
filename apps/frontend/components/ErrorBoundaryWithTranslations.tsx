@@ -16,6 +16,7 @@ export default function ErrorBoundaryWithTranslations({
   onError,
 }: ErrorBoundaryWithTranslationsProps) {
   const t = useTranslations('errors.boundary')
+  const tDetails = useTranslations('errors.toast.details')
 
   return (
     <ErrorBoundary
@@ -27,6 +28,14 @@ export default function ErrorBoundaryWithTranslations({
         tryAgain: t('tryAgain'),
         reloadPage: t('reloadPage'),
         devDetails: t('devDetails'),
+        details: {
+          show: tDetails('show'),
+          hide: tDetails('hide'),
+          details: tDetails('details'),
+          statusLabel: tDetails('statusLabel'),
+          codeLabel: tDetails('codeLabel'),
+          traceIdLabel: tDetails('traceIdLabel'),
+        },
       }}
     >
       {children}

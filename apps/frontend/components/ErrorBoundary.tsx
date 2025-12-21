@@ -2,6 +2,7 @@
 
 import { Component, type ReactNode } from 'react'
 import { logError } from '@/lib/logging/error-logger'
+import { BackendApiError } from '@/lib/errors'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -13,12 +14,21 @@ interface ErrorBoundaryProps {
     tryAgain: string
     reloadPage: string
     devDetails: string
+    details?: {
+      show: string
+      hide: string
+      details: string
+      statusLabel: string
+      codeLabel: string
+      traceIdLabel: string
+    }
   }
 }
 
 interface ErrorBoundaryState {
   hasError: boolean
   error: Error | null
+  expanded: boolean
 }
 
 /**
@@ -31,13 +41,15 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     this.state = {
       hasError: false,
       error: null,
+      expanded: false,
     }
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return {
       hasError: true,
       error,
+      expanded: false,
     }
   }
 
@@ -55,7 +67,14 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     this.setState({
       hasError: false,
       error: null,
+      expanded: false,
     })
+  }
+
+  handleToggleExpanded = () => {
+    this.setState((prevState) => ({
+      expanded: !prevState.expanded,
+    }))
   }
 
   render() {
@@ -70,7 +89,19 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         tryAgain: 'Try again',
         reloadPage: 'Reload page',
         devDetails: 'Error details (dev only)',
+        details: {
+          show: 'Show',
+          hide: 'Hide',
+          details: 'details',
+          statusLabel: 'Status',
+          codeLabel: 'Code',
+          traceIdLabel: 'Trace ID',
+        },
       }
+
+      const error = this.state.error
+      const isBackendError = error instanceof BackendApiError
+      const hasTraceId = isBackendError && error.traceId
 
       // Default fallback UI
       return (
@@ -80,8 +111,48 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               {t.title}
             </h2>
             <p className="mb-4 text-sm text-muted-foreground">
-              {this.state.error.message || t.fallbackMessage}
+              {error.message || t.fallbackMessage}
             </p>
+            {isBackendError && (
+              <div className="mb-4">
+                {this.state.expanded && (
+                  <div className="space-y-1 text-xs text-danger/80 text-left">
+                    <p>
+                      <span className="font-semibold">
+                        {t.details?.statusLabel}:
+                      </span>{' '}
+                      {error.status}
+                    </p>
+                    {error.code && (
+                      <p>
+                        <span className="font-semibold">
+                          {t.details?.codeLabel}:
+                        </span>{' '}
+                        {error.code}
+                      </p>
+                    )}
+                    {hasTraceId && (
+                      <p className="font-mono text-xs break-all">
+                        <span className="font-semibold">
+                          {t.details?.traceIdLabel}:
+                        </span>{' '}
+                        {error.traceId}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {hasTraceId && (
+                  <button
+                    onClick={this.handleToggleExpanded}
+                    className="mt-1 text-xs text-danger/90 hover:text-danger underline"
+                  >
+                    {this.state.expanded
+                      ? `${t.details?.hide} ${t.details?.details}`
+                      : `${t.details?.show} ${t.details?.details}`}
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex gap-2 justify-center">
               <button
                 onClick={this.handleReset}
@@ -102,7 +173,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                   {t.devDetails}
                 </summary>
                 <pre className="mt-2 overflow-auto rounded bg-surface p-2 text-xs">
-                  {this.state.error.stack}
+                  {error.stack}
                 </pre>
               </details>
             )}
