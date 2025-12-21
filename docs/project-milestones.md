@@ -165,6 +165,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Details:**
 - Hand display, trick area, bidding UI, trump selector.
 - Frontend shows Problem Details errors clearly.
+**Progress:** Core components implemented and functional. Ongoing UX refinements include phase-specific waiting messages in trick area (shows "Waiting for bidding to complete…" during bidding, "Waiting for trumps to be chosen…" during trump selection, and "Waiting for lead…" during trick play).  
 **Acceptance:** Gameplay readable and intuitive.
 
 ---
@@ -194,7 +195,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟩 **18. Architecture & Reliability**
+### ✅ **18. Architecture & Reliability**
 **Details:**
 - **WebSockets / Server Push & Architecture:** Replace polling with WebSockets (or SSE) and decide on the long‑term realtime architecture and testing strategy.  
   - Add end-to-end WebSocket integration tests for game sessions (connect, initial snapshot, broadcasts, shutdown).  
