@@ -41,5 +41,6 @@
       "lastGame": "▶ Last Game",
       "mostRecentGame": "▶ Most Recent Game"
     }
-  }
+  },
+  "gameName": "Game {gameId}"
 }

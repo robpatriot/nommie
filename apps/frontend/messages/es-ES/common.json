@@ -41,5 +41,6 @@
       "lastGame": "▶ Última partida",
       "mostRecentGame": "▶ Partida más reciente"
     }
-  }
+  },
+  "gameName": "Partida {gameId}"
 }

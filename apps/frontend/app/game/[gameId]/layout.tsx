@@ -17,7 +17,7 @@ export default async function GameLayout({
     acceptLanguageHeader: headerStore.get('accept-language'),
   })
 
-  const messages = await loadMessages(locale, ['game', 'errors'])
+  const messages = await loadMessages(locale, ['game', 'errors', 'toasts'])
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
