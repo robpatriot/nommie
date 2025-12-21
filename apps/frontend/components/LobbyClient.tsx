@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import GameList from './GameList'
 import CreateGameModal from './CreateGameModal'
 import Toast from './Toast'
@@ -46,6 +47,7 @@ export default function LobbyClient({
   inProgressGames: initialInProgress,
   creatorName,
 }: LobbyClientProps) {
+  const t = useTranslations('lobby')
   const router = useRouter()
   const { toasts, showToast, hideToast } = useToast()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -106,22 +108,22 @@ export default function LobbyClient({
       await refetchGames()
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Failed to refresh games list'
+        error instanceof Error ? error.message : t('toasts.refreshFailed')
       showToast(message, 'error')
     }
   }
 
   const handleCreateGame = async (name: string) => {
     // Use default name if provided name is empty
-    const defaultName = `${creatorName}'s game`
+    const defaultName = t('createGame.defaultName', { name: creatorName })
     const gameName = name.trim() || defaultName
 
     try {
       const game = await createGameMutation.mutateAsync({ name: gameName })
-      showToast('Game created successfully!', 'success')
+      showToast(t('toasts.createdSuccess'), 'success')
       router.push(`/game/${game.id}`)
     } catch (error) {
-      const backendError = toQueryError(error, 'Failed to create game')
+      const backendError = toQueryError(error, t('toasts.createFailed'))
       showToast(backendError.message, 'error', backendError)
       logBackendError('Create game failed', backendError, {
         action: 'createGame',
@@ -133,10 +135,10 @@ export default function LobbyClient({
   const handleJoin = async (gameId: number) => {
     try {
       await joinGameMutation.mutateAsync(gameId)
-      showToast('Joined game successfully!', 'success')
+      showToast(t('toasts.joinedSuccess'), 'success')
       router.push(`/game/${gameId}`)
     } catch (error) {
-      const backendError = toQueryError(error, 'Failed to join game')
+      const backendError = toQueryError(error, t('toasts.joinFailed'))
 
       // Customize error message for validation errors
       let message = backendError.message
@@ -144,7 +146,7 @@ export default function LobbyClient({
         backendError.status === 400 &&
         backendError.code === 'VALIDATION_ERROR'
       ) {
-        message = 'That game just filled up. Please choose another one.'
+        message = t('toasts.gameFilledUp')
         router.refresh()
       }
 
@@ -161,30 +163,24 @@ export default function LobbyClient({
   }
 
   const handleDelete = async (gameId: number) => {
-    if (
-      !confirm(
-        'Are you sure you want to delete this game? This action cannot be undone.'
-      )
-    ) {
+    if (!confirm(t('confirmations.deleteGame'))) {
       return
     }
 
     try {
       // deleteGameAction will fetch the lock_version automatically if not provided
       await deleteGameMutation.mutateAsync({ gameId })
-      showToast('Game deleted successfully', 'success')
+      showToast(t('toasts.deletedSuccess'), 'success')
       router.refresh()
     } catch (error) {
-      const backendError = toQueryError(error, 'Failed to delete game')
+      const backendError = toQueryError(error, t('toasts.deleteFailed'))
 
       // Customize error messages for specific status codes
       let message = backendError.message
       if (backendError.status === 428) {
-        message =
-          'Cannot delete game: missing version information. Please try again.'
+        message = t('toasts.deleteMissingVersion')
       } else if (backendError.status === 409) {
-        message =
-          'Cannot delete game: game was modified. Please refresh and try again.'
+        message = t('toasts.deleteConflict')
       }
 
       showToast(message, 'error', backendError)
@@ -207,15 +203,14 @@ export default function LobbyClient({
           intro={
             <div className="space-y-4">
               <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-                Game Lobby
+                {t('hero.kicker')}
               </p>
               <div>
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                  Seat your table and deal the next hand.
+                  {t('hero.title')}
                 </h1>
                 <p className="mt-2 text-sm text-muted sm:text-base">
-                  Select a table, claim a seat, and begin the bidding once
-                  everyone is ready.
+                  {t('hero.description')}
                 </p>
               </div>
             </div>
@@ -223,19 +218,19 @@ export default function LobbyClient({
           aside={
             <div className="grid gap-3 sm:grid-cols-3">
               <StatCard
-                label="Joinable tables"
+                label={t('stats.joinableTables.label')}
                 value={filteredJoinableGames.length}
-                description="Open public tables"
+                description={t('stats.joinableTables.description')}
               />
               <StatCard
-                label="Seats available"
+                label={t('stats.seatsAvailable.label')}
                 value={openSeatCount}
-                description="Across joinable tables"
+                description={t('stats.seatsAvailable.description')}
               />
               <StatCard
-                label="In progress"
+                label={t('stats.inProgress.label')}
                 value={sortedInProgressGames.length}
-                description="Active or full tables"
+                description={t('stats.inProgress.description')}
               />
             </div>
           }
@@ -244,12 +239,12 @@ export default function LobbyClient({
               <button
                 onClick={() => setIsCreateModalOpen(true)}
                 className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90"
-                aria-label="Create a new game"
+                aria-label={t('actions.create.ariaLabel')}
               >
                 <span role="img" aria-hidden>
                   ➕
                 </span>
-                <span className="ml-2">Create game</span>
+                <span className="ml-2">{t('actions.create.label')}</span>
               </button>
               <button
                 onClick={handleRefresh}
@@ -257,7 +252,9 @@ export default function LobbyClient({
                 className="inline-flex w-full items-center justify-center rounded-2xl border border-border/60 bg-surface px-5 py-3 font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 aria-live="polite"
               >
-                {isRefreshing ? 'Refreshing…' : 'Refresh list'}
+                {isRefreshing
+                  ? t('actions.refresh.refreshing')
+                  : t('actions.refresh.label')}
               </button>
             </div>
           }
@@ -266,9 +263,9 @@ export default function LobbyClient({
         <div className="grid gap-6 lg:grid-cols-2">
           <GameList
             games={filteredJoinableGames}
-            title="Joinable games"
-            emptyMessage="No games available to join. Create one to get started!"
-            actionsLabel="Actions"
+            title={t('lists.joinable.title')}
+            emptyMessage={t('lists.joinable.empty')}
+            actionsLabel={t('lists.actionsLabel')}
             renderActions={(game) => {
               const actions = []
 
@@ -279,7 +276,7 @@ export default function LobbyClient({
                     onClick={() => handleDelete(game.id)}
                     className="rounded-full border border-danger/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-danger transition hover:bg-danger hover:text-danger-foreground"
                   >
-                    Delete
+                    {t('actions.delete')}
                   </button>
                 )
               }
@@ -291,7 +288,7 @@ export default function LobbyClient({
                     onClick={() => handleRejoin(game.id)}
                     className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
                   >
-                    Go to game
+                    {t('actions.goToGame')}
                   </button>
                 )
               } else if (
@@ -304,7 +301,7 @@ export default function LobbyClient({
                     onClick={() => handleJoin(game.id)}
                     className="rounded-full bg-accent/90 px-4 py-2 text-sm font-semibold text-accent-foreground shadow shadow-accent/30 transition hover:bg-accent"
                   >
-                    Join
+                    {t('actions.join')}
                   </button>
                 )
               } else if (game.player_count >= game.max_players) {
@@ -313,7 +310,7 @@ export default function LobbyClient({
                     key="full"
                     className="rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-subtle"
                   >
-                    Full table
+                    {t('labels.fullTable')}
                   </span>
                 )
               }
@@ -326,9 +323,9 @@ export default function LobbyClient({
 
           <GameList
             games={sortedInProgressGames}
-            title="In progress"
-            emptyMessage="No games currently in progress."
-            actionsLabel="Actions"
+            title={t('lists.inProgress.title')}
+            emptyMessage={t('lists.inProgress.empty')}
+            actionsLabel={t('lists.actionsLabel')}
             renderActions={(game) => {
               const actions = []
 
@@ -339,7 +336,7 @@ export default function LobbyClient({
                     onClick={() => handleDelete(game.id)}
                     className="rounded-full border border-danger/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-danger transition hover:bg-danger hover:text-danger-foreground"
                   >
-                    Delete
+                    {t('actions.delete')}
                   </button>
                 )
               }
@@ -351,7 +348,7 @@ export default function LobbyClient({
                     onClick={() => handleRejoin(game.id)}
                     className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
                   >
-                    Rejoin
+                    {t('actions.rejoin')}
                   </button>
                 )
               }

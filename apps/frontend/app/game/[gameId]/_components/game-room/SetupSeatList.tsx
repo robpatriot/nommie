@@ -1,3 +1,5 @@
+import { useTranslations } from 'next-intl'
+
 type SetupSeat = {
   seat: number
   seatNumber: number
@@ -13,30 +15,30 @@ interface SetupSeatListProps {
 }
 
 export function SetupSeatList({ seats }: SetupSeatListProps) {
+  const t = useTranslations('game.gameRoom')
   return (
     <div className="rounded-3xl border border-white/10 bg-surface/80 p-5 shadow-[0_35px_100px_rgba(0,0,0,0.35)] backdrop-blur">
       <header className="mb-4 flex flex-col gap-1">
         <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-          Seating
+          {t('setupSeats.kicker')}
         </p>
         <h2 className="text-2xl font-semibold text-foreground">
-          Who is sitting where
+          {t('setupSeats.title')}
         </h2>
-        <p className="text-sm text-muted">
-          Each seat shows whether it is filled by a human player, an AI seat, or
-          still open.
-        </p>
+        <p className="text-sm text-muted">{t('setupSeats.description')}</p>
       </header>
 
       <ul className="space-y-3">
         {seats.map((seat) => {
           const displayName =
-            seat.isOccupied || seat.isAi ? seat.name : 'Waiting for player'
+            seat.isOccupied || seat.isAi
+              ? seat.name
+              : t('setupSeats.waitingForPlayer')
           const statusLabel = seat.isAi
-            ? 'AI player'
+            ? t('setupSeats.status.ai')
             : seat.isOccupied
-              ? 'Human player'
-              : 'Open seat'
+              ? t('setupSeats.status.human')
+              : t('setupSeats.status.open')
 
           return (
             <li
@@ -50,7 +52,7 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-                    Seat {seat.seatNumber}
+                    {t('setupSeats.seatLabel', { seatNumber: seat.seatNumber })}
                   </p>
                   <p className="text-base font-semibold text-foreground">
                     {displayName}
@@ -63,7 +65,9 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
                       : 'bg-border/20 text-subtle'
                   }`}
                 >
-                  {seat.isReady ? 'Ready' : 'Not ready'}
+                  {seat.isReady
+                    ? t('setupSeats.ready.ready')
+                    : t('setupSeats.ready.notReady')}
                 </span>
               </div>
 
@@ -73,7 +77,7 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
                 </span>
                 {seat.isViewer ? (
                   <span className="rounded-full border border-primary/50 px-3 py-1 text-xs text-primary">
-                    Your seat
+                    {t('setupSeats.yourSeat')}
                   </span>
                 ) : null}
               </div>

@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+import { getTranslations } from 'next-intl/server'
 import LobbyClient from '@/components/LobbyClient'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { getAvailableGames } from '@/lib/api'
@@ -7,6 +8,7 @@ import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { handleAllowlistError } from '@/lib/auth/allowlist'
 
 export default async function LobbyPage() {
+  const t = await getTranslations('lobby')
   const session = await auth()
 
   // Protect route: redirect to home if not authenticated
@@ -45,11 +47,11 @@ export default async function LobbyPage() {
   }
   const inProgressGames = Array.from(inProgressGamesMap.values())
 
-  const creatorName = session.user?.name || 'You'
+  const creatorName = session.user?.name || t('you')
 
   return (
     <ErrorBoundary>
-      <BreadcrumbSetter crumbs={[{ label: 'Lobby' }]} />
+      <BreadcrumbSetter crumbs={[{ label: t('breadcrumbs.lobby') }]} />
       <LobbyClient
         joinableGames={joinableGames}
         inProgressGames={inProgressGames}

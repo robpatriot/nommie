@@ -1,5 +1,6 @@
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
+import { getTranslations } from 'next-intl/server'
 import { PageContainer } from '@/components/PageContainer'
 import { SurfaceCard } from '@/components/SurfaceCard'
 import { StatCard } from '@/components/StatCard'
@@ -10,6 +11,7 @@ export default async function Home({
 }: {
   searchParams?: Promise<{ accessDenied?: string }>
 }) {
+  const t = await getTranslations('common')
   const session = await auth()
   const params = (await searchParams) ?? {}
   const showAccessDenied = params.accessDenied === 'true'
@@ -32,11 +34,11 @@ export default async function Home({
           tone="strong"
           className="mb-6 max-w-4xl mx-auto"
         >
-          <h2 className="text-xl font-semibold mb-2">Access restricted</h2>
+          <h2 className="text-xl font-semibold mb-2">
+            {t('home.accessDenied.title')}
+          </h2>
           <p className="text-sm text-muted">
-            Your account is not currently allowed to access Nommie. If you
-            believe this is a mistake, please contact the person who invited you
-            or the site administrator.
+            {t('home.accessDenied.description')}
           </p>
         </SurfaceCard>
       )}
@@ -49,15 +51,13 @@ export default async function Home({
           className="shadow-[0_40px_120px_rgba(0,0,0,0.25)]"
         >
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-subtle">
-            Steady Nomination Whist evenings
+            {t('home.hero.kicker')}
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-            {appName} seats your table and keeps the count so you can simply
-            play.
+            {t('home.hero.title', { appName })}
           </h1>
           <p className="mt-4 text-lg text-muted sm:text-xl">
-            Deal the cards, declare your bid, and let the table cue each action
-            wherever your friends are seated.
+            {t('home.hero.description')}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <form action={signInWithGoogleAction} className="sm:flex-1">
@@ -68,31 +68,31 @@ export default async function Home({
                 <span role="img" aria-hidden>
                   🚪
                 </span>
-                Enter the lobby
+                {t('home.hero.primaryCta')}
               </button>
             </form>
             <div className="flex items-center justify-center rounded-2xl border border-border/60 bg-surface px-4 py-3 text-sm font-semibold text-muted shadow-inner shadow-black/10 sm:w-60">
-              Take your seat from any device
+              {t('home.hero.secondaryCta')}
             </div>
           </div>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
             <StatCard
               align="start"
-              label="Read the table"
-              value="Follow each seat and trick at a glance, no fuss."
+              label={t('home.stats.readTheTable.label')}
+              value={t('home.stats.readTheTable.value')}
               valueClassName="text-sm font-semibold text-foreground"
             />
             <StatCard
               align="start"
-              label="Prompted turns"
-              value="Play each card with clear prompts so the table keeps a reliable pace."
+              label={t('home.stats.promptedTurns.label')}
+              value={t('home.stats.promptedTurns.value')}
               valueClassName="text-sm font-semibold text-foreground"
             />
             <StatCard
               align="start"
-              label="Resume swiftly"
-              value="Jump back into your previous game and resume the count straightaway."
+              label={t('home.stats.resumeSwiftly.label')}
+              value={t('home.stats.resumeSwiftly.value')}
               valueClassName="text-sm font-semibold text-foreground"
             />
           </div>
@@ -105,7 +105,7 @@ export default async function Home({
           className="relative hidden border-white/20 bg-gradient-to-br from-surface/70 to-surface-strong/40 shadow-[0_30px_90px_rgba(0,0,0,0.35)] lg:flex lg:flex-col"
         >
           <div className="text-sm font-semibold uppercase tracking-[0.4em] text-muted">
-            At the table
+            {t('home.aside.kicker')}
           </div>
           <div className="mt-6 flex flex-1 items-center justify-center">
             <div className="relative aspect-[4/5] w-full max-w-xs rounded-[32px] border border-border/80 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.85)] to-[rgba(var(--felt-base),0.95)] p-6 shadow-2xl">
@@ -113,36 +113,40 @@ export default async function Home({
               <div className="relative flex h-full flex-col items-center justify-between text-center text-card-cream">
                 <div className="w-full">
                   <p className="text-xs uppercase tracking-[0.4em] text-card-cream opacity-70">
-                    your seat
+                    {t('home.aside.yourSeat')}
                   </p>
                   <p className="mt-2 text-2xl font-semibold">
-                    Dealer standing by
+                    {t('home.aside.dealerStandingBy')}
                   </p>
                 </div>
                 <div className="grid w-full grid-cols-2 gap-3 text-left text-sm">
                   <div className="rounded-2xl bg-white/10 p-3 backdrop-blur">
                     <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
-                      Live turn
+                      {t('home.aside.liveTurn')}
                     </p>
-                    <p className="text-lg font-semibold">Your turn</p>
+                    <p className="text-lg font-semibold">
+                      {t('home.aside.yourTurn')}
+                    </p>
                   </div>
                   <div className="rounded-2xl bg-white/10 p-3 backdrop-blur">
                     <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
-                      Tricks played
+                      {t('home.aside.tricksPlayed')}
                     </p>
-                    <p className="text-lg font-semibold">3 of 7</p>
+                    <p className="text-lg font-semibold">
+                      {t('home.aside.tricksValue')}
+                    </p>
                   </div>
                   <div className="col-span-2 rounded-2xl bg-white/10 p-3 backdrop-blur">
                     <p className="text-xs uppercase tracking-widest text-card-cream opacity-60">
-                      Device swap
+                      {t('home.aside.deviceSwap')}
                     </p>
                     <p className="text-lg font-semibold">
-                      Swap devices mid-round and stay with the play.
+                      {t('home.aside.deviceSwapValue')}
                     </p>
                   </div>
                 </div>
                 <div className="text-xs uppercase tracking-[0.5em] text-card-cream opacity-60">
-                  play on
+                  {t('home.aside.footer')}
                 </div>
               </div>
             </div>

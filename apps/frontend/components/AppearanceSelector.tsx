@@ -1,36 +1,30 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { updateAppearanceAction } from '@/app/actions/settings-actions'
 import { useTheme, type ThemeMode } from './theme-provider'
 
 const OPTIONS: Array<{
   value: ThemeMode
-  label: string
-  description: string
   emoji: string
 }> = [
   {
     value: 'system',
-    label: 'Match system',
-    description: 'Automatically align with your device setting.',
     emoji: '🖥️',
   },
   {
     value: 'light',
-    label: 'Light',
-    description: 'Bright background with dark text.',
     emoji: '🌞',
   },
   {
     value: 'dark',
-    label: 'Dark',
-    description: 'Dim background that is easier on eyes at night.',
     emoji: '🌙',
   },
 ]
 
 export function AppearanceSelector() {
+  const t = useTranslations('settings')
   const { theme, setTheme, hydrated } = useTheme()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -66,7 +60,7 @@ export function AppearanceSelector() {
     <div
       className="flex flex-col gap-4"
       role="radiogroup"
-      aria-label="Appearance"
+      aria-label={t('appearance.ariaLabel')}
       aria-busy={isPending}
     >
       <div className="flex flex-col gap-3">
@@ -90,10 +84,10 @@ export function AppearanceSelector() {
               </span>
               <span className="flex flex-1 flex-col">
                 <span className="text-sm font-semibold text-foreground">
-                  {option.label}
+                  {t(`appearance.options.${option.value}.label`)}
                 </span>
                 <span className="text-xs text-subtle">
-                  {option.description}
+                  {t(`appearance.options.${option.value}.description`)}
                 </span>
               </span>
               {isActive ? (
@@ -117,11 +111,13 @@ export function AppearanceSelector() {
       </div>
       <div className="min-h-[1.5rem] text-sm">
         {isPending ? (
-          <span className="text-muted">Saving appearance…</span>
+          <span className="text-muted">{t('appearance.status.saving')}</span>
         ) : errorMessage ? (
-          <span className="text-danger">Could not save: {errorMessage}</span>
+          <span className="text-danger">
+            {t('appearance.status.couldNotSave', { error: errorMessage })}
+          </span>
         ) : (
-          <span className="text-subtle">Changes are saved automatically.</span>
+          <span className="text-subtle">{t('appearance.status.saved')}</span>
         )}
       </div>
     </div>

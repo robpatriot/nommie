@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 function getInitials(email?: string | null) {
   if (!email) {
     return '👤'
@@ -37,6 +38,7 @@ type HeaderProps = {
 }
 
 export default function Header({ session, lastActiveGameId }: HeaderProps) {
+  const t = useTranslations('nav')
   const { crumbs } = useHeaderBreadcrumbs()
   const hasBreadcrumbs = session?.user && crumbs.length > 0
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
@@ -68,7 +70,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
           <Link
             href="/"
             className="inline-flex items-center gap-3 rounded-full bg-surface px-3 py-2 text-lg font-semibold text-foreground shadow-inner shadow-black/10 transition hover:bg-surface-strong/80"
-            aria-label="Nommie home"
+            aria-label={t('brand.homeAria')}
           >
             <span className="text-2xl" role="img" aria-hidden>
               🃏
@@ -78,7 +80,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
           {hasBreadcrumbs ? (
             <nav
               className="hidden items-center gap-2 text-sm text-muted sm:flex"
-              aria-label="Breadcrumb"
+              aria-label={t('breadcrumbs.ariaLabel')}
             >
               {crumbs.map((crumb, index) => {
                 const isLast = index === crumbs.length - 1
@@ -108,14 +110,8 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
                 )
               })}
             </nav>
-          ) : session?.user ? (
-            <span className="text-sm text-muted">
-              A calm table for playing Nomination Whist
-            </span>
           ) : (
-            <span className="text-sm text-muted">
-              A calm table for playing Nomination Whist
-            </span>
+            <span className="text-sm text-muted">{t('tagline')}</span>
           )}
         </div>
 
@@ -133,14 +129,14 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
                   className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-surface text-sm font-semibold uppercase tracking-wide text-muted transition hover:border-primary/50 hover:text-foreground"
                   aria-haspopup="true"
                   aria-expanded={isUserMenuOpen}
-                  aria-label="Account menu"
+                  aria-label={t('account.menuAria')}
                 >
                   {getInitials(session.user.email)}
                 </button>
                 {isUserMenuOpen ? (
                   <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border/60 bg-surface p-3 text-sm shadow-lg shadow-black/20">
                     <p className="mb-2 truncate text-xs uppercase tracking-wide text-subtle">
-                      Signed in as
+                      {t('account.signedInAs')}
                     </p>
                     <p className="mb-3 truncate text-foreground">
                       {session.user.email}
@@ -150,7 +146,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
                       className="mb-2 flex w-full items-center justify-between rounded-2xl border border-border/70 bg-surface px-4 py-2 font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
                       onClick={() => setIsUserMenuOpen(false)}
                     >
-                      Settings
+                      {t('account.settings')}
                       <span aria-hidden>⚙️</span>
                     </Link>
                     <form action={signOutAction}>
@@ -158,7 +154,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
                         type="submit"
                         className="w-full rounded-2xl border border-border/70 bg-surface px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
                       >
-                        Sign out
+                        {t('account.signOut')}
                       </button>
                     </form>
                   </div>
@@ -174,7 +170,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
                 <span role="img" aria-hidden>
                   ✨
                 </span>
-                Sign in with Google
+                {t('auth.signInWithGoogle')}
               </button>
             </form>
           )}

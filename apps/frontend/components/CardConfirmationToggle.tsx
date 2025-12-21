@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useTranslations } from 'next-intl'
 import { updateUserOptionsAction } from '@/app/actions/settings-actions'
 
 interface CardConfirmationToggleProps {
@@ -10,6 +11,7 @@ interface CardConfirmationToggleProps {
 export function CardConfirmationToggle({
   initialEnabled,
 }: CardConfirmationToggleProps) {
+  const t = useTranslations('settings')
   const [enabled, setEnabled] = useState(initialEnabled)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
@@ -49,12 +51,18 @@ export function CardConfirmationToggle({
       >
         <div className="flex flex-col text-left">
           <span className="text-sm font-semibold text-foreground">
-            {enabled ? 'Confirmation required' : 'Auto-play cards'}
+            {t(
+              enabled
+                ? 'cardConfirmation.toggle.enabled.title'
+                : 'cardConfirmation.toggle.disabled.title'
+            )}
           </span>
           <span className="text-xs text-subtle">
-            {enabled
-              ? 'Play button is shown. Pick a card, then confirm.'
-              : 'Skips the confirmation button. Clicking a legal card plays it immediately.'}
+            {t(
+              enabled
+                ? 'cardConfirmation.toggle.enabled.description'
+                : 'cardConfirmation.toggle.disabled.description'
+            )}
           </span>
         </div>
         <span
@@ -73,11 +81,17 @@ export function CardConfirmationToggle({
       </button>
       <div className="min-h-[1.5rem] text-sm">
         {isPending ? (
-          <span className="text-muted">Saving gameplay preference…</span>
+          <span className="text-muted">
+            {t('cardConfirmation.status.saving')}
+          </span>
         ) : errorMessage ? (
-          <span className="text-danger">Could not save: {errorMessage}</span>
+          <span className="text-danger">
+            {t('cardConfirmation.status.couldNotSave', { error: errorMessage })}
+          </span>
         ) : (
-          <span className="text-subtle">Changes are saved automatically.</span>
+          <span className="text-subtle">
+            {t('cardConfirmation.status.saved')}
+          </span>
         )}
       </div>
     </div>

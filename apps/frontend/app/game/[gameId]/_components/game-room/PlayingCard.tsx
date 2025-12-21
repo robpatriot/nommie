@@ -1,11 +1,12 @@
+import { useTranslations } from 'next-intl'
 import type { Card } from '@/lib/game-room/types'
 import { cn } from '@/lib/cn'
 
 const suitMap = {
-  S: { symbol: '♠', color: 'text-slate-900', label: 'Spades' },
-  H: { symbol: '♥', color: 'text-rose-600', label: 'Hearts' },
-  D: { symbol: '♦', color: 'text-rose-600', label: 'Diamonds' },
-  C: { symbol: '♣', color: 'text-slate-900', label: 'Clubs' },
+  S: { symbol: '♠', color: 'text-slate-900' },
+  H: { symbol: '♥', color: 'text-rose-600' },
+  D: { symbol: '♦', color: 'text-rose-600' },
+  C: { symbol: '♣', color: 'text-slate-900' },
 } as const
 
 export const CARD_DIMENSIONS = {
@@ -53,10 +54,22 @@ export function PlayingCard({
   isDimmed,
   isSelected,
 }: PlayingCardProps) {
+  const t = useTranslations('game.gameRoom')
   const suitKey = card.slice(-1) as keyof typeof suitMap
   const suit = suitMap[suitKey] ?? suitMap.S
   const rankLabel = getRankLabel(card)
   const styles = sizeStyles[size]
+
+  // Map suit keys to translation keys
+  const suitLabelKey =
+    suitKey === 'S'
+      ? 'SPADES'
+      : suitKey === 'H'
+        ? 'HEARTS'
+        : suitKey === 'D'
+          ? 'DIAMONDS'
+          : 'CLUBS'
+  const suitLabel = t(`trump.${suitLabelKey}`)
 
   return (
     <div
@@ -73,7 +86,7 @@ export function PlayingCard({
         isSelected ? 'scale-[1.02]' : '',
         className
       )}
-      aria-label={`${rankLabel} of ${suit.label}`}
+      aria-label={`${rankLabel} of ${suitLabel}`}
     >
       <span
         className={cn(

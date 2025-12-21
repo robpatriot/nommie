@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useTranslations } from 'next-intl'
 import type { Card, GameSnapshot, Seat } from '@/lib/game-room/types'
 import { getPlayerDisplayName } from '@/utils/player-names'
 import {
@@ -70,6 +71,7 @@ export interface GameRoomViewProps {
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
+  const t = useTranslations('game.gameRoom')
   const {
     snapshot,
     playerNames,
@@ -328,15 +330,13 @@ export function GameRoomView(props: GameRoomViewProps) {
               <div className="flex flex-col gap-4">
                 <div className="space-y-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
-                    Setup · Game {gameId}
+                    {t('setup.kicker', { gameId })}
                   </p>
                   <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
-                    Add players
+                    {t('setup.title')}
                   </h2>
                   <p className="text-sm text-muted sm:text-base">
-                    Confirm who is seated, drop in AI partners where needed, and
-                    ready up once your table is set. The match begins when every
-                    seat is marked ready.
+                    {t('setup.description')}
                   </p>
                 </div>
                 <ReadyPanel readyState={readyState} />
@@ -346,26 +346,26 @@ export function GameRoomView(props: GameRoomViewProps) {
               <>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <StatCard
-                    label="Total players"
+                    label={t('setup.stats.totalPlayers.label')}
                     value={`${filledSeatCount}/${totalSeatCount}`}
-                    description="Human or AI seats assigned"
+                    description={t('setup.stats.totalPlayers.description')}
                   />
                   <StatCard
-                    label="AI players"
+                    label={t('setup.stats.aiPlayers.label')}
                     value={aiSeatCount}
-                    description="Bots currently seated"
+                    description={t('setup.stats.aiPlayers.description')}
                   />
                   <StatCard
-                    label="Ready players"
+                    label={t('setup.stats.readyPlayers.label')}
                     value={`${readySeatCount}/${totalSeatCount}`}
-                    description="Marked ready so far"
+                    description={t('setup.stats.readyPlayers.description')}
                   />
                 </div>
                 <div className="rounded-3xl border border-white/10 bg-surface/70 p-4 shadow-[0_30px_90px_rgba(0,0,0,0.35)]">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
-                    <span>Quick actions</span>
+                    <span>{t('setup.quickActions.title')}</span>
                     <span className="text-[10px] font-normal tracking-[0.2em] text-muted">
-                      Stay synced & invite friends
+                      {t('setup.quickActions.subtitle')}
                     </span>
                   </div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -377,18 +377,18 @@ export function GameRoomView(props: GameRoomViewProps) {
                         disabled={isRefreshing}
                         aria-label={
                           isRefreshing
-                            ? 'Refreshing game state'
-                            : 'Refresh game state'
+                            ? t('actions.refreshingAria')
+                            : t('actions.refreshAria')
                         }
                       >
                         <div className="space-y-1">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
-                            Manual sync
+                            {t('setup.quickActions.manualSync')}
                           </p>
                           <p className="text-base font-semibold text-foreground">
                             {isRefreshing
-                              ? 'Refreshing…'
-                              : 'Refresh game state'}
+                              ? t('actions.refreshingLabel')
+                              : t('actions.refreshLabel')}
                           </p>
                         </div>
                         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
@@ -417,14 +417,14 @@ export function GameRoomView(props: GameRoomViewProps) {
                         void navigator.clipboard.writeText(url)
                       }}
                       className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                      aria-label="Copy invite link to clipboard"
+                      aria-label={t('setup.quickActions.copyInviteAria')}
                     >
                       <div className="space-y-1">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
-                          Share link
+                          {t('setup.quickActions.shareLink')}
                         </p>
                         <p className="text-base font-semibold text-foreground">
-                          Copy invite
+                          {t('setup.quickActions.copyInvite')}
                         </p>
                       </div>
                       <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, FormEvent } from 'react'
+import { useTranslations } from 'next-intl'
 
 interface CreateGameModalProps {
   isOpen: boolean
@@ -15,9 +16,10 @@ export default function CreateGameModal({
   onCreateGame,
   creatorName,
 }: CreateGameModalProps) {
+  const t = useTranslations('lobby')
   const [name, setName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const defaultName = `${creatorName}'s game`
+  const defaultName = t('createGame.defaultName', { name: creatorName })
 
   const handleCancel = useCallback(() => {
     setName('')
@@ -70,24 +72,23 @@ export default function CreateGameModal({
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
-              New Table
+              {t('createModal.kicker')}
             </p>
             <h2
               id="create-game-title"
               className="mt-2 text-2xl font-semibold text-foreground"
             >
-              Name your game
+              {t('createModal.title')}
             </h2>
             <p className="text-sm text-muted">
-              Keep it casual. We will fall back to &quot;{defaultName}&quot; if
-              you leave it blank.
+              {t('createModal.description', { defaultName })}
             </p>
           </div>
           <button
             type="button"
             onClick={handleCancel}
             className="rounded-full border border-border/60 bg-surface px-3 py-1 text-sm font-medium text-subtle transition hover:text-foreground"
-            aria-label="Close create game modal"
+            aria-label={t('createModal.closeAria')}
           >
             ✕
           </button>
@@ -95,7 +96,8 @@ export default function CreateGameModal({
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-            Game name <span className="text-muted">(optional)</span>
+            {t('createModal.gameNameLabel')}{' '}
+            <span className="text-muted">({t('createModal.optional')})</span>
             <input
               type="text"
               id="game-name"
@@ -108,10 +110,7 @@ export default function CreateGameModal({
             />
           </label>
 
-          <p className="text-xs text-subtle">
-            Name the table so your group knows where to sit; everything else
-            stays steady.
-          </p>
+          <p className="text-xs text-subtle">{t('createModal.helper')}</p>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <button
@@ -120,14 +119,16 @@ export default function CreateGameModal({
               disabled={isSubmitting}
               className="rounded-2xl border border-border/70 bg-surface px-4 py-3 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Cancel
+              {t('createModal.cancel')}
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
               className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSubmitting ? 'Creating…' : 'Create game'}
+              {isSubmitting
+                ? t('createModal.creating')
+                : t('createModal.create')}
             </button>
           </div>
         </form>

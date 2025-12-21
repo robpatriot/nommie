@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import type { GameRoomViewProps } from '../game-room-view'
 
 interface ReadyPanelProps {
@@ -9,6 +10,7 @@ export function ReadyPanel({
   readyState,
   variant = 'default',
 }: ReadyPanelProps) {
+  const t = useTranslations('game.gameRoom')
   const isCompact = variant === 'compact'
 
   if (!readyState) {
@@ -18,7 +20,7 @@ export function ReadyPanel({
           isCompact ? 'p-3 text-[11px]' : 'p-4 text-xs'
         } text-subtle`}
       >
-        Ready controls will appear once interactions are available.
+        {t('ready.none')}
       </div>
     )
   }
@@ -35,9 +37,9 @@ export function ReadyPanel({
             isCompact ? 'text-xs' : 'text-sm'
           }`}
         >
-          Game in play
+          {t('ready.inPlayTitle')}
         </h3>
-        <p>Actions surface here when the table needs you.</p>
+        <p>{t('ready.inPlayDescription')}</p>
       </div>
     )
   }
@@ -56,14 +58,14 @@ export function ReadyPanel({
             isCompact ? 'text-[11px]' : 'mb-2 text-sm'
           }`}
         >
-          Ready up
+          {t('ready.title')}
         </h3>
         <p
           className={`text-success-contrast/80 ${
             isCompact ? 'text-[11px]' : 'mb-3 text-xs'
           }`}
         >
-          Mark yourself ready. The game begins when every seat is ready.
+          {t('ready.description')}
         </p>
       </div>
       <button
@@ -77,17 +79,17 @@ export function ReadyPanel({
         disabled={readyState.isPending || readyState.hasMarked}
         aria-label={
           readyState.isPending
-            ? 'Marking as ready'
+            ? t('ready.button.aria.marking')
             : readyState.hasMarked
-              ? 'Ready, waiting for other players'
-              : 'Mark yourself as ready'
+              ? t('ready.button.aria.readyWaiting')
+              : t('ready.button.aria.markReady')
         }
       >
         {readyState.isPending
-          ? 'Marking…'
+          ? t('ready.button.marking')
           : readyState.hasMarked
-            ? 'Ready — waiting for others'
-            : "I'm ready"}
+            ? t('ready.button.readyWaiting')
+            : t('ready.button.label')}
       </button>
     </div>
   )

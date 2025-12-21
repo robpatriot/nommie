@@ -3,13 +3,14 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Suspense } from 'react'
 import Script from 'next/script'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import './globals.css'
 import Header from '@/components/Header'
 import { HeaderBreadcrumbProvider } from '@/components/header-breadcrumbs'
 import { getLastActiveGame } from '@/lib/api'
 import { auth } from '@/auth'
 import type { Session } from 'next-auth'
+import { NextIntlClientProvider } from 'next-intl'
 
 import {
   ThemeProvider,
@@ -18,6 +19,8 @@ import {
 } from '@/components/theme-provider'
 import PerformanceMonitorWrapper from '@/components/PerformanceMonitorWrapper'
 import { AppQueryClientProvider } from '@/lib/providers/query-client-provider'
+import { LOCALE_COOKIE_NAME, resolveLocale } from '@/i18n/locale'
+import { loadMessages } from '@/i18n/messages'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -65,6 +68,13 @@ export default async function RootLayout({
   }
 
   const cookieStore = await cookies()
+  const headerStore = await headers()
+
+  const { locale } = resolveLocale({
+    cookieLocale: cookieStore.get(LOCALE_COOKIE_NAME)?.value ?? null,
+    acceptLanguageHeader: headerStore.get('accept-language'),
+  })
+
   const themeCookie = cookieStore.get('nommie_theme')?.value ?? null
 
   let initialTheme: ThemeMode = 'system'
@@ -81,9 +91,16 @@ export default async function RootLayout({
     }
   }
 
+  const messages = await loadMessages(locale, [
+    'common',
+    'nav',
+    'errors',
+    'toasts',
+  ])
+
   return (
     <html
-      lang="en"
+      lang={locale}
       data-theme={initialResolved}
       data-user-theme={initialTheme}
       suppressHydrationWarning
@@ -92,25 +109,27 @@ export default async function RootLayout({
         <Script id="theme-sync" strategy="beforeInteractive">
           {themeScript}
         </Script>
-        <ThemeProvider
-          initialTheme={initialTheme}
-          initialResolved={initialResolved}
-        >
-          <AppQueryClientProvider>
-            <PerformanceMonitorWrapper />
-            <HeaderBreadcrumbProvider>
-              <div className="tabletop-content">
-                <Suspense fallback={null}>
-                  <Header
-                    session={session}
-                    lastActiveGameId={lastActiveGameId}
-                  />
-                </Suspense>
-                {children}
-              </div>
-            </HeaderBreadcrumbProvider>
-          </AppQueryClientProvider>
-        </ThemeProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <ThemeProvider
+            initialTheme={initialTheme}
+            initialResolved={initialResolved}
+          >
+            <AppQueryClientProvider>
+              <PerformanceMonitorWrapper />
+              <HeaderBreadcrumbProvider>
+                <div className="tabletop-content">
+                  <Suspense fallback={null}>
+                    <Header
+                      session={session}
+                      lastActiveGameId={lastActiveGameId}
+                    />
+                  </Suspense>
+                  {children}
+                </div>
+              </HeaderBreadcrumbProvider>
+            </AppQueryClientProvider>
+          </ThemeProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   )
