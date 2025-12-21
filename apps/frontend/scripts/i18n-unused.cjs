@@ -122,6 +122,16 @@ function main() {
 
   const corpus = files.map((f) => fs.readFileSync(f, 'utf8')).join('\n')
 
+  // Extract all namespace patterns from the codebase
+  const namespaceMatches = [
+    ...corpus.matchAll(
+      /(useTranslations|getTranslations)\s*\(\s*["'`]([^"'`]+)["'`]/g
+    ),
+  ]
+  const usedNamespaces = new Set(
+    namespaceMatches.map((m) => m[2]).filter((ns) => ns.length > 0)
+  )
+
   const unused = []
   for (const key of keys) {
     const isCoveredByDynamicPrefix = DYNAMIC_PREFIXES.some((p) =>
@@ -129,8 +139,56 @@ function main() {
     )
     if (isCoveredByDynamicPrefix) continue
 
-    const re = new RegExp(`["'\`]${escapeRegExp(key)}["'\`]`, 'g')
-    if (!re.test(corpus)) {
+    // Check if key is used as full string literal
+    const fullKeyPattern = new RegExp(`["'\`]${escapeRegExp(key)}["'\`]`, 'g')
+    if (fullKeyPattern.test(corpus)) {
+      continue // Key is used as full string
+    }
+
+    // Check if key is used with namespace prefix
+    // e.g., key = "common.home.hero.kicker"
+    // Check for: useTranslations('common') + t('home.hero.kicker')
+    // or: useTranslations('common.home') + t('hero.kicker')
+    // or: useTranslations('common.home.hero') + t('kicker')
+    const keyParts = key.split('.')
+    let found = false
+
+    for (let i = 0; i < keyParts.length - 1; i++) {
+      const namespace = keyParts.slice(0, i + 1).join('.')
+      const keySuffix = keyParts.slice(i + 1).join('.')
+
+      if (usedNamespaces.has(namespace)) {
+        // Check if the key suffix is used in the code (as string literal)
+        const keySuffixPattern = new RegExp(
+          `["'\`]${escapeRegExp(keySuffix)}["'\`]`,
+          'g'
+        )
+        if (keySuffixPattern.test(corpus)) {
+          found = true
+          break
+        }
+
+        // Check if the key suffix is used in template literals
+        // e.g., t(`gameStates.${state}`) where namespace is 'lobby.gameList'
+        // and keySuffix is 'gameStates.LOBBY'
+        // We need to check if any parent of keySuffix is in a template literal
+        const suffixParts = keySuffix.split('.')
+        for (let j = suffixParts.length - 1; j > 0; j--) {
+          const suffixParent = suffixParts.slice(0, j).join('.')
+          const templatePattern = new RegExp(
+            '`[^`]*' + escapeRegExp(suffixParent) + '[^`]*\\$\\{[^}]+\\}[^`]*`',
+            'g'
+          )
+          if (templatePattern.test(corpus)) {
+            found = true
+            break
+          }
+        }
+        if (found) break
+      }
+    }
+
+    if (!found) {
       unused.push(key)
     }
   }

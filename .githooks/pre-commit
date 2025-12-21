@@ -13,6 +13,7 @@ PRETTIER_REL_FE=()   # apps/frontend/* format targets (app-relative)
 PRETTIER_ABS_FE=()   # same as above but repo-relative for git add
 RUST_STAGED=()       # apps/backend/*.rs
 BACKEND_META=()      # Cargo.* changes that should trigger clippy
+I18N_TRIGGER=0       # Whether to run i18n checks (translation files or frontend code changed)
 
 # Collect staged files
 while IFS= read -r -d '' path; do
@@ -25,6 +26,7 @@ while IFS= read -r -d '' path; do
         *.d.ts) ;;  # ⛔️ skip TypeScript declaration files for ESLint
         *.ts|*.tsx)
           ESLINT_REL+=("$rel")
+          I18N_TRIGGER=1  # Frontend code changes may use translations
           ;;
       esac
 
@@ -33,6 +35,13 @@ while IFS= read -r -d '' path; do
         *.ts|*.tsx|*.js|*.jsx|*.cjs|*.mjs|*.json|*.md|*.mdx|*.css|*.scss|*.yml|*.yaml|*.html)
           PRETTIER_REL_FE+=("$rel")
           PRETTIER_ABS_FE+=("$path")
+          ;;
+      esac
+
+      # ---- i18n trigger (translation files) ----
+      case "$path" in
+        messages/**/*.json)
+          I18N_TRIGGER=1
           ;;
       esac
       ;;
@@ -85,6 +94,14 @@ if ((${#ESLINT_REL[@]})); then
   fi
 else
   echo "  • FE eslint: no staged frontend TS/TSX files"
+fi
+
+# i18n checks — run if translation files or frontend code changed
+if ((I18N_TRIGGER)); then
+  echo "  • FE i18n check (translation files or frontend code changed)"
+  cd apps/frontend && node scripts/i18n-check.cjs && cd ../..
+else
+  echo "  • FE i18n check skipped (no translation or frontend code changes)"
 fi
 
 echo "[pre-commit] Phase A OK ✅"
