@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
 import type { Card } from '@/lib/game-room/types'
 import { getOrientation, ORIENTATION_ORDER_TRICK } from './utils'
@@ -220,6 +221,7 @@ export function TrickArea({
   isRefreshing = false,
   cardScale = 1,
 }: TrickAreaProps) {
+  const t = useTranslations('game.gameRoom.trickArea')
   const orderedCards = useMemo(() => {
     const cards = Array.from(trickMap.entries()).map(([seat, card]) => ({
       seat,
@@ -274,7 +276,7 @@ export function TrickArea({
         paddingBottom: `${scaledDimensions.bottomPadding}px`,
       }}
       role="region"
-      aria-label="Current trick cards"
+      aria-label={t('ariaLabel')}
     >
       {onRefresh ? (
         <div className="pointer-events-auto absolute right-4 top-4 z-10 sm:hidden">
@@ -294,14 +296,17 @@ export function TrickArea({
         <div className="flex flex-col items-center gap-2">
           <span className="text-sm font-medium text-subtle">
             {phase.phase === 'Bidding'
-              ? 'Waiting for bidding to complete…'
+              ? t('waitingForBidding')
               : phase.phase === 'TrumpSelect'
-                ? 'Waiting for trumps to be chosen…'
-                : 'Waiting for lead…'}
+                ? t('waitingForTrump')
+                : t('waitingForLead')}
           </span>
           {phase.phase === 'Trick' ? (
             <span className="text-xs text-muted">
-              Trick {phase.data.trick_no} of {round?.hand_size ?? '?'}
+              {t('trickOf', {
+                trickNo: phase.data.trick_no,
+                handSize: round?.hand_size ?? '?',
+              })}
             </span>
           ) : null}
         </div>

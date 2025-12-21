@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useTranslations } from 'next-intl'
 
 import type { RoundHistoryEntry, Seat } from '@/lib/game-room/types'
 import { formatTrump, shortenNameForDisplay } from './utils'
@@ -24,6 +25,8 @@ export function ScoreHistoryDialog({
   isLoading = false,
   error,
 }: ScoreHistoryDialogProps) {
+  const t = useTranslations('game.gameRoom.history')
+
   useEffect(() => {
     if (!isOpen) {
       return
@@ -60,29 +63,27 @@ export function ScoreHistoryDialog({
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-              Score archive
+              {t('kicker')}
             </p>
             <h2
               id="score-history-title"
               className="mt-2 text-3xl font-semibold text-foreground"
             >
-              Score sheet
+              {t('title')}
             </h2>
-            <p className="text-sm text-muted">
-              Review bids, trump picks, and the running totals for every round.
-            </p>
+            <p className="text-sm text-muted">{t('description')}</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-border/60 bg-surface px-3 py-1 text-xs text-muted">
             <span className="text-lg leading-none text-amber-400">★</span>
             <span className="uppercase tracking-[0.35em] text-[10px]">
-              Trump caller
+              {t('trumpCaller')}
             </span>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-full border border-border/60 bg-surface px-3 py-1.5 text-sm font-semibold text-muted transition hover:border-primary/40 hover:text-foreground"
-            aria-label="Close score history"
+            aria-label={t('closeAria')}
           >
             ✕
           </button>
@@ -97,16 +98,16 @@ export function ScoreHistoryDialog({
         <div className="mt-6 max-h-[60vh] overflow-y-auto pr-1">
           {isLoading ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted">
-              Loading history…
+              {t('loading')}
             </div>
           ) : rounds.length === 0 ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted">
-              No completed rounds yet. Start playing to build the score sheet.
+              {t('empty')}
             </div>
           ) : (
             <div className="flex flex-col gap-3 text-sm">
               <div className="grid grid-cols-[minmax(260px,1.25fr)_repeat(4,minmax(120px,0.9fr))] gap-4 rounded-2xl border border-border/60 bg-surface/60 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.3em] text-subtle">
-                <span>Round</span>
+                <span>{t('table.round')}</span>
                 {playerNames.map((name) => (
                   <span
                     key={name}
@@ -126,14 +127,18 @@ export function ScoreHistoryDialog({
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
-                          Round {round.roundNo}
+                          {t('roundCard.roundKicker', {
+                            roundNo: round.roundNo,
+                          })}
                         </p>
                         <p className="text-lg font-semibold text-foreground">
-                          {round.handSize} cards
+                          {t('roundCard.handSize', {
+                            handSize: round.handSize,
+                          })}
                         </p>
                       </div>
                       <div className="text-right text-xs text-muted">
-                        Dealer
+                        {t('roundCard.dealer')}
                         <br />
                         <span className="font-medium text-foreground">
                           {seatDisplayName(round.dealerSeat)}
@@ -141,19 +146,19 @@ export function ScoreHistoryDialog({
                       </div>
                     </div>
                     <div className="rounded-2xl border border-border/30 bg-background/60 px-3 py-2 text-xs text-muted">
-                      Trump{' '}
+                      {t('roundCard.trump')}{' '}
                       <span className="font-semibold text-foreground">
                         {formatTrump(round.trump)}
                       </span>{' '}
                       {round.trumpSelectorSeat !== null ? (
                         <>
-                          by{' '}
+                          {t('roundCard.by')}{' '}
                           <span className="font-medium text-foreground">
                             {seatDisplayName(round.trumpSelectorSeat)}
                           </span>
                         </>
                       ) : (
-                        '(pending)'
+                        t('roundCard.pending')
                       )}
                     </div>
                   </div>
@@ -168,12 +173,14 @@ export function ScoreHistoryDialog({
                       >
                         <div className="text-sm font-semibold text-foreground">
                           <span className="flex items-center justify-center gap-1">
-                            <span>Bid {bid ?? '—'}</span>
+                            <span>
+                              {t('roundCard.bid', { bid: bid ?? '—' })}
+                            </span>
                             {isSelector ? (
                               <span
                                 className="text-base leading-none text-amber-400"
-                                aria-label="Trump caller"
-                                title="Trump caller"
+                                aria-label={t('trumpCaller')}
+                                title={t('trumpCaller')}
                               >
                                 ★
                               </span>
@@ -181,7 +188,7 @@ export function ScoreHistoryDialog({
                           </span>
                         </div>
                         <div className="text-[10px] uppercase tracking-[0.3em] text-subtle">
-                          Total
+                          {t('roundCard.total')}
                         </div>
                         <div className="text-2xl font-bold text-foreground">
                           {cumulative}

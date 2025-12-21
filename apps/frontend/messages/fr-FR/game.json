@@ -159,8 +159,22 @@
     "play": {
       "title": "Jouer une carte",
       "description": "Choisissez une carte autorisée dans votre main. Seules les cartes valides restent activées.",
-      "waitingOn": "En attente : {name}",
+      "waitingOn": "En attente : {name}",
       "selectedCardLabel": "Carte sélectionnée",
+      "button": {
+        "playing": "Jeu…",
+        "playCard": "Jouer",
+        "playSelectedCard": "Jouer la carte sélectionnée",
+        "waitingFor": "En attente de {name}",
+        "waitingForNext": "En attente du prochain joueur",
+        "aria": {
+          "selectCard": "Sélectionner une carte à jouer",
+          "playing": "Carte en cours de jeu",
+          "playSelected": "Jouer la carte sélectionnée : {card}",
+          "playSelectedGeneric": "Jouer la carte sélectionnée",
+          "waitingForPlayer": "En attente de {name} pour jouer"
+        }
+      },
       "submit": {
         "playing": "Jeu…",
         "label": {
@@ -170,12 +184,21 @@
         "waitingFor": "En attente de {name}",
         "aria": {
           "playing": "Carte en cours de jeu",
-          "playSelected": "Jouer la carte sélectionnée : {card}",
+          "playSelected": "Jouer la carte sélectionnée : {card}",
           "playSelectedGeneric": "Jouer la carte sélectionnée",
           "waitingForPlayer": "En attente de {name} pour jouer"
         }
       },
+      "status": {
+        "handWillAppear": "La main apparaîtra une fois la partie commencée.",
+        "waitingFor": "En attente de {name}",
+        "waitingForNext": "En attente du prochain joueur",
+        "tapToPlay": "Appuyez sur n'importe quelle carte valide pour jouer",
+        "tapToPlayImmediate": "Appuyez sur une carte valide pour jouer immédiatement."
+      },
       "legal": {
+        "short": "Valides :",
+        "long": "Cartes valides :",
         "empty": "Aucune"
       }
     },
@@ -188,8 +211,11 @@
     },
     "trickArea": {
       "lastRoundFinalPosition": "Position finale de la manche précédente",
-      "waitingForLead": "En attente de l’entame…",
-      "trickOf": "Pli {trickNo} sur {handSize}"
+      "waitingForLead": "En attente de l'entame…",
+      "waitingForBidding": "En attente de la fin des annonces…",
+      "waitingForTrump": "En attente du choix de l'atout…",
+      "trickOf": "Pli {trickNo} sur {handSize}",
+      "ariaLabel": "Cartes du pli actuel"
     },
     "hand": {
       "title": "Votre main",

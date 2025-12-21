@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import { BiddingPanel } from './BiddingPanel'
 import { LastTrick } from './LastTrick'
@@ -23,6 +24,8 @@ export function PlayerActions({
   lastTrick,
   seatDisplayName,
 }: PlayerActionsProps) {
+  const t = useTranslations('game.gameRoom.tableActions')
+
   if (phase.phase === 'Bidding' && bidding) {
     return (
       <BiddingPanel
@@ -60,16 +63,13 @@ export function PlayerActions({
     <section className="flex w-full flex-col gap-3 rounded-3xl border border-white/10 bg-surface/80 p-5 text-sm text-muted shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur">
       <header className="flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
-          Table actions
+          {t('title')}
         </h2>
         <span className="rounded-full bg-surface px-3 py-1 text-xs text-muted">
-          Waiting for next phase
+          {t('waitingBadge')}
         </span>
       </header>
-      <p>
-        Interactive controls will surface here as soon as the current phase
-        requires your input.
-      </p>
+      <p>{t('description')}</p>
     </section>
   )
 }

@@ -1,1 +1,23 @@
-{}
+{
+  "gameRoom": {
+    "bidSubmitted": "Puntata inviata",
+    "trumpSelected": "Briscola selezionata",
+    "cardPlayed": "Carta giocata",
+    "aiSeatAdded": "Posto IA aggiunto",
+    "aiSeatRemoved": "Posto IA rimosso",
+    "aiSeatUpdated": "Posto IA aggiornato",
+    "errors": {
+      "lockVersionRequiredBid": "La versione di blocco è richiesta per inviare una puntata",
+      "lockVersionRequiredTrump": "La versione di blocco è richiesta per selezionare la briscola",
+      "lockVersionRequiredCard": "La versione di blocco è richiesta per giocare una carta",
+      "unableToMarkReady": "Impossibile segnare come pronto",
+      "failedToSubmitBid": "Impossibile inviare la puntata",
+      "failedToSelectTrump": "Impossibile selezionare la briscola",
+      "failedToPlayCard": "Impossibile giocare la carta",
+      "failedToLoadAiRegistry": "Impossibile caricare il registro IA",
+      "failedToAddAiSeat": "Impossibile aggiungere posto IA",
+      "failedToRemoveAiSeat": "Impossibile rimuovere posto IA",
+      "failedToUpdateAiSeat": "Impossibile aggiornare posto IA"
+    }
+  }
+}

@@ -1,1 +1,23 @@
-{}
+{
+  "gameRoom": {
+    "bidSubmitted": "Gebot abgegeben",
+    "trumpSelected": "Trumpf gewählt",
+    "cardPlayed": "Karte gespielt",
+    "aiSeatAdded": "KI-Sitzplatz hinzugefügt",
+    "aiSeatRemoved": "KI-Sitzplatz entfernt",
+    "aiSeatUpdated": "KI-Sitzplatz aktualisiert",
+    "errors": {
+      "lockVersionRequiredBid": "Sperrversion ist erforderlich, um ein Gebot abzugeben",
+      "lockVersionRequiredTrump": "Sperrversion ist erforderlich, um den Trumpf zu wählen",
+      "lockVersionRequiredCard": "Sperrversion ist erforderlich, um eine Karte zu spielen",
+      "unableToMarkReady": "Kann nicht als bereit markiert werden",
+      "failedToSubmitBid": "Gebot konnte nicht abgegeben werden",
+      "failedToSelectTrump": "Trumpf konnte nicht gewählt werden",
+      "failedToPlayCard": "Karte konnte nicht gespielt werden",
+      "failedToLoadAiRegistry": "KI-Register konnte nicht geladen werden",
+      "failedToAddAiSeat": "KI-Sitzplatz konnte nicht hinzugefügt werden",
+      "failedToRemoveAiSeat": "KI-Sitzplatz konnte nicht entfernt werden",
+      "failedToUpdateAiSeat": "KI-Sitzplatz konnte nicht aktualisiert werden"
+    }
+  }
+}

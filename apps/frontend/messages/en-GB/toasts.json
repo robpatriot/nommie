@@ -1,1 +1,23 @@
-{}
+{
+  "gameRoom": {
+    "bidSubmitted": "Bid submitted",
+    "trumpSelected": "Trump selected",
+    "cardPlayed": "Card played",
+    "aiSeatAdded": "AI seat added",
+    "aiSeatRemoved": "AI seat removed",
+    "aiSeatUpdated": "AI seat updated",
+    "errors": {
+      "lockVersionRequiredBid": "Lock version is required to submit bid",
+      "lockVersionRequiredTrump": "Lock version is required to select trump",
+      "lockVersionRequiredCard": "Lock version is required to play card",
+      "unableToMarkReady": "Unable to mark ready",
+      "failedToSubmitBid": "Failed to submit bid",
+      "failedToSelectTrump": "Failed to select trump",
+      "failedToPlayCard": "Failed to play card",
+      "failedToLoadAiRegistry": "Failed to load AI registry",
+      "failedToAddAiSeat": "Failed to add AI seat",
+      "failedToRemoveAiSeat": "Failed to remove AI seat",
+      "failedToUpdateAiSeat": "Failed to update AI seat"
+    }
+  }
+}

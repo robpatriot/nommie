@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { useTranslations } from 'next-intl'
 import type { BiddingSnapshot, Seat } from '@/lib/game-room/types'
 import { getPlayerDisplayName } from '@/utils/player-names'
 import { getOrientation } from './utils'
@@ -29,6 +30,7 @@ export function BiddingPanel({
   playerNames,
   bidding,
 }: BiddingPanelProps) {
+  const t = useTranslations('game.gameRoom.bidding')
   const minBid = phase.min_bid
   const maxBid = phase.max_bid
   const handSize = phase.round.hand_size
@@ -102,21 +104,21 @@ export function BiddingPanel({
 
   if (parsedBid === null) {
     if (hasTyped) {
-      validationMessages.push('Enter a bid before submitting.')
+      validationMessages.push(t('validation.enterBid'))
     }
   } else {
     if (parsedBid < minBid) {
-      validationMessages.push(`Bid must be at least ${minBid}.`)
+      validationMessages.push(t('validation.minBid', { minBid }))
     }
     if (parsedBid > maxBid) {
-      validationMessages.push(`Bid cannot exceed ${maxBid}.`)
+      validationMessages.push(t('validation.maxBid', { maxBid }))
     }
     if (parsedBid === 0 && zeroBidLocked) {
-      validationMessages.push("You've bid 0 the maximum number of times.")
+      validationMessages.push(t('validation.zeroBidLocked'))
     }
     if (hitsHandSize) {
       validationMessages.push(
-        `Total bids cannot equal ${handSize}. Choose another number.`
+        t('validation.totalCannotEqualHandSize', { handSize })
       )
     }
   }
@@ -183,11 +185,9 @@ export function BiddingPanel({
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
-            Bidding
+            {t('title')}
           </h2>
-          <p className="text-xs text-success-contrast/80">
-            Everyone&apos;s bids stay visible below.
-          </p>
+          <p className="text-xs text-success-contrast/80">{t('subtitle')}</p>
         </div>
         <div
           className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 ${
@@ -197,7 +197,7 @@ export function BiddingPanel({
           } border`}
         >
           <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-success-contrast/80">
-            {isViewerTurn ? 'Your turn' : 'Waiting'}
+            {isViewerTurn ? t('turn.yourTurn') : t('turn.waiting')}
           </span>
           {!isViewerTurn && (
             <span className="text-sm font-bold text-success-contrast/90">
@@ -215,7 +215,7 @@ export function BiddingPanel({
           htmlFor="bid-value"
           className="text-xs font-medium uppercase tracking-wide"
         >
-          Your bid
+          {t('yourBidLabel')}
         </label>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -232,7 +232,7 @@ export function BiddingPanel({
                 : 'border-success/40 focus:border-success focus:ring focus:ring-success/40'
             } ${flashValidation && hasValidationIssue ? 'animate-pulse' : ''}`}
             disabled={viewerBid !== null || bidding.isPending || !isViewerTurn}
-            aria-label="Bid value"
+            aria-label={t('bidValueAria')}
             aria-describedby={describedByIds}
             aria-invalid={hasValidationIssue}
             ref={inputRef}
@@ -243,22 +243,22 @@ export function BiddingPanel({
             disabled={isSubmitDisabled}
             aria-label={
               bidding.isPending
-                ? 'Submitting bid'
+                ? t('submit.aria.submitting')
                 : parsedBid !== null
-                  ? `Submit bid of ${parsedBid}`
-                  : 'Submit bid'
+                  ? t('submit.aria.submitOf', { bid: parsedBid })
+                  : t('submit.aria.submit')
             }
           >
-            {bidding.isPending ? 'Submitting…' : 'Submit bid'}
+            {bidding.isPending ? t('submit.submitting') : t('submit.label')}
           </button>
         </div>
         <p id="bid-range-hint" className="text-xs text-success-contrast/80">
-          Allowed range: {minBid} – {maxBid}.{' '}
+          {t('allowedRange', { minBid, maxBid })}{' '}
           {isViewerTurn
             ? viewerBid === null
-              ? "Choose a value and submit when you're ready."
-              : 'Bid submitted — waiting for other players.'
-            : `Waiting for ${activeName} to bid.`}
+              ? t('hint.chooseAndSubmit')
+              : t('hint.submittedWaiting')
+            : t('hint.waitingForPlayer', { name: activeName })}
         </p>
         {warningMessage ? (
           <p
@@ -275,7 +275,7 @@ export function BiddingPanel({
 
       <div className="rounded-2xl border border-success/20 bg-surface/70 p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide">
-          Table bids
+          {t('tableBids')}
         </h3>
         <div className="flex flex-col gap-2">
           {seatBids.map(({ seat, name, bid, orientation }) => (

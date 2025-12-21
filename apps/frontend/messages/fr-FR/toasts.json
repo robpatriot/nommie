@@ -1,1 +1,23 @@
-{}
+{
+  "gameRoom": {
+    "bidSubmitted": "Annonce soumise",
+    "trumpSelected": "Atout sélectionné",
+    "cardPlayed": "Carte jouée",
+    "aiSeatAdded": "Siège IA ajouté",
+    "aiSeatRemoved": "Siège IA supprimé",
+    "aiSeatUpdated": "Siège IA mis à jour",
+    "errors": {
+      "lockVersionRequiredBid": "La version de verrouillage est requise pour soumettre une enchère",
+      "lockVersionRequiredTrump": "La version de verrouillage est requise pour sélectionner l'atout",
+      "lockVersionRequiredCard": "La version de verrouillage est requise pour jouer une carte",
+      "unableToMarkReady": "Impossible de marquer comme prêt",
+      "failedToSubmitBid": "Échec de la soumission de l'enchère",
+      "failedToSelectTrump": "Échec de la sélection de l'atout",
+      "failedToPlayCard": "Échec du jeu de la carte",
+      "failedToLoadAiRegistry": "Échec du chargement du registre IA",
+      "failedToAddAiSeat": "Échec de l'ajout d'un siège IA",
+      "failedToRemoveAiSeat": "Échec de la suppression d'un siège IA",
+      "failedToUpdateAiSeat": "Échec de la mise à jour d'un siège IA"
+    }
+  }
+}

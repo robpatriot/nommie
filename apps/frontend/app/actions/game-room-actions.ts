@@ -1,5 +1,6 @@
 'use server'
 
+import { getTranslations } from 'next-intl/server'
 import { BackendApiError } from '@/lib/api'
 import {
   fetchGameSnapshot,
@@ -91,7 +92,8 @@ export async function getGameRoomSnapshotAction(
     if (error instanceof BackendApiError && error.status === 304) {
       return { kind: 'not_modified' }
     }
-    return toErrorResult(error, 'Failed to fetch game snapshot')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToFetchGameSnapshot'))
   }
 }
 
@@ -102,7 +104,8 @@ export async function markPlayerReadyAction(
     await markPlayerReady(gameId)
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to mark player ready')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToMarkPlayerReady'))
   }
 }
 
@@ -137,7 +140,8 @@ export async function submitBidAction(
     await submitBid(request.gameId, bidValue, request.lockVersion)
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to submit bid')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToSubmitBid'))
   }
 }
 
@@ -162,7 +166,8 @@ export async function selectTrumpAction(
     await selectTrump(request.gameId, request.trump, request.lockVersion)
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to select trump')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToSelectTrump'))
   }
 }
 
@@ -198,7 +203,8 @@ export async function submitPlayAction(
     await submitPlay(request.gameId, card, request.lockVersion)
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to play card')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToPlayCard'))
   }
 }
 
@@ -235,16 +241,15 @@ export async function addAiSeatAction(
       ) {
         finalLockVersion = snapshotResult.lockVersion
       } else {
+        const t = await getTranslations('errors.actions')
         return toErrorResult(
           new Error('Failed to get lock version from game snapshot'),
-          'Failed to add AI seat: could not determine game version'
+          t('failedToAddAiSeatNoVersion')
         )
       }
     } catch (error) {
-      return toErrorResult(
-        error,
-        'Failed to add AI seat: could not fetch game snapshot'
-      )
+      const t = await getTranslations('errors.actions')
+      return toErrorResult(error, t('failedToAddAiSeatNoSnapshot'))
     }
   }
 
@@ -257,7 +262,8 @@ export async function addAiSeatAction(
     })
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to add AI seat')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToAddAiSeat'))
   }
 }
 
@@ -285,16 +291,15 @@ export async function removeAiSeatAction(
       ) {
         finalLockVersion = snapshotResult.lockVersion
       } else {
+        const t = await getTranslations('errors.actions')
         return toErrorResult(
           new Error('Failed to get lock version from game snapshot'),
-          'Failed to remove AI seat: could not determine game version'
+          t('failedToRemoveAiSeatNoVersion')
         )
       }
     } catch (error) {
-      return toErrorResult(
-        error,
-        'Failed to remove AI seat: could not fetch game snapshot'
-      )
+      const t = await getTranslations('errors.actions')
+      return toErrorResult(error, t('failedToRemoveAiSeatNoSnapshot'))
     }
   }
 
@@ -304,7 +309,8 @@ export async function removeAiSeatAction(
     })
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to remove AI seat')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToRemoveAiSeat'))
   }
 }
 
@@ -332,16 +338,15 @@ export async function updateAiSeatAction(
       ) {
         finalLockVersion = snapshotResult.lockVersion
       } else {
+        const t = await getTranslations('errors.actions')
         return toErrorResult(
           new Error('Failed to get lock version from game snapshot'),
-          'Failed to update AI seat: could not determine game version'
+          t('failedToUpdateAiSeatNoVersion')
         )
       }
     } catch (error) {
-      return toErrorResult(
-        error,
-        'Failed to update AI seat: could not fetch game snapshot'
-      )
+      const t = await getTranslations('errors.actions')
+      return toErrorResult(error, t('failedToUpdateAiSeatNoSnapshot'))
     }
   }
 
@@ -354,7 +359,8 @@ export async function updateAiSeatAction(
     })
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to update AI seat')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToUpdateAiSeat'))
   }
 }
 
@@ -365,6 +371,7 @@ export async function fetchAiRegistryAction(): Promise<
     const ais = await listRegisteredAis()
     return { kind: 'ok', data: ais }
   } catch (error) {
-    return toErrorResult(error, 'Failed to fetch AI registry')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToFetchAiRegistry'))
   }
 }

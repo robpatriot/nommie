@@ -1,6 +1,7 @@
 'use client'
 
 import { type FormEvent, startTransition, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import type { Seat, Trump, TrumpSelectSnapshot } from '@/lib/game-room/types'
 import { getPlayerDisplayName } from '@/utils/player-names'
 import { formatTrump } from './utils'
@@ -19,6 +20,7 @@ export function TrumpSelectPanel({
   playerNames,
   trump,
 }: TrumpSelectPanelProps) {
+  const t = useTranslations('game.gameRoom.trumpSelect')
   const allowedTrumps = phase.allowed_trumps
   const [selectedTrump, setSelectedTrump] = useState<Trump | null>(null)
 
@@ -100,12 +102,9 @@ export function TrumpSelectPanel({
     <section className="flex w-full flex-col gap-4 rounded-3xl border border-accent/50 bg-accent/15 p-5 text-accent-contrast shadow-[0_30px_90px_rgba(94,234,212,0.25)]">
       <header>
         <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
-          Select trump
+          {t('title')}
         </h2>
-        <p className="text-xs text-accent-contrast/80">
-          Choose the trump suit for this round. Trump cards outrank all other
-          suits.
-        </p>
+        <p className="text-xs text-accent-contrast/80">{t('description')}</p>
       </header>
 
       <form
@@ -146,7 +145,13 @@ export function TrumpSelectPanel({
                         ? 'cursor-not-allowed opacity-60'
                         : 'cursor-pointer'
                     }`}
-                    aria-label={`Select ${formatTrump(option)} as trump suit${isSelected ? ', currently selected' : ''}`}
+                    aria-label={
+                      isSelected
+                        ? t('optionAriaSelected', {
+                            trump: formatTrump(option),
+                          })
+                        : t('optionAria', { trump: formatTrump(option) })
+                    }
                     aria-pressed={isSelected}
                   >
                     <span
@@ -185,7 +190,13 @@ export function TrumpSelectPanel({
                     ? 'cursor-not-allowed opacity-60'
                     : 'cursor-pointer'
                 }`}
-                aria-label={`Select ${formatTrump('NO_TRUMPS')} as trump${selectedTrump === 'NO_TRUMPS' ? ', currently selected' : ''}`}
+                aria-label={
+                  selectedTrump === 'NO_TRUMPS'
+                    ? t('optionAriaSelected', {
+                        trump: formatTrump('NO_TRUMPS'),
+                      })
+                    : t('optionAria', { trump: formatTrump('NO_TRUMPS') })
+                }
                 aria-pressed={selectedTrump === 'NO_TRUMPS'}
               >
                 <span className="text-xl font-semibold text-accent-contrast">
@@ -202,10 +213,12 @@ export function TrumpSelectPanel({
           disabled={!canSelect || isPending || !selectedTrump}
           aria-label={
             isPending
-              ? 'Selecting trump suit'
+              ? t('submit.aria.selecting')
               : selectedTrump
-                ? `Confirm ${formatTrump(selectedTrump)} as trump suit`
-                : 'Select trump suit'
+                ? t('submit.aria.confirm', {
+                    trump: formatTrump(selectedTrump),
+                  })
+                : t('submit.aria.select')
           }
         >
           {submitLabel}
@@ -213,8 +226,8 @@ export function TrumpSelectPanel({
 
         <p className="text-xs text-accent-contrast/75">
           {canSelect
-            ? 'Select a trump suit and confirm to continue to trick play.'
-            : `Waiting for ${activeName} to choose the trump suit.`}
+            ? t('hint.canSelect')
+            : t('hint.waitingForPlayer', { name: activeName })}
         </p>
       </form>
     </section>

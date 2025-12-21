@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useTranslations } from 'next-intl'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import type { Trump } from '@/lib/game-room/types'
 import { useToast } from '@/hooks/useToast'
@@ -30,6 +31,8 @@ export function useGameRoomActions({
   setHasMarkedReady,
 }: UseGameRoomActionsProps) {
   const { showToast } = useToast()
+  const t = useTranslations('toasts')
+  const tErrors = useTranslations('toasts.gameRoom.errors')
 
   // Mutations
   const markPlayerReadyMutation = useMarkPlayerReady()
@@ -52,7 +55,7 @@ export function useGameRoomActions({
       await markPlayerReadyMutation.mutateAsync(gameId)
       setHasMarkedReady(true)
     } catch (err) {
-      const backendError = toQueryError(err, 'Unable to mark ready')
+      const backendError = toQueryError(err, tErrors('unableToMarkReady'))
       showToast(backendError.message, 'error', backendError)
     }
   }, [
@@ -63,6 +66,7 @@ export function useGameRoomActions({
     markPlayerReadyMutation,
     setHasMarkedReady,
     showToast,
+    tErrors,
   ])
 
   const handleSubmitBid = useCallback(
@@ -72,7 +76,7 @@ export function useGameRoomActions({
       }
 
       if (snapshot.lockVersion === undefined) {
-        showToast('Lock version is required to submit bid', 'error')
+        showToast(tErrors('lockVersionRequiredBid'), 'error')
         return
       }
 
@@ -82,13 +86,21 @@ export function useGameRoomActions({
           bid,
           lockVersion: snapshot.lockVersion!,
         })
-        showToast('Bid submitted', 'success')
+        showToast(t('gameRoom.bidSubmitted'), 'success')
       } catch (err) {
-        const backendError = toQueryError(err, 'Failed to submit bid')
+        const backendError = toQueryError(err, tErrors('failedToSubmitBid'))
         showToast(backendError.message, 'error', backendError)
       }
     },
-    [gameId, isBidPending, snapshot.lockVersion, submitBidMutation, showToast]
+    [
+      gameId,
+      isBidPending,
+      snapshot.lockVersion,
+      submitBidMutation,
+      showToast,
+      t,
+      tErrors,
+    ]
   )
 
   const handleSelectTrump = useCallback(
@@ -98,7 +110,7 @@ export function useGameRoomActions({
       }
 
       if (snapshot.lockVersion === undefined) {
-        showToast('Lock version is required to select trump', 'error')
+        showToast(tErrors('lockVersionRequiredTrump'), 'error')
         return
       }
 
@@ -108,9 +120,9 @@ export function useGameRoomActions({
           trump,
           lockVersion: snapshot.lockVersion!,
         })
-        showToast('Trump selected', 'success')
+        showToast(t('gameRoom.trumpSelected'), 'success')
       } catch (err) {
-        const backendError = toQueryError(err, 'Failed to select trump')
+        const backendError = toQueryError(err, tErrors('failedToSelectTrump'))
         showToast(backendError.message, 'error', backendError)
       }
     },
@@ -120,6 +132,8 @@ export function useGameRoomActions({
       snapshot.lockVersion,
       selectTrumpMutation,
       showToast,
+      t,
+      tErrors,
     ]
   )
 
@@ -130,7 +144,7 @@ export function useGameRoomActions({
       }
 
       if (snapshot.lockVersion === undefined) {
-        showToast('Lock version is required to play card', 'error')
+        showToast(tErrors('lockVersionRequiredCard'), 'error')
         return
       }
 
@@ -140,13 +154,21 @@ export function useGameRoomActions({
           card,
           lockVersion: snapshot.lockVersion!,
         })
-        showToast('Card played', 'success')
+        showToast(t('gameRoom.cardPlayed'), 'success')
       } catch (err) {
-        const backendError = toQueryError(err, 'Failed to play card')
+        const backendError = toQueryError(err, tErrors('failedToPlayCard'))
         showToast(backendError.message, 'error', backendError)
       }
     },
-    [gameId, isPlayPending, snapshot.lockVersion, submitPlayMutation, showToast]
+    [
+      gameId,
+      isPlayPending,
+      snapshot.lockVersion,
+      submitPlayMutation,
+      showToast,
+      t,
+      tErrors,
+    ]
   )
 
   return {

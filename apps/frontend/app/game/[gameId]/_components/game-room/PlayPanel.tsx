@@ -1,6 +1,7 @@
 'use client'
 
 import { type FormEvent } from 'react'
+import { useTranslations } from 'next-intl'
 import type { Card, TrickSnapshot } from '@/lib/game-room/types'
 import { getPlayerDisplayName } from '@/utils/player-names'
 import type { GameRoomViewProps } from '../game-room-view'
@@ -21,6 +22,7 @@ export function PlayPanel({
   selectedCard,
   onPlayCard,
 }: PlayPanelProps) {
+  const t = useTranslations('game.gameRoom.play')
   const isViewerTurn = phase.to_act === play.viewerSeat
   const activeName = getPlayerDisplayName(
     phase.to_act,
@@ -45,14 +47,12 @@ export function PlayPanel({
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
-            Play card
+            {t('title')}
           </h2>
-          <p className="text-xs text-muted">
-            Choose a legal card from your hand. Only allowed cards stay enabled.
-          </p>
+          <p className="text-xs text-muted">{t('description')}</p>
         </div>
         <div className="rounded-full border border-primary/50 bg-primary/25 px-3 py-1 text-xs font-semibold text-foreground">
-          Waiting on: {activeName}
+          {t('waitingOn', { name: activeName })}
         </div>
       </header>
 
@@ -62,7 +62,7 @@ export function PlayPanel({
       >
         <div className="flex flex-col items-start gap-3 text-sm text-foreground">
           <span className="text-xs uppercase tracking-wide text-muted">
-            Selected card
+            {t('selectedCardLabel')}
           </span>
           {selectedCard ? (
             <PlayingCard card={selectedCard} size="md" />
@@ -78,29 +78,31 @@ export function PlayPanel({
           disabled={isSubmitDisabled}
           aria-label={
             play.isPending
-              ? 'Playing card'
+              ? t('submit.aria.playing')
               : isViewerTurn && selectedCard
-                ? `Play selected card: ${selectedCard}`
+                ? t('submit.aria.playSelected', { card: selectedCard })
                 : isViewerTurn
-                  ? 'Play selected card'
-                  : `Waiting for ${activeName} to play`
+                  ? t('submit.aria.playSelectedGeneric')
+                  : t('submit.aria.waitingForPlayer', { name: activeName })
           }
         >
           {play.isPending ? (
-            'Playing…'
+            t('submit.playing')
           ) : isViewerTurn ? (
             <>
-              <span className="sm:hidden">Play card</span>
-              <span className="hidden sm:inline">Play selected card</span>
+              <span className="sm:hidden">{t('submit.label.mobile')}</span>
+              <span className="hidden sm:inline">
+                {t('submit.label.desktop')}
+              </span>
             </>
           ) : (
-            `Waiting for ${activeName}`
+            t('submit.waitingFor', { name: activeName })
           )}
         </button>
         <p className="text-xs text-muted">
-          <span className="sm:hidden">Legal:</span>
-          <span className="hidden sm:inline">Legal cards:</span>{' '}
-          {play.playable.length ? play.playable.join(', ') : '—'}
+          <span className="sm:hidden">{t('legal.short')}</span>
+          <span className="hidden sm:inline">{t('legal.long')}</span>{' '}
+          {play.playable.length ? play.playable.join(', ') : t('legal.empty')}
         </p>
       </form>
     </section>

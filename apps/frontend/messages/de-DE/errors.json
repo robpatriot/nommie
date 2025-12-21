@@ -67,7 +67,6 @@
       "show": "Anzeigen",
       "hide": "Ausblenden",
       "details": "Details",
-      "messageLabel": "Servermeldung",
       "statusLabel": "HTTP-Status",
       "codeLabel": "Fehlercode",
       "traceIdLabel": "Trace-Kennung"
@@ -79,5 +78,27 @@
     "tryAgain": "Erneut versuchen",
     "reloadPage": "Seite neu laden",
     "devDetails": "Fehlerdetails (nur Dev)"
+  },
+  "actions": {
+    "failedToFetchGameSnapshot": "Spielzustand konnte nicht geladen werden",
+    "failedToMarkPlayerReady": "Spieler konnte nicht als bereit markiert werden",
+    "failedToSubmitBid": "Gebot konnte nicht abgegeben werden",
+    "failedToSelectTrump": "Trumpf konnte nicht gewählt werden",
+    "failedToPlayCard": "Karte konnte nicht gespielt werden",
+    "failedToAddAiSeat": "KI-Sitzplatz konnte nicht hinzugefügt werden",
+    "failedToAddAiSeatNoVersion": "KI-Sitzplatz konnte nicht hinzugefügt werden: Spielversion konnte nicht ermittelt werden",
+    "failedToAddAiSeatNoSnapshot": "KI-Sitzplatz konnte nicht hinzugefügt werden: Spielzustand konnte nicht geladen werden",
+    "failedToRemoveAiSeat": "KI-Sitzplatz konnte nicht entfernt werden",
+    "failedToRemoveAiSeatNoVersion": "KI-Sitzplatz konnte nicht entfernt werden: Spielversion konnte nicht ermittelt werden",
+    "failedToRemoveAiSeatNoSnapshot": "KI-Sitzplatz konnte nicht entfernt werden: Spielzustand konnte nicht geladen werden",
+    "failedToUpdateAiSeat": "KI-Sitzplatz konnte nicht aktualisiert werden",
+    "failedToUpdateAiSeatNoVersion": "KI-Sitzplatz konnte nicht aktualisiert werden: Spielversion konnte nicht ermittelt werden",
+    "failedToUpdateAiSeatNoSnapshot": "KI-Sitzplatz konnte nicht aktualisiert werden: Spielzustand konnte nicht geladen werden",
+    "failedToFetchAiRegistry": "KI-Register konnte nicht geladen werden",
+    "failedToDeleteGameNoVersion": "Spiel konnte nicht gelöscht werden: Spielversion konnte nicht ermittelt werden",
+    "failedToDeleteGameNoSnapshot": "Spiel konnte nicht gelöscht werden: Spielzustand konnte nicht geladen werden"
+  },
+  "page": {
+    "failedToLoadGameSnapshot": "Spielzustand konnte nicht geladen werden: unerwartete Antwort"
   }
 }

@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 import type { Seat } from '@/lib/game-room/types'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { useAiRegistry } from '@/hooks/queries/useAi'
@@ -34,6 +35,8 @@ export function useAiSeatManagement({
   canViewAiManager,
 }: UseAiSeatManagementProps) {
   const { showToast } = useToast()
+  const t = useTranslations('toasts.gameRoom')
+  const tErrors = useTranslations('toasts.gameRoom.errors')
 
   // AI registry query - only enabled when AI manager is visible
   const {
@@ -46,7 +49,7 @@ export function useAiSeatManagement({
   const aiRegistryError = aiRegistryQueryError
     ? aiRegistryQueryError instanceof Error
       ? aiRegistryQueryError.message
-      : 'Failed to load AI registry'
+      : tErrors('failedToLoadAiRegistry')
     : null
 
   // Convert AI registry data to expected format
@@ -87,9 +90,9 @@ export function useAiSeatManagement({
           seed: selection?.seed,
           lockVersion: snapshot.lockVersion,
         })
-        showToast('AI seat added', 'success')
+        showToast(t('aiSeatAdded'), 'success')
       } catch (err) {
-        const backendError = toQueryError(err, 'Failed to add AI seat')
+        const backendError = toQueryError(err, tErrors('failedToAddAiSeat'))
         showToast(backendError.message, 'error', backendError)
       }
     },
@@ -101,6 +104,8 @@ export function useAiSeatManagement({
       addAiSeatMutation,
       showToast,
       snapshot.lockVersion,
+      t,
+      tErrors,
     ]
   )
 
@@ -116,9 +121,9 @@ export function useAiSeatManagement({
           seat,
           lockVersion: snapshot.lockVersion,
         })
-        showToast('AI seat removed', 'success')
+        showToast(t('aiSeatRemoved'), 'success')
       } catch (err) {
-        const backendError = toQueryError(err, 'Failed to remove AI seat')
+        const backendError = toQueryError(err, tErrors('failedToRemoveAiSeat'))
         showToast(backendError.message, 'error', backendError)
       }
     },
@@ -129,6 +134,8 @@ export function useAiSeatManagement({
       removeAiSeatMutation,
       showToast,
       snapshot.lockVersion,
+      t,
+      tErrors,
     ]
   )
 
@@ -147,9 +154,9 @@ export function useAiSeatManagement({
           seed: selection.seed,
           lockVersion: snapshot.lockVersion,
         })
-        showToast('AI seat updated', 'success')
+        showToast(t('aiSeatUpdated'), 'success')
       } catch (err) {
-        const backendError = toQueryError(err, 'Failed to update AI seat')
+        const backendError = toQueryError(err, tErrors('failedToUpdateAiSeat'))
         showToast(backendError.message, 'error', backendError)
       }
     },
@@ -160,6 +167,8 @@ export function useAiSeatManagement({
       updateAiSeatMutation,
       showToast,
       snapshot.lockVersion,
+      t,
+      tErrors,
     ]
   )
 

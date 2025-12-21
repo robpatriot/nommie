@@ -1,1 +1,23 @@
-{}
+{
+  "gameRoom": {
+    "bidSubmitted": "Puja enviada",
+    "trumpSelected": "Triunfo seleccionado",
+    "cardPlayed": "Carta jugada",
+    "aiSeatAdded": "Asiento de IA añadido",
+    "aiSeatRemoved": "Asiento de IA eliminado",
+    "aiSeatUpdated": "Asiento de IA actualizado",
+    "errors": {
+      "lockVersionRequiredBid": "Se requiere la versión de bloqueo para enviar una puja",
+      "lockVersionRequiredTrump": "Se requiere la versión de bloqueo para seleccionar el triunfo",
+      "lockVersionRequiredCard": "Se requiere la versión de bloqueo para jugar una carta",
+      "unableToMarkReady": "No se puede marcar como listo",
+      "failedToSubmitBid": "Error al enviar la puja",
+      "failedToSelectTrump": "Error al seleccionar el triunfo",
+      "failedToPlayCard": "Error al jugar la carta",
+      "failedToLoadAiRegistry": "Error al cargar el registro de IA",
+      "failedToAddAiSeat": "Error al añadir asiento de IA",
+      "failedToRemoveAiSeat": "Error al eliminar asiento de IA",
+      "failedToUpdateAiSeat": "Error al actualizar asiento de IA"
+    }
+  }
+}

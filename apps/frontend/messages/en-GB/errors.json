@@ -67,7 +67,6 @@
       "show": "Show",
       "hide": "Hide",
       "details": "details",
-      "messageLabel": "Details",
       "statusLabel": "Status",
       "codeLabel": "Code",
       "traceIdLabel": "Trace ID"
@@ -79,5 +78,27 @@
     "tryAgain": "Try again",
     "reloadPage": "Reload page",
     "devDetails": "Error details (dev only)"
+  },
+  "actions": {
+    "failedToFetchGameSnapshot": "Failed to fetch game snapshot",
+    "failedToMarkPlayerReady": "Failed to mark player ready",
+    "failedToSubmitBid": "Failed to submit bid",
+    "failedToSelectTrump": "Failed to select trump",
+    "failedToPlayCard": "Failed to play card",
+    "failedToAddAiSeat": "Failed to add AI seat",
+    "failedToAddAiSeatNoVersion": "Failed to add AI seat: could not determine game version",
+    "failedToAddAiSeatNoSnapshot": "Failed to add AI seat: could not fetch game snapshot",
+    "failedToRemoveAiSeat": "Failed to remove AI seat",
+    "failedToRemoveAiSeatNoVersion": "Failed to remove AI seat: could not determine game version",
+    "failedToRemoveAiSeatNoSnapshot": "Failed to remove AI seat: could not fetch game snapshot",
+    "failedToUpdateAiSeat": "Failed to update AI seat",
+    "failedToUpdateAiSeatNoVersion": "Failed to update AI seat: could not determine game version",
+    "failedToUpdateAiSeatNoSnapshot": "Failed to update AI seat: could not fetch game snapshot",
+    "failedToFetchAiRegistry": "Failed to fetch AI registry",
+    "failedToDeleteGameNoVersion": "Failed to delete game: could not determine game version",
+    "failedToDeleteGameNoSnapshot": "Failed to delete game: could not fetch game snapshot"
+  },
+  "page": {
+    "failedToLoadGameSnapshot": "Failed to load game snapshot: unexpected response"
   }
 }

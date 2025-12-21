@@ -55,6 +55,7 @@ export function PlayingCard({
   isSelected,
 }: PlayingCardProps) {
   const t = useTranslations('game.gameRoom')
+  const tCards = useTranslations('game.cards')
   const suitKey = card.slice(-1) as keyof typeof suitMap
   const suit = suitMap[suitKey] ?? suitMap.S
   const rankLabel = getRankLabel(card)
@@ -86,7 +87,10 @@ export function PlayingCard({
         isSelected ? 'scale-[1.02]' : '',
         className
       )}
-      aria-label={`${rankLabel} of ${suitLabel}`}
+      aria-label={tCards('aria.rankOfSuit', {
+        rank: rankLabel,
+        suit: suitLabel,
+      })}
     >
       <span
         className={cn(

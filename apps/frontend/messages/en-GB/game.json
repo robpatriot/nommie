@@ -161,6 +161,20 @@
       "description": "Choose a legal card from your hand. Only allowed cards stay enabled.",
       "waitingOn": "Waiting on: {name}",
       "selectedCardLabel": "Selected card",
+      "button": {
+        "playing": "Playing…",
+        "playCard": "Play card",
+        "playSelectedCard": "Play selected card",
+        "waitingFor": "Waiting for {name}",
+        "waitingForNext": "Waiting for next player",
+        "aria": {
+          "selectCard": "Select card to play",
+          "playing": "Playing card",
+          "playSelected": "Play selected card: {card}",
+          "playSelectedGeneric": "Play selected card",
+          "waitingForPlayer": "Waiting for {name} to play"
+        }
+      },
       "submit": {
         "playing": "Playing…",
         "label": {
@@ -175,7 +189,16 @@
           "waitingForPlayer": "Waiting for {name} to play"
         }
       },
+      "status": {
+        "handWillAppear": "Hand will appear once the game starts.",
+        "waitingFor": "Waiting for {name}",
+        "waitingForNext": "Waiting for next player",
+        "tapToPlay": "Tap any legal card to play",
+        "tapToPlayImmediate": "Tap a legal card to play immediately."
+      },
       "legal": {
+        "short": "Legal:",
+        "long": "Legal cards:",
         "empty": "—"
       }
     },
@@ -189,7 +212,10 @@
     "trickArea": {
       "lastRoundFinalPosition": "Last round's final position",
       "waitingForLead": "Waiting for lead…",
-      "trickOf": "Trick {trickNo} of {handSize}"
+      "waitingForBidding": "Waiting for bidding to complete…",
+      "waitingForTrump": "Waiting for trumps to be chosen…",
+      "trickOf": "Trick {trickNo} of {handSize}",
+      "ariaLabel": "Current trick cards"
     },
     "hand": {
       "title": "Your hand",

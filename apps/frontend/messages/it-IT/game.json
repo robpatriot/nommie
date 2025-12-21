@@ -161,6 +161,20 @@
       "description": "Scegli una carta legale dalla tua mano. Solo le carte consentite restano attive.",
       "waitingOn": "In attesa: {name}",
       "selectedCardLabel": "Carta selezionata",
+      "button": {
+        "playing": "Giocando…",
+        "playCard": "Gioca",
+        "playSelectedCard": "Gioca carta selezionata",
+        "waitingFor": "In attesa di {name}",
+        "waitingForNext": "In attesa del prossimo giocatore",
+        "aria": {
+          "selectCard": "Seleziona carta da giocare",
+          "playing": "Giocando la carta",
+          "playSelected": "Gioca la carta selezionata: {card}",
+          "playSelectedGeneric": "Gioca carta selezionata",
+          "waitingForPlayer": "In attesa di {name} per giocare"
+        }
+      },
       "submit": {
         "playing": "Giocando…",
         "label": {
@@ -175,7 +189,16 @@
           "waitingForPlayer": "In attesa di {name} per giocare"
         }
       },
+      "status": {
+        "handWillAppear": "La mano apparirà una volta iniziata la partita.",
+        "waitingFor": "In attesa di {name}",
+        "waitingForNext": "In attesa del prossimo giocatore",
+        "tapToPlay": "Tocca una carta valida per giocare",
+        "tapToPlayImmediate": "Tocca una carta valida per giocare immediatamente."
+      },
       "legal": {
+        "short": "Valide:",
+        "long": "Carte valide:",
         "empty": "Nessuna"
       }
     },
@@ -188,8 +211,11 @@
     },
     "trickArea": {
       "lastRoundFinalPosition": "Posizione finale della mano precedente",
-      "waitingForLead": "In attesa dell’attacco…",
-      "trickOf": "Presa {trickNo} su {handSize}"
+      "waitingForLead": "In attesa dell'attacco…",
+      "waitingForBidding": "In attesa della fine delle offerte…",
+      "waitingForTrump": "In attesa della scelta del seme di briscola…",
+      "trickOf": "Presa {trickNo} su {handSize}",
+      "ariaLabel": "Carte della presa attuale"
     },
     "hand": {
       "title": "La tua mano",

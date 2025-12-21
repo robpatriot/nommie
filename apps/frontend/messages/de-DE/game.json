@@ -161,6 +161,20 @@
       "description": "Wähle eine erlaubte Karte aus deiner Hand. Nur erlaubte Karten bleiben aktiv.",
       "waitingOn": "Warten auf: {name}",
       "selectedCardLabel": "Ausgewählte Karte",
+      "button": {
+        "playing": "Spielen…",
+        "playCard": "Spielen",
+        "playSelectedCard": "Ausgewählte Karte spielen",
+        "waitingFor": "Warten auf {name}",
+        "waitingForNext": "Warten auf nächsten Spieler",
+        "aria": {
+          "selectCard": "Karte zum Spielen auswählen",
+          "playing": "Karte wird gespielt",
+          "playSelected": "Ausgewählte Karte spielen: {card}",
+          "playSelectedGeneric": "Ausgewählte Karte spielen",
+          "waitingForPlayer": "Warten auf {name} zum Spielen"
+        }
+      },
       "submit": {
         "playing": "Spielen…",
         "label": {
@@ -175,7 +189,16 @@
           "waitingForPlayer": "Warten auf {name} zum Spielen"
         }
       },
+      "status": {
+        "handWillAppear": "Die Hand erscheint, sobald das Spiel beginnt.",
+        "waitingFor": "Warten auf {name}",
+        "waitingForNext": "Warten auf nächsten Spieler",
+        "tapToPlay": "Tippe auf eine erlaubte Karte zum Spielen",
+        "tapToPlayImmediate": "Tippe auf eine erlaubte Karte, um sofort zu spielen."
+      },
       "legal": {
+        "short": "Erlaubt:",
+        "long": "Erlaubte Karten:",
         "empty": "Keine"
       }
     },
@@ -189,7 +212,10 @@
     "trickArea": {
       "lastRoundFinalPosition": "Endposition der letzten Runde",
       "waitingForLead": "Warten auf Ausspiel…",
-      "trickOf": "Stich {trickNo} von {handSize}"
+      "waitingForBidding": "Warten auf das Ende des Bietens…",
+      "waitingForTrump": "Warten auf die Wahl der Trumpffarbe…",
+      "trickOf": "Stich {trickNo} von {handSize}",
+      "ariaLabel": "Aktuelle Stichkarten"
     },
     "hand": {
       "title": "Deine Hand",

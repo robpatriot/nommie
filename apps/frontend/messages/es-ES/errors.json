@@ -67,7 +67,6 @@
       "show": "Mostrar",
       "hide": "Ocultar",
       "details": "detalles",
-      "messageLabel": "Mensaje del servidor",
       "statusLabel": "Estado HTTP",
       "codeLabel": "Código de error",
       "traceIdLabel": "ID de traza"
@@ -79,5 +78,27 @@
     "tryAgain": "Reintentar",
     "reloadPage": "Recargar página",
     "devDetails": "Detalles del error (solo dev)"
+  },
+  "actions": {
+    "failedToFetchGameSnapshot": "Error al cargar el estado de la partida",
+    "failedToMarkPlayerReady": "Error al marcar al jugador como listo",
+    "failedToSubmitBid": "Error al enviar la puja",
+    "failedToSelectTrump": "Error al seleccionar el triunfo",
+    "failedToPlayCard": "Error al jugar la carta",
+    "failedToAddAiSeat": "Error al añadir asiento de IA",
+    "failedToAddAiSeatNoVersion": "Error al añadir asiento de IA: no se pudo determinar la versión de la partida",
+    "failedToAddAiSeatNoSnapshot": "Error al añadir asiento de IA: no se pudo cargar el estado de la partida",
+    "failedToRemoveAiSeat": "Error al eliminar asiento de IA",
+    "failedToRemoveAiSeatNoVersion": "Error al eliminar asiento de IA: no se pudo determinar la versión de la partida",
+    "failedToRemoveAiSeatNoSnapshot": "Error al eliminar asiento de IA: no se pudo cargar el estado de la partida",
+    "failedToUpdateAiSeat": "Error al actualizar asiento de IA",
+    "failedToUpdateAiSeatNoVersion": "Error al actualizar asiento de IA: no se pudo determinar la versión de la partida",
+    "failedToUpdateAiSeatNoSnapshot": "Error al actualizar asiento de IA: no se pudo cargar el estado de la partida",
+    "failedToFetchAiRegistry": "Error al cargar el registro de IA",
+    "failedToDeleteGameNoVersion": "Error al eliminar la partida: no se pudo determinar la versión",
+    "failedToDeleteGameNoSnapshot": "Error al eliminar la partida: no se pudo cargar el estado"
+  },
+  "page": {
+    "failedToLoadGameSnapshot": "Error al cargar el estado de la partida: respuesta inesperada"
   }
 }

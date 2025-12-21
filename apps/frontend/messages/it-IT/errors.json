@@ -67,7 +67,6 @@
       "show": "Mostra",
       "hide": "Nascondi",
       "details": "dettagli",
-      "messageLabel": "Messaggio server",
       "statusLabel": "Stato HTTP",
       "codeLabel": "Codice errore",
       "traceIdLabel": "ID traccia"
@@ -79,5 +78,27 @@
     "tryAgain": "Riprova",
     "reloadPage": "Ricarica pagina",
     "devDetails": "Dettagli errore (solo dev)"
+  },
+  "actions": {
+    "failedToFetchGameSnapshot": "Impossibile caricare lo stato della partita",
+    "failedToMarkPlayerReady": "Impossibile segnare il giocatore come pronto",
+    "failedToSubmitBid": "Impossibile inviare la puntata",
+    "failedToSelectTrump": "Impossibile selezionare la briscola",
+    "failedToPlayCard": "Impossibile giocare la carta",
+    "failedToAddAiSeat": "Impossibile aggiungere posto IA",
+    "failedToAddAiSeatNoVersion": "Impossibile aggiungere posto IA: impossibile determinare la versione della partita",
+    "failedToAddAiSeatNoSnapshot": "Impossibile aggiungere posto IA: impossibile caricare lo stato della partita",
+    "failedToRemoveAiSeat": "Impossibile rimuovere posto IA",
+    "failedToRemoveAiSeatNoVersion": "Impossibile rimuovere posto IA: impossibile determinare la versione della partita",
+    "failedToRemoveAiSeatNoSnapshot": "Impossibile rimuovere posto IA: impossibile caricare lo stato della partita",
+    "failedToUpdateAiSeat": "Impossibile aggiornare posto IA",
+    "failedToUpdateAiSeatNoVersion": "Impossibile aggiornare posto IA: impossibile determinare la versione della partita",
+    "failedToUpdateAiSeatNoSnapshot": "Impossibile aggiornare posto IA: impossibile caricare lo stato della partita",
+    "failedToFetchAiRegistry": "Impossibile caricare il registro IA",
+    "failedToDeleteGameNoVersion": "Impossibile eliminare la partita: impossibile determinare la versione",
+    "failedToDeleteGameNoSnapshot": "Impossibile eliminare la partita: impossibile caricare lo stato"
+  },
+  "page": {
+    "failedToLoadGameSnapshot": "Impossibile caricare lo stato della partita: risposta inattesa"
   }
 }

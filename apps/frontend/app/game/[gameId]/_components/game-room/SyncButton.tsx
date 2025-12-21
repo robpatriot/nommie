@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/cn'
 
 interface SyncButtonProps {
@@ -15,6 +16,8 @@ export function SyncButton({
   isRefreshing,
   className,
 }: SyncButtonProps) {
+  const t = useTranslations('game.gameRoom.actions')
+
   return (
     <button
       type="button"
@@ -24,9 +27,9 @@ export function SyncButton({
         'flex items-center gap-2 rounded-full border border-white/20 bg-black/40 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-primary/60 hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60',
         className
       )}
-      aria-label={isRefreshing ? 'Refreshing game state' : 'Refresh game state'}
+      aria-label={isRefreshing ? t('refreshingAria') : t('refreshAria')}
     >
-      <span>Sync</span>
+      <span>{t('sync')}</span>
       <svg
         aria-hidden="true"
         className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}

@@ -161,6 +161,20 @@
       "description": "Elige una carta legal de tu mano. Solo las cartas permitidas quedan activas.",
       "waitingOn": "Esperando: {name}",
       "selectedCardLabel": "Carta seleccionada",
+      "button": {
+        "playing": "Jugando…",
+        "playCard": "Jugar",
+        "playSelectedCard": "Jugar carta seleccionada",
+        "waitingFor": "Esperando a {name}",
+        "waitingForNext": "Esperando al siguiente jugador",
+        "aria": {
+          "selectCard": "Seleccionar carta para jugar",
+          "playing": "Jugando carta",
+          "playSelected": "Jugar la carta seleccionada: {card}",
+          "playSelectedGeneric": "Jugar carta seleccionada",
+          "waitingForPlayer": "Esperando a {name} para jugar"
+        }
+      },
       "submit": {
         "playing": "Jugando…",
         "label": {
@@ -175,7 +189,16 @@
           "waitingForPlayer": "Esperando a {name} para jugar"
         }
       },
+      "status": {
+        "handWillAppear": "La mano aparecerá una vez que comience la partida.",
+        "waitingFor": "Esperando a {name}",
+        "waitingForNext": "Esperando al siguiente jugador",
+        "tapToPlay": "Toca cualquier carta válida para jugar",
+        "tapToPlayImmediate": "Toca una carta válida para jugar inmediatamente."
+      },
       "legal": {
+        "short": "Válidas:",
+        "long": "Cartas válidas:",
         "empty": "Ninguna"
       }
     },
@@ -189,7 +212,10 @@
     "trickArea": {
       "lastRoundFinalPosition": "Posición final de la ronda anterior",
       "waitingForLead": "Esperando la salida…",
-      "trickOf": "Baza {trickNo} de {handSize}"
+      "waitingForBidding": "Esperando a que termine la puja…",
+      "waitingForTrump": "Esperando a que se elija el triunfo…",
+      "trickOf": "Baza {trickNo} de {handSize}",
+      "ariaLabel": "Cartas de la baza actual"
     },
     "hand": {
       "title": "Tu mano",

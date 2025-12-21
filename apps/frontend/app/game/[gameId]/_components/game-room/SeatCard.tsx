@@ -1,3 +1,6 @@
+'use client'
+
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/cn'
 import type { SeatSummary } from './utils'
 
@@ -12,6 +15,7 @@ export function SeatCard({
   variant = 'table',
   className = '',
 }: SeatCardProps) {
+  const t = useTranslations('game.gameRoom')
   const { orientation, name, isViewer, tricksWon, isActive, bid } = summary
 
   const positionStyles: Record<SeatSummary['orientation'], string> = {
@@ -26,9 +30,9 @@ export function SeatCard({
   const badge =
     orientation === 'bottom'
       ? isViewer
-        ? 'You'
-        : 'South seat'
-      : `${orientation.charAt(0).toUpperCase()}${orientation.slice(1)} seat`
+        ? t('you')
+        : t('seat.badge.south')
+      : t(`seat.badge.${orientation}`)
 
   const baseClasses =
     variant === 'table'
@@ -59,19 +63,19 @@ export function SeatCard({
       <div className="flex flex-wrap items-center justify-center gap-1 text-[10px] sm:justify-end">
         {typeof bid === 'number' ? (
           <span className="rounded-full bg-black/20 px-2 py-0.5 font-semibold text-foreground">
-            Bid {bid}
+            {t('seat.bid', { bid })}
           </span>
         ) : null}
         {typeof tricksWon === 'number' ? (
           <span className="rounded-full bg-black/20 px-2 py-0.5 font-semibold text-foreground">
-            Won {tricksWon}
+            {t('seat.won', { tricksWon })}
           </span>
         ) : null}
       </div>
 
       {isViewer ? (
         <span className="hidden self-center rounded-full bg-success/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success-contrast sm:inline">
-          You
+          {t('you')}
         </span>
       ) : null}
     </div>

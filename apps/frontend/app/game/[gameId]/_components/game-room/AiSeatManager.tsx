@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import type { GameRoomViewProps } from '../game-room-view'
 
 interface AiSeatManagerProps {
@@ -5,11 +6,12 @@ interface AiSeatManagerProps {
 }
 
 export function AiSeatManager({ aiState }: AiSeatManagerProps) {
+  const t = useTranslations('game.gameRoom.ai')
+
   if (!aiState) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-surface/60 p-4 text-sm text-subtle">
-        The host is configuring AI players for this game. Seating updates will
-        appear once the match begins.
+        {t('noAccess')}
       </div>
     )
   }
@@ -32,31 +34,29 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
   const waitingSeatCount = seats.filter((seat) => !seat.isOccupied).length
   const waitingSeatLabel =
     waitingSeatCount === 0
-      ? 'All seats filled'
-      : `${waitingSeatCount} open seat${
-          waitingSeatCount === 1 ? '' : 's'
-        } waiting for players`
+      ? t('waitingSeatLabel.allFilled')
+      : t('waitingSeatLabel.openSeats', { count: waitingSeatCount })
 
   return (
     <div className="rounded-xl border border-accent/40 bg-accent/10 p-4 text-sm text-accent-contrast">
       <header className="mb-4 space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-            AI Seats
+            {t('kicker')}
           </p>
           <span className="rounded-full border border-accent/40 bg-accent/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-accent-contrast">
-            {aiState.aiSeats} bots ·{' '}
-            {aiState.totalSeats - aiState.availableSeats}/{aiState.totalSeats}{' '}
-            seats filled
+            {t('summary', {
+              bots: aiState.aiSeats,
+              filled: aiState.totalSeats - aiState.availableSeats,
+              total: aiState.totalSeats,
+            })}
           </span>
         </div>
         <div className="space-y-1">
           <h3 className="text-xl font-semibold text-foreground">
-            Bring bots to fill the table
+            {t('title')}
           </h3>
-          <p className="text-xs text-muted">
-            Use bots to fill empty seats before the game starts.
-          </p>
+          <p className="text-xs text-muted">{t('description')}</p>
         </div>
       </header>
 
@@ -71,11 +71,13 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
             className="relative inline-flex items-center justify-start rounded-md bg-accent pl-3 pr-8 py-2 text-sm font-semibold text-accent-foreground transition hover:bg-accent/80 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-accent-foreground/70"
             aria-label={
               aiState.isPending
-                ? 'Adding AI player'
-                : `Add AI player with profile ${preferredDefaultName}`
+                ? t('add.aria.adding')
+                : t('add.aria.addWithProfile', {
+                    profile: preferredDefaultName,
+                  })
             }
           >
-            <span className="whitespace-nowrap">Add AI</span>
+            <span className="whitespace-nowrap">{t('add.label')}</span>
             {aiState.isPending ? (
               <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center">
                 <svg
@@ -104,11 +106,11 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
             ) : null}
           </button>
           <span className="text-[11px] text-accent-contrast/80">
-            Defaults to&nbsp;
+            {t('defaultsTo')}&nbsp;
             <span className="font-semibold text-accent-contrast">
               {preferredDefaultName}
             </span>
-            {isRegistryLoading ? ' (loading registry…)' : ''}
+            {isRegistryLoading ? t('registryLoadingSuffix') : ''}
           </span>
         </div>
 
@@ -128,24 +130,31 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
-                      Seat {seat.seat + 1}
+                      {t('seatLabel', { seatNumber: seat.seat + 1 })}
                     </p>
                     <p className="text-base font-semibold text-foreground">
                       {seat.name}
                     </p>
                     <p className="text-[11px] uppercase tracking-wide text-subtle">
                       {seat.aiProfile
-                        ? `Running ${seat.aiProfile.name} · v${seat.aiProfile.version}`
-                        : 'Select an AI profile to tune this bot'}
+                        ? t('runningProfile', {
+                            name: seat.aiProfile.name,
+                            version: seat.aiProfile.version,
+                          })
+                        : t('selectProfileHint')}
                     </p>
                   </div>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <label htmlFor={`ai-seat-${seat.seat}`} className="sr-only">
-                      Select AI profile for seat {seat.seat + 1}
+                      {t('profileSelect.labelSr', {
+                        seatNumber: seat.seat + 1,
+                      })}
                     </label>
                     <select
                       id={`ai-seat-${seat.seat}`}
-                      aria-label={`Select AI profile for seat ${seat.seat + 1}`}
+                      aria-label={t('profileSelect.aria', {
+                        seatNumber: seat.seat + 1,
+                      })}
                       className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/50 disabled:cursor-not-allowed disabled:text-muted"
                       disabled={
                         aiState.isPending ||
@@ -174,21 +183,24 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                       {registryEntries.length === 0 ? (
                         <option value="">
                           {isRegistryLoading
-                            ? 'Loading profiles…'
-                            : 'No profiles available'}
+                            ? t('profileSelect.loading')
+                            : t('profileSelect.none')}
                         </option>
                       ) : (
                         <>
                           {!seat.aiProfile ? (
                             <option value="" disabled>
-                              Select a profile
+                              {t('profileSelect.select')}
                             </option>
                           ) : null}
                           {registryEntries.map((entry) => {
                             const key = `${entry.name}::${entry.version}`
                             return (
                               <option key={key} value={key}>
-                                {entry.name} · v{entry.version}
+                                {t('profileOption', {
+                                  name: entry.name,
+                                  version: entry.version,
+                                })}
                               </option>
                             )
                           })}
@@ -202,10 +214,12 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                       }}
                       disabled={aiState.isPending}
                       className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-accent/40 text-accent-contrast transition hover:bg-accent/20 disabled:cursor-not-allowed disabled:text-accent-contrast/60"
-                      aria-label={`Remove AI from seat ${seat.seat + 1}`}
+                      aria-label={t('remove.aria', {
+                        seatNumber: seat.seat + 1,
+                      })}
                     >
                       <span className="sr-only">
-                        Remove AI from seat {seat.seat + 1}
+                        {t('remove.sr', { seatNumber: seat.seat + 1 })}
                       </span>
                       <svg
                         aria-hidden="true"
@@ -231,8 +245,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
           </ul>
         ) : (
           <div className="rounded-2xl border border-dashed border-accent/30 bg-surface/40 px-4 py-3 text-xs text-accent-contrast/80">
-            No bots are seated yet. Use the Add AI action to drop one into the
-            next open seat.
+            {t('empty')}
           </div>
         )}
 

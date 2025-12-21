@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
 import { formatTrump, getPhaseLabel } from './utils'
 import { PhaseFact } from './PhaseFact'
@@ -35,6 +36,9 @@ export function ScoreSidebar({
   isHistoryLoading = false,
   className,
 }: ScoreSidebarProps) {
+  const t = useTranslations('game.gameRoom.sidebar')
+  const tError = useTranslations('game.gameRoom.error')
+
   return (
     <aside
       className={cn(
@@ -46,19 +50,19 @@ export function ScoreSidebar({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-subtle">
-              Game {gameId}
+              {t('kicker', { gameId })}
             </p>
             <h2 className="text-2xl font-bold text-foreground">
               {getPhaseLabel(phase)}
             </h2>
             <p className="text-sm text-muted">
-              Turn{' '}
+              {t('turnLabel')}{' '}
               <span className="font-semibold text-primary">{activeName}</span>
             </p>
           </div>
           {phase.phase === 'Trick' ? (
             <StatCard
-              label="Trick"
+              label={t('trick.label')}
               value={`${phase.data.trick_no} / ${round?.hand_size ?? '?'}`}
               className="px-3 py-1.5"
               valueClassName="text-base"
@@ -69,10 +73,19 @@ export function ScoreSidebar({
 
       {round ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-border/60 bg-surface/70 p-3 text-sm text-muted">
-          <PhaseFact label="Round" value={`${roundNo}`} />
-          <PhaseFact label="Dealer" value={seatDisplayName(dealer)} />
-          <PhaseFact label="Hand Size" value={round.hand_size.toString()} />
-          <PhaseFact label="Trump" value={formatTrump(round.trump)} />
+          <PhaseFact label={t('facts.round')} value={`${roundNo}`} />
+          <PhaseFact
+            label={t('facts.dealer')}
+            value={seatDisplayName(dealer)}
+          />
+          <PhaseFact
+            label={t('facts.handSize')}
+            value={round.hand_size.toString()}
+          />
+          <PhaseFact
+            label={t('facts.trump')}
+            value={formatTrump(round.trump)}
+          />
         </div>
       ) : null}
 
@@ -81,7 +94,7 @@ export function ScoreSidebar({
           <p>{error.message}</p>
           {error.traceId ? (
             <p className="text-xs text-warning-foreground/80">
-              traceId: {error.traceId}
+              {tError('traceIdLabel')}: {error.traceId}
             </p>
           ) : null}
         </div>
@@ -92,7 +105,7 @@ export function ScoreSidebar({
         open
       >
         <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-foreground transition hover:bg-surface">
-          <span>Scoreboard</span>
+          <span>{t('scoreboard.title')}</span>
           {onShowHistory ? (
             <button
               type="button"
@@ -102,9 +115,13 @@ export function ScoreSidebar({
               }}
               disabled={isHistoryLoading}
               className="flex items-center gap-1 rounded-full border border-white/20 bg-surface/60 px-3 py-1 text-[11px] font-semibold text-foreground transition hover:border-primary/60 hover:bg-primary/10 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label="Show score history"
+              aria-label={t('scoreboard.showHistoryAria')}
             >
-              <span>{isHistoryLoading ? 'Opening…' : 'History'}</span>
+              <span>
+                {isHistoryLoading
+                  ? t('scoreboard.opening')
+                  : t('scoreboard.history')}
+              </span>
               <svg
                 aria-hidden="true"
                 className="h-3 w-3"

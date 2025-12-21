@@ -494,7 +494,7 @@ export function GameRoomView(props: GameRoomViewProps) {
             ) : null}
             {showPreviousRoundPosition ? (
               <div className="text-left text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
-                Last round&apos;s final position
+                {t('trickArea.lastRoundFinalPosition')}
               </div>
             ) : null}
             <div

@@ -67,7 +67,6 @@
       "show": "Afficher",
       "hide": "Masquer",
       "details": "les détails",
-      "messageLabel": "Détails techniques",
       "statusLabel": "Statut HTTP",
       "codeLabel": "Code d’erreur",
       "traceIdLabel": "ID de trace"
@@ -75,9 +74,31 @@
   },
   "boundary": {
     "title": "Une erreur est survenue",
-    "fallbackMessage": "Une erreur inattendue s’est produite",
+    "fallbackMessage": "Une erreur inattendue s'est produite",
     "tryAgain": "Réessayer",
     "reloadPage": "Recharger la page",
-    "devDetails": "Détails de l’erreur (dev uniquement)"
+    "devDetails": "Détails de l'erreur (dev uniquement)"
+  },
+  "actions": {
+    "failedToFetchGameSnapshot": "Échec du chargement de l'état de la partie",
+    "failedToMarkPlayerReady": "Échec du marquage du joueur comme prêt",
+    "failedToSubmitBid": "Échec de la soumission de l'enchère",
+    "failedToSelectTrump": "Échec de la sélection de l'atout",
+    "failedToPlayCard": "Échec du jeu de la carte",
+    "failedToAddAiSeat": "Échec de l'ajout d'un siège IA",
+    "failedToAddAiSeatNoVersion": "Échec de l'ajout d'un siège IA : impossible de déterminer la version de la partie",
+    "failedToAddAiSeatNoSnapshot": "Échec de l'ajout d'un siège IA : impossible de charger l'état de la partie",
+    "failedToRemoveAiSeat": "Échec de la suppression d'un siège IA",
+    "failedToRemoveAiSeatNoVersion": "Échec de la suppression d'un siège IA : impossible de déterminer la version de la partie",
+    "failedToRemoveAiSeatNoSnapshot": "Échec de la suppression d'un siège IA : impossible de charger l'état de la partie",
+    "failedToUpdateAiSeat": "Échec de la mise à jour d'un siège IA",
+    "failedToUpdateAiSeatNoVersion": "Échec de la mise à jour d'un siège IA : impossible de déterminer la version de la partie",
+    "failedToUpdateAiSeatNoSnapshot": "Échec de la mise à jour d'un siège IA : impossible de charger l'état de la partie",
+    "failedToFetchAiRegistry": "Échec du chargement du registre IA",
+    "failedToDeleteGameNoVersion": "Échec de la suppression de la partie : impossible de déterminer la version",
+    "failedToDeleteGameNoSnapshot": "Échec de la suppression de la partie : impossible de charger l'état"
+  },
+  "page": {
+    "failedToLoadGameSnapshot": "Échec du chargement de l'état de la partie : réponse inattendue"
   }
 }
