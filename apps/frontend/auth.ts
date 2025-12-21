@@ -59,8 +59,7 @@ const nextAuthResult = NextAuth({
         token.googleSub = profile.sub
         token.name = profile.name || token.name
 
-        // Store backend JWT in cookie on initial login
-        // (Also stored in token for backward compatibility during migration)
+        // Store backend JWT in cookie and token on initial login
         const backendBase = getBackendBaseUrlOrThrow()
 
         try {
@@ -77,10 +76,9 @@ const nextAuthResult = NextAuth({
           if (response.ok) {
             const data = await response.json()
             if (data && typeof data.token === 'string') {
-              // Store in token for backward compatibility
+              // Store in token and cookie
               token.backendJwt = data.token
 
-              // Also store in cookie (new approach)
               const { setBackendJwtInCookie } =
                 await import('@/lib/auth/backend-jwt-cookie')
               await setBackendJwtInCookie(data.token)

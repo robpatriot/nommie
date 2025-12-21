@@ -244,7 +244,14 @@
         "long": "Legal cards:",
         "all": "all"
       },
+      "suitAbbrev": {
+        "S": "S",
+        "C": "C",
+        "H": "H",
+        "D": "D"
+      },
       "waitingOn": "Waiting on {name}",
+      "you": "You",
       "empty": "Hand will appear once available.",
       "cardState": {
         "selected": "selected",
@@ -340,6 +347,12 @@
     }
   },
   "cards": {
+    "rank": {
+      "J": "J",
+      "Q": "Q",
+      "K": "K",
+      "A": "A"
+    },
     "suit": {
       "spades": "Spades",
       "hearts": "Hearts",

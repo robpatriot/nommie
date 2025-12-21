@@ -37,7 +37,7 @@ export default function Toast({ toasts, onClose }: ToastProps) {
   })
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex max-w-md flex-col-reverse gap-2">
+    <div className="fixed bottom-4 right-4 z-[100] flex max-w-md flex-col-reverse gap-2">
       {sortedToasts.map((toast) => (
         <ToastItem
           key={toast.id}

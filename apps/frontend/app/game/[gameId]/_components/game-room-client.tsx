@@ -100,6 +100,7 @@ export function GameRoomClient({
     canMarkReady,
     hasMarkedReady,
     setHasMarkedReady,
+    showToast,
   })
 
   // Game room controls
@@ -120,6 +121,7 @@ export function GameRoomClient({
     gameId,
     snapshot,
     canViewAiManager,
+    showToast,
   })
 
   return (

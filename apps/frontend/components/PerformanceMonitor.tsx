@@ -44,7 +44,7 @@ export function PerformanceMonitor() {
     // Store LCP entry collected via PerformanceObserver
     let lcpEntry: LargestContentfulPaint | null = null
 
-    // Set up PerformanceObserver for LCP (replaces deprecated getEntriesByType)
+    // Set up PerformanceObserver for LCP
     let lcpObserver: PerformanceObserver | null = null
     if ('PerformanceObserver' in window) {
       try {
@@ -180,7 +180,7 @@ export function PerformanceMonitor() {
         console.groupEnd()
       }
 
-      // Web Vitals - LCP (using PerformanceObserver instead of deprecated getEntriesByType)
+      // Web Vitals - LCP (using PerformanceObserver)
       if (lcpEntry) {
         // LargestContentfulPaint has renderTime or loadTime
         const lcpValue =

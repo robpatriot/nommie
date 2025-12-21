@@ -2,9 +2,8 @@ use actix_web::http::StatusCode;
 use actix_web::ResponseError;
 use backend::db::txn::with_txn;
 use backend::entities::user_credentials;
-use backend::AppError;
-use backend::ErrorCode;
 use backend::services::users::UserService;
+use backend::{AppError, ErrorCode};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 
@@ -63,9 +62,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
                 .filter(user_credentials::Column::Email.eq(&normalized_email))
                 .one(txn)
                 .await
-                .map_err(|e| {
-                    backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-                })?
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?
                 .expect("should have credential row");
 
             assert_eq!(
@@ -115,9 +112,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
                 .filter(user_credentials::Column::Email.eq(&normalized_email))
                 .one(txn)
                 .await
-                .map_err(|e| {
-                    backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-                })?
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?
                 .expect("should have credential row");
 
             assert_eq!(
@@ -201,7 +196,7 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
             let service = UserService;
 
             // Create a user with NULL google_sub by directly inserting into the database
-            // This simulates a legacy user who doesn't have a google_sub set yet
+            // This simulates a user who doesn't have a google_sub set yet
             use backend::entities::users;
             use sea_orm::{ActiveModelTrait, NotSet, Set};
 
@@ -219,9 +214,10 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
                 updated_at: Set(now),
             };
 
-            let user = user_active.insert(txn).await.map_err(|e| {
-                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-            })?;
+            let user = user_active
+                .insert(txn)
+                .await
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
 
             // Create credential with NULL google_sub
             // Note: store normalized email to match service behavior
@@ -236,9 +232,10 @@ async fn test_ensure_user_set_null_google_sub() -> Result<(), AppError> {
                 updated_at: Set(now),
             };
 
-            credential_active.insert(txn).await.map_err(|e| {
-                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-            })?;
+            credential_active
+                .insert(txn)
+                .await
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
 
             // Scenario 4: Repeat login (email exists, google_sub NULL) → sets google_sub to incoming, succeeds
             let updated_user = service

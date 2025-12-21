@@ -21,7 +21,7 @@ import { fetchWithAuthWithRetry } from './server/fetch-with-retry'
 // Re-export BackendApiError for convenience (it's also available from ./errors)
 export { BackendApiError }
 
-// Re-export ProblemDetails interface for backward compatibility
+// Re-export ProblemDetails interface for convenience
 export type { ProblemDetails } from './api/error-parsing'
 
 /**

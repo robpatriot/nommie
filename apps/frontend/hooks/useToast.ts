@@ -36,7 +36,7 @@ export function useToast() {
       // Hide specific toast by id
       setToasts((prev) => prev.filter((toast) => toast.id !== id))
     } else {
-      // Hide all toasts (backward compatibility)
+      // Hide all toasts
       setToasts([])
     }
   }, [])

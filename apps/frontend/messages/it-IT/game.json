@@ -244,7 +244,14 @@
         "long": "Carte valide:",
         "all": "tutte"
       },
+      "suitAbbrev": {
+        "S": "P",
+        "C": "F",
+        "H": "C",
+        "D": "Q"
+      },
       "waitingOn": "In attesa di {name}",
+      "you": "Tu",
       "empty": "La mano apparirà quando sarà disponibile.",
       "cardState": {
         "selected": "selezionata",
@@ -340,6 +347,12 @@
     }
   },
   "cards": {
+    "rank": {
+      "J": "F",
+      "Q": "D",
+      "K": "R",
+      "A": "A"
+    },
     "suit": {
       "spades": "Picche",
       "hearts": "Cuori",

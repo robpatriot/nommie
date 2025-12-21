@@ -244,8 +244,15 @@
         "long": "Cartes autorisées :",
         "all": "toutes"
       },
+      "suitAbbrev": {
+        "S": "P",
+        "C": "T",
+        "H": "Co",
+        "D": "Ca"
+      },
       "waitingOn": "En attente de {name}",
-      "empty": "La main apparaîtra dès qu’elle sera disponible.",
+      "you": "Vous",
+      "empty": "La main apparaîtra dès qu'elle sera disponible.",
       "cardState": {
         "selected": "sélectionnée",
         "playable": "jouable",
@@ -340,6 +347,12 @@
     }
   },
   "cards": {
+    "rank": {
+      "J": "V",
+      "Q": "D",
+      "K": "R",
+      "A": "A"
+    },
     "suit": {
       "spades": "Piques",
       "hearts": "Cœurs",

@@ -16,6 +16,15 @@ const NAMESPACES = [
   'game',
 ]
 
+// Keys that are allowed to be identical to the default locale
+// These are cases where the translation is legitimately the same (e.g., abbreviations, proper nouns)
+const ALLOWED_IDENTICAL_KEYS = [
+  'game.gameRoom.hand.suitAbbrev.H', // Hearts abbreviation is "H" in both English and German
+  'game.cards.rank.A', // Ace abbreviation is "A" in all languages (Ace/As/Ass/Asso all start with A)
+  'game.cards.rank.K', // King abbreviation is "K" in both English and German (King/König both start with K)
+  'game.cards.rank.J', // Jack abbreviation is "J" in both English and Spanish (Jack/Jota both start with J)
+]
+
 function readJson(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8')
   return JSON.parse(raw)
@@ -114,7 +123,7 @@ function main() {
       for (const [k, v] of current.entries()) {
         const baseValue = base.get(k)
         if (baseValue === undefined) continue
-        if (v === baseValue) {
+        if (v === baseValue && !ALLOWED_IDENTICAL_KEYS.includes(k)) {
           untranslated.push(k)
         }
       }

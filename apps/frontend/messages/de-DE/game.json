@@ -244,7 +244,14 @@
         "long": "Erlaubte Karten:",
         "all": "alle"
       },
+      "suitAbbrev": {
+        "S": "P",
+        "C": "Kr",
+        "H": "H",
+        "D": "Ka"
+      },
       "waitingOn": "Warten auf {name}",
+      "you": "Du",
       "empty": "Die Hand erscheint, sobald sie verfügbar ist.",
       "cardState": {
         "selected": "ausgewählt",
@@ -340,6 +347,12 @@
     }
   },
   "cards": {
+    "rank": {
+      "J": "B",
+      "Q": "D",
+      "K": "K",
+      "A": "A"
+    },
     "suit": {
       "spades": "Pik",
       "hearts": "Herz",

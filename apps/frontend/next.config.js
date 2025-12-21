@@ -30,7 +30,7 @@ const nextConfig = {
   output: 'standalone',
   async headers() {
     // Build Content-Security-Policy
-    // Using balanced approach: allows 'unsafe-inline' for Next.js compatibility
+    // Allows 'unsafe-inline' for Next.js hydration and theme scripts
     // while restricting external sources to only what's needed
     
     // Get backend URLs for CSP connect-src directive

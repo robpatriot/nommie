@@ -97,10 +97,11 @@ export function GameRoomView(props: GameRoomViewProps) {
   // If viewerSeat is undefined/null, no seat will be marked as "viewer".
   const effectiveViewerSeat: Seat | null = viewerSeat ?? null
 
+  const tYou = t('you')
   const seatDisplayName = useCallback(
     (seat: Seat) =>
-      getPlayerDisplayName(seat, effectiveViewerSeat, playerNames),
-    [playerNames, effectiveViewerSeat]
+      getPlayerDisplayName(seat, effectiveViewerSeat, playerNames, tYou),
+    [playerNames, effectiveViewerSeat, tYou]
   )
   const activeName =
     typeof activeSeat === 'number' ? seatDisplayName(activeSeat) : 'Waiting'
@@ -197,7 +198,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     return mapGameHistory(rawHistory)
   }, [rawHistory])
 
-  // Convert query error to string for compatibility
+  // Convert query error to string
   const historyError = useMemo<string | null>(() => {
     if (!historyQueryError) {
       return null

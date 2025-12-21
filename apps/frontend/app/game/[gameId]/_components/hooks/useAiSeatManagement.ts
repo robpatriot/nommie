@@ -8,7 +8,8 @@ import {
   useUpdateAiSeat,
   useRemoveAiSeat,
 } from '@/hooks/mutations/useGameRoomMutations'
-import { useToast } from '@/hooks/useToast'
+import type { ToastMessage } from '@/components/Toast'
+import type { BackendApiError } from '@/lib/errors'
 import { toQueryError } from '@/lib/queries/query-error-handler'
 import type { AiSeatSelection } from '../game-room-view'
 
@@ -23,6 +24,11 @@ interface UseAiSeatManagementProps {
   gameId: number
   snapshot: GameRoomSnapshotPayload
   canViewAiManager: boolean
+  showToast: (
+    message: string,
+    type: ToastMessage['type'],
+    error?: BackendApiError
+  ) => string
 }
 
 /**
@@ -33,8 +39,8 @@ export function useAiSeatManagement({
   gameId,
   snapshot,
   canViewAiManager,
+  showToast,
 }: UseAiSeatManagementProps) {
-  const { showToast } = useToast()
   const t = useTranslations('toasts.gameRoom')
   const tErrors = useTranslations('toasts.gameRoom.errors')
 
@@ -45,7 +51,7 @@ export function useAiSeatManagement({
     error: aiRegistryQueryError,
   } = useAiRegistry(canViewAiManager)
 
-  // Convert query error to string for compatibility
+  // Convert query error to string
   const aiRegistryError = aiRegistryQueryError
     ? aiRegistryQueryError instanceof Error
       ? aiRegistryQueryError.message

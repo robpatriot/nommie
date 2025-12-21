@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import type { Trump } from '@/lib/game-room/types'
-import { useToast } from '@/hooks/useToast'
+import type { ToastMessage } from '@/components/Toast'
 import {
   useMarkPlayerReady,
   useSubmitBid,
@@ -10,6 +10,7 @@ import {
   useSubmitPlay,
 } from '@/hooks/mutations/useGameRoomMutations'
 import { toQueryError } from '@/lib/queries/query-error-handler'
+import type { BackendApiError } from '@/lib/errors'
 
 interface UseGameRoomActionsProps {
   gameId: number
@@ -17,6 +18,11 @@ interface UseGameRoomActionsProps {
   canMarkReady: boolean
   hasMarkedReady: boolean
   setHasMarkedReady: (value: boolean) => void
+  showToast: (
+    message: string,
+    type: ToastMessage['type'],
+    error?: BackendApiError
+  ) => string
 }
 
 /**
@@ -29,8 +35,8 @@ export function useGameRoomActions({
   canMarkReady,
   hasMarkedReady,
   setHasMarkedReady,
+  showToast,
 }: UseGameRoomActionsProps) {
-  const { showToast } = useToast()
   const t = useTranslations('toasts')
   const tErrors = useTranslations('toasts.gameRoom.errors')
 

@@ -108,7 +108,7 @@ where
                 header::HeaderValue::from_static("geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=()"),
             );
 
-            // X-XSS-Protection: Legacy header (deprecated but still useful for older browsers)
+            // X-XSS-Protection: Included for older browser support
             headers.insert(
                 header::HeaderName::from_static("x-xss-protection"),
                 header::HeaderValue::from_static("1; mode=block"),

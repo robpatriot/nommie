@@ -41,9 +41,14 @@ type PlayingCardProps = {
   isSelected?: boolean
 }
 
-function getRankLabel(card: Card) {
+function getRankLabel(card: Card, tRank: (key: string) => string) {
   const value = card.slice(0, -1)
   if (value === 'T') return '10'
+  // Translate letter ranks (J, Q, K, A) for localization
+  if (value === 'J' || value === 'Q' || value === 'K' || value === 'A') {
+    return tRank(value)
+  }
+  // Numbers (2-9) are universal, return as-is
   return value || card
 }
 
@@ -56,9 +61,10 @@ export function PlayingCard({
 }: PlayingCardProps) {
   const t = useTranslations('game.gameRoom')
   const tCards = useTranslations('game.cards')
+  const tRank = useTranslations('game.cards.rank')
   const suitKey = card.slice(-1) as keyof typeof suitMap
   const suit = suitMap[suitKey] ?? suitMap.S
-  const rankLabel = getRankLabel(card)
+  const rankLabel = getRankLabel(card, tRank)
   const styles = sizeStyles[size]
 
   // Map suit keys to translation keys

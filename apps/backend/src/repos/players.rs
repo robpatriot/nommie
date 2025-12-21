@@ -126,7 +126,7 @@ pub async fn resolve_display_name_for_membership<C: ConnectionTrait + Send + Syn
 /// Get the display name of a player in a game by seat.
 ///
 /// Uses the consolidated `resolve_display_name_for_membership` function internally.
-/// Does not include the final "Player {seat+1}" fallback for backwards compatibility.
+/// Does not include the final "Player {seat+1}" fallback.
 ///
 /// # Arguments
 /// * `conn` - Database connection
@@ -155,6 +155,6 @@ pub async fn get_display_name_by_seat<C: ConnectionTrait + Send + Sync>(
             )
         })?;
 
-    // Use consolidated function without final fallback (for backwards compatibility)
+    // Use consolidated function without final fallback
     resolve_display_name_for_membership(conn, membership, seat, false).await
 }
