@@ -208,6 +208,7 @@ export interface ManageAiSeatRequest {
   registryName?: string
   registryVersion?: string
   seed?: number
+  lockVersion?: number
 }
 
 export async function addAiSeatAction(
@@ -223,8 +224,32 @@ export async function addAiSeatAction(
     }
   }
 
+  // If no lock_version is provided, fetch the game snapshot to get it
+  let finalLockVersion = request.lockVersion
+  if (finalLockVersion === undefined) {
+    try {
+      const snapshotResult = await fetchGameSnapshot(request.gameId)
+      if (
+        snapshotResult.kind === 'ok' &&
+        snapshotResult.lockVersion !== undefined
+      ) {
+        finalLockVersion = snapshotResult.lockVersion
+      } else {
+        return toErrorResult(
+          new Error('Failed to get lock version from game snapshot'),
+          'Failed to add AI seat: could not determine game version'
+        )
+      }
+    } catch (error) {
+      return toErrorResult(
+        error,
+        'Failed to add AI seat: could not fetch game snapshot'
+      )
+    }
+  }
+
   try {
-    await addAiSeat(request.gameId, {
+    await addAiSeat(request.gameId, finalLockVersion, {
       seat: request.seat,
       registryName: request.registryName,
       registryVersion: request.registryVersion,
@@ -249,8 +274,32 @@ export async function removeAiSeatAction(
     }
   }
 
+  // If no lock_version is provided, fetch the game snapshot to get it
+  let finalLockVersion = request.lockVersion
+  if (finalLockVersion === undefined) {
+    try {
+      const snapshotResult = await fetchGameSnapshot(request.gameId)
+      if (
+        snapshotResult.kind === 'ok' &&
+        snapshotResult.lockVersion !== undefined
+      ) {
+        finalLockVersion = snapshotResult.lockVersion
+      } else {
+        return toErrorResult(
+          new Error('Failed to get lock version from game snapshot'),
+          'Failed to remove AI seat: could not determine game version'
+        )
+      }
+    } catch (error) {
+      return toErrorResult(
+        error,
+        'Failed to remove AI seat: could not fetch game snapshot'
+      )
+    }
+  }
+
   try {
-    await removeAiSeat(request.gameId, {
+    await removeAiSeat(request.gameId, finalLockVersion, {
       seat: request.seat,
     })
     return { kind: 'ok' }
@@ -272,8 +321,32 @@ export async function updateAiSeatAction(
     }
   }
 
+  // If no lock_version is provided, fetch the game snapshot to get it
+  let finalLockVersion = request.lockVersion
+  if (finalLockVersion === undefined) {
+    try {
+      const snapshotResult = await fetchGameSnapshot(request.gameId)
+      if (
+        snapshotResult.kind === 'ok' &&
+        snapshotResult.lockVersion !== undefined
+      ) {
+        finalLockVersion = snapshotResult.lockVersion
+      } else {
+        return toErrorResult(
+          new Error('Failed to get lock version from game snapshot'),
+          'Failed to update AI seat: could not determine game version'
+        )
+      }
+    } catch (error) {
+      return toErrorResult(
+        error,
+        'Failed to update AI seat: could not fetch game snapshot'
+      )
+    }
+  }
+
   try {
-    await updateAiSeat(request.gameId, {
+    await updateAiSeat(request.gameId, finalLockVersion, {
       seat: request.seat,
       registryName: request.registryName,
       registryVersion: request.registryVersion,

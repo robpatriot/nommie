@@ -145,23 +145,27 @@ export interface ManageAiSeatPayload {
   seed?: number
 }
 
-function buildAiSeatBody(payload?: ManageAiSeatPayload) {
-  const body: Record<string, unknown> = {}
-  if (!payload) {
-    return body
+function buildAiSeatBody(
+  payload: ManageAiSeatPayload | undefined,
+  lockVersion: number
+) {
+  const body: Record<string, unknown> = {
+    lock_version: lockVersion,
   }
 
-  if (payload.seat !== undefined) {
-    body.seat = payload.seat
-  }
-  if (payload.registryName) {
-    body.registry_name = payload.registryName
-  }
-  if (payload.registryVersion) {
-    body.registry_version = payload.registryVersion
-  }
-  if (typeof payload.seed === 'number') {
-    body.seed = payload.seed
+  if (payload) {
+    if (payload.seat !== undefined) {
+      body.seat = payload.seat
+    }
+    if (payload.registryName) {
+      body.registry_name = payload.registryName
+    }
+    if (payload.registryVersion) {
+      body.registry_version = payload.registryVersion
+    }
+    if (typeof payload.seed === 'number') {
+      body.seed = payload.seed
+    }
   }
 
   return body
@@ -169,31 +173,34 @@ function buildAiSeatBody(payload?: ManageAiSeatPayload) {
 
 export async function addAiSeat(
   gameId: number,
+  lockVersion: number,
   payload?: ManageAiSeatPayload
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ai/add`, {
     method: 'POST',
-    body: JSON.stringify(buildAiSeatBody(payload)),
+    body: JSON.stringify(buildAiSeatBody(payload, lockVersion)),
   })
 }
 
 export async function updateAiSeat(
   gameId: number,
+  lockVersion: number,
   payload: ManageAiSeatPayload
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ai/update`, {
     method: 'POST',
-    body: JSON.stringify(buildAiSeatBody(payload)),
+    body: JSON.stringify(buildAiSeatBody(payload, lockVersion)),
   })
 }
 
 export async function removeAiSeat(
   gameId: number,
+  lockVersion: number,
   payload?: ManageAiSeatPayload
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ai/remove`, {
     method: 'POST',
-    body: JSON.stringify(buildAiSeatBody(payload)),
+    body: JSON.stringify(buildAiSeatBody(payload, lockVersion)),
   })
 }
 

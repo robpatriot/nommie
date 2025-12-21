@@ -886,12 +886,13 @@ struct DeleteGameRequest {
     lock_version: i32,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 struct ManageAiSeatRequest {
     seat: Option<u8>,
     registry_name: Option<String>,
     registry_version: Option<String>,
     seed: Option<u64>,
+    lock_version: i32,
 }
 
 fn resolve_registry_selection(
@@ -940,15 +941,16 @@ async fn add_ai_seat(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
-    body: Option<web::Json<ManageAiSeatRequest>>,
+    body: ValidatedJson<ManageAiSeatRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
-    let request = body.map(|b| b.into_inner()).unwrap_or_default();
+    let request = body.into_inner();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
+    let lock_version = request.lock_version;
 
-    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_lock_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1083,8 +1085,7 @@ async fn add_ai_seat(
                 .map_err(AppError::from)?;
 
             // Touch game to increment lock_version so websocket clients receive the update
-            let game = games_repo::require_game(txn, id).await?;
-            let updated_game = games_repo::touch_game(txn, id, game.lock_version)
+            let updated_game = games_repo::touch_game(txn, id, lock_version)
                 .await
                 .map_err(AppError::from)?;
             Ok(updated_game.lock_version)
@@ -1092,7 +1093,7 @@ async fn add_ai_seat(
     })
     .await?;
 
-    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
+    publish_snapshot_with_lock(&app_state, id, updated_lock_version).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1101,15 +1102,16 @@ async fn remove_ai_seat(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
-    body: Option<web::Json<ManageAiSeatRequest>>,
+    body: ValidatedJson<ManageAiSeatRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
-    let request = body.map(|b| b.into_inner()).unwrap_or_default();
+    let request = body.into_inner();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
+    let lock_version = request.lock_version;
 
-    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_lock_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1201,8 +1203,8 @@ async fn remove_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            let game = games_repo::require_game(txn, id).await?;
-            let updated_game = games_repo::touch_game(txn, id, game.lock_version)
+            // Touch game to increment lock_version so websocket clients receive the update
+            let updated_game = games_repo::touch_game(txn, id, lock_version)
                 .await
                 .map_err(AppError::from)?;
             Ok(updated_game.lock_version)
@@ -1210,7 +1212,7 @@ async fn remove_ai_seat(
     })
     .await?;
 
-    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
+    publish_snapshot_with_lock(&app_state, id, updated_lock_version).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1219,11 +1221,11 @@ async fn update_ai_seat(
     http_req: HttpRequest,
     game_id: GameId,
     membership: GameMembership,
-    body: Option<web::Json<ManageAiSeatRequest>>,
+    body: ValidatedJson<ManageAiSeatRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
-    let request = body.map(|b| b.into_inner()).unwrap_or_default();
+    let request = body.into_inner();
 
     let Some(seat_val) = request.seat else {
         return Err(AppError::bad_request(
@@ -1239,7 +1241,9 @@ async fn update_ai_seat(
         ));
     }
 
-    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
+    let lock_version = request.lock_version;
+
+    let updated_lock_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1336,8 +1340,8 @@ async fn update_ai_seat(
                 }
             }
 
-            let game = games_repo::require_game(txn, id).await?;
-            let updated_game = games_repo::touch_game(txn, id, game.lock_version)
+            // Touch game to increment lock_version so websocket clients receive the update
+            let updated_game = games_repo::touch_game(txn, id, lock_version)
                 .await
                 .map_err(AppError::from)?;
             Ok(updated_game.lock_version)
@@ -1345,7 +1349,7 @@ async fn update_ai_seat(
     })
     .await?;
 
-    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
+    publish_snapshot_with_lock(&app_state, id, updated_lock_version).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }

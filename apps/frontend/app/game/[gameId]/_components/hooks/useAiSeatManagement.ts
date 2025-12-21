@@ -87,6 +87,7 @@ export function useAiSeatManagement({
             registryName,
             registryVersion,
             seed: selection?.seed,
+            lockVersion: snapshot.lockVersion,
           })
           showToast('AI seat added', 'success')
         } catch (err) {
@@ -103,6 +104,7 @@ export function useAiSeatManagement({
       runExclusiveAction,
       addAiSeatMutation,
       showToast,
+      snapshot.lockVersion,
     ]
   )
 
@@ -114,7 +116,11 @@ export function useAiSeatManagement({
 
       await runExclusiveAction('ai', async () => {
         try {
-          await removeAiSeatMutation.mutateAsync({ gameId, seat })
+          await removeAiSeatMutation.mutateAsync({
+            gameId,
+            seat,
+            lockVersion: snapshot.lockVersion,
+          })
           showToast('AI seat removed', 'success')
         } catch (err) {
           const backendError = toQueryError(err, 'Failed to remove AI seat')
@@ -129,6 +135,7 @@ export function useAiSeatManagement({
       runExclusiveAction,
       removeAiSeatMutation,
       showToast,
+      snapshot.lockVersion,
     ]
   )
 
@@ -146,6 +153,7 @@ export function useAiSeatManagement({
             registryName: selection.registryName,
             registryVersion: selection.registryVersion,
             seed: selection.seed,
+            lockVersion: snapshot.lockVersion,
           })
           showToast('AI seat updated', 'success')
         } catch (err) {
@@ -161,6 +169,7 @@ export function useAiSeatManagement({
       runExclusiveAction,
       updateAiSeatMutation,
       showToast,
+      snapshot.lockVersion,
     ]
   )
 
