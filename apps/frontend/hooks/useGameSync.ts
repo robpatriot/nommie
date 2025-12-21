@@ -75,6 +75,8 @@ export function useGameSync({
   const shouldReconnectRef = useRef(true)
   const etagRef = useRef<string | undefined>(initialData.etag)
   const lockVersionRef = useRef<number | undefined>(initialData.lockVersion)
+  // Use refs for message handlers to avoid recreating connect callback unnecessarily
+  const handleMessageEventRef = useRef<(event: MessageEvent<string>) => void>()
 
   const buildEtag = useCallback(
     (lockVersion?: number) =>
@@ -200,6 +202,9 @@ export function useGameSync({
     [handleSnapshotMessage, gameId]
   )
 
+  // Keep the ref in sync with the latest handler
+  handleMessageEventRef.current = handleMessageEvent
+
   const scheduleReconnect = useCallback((connectFn: () => Promise<void>) => {
     if (!shouldReconnectRef.current) {
       return
@@ -266,7 +271,10 @@ export function useGameSync({
         setConnectionState('connected')
       }
 
-      ws.onmessage = handleMessageEvent
+      // Use ref to avoid dependency on handleMessageEvent in connect callback
+      ws.onmessage = (event) => {
+        handleMessageEventRef.current?.(event)
+      }
 
       ws.onerror = () => {
         setSyncError({
@@ -293,13 +301,7 @@ export function useGameSync({
       })
       scheduleReconnect(connect)
     }
-  }, [
-    fetchWsToken,
-    gameId,
-    handleMessageEvent,
-    resolveWsUrl,
-    scheduleReconnect,
-  ])
+  }, [fetchWsToken, gameId, resolveWsUrl, scheduleReconnect])
 
   useEffect(() => {
     void connect()
