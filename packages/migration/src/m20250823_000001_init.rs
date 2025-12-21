@@ -37,6 +37,7 @@ enum UserOptions {
     UserId,
     AppearanceMode,
     RequireCardConfirmation,
+    Locale,
     UpdatedAt,
 }
 
@@ -335,6 +336,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(true),
                     )
+                    .col(ColumnDef::new(UserOptions::Locale).string().null())
                     .col(
                         ColumnDef::new(UserOptions::UpdatedAt)
                             .timestamp_with_time_zone()

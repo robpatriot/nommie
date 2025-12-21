@@ -7,13 +7,16 @@ use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
 use crate::extractors::ValidatedJson;
-use crate::repos::user_options::{self, AppearanceMode, UpdateUserOptions, UserOptions};
+use crate::repos::user_options::{
+    self, AppearanceMode, UpdateUserOptions, UserLocale, UserOptions,
+};
 use crate::state::app_state::AppState;
 
 #[derive(Debug, Serialize)]
 pub struct UserOptionsResponse {
     pub appearance_mode: AppearanceMode,
     pub require_card_confirmation: bool,
+    pub locale: Option<UserLocale>,
     pub updated_at: String,
 }
 
@@ -22,6 +25,7 @@ impl From<UserOptions> for UserOptionsResponse {
         Self {
             appearance_mode: value.appearance_mode,
             require_card_confirmation: value.require_card_confirmation,
+            locale: value.locale,
             updated_at: value.updated_at.to_string(),
         }
     }
@@ -33,6 +37,8 @@ pub struct UpdateUserOptionsRequest {
     pub appearance_mode: Option<AppearanceMode>,
     #[serde(default)]
     pub require_card_confirmation: Option<bool>,
+    #[serde(default)]
+    pub locale: Option<UserLocale>,
 }
 
 async fn get_user_options(
@@ -62,7 +68,18 @@ async fn update_user_options(
     let user_id = current_user.id;
     let payload = body.into_inner();
 
-    if payload.appearance_mode.is_none() && payload.require_card_confirmation.is_none() {
+    if let Some(locale) = payload.locale {
+        tracing::info!(
+            user_id = user_id,
+            locale = locale.as_str(),
+            "user_options.locale_updated"
+        );
+    }
+
+    if payload.appearance_mode.is_none()
+        && payload.require_card_confirmation.is_none()
+        && payload.locale.is_none()
+    {
         return Err(AppError::Validation {
             code: ErrorCode::ValidationError,
             detail: "At least one option must be provided".to_string(),
@@ -73,6 +90,7 @@ async fn update_user_options(
     let update_request = UpdateUserOptions {
         appearance_mode: payload.appearance_mode,
         require_card_confirmation: payload.require_card_confirmation,
+        locale: payload.locale,
     };
 
     let options = with_txn(Some(&req), &app_state, move |txn| {

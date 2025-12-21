@@ -37,11 +37,52 @@ impl AppearanceMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UserLocale {
+    #[serde(rename = "en-GB")]
+    EnGb,
+    #[serde(rename = "fr-FR")]
+    FrFr,
+    #[serde(rename = "de-DE")]
+    DeDe,
+    #[serde(rename = "es-ES")]
+    EsEs,
+    #[serde(rename = "it-IT")]
+    ItIt,
+}
+
+impl UserLocale {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::EnGb => "en-GB",
+            Self::FrFr => "fr-FR",
+            Self::DeDe => "de-DE",
+            Self::EsEs => "es-ES",
+            Self::ItIt => "it-IT",
+        }
+    }
+
+    pub fn from_db(value: &str, user_id: i64) -> Result<Self, DomainError> {
+        match value {
+            "en-GB" => Ok(Self::EnGb),
+            "fr-FR" => Ok(Self::FrFr),
+            "de-DE" => Ok(Self::DeDe),
+            "es-ES" => Ok(Self::EsEs),
+            "it-IT" => Ok(Self::ItIt),
+            other => Err(DomainError::infra(
+                InfraErrorKind::DataCorruption,
+                format!("invalid locale '{other}' stored for user_id={user_id}"),
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserOptions {
     pub user_id: i64,
     pub appearance_mode: AppearanceMode,
     pub require_card_confirmation: bool,
+    pub locale: Option<UserLocale>,
     pub updated_at: OffsetDateTime,
 }
 
@@ -49,6 +90,7 @@ pub struct UserOptions {
 pub struct UpdateUserOptions {
     pub appearance_mode: Option<AppearanceMode>,
     pub require_card_confirmation: Option<bool>,
+    pub locale: Option<UserLocale>,
 }
 
 pub async fn ensure_default_for_user(
@@ -69,6 +111,7 @@ pub async fn update_options(
         user_id,
         options.appearance_mode.map(|mode| mode.as_str()),
         options.require_card_confirmation,
+        options.locale.map(|locale| locale.as_str()),
     )
     .await?;
     UserOptions::try_from(model)
@@ -79,10 +122,15 @@ impl TryFrom<crate::entities::user_options::Model> for UserOptions {
 
     fn try_from(model: crate::entities::user_options::Model) -> Result<Self, Self::Error> {
         let appearance_mode = AppearanceMode::from_db(&model.appearance_mode, model.user_id)?;
+        let locale = model
+            .locale
+            .map(|l| UserLocale::from_db(&l, model.user_id))
+            .transpose()?;
         Ok(Self {
             user_id: model.user_id,
             appearance_mode,
             require_card_confirmation: model.require_card_confirmation,
+            locale,
             updated_at: model.updated_at,
         })
     }
