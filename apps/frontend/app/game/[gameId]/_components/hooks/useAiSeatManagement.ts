@@ -22,23 +22,16 @@ interface UseAiSeatManagementProps {
   gameId: number
   snapshot: GameRoomSnapshotPayload
   canViewAiManager: boolean
-  isAiPending: boolean
-  runExclusiveAction: (
-    actionType: 'ai',
-    actionFn: () => Promise<void>
-  ) => Promise<void>
 }
 
 /**
  * Manages AI seat operations (add, update, remove) and computes AI seat state.
- * Handles AI registry query and mutation states.
+ * Uses TanStack Query mutation state for pending and error handling.
  */
 export function useAiSeatManagement({
   gameId,
   snapshot,
   canViewAiManager,
-  isAiPending,
-  runExclusiveAction,
 }: UseAiSeatManagementProps) {
   const { showToast } = useToast()
 
@@ -64,6 +57,12 @@ export function useAiSeatManagement({
   const updateAiSeatMutation = useUpdateAiSeat()
   const removeAiSeatMutation = useRemoveAiSeat()
 
+  // Combined pending state from all AI mutations
+  const isAiPending =
+    addAiSeatMutation.isPending ||
+    updateAiSeatMutation.isPending ||
+    removeAiSeatMutation.isPending
+
   const aiControlsEnabled = canViewAiManager
 
   const handleAddAi = useCallback(
@@ -72,36 +71,33 @@ export function useAiSeatManagement({
         return
       }
 
-      await runExclusiveAction('ai', async () => {
-        const registryName =
-          selection?.registryName ??
-          aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
-          DEFAULT_AI_NAME
-        const registryVersion =
-          selection?.registryVersion ??
-          aiRegistry.find((entry) => entry.name === registryName)?.version
+      const registryName =
+        selection?.registryName ??
+        aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
+        DEFAULT_AI_NAME
+      const registryVersion =
+        selection?.registryVersion ??
+        aiRegistry.find((entry) => entry.name === registryName)?.version
 
-        try {
-          await addAiSeatMutation.mutateAsync({
-            gameId,
-            registryName,
-            registryVersion,
-            seed: selection?.seed,
-            lockVersion: snapshot.lockVersion,
-          })
-          showToast('AI seat added', 'success')
-        } catch (err) {
-          const backendError = toQueryError(err, 'Failed to add AI seat')
-          showToast(backendError.message, 'error', backendError)
-        }
-      })
+      try {
+        await addAiSeatMutation.mutateAsync({
+          gameId,
+          registryName,
+          registryVersion,
+          seed: selection?.seed,
+          lockVersion: snapshot.lockVersion,
+        })
+        showToast('AI seat added', 'success')
+      } catch (err) {
+        const backendError = toQueryError(err, 'Failed to add AI seat')
+        showToast(backendError.message, 'error', backendError)
+      }
     },
     [
       aiRegistry,
       aiControlsEnabled,
       gameId,
       isAiPending,
-      runExclusiveAction,
       addAiSeatMutation,
       showToast,
       snapshot.lockVersion,
@@ -114,25 +110,22 @@ export function useAiSeatManagement({
         return
       }
 
-      await runExclusiveAction('ai', async () => {
-        try {
-          await removeAiSeatMutation.mutateAsync({
-            gameId,
-            seat,
-            lockVersion: snapshot.lockVersion,
-          })
-          showToast('AI seat removed', 'success')
-        } catch (err) {
-          const backendError = toQueryError(err, 'Failed to remove AI seat')
-          showToast(backendError.message, 'error', backendError)
-        }
-      })
+      try {
+        await removeAiSeatMutation.mutateAsync({
+          gameId,
+          seat,
+          lockVersion: snapshot.lockVersion,
+        })
+        showToast('AI seat removed', 'success')
+      } catch (err) {
+        const backendError = toQueryError(err, 'Failed to remove AI seat')
+        showToast(backendError.message, 'error', backendError)
+      }
     },
     [
       aiControlsEnabled,
       gameId,
       isAiPending,
-      runExclusiveAction,
       removeAiSeatMutation,
       showToast,
       snapshot.lockVersion,
@@ -145,28 +138,25 @@ export function useAiSeatManagement({
         return
       }
 
-      await runExclusiveAction('ai', async () => {
-        try {
-          await updateAiSeatMutation.mutateAsync({
-            gameId,
-            seat,
-            registryName: selection.registryName,
-            registryVersion: selection.registryVersion,
-            seed: selection.seed,
-            lockVersion: snapshot.lockVersion,
-          })
-          showToast('AI seat updated', 'success')
-        } catch (err) {
-          const backendError = toQueryError(err, 'Failed to update AI seat')
-          showToast(backendError.message, 'error', backendError)
-        }
-      })
+      try {
+        await updateAiSeatMutation.mutateAsync({
+          gameId,
+          seat,
+          registryName: selection.registryName,
+          registryVersion: selection.registryVersion,
+          seed: selection.seed,
+          lockVersion: snapshot.lockVersion,
+        })
+        showToast('AI seat updated', 'success')
+      } catch (err) {
+        const backendError = toQueryError(err, 'Failed to update AI seat')
+        showToast(backendError.message, 'error', backendError)
+      }
     },
     [
       aiControlsEnabled,
       gameId,
       isAiPending,
-      runExclusiveAction,
       updateAiSeatMutation,
       showToast,
       snapshot.lockVersion,
@@ -213,7 +203,7 @@ export function useAiSeatManagement({
       totalSeats,
       availableSeats,
       aiSeats,
-      isPending: isAiPending || !aiControlsEnabled,
+      isPending: isAiPending,
       canAdd: availableSeats > 0 && !isAiRegistryLoading && aiControlsEnabled,
       canRemove: aiSeats > 0 && aiControlsEnabled,
       onAdd: (selection?: AiSeatSelection) => {

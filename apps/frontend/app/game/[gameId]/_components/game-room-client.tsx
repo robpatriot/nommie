@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import Toast from '@/components/Toast'
@@ -10,20 +10,12 @@ import { useGameRoomSnapshot } from '@/hooks/queries/useGameRoomSnapshot'
 import type { Seat } from '@/lib/game-room/types'
 
 import { GameRoomView } from './game-room-view'
-import type { GameRoomError } from './game-room-view.types'
-import {
-  useAddAiSeat,
-  useUpdateAiSeat,
-  useRemoveAiSeat,
-} from '@/hooks/mutations/useGameRoomMutations'
 import { getGameRoomError } from '@/lib/queries/query-error-handler'
 import { useGameRoomReadyState } from './hooks/useGameRoomReadyState'
 import { useSlowSyncIndicator } from './hooks/useSlowSyncIndicator'
 import { useGameRoomActions } from './hooks/useGameRoomActions'
 import { useGameRoomControls } from './hooks/useGameRoomControls'
 import { useAiSeatManagement } from './hooks/useAiSeatManagement'
-
-type PendingAction = 'ready' | 'bid' | 'trump' | 'play' | 'ai' | null
 
 interface GameRoomClientProps {
   initialData: GameRoomSnapshotPayload
@@ -55,11 +47,9 @@ export function GameRoomClient({
   } = useGameSync({ initialData, gameId })
 
   const { toasts, showToast, hideToast } = useToast()
-  const [pendingAction, setPendingAction] = useState<PendingAction>(null)
-  const [actionError, setActionError] = useState<GameRoomError | null>(null)
 
-  // Combine errors from query, WebSocket, and actions
-  const combinedError = actionError ?? syncError ?? getGameRoomError(queryError)
+  // Combine errors from query and WebSocket (mutations handle their own errors)
+  const combinedError = syncError ?? getGameRoomError(queryError)
 
   // Combine loading/refreshing states
   // Only show loading for initial loads (isLoading) or manual refreshes (syncIsRefreshing)
@@ -83,42 +73,6 @@ export function GameRoomClient({
   const viewerIsHost = viewerSeatForInteractions === hostSeat
   const canViewAiManager = viewerIsHost && phaseName === 'Init'
 
-  // AI mutations for pending state calculation
-  const addAiSeatMutation = useAddAiSeat()
-  const updateAiSeatMutation = useUpdateAiSeat()
-  const removeAiSeatMutation = useRemoveAiSeat()
-
-  // Calculate combined pending states (pendingAction + mutation states)
-  const isAiPending =
-    pendingAction === 'ai' ||
-    addAiSeatMutation.isPending ||
-    updateAiSeatMutation.isPending ||
-    removeAiSeatMutation.isPending
-
-  // Exclusive action runner (shared across all actions)
-  const finishAction = useCallback(() => {
-    setPendingAction(null)
-  }, [])
-
-  const runExclusiveAction = useCallback(
-    async (
-      actionType: Exclude<PendingAction, null>,
-      actionFn: () => Promise<void>
-    ) => {
-      if (pendingAction) {
-        return
-      }
-      setPendingAction(actionType)
-      setActionError(null)
-      try {
-        await actionFn()
-      } finally {
-        finishAction()
-      }
-    },
-    [finishAction, pendingAction]
-  )
-
   // Ready state management
   const { hasMarkedReady, setHasMarkedReady, canMarkReady } =
     useGameRoomReadyState(snapshot, viewerSeatForInteractions, phaseName)
@@ -136,30 +90,17 @@ export function GameRoomClient({
     handleSubmitBid,
     handleSelectTrump,
     handlePlayCard,
-    isReadyPending: isReadyPendingFromHook,
-    isBidPending: isBidPendingFromHook,
-    isTrumpPending: isTrumpPendingFromHook,
-    isPlayPending: isPlayPendingFromHook,
-    actionError: actionErrorFromHook,
+    isReadyPending,
+    isBidPending,
+    isTrumpPending,
+    isPlayPending,
   } = useGameRoomActions({
     gameId,
     snapshot,
     canMarkReady,
     hasMarkedReady,
     setHasMarkedReady,
-    runExclusiveAction,
   })
-
-  // Sync actionError from hook
-  useEffect(() => {
-    setActionError(actionErrorFromHook)
-  }, [actionErrorFromHook])
-
-  // Calculate combined pending states
-  const isReadyPending = pendingAction === 'ready' || isReadyPendingFromHook
-  const isBidPending = pendingAction === 'bid' || isBidPendingFromHook
-  const isTrumpPending = pendingAction === 'trump' || isTrumpPendingFromHook
-  const isPlayPending = pendingAction === 'play' || isPlayPendingFromHook
 
   // Game room controls
   const { biddingControls, trumpControls, playControls } = useGameRoomControls({
@@ -179,8 +120,6 @@ export function GameRoomClient({
     gameId,
     snapshot,
     canViewAiManager,
-    isAiPending,
-    runExclusiveAction,
   })
 
   return (

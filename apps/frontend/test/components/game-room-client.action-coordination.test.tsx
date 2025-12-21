@@ -45,16 +45,30 @@ const initializedGameIds = new Set<number>()
 
 // Mock mutation hooks - mutateAsync should call the corresponding server action
 // If the action returns an error, mutateAsync should throw
-const mockUseMarkPlayerReady = vi.fn(() => ({
-  mutateAsync: async (gameId: number) => {
-    const result = await mockMarkPlayerReadyAction(gameId)
-    if (result.kind === 'error') {
-      throw new Error(result.message)
-    }
-    return result
-  },
-  isPending: false,
-}))
+// Track pending state to prevent concurrent calls - use shared state object
+const markPlayerReadyState = { isPending: false }
+const mockUseMarkPlayerReady = vi.fn(() => {
+  return {
+    mutateAsync: async (gameId: number) => {
+      if (markPlayerReadyState.isPending) {
+        return // Don't call if already pending
+      }
+      markPlayerReadyState.isPending = true
+      try {
+        const result = await mockMarkPlayerReadyAction(gameId)
+        if (result.kind === 'error') {
+          throw new Error(result.message)
+        }
+        return result
+      } finally {
+        markPlayerReadyState.isPending = false
+      }
+    },
+    get isPending() {
+      return markPlayerReadyState.isPending
+    },
+  }
+})
 
 const mockUseSubmitBid = vi.fn(() => ({
   mutateAsync: (request: unknown) => mockSubmitBidAction(request),
@@ -168,6 +182,9 @@ describe('GameRoomClient', () => {
     // Use real timers by default - userEvent and waitFor need real timers
     // Individual tests can switch to fake timers for timing-specific tests
     vi.useRealTimers()
+
+    // Reset pending state
+    markPlayerReadyState.isPending = false
 
     // Reset initialized game IDs
     initializedGameIds.clear()

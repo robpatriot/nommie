@@ -1,6 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback } from 'react'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
-import type { GameRoomError } from '../game-room-view.types'
 import type { Trump } from '@/lib/game-room/types'
 import { useToast } from '@/hooks/useToast'
 import {
@@ -11,23 +10,17 @@ import {
 } from '@/hooks/mutations/useGameRoomMutations'
 import { toQueryError } from '@/lib/queries/query-error-handler'
 
-type PendingAction = 'ready' | 'bid' | 'trump' | 'play' | 'ai' | null
-
 interface UseGameRoomActionsProps {
   gameId: number
   snapshot: GameRoomSnapshotPayload
   canMarkReady: boolean
   hasMarkedReady: boolean
   setHasMarkedReady: (value: boolean) => void
-  runExclusiveAction: (
-    actionType: Exclude<PendingAction, null>,
-    actionFn: () => Promise<void>
-  ) => Promise<void>
 }
 
 /**
  * Manages all game room action handlers (ready, bid, trump, play).
- * Handles pending state, error state, and exclusive action execution.
+ * Uses TanStack Query mutation state for pending and error handling.
  */
 export function useGameRoomActions({
   gameId,
@@ -35,9 +28,7 @@ export function useGameRoomActions({
   canMarkReady,
   hasMarkedReady,
   setHasMarkedReady,
-  runExclusiveAction,
 }: UseGameRoomActionsProps) {
-  const [actionError, setActionError] = useState<GameRoomError | null>(null)
   const { showToast } = useToast()
 
   // Mutations
@@ -46,7 +37,7 @@ export function useGameRoomActions({
   const selectTrumpMutation = useSelectTrump()
   const submitPlayMutation = useSubmitPlay()
 
-  // Pending states
+  // Pending states from mutations
   const isReadyPending = markPlayerReadyMutation.isPending
   const isBidPending = submitBidMutation.isPending
   const isTrumpPending = selectTrumpMutation.isPending
@@ -57,26 +48,18 @@ export function useGameRoomActions({
       return
     }
 
-    await runExclusiveAction('ready', async () => {
-      setActionError(null)
-      try {
-        await markPlayerReadyMutation.mutateAsync(gameId)
-        setHasMarkedReady(true)
-      } catch (err) {
-        const backendError = toQueryError(err, 'Unable to mark ready')
-        setActionError({
-          message: backendError.message,
-          traceId: backendError.traceId,
-        })
-        showToast(backendError.message, 'error', backendError)
-      }
-    })
+    try {
+      await markPlayerReadyMutation.mutateAsync(gameId)
+      setHasMarkedReady(true)
+    } catch (err) {
+      const backendError = toQueryError(err, 'Unable to mark ready')
+      showToast(backendError.message, 'error', backendError)
+    }
   }, [
     canMarkReady,
     gameId,
     hasMarkedReady,
     isReadyPending,
-    runExclusiveAction,
     markPlayerReadyMutation,
     setHasMarkedReady,
     showToast,
@@ -88,35 +71,24 @@ export function useGameRoomActions({
         return
       }
 
-      await runExclusiveAction('bid', async () => {
-        setActionError(null)
-        if (snapshot.lockVersion === undefined) {
-          setActionError({
-            message: 'Lock version is required to submit bid',
-          })
-          return
-        }
-        try {
-          await submitBidMutation.mutateAsync({
-            gameId,
-            bid,
-            lockVersion: snapshot.lockVersion!,
-          })
-          showToast('Bid submitted', 'success')
-        } catch (err) {
-          const backendError = toQueryError(err, 'Failed to submit bid')
-          showToast(backendError.message, 'error', backendError)
-        }
-      })
+      if (snapshot.lockVersion === undefined) {
+        showToast('Lock version is required to submit bid', 'error')
+        return
+      }
+
+      try {
+        await submitBidMutation.mutateAsync({
+          gameId,
+          bid,
+          lockVersion: snapshot.lockVersion!,
+        })
+        showToast('Bid submitted', 'success')
+      } catch (err) {
+        const backendError = toQueryError(err, 'Failed to submit bid')
+        showToast(backendError.message, 'error', backendError)
+      }
     },
-    [
-      gameId,
-      isBidPending,
-      runExclusiveAction,
-      snapshot.lockVersion,
-      submitBidMutation,
-      showToast,
-    ]
+    [gameId, isBidPending, snapshot.lockVersion, submitBidMutation, showToast]
   )
 
   const handleSelectTrump = useCallback(
@@ -125,31 +97,26 @@ export function useGameRoomActions({
         return
       }
 
-      await runExclusiveAction('trump', async () => {
-        setActionError(null)
-        if (snapshot.lockVersion === undefined) {
-          setActionError({
-            message: 'Lock version is required to select trump',
-          })
-          return
-        }
-        try {
-          await selectTrumpMutation.mutateAsync({
-            gameId,
-            trump,
-            lockVersion: snapshot.lockVersion!,
-          })
-          showToast('Trump selected', 'success')
-        } catch (err) {
-          const backendError = toQueryError(err, 'Failed to select trump')
-          showToast(backendError.message, 'error', backendError)
-        }
-      })
+      if (snapshot.lockVersion === undefined) {
+        showToast('Lock version is required to select trump', 'error')
+        return
+      }
+
+      try {
+        await selectTrumpMutation.mutateAsync({
+          gameId,
+          trump,
+          lockVersion: snapshot.lockVersion!,
+        })
+        showToast('Trump selected', 'success')
+      } catch (err) {
+        const backendError = toQueryError(err, 'Failed to select trump')
+        showToast(backendError.message, 'error', backendError)
+      }
     },
     [
       gameId,
       isTrumpPending,
-      runExclusiveAction,
       snapshot.lockVersion,
       selectTrumpMutation,
       showToast,
@@ -162,35 +129,24 @@ export function useGameRoomActions({
         return
       }
 
-      await runExclusiveAction('play', async () => {
-        setActionError(null)
-        if (snapshot.lockVersion === undefined) {
-          setActionError({
-            message: 'Lock version is required to play card',
-          })
-          return
-        }
-        try {
-          await submitPlayMutation.mutateAsync({
-            gameId,
-            card,
-            lockVersion: snapshot.lockVersion!,
-          })
-          showToast('Card played', 'success')
-        } catch (err) {
-          const backendError = toQueryError(err, 'Failed to play card')
-          showToast(backendError.message, 'error', backendError)
-        }
-      })
+      if (snapshot.lockVersion === undefined) {
+        showToast('Lock version is required to play card', 'error')
+        return
+      }
+
+      try {
+        await submitPlayMutation.mutateAsync({
+          gameId,
+          card,
+          lockVersion: snapshot.lockVersion!,
+        })
+        showToast('Card played', 'success')
+      } catch (err) {
+        const backendError = toQueryError(err, 'Failed to play card')
+        showToast(backendError.message, 'error', backendError)
+      }
     },
-    [
-      gameId,
-      isPlayPending,
-      runExclusiveAction,
-      snapshot.lockVersion,
-      submitPlayMutation,
-      showToast,
-    ]
+    [gameId, isPlayPending, snapshot.lockVersion, submitPlayMutation, showToast]
   )
 
   return {
@@ -199,12 +155,10 @@ export function useGameRoomActions({
     handleSubmitBid,
     handleSelectTrump,
     handlePlayCard,
-    // Pending states
+    // Pending states from mutations
     isReadyPending,
     isBidPending,
     isTrumpPending,
     isPlayPending,
-    // Error state
-    actionError,
   }
 }
