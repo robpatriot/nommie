@@ -46,7 +46,12 @@
     }
   },
   "language": {
+    "separator": "o",
     "options": {
+      "browser": {
+        "label": "Usa impostazione predefinita del browser",
+        "description": "Usa automaticamente la lingua del tuo dispositivo"
+      },
       "en-GB": {
         "label": "Inglese (Regno Unito)",
         "description": "Inglese britannico"

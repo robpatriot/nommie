@@ -14,7 +14,7 @@ import {
 export type UpdateUserOptionsPayload = {
   appearance_mode?: ThemeMode
   require_card_confirmation?: boolean
-  locale?: SupportedLocale
+  locale?: SupportedLocale | null
 }
 
 export async function updateUserOptionsAction(
@@ -41,15 +41,21 @@ export async function updateUserOptionsAction(
     })
 
     // If locale was updated, sync the cookie
-    if (payload.locale && isSupportedLocale(payload.locale)) {
+    if (payload.locale !== undefined) {
       const cookieStore = await cookies()
-      cookieStore.set(LOCALE_COOKIE_NAME, payload.locale, {
-        httpOnly: false,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        maxAge: 60 * 60 * 24 * 365,
-      })
+      if (payload.locale && isSupportedLocale(payload.locale)) {
+        // Set cookie to match backend preference
+        cookieStore.set(LOCALE_COOKIE_NAME, payload.locale, {
+          httpOnly: false,
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production',
+          path: '/',
+          maxAge: 60 * 60 * 24 * 365,
+        })
+      } else {
+        // Unset preference - delete the cookie so browser setting takes precedence
+        cookieStore.delete(LOCALE_COOKIE_NAME)
+      }
     }
 
     return { kind: 'ok' }
@@ -63,7 +69,7 @@ export async function updateAppearanceAction(mode: ThemeMode) {
 }
 
 export async function updateLocaleAction(
-  locale: SupportedLocale
+  locale: SupportedLocale | null
 ): Promise<SimpleActionResult> {
   return updateUserOptionsAction({ locale })
 }

@@ -46,7 +46,12 @@
     }
   },
   "language": {
+    "separator": "o",
     "options": {
+      "browser": {
+        "label": "Usar idioma del navegador",
+        "description": "Usar automáticamente el idioma de tu dispositivo"
+      },
       "en-GB": {
         "label": "Inglés (Reino Unido)",
         "description": "Inglés británico"

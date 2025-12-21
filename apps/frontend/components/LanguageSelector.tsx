@@ -31,30 +31,33 @@ export function LanguageSelector({
     return DEFAULT_LOCALE
   }, [effectiveLocaleRaw])
 
-  const initialSelection = useMemo<SupportedLocale>(() => {
-    if (preferredLocale && isSupportedLocale(preferredLocale)) {
-      return preferredLocale
-    }
-    return effectiveLocale
-  }, [preferredLocale, effectiveLocale])
-
-  const [selected, setSelected] = useState<SupportedLocale>(initialSelection)
+  const isUsingPreference = preferredLocale != null
+  const [selectedLocale, setSelectedLocale] = useState<SupportedLocale | null>(
+    preferredLocale && isSupportedLocale(preferredLocale)
+      ? preferredLocale
+      : null
+  )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const isUsingPreference = preferredLocale != null
-  const selectedLabel = t(`settings.language.options.${selected}.label`)
+  const selectedLabel = selectedLocale
+    ? t(`settings.language.options.${selectedLocale}.label`)
+    : t('settings.language.options.browser.label')
   const effectiveLabel = t(`settings.language.options.${effectiveLocale}.label`)
 
-  const onChange = (nextLocale: SupportedLocale) => {
-    setSelected(nextLocale)
+  const onChange = (nextLocale: SupportedLocale | null) => {
+    setSelectedLocale(nextLocale)
     setErrorMessage(null)
 
     startTransition(async () => {
       const result = await updateLocaleAction(nextLocale)
       if (result.kind === 'error') {
         setErrorMessage(result.message)
-        setSelected(initialSelection)
+        setSelectedLocale(
+          preferredLocale && isSupportedLocale(preferredLocale)
+            ? preferredLocale
+            : null
+        )
         return
       }
 
@@ -65,8 +68,9 @@ export function LanguageSelector({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
+        {/* Specific locale options */}
         {SUPPORTED_LOCALES.map((locale) => {
-          const isActive = selected === locale
+          const isActive = selectedLocale === locale
           return (
             <button
               key={locale}
@@ -106,6 +110,57 @@ export function LanguageSelector({
             </button>
           )
         })}
+
+        {/* Visual separator */}
+        <div className="my-2 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border/30" />
+          <span className="text-xs uppercase tracking-wide text-subtle">
+            {t('settings.language.separator')}
+          </span>
+          <div className="h-px flex-1 bg-border/30" />
+        </div>
+
+        {/* Browser default option */}
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          disabled={isPending}
+          aria-pressed={selectedLocale === null}
+          className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+            selectedLocale === null
+              ? 'border-primary/60 bg-primary/10 text-foreground shadow-inner shadow-primary/20'
+              : 'border-dashed border-muted/40 bg-surface/40 text-muted hover:border-primary/40 hover:bg-surface/60 hover:text-foreground'
+          } ${isPending ? 'opacity-80' : ''}`}
+        >
+          <span className="flex items-center gap-3">
+            <span aria-hidden className="text-lg">
+              🌐
+            </span>
+            <span className="flex flex-col">
+              <span className="text-sm font-semibold text-foreground">
+                {t('settings.language.options.browser.label')}
+              </span>
+              <span className="text-xs text-subtle">
+                {t('settings.language.options.browser.description')}
+              </span>
+            </span>
+          </span>
+          {selectedLocale === null ? (
+            <span
+              aria-hidden
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+            >
+              ✓
+            </span>
+          ) : (
+            <span
+              aria-hidden
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 text-xs text-muted"
+            >
+              ○
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="min-h-[1.5rem] text-sm">
@@ -119,7 +174,7 @@ export function LanguageSelector({
               error: errorMessage,
             })}
           </span>
-        ) : isUsingPreference ? (
+        ) : isUsingPreference && selectedLocale ? (
           <span className="text-subtle">
             {t('settings.language.status.usingPreference', {
               language: selectedLabel,
