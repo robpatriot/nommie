@@ -76,7 +76,9 @@ export function useGameSync({
   const etagRef = useRef<string | undefined>(initialData.etag)
   const lockVersionRef = useRef<number | undefined>(initialData.lockVersion)
   // Use refs for message handlers to avoid recreating connect callback unnecessarily
-  const handleMessageEventRef = useRef<(event: MessageEvent<string>) => void>()
+  const handleMessageEventRef = useRef<
+    ((event: MessageEvent<string>) => void) | undefined
+  >(undefined)
 
   const buildEtag = useCallback(
     (lockVersion?: number) =>
