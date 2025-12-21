@@ -1,0 +1,18 @@
+{
+  "brand": {
+    "homeAria": "Home di Nommie"
+  },
+  "breadcrumbs": {
+    "ariaLabel": "Percorso di navigazione"
+  },
+  "tagline": "Un tavolo tranquillo per giocare a Nomination Whist",
+  "account": {
+    "menuAria": "Menu account",
+    "signedInAs": "Accesso effettuato come",
+    "settings": "Impostazioni",
+    "signOut": "Esci"
+  },
+  "auth": {
+    "signInWithGoogle": "Accedi con Google"
+  }
+}

@@ -1,0 +1,327 @@
+{
+  "gameRoom": {
+    "you": "Vous",
+    "orientation": {
+      "top": "Haut",
+      "left": "Gauche",
+      "right": "Droite",
+      "bottom": "Bas"
+    },
+    "seat": {
+      "badge": {
+        "top": "Siège du haut",
+        "left": "Siège de gauche",
+        "right": "Siège de droite",
+        "south": "Siège du bas"
+      },
+      "bid": "Annonce {bid}",
+      "won": "Gagné {tricksWon}"
+    },
+    "lastTrick": {
+      "title": "Dernier pli",
+      "empty": "Aucun pli terminé pour l’instant."
+    },
+    "status": {
+      "waiting": "En attente"
+    },
+    "phase": {
+      "init": "Initialisation",
+      "bidding": "Annonce",
+      "trumpSelect": "Choix de l’atout",
+      "trick": "Jeu des plis",
+      "scoring": "Calcul des scores",
+      "complete": "Manche terminée",
+      "gameOver": "Partie terminée",
+      "unknown": "Phase inconnue"
+    },
+    "trump": {
+      "undeclared": "Non annoncé",
+      "CLUBS": "Trèfles",
+      "DIAMONDS": "Carreaux",
+      "HEARTS": "Cœurs",
+      "SPADES": "Piques",
+      "NO_TRUMPS": "Sans atout"
+    },
+    "setup": {
+      "kicker": "Configuration · Partie {gameId}",
+      "title": "Ajouter des joueurs",
+      "description": "Confirmez qui est assis, ajoutez des partenaires IA si nécessaire, puis signalez-vous prêt une fois la table en place. La partie commence quand chaque siège est prêt.",
+      "stats": {
+        "totalPlayers": {
+          "label": "Joueurs au total",
+          "description": "Places humaines ou IA attribuées"
+        },
+        "aiPlayers": {
+          "label": "Joueurs IA",
+          "description": "Bots actuellement assis"
+        },
+        "readyPlayers": {
+          "label": "Joueurs prêts",
+          "description": "Marqués prêts pour l’instant"
+        }
+      },
+      "quickActions": {
+        "title": "Actions rapides",
+        "subtitle": "Restez synchronisé et invitez des amis",
+        "manualSync": "Synchronisation manuelle",
+        "copyInviteAria": "Copier le lien d’invitation dans le presse-papiers",
+        "shareLink": "Partager le lien",
+        "copyInvite": "Copier l’invitation"
+      }
+    },
+    "setupSeats": {
+      "kicker": "Placement",
+      "title": "Qui est assis où",
+      "description": "Chaque siège indique s’il est occupé par un joueur, un bot, ou encore libre.",
+      "waitingForPlayer": "En attente d’un joueur",
+      "status": {
+        "ai": "Joueur IA",
+        "human": "Joueur",
+        "open": "Siège libre"
+      },
+      "seatLabel": "Siège {seatNumber}",
+      "ready": {
+        "ready": "Prêt",
+        "notReady": "Pas prêt"
+      },
+      "yourSeat": "Votre siège"
+    },
+    "ready": {
+      "none": "Les commandes Prêt apparaîtront lorsque ce sera disponible.",
+      "inPlayTitle": "Partie en cours",
+      "inPlayDescription": "Les actions apparaissent ici lorsque la table a besoin de vous.",
+      "title": "Se déclarer prêt",
+      "description": "Marquez-vous prêt. La partie commence quand tous les sièges sont prêts.",
+      "button": {
+        "label": "Je suis prêt",
+        "marking": "En cours…",
+        "readyWaiting": "Prêt — en attente des autres",
+        "aria": {
+          "marking": "Marquage en prêt",
+          "readyWaiting": "Prêt, en attente des autres joueurs",
+          "markReady": "Se marquer comme prêt"
+        }
+      }
+    },
+    "bidding": {
+      "title": "Annonce",
+      "subtitle": "Les annonces de chacun restent visibles ci-dessous.",
+      "turn": {
+        "yourTurn": "À vous",
+        "waiting": "En attente"
+      },
+      "yourBidLabel": "Votre annonce",
+      "bidValueAria": "Valeur de l’annonce",
+      "submit": {
+        "label": "Valider l’annonce",
+        "submitting": "Validation…",
+        "aria": {
+          "submitting": "Validation de l’annonce",
+          "submit": "Valider l’annonce",
+          "submitOf": "Valider l’annonce de {bid}"
+        }
+      },
+      "allowedRange": "Plage autorisée : {minBid} – {maxBid}.",
+      "hint": {
+        "chooseAndSubmit": "Choisissez une valeur puis validez quand vous êtes prêt.",
+        "submittedWaiting": "Annonce validée — en attente des autres joueurs.",
+        "waitingForPlayer": "En attente de l’annonce de {name}."
+      },
+      "validation": {
+        "enterBid": "Saisissez une annonce avant de valider.",
+        "minBid": "L’annonce doit être au moins {minBid}.",
+        "maxBid": "L’annonce ne peut pas dépasser {maxBid}.",
+        "zeroBidLocked": "Vous avez annoncé 0 le nombre maximum de fois.",
+        "totalCannotEqualHandSize": "Le total des annonces ne peut pas être égal à {handSize}. Choisissez un autre nombre."
+      },
+      "tableBids": "Annonces de la table"
+    },
+    "trumpSelect": {
+      "title": "Choisir l’atout",
+      "description": "Choisissez la couleur d’atout pour cette manche. Les atouts battent toutes les autres couleurs.",
+      "optionAria": "Choisir {trump} comme atout",
+      "optionAriaSelected": "Choisir {trump} comme atout, actuellement sélectionné",
+      "submit": {
+        "choosing": "Choix…",
+        "confirm": "Confirmer l’atout",
+        "waitingFor": "En attente de {name}",
+        "aria": {
+          "selecting": "Choix de l’atout",
+          "confirm": "Confirmer {trump} comme atout",
+          "select": "Choisir un atout"
+        }
+      },
+      "hint": {
+        "canSelect": "Choisissez un atout puis confirmez pour passer au jeu des plis.",
+        "waitingForPlayer": "En attente de {name} pour choisir l’atout."
+      }
+    },
+    "play": {
+      "title": "Jouer une carte",
+      "description": "Choisissez une carte autorisée dans votre main. Seules les cartes valides restent activées.",
+      "waitingOn": "En attente : {name}",
+      "selectedCardLabel": "Carte sélectionnée",
+      "submit": {
+        "playing": "Jeu…",
+        "label": {
+          "mobile": "Jouer",
+          "desktop": "Jouer la carte sélectionnée"
+        },
+        "waitingFor": "En attente de {name}",
+        "aria": {
+          "playing": "Carte en cours de jeu",
+          "playSelected": "Jouer la carte sélectionnée : {card}",
+          "playSelectedGeneric": "Jouer la carte sélectionnée",
+          "waitingForPlayer": "En attente de {name} pour jouer"
+        }
+      },
+      "legal": {
+        "empty": "Aucune"
+      }
+    },
+    "actions": {
+      "refreshAria": "Actualiser l’état de la partie",
+      "refreshingAria": "Actualisation de l’état de la partie",
+      "refreshLabel": "Actualiser l’état",
+      "refreshingLabel": "Actualisation…",
+      "sync": "Syncro"
+    },
+    "trickArea": {
+      "lastRoundFinalPosition": "Position finale de la manche précédente",
+      "waitingForLead": "En attente de l’entame…",
+      "trickOf": "Pli {trickNo} sur {handSize}"
+    },
+    "hand": {
+      "title": "Votre main",
+      "status": {
+        "readOnlyPreview": "Aperçu en lecture seule",
+        "handWillAppear": "La main apparaîtra une fois la partie commencée.",
+        "waitingFor": "En attente de {name}",
+        "nextPlayer": "le prochain joueur",
+        "tapLegalCardToPlay": "Touchez une carte autorisée pour jouer immédiatement."
+      },
+      "playButton": {
+        "playing": "Jeu…",
+        "label": {
+          "mobile": "Jouer",
+          "desktop": "Jouer la carte sélectionnée"
+        },
+        "aria": {
+          "playing": "Carte en cours de jeu",
+          "playSelected": "Jouer la carte sélectionnée : {card}",
+          "selectCard": "Sélectionnez une carte à jouer"
+        }
+      },
+      "tapAnyLegalCard": "Touchez une carte autorisée pour jouer",
+      "legal": {
+        "short": "Autorisé :",
+        "long": "Cartes autorisées :",
+        "all": "toutes"
+      },
+      "waitingOn": "En attente de {name}",
+      "empty": "La main apparaîtra dès qu’elle sera disponible.",
+      "cardState": {
+        "selected": "sélectionnée",
+        "playable": "jouable",
+        "notPlayable": "non jouable"
+      },
+      "cardAria": "{card} — {state}"
+    },
+    "tableActions": {
+      "title": "Actions de table",
+      "waitingBadge": "En attente de la phase suivante",
+      "description": "Les commandes interactives apparaîtront dès que la phase en cours nécessitera votre action."
+    },
+    "sidebar": {
+      "kicker": "Partie {gameId}",
+      "turnLabel": "Tour",
+      "trick": {
+        "label": "Pli"
+      },
+      "facts": {
+        "round": "Manche",
+        "dealer": "Donneur",
+        "handSize": "Nombre de cartes",
+        "trump": "Atout"
+      },
+      "scoreboard": {
+        "title": "Tableau des scores",
+        "showHistoryAria": "Afficher l’historique des scores",
+        "opening": "Ouverture…",
+        "history": "Historique"
+      }
+    },
+    "history": {
+      "kicker": "Archive des scores",
+      "title": "Feuille de score",
+      "description": "Consultez les annonces, l’atout choisi et les totaux cumulés à chaque manche.",
+      "trumpCaller": "Annonceur d’atout",
+      "closeAria": "Fermer l’historique des scores",
+      "loading": "Chargement de l’historique…",
+      "empty": "Aucune manche terminée pour le moment. Commencez à jouer pour remplir la feuille de score.",
+      "table": {
+        "round": "Manche"
+      },
+      "roundCard": {
+        "roundKicker": "Manche {roundNo}",
+        "handSize": "{handSize} cartes",
+        "dealer": "Donneur",
+        "trump": "Atout",
+        "by": "par",
+        "pending": "(en attente)",
+        "bid": "Annonce {bid}",
+        "total": "Cumul"
+      }
+    },
+    "error": {
+      "traceIdLabel": "ID de trace"
+    },
+    "ai": {
+      "noAccess": "L’hôte configure les joueurs IA pour cette partie. Les mises à jour de placement apparaîtront au début du match.",
+      "waitingSeatLabel": {
+        "allFilled": "Tous les sièges sont occupés",
+        "openSeats": "{count, plural, one {# siège libre en attente de joueurs} other {# sièges libres en attente de joueurs}}"
+      },
+      "kicker": "Sièges IA",
+      "summary": "{bots} bots · {filled}/{total} sièges occupés",
+      "title": "Ajouter des bots pour compléter la table",
+      "description": "Utilisez des bots pour remplir les sièges vides avant le début de la partie.",
+      "add": {
+        "label": "Ajouter un bot",
+        "aria": {
+          "adding": "Ajout d’un bot",
+          "addWithProfile": "Ajouter un bot avec le profil {profile}"
+        }
+      },
+      "defaultsTo": "Par défaut",
+      "registryLoadingSuffix": " (chargement du registre…) ",
+      "seatLabel": "Siège {seatNumber}",
+      "runningProfile": "Exécute {name} · v{version}",
+      "selectProfileHint": "Sélectionnez un profil IA pour régler ce bot",
+      "profileSelect": {
+        "labelSr": "Sélectionner un profil IA pour le siège {seatNumber}",
+        "aria": "Sélectionner un profil IA pour le siège {seatNumber}",
+        "loading": "Chargement des profils…",
+        "none": "Aucun profil disponible",
+        "select": "Choisir un profil"
+      },
+      "profileOption": "{name} · version {version}",
+      "remove": {
+        "aria": "Retirer le bot du siège {seatNumber}",
+        "sr": "Retirer le bot du siège {seatNumber}"
+      },
+      "empty": "Aucun bot n’est assis pour le moment. Utilisez Ajouter un bot pour en placer un sur le prochain siège libre."
+    }
+  },
+  "cards": {
+    "suit": {
+      "spades": "Piques",
+      "hearts": "Cœurs",
+      "diamonds": "Carreaux",
+      "clubs": "Trèfles"
+    },
+    "aria": {
+      "rankOfSuit": "{rank} de {suit}"
+    }
+  }
+}

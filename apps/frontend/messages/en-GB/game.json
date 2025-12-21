@@ -1,0 +1,327 @@
+{
+  "gameRoom": {
+    "you": "You",
+    "orientation": {
+      "top": "Top",
+      "left": "Left",
+      "right": "Right",
+      "bottom": "Bottom"
+    },
+    "seat": {
+      "badge": {
+        "top": "Top seat",
+        "left": "Left seat",
+        "right": "Right seat",
+        "south": "South seat"
+      },
+      "bid": "Bid {bid}",
+      "won": "Won {tricksWon}"
+    },
+    "lastTrick": {
+      "title": "Last trick",
+      "empty": "No trick completed yet."
+    },
+    "status": {
+      "waiting": "Waiting"
+    },
+    "phase": {
+      "init": "Initializing",
+      "bidding": "Bidding Round",
+      "trumpSelect": "Select trump",
+      "trick": "Trick play",
+      "scoring": "Round scoring",
+      "complete": "Round complete",
+      "gameOver": "Game over",
+      "unknown": "Unknown phase"
+    },
+    "trump": {
+      "undeclared": "Undeclared",
+      "CLUBS": "Clubs",
+      "DIAMONDS": "Diamonds",
+      "HEARTS": "Hearts",
+      "SPADES": "Spades",
+      "NO_TRUMPS": "No trumps"
+    },
+    "setup": {
+      "kicker": "Setup · Game {gameId}",
+      "title": "Add players",
+      "description": "Confirm who is seated, drop in AI partners where needed, and ready up once your table is set. The match begins when every seat is marked ready.",
+      "stats": {
+        "totalPlayers": {
+          "label": "Total players",
+          "description": "Human or AI seats assigned"
+        },
+        "aiPlayers": {
+          "label": "AI players",
+          "description": "Bots currently seated"
+        },
+        "readyPlayers": {
+          "label": "Ready players",
+          "description": "Marked ready so far"
+        }
+      },
+      "quickActions": {
+        "title": "Quick actions",
+        "subtitle": "Stay synced & invite friends",
+        "manualSync": "Manual sync",
+        "copyInviteAria": "Copy invite link to clipboard",
+        "shareLink": "Share link",
+        "copyInvite": "Copy invite"
+      }
+    },
+    "setupSeats": {
+      "kicker": "Seating",
+      "title": "Who is sitting where",
+      "description": "Each seat shows whether it is filled by a human player, an AI seat, or still open.",
+      "waitingForPlayer": "Waiting for player",
+      "status": {
+        "ai": "AI player",
+        "human": "Human player",
+        "open": "Open seat"
+      },
+      "seatLabel": "Seat {seatNumber}",
+      "ready": {
+        "ready": "Ready",
+        "notReady": "Not ready"
+      },
+      "yourSeat": "Your seat"
+    },
+    "ready": {
+      "none": "Ready controls will appear once interactions are available.",
+      "inPlayTitle": "Game in play",
+      "inPlayDescription": "Actions surface here when the table needs you.",
+      "title": "Ready up",
+      "description": "Mark yourself ready. The game begins when every seat is ready.",
+      "button": {
+        "label": "I'm ready",
+        "marking": "Marking…",
+        "readyWaiting": "Ready — waiting for others",
+        "aria": {
+          "marking": "Marking as ready",
+          "readyWaiting": "Ready, waiting for other players",
+          "markReady": "Mark yourself as ready"
+        }
+      }
+    },
+    "bidding": {
+      "title": "Bidding",
+      "subtitle": "Everyone's bids stay visible below.",
+      "turn": {
+        "yourTurn": "Your turn",
+        "waiting": "Waiting"
+      },
+      "yourBidLabel": "Your bid",
+      "bidValueAria": "Bid value",
+      "submit": {
+        "label": "Submit bid",
+        "submitting": "Submitting…",
+        "aria": {
+          "submitting": "Submitting bid",
+          "submit": "Submit bid",
+          "submitOf": "Submit bid of {bid}"
+        }
+      },
+      "allowedRange": "Allowed range: {minBid} – {maxBid}.",
+      "hint": {
+        "chooseAndSubmit": "Choose a value and submit when you're ready.",
+        "submittedWaiting": "Bid submitted — waiting for other players.",
+        "waitingForPlayer": "Waiting for {name} to bid."
+      },
+      "validation": {
+        "enterBid": "Enter a bid before submitting.",
+        "minBid": "Bid must be at least {minBid}.",
+        "maxBid": "Bid cannot exceed {maxBid}.",
+        "zeroBidLocked": "You've bid 0 the maximum number of times.",
+        "totalCannotEqualHandSize": "Total bids cannot equal {handSize}. Choose another number."
+      },
+      "tableBids": "Table bids"
+    },
+    "trumpSelect": {
+      "title": "Select trump",
+      "description": "Choose the trump suit for this round. Trump cards outrank all other suits.",
+      "optionAria": "Select {trump} as trump suit",
+      "optionAriaSelected": "Select {trump} as trump suit, currently selected",
+      "submit": {
+        "choosing": "Choosing…",
+        "confirm": "Confirm trump",
+        "waitingFor": "Waiting for {name}",
+        "aria": {
+          "selecting": "Selecting trump suit",
+          "confirm": "Confirm {trump} as trump suit",
+          "select": "Select trump suit"
+        }
+      },
+      "hint": {
+        "canSelect": "Select a trump suit and confirm to continue to trick play.",
+        "waitingForPlayer": "Waiting for {name} to choose the trump suit."
+      }
+    },
+    "play": {
+      "title": "Play card",
+      "description": "Choose a legal card from your hand. Only allowed cards stay enabled.",
+      "waitingOn": "Waiting on: {name}",
+      "selectedCardLabel": "Selected card",
+      "submit": {
+        "playing": "Playing…",
+        "label": {
+          "mobile": "Play card",
+          "desktop": "Play selected card"
+        },
+        "waitingFor": "Waiting for {name}",
+        "aria": {
+          "playing": "Playing card",
+          "playSelected": "Play selected card: {card}",
+          "playSelectedGeneric": "Play selected card",
+          "waitingForPlayer": "Waiting for {name} to play"
+        }
+      },
+      "legal": {
+        "empty": "—"
+      }
+    },
+    "actions": {
+      "refreshAria": "Refresh game state",
+      "refreshingAria": "Refreshing game state",
+      "refreshLabel": "Refresh game state",
+      "refreshingLabel": "Refreshing…",
+      "sync": "Sync"
+    },
+    "trickArea": {
+      "lastRoundFinalPosition": "Last round's final position",
+      "waitingForLead": "Waiting for lead…",
+      "trickOf": "Trick {trickNo} of {handSize}"
+    },
+    "hand": {
+      "title": "Your hand",
+      "status": {
+        "readOnlyPreview": "Read-only preview",
+        "handWillAppear": "Hand will appear once the game starts.",
+        "waitingFor": "Waiting for {name}",
+        "nextPlayer": "next player",
+        "tapLegalCardToPlay": "Tap a legal card to play immediately."
+      },
+      "playButton": {
+        "playing": "Playing…",
+        "label": {
+          "mobile": "Play card",
+          "desktop": "Play selected card"
+        },
+        "aria": {
+          "playing": "Playing card",
+          "playSelected": "Play selected card: {card}",
+          "selectCard": "Select a card to play"
+        }
+      },
+      "tapAnyLegalCard": "Tap any legal card to play",
+      "legal": {
+        "short": "Legal:",
+        "long": "Legal cards:",
+        "all": "all"
+      },
+      "waitingOn": "Waiting on {name}",
+      "empty": "Hand will appear once available.",
+      "cardState": {
+        "selected": "selected",
+        "playable": "playable",
+        "notPlayable": "not playable"
+      },
+      "cardAria": "{card}, {state}"
+    },
+    "tableActions": {
+      "title": "Table actions",
+      "waitingBadge": "Waiting for next phase",
+      "description": "Interactive controls will surface here as soon as the current phase requires your input."
+    },
+    "sidebar": {
+      "kicker": "Game {gameId}",
+      "turnLabel": "Turn",
+      "trick": {
+        "label": "Trick"
+      },
+      "facts": {
+        "round": "Round",
+        "dealer": "Dealer",
+        "handSize": "Hand size",
+        "trump": "Trump"
+      },
+      "scoreboard": {
+        "title": "Scoreboard",
+        "showHistoryAria": "Show score history",
+        "opening": "Opening…",
+        "history": "History"
+      }
+    },
+    "history": {
+      "kicker": "Score archive",
+      "title": "Score sheet",
+      "description": "Review bids, trump picks, and the running totals for every round.",
+      "trumpCaller": "Trump caller",
+      "closeAria": "Close score history",
+      "loading": "Loading history…",
+      "empty": "No completed rounds yet. Start playing to build the score sheet.",
+      "table": {
+        "round": "Round"
+      },
+      "roundCard": {
+        "roundKicker": "Round {roundNo}",
+        "handSize": "{handSize} cards",
+        "dealer": "Dealer",
+        "trump": "Trump",
+        "by": "by",
+        "pending": "(pending)",
+        "bid": "Bid {bid}",
+        "total": "Total"
+      }
+    },
+    "error": {
+      "traceIdLabel": "traceId"
+    },
+    "ai": {
+      "noAccess": "The host is configuring AI players for this game. Seating updates will appear once the match begins.",
+      "waitingSeatLabel": {
+        "allFilled": "All seats filled",
+        "openSeats": "{count, plural, one {# open seat waiting for players} other {# open seats waiting for players}}"
+      },
+      "kicker": "AI Seats",
+      "summary": "{bots} bots · {filled}/{total} seats filled",
+      "title": "Bring bots to fill the table",
+      "description": "Use bots to fill empty seats before the game starts.",
+      "add": {
+        "label": "Add AI",
+        "aria": {
+          "adding": "Adding AI player",
+          "addWithProfile": "Add AI player with profile {profile}"
+        }
+      },
+      "defaultsTo": "Defaults to",
+      "registryLoadingSuffix": " (loading registry…)",
+      "seatLabel": "Seat {seatNumber}",
+      "runningProfile": "Running {name} · v{version}",
+      "selectProfileHint": "Select an AI profile to tune this bot",
+      "profileSelect": {
+        "labelSr": "Select AI profile for seat {seatNumber}",
+        "aria": "Select AI profile for seat {seatNumber}",
+        "loading": "Loading profiles…",
+        "none": "No profiles available",
+        "select": "Select a profile"
+      },
+      "profileOption": "{name} · v{version}",
+      "remove": {
+        "aria": "Remove AI from seat {seatNumber}",
+        "sr": "Remove AI from seat {seatNumber}"
+      },
+      "empty": "No bots are seated yet. Use the Add AI action to drop one into the next open seat."
+    }
+  },
+  "cards": {
+    "suit": {
+      "spades": "Spades",
+      "hearts": "Hearts",
+      "diamonds": "Diamonds",
+      "clubs": "Clubs"
+    },
+    "aria": {
+      "rankOfSuit": "{rank} of {suit}"
+    }
+  }
+}

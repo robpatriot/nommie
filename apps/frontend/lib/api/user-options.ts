@@ -2,10 +2,12 @@
 
 import { fetchWithAuth } from '@/lib/api'
 import type { ThemeMode } from '@/components/theme-provider'
+import type { SupportedLocale } from '@/i18n/locale'
 
 export interface UserOptionsResponse {
   appearance_mode: ThemeMode
   require_card_confirmation: boolean
+  locale: SupportedLocale | null
   updated_at: string
 }
 

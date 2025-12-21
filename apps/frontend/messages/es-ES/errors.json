@@ -1,0 +1,83 @@
+{
+  "codes": {
+    "UNAUTHORIZED": "Inicia sesión para continuar.",
+    "UNAUTHORIZED_MISSING_BEARER": "Inicia sesión para continuar.",
+    "UNAUTHORIZED_INVALID_JWT": "Tu sesión no es válida. Vuelve a iniciar sesión.",
+    "UNAUTHORIZED_EXPIRED_JWT": "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+    "FORBIDDEN": "No tienes acceso para hacer eso.",
+    "FORBIDDEN_USER_NOT_FOUND": "No se pudo encontrar tu cuenta.",
+    "EMAIL_NOT_ALLOWED": "Acceso restringido. Contacta con soporte.",
+    "MISSING_BACKEND_JWT": "Inicia sesión para continuar.",
+    "BACKEND_STARTING": "El servidor se está iniciando. Inténtalo de nuevo en un momento.",
+    "NOT_A_MEMBER": "No eres miembro de esta partida.",
+    "INSUFFICIENT_ROLE": "No tienes permisos para hacer eso.",
+
+    "INVALID_GAME_ID": "Ese enlace de partida no es válido.",
+    "INVALID_EMAIL": "Introduce un correo electrónico válido.",
+    "INVALID_GOOGLE_SUB": "Error al iniciar sesión. Inténtalo de nuevo.",
+    "INVALID_SEAT": "Ese asiento no es válido.",
+    "INVALID_BID": "Esa puja no es válida.",
+    "MUST_FOLLOW_SUIT": "Debes seguir el palo.",
+    "CARD_NOT_IN_HAND": "No puedes jugar esa carta.",
+    "OUT_OF_TURN": "No es tu turno.",
+    "PHASE_MISMATCH": "Esa acción no está disponible ahora.",
+    "PARSE_CARD": "Esa carta no es válida.",
+    "INVALID_TRUMP_CONVERSION": "Esa elección de triunfo no es válida.",
+    "VALIDATION_ERROR": "Revisa los datos e inténtalo de nuevo.",
+    "BAD_REQUEST": "Esa solicitud no es válida.",
+    "INVALID_HEADER": "Falta información necesaria en la solicitud.",
+    "PRECONDITION_REQUIRED": "Actualiza e inténtalo de nuevo.",
+
+    "GAME_NOT_FOUND": "No se encontró esa partida.",
+    "USER_NOT_FOUND": "No se pudo encontrar tu cuenta.",
+    "PLAYER_NOT_FOUND": "No se encontró ese jugador.",
+    "NOT_FOUND": "No pudimos encontrar lo que buscas.",
+
+    "GOOGLE_SUB_MISMATCH": "Ese correo está vinculado a otra cuenta de Google.",
+    "JOIN_CODE_CONFLICT": "Ese código ya está en uso. Inténtalo de nuevo.",
+    "SEAT_TAKEN": "Ese asiento ya está ocupado.",
+    "UNIQUE_EMAIL": "Ese correo ya está en uso.",
+    "OPTIMISTIC_LOCK": "La partida cambió. Actualiza e inténtalo de nuevo.",
+    "CONFLICT": "No se pudo completar porque algo cambió.",
+
+    "DB_ERROR": "Algo salió mal. Inténtalo de nuevo.",
+    "DB_UNAVAILABLE": "El servidor no está disponible temporalmente. Inténtalo de nuevo.",
+    "DB_POOL_EXHAUSTED": "El servidor está ocupado. Inténtalo de nuevo.",
+    "DB_TIMEOUT": "Tardó demasiado. Inténtalo de nuevo.",
+    "LOCK_TIMEOUT_ACQUIRE": "El servidor está ocupado. Inténtalo de nuevo.",
+    "LOCK_TIMEOUT_BODY": "El servidor está ocupado. Inténtalo de nuevo.",
+    "MIGRATION_CANCELLED": "El servidor se está reiniciando. Inténtalo de nuevo.",
+    "MIGRATION_FAILED": "El servidor se está reiniciando. Inténtalo de nuevo.",
+    "POSTCHECK_MISMATCH": "El servidor se está reiniciando. Inténtalo de nuevo.",
+    "SQLITE_LOCK_ERROR": "El servidor está ocupado. Inténtalo de nuevo.",
+    "UNIQUE_VIOLATION": "Eso ya existe.",
+    "FK_VIOLATION": "No se pudo completar.",
+    "CHECK_VIOLATION": "Ese valor no es válido.",
+    "RECORD_NOT_FOUND": "No pudimos encontrar lo que buscas.",
+    "INTERNAL": "Algo salió mal. Inténtalo de nuevo.",
+    "INTERNAL_ERROR": "Algo salió mal. Inténtalo de nuevo.",
+    "CONFIG_ERROR": "El servidor está mal configurado. Contacta con soporte.",
+    "DATA_CORRUPTION": "Algo salió mal. Contacta con soporte.",
+
+    "UNKNOWN_ERROR": "Algo salió mal. Inténtalo de nuevo."
+  },
+  "toast": {
+    "closeAria": "Cerrar",
+    "details": {
+      "show": "Mostrar",
+      "hide": "Ocultar",
+      "details": "detalles",
+      "messageLabel": "Mensaje del servidor",
+      "statusLabel": "Estado HTTP",
+      "codeLabel": "Código de error",
+      "traceIdLabel": "ID de traza"
+    }
+  },
+  "boundary": {
+    "title": "Algo salió mal",
+    "fallbackMessage": "Ocurrió un error inesperado",
+    "tryAgain": "Reintentar",
+    "reloadPage": "Recargar página",
+    "devDetails": "Detalles del error (solo dev)"
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "breadcrumbs": {
+    "lobby": "Lobby"
+  },
+  "hero": {
+    "kicker": "Game Lobby",
+    "title": "Seat your table and deal the next hand.",
+    "description": "Select a table, claim a seat, and begin the bidding once everyone is ready."
+  },
+  "stats": {
+    "joinableTables": {
+      "label": "Joinable tables",
+      "description": "Open public tables"
+    },
+    "seatsAvailable": {
+      "label": "Seats available",
+      "description": "Across joinable tables"
+    },
+    "inProgress": {
+      "label": "In progress",
+      "description": "Active or full tables"
+    }
+  },
+  "actions": {
+    "create": {
+      "ariaLabel": "Create a new game",
+      "label": "Create game"
+    },
+    "refresh": {
+      "label": "Refresh list",
+      "refreshing": "Refreshing…"
+    },
+    "delete": "Delete",
+    "goToGame": "Go to game",
+    "join": "Join",
+    "rejoin": "Rejoin"
+  },
+  "lists": {
+    "actionsLabel": "Actions",
+    "joinable": {
+      "title": "Joinable games",
+      "empty": "No games available to join. Create one to get started!"
+    },
+    "inProgress": {
+      "title": "In progress",
+      "empty": "No games currently in progress."
+    }
+  },
+  "labels": {
+    "fullTable": "Full table"
+  },
+  "you": "You",
+  "createGame": {
+    "defaultName": "{name}'s game"
+  },
+  "createModal": {
+    "kicker": "New table",
+    "title": "Name your game",
+    "description": "Keep it casual. We'll fall back to \"{defaultName}\" if you leave it blank.",
+    "closeAria": "Close create game modal",
+    "gameNameLabel": "Game name",
+    "optional": "optional",
+    "helper": "Name the table so your group knows where to sit; everything else stays steady.",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create game"
+  },
+  "toasts": {
+    "refreshFailed": "Failed to refresh games list",
+    "createFailed": "Failed to create game",
+    "createdSuccess": "Game created successfully!",
+    "gameFilledUp": "That game just filled up. Please choose another one.",
+    "joinedSuccess": "Joined game successfully!",
+    "joinFailed": "Failed to join game",
+    "deleteFailed": "Failed to delete game",
+    "deleteMissingVersion": "Cannot delete game: missing version information. Please try again.",
+    "deleteConflict": "Cannot delete game: game was modified. Please refresh and try again.",
+    "deletedSuccess": "Game deleted successfully"
+  },
+  "confirmations": {
+    "deleteGame": "Are you sure you want to delete this game? This action cannot be undone."
+  }
+}

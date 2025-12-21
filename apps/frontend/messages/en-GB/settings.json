@@ -1,0 +1,95 @@
+{
+  "breadcrumbs": {
+    "settings": "Settings"
+  },
+  "sections": {
+    "display": {
+      "kicker": "Display",
+      "appearance": {
+        "title": "Appearance",
+        "description": "Choose how Nommie looks across all devices. The appearance setting applies everywhere you're signed in."
+      }
+    },
+    "language": {
+      "kicker": "Language",
+      "title": "Language",
+      "description": "Choose the language Nommie uses for menus, buttons, and game prompts."
+    },
+    "gameplay": {
+      "kicker": "Gameplay",
+      "cardConfirmation": {
+        "title": "Card confirmation",
+        "description": "Keep the confirmation button if you prefer a two-step action, or turn it off to play a legal card immediately when you click it."
+      }
+    }
+  },
+  "appearance": {
+    "ariaLabel": "Appearance",
+    "options": {
+      "system": {
+        "label": "Match system",
+        "description": "Automatically align with your device setting."
+      },
+      "light": {
+        "label": "Light",
+        "description": "Bright background with dark text."
+      },
+      "dark": {
+        "label": "Dark",
+        "description": "Dim background that is easier on eyes at night."
+      }
+    },
+    "status": {
+      "saving": "Saving appearance…",
+      "couldNotSave": "Could not save: {error}",
+      "saved": "Changes are saved automatically."
+    }
+  },
+  "language": {
+    "options": {
+      "en-GB": {
+        "label": "English (UK)",
+        "description": "British English"
+      },
+      "fr-FR": {
+        "label": "French (France)",
+        "description": "French"
+      },
+      "de-DE": {
+        "label": "German (Germany)",
+        "description": "German"
+      },
+      "es-ES": {
+        "label": "Spanish (Spain)",
+        "description": "Spanish"
+      },
+      "it-IT": {
+        "label": "Italian (Italy)",
+        "description": "Italian"
+      }
+    },
+    "status": {
+      "saving": "Saving language…",
+      "couldNotSave": "Could not save: {error}",
+      "usingPreference": "Using your saved language: {language}.",
+      "usingBrowser": "Using your device language: {language}."
+    }
+  },
+  "cardConfirmation": {
+    "toggle": {
+      "enabled": {
+        "title": "Confirmation required",
+        "description": "Play button is shown. Pick a card, then confirm."
+      },
+      "disabled": {
+        "title": "Auto-play cards",
+        "description": "Skips the confirmation button. Clicking a legal card plays it immediately."
+      }
+    },
+    "status": {
+      "saving": "Saving gameplay preference…",
+      "couldNotSave": "Could not save: {error}",
+      "saved": "Changes are saved automatically."
+    }
+  }
+}

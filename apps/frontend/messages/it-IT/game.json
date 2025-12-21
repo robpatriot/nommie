@@ -1,0 +1,327 @@
+{
+  "gameRoom": {
+    "you": "Tu",
+    "orientation": {
+      "top": "Sopra",
+      "left": "Sinistra",
+      "right": "Destra",
+      "bottom": "Sotto"
+    },
+    "seat": {
+      "badge": {
+        "top": "Posto in alto",
+        "left": "Posto a sinistra",
+        "right": "Posto a destra",
+        "south": "Posto in basso"
+      },
+      "bid": "Puntata {bid}",
+      "won": "Vinte {tricksWon}"
+    },
+    "lastTrick": {
+      "title": "Ultima presa",
+      "empty": "Nessuna presa completata finora."
+    },
+    "status": {
+      "waiting": "In attesa"
+    },
+    "phase": {
+      "init": "Inizializzazione",
+      "bidding": "Puntate",
+      "trumpSelect": "Scegli briscola",
+      "trick": "Gioco delle prese",
+      "scoring": "Punteggio mano",
+      "complete": "Mano completata",
+      "gameOver": "Partita finita",
+      "unknown": "Fase sconosciuta"
+    },
+    "trump": {
+      "undeclared": "Non dichiarata",
+      "CLUBS": "Fiori",
+      "DIAMONDS": "Quadri",
+      "HEARTS": "Cuori",
+      "SPADES": "Picche",
+      "NO_TRUMPS": "Senza briscola"
+    },
+    "setup": {
+      "kicker": "Setup · Partita {gameId}",
+      "title": "Aggiungi giocatori",
+      "description": "Conferma chi è seduto, inserisci compagni IA se necessario e segnati pronto quando il tavolo è pronto. La partita inizia quando ogni posto è pronto.",
+      "stats": {
+        "totalPlayers": {
+          "label": "Giocatori totali",
+          "description": "Posti umani o IA assegnati"
+        },
+        "aiPlayers": {
+          "label": "Giocatori IA",
+          "description": "Bot attualmente seduti"
+        },
+        "readyPlayers": {
+          "label": "Giocatori pronti",
+          "description": "Segnati pronti finora"
+        }
+      },
+      "quickActions": {
+        "title": "Azioni rapide",
+        "subtitle": "Resta sincronizzato e invita amici",
+        "manualSync": "Sincronizzazione manuale",
+        "copyInviteAria": "Copia il link d’invito negli appunti",
+        "shareLink": "Condividi link",
+        "copyInvite": "Copia invito"
+      }
+    },
+    "setupSeats": {
+      "kicker": "Posti",
+      "title": "Chi siede dove",
+      "description": "Ogni posto mostra se è occupato da un giocatore, un bot o se è libero.",
+      "waitingForPlayer": "In attesa di un giocatore",
+      "status": {
+        "ai": "Giocatore IA",
+        "human": "Giocatore",
+        "open": "Posto libero"
+      },
+      "seatLabel": "Posto {seatNumber}",
+      "ready": {
+        "ready": "Pronto",
+        "notReady": "Non pronto"
+      },
+      "yourSeat": "Il tuo posto"
+    },
+    "ready": {
+      "none": "I controlli Pronto appariranno quando disponibili.",
+      "inPlayTitle": "Partita in corso",
+      "inPlayDescription": "Le azioni appariranno qui quando il tavolo avrà bisogno di te.",
+      "title": "Segnati pronto",
+      "description": "Segnati pronto. La partita inizia quando tutti i posti sono pronti.",
+      "button": {
+        "label": "Sono pronto",
+        "marking": "Impostazione…",
+        "readyWaiting": "Pronto — in attesa degli altri",
+        "aria": {
+          "marking": "Impostazione come pronto",
+          "readyWaiting": "Pronto, in attesa degli altri giocatori",
+          "markReady": "Segnarti come pronto"
+        }
+      }
+    },
+    "bidding": {
+      "title": "Puntate",
+      "subtitle": "Le puntate di tutti restano visibili qui sotto.",
+      "turn": {
+        "yourTurn": "Tocca a te",
+        "waiting": "In attesa"
+      },
+      "yourBidLabel": "La tua puntata",
+      "bidValueAria": "Valore puntata",
+      "submit": {
+        "label": "Invia puntata",
+        "submitting": "Invio…",
+        "aria": {
+          "submitting": "Invio della puntata",
+          "submit": "Invia puntata",
+          "submitOf": "Invia puntata di {bid}"
+        }
+      },
+      "allowedRange": "Intervallo consentito: {minBid} – {maxBid}.",
+      "hint": {
+        "chooseAndSubmit": "Scegli un valore e invia quando sei pronto.",
+        "submittedWaiting": "Puntata inviata — in attesa degli altri.",
+        "waitingForPlayer": "In attesa della puntata di {name}."
+      },
+      "validation": {
+        "enterBid": "Inserisci una puntata prima di inviare.",
+        "minBid": "La puntata deve essere almeno {minBid}.",
+        "maxBid": "La puntata non può superare {maxBid}.",
+        "zeroBidLocked": "Hai puntato 0 il numero massimo di volte.",
+        "totalCannotEqualHandSize": "La somma delle puntate non può essere {handSize}. Scegli un altro numero."
+      },
+      "tableBids": "Puntate al tavolo"
+    },
+    "trumpSelect": {
+      "title": "Scegli briscola",
+      "description": "Scegli il seme di briscola per questa mano. Le briscole battono tutti gli altri semi.",
+      "optionAria": "Scegli {trump} come briscola",
+      "optionAriaSelected": "Scegli {trump} come briscola, attualmente selezionato",
+      "submit": {
+        "choosing": "Scelta…",
+        "confirm": "Conferma briscola",
+        "waitingFor": "In attesa di {name}",
+        "aria": {
+          "selecting": "Scelta della briscola",
+          "confirm": "Conferma {trump} come briscola",
+          "select": "Scegli la briscola"
+        }
+      },
+      "hint": {
+        "canSelect": "Scegli una briscola e conferma per continuare con le prese.",
+        "waitingForPlayer": "In attesa di {name} per scegliere la briscola."
+      }
+    },
+    "play": {
+      "title": "Gioca carta",
+      "description": "Scegli una carta legale dalla tua mano. Solo le carte consentite restano attive.",
+      "waitingOn": "In attesa: {name}",
+      "selectedCardLabel": "Carta selezionata",
+      "submit": {
+        "playing": "Giocando…",
+        "label": {
+          "mobile": "Gioca",
+          "desktop": "Gioca carta selezionata"
+        },
+        "waitingFor": "In attesa di {name}",
+        "aria": {
+          "playing": "Giocando la carta",
+          "playSelected": "Gioca la carta selezionata: {card}",
+          "playSelectedGeneric": "Gioca carta selezionata",
+          "waitingForPlayer": "In attesa di {name} per giocare"
+        }
+      },
+      "legal": {
+        "empty": "Nessuna"
+      }
+    },
+    "actions": {
+      "refreshAria": "Aggiorna lo stato della partita",
+      "refreshingAria": "Aggiornamento dello stato della partita",
+      "refreshLabel": "Aggiorna lo stato",
+      "refreshingLabel": "Aggiornamento…",
+      "sync": "Sincronizza"
+    },
+    "trickArea": {
+      "lastRoundFinalPosition": "Posizione finale della mano precedente",
+      "waitingForLead": "In attesa dell’attacco…",
+      "trickOf": "Presa {trickNo} su {handSize}"
+    },
+    "hand": {
+      "title": "La tua mano",
+      "status": {
+        "readOnlyPreview": "Anteprima (sola lettura)",
+        "handWillAppear": "La mano apparirà quando la partita inizierà.",
+        "waitingFor": "In attesa di {name}",
+        "nextPlayer": "il prossimo giocatore",
+        "tapLegalCardToPlay": "Tocca una carta legale per giocare subito."
+      },
+      "playButton": {
+        "playing": "Giocando…",
+        "label": {
+          "mobile": "Gioca carta",
+          "desktop": "Gioca carta selezionata"
+        },
+        "aria": {
+          "playing": "Giocando la carta",
+          "playSelected": "Gioca la carta selezionata: {card}",
+          "selectCard": "Seleziona una carta da giocare"
+        }
+      },
+      "tapAnyLegalCard": "Tocca una carta legale per giocare",
+      "legal": {
+        "short": "Valide:",
+        "long": "Carte valide:",
+        "all": "tutte"
+      },
+      "waitingOn": "In attesa di {name}",
+      "empty": "La mano apparirà quando sarà disponibile.",
+      "cardState": {
+        "selected": "selezionata",
+        "playable": "giocabile",
+        "notPlayable": "non giocabile"
+      },
+      "cardAria": "{card} — {state}"
+    },
+    "tableActions": {
+      "title": "Azioni al tavolo",
+      "waitingBadge": "In attesa della fase successiva",
+      "description": "I controlli interattivi appariranno qui non appena la fase corrente richiederà la tua azione."
+    },
+    "sidebar": {
+      "kicker": "Partita {gameId}",
+      "turnLabel": "Turno",
+      "trick": {
+        "label": "Presa"
+      },
+      "facts": {
+        "round": "Mano",
+        "dealer": "Mazziere",
+        "handSize": "Carte in mano",
+        "trump": "Briscola"
+      },
+      "scoreboard": {
+        "title": "Punteggio",
+        "showHistoryAria": "Mostra storico punteggi",
+        "opening": "Apertura…",
+        "history": "Storico"
+      }
+    },
+    "history": {
+      "kicker": "Archivio punteggi",
+      "title": "Tabellone",
+      "description": "Rivedi puntate, briscola e totali cumulati per ogni mano.",
+      "trumpCaller": "Chiamante briscola",
+      "closeAria": "Chiudi storico punteggi",
+      "loading": "Caricamento storico…",
+      "empty": "Nessuna mano completata per ora. Inizia a giocare per costruire il tabellone.",
+      "table": {
+        "round": "Mano"
+      },
+      "roundCard": {
+        "roundKicker": "Mano {roundNo}",
+        "handSize": "{handSize} carte",
+        "dealer": "Mazziere",
+        "trump": "Briscola",
+        "by": "da",
+        "pending": "(in attesa)",
+        "bid": "Puntata {bid}",
+        "total": "Totale"
+      }
+    },
+    "error": {
+      "traceIdLabel": "ID traccia"
+    },
+    "ai": {
+      "noAccess": "L’host sta configurando i giocatori IA. Gli aggiornamenti dei posti appariranno quando la partita inizierà.",
+      "waitingSeatLabel": {
+        "allFilled": "Tutti i posti occupati",
+        "openSeats": "{count, plural, one {# posto libero in attesa di giocatori} other {# posti liberi in attesa di giocatori}}"
+      },
+      "kicker": "Posti IA",
+      "summary": "{bots} bot · {filled}/{total} posti occupati",
+      "title": "Aggiungi bot per completare il tavolo",
+      "description": "Usa i bot per riempire i posti liberi prima di iniziare.",
+      "add": {
+        "label": "Aggiungi bot",
+        "aria": {
+          "adding": "Aggiunta bot",
+          "addWithProfile": "Aggiungi bot con profilo {profile}"
+        }
+      },
+      "defaultsTo": "Predefinito",
+      "registryLoadingSuffix": " (caricamento registro…)",
+      "seatLabel": "Posto {seatNumber}",
+      "runningProfile": "In esecuzione {name} · v{version}",
+      "selectProfileHint": "Seleziona un profilo IA per configurare questo bot",
+      "profileSelect": {
+        "labelSr": "Seleziona un profilo IA per il posto {seatNumber}",
+        "aria": "Seleziona un profilo IA per il posto {seatNumber}",
+        "loading": "Caricamento profili…",
+        "none": "Nessun profilo disponibile",
+        "select": "Seleziona un profilo"
+      },
+      "profileOption": "{name} · ver. {version}",
+      "remove": {
+        "aria": "Rimuovi il bot dal posto {seatNumber}",
+        "sr": "Rimuovi il bot dal posto {seatNumber}"
+      },
+      "empty": "Nessun bot è seduto per ora. Usa Aggiungi bot per inserirne uno nel prossimo posto libero."
+    }
+  },
+  "cards": {
+    "suit": {
+      "spades": "Picche",
+      "hearts": "Cuori",
+      "diamonds": "Quadri",
+      "clubs": "Fiori"
+    },
+    "aria": {
+      "rankOfSuit": "{rank} di {suit}"
+    }
+  }
+}

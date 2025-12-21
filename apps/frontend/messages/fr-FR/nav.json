@@ -1,0 +1,18 @@
+{
+  "brand": {
+    "homeAria": "Accueil Nommie"
+  },
+  "breadcrumbs": {
+    "ariaLabel": "Fil d’Ariane"
+  },
+  "tagline": "Une table paisible pour jouer à la Nomination Whist",
+  "account": {
+    "menuAria": "Menu du compte",
+    "signedInAs": "Connecté en tant que",
+    "settings": "Paramètres",
+    "signOut": "Se déconnecter"
+  },
+  "auth": {
+    "signInWithGoogle": "Se connecter avec Google"
+  }
+}

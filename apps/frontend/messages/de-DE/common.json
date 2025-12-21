@@ -1,0 +1,41 @@
+{
+  "home": {
+    "accessDenied": {
+      "title": "Zugriff eingeschränkt",
+      "description": "Dein Konto darf derzeit nicht auf Nommie zugreifen. Wenn du glaubst, dass das ein Fehler ist, wende dich an die Person, die dich eingeladen hat, oder an den Administrator."
+    },
+    "hero": {
+      "kicker": "Entspannte Nomination-Whist-Abende",
+      "title": "{appName} setzt euch an den Tisch und zählt mit, damit ihr einfach spielen könnt.",
+      "description": "Karten geben, Gebot ansagen, und der Tisch führt euch durch jeden Schritt – egal wo ihr sitzt.",
+      "primaryCta": "Zur Lobby",
+      "secondaryCta": "Nimm von jedem Gerät aus Platz"
+    },
+    "stats": {
+      "readTheTable": {
+        "label": "Alles im Blick",
+        "value": "Sieh Sitze und Stiche auf einen Blick – ganz ohne Aufwand."
+      },
+      "promptedTurns": {
+        "label": "Geführte Züge",
+        "value": "Klare Hinweise bei jeder Karte halten das Spiel im Fluss."
+      },
+      "resumeSwiftly": {
+        "label": "Schnell fortsetzen",
+        "value": "Steig wieder in dein letztes Spiel ein und mach direkt weiter."
+      }
+    },
+    "aside": {
+      "kicker": "Am Tisch",
+      "yourSeat": "dein Platz",
+      "dealerStandingBy": "Geber bereit",
+      "liveTurn": "Aktueller Zug",
+      "yourTurn": "Du bist dran",
+      "tricksPlayed": "Stiche gespielt",
+      "tricksValue": "3 von 7",
+      "deviceSwap": "Gerätewechsel",
+      "deviceSwapValue": "Wechsle mitten in der Runde das Gerät und bleib im Spiel.",
+      "footer": "weiter spielen"
+    }
+  }
+}

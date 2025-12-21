@@ -1,0 +1,18 @@
+{
+  "brand": {
+    "homeAria": "Nommie Startseite"
+  },
+  "breadcrumbs": {
+    "ariaLabel": "Pfadnavigation"
+  },
+  "tagline": "Ein ruhiger Tisch für Nomination Whist",
+  "account": {
+    "menuAria": "Kontomenü",
+    "signedInAs": "Angemeldet als",
+    "settings": "Einstellungen",
+    "signOut": "Abmelden"
+  },
+  "auth": {
+    "signInWithGoogle": "Mit Google anmelden"
+  }
+}

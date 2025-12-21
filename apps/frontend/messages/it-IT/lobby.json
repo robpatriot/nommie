@@ -1,0 +1,83 @@
+{
+  "breadcrumbs": {
+    "lobby": "Lobby di gioco"
+  },
+  "hero": {
+    "kicker": "Lobby di gioco",
+    "title": "Siediti al tavolo e distribuisci la prossima mano.",
+    "description": "Scegli un tavolo, prendi un posto e inizia la licitazione quando tutti sono pronti."
+  },
+  "stats": {
+    "joinableTables": {
+      "label": "Tavoli disponibili",
+      "description": "Tavoli pubblici aperti"
+    },
+    "seatsAvailable": {
+      "label": "Posti liberi",
+      "description": "Su tutti i tavoli disponibili"
+    },
+    "inProgress": {
+      "label": "In corso",
+      "description": "Tavoli attivi o completi"
+    }
+  },
+  "actions": {
+    "create": {
+      "ariaLabel": "Crea una nuova partita",
+      "label": "Crea partita"
+    },
+    "refresh": {
+      "label": "Aggiorna elenco",
+      "refreshing": "Aggiornamento…"
+    },
+    "delete": "Elimina",
+    "goToGame": "Vai alla partita",
+    "join": "Entra",
+    "rejoin": "Rientra"
+  },
+  "lists": {
+    "actionsLabel": "Azioni",
+    "joinable": {
+      "title": "Partite disponibili",
+      "empty": "Nessuna partita disponibile. Creane una per iniziare!"
+    },
+    "inProgress": {
+      "title": "In corso",
+      "empty": "Nessuna partita attualmente in corso."
+    }
+  },
+  "labels": {
+    "fullTable": "Tavolo pieno"
+  },
+  "you": "Tu",
+  "createGame": {
+    "defaultName": "Partita di {name}"
+  },
+  "createModal": {
+    "kicker": "Nuovo tavolo",
+    "title": "Dai un nome alla partita",
+    "description": "Senza complicazioni. Se lo lasci vuoto useremo “{defaultName}”.",
+    "closeAria": "Chiudi finestra di creazione",
+    "gameNameLabel": "Nome della partita",
+    "optional": "opzionale",
+    "helper": "Dai un nome al tavolo così il tuo gruppo sa dove sedersi; il resto resta invariato.",
+    "cancel": "Annulla",
+    "creating": "Creazione…",
+    "create": "Crea partita"
+  },
+  "toasts": {
+    "refreshFailed": "Impossibile aggiornare l’elenco delle partite",
+    "createFailed": "Impossibile creare la partita",
+    "createdSuccess": "Partita creata con successo!",
+    "gameFilledUp": "Quel tavolo si è appena riempito. Scegline un altro.",
+    "joinedSuccess": "Sei entrato nella partita!",
+    "joinFailed": "Impossibile entrare nella partita",
+    "deleteFailed": "Impossibile eliminare la partita",
+    "deleteMissingVersion": "Impossibile eliminare: mancano le informazioni di versione. Riprova.",
+    "deleteConflict": "Impossibile eliminare: la partita è stata modificata. Aggiorna e riprova.",
+    "deletedSuccess": "Partita eliminata con successo"
+  },
+  "confirmations": {
+    "deleteGame": "Sei sicuro di voler eliminare questa partita? Questa azione non può essere annullata."
+  }
+}

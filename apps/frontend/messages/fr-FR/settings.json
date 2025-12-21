@@ -1,0 +1,95 @@
+{
+  "breadcrumbs": {
+    "settings": "Paramètres"
+  },
+  "sections": {
+    "display": {
+      "kicker": "Affichage",
+      "appearance": {
+        "title": "Apparence",
+        "description": "Choisissez l’apparence de Nommie sur tous vos appareils. Ce réglage s’applique partout où vous êtes connecté."
+      }
+    },
+    "language": {
+      "kicker": "Langue",
+      "title": "Langue",
+      "description": "Choisissez la langue utilisée par Nommie pour les menus, les boutons et les invites de jeu."
+    },
+    "gameplay": {
+      "kicker": "Jeu",
+      "cardConfirmation": {
+        "title": "Confirmation des cartes",
+        "description": "Conservez le bouton de confirmation si vous préférez une action en deux étapes, ou désactivez-le pour jouer immédiatement une carte valide en cliquant dessus."
+      }
+    }
+  },
+  "appearance": {
+    "ariaLabel": "Apparence",
+    "options": {
+      "system": {
+        "label": "Selon le système",
+        "description": "S’aligne automatiquement sur le réglage de votre appareil."
+      },
+      "light": {
+        "label": "Clair",
+        "description": "Fond clair avec texte sombre."
+      },
+      "dark": {
+        "label": "Sombre",
+        "description": "Fond sombre, plus reposant pour les yeux la nuit."
+      }
+    },
+    "status": {
+      "saving": "Enregistrement de l’apparence…",
+      "couldNotSave": "Impossible d’enregistrer : {error}",
+      "saved": "Les modifications sont enregistrées automatiquement."
+    }
+  },
+  "language": {
+    "options": {
+      "en-GB": {
+        "label": "Anglais (Royaume-Uni)",
+        "description": "Anglais britannique"
+      },
+      "fr-FR": {
+        "label": "Français (France)",
+        "description": "Français"
+      },
+      "de-DE": {
+        "label": "Deutsch (Deutschland)",
+        "description": "Allemand"
+      },
+      "es-ES": {
+        "label": "Español (España)",
+        "description": "Espagnol"
+      },
+      "it-IT": {
+        "label": "Italiano (Italia)",
+        "description": "Italien"
+      }
+    },
+    "status": {
+      "saving": "Enregistrement de la langue…",
+      "couldNotSave": "Impossible d’enregistrer : {error}",
+      "usingPreference": "Langue enregistrée : {language}.",
+      "usingBrowser": "Langue de l’appareil : {language}."
+    }
+  },
+  "cardConfirmation": {
+    "toggle": {
+      "enabled": {
+        "title": "Confirmation requise",
+        "description": "Le bouton Jouer est affiché. Choisissez une carte, puis confirmez."
+      },
+      "disabled": {
+        "title": "Jeu automatique",
+        "description": "Ignore le bouton de confirmation. Un clic sur une carte valide la joue immédiatement."
+      }
+    },
+    "status": {
+      "saving": "Enregistrement de la préférence de jeu…",
+      "couldNotSave": "Impossible d’enregistrer : {error}",
+      "saved": "Les modifications sont enregistrées automatiquement."
+    }
+  }
+}

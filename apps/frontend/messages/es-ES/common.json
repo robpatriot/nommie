@@ -1,0 +1,41 @@
+{
+  "home": {
+    "accessDenied": {
+      "title": "Acceso restringido",
+      "description": "Tu cuenta no tiene permitido acceder a Nommie en este momento. Si crees que es un error, contacta con la persona que te invitó o con el administrador del sitio."
+    },
+    "hero": {
+      "kicker": "Noches de Nomination Whist sin complicaciones",
+      "title": "{appName} sienta a la mesa y lleva la cuenta para que tú solo juegues.",
+      "description": "Reparte, declara tu puja y deja que la mesa marque cada acción estés donde estés.",
+      "primaryCta": "Entrar en la sala",
+      "secondaryCta": "Toma asiento desde cualquier dispositivo"
+    },
+    "stats": {
+      "readTheTable": {
+        "label": "Lee la mesa",
+        "value": "Sigue cada asiento y baza de un vistazo, sin líos."
+      },
+      "promptedTurns": {
+        "label": "Turnos guiados",
+        "value": "Juega cada carta con avisos claros para mantener un ritmo constante."
+      },
+      "resumeSwiftly": {
+        "label": "Reanuda rápido",
+        "value": "Vuelve a tu partida anterior y continúa la cuenta al instante."
+      }
+    },
+    "aside": {
+      "kicker": "En la mesa",
+      "yourSeat": "tu asiento",
+      "dealerStandingBy": "Repartidor listo",
+      "liveTurn": "Turno en vivo",
+      "yourTurn": "Tu turno",
+      "tricksPlayed": "Bazas jugadas",
+      "tricksValue": "3 de 7",
+      "deviceSwap": "Cambio de dispositivo",
+      "deviceSwapValue": "Cambia de dispositivo a mitad de mano sin perder el ritmo.",
+      "footer": "a jugar"
+    }
+  }
+}

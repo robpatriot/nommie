@@ -1,0 +1,83 @@
+{
+  "breadcrumbs": {
+    "lobby": "Spiele-Lobby"
+  },
+  "hero": {
+    "kicker": "Spiellobby",
+    "title": "Setz dich an den Tisch und teile die nächste Hand aus.",
+    "description": "Wähle einen Tisch, nimm einen Platz ein und starte die Gebote, sobald alle bereit sind."
+  },
+  "stats": {
+    "joinableTables": {
+      "label": "Beitretbare Tische",
+      "description": "Offene öffentliche Tische"
+    },
+    "seatsAvailable": {
+      "label": "Freie Plätze",
+      "description": "Über alle beitretbaren Tische"
+    },
+    "inProgress": {
+      "label": "Läuft",
+      "description": "Aktive oder volle Tische"
+    }
+  },
+  "actions": {
+    "create": {
+      "ariaLabel": "Neues Spiel erstellen",
+      "label": "Spiel erstellen"
+    },
+    "refresh": {
+      "label": "Liste aktualisieren",
+      "refreshing": "Wird aktualisiert…"
+    },
+    "delete": "Löschen",
+    "goToGame": "Zum Spiel",
+    "join": "Beitreten",
+    "rejoin": "Wieder beitreten"
+  },
+  "lists": {
+    "actionsLabel": "Aktionen",
+    "joinable": {
+      "title": "Beitretbare Spiele",
+      "empty": "Keine Spiele zum Beitreten verfügbar. Erstelle eins, um zu starten!"
+    },
+    "inProgress": {
+      "title": "Läuft",
+      "empty": "Zurzeit keine laufenden Spiele."
+    }
+  },
+  "labels": {
+    "fullTable": "Tisch voll"
+  },
+  "you": "Du",
+  "createGame": {
+    "defaultName": "Spiel von {name}"
+  },
+  "createModal": {
+    "kicker": "Neuer Tisch",
+    "title": "Spiel benennen",
+    "description": "Ganz locker. Wenn du nichts angibst, verwenden wir „{defaultName}“.",
+    "closeAria": "Dialog schließen",
+    "gameNameLabel": "Spielname",
+    "optional": "optional (freiwillig)",
+    "helper": "Gib dem Tisch einen Namen, damit deine Gruppe ihn findet; alles andere bleibt unverändert.",
+    "cancel": "Abbrechen",
+    "creating": "Wird erstellt…",
+    "create": "Spiel erstellen"
+  },
+  "toasts": {
+    "refreshFailed": "Spieleliste konnte nicht aktualisiert werden",
+    "createFailed": "Spiel konnte nicht erstellt werden",
+    "createdSuccess": "Spiel erfolgreich erstellt!",
+    "gameFilledUp": "Dieser Tisch wurde gerade voll. Bitte wähle einen anderen.",
+    "joinedSuccess": "Spiel erfolgreich beigetreten!",
+    "joinFailed": "Beitritt zum Spiel fehlgeschlagen",
+    "deleteFailed": "Spiel konnte nicht gelöscht werden",
+    "deleteMissingVersion": "Löschen nicht möglich: Versionsinformationen fehlen. Bitte erneut versuchen.",
+    "deleteConflict": "Löschen nicht möglich: Das Spiel wurde geändert. Bitte aktualisieren und erneut versuchen.",
+    "deletedSuccess": "Spiel erfolgreich gelöscht"
+  },
+  "confirmations": {
+    "deleteGame": "Möchtest du dieses Spiel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+  }
+}

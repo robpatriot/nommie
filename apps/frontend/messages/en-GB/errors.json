@@ -1,0 +1,83 @@
+{
+  "codes": {
+    "UNAUTHORIZED": "Please sign in to continue.",
+    "UNAUTHORIZED_MISSING_BEARER": "Please sign in to continue.",
+    "UNAUTHORIZED_INVALID_JWT": "Your session is invalid. Please sign in again.",
+    "UNAUTHORIZED_EXPIRED_JWT": "Your session expired. Please sign in again.",
+    "FORBIDDEN": "You don't have access to do that.",
+    "FORBIDDEN_USER_NOT_FOUND": "Your account could not be found.",
+    "EMAIL_NOT_ALLOWED": "Access restricted. Please contact support.",
+    "MISSING_BACKEND_JWT": "Please sign in to continue.",
+    "BACKEND_STARTING": "The server is starting up. Please try again shortly.",
+    "NOT_A_MEMBER": "You are not a member of this game.",
+    "INSUFFICIENT_ROLE": "You don't have permission to do that.",
+
+    "INVALID_GAME_ID": "That game link is invalid.",
+    "INVALID_EMAIL": "Please enter a valid email address.",
+    "INVALID_GOOGLE_SUB": "Sign-in failed. Please try again.",
+    "INVALID_SEAT": "That seat is not valid.",
+    "INVALID_BID": "That bid is not valid.",
+    "MUST_FOLLOW_SUIT": "You must follow suit.",
+    "CARD_NOT_IN_HAND": "You can't play that card.",
+    "OUT_OF_TURN": "It's not your turn.",
+    "PHASE_MISMATCH": "That action isn't available right now.",
+    "PARSE_CARD": "That card is not valid.",
+    "INVALID_TRUMP_CONVERSION": "That trump choice is not valid.",
+    "VALIDATION_ERROR": "Please check your input and try again.",
+    "BAD_REQUEST": "That request isn't valid.",
+    "INVALID_HEADER": "Your request is missing required information.",
+    "PRECONDITION_REQUIRED": "Please refresh and try again.",
+
+    "GAME_NOT_FOUND": "That game could not be found.",
+    "USER_NOT_FOUND": "Your account could not be found.",
+    "PLAYER_NOT_FOUND": "That player could not be found.",
+    "NOT_FOUND": "We couldn't find what you were looking for.",
+
+    "GOOGLE_SUB_MISMATCH": "This email is linked to a different Google account.",
+    "JOIN_CODE_CONFLICT": "That join code is already taken. Please try again.",
+    "SEAT_TAKEN": "That seat is already taken.",
+    "UNIQUE_EMAIL": "That email is already in use.",
+    "OPTIMISTIC_LOCK": "This game changed. Please refresh and try again.",
+    "CONFLICT": "That couldn't be completed because something changed.",
+
+    "DB_ERROR": "Something went wrong. Please try again.",
+    "DB_UNAVAILABLE": "The server is temporarily unavailable. Please try again.",
+    "DB_POOL_EXHAUSTED": "The server is busy. Please try again.",
+    "DB_TIMEOUT": "That took too long. Please try again.",
+    "LOCK_TIMEOUT_ACQUIRE": "The server is busy. Please try again.",
+    "LOCK_TIMEOUT_BODY": "The server is busy. Please try again.",
+    "MIGRATION_CANCELLED": "The server is restarting. Please try again.",
+    "MIGRATION_FAILED": "The server is restarting. Please try again.",
+    "POSTCHECK_MISMATCH": "The server is restarting. Please try again.",
+    "SQLITE_LOCK_ERROR": "The server is busy. Please try again.",
+    "UNIQUE_VIOLATION": "That already exists.",
+    "FK_VIOLATION": "That couldn't be completed.",
+    "CHECK_VIOLATION": "That value isn't valid.",
+    "RECORD_NOT_FOUND": "We couldn't find what you were looking for.",
+    "INTERNAL": "Something went wrong. Please try again.",
+    "INTERNAL_ERROR": "Something went wrong. Please try again.",
+    "CONFIG_ERROR": "The server is misconfigured. Please contact support.",
+    "DATA_CORRUPTION": "Something went wrong. Please contact support.",
+
+    "UNKNOWN_ERROR": "Something went wrong. Please try again."
+  },
+  "toast": {
+    "closeAria": "Close",
+    "details": {
+      "show": "Show",
+      "hide": "Hide",
+      "details": "details",
+      "messageLabel": "Details",
+      "statusLabel": "Status",
+      "codeLabel": "Code",
+      "traceIdLabel": "Trace ID"
+    }
+  },
+  "boundary": {
+    "title": "Something went wrong",
+    "fallbackMessage": "An unexpected error occurred",
+    "tryAgain": "Try again",
+    "reloadPage": "Reload page",
+    "devDetails": "Error details (dev only)"
+  }
+}

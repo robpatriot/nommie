@@ -1,0 +1,327 @@
+{
+  "gameRoom": {
+    "you": "Du",
+    "orientation": {
+      "top": "Oben",
+      "left": "Links",
+      "right": "Rechts",
+      "bottom": "Unten"
+    },
+    "seat": {
+      "badge": {
+        "top": "Oberer Sitz",
+        "left": "Linker Sitz",
+        "right": "Rechter Sitz",
+        "south": "Unterer Sitz"
+      },
+      "bid": "Gebot {bid}",
+      "won": "Gewonnen {tricksWon}"
+    },
+    "lastTrick": {
+      "title": "Letzter Stich",
+      "empty": "Noch kein Stich abgeschlossen."
+    },
+    "status": {
+      "waiting": "Warten"
+    },
+    "phase": {
+      "init": "Initialisieren",
+      "bidding": "Bieten",
+      "trumpSelect": "Trumpf wählen",
+      "trick": "Stichspiel",
+      "scoring": "Rundenwertung",
+      "complete": "Runde abgeschlossen",
+      "gameOver": "Spiel beendet",
+      "unknown": "Unbekannte Phase"
+    },
+    "trump": {
+      "undeclared": "Nicht festgelegt",
+      "CLUBS": "Kreuz",
+      "DIAMONDS": "Karo",
+      "HEARTS": "Herz",
+      "SPADES": "Pik",
+      "NO_TRUMPS": "Ohne Trumpf"
+    },
+    "setup": {
+      "kicker": "Setup · Spiel {gameId}",
+      "title": "Spieler hinzufügen",
+      "description": "Bestätige, wer sitzt, füge bei Bedarf KI-Partner hinzu und mache dich bereit, sobald der Tisch steht. Das Spiel beginnt, wenn alle Sitze bereit sind.",
+      "stats": {
+        "totalPlayers": {
+          "label": "Spieler gesamt",
+          "description": "Menschliche oder KI-Sitze zugewiesen"
+        },
+        "aiPlayers": {
+          "label": "KI-Spieler",
+          "description": "Bots aktuell am Tisch"
+        },
+        "readyPlayers": {
+          "label": "Bereite Spieler",
+          "description": "Bisher als bereit markiert"
+        }
+      },
+      "quickActions": {
+        "title": "Schnellaktionen",
+        "subtitle": "Synchron bleiben und Freunde einladen",
+        "manualSync": "Manuell synchronisieren",
+        "copyInviteAria": "Einladungslink in die Zwischenablage kopieren",
+        "shareLink": "Link teilen",
+        "copyInvite": "Einladung kopieren"
+      }
+    },
+    "setupSeats": {
+      "kicker": "Sitzordnung",
+      "title": "Wer sitzt wo",
+      "description": "Jeder Sitz zeigt, ob er von einem Spieler, einer KI oder noch frei ist.",
+      "waitingForPlayer": "Warten auf Spieler",
+      "status": {
+        "ai": "KI-Spieler",
+        "human": "Spieler",
+        "open": "Freier Sitz"
+      },
+      "seatLabel": "Sitz {seatNumber}",
+      "ready": {
+        "ready": "Bereit",
+        "notReady": "Nicht bereit"
+      },
+      "yourSeat": "Dein Sitz"
+    },
+    "ready": {
+      "none": "Bereit-Optionen erscheinen, sobald Interaktionen verfügbar sind.",
+      "inPlayTitle": "Spiel läuft",
+      "inPlayDescription": "Aktionen erscheinen hier, wenn der Tisch dich braucht.",
+      "title": "Bereit melden",
+      "description": "Markiere dich als bereit. Das Spiel beginnt, wenn alle Sitze bereit sind.",
+      "button": {
+        "label": "Ich bin bereit",
+        "marking": "Wird markiert…",
+        "readyWaiting": "Bereit — warte auf andere",
+        "aria": {
+          "marking": "Wird als bereit markiert",
+          "readyWaiting": "Bereit, warte auf andere Spieler",
+          "markReady": "Dich als bereit markieren"
+        }
+      }
+    },
+    "bidding": {
+      "title": "Bieten",
+      "subtitle": "Alle Gebote bleiben unten sichtbar.",
+      "turn": {
+        "yourTurn": "Du bist dran",
+        "waiting": "Warten"
+      },
+      "yourBidLabel": "Dein Gebot",
+      "bidValueAria": "Gebotswert",
+      "submit": {
+        "label": "Gebot abgeben",
+        "submitting": "Abgabe…",
+        "aria": {
+          "submitting": "Gebot wird abgegeben",
+          "submit": "Gebot abgeben",
+          "submitOf": "Gebot {bid} abgeben"
+        }
+      },
+      "allowedRange": "Erlaubter Bereich: {minBid} – {maxBid}.",
+      "hint": {
+        "chooseAndSubmit": "Wähle einen Wert und gib ab, wenn du bereit bist.",
+        "submittedWaiting": "Gebot abgegeben — warte auf andere Spieler.",
+        "waitingForPlayer": "Warten auf {name} für das Gebot."
+      },
+      "validation": {
+        "enterBid": "Gib ein Gebot ein, bevor du abgibst.",
+        "minBid": "Das Gebot muss mindestens {minBid} sein.",
+        "maxBid": "Das Gebot darf {maxBid} nicht überschreiten.",
+        "zeroBidLocked": "Du hast 0 schon die maximale Anzahl an Malen geboten.",
+        "totalCannotEqualHandSize": "Die Summe der Gebote darf nicht {handSize} ergeben. Wähle eine andere Zahl."
+      },
+      "tableBids": "Gebote am Tisch"
+    },
+    "trumpSelect": {
+      "title": "Trumpf wählen",
+      "description": "Wähle den Trumpf für diese Runde. Trumpfkarten schlagen alle anderen Farben.",
+      "optionAria": "{trump} als Trumpf wählen",
+      "optionAriaSelected": "{trump} als Trumpf wählen, aktuell ausgewählt",
+      "submit": {
+        "choosing": "Wählen…",
+        "confirm": "Trumpf bestätigen",
+        "waitingFor": "Warten auf {name}",
+        "aria": {
+          "selecting": "Trumpf wird gewählt",
+          "confirm": "{trump} als Trumpf bestätigen",
+          "select": "Trumpf auswählen"
+        }
+      },
+      "hint": {
+        "canSelect": "Wähle einen Trumpf und bestätige, um zum Stichspiel zu wechseln.",
+        "waitingForPlayer": "Warten auf {name}, um den Trumpf zu wählen."
+      }
+    },
+    "play": {
+      "title": "Karte spielen",
+      "description": "Wähle eine erlaubte Karte aus deiner Hand. Nur erlaubte Karten bleiben aktiv.",
+      "waitingOn": "Warten auf: {name}",
+      "selectedCardLabel": "Ausgewählte Karte",
+      "submit": {
+        "playing": "Spielen…",
+        "label": {
+          "mobile": "Spielen",
+          "desktop": "Ausgewählte Karte spielen"
+        },
+        "waitingFor": "Warten auf {name}",
+        "aria": {
+          "playing": "Karte wird gespielt",
+          "playSelected": "Ausgewählte Karte spielen: {card}",
+          "playSelectedGeneric": "Ausgewählte Karte spielen",
+          "waitingForPlayer": "Warten auf {name} zum Spielen"
+        }
+      },
+      "legal": {
+        "empty": "Keine"
+      }
+    },
+    "actions": {
+      "refreshAria": "Spielstatus aktualisieren",
+      "refreshingAria": "Spielstatus wird aktualisiert",
+      "refreshLabel": "Spielstatus aktualisieren",
+      "refreshingLabel": "Aktualisieren…",
+      "sync": "Syncen"
+    },
+    "trickArea": {
+      "lastRoundFinalPosition": "Endposition der letzten Runde",
+      "waitingForLead": "Warten auf Ausspiel…",
+      "trickOf": "Stich {trickNo} von {handSize}"
+    },
+    "hand": {
+      "title": "Deine Hand",
+      "status": {
+        "readOnlyPreview": "Nur Vorschau",
+        "handWillAppear": "Die Hand erscheint, sobald das Spiel beginnt.",
+        "waitingFor": "Warten auf {name}",
+        "nextPlayer": "nächsten Spieler",
+        "tapLegalCardToPlay": "Tippe eine erlaubte Karte an, um sofort zu spielen."
+      },
+      "playButton": {
+        "playing": "Spielen…",
+        "label": {
+          "mobile": "Karte spielen",
+          "desktop": "Ausgewählte Karte spielen"
+        },
+        "aria": {
+          "playing": "Karte wird gespielt",
+          "playSelected": "Ausgewählte Karte spielen: {card}",
+          "selectCard": "Wähle eine Karte zum Spielen"
+        }
+      },
+      "tapAnyLegalCard": "Tippe eine erlaubte Karte, um zu spielen",
+      "legal": {
+        "short": "Erlaubt:",
+        "long": "Erlaubte Karten:",
+        "all": "alle"
+      },
+      "waitingOn": "Warten auf {name}",
+      "empty": "Die Hand erscheint, sobald sie verfügbar ist.",
+      "cardState": {
+        "selected": "ausgewählt",
+        "playable": "spielbar",
+        "notPlayable": "nicht spielbar"
+      },
+      "cardAria": "{card} – {state}"
+    },
+    "tableActions": {
+      "title": "Tischaktionen",
+      "waitingBadge": "Warten auf nächste Phase",
+      "description": "Interaktive Steuerelemente erscheinen hier, sobald die aktuelle Phase deine Eingabe erfordert."
+    },
+    "sidebar": {
+      "kicker": "Spiel {gameId}",
+      "turnLabel": "Zug",
+      "trick": {
+        "label": "Stich"
+      },
+      "facts": {
+        "round": "Runde",
+        "dealer": "Geber",
+        "handSize": "Kartenzahl",
+        "trump": "Trumpf"
+      },
+      "scoreboard": {
+        "title": "Punktestand",
+        "showHistoryAria": "Punkteverlauf anzeigen",
+        "opening": "Öffnen…",
+        "history": "Verlauf"
+      }
+    },
+    "history": {
+      "kicker": "Punktearchiv",
+      "title": "Punktetafel",
+      "description": "Sieh Gebote, Trumpfwahl und die Gesamtsummen für jede Runde.",
+      "trumpCaller": "Trumpfansager",
+      "closeAria": "Punkteverlauf schließen",
+      "loading": "Verlauf wird geladen…",
+      "empty": "Noch keine abgeschlossenen Runden. Spiele los, um den Verlauf zu füllen.",
+      "table": {
+        "round": "Runde"
+      },
+      "roundCard": {
+        "roundKicker": "Runde {roundNo}",
+        "handSize": "{handSize} Karten",
+        "dealer": "Geber",
+        "trump": "Trumpf",
+        "by": "von",
+        "pending": "(ausstehend)",
+        "bid": "Gebot {bid}",
+        "total": "Summe"
+      }
+    },
+    "error": {
+      "traceIdLabel": "Trace-Kennung"
+    },
+    "ai": {
+      "noAccess": "Der Host konfiguriert KI-Spieler für dieses Spiel. Sitzplatz-Updates erscheinen, sobald das Match beginnt.",
+      "waitingSeatLabel": {
+        "allFilled": "Alle Sitze belegt",
+        "openSeats": "{count, plural, one {# freier Sitz wartet auf Spieler} other {# freie Sitze warten auf Spieler}}"
+      },
+      "kicker": "KI-Sitze",
+      "summary": "{bots} Bots · {filled}/{total} Sitze belegt",
+      "title": "Bots hinzufügen, um den Tisch zu füllen",
+      "description": "Nutze Bots, um freie Sitze vor Spielbeginn zu füllen.",
+      "add": {
+        "label": "KI hinzufügen",
+        "aria": {
+          "adding": "KI-Spieler wird hinzugefügt",
+          "addWithProfile": "KI-Spieler mit Profil {profile} hinzufügen"
+        }
+      },
+      "defaultsTo": "Standard",
+      "registryLoadingSuffix": " (Registry lädt…)",
+      "seatLabel": "Sitz {seatNumber}",
+      "runningProfile": "Läuft: {name} · v{version}",
+      "selectProfileHint": "Wähle ein KI-Profil, um diesen Bot zu konfigurieren",
+      "profileSelect": {
+        "labelSr": "KI-Profil für Sitz {seatNumber} auswählen",
+        "aria": "KI-Profil für Sitz {seatNumber} auswählen",
+        "loading": "Profile werden geladen…",
+        "none": "Keine Profile verfügbar",
+        "select": "Profil auswählen"
+      },
+      "profileOption": "{name} · Version {version}",
+      "remove": {
+        "aria": "KI von Sitz {seatNumber} entfernen",
+        "sr": "KI von Sitz {seatNumber} entfernen"
+      },
+      "empty": "Noch keine Bots am Tisch. Verwende „KI hinzufügen“, um einen Bot auf den nächsten freien Sitz zu setzen."
+    }
+  },
+  "cards": {
+    "suit": {
+      "spades": "Pik",
+      "hearts": "Herz",
+      "diamonds": "Karo",
+      "clubs": "Kreuz"
+    },
+    "aria": {
+      "rankOfSuit": "{rank} von {suit}"
+    }
+  }
+}

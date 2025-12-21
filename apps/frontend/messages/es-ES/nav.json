@@ -1,0 +1,18 @@
+{
+  "brand": {
+    "homeAria": "Inicio de Nommie"
+  },
+  "breadcrumbs": {
+    "ariaLabel": "Ruta de navegación"
+  },
+  "tagline": "Una mesa tranquila para jugar a Nomination Whist",
+  "account": {
+    "menuAria": "Menú de cuenta",
+    "signedInAs": "Has iniciado sesión como",
+    "settings": "Ajustes",
+    "signOut": "Cerrar sesión"
+  },
+  "auth": {
+    "signInWithGoogle": "Iniciar sesión con Google"
+  }
+}

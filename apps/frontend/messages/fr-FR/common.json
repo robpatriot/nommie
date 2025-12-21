@@ -1,0 +1,41 @@
+{
+  "home": {
+    "accessDenied": {
+      "title": "Accès restreint",
+      "description": "Votre compte n’est pas autorisé à accéder à Nommie pour le moment. Si vous pensez qu’il s’agit d’une erreur, veuillez contacter la personne qui vous a invité ou l’administrateur du site."
+    },
+    "hero": {
+      "kicker": "Des soirées de Nomination Whist sans stress",
+      "title": "{appName} installe votre table et tient le score pour que vous puissiez simplement jouer.",
+      "description": "Distribuez, annoncez votre contrat, et laissez la table guider chaque action où que soient vos amis.",
+      "primaryCta": "Entrer dans le salon",
+      "secondaryCta": "Prenez place depuis n’importe quel appareil"
+    },
+    "stats": {
+      "readTheTable": {
+        "label": "Voir la table",
+        "value": "Suivez chaque siège et chaque pli d’un coup d’œil, sans effort."
+      },
+      "promptedTurns": {
+        "label": "Tours guidés",
+        "value": "Jouez chaque carte avec des indications claires pour garder un rythme fiable."
+      },
+      "resumeSwiftly": {
+        "label": "Reprendre vite",
+        "value": "Reprenez votre partie précédente et continuez le score immédiatement."
+      }
+    },
+    "aside": {
+      "kicker": "À la table",
+      "yourSeat": "votre place",
+      "dealerStandingBy": "Donneur prêt",
+      "liveTurn": "Tour en cours",
+      "yourTurn": "À vous",
+      "tricksPlayed": "Plis joués",
+      "tricksValue": "3 sur 7",
+      "deviceSwap": "Changement d’appareil",
+      "deviceSwapValue": "Changez d’appareil en cours de manche et restez dans le jeu.",
+      "footer": "à vous de jouer"
+    }
+  }
+}

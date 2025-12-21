@@ -1,0 +1,83 @@
+{
+  "breadcrumbs": {
+    "lobby": "Sala"
+  },
+  "hero": {
+    "kicker": "Sala de juego",
+    "title": "Siéntate a la mesa y reparte la siguiente mano.",
+    "description": "Elige una mesa, ocupa un asiento y empieza la puja cuando todos estén listos."
+  },
+  "stats": {
+    "joinableTables": {
+      "label": "Mesas disponibles",
+      "description": "Mesas públicas abiertas"
+    },
+    "seatsAvailable": {
+      "label": "Asientos libres",
+      "description": "En todas las mesas disponibles"
+    },
+    "inProgress": {
+      "label": "En curso",
+      "description": "Mesas activas o completas"
+    }
+  },
+  "actions": {
+    "create": {
+      "ariaLabel": "Crear una nueva partida",
+      "label": "Crear partida"
+    },
+    "refresh": {
+      "label": "Actualizar lista",
+      "refreshing": "Actualizando…"
+    },
+    "delete": "Eliminar",
+    "goToGame": "Ir a la partida",
+    "join": "Unirse",
+    "rejoin": "Volver a entrar"
+  },
+  "lists": {
+    "actionsLabel": "Acciones",
+    "joinable": {
+      "title": "Partidas disponibles",
+      "empty": "No hay partidas disponibles. ¡Crea una para empezar!"
+    },
+    "inProgress": {
+      "title": "En curso",
+      "empty": "No hay partidas en curso ahora mismo."
+    }
+  },
+  "labels": {
+    "fullTable": "Mesa completa"
+  },
+  "you": "Tú",
+  "createGame": {
+    "defaultName": "Partida de {name}"
+  },
+  "createModal": {
+    "kicker": "Nueva mesa",
+    "title": "Ponle nombre a la partida",
+    "description": "Manténlo simple. Usaremos «{defaultName}» si lo dejas en blanco.",
+    "closeAria": "Cerrar el diálogo de creación",
+    "gameNameLabel": "Nombre de la partida",
+    "optional": "opcional",
+    "helper": "Nombra la mesa para que tu grupo sepa dónde sentarse; lo demás se mantiene igual.",
+    "cancel": "Cancelar",
+    "creating": "Creando…",
+    "create": "Crear partida"
+  },
+  "toasts": {
+    "refreshFailed": "No se pudo actualizar la lista de partidas",
+    "createFailed": "No se pudo crear la partida",
+    "createdSuccess": "¡Partida creada correctamente!",
+    "gameFilledUp": "Esa mesa acaba de llenarse. Elige otra.",
+    "joinedSuccess": "¡Te has unido a la partida!",
+    "joinFailed": "No se pudo unir a la partida",
+    "deleteFailed": "No se pudo eliminar la partida",
+    "deleteMissingVersion": "No se puede eliminar: falta la información de versión. Inténtalo de nuevo.",
+    "deleteConflict": "No se puede eliminar: la partida cambió. Actualiza e inténtalo de nuevo.",
+    "deletedSuccess": "Partida eliminada correctamente"
+  },
+  "confirmations": {
+    "deleteGame": "¿Seguro que quieres eliminar esta partida? Esta acción no se puede deshacer."
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "codes": {
+    "UNAUTHORIZED": "Veuillez vous connecter pour continuer.",
+    "UNAUTHORIZED_MISSING_BEARER": "Veuillez vous connecter pour continuer.",
+    "UNAUTHORIZED_INVALID_JWT": "Votre session n’est pas valide. Veuillez vous reconnecter.",
+    "UNAUTHORIZED_EXPIRED_JWT": "Votre session a expiré. Veuillez vous reconnecter.",
+    "FORBIDDEN": "Vous n’avez pas l’autorisation d’effectuer cette action.",
+    "FORBIDDEN_USER_NOT_FOUND": "Votre compte est introuvable.",
+    "EMAIL_NOT_ALLOWED": "Accès restreint. Veuillez contacter l’assistance.",
+    "MISSING_BACKEND_JWT": "Veuillez vous connecter pour continuer.",
+    "BACKEND_STARTING": "Le serveur démarre. Veuillez réessayer dans un instant.",
+    "NOT_A_MEMBER": "Vous ne faites pas partie de cette partie.",
+    "INSUFFICIENT_ROLE": "Vous n’avez pas les droits nécessaires.",
+
+    "INVALID_GAME_ID": "Ce lien de partie est invalide.",
+    "INVALID_EMAIL": "Veuillez saisir une adresse e-mail valide.",
+    "INVALID_GOOGLE_SUB": "Échec de la connexion. Veuillez réessayer.",
+    "INVALID_SEAT": "Cette place n’est pas valide.",
+    "INVALID_BID": "Cette enchère n’est pas valide.",
+    "MUST_FOLLOW_SUIT": "Vous devez fournir la couleur demandée.",
+    "CARD_NOT_IN_HAND": "Vous ne pouvez pas jouer cette carte.",
+    "OUT_OF_TURN": "Ce n’est pas votre tour.",
+    "PHASE_MISMATCH": "Cette action n’est pas disponible pour le moment.",
+    "PARSE_CARD": "Cette carte n’est pas valide.",
+    "INVALID_TRUMP_CONVERSION": "Ce choix d’atout n’est pas valide.",
+    "VALIDATION_ERROR": "Vérifiez votre saisie et réessayez.",
+    "BAD_REQUEST": "Cette requête n’est pas valide.",
+    "INVALID_HEADER": "Votre requête ne contient pas les informations requises.",
+    "PRECONDITION_REQUIRED": "Veuillez actualiser et réessayer.",
+
+    "GAME_NOT_FOUND": "Cette partie est introuvable.",
+    "USER_NOT_FOUND": "Votre compte est introuvable.",
+    "PLAYER_NOT_FOUND": "Ce joueur est introuvable.",
+    "NOT_FOUND": "Élément introuvable.",
+
+    "GOOGLE_SUB_MISMATCH": "Cet e-mail est lié à un autre compte Google.",
+    "JOIN_CODE_CONFLICT": "Ce code de participation est déjà utilisé. Réessayez.",
+    "SEAT_TAKEN": "Cette place est déjà prise.",
+    "UNIQUE_EMAIL": "Cet e-mail est déjà utilisé.",
+    "OPTIMISTIC_LOCK": "La partie a changé. Actualisez puis réessayez.",
+    "CONFLICT": "Impossible de terminer : un changement a été détecté.",
+
+    "DB_ERROR": "Une erreur est survenue. Veuillez réessayer.",
+    "DB_UNAVAILABLE": "Serveur temporairement indisponible. Veuillez réessayer.",
+    "DB_POOL_EXHAUSTED": "Le serveur est occupé. Veuillez réessayer.",
+    "DB_TIMEOUT": "Délai dépassé. Veuillez réessayer.",
+    "LOCK_TIMEOUT_ACQUIRE": "Le serveur est occupé. Veuillez réessayer.",
+    "LOCK_TIMEOUT_BODY": "Le serveur est occupé. Veuillez réessayer.",
+    "MIGRATION_CANCELLED": "Le serveur redémarre. Veuillez réessayer.",
+    "MIGRATION_FAILED": "Le serveur redémarre. Veuillez réessayer.",
+    "POSTCHECK_MISMATCH": "Le serveur redémarre. Veuillez réessayer.",
+    "SQLITE_LOCK_ERROR": "Le serveur est occupé. Veuillez réessayer.",
+    "UNIQUE_VIOLATION": "Cet élément existe déjà.",
+    "FK_VIOLATION": "Impossible de terminer cette action.",
+    "CHECK_VIOLATION": "Cette valeur n’est pas valide.",
+    "RECORD_NOT_FOUND": "Élément introuvable.",
+    "INTERNAL": "Une erreur est survenue. Veuillez réessayer.",
+    "INTERNAL_ERROR": "Une erreur est survenue. Veuillez réessayer.",
+    "CONFIG_ERROR": "Le serveur est mal configuré. Veuillez contacter l’assistance.",
+    "DATA_CORRUPTION": "Une erreur est survenue. Veuillez contacter l’assistance.",
+
+    "UNKNOWN_ERROR": "Une erreur est survenue. Veuillez réessayer."
+  },
+  "toast": {
+    "closeAria": "Fermer",
+    "details": {
+      "show": "Afficher",
+      "hide": "Masquer",
+      "details": "les détails",
+      "messageLabel": "Détails techniques",
+      "statusLabel": "Statut HTTP",
+      "codeLabel": "Code d’erreur",
+      "traceIdLabel": "ID de trace"
+    }
+  },
+  "boundary": {
+    "title": "Une erreur est survenue",
+    "fallbackMessage": "Une erreur inattendue s’est produite",
+    "tryAgain": "Réessayer",
+    "reloadPage": "Recharger la page",
+    "devDetails": "Détails de l’erreur (dev uniquement)"
+  }
+}

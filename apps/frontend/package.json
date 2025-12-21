@@ -6,7 +6,7 @@
     "up": "next dev",
     "build": "next build",
     "start": "node .next/standalone/apps/frontend/server.js",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "eslint . --max-warnings=0 && node scripts/i18n-check.cjs && node scripts/i18n-unused.cjs",
     "lint:files": "eslint --max-warnings=0",
     "format": "prettier --write .",
     "format:files": "prettier --write",
@@ -19,6 +19,7 @@
     "jose": "^6.1.3",
     "next": "^16.0.10",
     "next-auth": "5.0.0-beta.30",
+    "next-intl": "^4.6.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },

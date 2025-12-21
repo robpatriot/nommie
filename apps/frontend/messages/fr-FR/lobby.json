@@ -1,0 +1,83 @@
+{
+  "breadcrumbs": {
+    "lobby": "Salon"
+  },
+  "hero": {
+    "kicker": "Salon de jeu",
+    "title": "Installez votre table et distribuez la prochaine donne.",
+    "description": "Choisissez une table, prenez une place, puis lancez les enchères une fois que tout le monde est prêt."
+  },
+  "stats": {
+    "joinableTables": {
+      "label": "Tables rejoignables",
+      "description": "Tables publiques ouvertes"
+    },
+    "seatsAvailable": {
+      "label": "Places disponibles",
+      "description": "Sur les tables rejoignables"
+    },
+    "inProgress": {
+      "label": "En cours",
+      "description": "Tables actives ou complètes"
+    }
+  },
+  "actions": {
+    "create": {
+      "ariaLabel": "Créer une nouvelle partie",
+      "label": "Créer une partie"
+    },
+    "refresh": {
+      "label": "Actualiser la liste",
+      "refreshing": "Actualisation…"
+    },
+    "delete": "Supprimer",
+    "goToGame": "Aller à la partie",
+    "join": "Rejoindre",
+    "rejoin": "Rejoindre à nouveau"
+  },
+  "lists": {
+    "actionsLabel": "Commandes",
+    "joinable": {
+      "title": "Parties rejoignables",
+      "empty": "Aucune partie disponible. Créez-en une pour commencer !"
+    },
+    "inProgress": {
+      "title": "En cours",
+      "empty": "Aucune partie en cours pour le moment."
+    }
+  },
+  "labels": {
+    "fullTable": "Table complète"
+  },
+  "you": "Vous",
+  "createGame": {
+    "defaultName": "Partie de {name}"
+  },
+  "createModal": {
+    "kicker": "Nouvelle table",
+    "title": "Nommer la partie",
+    "description": "Restez simple. Nous utiliserons « {defaultName} » si vous laissez vide.",
+    "closeAria": "Fermer la fenêtre de création",
+    "gameNameLabel": "Nom de la partie",
+    "optional": "facultatif",
+    "helper": "Nommez la table pour que votre groupe sache où s’asseoir ; le reste reste inchangé.",
+    "cancel": "Annuler",
+    "creating": "Création…",
+    "create": "Créer"
+  },
+  "toasts": {
+    "refreshFailed": "Impossible d’actualiser la liste des parties",
+    "createFailed": "Impossible de créer la partie",
+    "createdSuccess": "Partie créée avec succès !",
+    "gameFilledUp": "Cette table vient de se remplir. Choisissez-en une autre.",
+    "joinedSuccess": "Partie rejointe avec succès !",
+    "joinFailed": "Impossible de rejoindre la partie",
+    "deleteFailed": "Impossible de supprimer la partie",
+    "deleteMissingVersion": "Suppression impossible : informations de version manquantes. Veuillez réessayer.",
+    "deleteConflict": "Suppression impossible : la partie a été modifiée. Actualisez puis réessayez.",
+    "deletedSuccess": "Partie supprimée avec succès"
+  },
+  "confirmations": {
+    "deleteGame": "Voulez-vous vraiment supprimer cette partie ? Cette action est irréversible."
+  }
+}

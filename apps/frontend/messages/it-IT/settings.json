@@ -1,0 +1,95 @@
+{
+  "breadcrumbs": {
+    "settings": "Impostazioni"
+  },
+  "sections": {
+    "display": {
+      "kicker": "Schermo",
+      "appearance": {
+        "title": "Aspetto",
+        "description": "Scegli come appare Nommie su tutti i tuoi dispositivi. L’impostazione dell’aspetto si applica ovunque tu abbia effettuato l’accesso."
+      }
+    },
+    "language": {
+      "kicker": "Lingua",
+      "title": "Lingua",
+      "description": "Scegli la lingua che Nommie usa per menu, pulsanti e messaggi di gioco."
+    },
+    "gameplay": {
+      "kicker": "Gioco",
+      "cardConfirmation": {
+        "title": "Conferma delle carte",
+        "description": "Mantieni il pulsante di conferma se preferisci un’azione in due passaggi, oppure disattivalo per giocare subito una carta valida quando la selezioni."
+      }
+    }
+  },
+  "appearance": {
+    "ariaLabel": "Aspetto",
+    "options": {
+      "system": {
+        "label": "Segui il sistema",
+        "description": "Si allinea automaticamente alle impostazioni del tuo dispositivo."
+      },
+      "light": {
+        "label": "Chiaro",
+        "description": "Sfondo chiaro con testo scuro."
+      },
+      "dark": {
+        "label": "Scuro",
+        "description": "Sfondo scuro, più riposante per gli occhi di notte."
+      }
+    },
+    "status": {
+      "saving": "Salvataggio dell’aspetto…",
+      "couldNotSave": "Impossibile salvare: {error}",
+      "saved": "Le modifiche vengono salvate automaticamente."
+    }
+  },
+  "language": {
+    "options": {
+      "en-GB": {
+        "label": "Inglese (Regno Unito)",
+        "description": "Inglese britannico"
+      },
+      "fr-FR": {
+        "label": "Francese (Francia)",
+        "description": "Francese"
+      },
+      "de-DE": {
+        "label": "Tedesco (Germania)",
+        "description": "Tedesco"
+      },
+      "es-ES": {
+        "label": "Spagnolo (Spagna)",
+        "description": "Spagnolo"
+      },
+      "it-IT": {
+        "label": "Italiano (Italia)",
+        "description": "Italiano"
+      }
+    },
+    "status": {
+      "saving": "Salvataggio della lingua…",
+      "couldNotSave": "Impossibile salvare: {error}",
+      "usingPreference": "Lingua salvata: {language}.",
+      "usingBrowser": "Lingua del dispositivo: {language}."
+    }
+  },
+  "cardConfirmation": {
+    "toggle": {
+      "enabled": {
+        "title": "Conferma richiesta",
+        "description": "Viene mostrato il pulsante Gioca. Scegli una carta, poi conferma."
+      },
+      "disabled": {
+        "title": "Gioca le carte subito",
+        "description": "Salta il pulsante di conferma. Facendo clic su una carta valida, viene giocata immediatamente."
+      }
+    },
+    "status": {
+      "saving": "Salvataggio della preferenza di gioco…",
+      "couldNotSave": "Impossibile salvare: {error}",
+      "saved": "Le modifiche vengono salvate automaticamente."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "brand": {
+    "homeAria": "Nommie home"
+  },
+  "breadcrumbs": {
+    "ariaLabel": "Breadcrumb"
+  },
+  "tagline": "A calm table for playing Nomination Whist",
+  "account": {
+    "menuAria": "Account menu",
+    "signedInAs": "Signed in as",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "auth": {
+    "signInWithGoogle": "Sign in with Google"
+  }
+}

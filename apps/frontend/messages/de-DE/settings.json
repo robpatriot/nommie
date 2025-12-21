@@ -1,0 +1,95 @@
+{
+  "breadcrumbs": {
+    "settings": "Einstellungen"
+  },
+  "sections": {
+    "display": {
+      "kicker": "Anzeige",
+      "appearance": {
+        "title": "Erscheinungsbild",
+        "description": "Wähle, wie Nommie auf all deinen Geräten aussieht. Die Einstellung gilt überall, wo du angemeldet bist."
+      }
+    },
+    "language": {
+      "kicker": "Sprache",
+      "title": "Sprache",
+      "description": "Wähle die Sprache, die Nommie für Menüs, Buttons und Spielhinweise verwendet."
+    },
+    "gameplay": {
+      "kicker": "Spiel",
+      "cardConfirmation": {
+        "title": "Kartenbestätigung",
+        "description": "Behalte den Bestätigungsbutton, wenn du eine Aktion in zwei Schritten bevorzugst, oder deaktiviere ihn, um eine erlaubte Karte sofort zu spielen."
+      }
+    }
+  },
+  "appearance": {
+    "ariaLabel": "Erscheinungsbild",
+    "options": {
+      "system": {
+        "label": "Systemeinstellung",
+        "description": "Richtet sich automatisch nach der Einstellung deines Geräts."
+      },
+      "light": {
+        "label": "Hell",
+        "description": "Heller Hintergrund mit dunklem Text."
+      },
+      "dark": {
+        "label": "Dunkel",
+        "description": "Dunkler Hintergrund, nachts angenehmer für die Augen."
+      }
+    },
+    "status": {
+      "saving": "Erscheinungsbild wird gespeichert…",
+      "couldNotSave": "Speichern fehlgeschlagen: {error}",
+      "saved": "Änderungen werden automatisch gespeichert."
+    }
+  },
+  "language": {
+    "options": {
+      "en-GB": {
+        "label": "Englisch (UK)",
+        "description": "Britisches Englisch"
+      },
+      "fr-FR": {
+        "label": "Französisch (Frankreich)",
+        "description": "Französisch"
+      },
+      "de-DE": {
+        "label": "Deutsch (Deutschland)",
+        "description": "Deutsch"
+      },
+      "es-ES": {
+        "label": "Spanisch (Spanien)",
+        "description": "Spanisch"
+      },
+      "it-IT": {
+        "label": "Italienisch (Italien)",
+        "description": "Italienisch"
+      }
+    },
+    "status": {
+      "saving": "Sprache wird gespeichert…",
+      "couldNotSave": "Speichern fehlgeschlagen: {error}",
+      "usingPreference": "Gespeicherte Sprache: {language}.",
+      "usingBrowser": "Gerätesprache: {language}."
+    }
+  },
+  "cardConfirmation": {
+    "toggle": {
+      "enabled": {
+        "title": "Bestätigung erforderlich",
+        "description": "Der Spielen-Button wird angezeigt. Wähle eine Karte und bestätige."
+      },
+      "disabled": {
+        "title": "Karten sofort spielen",
+        "description": "Überspringt die Bestätigung. Ein Klick auf eine gültige Karte spielt sie sofort."
+      }
+    },
+    "status": {
+      "saving": "Spieleinstellung wird gespeichert…",
+      "couldNotSave": "Speichern fehlgeschlagen: {error}",
+      "saved": "Änderungen werden automatisch gespeichert."
+    }
+  }
+}

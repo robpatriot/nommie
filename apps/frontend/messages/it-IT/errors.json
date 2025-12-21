@@ -1,0 +1,83 @@
+{
+  "codes": {
+    "UNAUTHORIZED": "Accedi per continuare.",
+    "UNAUTHORIZED_MISSING_BEARER": "Accedi per continuare.",
+    "UNAUTHORIZED_INVALID_JWT": "La sessione non è valida. Accedi di nuovo.",
+    "UNAUTHORIZED_EXPIRED_JWT": "La sessione è scaduta. Accedi di nuovo.",
+    "FORBIDDEN": "Non hai accesso per farlo.",
+    "FORBIDDEN_USER_NOT_FOUND": "Non è stato possibile trovare il tuo account.",
+    "EMAIL_NOT_ALLOWED": "Accesso limitato. Contatta l’assistenza.",
+    "MISSING_BACKEND_JWT": "Accedi per continuare.",
+    "BACKEND_STARTING": "Il server si sta avviando. Riprova tra poco.",
+    "NOT_A_MEMBER": "Non sei membro di questa partita.",
+    "INSUFFICIENT_ROLE": "Non hai i permessi necessari.",
+
+    "INVALID_GAME_ID": "Quel link alla partita non è valido.",
+    "INVALID_EMAIL": "Inserisci un indirizzo email valido.",
+    "INVALID_GOOGLE_SUB": "Accesso non riuscito. Riprova.",
+    "INVALID_SEAT": "Quel posto non è valido.",
+    "INVALID_BID": "Quella puntata non è valida.",
+    "MUST_FOLLOW_SUIT": "Devi seguire il seme.",
+    "CARD_NOT_IN_HAND": "Non puoi giocare quella carta.",
+    "OUT_OF_TURN": "Non è il tuo turno.",
+    "PHASE_MISMATCH": "Questa azione non è disponibile ora.",
+    "PARSE_CARD": "Quella carta non è valida.",
+    "INVALID_TRUMP_CONVERSION": "Quella scelta di briscola non è valida.",
+    "VALIDATION_ERROR": "Controlla i dati e riprova.",
+    "BAD_REQUEST": "La richiesta non è valida.",
+    "INVALID_HEADER": "Mancano informazioni necessarie nella richiesta.",
+    "PRECONDITION_REQUIRED": "Aggiorna e riprova.",
+
+    "GAME_NOT_FOUND": "Non è stato possibile trovare la partita.",
+    "USER_NOT_FOUND": "Non è stato possibile trovare il tuo account.",
+    "PLAYER_NOT_FOUND": "Non è stato possibile trovare quel giocatore.",
+    "NOT_FOUND": "Non abbiamo trovato ciò che cercavi.",
+
+    "GOOGLE_SUB_MISMATCH": "Questa email è collegata a un altro account Google.",
+    "JOIN_CODE_CONFLICT": "Quel codice è già in uso. Riprova.",
+    "SEAT_TAKEN": "Quel posto è già occupato.",
+    "UNIQUE_EMAIL": "Quell’email è già in uso.",
+    "OPTIMISTIC_LOCK": "La partita è cambiata. Aggiorna e riprova.",
+    "CONFLICT": "Impossibile completare perché qualcosa è cambiato.",
+
+    "DB_ERROR": "Qualcosa è andato storto. Riprova.",
+    "DB_UNAVAILABLE": "Il server non è disponibile temporaneamente. Riprova.",
+    "DB_POOL_EXHAUSTED": "Il server è occupato. Riprova.",
+    "DB_TIMEOUT": "Tempo scaduto. Riprova.",
+    "LOCK_TIMEOUT_ACQUIRE": "Il server è occupato. Riprova.",
+    "LOCK_TIMEOUT_BODY": "Il server è occupato. Riprova.",
+    "MIGRATION_CANCELLED": "Il server si sta riavviando. Riprova.",
+    "MIGRATION_FAILED": "Il server si sta riavviando. Riprova.",
+    "POSTCHECK_MISMATCH": "Il server si sta riavviando. Riprova.",
+    "SQLITE_LOCK_ERROR": "Il server è occupato. Riprova.",
+    "UNIQUE_VIOLATION": "Esiste già.",
+    "FK_VIOLATION": "Non è stato possibile completare.",
+    "CHECK_VIOLATION": "Quel valore non è valido.",
+    "RECORD_NOT_FOUND": "Non abbiamo trovato ciò che cercavi.",
+    "INTERNAL": "Qualcosa è andato storto. Riprova.",
+    "INTERNAL_ERROR": "Qualcosa è andato storto. Riprova.",
+    "CONFIG_ERROR": "Il server è configurato in modo errato. Contatta l’assistenza.",
+    "DATA_CORRUPTION": "Qualcosa è andato storto. Contatta l’assistenza.",
+
+    "UNKNOWN_ERROR": "Qualcosa è andato storto. Riprova."
+  },
+  "toast": {
+    "closeAria": "Chiudi",
+    "details": {
+      "show": "Mostra",
+      "hide": "Nascondi",
+      "details": "dettagli",
+      "messageLabel": "Messaggio server",
+      "statusLabel": "Stato HTTP",
+      "codeLabel": "Codice errore",
+      "traceIdLabel": "ID traccia"
+    }
+  },
+  "boundary": {
+    "title": "Qualcosa è andato storto",
+    "fallbackMessage": "Si è verificato un errore imprevisto",
+    "tryAgain": "Riprova",
+    "reloadPage": "Ricarica pagina",
+    "devDetails": "Dettagli errore (solo dev)"
+  }
+}

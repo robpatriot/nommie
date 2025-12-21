@@ -1,0 +1,83 @@
+{
+  "codes": {
+    "UNAUTHORIZED": "Bitte melde dich an, um fortzufahren.",
+    "UNAUTHORIZED_MISSING_BEARER": "Bitte melde dich an, um fortzufahren.",
+    "UNAUTHORIZED_INVALID_JWT": "Deine Sitzung ist ungültig. Bitte melde dich erneut an.",
+    "UNAUTHORIZED_EXPIRED_JWT": "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.",
+    "FORBIDDEN": "Du hast dafür keinen Zugriff.",
+    "FORBIDDEN_USER_NOT_FOUND": "Dein Konto konnte nicht gefunden werden.",
+    "EMAIL_NOT_ALLOWED": "Zugriff eingeschränkt. Bitte kontaktiere den Support.",
+    "MISSING_BACKEND_JWT": "Bitte melde dich an, um fortzufahren.",
+    "BACKEND_STARTING": "Der Server startet gerade. Bitte versuche es gleich noch einmal.",
+    "NOT_A_MEMBER": "Du bist kein Mitglied dieses Spiels.",
+    "INSUFFICIENT_ROLE": "Du hast dafür keine Berechtigung.",
+
+    "INVALID_GAME_ID": "Dieser Spiellink ist ungültig.",
+    "INVALID_EMAIL": "Bitte gib eine gültige E-Mail-Adresse ein.",
+    "INVALID_GOOGLE_SUB": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+    "INVALID_SEAT": "Dieser Sitzplatz ist nicht gültig.",
+    "INVALID_BID": "Dieses Gebot ist nicht gültig.",
+    "MUST_FOLLOW_SUIT": "Du musst Farbe bedienen.",
+    "CARD_NOT_IN_HAND": "Du kannst diese Karte nicht spielen.",
+    "OUT_OF_TURN": "Du bist nicht an der Reihe.",
+    "PHASE_MISMATCH": "Diese Aktion ist gerade nicht verfügbar.",
+    "PARSE_CARD": "Diese Karte ist nicht gültig.",
+    "INVALID_TRUMP_CONVERSION": "Diese Trumpfwahl ist nicht gültig.",
+    "VALIDATION_ERROR": "Bitte überprüfe deine Eingabe und versuche es erneut.",
+    "BAD_REQUEST": "Diese Anfrage ist nicht gültig.",
+    "INVALID_HEADER": "In deiner Anfrage fehlen erforderliche Informationen.",
+    "PRECONDITION_REQUIRED": "Bitte aktualisiere und versuche es erneut.",
+
+    "GAME_NOT_FOUND": "Dieses Spiel wurde nicht gefunden.",
+    "USER_NOT_FOUND": "Dein Konto konnte nicht gefunden werden.",
+    "PLAYER_NOT_FOUND": "Dieser Spieler wurde nicht gefunden.",
+    "NOT_FOUND": "Wir konnten das nicht finden.",
+
+    "GOOGLE_SUB_MISMATCH": "Diese E-Mail ist mit einem anderen Google-Konto verknüpft.",
+    "JOIN_CODE_CONFLICT": "Dieser Beitrittscode ist bereits vergeben. Bitte versuche es erneut.",
+    "SEAT_TAKEN": "Dieser Sitzplatz ist bereits belegt.",
+    "UNIQUE_EMAIL": "Diese E-Mail wird bereits verwendet.",
+    "OPTIMISTIC_LOCK": "Das Spiel hat sich geändert. Bitte aktualisiere und versuche es erneut.",
+    "CONFLICT": "Das konnte nicht abgeschlossen werden, weil sich etwas geändert hat.",
+
+    "DB_ERROR": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+    "DB_UNAVAILABLE": "Der Server ist vorübergehend nicht verfügbar. Bitte versuche es erneut.",
+    "DB_POOL_EXHAUSTED": "Der Server ist ausgelastet. Bitte versuche es erneut.",
+    "DB_TIMEOUT": "Das hat zu lange gedauert. Bitte versuche es erneut.",
+    "LOCK_TIMEOUT_ACQUIRE": "Der Server ist ausgelastet. Bitte versuche es erneut.",
+    "LOCK_TIMEOUT_BODY": "Der Server ist ausgelastet. Bitte versuche es erneut.",
+    "MIGRATION_CANCELLED": "Der Server startet neu. Bitte versuche es erneut.",
+    "MIGRATION_FAILED": "Der Server startet neu. Bitte versuche es erneut.",
+    "POSTCHECK_MISMATCH": "Der Server startet neu. Bitte versuche es erneut.",
+    "SQLITE_LOCK_ERROR": "Der Server ist ausgelastet. Bitte versuche es erneut.",
+    "UNIQUE_VIOLATION": "Das existiert bereits.",
+    "FK_VIOLATION": "Das konnte nicht abgeschlossen werden.",
+    "CHECK_VIOLATION": "Dieser Wert ist nicht gültig.",
+    "RECORD_NOT_FOUND": "Wir konnten das nicht finden.",
+    "INTERNAL": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+    "INTERNAL_ERROR": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
+    "CONFIG_ERROR": "Der Server ist falsch konfiguriert. Bitte kontaktiere den Support.",
+    "DATA_CORRUPTION": "Etwas ist schiefgelaufen. Bitte kontaktiere den Support.",
+
+    "UNKNOWN_ERROR": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
+  },
+  "toast": {
+    "closeAria": "Schließen",
+    "details": {
+      "show": "Anzeigen",
+      "hide": "Ausblenden",
+      "details": "Details",
+      "messageLabel": "Servermeldung",
+      "statusLabel": "HTTP-Status",
+      "codeLabel": "Fehlercode",
+      "traceIdLabel": "Trace-Kennung"
+    }
+  },
+  "boundary": {
+    "title": "Etwas ist schiefgelaufen",
+    "fallbackMessage": "Ein unerwarteter Fehler ist aufgetreten",
+    "tryAgain": "Erneut versuchen",
+    "reloadPage": "Seite neu laden",
+    "devDetails": "Fehlerdetails (nur Dev)"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "home": {
+    "accessDenied": {
+      "title": "Access restricted",
+      "description": "Your account is not currently allowed to access Nommie. If you believe this is a mistake, please contact the person who invited you or the site administrator."
+    },
+    "hero": {
+      "kicker": "Steady Nomination Whist evenings",
+      "title": "{appName} seats your table and keeps the count so you can simply play.",
+      "description": "Deal the cards, declare your bid, and let the table cue each action wherever your friends are seated.",
+      "primaryCta": "Enter the lobby",
+      "secondaryCta": "Take your seat from any device"
+    },
+    "stats": {
+      "readTheTable": {
+        "label": "Read the table",
+        "value": "Follow each seat and trick at a glance, no fuss."
+      },
+      "promptedTurns": {
+        "label": "Prompted turns",
+        "value": "Play each card with clear prompts so the table keeps a reliable pace."
+      },
+      "resumeSwiftly": {
+        "label": "Resume swiftly",
+        "value": "Jump back into your previous game and resume the count straightaway."
+      }
+    },
+    "aside": {
+      "kicker": "At the table",
+      "yourSeat": "your seat",
+      "dealerStandingBy": "Dealer standing by",
+      "liveTurn": "Live turn",
+      "yourTurn": "Your turn",
+      "tricksPlayed": "Tricks played",
+      "tricksValue": "3 of 7",
+      "deviceSwap": "Device swap",
+      "deviceSwapValue": "Swap devices mid-round and stay with the play.",
+      "footer": "play on"
+    }
+  }
+}
