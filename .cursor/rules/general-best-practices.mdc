@@ -1,0 +1,74 @@
+---
+description: General best practices for security, testing, error handling, and AI-assisted development
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# CRITICAL: General Best Practices
+
+These rules apply to ALL code changes and development work in this project.
+
+## Security
+
+### Never Commit Secrets or Credentials
+
+- MUST NEVER commit API keys, passwords, tokens, private keys, or any credentials
+- MUST use environment variables or secret management systems for sensitive data
+- MUST verify `.gitignore` includes sensitive files before committing
+- MUST scan code for hardcoded secrets (passwords, keys, tokens) before committing
+- If secrets are accidentally committed, they MUST be rotated immediately (they cannot be removed from git history)
+
+### Input Validation and Sanitization
+
+- MUST validate and sanitize ALL user inputs
+- MUST use parameterized queries for database operations (prevents SQL injection)
+- MUST validate data types, ranges, and formats on the server side
+- MUST NEVER trust client-side validation alone (always validate on backend)
+
+## Error Handling
+
+### Handle Errors Explicitly
+
+- MUST NOT ignore errors silently
+- MUST log errors with sufficient context for debugging (request IDs, user context, etc.)
+- MUST return meaningful error messages to users (sanitized to avoid leaking internal details)
+- MUST use proper error types, not generic exceptions
+- MUST handle edge cases and error conditions explicitly
+
+## Testing
+
+### Write Tests for Critical Paths
+
+- MUST write tests for security-sensitive code
+- SHOULD write tests for complex business logic
+- MUST test edge cases and error conditions
+- MUST keep test code as clean and maintainable as production code
+- Tests MUST be deterministic (no flaky tests based on timing or randomness)
+
+## AI-Assisted Development
+
+### Verify AI Suggestions Before Committing
+
+- MUST review all AI-generated code before committing
+- MUST run tests and linters on AI-generated code
+- MUST understand what the code does; never blindly accept AI suggestions
+- MUST check for security implications of AI suggestions
+- MUST verify that AI suggestions align with project patterns and conventions
+
+### Suggested Commits
+
+When asked to create commits or suggest commits:
+- MUST provide a list of one or more proposed commits
+- Each proposed commit MUST include:
+  - List of files to be included
+  - Suggested commit message
+  - Brief rationale for the change
+- MUST NOT execute commits until explicitly approved by the user
+- MUST wait for user review and approval before running `git commit` or any commit commands
+- Example format:
+  ```
+  Proposed commit 1:
+  Files: src/api/users.rs, src/routes/users.rs
+  Message: Add user validation endpoint
+  Rationale: Implements input validation for user creation endpoint
+  ```
