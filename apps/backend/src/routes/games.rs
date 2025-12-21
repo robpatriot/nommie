@@ -7,6 +7,7 @@ use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use rand::random;
 use serde::{Deserialize, Serialize};
+use time::format_description::well_known::Rfc3339;
 use tracing::{debug, warn};
 
 use crate::ai::{registry, HeuristicV1, RandomPlayer};
@@ -569,6 +570,11 @@ fn game_visibility_to_string(visibility: &GameVisibility) -> String {
     }
 }
 
+/// Helper function to format OffsetDateTime as RFC 3339 string
+fn format_rfc3339(dt: &time::OffsetDateTime) -> String {
+    dt.format(&Rfc3339).unwrap_or_else(|_| dt.to_string())
+}
+
 /// Helper function to convert game domain model + memberships to frontend Game format
 ///
 /// Returns an error if the game does not have a creator (created_by is None).
@@ -615,10 +621,10 @@ fn game_to_response(
         state: game_state_to_string(&game.state),
         visibility: game_visibility_to_string(&game.visibility),
         created_by,
-        created_at: game.created_at.to_string(),
-        updated_at: game.updated_at.to_string(),
-        started_at: game.started_at.map(|dt| dt.to_string()),
-        ended_at: game.ended_at.map(|dt| dt.to_string()),
+        created_at: format_rfc3339(&game.created_at),
+        updated_at: format_rfc3339(&game.updated_at),
+        started_at: game.started_at.as_ref().map(format_rfc3339),
+        ended_at: game.ended_at.as_ref().map(format_rfc3339),
         current_round: game.current_round,
         player_count,
         max_players: 4,
