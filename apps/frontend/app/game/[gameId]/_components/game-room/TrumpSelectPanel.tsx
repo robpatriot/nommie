@@ -4,7 +4,6 @@ import { type FormEvent, startTransition, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { Seat, Trump, TrumpSelectSnapshot } from '@/lib/game-room/types'
 import { getPlayerDisplayName } from '@/utils/player-names'
-import { formatTrump } from './utils'
 import type { GameRoomViewProps } from '../game-room-view'
 
 interface TrumpSelectPanelProps {
@@ -21,6 +20,8 @@ export function TrumpSelectPanel({
   trump,
 }: TrumpSelectPanelProps) {
   const t = useTranslations('game.gameRoom.trumpSelect')
+  const tYou = useTranslations('game.gameRoom')
+  const tTrump = useTranslations('game.gameRoom.trump')
   const allowedTrumps = phase.allowed_trumps
   const [selectedTrump, setSelectedTrump] = useState<Trump | null>(null)
 
@@ -41,7 +42,12 @@ export function TrumpSelectPanel({
     })
   }, [allowedTrumps])
 
-  const activeName = getPlayerDisplayName(phase.to_act, viewerSeat, playerNames)
+  const activeName = getPlayerDisplayName(
+    phase.to_act,
+    viewerSeat,
+    playerNames,
+    tYou('you')
+  )
   const canSelect = trump?.canSelect ?? false
   const isPending = trump?.isPending ?? false
 
@@ -148,9 +154,9 @@ export function TrumpSelectPanel({
                     aria-label={
                       isSelected
                         ? t('optionAriaSelected', {
-                            trump: formatTrump(option),
+                            trump: tTrump(option),
                           })
-                        : t('optionAria', { trump: formatTrump(option) })
+                        : t('optionAria', { trump: tTrump(option) })
                     }
                     aria-pressed={isSelected}
                   >
@@ -193,14 +199,14 @@ export function TrumpSelectPanel({
                 aria-label={
                   selectedTrump === 'NO_TRUMPS'
                     ? t('optionAriaSelected', {
-                        trump: formatTrump('NO_TRUMPS'),
+                        trump: tTrump('NO_TRUMPS'),
                       })
-                    : t('optionAria', { trump: formatTrump('NO_TRUMPS') })
+                    : t('optionAria', { trump: tTrump('NO_TRUMPS') })
                 }
                 aria-pressed={selectedTrump === 'NO_TRUMPS'}
               >
                 <span className="text-xl font-semibold text-accent-contrast">
-                  No Trumps
+                  {tTrump('NO_TRUMPS')}
                 </span>
               </button>
             </div>
@@ -216,7 +222,7 @@ export function TrumpSelectPanel({
               ? t('submit.aria.selecting')
               : selectedTrump
                 ? t('submit.aria.confirm', {
-                    trump: formatTrump(selectedTrump),
+                    trump: tTrump(selectedTrump),
                   })
                 : t('submit.aria.select')
           }

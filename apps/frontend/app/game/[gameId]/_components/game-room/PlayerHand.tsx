@@ -802,6 +802,8 @@ export function PlayerHand({
   viewportRef: externalViewportRef,
 }: PlayerHandProps) {
   const t = useTranslations('game.gameRoom.play')
+  const tHand = useTranslations('game.gameRoom.hand')
+  const tSuitAbbrev = useTranslations('game.gameRoom.hand.suitAbbrev')
   const isTrickPhase = phase.phase === 'Trick' && !!playState
   const viewerTurn = isTrickPhase && phase.data.to_act === playState!.viewerSeat
   const playableCards = useMemo(
@@ -813,10 +815,11 @@ export function PlayerHand({
     waitingOnSeat === null
       ? null
       : waitingOnSeat === viewerSeat
-        ? 'You'
+        ? tHand('you')
         : playerNames[waitingOnSeat]
 
-  let handStatus = 'Read-only preview'
+  const readOnlyPreviewText = tHand('status.readOnlyPreview')
+  let handStatus = readOnlyPreviewText
 
   if (!viewerHand.length) {
     handStatus = t('status.handWillAppear')
@@ -856,14 +859,22 @@ export function PlayerHand({
       )
 
       if (hasLeadSuit) {
-        // Only one suit is legal (the lead suit)
-        return leadSuit
+        // Only one suit is legal (the lead suit) - translate the suit abbreviation
+        return tSuitAbbrev(leadSuit as 'S' | 'C' | 'H' | 'D')
       }
     }
 
     // Rule 3: No lead card or player doesn't have lead suit - all cards are legal
-    return 'all'
-  }, [isTrickPhase, playState, viewerTurn, phase, viewerHand])
+    return tHand('legal.all')
+  }, [
+    isTrickPhase,
+    playState,
+    viewerTurn,
+    phase,
+    viewerHand,
+    tSuitAbbrev,
+    tHand,
+  ])
 
   const internalViewportRef = useRef<HTMLDivElement | null>(null)
   const viewportRef = externalViewportRef ?? internalViewportRef
@@ -966,10 +977,10 @@ export function PlayerHand({
         <div className="flex flex-col gap-1 flex-shrink-0">
           {showTitle && (
             <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-              Your hand
+              {tHand('title')}
             </span>
           )}
-          {handStatus !== 'Read-only preview' && (
+          {handStatus !== readOnlyPreviewText && (
             <p className="text-xs text-muted" aria-live="polite">
               {handStatus}
             </p>
@@ -1044,7 +1055,7 @@ export function PlayerHand({
             ) : null}
             {!viewerTurn ? (
               <span className="rounded-full border border-white/15 bg-surface px-3 py-1 text-xs font-semibold text-subtle">
-                Waiting on {waitingOnName ?? '—'}
+                {tHand('waitingOn', { name: waitingOnName ?? '—' })}
               </span>
             ) : null}
           </div>
@@ -1060,9 +1071,7 @@ export function PlayerHand({
       >
         {viewerHand.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <span className="text-sm text-subtle">
-              Hand will appear once available.
-            </span>
+            <span className="text-sm text-subtle">{tHand('empty')}</span>
           </div>
         ) : (
           <div className="relative w-full h-full">
@@ -1077,8 +1086,18 @@ export function PlayerHand({
                 playState.isPending
 
               const cardLabel = isPlayable
-                ? `${card}, ${isSelected ? 'selected' : 'playable'}`
-                : `${card}, ${isDisabled ? 'not playable' : 'playable'}`
+                ? tHand('cardAria', {
+                    card,
+                    state: isSelected
+                      ? tHand('cardState.selected')
+                      : tHand('cardState.playable'),
+                  })
+                : tHand('cardAria', {
+                    card,
+                    state: isDisabled
+                      ? tHand('cardState.notPlayable')
+                      : tHand('cardState.playable'),
+                  })
 
               const position = layout.positions[index]
               if (!position) {

@@ -31,13 +31,19 @@ export function BiddingPanel({
   bidding,
 }: BiddingPanelProps) {
   const t = useTranslations('game.gameRoom.bidding')
+  const tYou = useTranslations('game.gameRoom')
   const minBid = phase.min_bid
   const maxBid = phase.max_bid
   const handSize = phase.round.hand_size
   const viewerBid = phase.bids[viewerSeat] ?? null
   const zeroBidLocked = bidding.zeroBidLocked ?? false
   const isViewerTurn = phase.to_act === viewerSeat
-  const activeName = getPlayerDisplayName(phase.to_act, viewerSeat, playerNames)
+  const activeName = getPlayerDisplayName(
+    phase.to_act,
+    viewerSeat,
+    playerNames,
+    tYou('you')
+  )
   const [bidInput, setBidInput] = useState<string>('')
   const [flashValidation, setFlashValidation] = useState(false)
   const [hasTyped, setHasTyped] = useState(false)
@@ -73,11 +79,11 @@ export function BiddingPanel({
     () =>
       ([0, 1, 2, 3] as const).map((seat) => ({
         seat,
-        name: getPlayerDisplayName(seat, viewerSeat, playerNames),
+        name: getPlayerDisplayName(seat, viewerSeat, playerNames, tYou('you')),
         bid: phase.bids[seat],
         orientation: getOrientation(layoutSeat, seat),
       })),
-    [layoutSeat, phase.bids, playerNames, viewerSeat]
+    [layoutSeat, phase.bids, playerNames, viewerSeat, tYou]
   )
 
   const { remainingNullBids, sumOfOtherBids } = useMemo(() => {

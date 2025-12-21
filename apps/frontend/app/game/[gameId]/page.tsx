@@ -88,12 +88,17 @@ export default async function GamePage({
     // Fallback to default behavior if options cannot be loaded
   }
 
-  const gameName = `Game ${resolvedGameId}`
+  const t = await getTranslations('common')
+  const tLobby = await getTranslations('lobby')
+  const gameName = t('gameName', { gameId: resolvedGameId })
 
   return (
     <ErrorBoundaryWithTranslations>
       <BreadcrumbSetter
-        crumbs={[{ label: 'Lobby', href: '/lobby' }, { label: gameName }]}
+        crumbs={[
+          { label: tLobby('breadcrumbs.lobby'), href: '/lobby' },
+          { label: gameName },
+        ]}
       />
       <GameRoomClient
         initialData={initialPayload}

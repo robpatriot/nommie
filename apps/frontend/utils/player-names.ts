@@ -45,17 +45,21 @@ export function extractPlayerNames(
 }
 
 /**
- * Returns the display name for a seat, showing "You" if it's the viewer's seat.
+ * Returns the display name for a seat, showing "You" (or translated equivalent) if it's the viewer's seat.
  *
  * @param seat - The seat index (0-3)
  * @param viewerSeat - The viewer's seat index, or null if unknown
  * @param playerNames - Tuple of 4 player names
- * @returns Display name: "You" if seat matches viewerSeat, otherwise playerNames[seat]
+ * @param youLabel - Optional translated label for "You" (defaults to "You")
+ * @returns Display name: youLabel if seat matches viewerSeat, otherwise playerNames[seat]
  */
 export function getPlayerDisplayName(
   seat: Seat,
   viewerSeat: Seat | null,
-  playerNames: [string, string, string, string]
+  playerNames: [string, string, string, string],
+  youLabel: string = 'You'
 ): string {
-  return viewerSeat !== null && seat === viewerSeat ? 'You' : playerNames[seat]
+  return viewerSeat !== null && seat === viewerSeat
+    ? youLabel
+    : playerNames[seat]
 }

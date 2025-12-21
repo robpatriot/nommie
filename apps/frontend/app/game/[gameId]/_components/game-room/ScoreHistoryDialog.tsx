@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 
 import type { RoundHistoryEntry, Seat } from '@/lib/game-room/types'
-import { formatTrump, shortenNameForDisplay } from './utils'
+import { shortenNameForDisplay } from './utils'
 
 interface ScoreHistoryDialogProps {
   isOpen: boolean
@@ -26,6 +26,7 @@ export function ScoreHistoryDialog({
   error,
 }: ScoreHistoryDialogProps) {
   const t = useTranslations('game.gameRoom.history')
+  const tTrump = useTranslations('game.gameRoom.trump')
 
   useEffect(() => {
     if (!isOpen) {
@@ -148,7 +149,9 @@ export function ScoreHistoryDialog({
                     <div className="rounded-2xl border border-border/30 bg-background/60 px-3 py-2 text-xs text-muted">
                       {t('roundCard.trump')}{' '}
                       <span className="font-semibold text-foreground">
-                        {formatTrump(round.trump)}
+                        {round.trump
+                          ? tTrump(round.trump)
+                          : tTrump('undeclared')}
                       </span>{' '}
                       {round.trumpSelectorSeat !== null ? (
                         <>

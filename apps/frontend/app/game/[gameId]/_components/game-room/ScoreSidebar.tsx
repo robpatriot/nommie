@@ -1,6 +1,5 @@
 import { useTranslations } from 'next-intl'
 import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
-import { formatTrump, getPhaseLabel } from './utils'
 import { PhaseFact } from './PhaseFact'
 import { StatCard } from '@/components/StatCard'
 import { cn } from '@/lib/cn'
@@ -21,6 +20,27 @@ interface ScoreSidebarProps {
   className?: string
 }
 
+function getPhaseTranslationKey(phase: PhaseSnapshot['phase']): string {
+  switch (phase) {
+    case 'Init':
+      return 'init'
+    case 'Bidding':
+      return 'bidding'
+    case 'TrumpSelect':
+      return 'trumpSelect'
+    case 'Trick':
+      return 'trick'
+    case 'Scoring':
+      return 'scoring'
+    case 'Complete':
+      return 'complete'
+    case 'GameOver':
+      return 'gameOver'
+    default:
+      return 'unknown'
+  }
+}
+
 export function ScoreSidebar({
   gameId,
   phase,
@@ -37,6 +57,8 @@ export function ScoreSidebar({
   className,
 }: ScoreSidebarProps) {
   const t = useTranslations('game.gameRoom.sidebar')
+  const tPhase = useTranslations('game.gameRoom.phase')
+  const tTrump = useTranslations('game.gameRoom.trump')
   const tError = useTranslations('game.gameRoom.error')
 
   return (
@@ -53,7 +75,7 @@ export function ScoreSidebar({
               {t('kicker', { gameId })}
             </p>
             <h2 className="text-2xl font-bold text-foreground">
-              {getPhaseLabel(phase)}
+              {tPhase(getPhaseTranslationKey(phase.phase))}
             </h2>
             <p className="text-sm text-muted">
               {t('turnLabel')}{' '}
@@ -84,7 +106,7 @@ export function ScoreSidebar({
           />
           <PhaseFact
             label={t('facts.trump')}
-            value={formatTrump(round.trump)}
+            value={round.trump ? tTrump(round.trump) : tTrump('undeclared')}
           />
         </div>
       ) : null}

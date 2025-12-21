@@ -23,11 +23,13 @@ export function PlayPanel({
   onPlayCard,
 }: PlayPanelProps) {
   const t = useTranslations('game.gameRoom.play')
+  const tYou = useTranslations('game.gameRoom')
   const isViewerTurn = phase.to_act === play.viewerSeat
   const activeName = getPlayerDisplayName(
     phase.to_act,
     play.viewerSeat,
-    playerNames
+    playerNames,
+    tYou('you')
   )
   const isCardPlayable = !!selectedCard && play.playable.includes(selectedCard)
   const isSubmitDisabled = !isViewerTurn || play.isPending || !isCardPlayable
