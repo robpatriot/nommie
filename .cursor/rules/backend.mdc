@@ -1,0 +1,130 @@
+---
+description: Backend-specific rules for persistence, transactions, handlers, errors, caching, and testing
+globs: ["apps/backend/**"]
+alwaysApply: true
+---
+
+# CRITICAL: Backend Rules
+
+These rules MUST be applied to ALL backend code changes. Review all sections before working on `apps/backend/**` files.
+
+## Persistence and Transactions
+
+**Architecture:**
+- Repos and services MUST be stateless and accept connections as parameters
+- Only SeaORM adapters MAY depend on SeaORM
+- Services MUST depend only on repo traits
+
+**Connection type requirements:**
+- Single reads: use `ConnectionTrait`
+- Multiple unrelated reads: use `ConnectionTrait`
+- Multiple related reads (need consistent snapshot): use `DatabaseTransaction`
+- Any mutation: use `DatabaseTransaction`
+
+Related data = queries with invariants between them (e.g., game + its round + that round's bids; round + its tricks + those tricks' plays).
+
+**Transaction handling:**
+- All DB work MUST run through `with_txn` or `require_db`
+- `with_txn` closures MUST return `Result<_, AppError>`
+- Nested transactions: only via `SharedTxn` in tests
+- Production: commit on `Ok`, rollback on `Err`
+- Tests: always rollback
+- MUST NOT call `begin`, `commit`, or `rollback` directly
+
+## Backend Code Standards
+
+**Handlers:**
+- MUST return `Result<T, AppError>` — MUST NOT return `HttpResponse`
+
+**Database access:**
+- MUST use `require_db(&state)` or `with_txn(&state, …)` for all DB access
+
+**Dependencies:**
+- Only SeaORM adapters MAY `use sea_orm::*`
+- Domain modules: MUST NOT import DB or Actix code
+
+**Code style:**
+- MUST use enums (not strings) for states, roles, and phases
+- MUST NOT use `unwrap()` or `expect()` outside tests
+- MUST use inline format strings: `format!("value: {variable}")` — MUST NOT use `format!("value: {}", variable)`
+
+## String Parameter Types
+
+**Parameter types:**
+- Query/lookup methods: MUST accept `&str`
+- Mutating operations: MUST take owned `String` (use `Option<String>` when optional)
+- DTO constructors: MUST use `impl Into<String>`
+
+## Extractors
+
+**Allowed extractors:**
+- MUST only use extractors defined in `apps/backend/src/extractors/`
+- See `apps/backend/src/extractors/mod.rs` for the canonical list of available extractors
+- Common extractors: `CurrentUser`, `GameId`, `GameMembership`, `ValidatedJson<T>`
+- MUST NOT create new extractors without updating the extractors module
+
+`ValidatedJson<T>` maps validation errors to `AppError` Problem Details.
+
+## JSON Extractors
+
+**Request body extraction:**
+- MUST always use `ValidatedJson<T>` for request body extraction in handlers
+- MUST NOT use `web::Json<T>`
+
+`ValidatedJson` provides standardized RFC7807 error handling for JSON parse/validation failures.
+
+Example:
+
+```rust
+async fn handler(body: ValidatedJson<CreateRequest>) -> Result<web::Json<Response>, AppError>
+```
+
+## Error Handling
+
+**Error format:**
+- MUST follow Problem Details format: `{ type, title, status, detail, code, trace_id }`
+- MUST create errors via `AppError` helpers
+- `code` MUST come from registry — MUST NOT use ad-hoc strings
+- MUST NOT leak raw serde/SQL/OAuth errors
+
+## Caching and ETags
+
+**Mutable endpoints (`PATCH`, `DELETE`):**
+- MUST enforce `If-Match`/`ETag`
+
+**Safe endpoints (`GET`, `HEAD`):**
+- MUST support `If-None-Match`
+- MUST return `304` when applicable
+
+**ETag requirements:**
+- `ETag` MUST uniquely identify resource state
+- MUST NOT issue weak ETags
+- MUST NOT combine with `Last-Modified`
+
+## Logging
+
+**Log requirements:**
+- Logs MUST include `trace_id`
+- MUST mask or hash PII (emails, google_sub)
+
+## AppState Access
+
+`AppState.db` is private — MUST access via `state.db()` or `require_db(&state)`.
+
+## Schema Migrations
+
+**Schema changes:**
+- We have NOT gone to production yet — MAY freely modify the schema as needed
+- Schema lives in the single initial migration file under `apps/backend/migration`
+- MUST update the initial migration file directly
+- MUST NOT create sequential migrations
+
+## Testing
+
+**Test requirements:**
+- Tests MUST be deterministic (seed time/RNG)
+- DB tests MUST use `_test` DB (rollback enforced)
+- MUST use `SharedTxn` for tests needing continuity
+- Committed data tests MUST use pooled DB setup
+- Error assertions: MUST use structured checks (error codes, variants) — MUST NOT use string matching
+- MUST rely on the DB kind chosen by `build_test_state()` — only override when a test MUST target a specific engine

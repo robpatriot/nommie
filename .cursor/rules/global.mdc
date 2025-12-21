@@ -1,0 +1,74 @@
+---
+description: Workspace-wide rules for development workflow, coding standards, file operations, and code comments
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# CRITICAL: Workspace Rules
+
+These rules MUST be applied to ALL code changes and operations in this project. Review all sections before making any changes.
+
+## Environment Setup
+
+Before running any pnpm commands, source environment files once per shell session:
+
+```bash
+set -a; source apps/backend/.env; source docker/dev-db/db.env; set +a
+```
+
+MUST NOT source env files repeatedly in the same shell session.
+
+## Linting
+
+After completing backend code changes, MUST run the linter:
+
+```bash
+pnpm be:lint
+```
+
+## Testing
+
+After completing backend development or when testing during development, MUST run tests:
+
+```bash
+pnpm be:test
+```
+
+MAY append additional arguments to run specific test subsets.
+
+## Coding Standards
+
+MUST follow these rules exactly. If a request would break them, stop and ask.
+
+- MUST NOT use deprecated or legacy code
+- MUST NOT use `#[deprecated]` attributes
+- MUST NOT leave legacy/compatibility functions — refactor callers instead
+
+## File Operations
+
+When renaming or moving files:
+- For tracked files: MUST use `git mv`
+- For untracked files: MUST use `mv`
+- MUST NOT manually recreate files when moving/renaming (this loses git history)
+
+Example:
+
+```bash
+git mv apps/backend/src/extractors/old_name.rs apps/backend/src/extractors/new_name.rs
+```
+
+## Code Comments Policy
+
+Code comments MUST follow these rules:
+
+**What comments MUST contain:**
+- Code rationale and invariants
+- Non-obvious behavior explanations
+
+**What comments MUST NOT contain:**
+- Implementation plans or step lists from prompts
+- Historical records (e.g., "moved from X", "deleted Y", "changed from Z")
+- Signposts to other code (e.g., "X is in Y", "see Y module")
+- Prompt artifacts or staged change descriptions
+
+Implement directly — no commentary in edits about what will be done.
