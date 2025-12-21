@@ -4,10 +4,10 @@ use backend::ai::{HeuristicV1, RandomPlayer};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::{ai_profiles, game_players, games};
-use backend::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
 use backend::state::security_config::SecurityConfig;
+use backend::AppError;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::json;
 
@@ -50,11 +50,18 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
         .build()
         .await?;
 
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    let lock_version = game.lock_version;
+
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
-            "registry_name": HeuristicV1::NAME
+            "registry_name": HeuristicV1::NAME,
+            "lock_version": lock_version
         }))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -122,12 +129,19 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
         .build()
         .await?;
 
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    let mut lock_version = game.lock_version;
+
     // Add initial AI seat (defaults to heuristic).
     let add_req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
-            "registry_name": HeuristicV1::NAME
+            "registry_name": HeuristicV1::NAME,
+            "lock_version": lock_version
         }))
         .to_request();
     add_req.extensions_mut().insert(shared.clone());
@@ -135,13 +149,21 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
     assert_eq!(add_resp.status(), StatusCode::NO_CONTENT);
     drop(add_resp);
 
+    // Refresh lock_version after adding AI seat
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    lock_version = game.lock_version;
+
     // Update the AI seat to RandomPlayer.
     let update_req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/update"))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "seat": 1,
-            "registry_name": RandomPlayer::NAME
+            "registry_name": RandomPlayer::NAME,
+            "lock_version": lock_version
         }))
         .to_request();
     update_req.extensions_mut().insert(shared.clone());
@@ -217,22 +239,39 @@ async fn host_can_remove_ai_seat() -> Result<(), AppError> {
         .build()
         .await?;
 
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    let mut lock_version = game.lock_version;
+
     // Add an AI seat first.
     let add_req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
         .insert_header(("Authorization", format!("Bearer {token}")))
-        .set_json(json!({}))
+        .set_json(json!({
+            "lock_version": lock_version
+        }))
         .to_request();
     add_req.extensions_mut().insert(shared.clone());
     let add_resp = test::call_service(&app, add_req).await;
     assert_eq!(add_resp.status(), StatusCode::NO_CONTENT);
     drop(add_resp);
 
+    // Refresh lock_version after adding AI seat
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    lock_version = game.lock_version;
+
     // Remove the AI seat.
     let remove_req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/remove"))
         .insert_header(("Authorization", format!("Bearer {token}")))
-        .set_json(json!({}))
+        .set_json(json!({
+            "lock_version": lock_version
+        }))
         .to_request();
     remove_req.extensions_mut().insert(shared.clone());
     let remove_resp = test::call_service(&app, remove_req).await;
@@ -289,10 +328,18 @@ async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
         .build()
         .await?;
 
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    let lock_version = game.lock_version;
+
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
         .insert_header(("Authorization", format!("Bearer {non_host_token}")))
-        .set_json(json!({}))
+        .set_json(json!({
+            "lock_version": lock_version
+        }))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
