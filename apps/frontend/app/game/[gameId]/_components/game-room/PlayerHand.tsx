@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
@@ -800,6 +801,7 @@ export function PlayerHand({
   layoutVariant = 'default',
   viewportRef: externalViewportRef,
 }: PlayerHandProps) {
+  const t = useTranslations('game.gameRoom.play')
   const isTrickPhase = phase.phase === 'Trick' && !!playState
   const viewerTurn = isTrickPhase && phase.data.to_act === playState!.viewerSeat
   const playableCards = useMemo(
@@ -817,11 +819,13 @@ export function PlayerHand({
   let handStatus = 'Read-only preview'
 
   if (!viewerHand.length) {
-    handStatus = 'Hand will appear once the game starts.'
+    handStatus = t('status.handWillAppear')
   } else if (isTrickPhase && !viewerTurn) {
-    handStatus = `Waiting for ${waitingOnName ?? 'next player'}`
+    handStatus = waitingOnName
+      ? t('status.waitingFor', { name: waitingOnName })
+      : t('status.waitingForNext')
   } else if (viewerTurn && !requireCardConfirmation) {
-    handStatus = 'Tap a legal card to play immediately.'
+    handStatus = t('status.tapToPlayImmediate')
   }
 
   // Responsive visibility: hide title below 400px, legal plays below 320px
@@ -992,26 +996,30 @@ export function PlayerHand({
                 className="rounded-2xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
                 aria-label={
                   playState.isPending
-                    ? 'Playing card'
+                    ? t('button.aria.playing')
                     : selectedCard
-                      ? `Play selected card: ${selectedCard}`
-                      : 'Select a card to play'
+                      ? t('button.aria.playSelected', { card: selectedCard })
+                      : t('button.aria.selectCard')
                 }
               >
                 {playState.isPending ? (
-                  'Playing…'
+                  t('button.playing')
                 ) : viewerTurn ? (
                   <>
-                    <span className="sm:hidden">Play card</span>
-                    <span className="hidden sm:inline">Play selected card</span>
+                    <span className="sm:hidden">{t('button.playCard')}</span>
+                    <span className="hidden sm:inline">
+                      {t('button.playSelectedCard')}
+                    </span>
                   </>
+                ) : waitingOnName ? (
+                  t('button.waitingFor', { name: waitingOnName })
                 ) : (
-                  `Waiting for ${waitingOnName ?? 'next player'}`
+                  t('button.waitingForNext')
                 )}
               </button>
             ) : (
               <span className="rounded-full border border-white/15 bg-surface px-4 py-1 text-xs font-semibold text-subtle">
-                Tap any legal card to play
+                {t('status.tapToPlay')}
               </span>
             )}
           </div>
@@ -1026,8 +1034,8 @@ export function PlayerHand({
             legalCardsDisplay ? (
               <div className="rounded-full bg-black/20 px-3 py-1">
                 <span className="text-sm font-medium text-muted">
-                  <span className="sm:hidden">Legal:</span>
-                  <span className="hidden sm:inline">Legal cards:</span>
+                  <span className="sm:hidden">{t('legal.short')}</span>
+                  <span className="hidden sm:inline">{t('legal.long')}</span>
                 </span>
                 <span className="ml-1.5 text-sm font-medium text-foreground">
                   {legalCardsDisplay}
