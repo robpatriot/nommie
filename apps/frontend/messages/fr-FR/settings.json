@@ -25,10 +25,11 @@
   },
   "appearance": {
     "ariaLabel": "Apparence",
+    "separator": "ou",
     "options": {
       "system": {
-        "label": "Selon le système",
-        "description": "S’aligne automatiquement sur le réglage de votre appareil."
+        "label": "Utiliser le réglage système",
+        "description": "S'aligne automatiquement sur le réglage de votre appareil."
       },
       "light": {
         "label": "Clair",
@@ -40,9 +41,10 @@
       }
     },
     "status": {
-      "saving": "Enregistrement de l’apparence…",
-      "couldNotSave": "Impossible d’enregistrer : {error}",
-      "saved": "Les modifications sont enregistrées automatiquement."
+      "saving": "Enregistrement de l'apparence…",
+      "couldNotSave": "Impossible d'enregistrer : {error}",
+      "usingPreference": "Apparence enregistrée : {appearance}.",
+      "usingSystem": "Réglage système : {appearance}."
     }
   },
   "language": {

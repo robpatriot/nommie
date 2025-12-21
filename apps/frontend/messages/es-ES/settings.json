@@ -25,9 +25,10 @@
   },
   "appearance": {
     "ariaLabel": "Apariencia",
+    "separator": "o",
     "options": {
       "system": {
-        "label": "Según el sistema",
+        "label": "Usar configuración del sistema",
         "description": "Se ajusta automáticamente a la configuración de tu dispositivo."
       },
       "light": {
@@ -42,7 +43,8 @@
     "status": {
       "saving": "Guardando la apariencia…",
       "couldNotSave": "No se pudo guardar: {error}",
-      "saved": "Los cambios se guardan automáticamente."
+      "usingPreference": "Apariencia guardada: {appearance}.",
+      "usingSystem": "Configuración del sistema: {appearance}."
     }
   },
   "language": {

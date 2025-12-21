@@ -25,9 +25,10 @@
   },
   "appearance": {
     "ariaLabel": "Erscheinungsbild",
+    "separator": "oder",
     "options": {
       "system": {
-        "label": "Systemeinstellung",
+        "label": "Systemeinstellung verwenden",
         "description": "Richtet sich automatisch nach der Einstellung deines Geräts."
       },
       "light": {
@@ -42,7 +43,8 @@
     "status": {
       "saving": "Erscheinungsbild wird gespeichert…",
       "couldNotSave": "Speichern fehlgeschlagen: {error}",
-      "saved": "Änderungen werden automatisch gespeichert."
+      "usingPreference": "Gespeichertes Erscheinungsbild: {appearance}.",
+      "usingSystem": "Systemeinstellung: {appearance}."
     }
   },
   "language": {

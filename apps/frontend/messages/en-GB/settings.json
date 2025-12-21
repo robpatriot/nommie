@@ -25,9 +25,10 @@
   },
   "appearance": {
     "ariaLabel": "Appearance",
+    "separator": "or",
     "options": {
       "system": {
-        "label": "Match system",
+        "label": "Use system default",
         "description": "Automatically align with your device setting."
       },
       "light": {
@@ -42,7 +43,8 @@
     "status": {
       "saving": "Saving appearance…",
       "couldNotSave": "Could not save: {error}",
-      "saved": "Changes are saved automatically."
+      "usingPreference": "Using your saved appearance: {appearance}.",
+      "usingSystem": "Using your system default: {appearance}."
     }
   },
   "language": {

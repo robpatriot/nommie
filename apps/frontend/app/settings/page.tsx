@@ -7,6 +7,7 @@ import { CardConfirmationToggle } from '@/components/CardConfirmationToggle'
 import { LanguageSelector } from '@/components/LanguageSelector'
 import { getUserOptions } from '@/lib/api/user-options'
 import { handleAllowlistError } from '@/lib/auth/allowlist'
+import type { ThemeMode } from '@/components/theme-provider'
 
 export default async function SettingsPage() {
   const t = await getTranslations('settings')
@@ -18,10 +19,14 @@ export default async function SettingsPage() {
 
   let requireCardConfirmation = true
   let preferredLocale: string | null = null
+  let preferredAppearance: ThemeMode | null = null
   try {
     const options = await getUserOptions()
     requireCardConfirmation = options.require_card_confirmation
     preferredLocale = options.locale
+    // Treat 'system' as null (no explicit preference) for consistency with locale
+    preferredAppearance =
+      options.appearance_mode === 'system' ? null : options.appearance_mode
   } catch (error) {
     await handleAllowlistError(error)
     // Swallow other errors and fall back to default
@@ -42,7 +47,7 @@ export default async function SettingsPage() {
             {t('sections.display.appearance.description')}
           </p>
         </div>
-        <AppearanceSelector />
+        <AppearanceSelector preferredAppearance={preferredAppearance} />
       </section>
       <section className="rounded-3xl border border-border/50 bg-surface/70 p-8">
         <div className="mb-6">

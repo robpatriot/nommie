@@ -25,9 +25,10 @@
   },
   "appearance": {
     "ariaLabel": "Aspetto",
+    "separator": "o",
     "options": {
       "system": {
-        "label": "Segui il sistema",
+        "label": "Usa impostazione predefinita del sistema",
         "description": "Si allinea automaticamente alle impostazioni del tuo dispositivo."
       },
       "light": {
@@ -40,9 +41,10 @@
       }
     },
     "status": {
-      "saving": "Salvataggio dell’aspetto…",
+      "saving": "Salvataggio dell'aspetto…",
       "couldNotSave": "Impossibile salvare: {error}",
-      "saved": "Le modifiche vengono salvate automaticamente."
+      "usingPreference": "Aspetto salvato: {appearance}.",
+      "usingSystem": "Impostazione del sistema: {appearance}."
     }
   },
   "language": {
