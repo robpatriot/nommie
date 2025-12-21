@@ -9,7 +9,6 @@ import {
 import { getBackendBaseUrlOrThrow } from '@/auth'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
 import { BackendApiError } from './errors'
-import { retryOnNetworkError } from './retry'
 import { parseErrorResponse } from './api/error-parsing'
 import {
   markBackendUp,
@@ -17,6 +16,7 @@ import {
   isInStartupWindow,
 } from '@/lib/server/backend-status'
 import { isBackendConnectionError } from '@/lib/server/connection-errors'
+import { fetchWithAuthWithRetry } from './server/fetch-with-retry'
 
 // Re-export BackendApiError for convenience (it's also available from ./errors)
 export { BackendApiError }
@@ -79,25 +79,15 @@ export async function fetchWithAuth(
 
   let response: Response
   try {
-    // Retry network errors with exponential backoff (1 retry by default)
-    // Application errors (4xx, 5xx) are not retried
-    response = await retryOnNetworkError(
-      async () => {
-        return await fetch(url, {
-          ...options,
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders,
-            ...options.headers,
-          },
-        })
+    // Direct fetch - retry logic is handled by TanStack Query for client-side requests
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+        ...options.headers,
       },
-      {
-        maxRetries: 1,
-        baseDelayMs: 500,
-        maxDelayMs: 2000,
-      }
-    )
+    })
 
     // Mark backend as up if we got a response (even if error) - connection succeeded
     // This helps differentiate startup failures from runtime failures
@@ -157,8 +147,12 @@ export async function fetchWithAuth(
 
 // Game-related API functions
 
+/**
+ * Fetch available games list.
+ * Uses fetchWithAuthWithRetry for improved SSR resilience on initial page load.
+ */
 export async function getAvailableGames(): Promise<Game[]> {
-  const response = await fetchWithAuth('/api/games/overview')
+  const response = await fetchWithAuthWithRetry('/api/games/overview')
   const data: GameListResponse = await response.json()
   return data.games
 }

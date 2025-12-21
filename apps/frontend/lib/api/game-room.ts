@@ -1,6 +1,7 @@
 'use server'
 
 import { fetchWithAuth, BackendApiError } from '@/lib/api'
+import { fetchWithAuthWithRetry } from '@/lib/server/fetch-with-retry'
 import type {
   BidConstraints,
   Card,
@@ -34,6 +35,7 @@ export interface SnapshotEnvelope {
 /**
  * Fetch game snapshot.
  * Works from both Server Components and Server Actions.
+ * Uses fetchWithAuthWithRetry for improved SSR resilience on initial page load.
  * Automatically refreshes JWT if needed.
  */
 export async function fetchGameSnapshot(
@@ -41,9 +43,12 @@ export async function fetchGameSnapshot(
   options: { etag?: string } = {}
 ): Promise<GameSnapshotResult> {
   try {
-    const response = await fetchWithAuth(`/api/games/${gameId}/snapshot`, {
-      headers: options.etag ? { 'If-None-Match': options.etag } : undefined,
-    })
+    const response = await fetchWithAuthWithRetry(
+      `/api/games/${gameId}/snapshot`,
+      {
+        headers: options.etag ? { 'If-None-Match': options.etag } : undefined,
+      }
+    )
 
     const body = (await response.json()) as SnapshotEnvelope
     const etag = response.headers.get('etag') ?? undefined

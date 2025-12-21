@@ -3,10 +3,27 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState } from 'react'
+import { BackendApiError } from '@/lib/errors'
+import { isNetworkError } from '@/lib/retry'
+
+/**
+ * Helper to check if a 5xx error is transient (should be retried).
+ * Transient 5xx errors: 502 (Bad Gateway), 503 (Service Unavailable), 504 (Gateway Timeout)
+ */
+function isTransient5xx(status: number): boolean {
+  return status === 502 || status === 503 || status === 504
+}
 
 /**
  * QueryClientProvider wrapper with default configuration.
  * Provides query client to the entire app.
+ *
+ * Retry Policy:
+ * - Never retry 4xx responses (client errors)
+ * - Retry transient 5xx responses (502/503/504) up to 1 time
+ * - Retry network errors (connection failures, DNS, timeouts) up to 1 time
+ * - Do not retry cancelled/aborted requests
+ * - Mutations: no automatic retries (retry: 0)
  */
 export function AppQueryClientProvider({
   children,
@@ -24,12 +41,53 @@ export function AppQueryClientProvider({
             // Cache time: how long unused data stays in cache
             // 5 minutes - unused queries stay cached for 5min
             gcTime: 5 * 60 * 1000,
-            // Retry failed requests 1 time
-            retry: 1,
+            // Smart retry: only retry network errors and transient 5xx
+            retry: (failureCount, error) => {
+              // Don't retry cancelled requests
+              if (error instanceof Error && error.name === 'AbortError') {
+                return false
+              }
+
+              // Handle BackendApiError (application errors with status codes)
+              if (error instanceof BackendApiError) {
+                const status = error.status
+
+                // Never retry 4xx (client errors)
+                if (status >= 400 && status < 500) {
+                  return false
+                }
+
+                // Retry transient 5xx errors (502, 503, 504) once
+                if (isTransient5xx(status)) {
+                  return failureCount < 1
+                }
+
+                // Don't retry other 5xx (could be application bugs we don't want to mask)
+                return false
+              }
+
+              // Retry genuine network errors (connection failures, DNS, timeouts)
+              if (isNetworkError(error)) {
+                return failureCount < 1
+              }
+
+              // Don't retry unknown error types
+              return false
+            },
+            // Exponential backoff for retries: 500ms, 1000ms (capped at 2000ms)
+            retryDelay: (attemptIndex) => {
+              const baseDelay = 500
+              const maxDelay = 2000
+              const delay = Math.min(
+                baseDelay * Math.pow(2, attemptIndex),
+                maxDelay
+              )
+              return delay
+            },
             // Refetch on window focus (good for keeping data fresh)
             refetchOnWindowFocus: true,
-            // Don't refetch on reconnect by default (can be overridden per query)
-            refetchOnReconnect: false,
+            // Refetch on reconnect (auto-heal after connectivity returns)
+            refetchOnReconnect: true,
           },
           mutations: {
             // Retry failed mutations 0 times (mutations shouldn't retry automatically)
