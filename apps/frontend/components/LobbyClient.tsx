@@ -170,7 +170,7 @@ export default function LobbyClient({
     }
 
     try {
-      // deleteGameAction will fetch the ETag automatically if not provided
+      // deleteGameAction will fetch the lock_version automatically if not provided
       await deleteGameMutation.mutateAsync({ gameId })
       showToast('Game deleted successfully', 'success')
       router.refresh()

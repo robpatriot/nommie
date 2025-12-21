@@ -64,27 +64,36 @@ export async function joinGameAction(
 
 export async function deleteGameAction(
   gameId: number,
-  etag?: string
+  lockVersion?: number
 ): Promise<SimpleActionResult> {
   try {
     // Auth is enforced centrally in fetchWithAuth
 
-    // If no ETag is provided, fetch the game snapshot to get it
-    let finalEtag = etag
-    if (!finalEtag) {
+    // If no lock_version is provided, fetch the game snapshot to get it
+    let finalLockVersion = lockVersion
+    if (finalLockVersion === undefined) {
       try {
         const snapshotResult = await fetchGameSnapshot(gameId)
-        if (snapshotResult.kind === 'ok' && snapshotResult.etag) {
-          finalEtag = snapshotResult.etag
+        if (
+          snapshotResult.kind === 'ok' &&
+          snapshotResult.lockVersion !== undefined
+        ) {
+          finalLockVersion = snapshotResult.lockVersion
+        } else {
+          return toErrorResult(
+            new Error('Failed to get lock version from game snapshot'),
+            'Failed to delete game: could not determine game version'
+          )
         }
       } catch (error) {
-        // If fetching the snapshot fails, still try to delete
-        // The backend will return 428 Precondition Required if ETag is required
-        console.warn('Failed to fetch game snapshot for ETag:', error)
+        return toErrorResult(
+          error,
+          'Failed to delete game: could not fetch game snapshot'
+        )
       }
     }
 
-    await deleteGame(gameId, finalEtag)
+    await deleteGame(gameId, finalLockVersion)
     return { kind: 'ok' }
   } catch (error) {
     return toErrorResult(error, 'Failed to delete game')

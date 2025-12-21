@@ -68,12 +68,12 @@ export function useDeleteGame() {
   return useMutation({
     mutationFn: async ({
       gameId,
-      etag,
+      lockVersion,
     }: {
       gameId: number
-      etag?: string
+      lockVersion?: number
     }): Promise<void> => {
-      const result = await deleteGameAction(gameId, etag)
+      const result = await deleteGameAction(gameId, lockVersion)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }
