@@ -41,7 +41,7 @@ export function GameRoomClient({
   const {
     data: snapshot = initialData,
     error: queryError,
-    isFetching: isSnapshotFetching,
+    isLoading: isSnapshotLoading,
   } = useGameRoomSnapshot(gameId, {
     initialData,
     etag: initialData.etag,
@@ -62,7 +62,9 @@ export function GameRoomClient({
   const combinedError = actionError ?? syncError ?? getGameRoomError(queryError)
 
   // Combine loading/refreshing states
-  const isRefreshing = syncIsRefreshing || isSnapshotFetching
+  // Only show loading for initial loads (isLoading) or manual refreshes (syncIsRefreshing)
+  // Background refetches won't trigger loading indicators
+  const isRefreshing = syncIsRefreshing || isSnapshotLoading
 
   // Calculate viewer seat once and reuse
   const viewerSeatForInteractions = useMemo<Seat | null>(
