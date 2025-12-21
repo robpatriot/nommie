@@ -17,7 +17,7 @@ export default async function LobbyLayout({
     acceptLanguageHeader: headerStore.get('accept-language'),
   })
 
-  const messages = await loadMessages(locale, ['lobby'])
+  const messages = await loadMessages(locale, ['lobby', 'errors'])
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
