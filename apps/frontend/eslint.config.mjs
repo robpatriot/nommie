@@ -34,6 +34,7 @@ export default tseslint.config(
       '*.config.ts',
       '*.config.mjs',
       '*.config.cjs',
+      'scripts/**/*.cjs',
     ],
   },
 

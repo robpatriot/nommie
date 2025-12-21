@@ -6,6 +6,7 @@ import { beforeAll, afterAll, afterEach, vi } from 'vitest'
 import './test/mocks/next-auth'
 import './test/mocks/next-navigation'
 import './test/mocks/next-server'
+import './test/mocks/next-intl'
 import './test/mocks/auth'
 
 // Import MSW server
