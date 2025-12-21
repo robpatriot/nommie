@@ -224,19 +224,23 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🕓 **21. Observability & Stability**
+### ✅ **20. Observability & Stability**
 **Dependencies:** 5, 11  
 **Details:**
 - **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id` when relevant.
 - **Frontend Trace Display:** Frontend displays `trace_id` on error surfaces.
 - **Health Endpoint:** Add `/health` route reporting DB connectivity and version info.
 - **Security Logging:** Structured security logging for authentication failures and rate limit hits with appropriate log levels and context.
-**Progress:** Trace IDs active; structured security logging implemented for auth failures and rate limits; enrichment and health route pending.  
+**Progress:** 
+- ✅ **Trace Context Enrichment:** Complete. `TraceSpan` middleware creates spans with `trace_id`, `user_id` (from JWT), and `game_id` (from path params). All logs within handlers automatically inherit these fields via instrumented spans.
+- ✅ **Security Logging:** Complete. `login_failed()` and `rate_limit_hit()` functions log security events with `trace_id` and appropriate context. Auth failures logged in JWT validation; rate limits logged in structured logger middleware.
+- ✅ **Health Endpoint:** Complete. `/health` route implemented at `apps/backend/src/routes/health.rs`, reporting DB connectivity, app version, migration status, and timestamp. Response includes `X-Trace-Id` header automatically via middleware.
+- ✅ **Frontend Trace Display:** Complete. Toast component displays `trace_id` for error toasts behind a collapsible "Show details" button. ErrorBoundary component now displays `trace_id` (along with status and code) for `BackendApiError` instances behind a collapsible "Show details" button, matching the Toast pattern.  
 **Acceptance:** Logs actionable; trace ID visible end-to-end; security events logged with appropriate detail; endpoint returns up/down status with trace context.
 
 ---
 
-### 🕓 **22. Open Source Observability Stack**
+### 🕓 **21. Open Source Observability Stack**
 **Dependencies:** 19, 10  
 **Details:**
 - **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus in Docker Compose for full observability.
@@ -245,7 +249,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### **23. Accessibility (a11y)**
+### **22. Accessibility (a11y)**
 **Dependencies:** 11, 15  
 **Details:**
 - **Keyboard-First Play:** Full keyboard navigation and control for all game interactions (card selection, bidding, trump selection, card play).  
@@ -264,7 +268,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### **24. Internationalisation Foundations**
+### **23. Internationalisation Foundations**
 **Dependencies:** 11, 15  
 **Details:**
 - **Internationalisation Foundations:** Define and implement the initial i18n strategy (framework choice, locale loading, placeholder translations) with scope finalised before execution.  
@@ -272,7 +276,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### ✅ **25. Email Allowlist & Access Control**
+### ✅ **24. Email Allowlist & Access Control**
 **Dependencies:** 7  
 **Details:**
 - **Email Allowlist:** Implement email allowlist for signup and login to restrict access to authorized email addresses.
@@ -285,7 +289,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### ✅ **26. Security Hardening**
+### ✅ **25. Security Hardening**
 **Dependencies:** 2, 7  
 **Details:**
 - **Docker Image Hardening:** Non-root users and pinned base images for backend and frontend containers.
@@ -302,7 +306,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **27. Documentation Maintenance (Ongoing)**
+### 🟨 **26. Documentation Maintenance (Ongoing)**
 **Dependencies:** 11  
 **Status:** Long-standing milestone — documentation is continuously maintained and updated as the project evolves.
 
@@ -356,7 +360,7 @@ Independent improvements that enhance robustness, performance, and developer exp
 - **Data & Auth Hygiene:** Email normalization (trim, lowercase, Unicode NFKC), validation, username cleaning, skip redundant writes.  
 - **PII-Safe Logging:** Mask or hash sensitive identifiers in logs.  
 - **Error Code Catalog:** Centralize all SCREAMING_SNAKE error codes.  
-- ~~**Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.~~ ✅ **Completed:** Rate limiting middleware implemented with security-specific logging (see Milestone 26).
+- ~~**Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.~~ ✅ **Completed:** Rate limiting middleware implemented with security-specific logging (see Milestone 25).
 
 *Progress:* Transactional harness and DTO structure already support deterministic time injection and data hygiene hooks. Rate limiting implemented and active.
 
