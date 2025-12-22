@@ -3,7 +3,7 @@ import {
   type RenderOptions,
   type RenderResult,
 } from '@testing-library/react'
-import { ReactElement } from 'react'
+import type { ReactElement } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // AllProviders wrapper - includes QueryClientProvider for TanStack Query

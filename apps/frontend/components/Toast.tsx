@@ -2,7 +2,7 @@
 
 import { startTransition, useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { BackendApiError } from '@/lib/errors'
+import type { BackendApiError } from '@/lib/errors'
 
 export interface ToastMessage {
   id: string

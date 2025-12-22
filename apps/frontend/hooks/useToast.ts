@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import type { ToastMessage } from '@/components/Toast'
-import { BackendApiError } from '@/lib/errors'
+import type { BackendApiError } from '@/lib/errors'
 
 /**
  * Hook for managing toast notifications.

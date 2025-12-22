@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, FormEvent } from 'react'
+import type { FormEvent } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 
 interface CreateGameModalProps {
