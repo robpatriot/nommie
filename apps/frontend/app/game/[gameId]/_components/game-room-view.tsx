@@ -488,7 +488,7 @@ export function GameRoomView(props: GameRoomViewProps) {
             className={cn(
               'relative flex flex-col gap-6',
               showCardWrapper &&
-                'rounded-[40px] border border-white/10 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.95)] via-[rgba(var(--felt-base),0.95)] to-[rgba(var(--felt-shadow),0.98)] px-6 pt-[44px] pb-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]'
+                'card-wrapper rounded-[40px] border border-white/10 px-6 pt-[44px] pb-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]'
             )}
           >
             {onRefresh ? (

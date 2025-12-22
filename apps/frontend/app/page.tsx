@@ -108,7 +108,7 @@ export default async function Home({
             {t('home.aside.kicker')}
           </div>
           <div className="mt-6 flex flex-1 items-center justify-center">
-            <div className="relative aspect-[4/5] w-full max-w-xs rounded-[32px] border border-border/80 bg-gradient-to-b from-[rgba(var(--felt-highlight),0.85)] to-[rgba(var(--felt-base),0.95)] p-6 shadow-2xl">
+            <div className="card-wrapper-home relative aspect-[4/5] w-full max-w-xs rounded-[32px] border border-border/80 p-6 shadow-2xl">
               <div className="absolute inset-6 rounded-[28px] border border-white/10" />
               <div className="relative flex h-full flex-col items-center justify-between text-center text-card-cream">
                 <div className="w-full">
