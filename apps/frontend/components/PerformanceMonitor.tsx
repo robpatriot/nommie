@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { useLocale } from 'next-intl'
+import { formatBytes, formatDuration } from '@/utils/number-formatting'
 
 // Performance thresholds (in milliseconds)
 const THRESHOLDS = {
@@ -23,6 +25,7 @@ const THRESHOLDS = {
  * <PerformanceMonitor />
  */
 export function PerformanceMonitor() {
+  const locale = useLocale()
   // Use ref to track if metrics have already been logged (prevents duplicate logging)
   const hasLoggedRef = useRef(false)
 
@@ -99,7 +102,7 @@ export function PerformanceMonitor() {
           Object.fromEntries(
             Object.entries(metrics).map(([key, value]) => [
               key,
-              `${value.toFixed(2)} ms`,
+              formatDuration(value, locale),
             ])
           )
         )
@@ -112,7 +115,7 @@ export function PerformanceMonitor() {
         paintEntries.forEach((entry) => {
           const rating = getPaintRating(entry.name, entry.startTime)
           console.log(
-            `${rating} ${entry.name}: ${entry.startTime.toFixed(2)} ms`
+            `${rating} ${entry.name}: ${formatDuration(entry.startTime, locale)}`
           )
         })
         console.groupEnd()
@@ -148,9 +151,9 @@ export function PerformanceMonitor() {
           Object.entries(resourceTypes).map(([type, stats]) => ({
             Type: type,
             Count: stats.count,
-            'Total Size': formatBytes(stats.totalSize),
-            'Total Time': `${stats.totalTime.toFixed(2)} ms`,
-            'Avg Time': `${(stats.totalTime / stats.count).toFixed(2)} ms`,
+            'Total Size': formatBytes(stats.totalSize, locale),
+            'Total Time': formatDuration(stats.totalTime, locale),
+            'Avg Time': formatDuration(stats.totalTime / stats.count, locale),
           }))
         )
 
@@ -170,8 +173,8 @@ export function PerformanceMonitor() {
           console.table(
             slowResources.map((r) => ({
               Resource: r.name,
-              'Load Time': `${r.time.toFixed(2)} ms`,
-              Size: formatBytes(r.size),
+              'Load Time': formatDuration(r.time, locale),
+              Size: formatBytes(r.size, locale),
             }))
           )
           console.groupEnd()
@@ -188,7 +191,7 @@ export function PerformanceMonitor() {
         if (lcpValue > 0) {
           const rating = getLcpRating(lcpValue)
           console.log(
-            `${rating} Largest Contentful Paint (LCP): ${lcpValue.toFixed(2)} ms`
+            `${rating} Largest Contentful Paint (LCP): ${formatDuration(lcpValue, locale)}`
           )
         }
       }
@@ -221,7 +224,7 @@ export function PerformanceMonitor() {
         lcpObserver.disconnect()
       }
     }
-  }, [])
+  }, [locale])
 
   return null
 }
@@ -253,12 +256,4 @@ function getResourceType(url: string): string {
   if (url.match(/\.(woff|woff2|ttf|otf|eot)$/i)) return 'Font'
   if (url.match(/\/api\//)) return 'API'
   return 'Other'
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }

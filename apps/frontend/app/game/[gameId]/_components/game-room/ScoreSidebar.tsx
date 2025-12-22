@@ -1,8 +1,9 @@
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import type { PhaseSnapshot, RoundPublic, Seat } from '@/lib/game-room/types'
 import { PhaseFact } from './PhaseFact'
 import { StatCard } from '@/components/StatCard'
 import { cn } from '@/lib/cn'
+import { formatNumber } from '@/utils/number-formatting'
 
 interface ScoreSidebarProps {
   gameId: number
@@ -56,6 +57,7 @@ export function ScoreSidebar({
   isHistoryLoading = false,
   className,
 }: ScoreSidebarProps) {
+  const locale = useLocale()
   const t = useTranslations('game.gameRoom.sidebar')
   const tPhase = useTranslations('game.gameRoom.phase')
   const tTrump = useTranslations('game.gameRoom.trump')
@@ -95,14 +97,17 @@ export function ScoreSidebar({
 
       {round ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-2xl border border-border/60 bg-surface/70 p-3 text-sm text-muted">
-          <PhaseFact label={t('facts.round')} value={`${roundNo}`} />
+          <PhaseFact
+            label={t('facts.round')}
+            value={formatNumber(roundNo, locale)}
+          />
           <PhaseFact
             label={t('facts.dealer')}
             value={seatDisplayName(dealer)}
           />
           <PhaseFact
             label={t('facts.handSize')}
-            value={round.hand_size.toString()}
+            value={formatNumber(round.hand_size, locale)}
           />
           <PhaseFact
             label={t('facts.trump')}

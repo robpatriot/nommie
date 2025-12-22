@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
+import { formatNumber } from '@/utils/number-formatting'
 import type { Game } from '@/lib/types'
 import { SurfaceCard } from './SurfaceCard'
 
@@ -32,6 +33,7 @@ export default function GameList({
   actionsLabel,
   renderActions,
 }: GameListProps) {
+  const locale = useLocale()
   const t = useTranslations('lobby.gameList')
   const tLobby = useTranslations('lobby')
   const [searchQuery, setSearchQuery] = useState('')
@@ -113,7 +115,10 @@ export default function GameList({
               stateClassNames[game.state] ?? 'bg-surface text-subtle'
             const actions = renderActions?.(game)
             const relativeUpdated = formatRelativeTime(game.updated_at)
-            const seatsOpen = Math.max(game.max_players - game.player_count, 0)
+            const seatsOpen = formatNumber(
+              Math.max(game.max_players - game.player_count, 0),
+              locale
+            )
 
             return (
               <article
@@ -142,7 +147,8 @@ export default function GameList({
                       {t('fields.players')}
                     </dt>
                     <dd className="text-base font-semibold text-foreground">
-                      {game.player_count} / {game.max_players}
+                      {formatNumber(game.player_count, locale)} /{' '}
+                      {formatNumber(game.max_players, locale)}
                     </dd>
                   </div>
                   <div className="rounded-2xl bg-surface-strong/70 px-3 py-2">
