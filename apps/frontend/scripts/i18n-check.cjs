@@ -23,6 +23,11 @@ const ALLOWED_IDENTICAL_KEYS = [
   'game.cards.rank.A', // Ace abbreviation is "A" in all languages (Ace/As/Ass/Asso all start with A)
   'game.cards.rank.K', // King abbreviation is "K" in both English and German (King/König both start with K)
   'game.cards.rank.J', // Jack abbreviation is "J" in both English and Spanish (Jack/Jota both start with J)
+  'common.home.aside.bidValue', // Bid value is a number, same in all languages
+  'common.home.aside.centerCardRank', // Card rank "A" is universal
+  'common.home.aside.centerCardSuit', // Card suit symbol "♠" is universal
+  'common.home.aside.trumpSuitIcon', // Card suit symbol "♣" is universal
+  'common.home.aside.playerWest', // "West" is the same in English and German (cardinal direction)
 ]
 
 function readJson(filePath) {
