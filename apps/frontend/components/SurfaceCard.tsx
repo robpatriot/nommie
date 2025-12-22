@@ -42,7 +42,7 @@ export function SurfaceCard<T extends ElementType = 'section'>({
   return (
     <Component
       className={cn(
-        'rounded-3xl border shadow-[0_35px_110px_rgba(0,0,0,0.35)] backdrop-blur',
+        'rounded-3xl border shadow-elevated backdrop-blur',
         toneClassMap[tone],
         paddingClassMap[padding],
         className

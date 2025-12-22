@@ -24,10 +24,7 @@ export function PageHero({
   footerClassName,
 }: PageHeroProps) {
   return (
-    <SurfaceCard
-      padding="lg"
-      className={cn('shadow-[0_45px_120px_rgba(0,0,0,0.35)]', className)}
-    >
+    <SurfaceCard padding="lg" className={className}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className={cn('flex flex-col gap-4 lg:flex-1', introClassName)}>
           {intro}

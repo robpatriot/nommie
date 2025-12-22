@@ -44,12 +44,7 @@ export default async function Home({
       )}
 
       <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <SurfaceCard
-          as="section"
-          padding="lg"
-          tone="strong"
-          className="shadow-[0_40px_120px_rgba(0,0,0,0.25)]"
-        >
+        <SurfaceCard as="section" padding="lg" tone="strong">
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-subtle">
             {t('home.hero.kicker')}
           </p>
@@ -102,7 +97,7 @@ export default async function Home({
           as="section"
           padding="lg"
           tone="subtle"
-          className="relative hidden border-white/20 bg-gradient-to-br from-surface/70 to-surface-strong/40 shadow-[0_30px_90px_rgba(0,0,0,0.35)] lg:flex lg:flex-col"
+          className="relative hidden border-white/20 bg-gradient-to-br from-surface/70 to-surface-strong/40 shadow-elevated lg:flex lg:flex-col"
         >
           <div className="text-sm font-semibold uppercase tracking-[0.4em] text-muted">
             {t('home.aside.kicker')}

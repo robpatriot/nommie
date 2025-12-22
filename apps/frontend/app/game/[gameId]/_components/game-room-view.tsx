@@ -365,7 +365,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                     description={t('setup.stats.readyPlayers.description')}
                   />
                 </div>
-                <div className="rounded-3xl border border-white/10 bg-surface/70 p-4 shadow-[0_30px_90px_rgba(0,0,0,0.35)]">
+                <div className="rounded-3xl border border-white/10 bg-surface/70 p-4 shadow-elevated">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
                     <span>{t('setup.quickActions.title')}</span>
                     <span className="text-[10px] font-normal tracking-[0.2em] text-muted">
@@ -482,13 +482,13 @@ export function GameRoomView(props: GameRoomViewProps) {
 
   return (
     <div className="flex flex-col text-foreground">
-      <PageContainer className="pb-16 overflow-x-hidden">
+      <PageContainer className="pb-16">
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section
             className={cn(
               'relative flex flex-col gap-6',
               showCardWrapper &&
-                'card-wrapper rounded-[40px] border border-white/10 px-6 pt-[44px] pb-6 shadow-[0_60px_140px_rgba(0,0,0,0.45)]'
+                'card-wrapper rounded-[40px] border border-white/10 px-6 pt-[44px] pb-6 shadow-elevated'
             )}
           >
             {onRefresh ? (

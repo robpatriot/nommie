@@ -75,11 +75,7 @@ export default function GameList({
   const showActions = typeof renderActions === 'function'
 
   return (
-    <SurfaceCard
-      as="section"
-      padding="md"
-      className="shadow-[0_30px_90px_rgba(0,0,0,0.3)]"
-    >
+    <SurfaceCard as="section" padding="md">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
         {games.length > 0 ? (
