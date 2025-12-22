@@ -82,5 +82,11 @@ export function errorCodeToMessageKey(code: string | undefined | null): string {
     return `errors.codes.${code}`
   }
 
+  if (process.env.NODE_ENV !== 'production') {
+    console.warn(
+      `Unknown error code '${code}', falling back to errors.codes.UNKNOWN_ERROR`
+    )
+  }
+
   return 'errors.codes.UNKNOWN_ERROR'
 }

@@ -83,6 +83,37 @@ function loadAll(locale) {
   return merged
 }
 
+function loadKnownErrorCodes() {
+  const errorsTsPath = path.join(ROOT, 'i18n', 'errors.ts')
+  if (!fs.existsSync(errorsTsPath)) {
+    throw new Error(
+      `Missing i18n error code source file: ${path.relative(ROOT, errorsTsPath)}`
+    )
+  }
+  const src = fs.readFileSync(errorsTsPath, 'utf8')
+  const marker = 'KNOWN_ERROR_CODES = ['
+  const start = src.indexOf(marker)
+  if (start === -1) {
+    throw new Error('Could not find KNOWN_ERROR_CODES array in i18n/errors.ts')
+  }
+  const afterMarker = src.slice(start + marker.length)
+  const endIndex = afterMarker.indexOf('] as const')
+  if (endIndex === -1) {
+    throw new Error(
+      'Could not find end of KNOWN_ERROR_CODES array in i18n/errors.ts'
+    )
+  }
+  const arrayText = afterMarker.slice(0, endIndex)
+  const codes = []
+  for (const line of arrayText.split('\n')) {
+    const match = line.match(/'([A-Z0-9_]+)'/)
+    if (match) {
+      codes.push(match[1])
+    }
+  }
+  return codes
+}
+
 function diffKeys(a, b) {
   const missing = []
   for (const key of a.keys()) {
@@ -100,6 +131,42 @@ function diffKeys(a, b) {
 function main() {
   const base = loadAll(DEFAULT_LOCALE)
   let failed = false
+
+  // Ensure that all KNOWN_ERROR_CODES have corresponding errors.codes.<CODE> entries
+  // and that there are no extra codes in the messages that are not in the registry.
+  const knownCodes = loadKnownErrorCodes()
+  const messageCodes = []
+  for (const key of base.keys()) {
+    if (key.startsWith('errors.codes.')) {
+      messageCodes.push(key.slice('errors.codes.'.length))
+    }
+  }
+  const missingCodeMessages = knownCodes.filter(
+    (code) => !messageCodes.includes(code)
+  )
+  const extraCodeMessages = messageCodes.filter(
+    (code) => !knownCodes.includes(code)
+  )
+  if (missingCodeMessages.length || extraCodeMessages.length) {
+    failed = true
+    console.error('\n[i18n] Error code/message mismatch')
+    if (missingCodeMessages.length) {
+      console.error(
+        `- Missing messages for error codes (${missingCodeMessages.length}):`
+      )
+      for (const code of missingCodeMessages) {
+        console.error(`  - errors.codes.${code}`)
+      }
+    }
+    if (extraCodeMessages.length) {
+      console.error(
+        `- Extra error code messages not in KNOWN_ERROR_CODES (${extraCodeMessages.length}):`
+      )
+      for (const code of extraCodeMessages) {
+        console.error(`  - errors.codes.${code}`)
+      }
+    }
+  }
 
   for (const locale of LOCALES) {
     const current = loadAll(locale)
