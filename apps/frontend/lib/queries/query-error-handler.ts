@@ -62,20 +62,18 @@ export function toQueryError(
 
 /**
  * Convert a query error to a GameRoomError for display in game room components.
- * Handles both Error instances and unknown error types.
+ * Only surfaces structured BackendApiError instances (which are already localized
+ * via error codes); other unexpected errors are treated as null here and are
+ * handled by higher-level toasts or loggers.
  */
-export function getGameRoomError(error: unknown): { message: string } | null {
+export function getGameRoomError(
+  error: unknown
+): { message: string; traceId?: string } | null {
   if (!error) {
     return null
   }
-  // Inline error message extraction (previously getErrorMessage)
-  let message: string
   if (error instanceof BackendApiError) {
-    message = error.message
-  } else if (error instanceof Error) {
-    message = error.message
-  } else {
-    message = 'An unexpected error occurred'
+    return { message: error.message, traceId: error.traceId }
   }
-  return { message }
+  return null
 }

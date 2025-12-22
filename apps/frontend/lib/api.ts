@@ -2,11 +2,14 @@
 // This file uses server-only APIs (cookies, backend JWT resolvers)
 'use server'
 
+import { getTranslations } from 'next-intl/server'
+
 import {
   getBackendJwtReadOnly,
   BackendJwtError,
 } from '@/lib/auth/refresh-backend-jwt'
 import { getBackendBaseUrlOrThrow } from '@/auth'
+import { errorCodeToMessageKey } from '@/i18n/errors'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
 import { BackendApiError } from './errors'
 import { parseErrorResponse } from './api/error-parsing'
@@ -23,6 +26,19 @@ export { BackendApiError }
 
 // Re-export ProblemDetails interface for convenience
 export type { ProblemDetails } from './api/error-parsing'
+
+async function getLocalizedErrorMessageForCode(
+  code: string,
+  fallback: string
+): Promise<string> {
+  try {
+    const t = await getTranslations('errors')
+    const key = errorCodeToMessageKey(code).replace('errors.', '')
+    return t(key)
+  } catch {
+    return fallback
+  }
+}
 
 /**
  * Make an authenticated API request to the backend.
@@ -50,26 +66,26 @@ export async function fetchWithAuth(
       // If the backend explicitly reports that this email is not allowed,
       // surface a stable 403 EMAIL_NOT_ALLOWED signal to callers.
       if (error.message === 'EMAIL_NOT_ALLOWED') {
-        throw new BackendApiError(
-          'Access restricted. Please contact support if you believe this is an error.',
-          403,
-          'EMAIL_NOT_ALLOWED'
+        const message = await getLocalizedErrorMessageForCode(
+          'EMAIL_NOT_ALLOWED',
+          'Access restricted. Please contact support if you believe this is an error.'
         )
+        throw new BackendApiError(message, 403, 'EMAIL_NOT_ALLOWED')
       }
       // During startup, if backend isn't ready, use 503 (Service Unavailable)
       // Otherwise, use 401 (Unauthorized) for actual auth issues
       if (isInStartupWindow() && error.message.includes('starting up')) {
-        throw new BackendApiError(
-          'Backend is starting up, please try again shortly',
-          503,
-          'BACKEND_STARTING'
+        const message = await getLocalizedErrorMessageForCode(
+          'BACKEND_STARTING',
+          'Backend is starting up, please try again shortly'
         )
+        throw new BackendApiError(message, 503, 'BACKEND_STARTING')
       }
-      throw new BackendApiError(
-        'Authentication required',
-        401,
-        'MISSING_BACKEND_JWT'
+      const message = await getLocalizedErrorMessageForCode(
+        'MISSING_BACKEND_JWT',
+        'Authentication required'
       )
+      throw new BackendApiError(message, 401, 'MISSING_BACKEND_JWT')
     }
     throw error
   }
