@@ -96,6 +96,7 @@ export default async function RootLayout({
     'nav',
     'errors',
     'toasts',
+    'lobby',
   ])
 
   return (
