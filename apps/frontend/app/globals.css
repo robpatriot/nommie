@@ -1,121 +1,71 @@
 @import 'tailwindcss';
-@config "../tailwind.config.js";
 
-:root {
-  color-scheme: light;
-  --color-bg: 233 242 240;
-  --color-bg-subtle: 223 236 231;
-  --color-surface: 250 252 250;
-  --color-surface-strong: 244 248 245;
-  --color-border: 190 206 198;
-  --color-ring: 255 176 111;
-  --color-text: 18 35 30;
-  --color-text-muted: 53 78 70;
-  --color-text-subtle: 109 132 123;
-  --color-primary: 239 149 74;
-  --color-primary-foreground: 255 252 248;
-  --color-primary-contrast: 18 35 30;
-  --color-accent: 47 178 148;
-  --color-accent-foreground: 12 45 37;
-  --color-danger: 220 82 82;
-  --color-danger-foreground: 255 245 244;
-  --color-success: 71 181 117;
-  --color-success-foreground: 10 53 36;
-  --color-success-contrast: 10 53 36;
-  --color-warning: 246 193 75;
-  --color-warning-foreground: 95 60 5;
-  --color-warning-contrast: 95 60 5;
-  --color-accent-contrast: 12 45 37;
-  --shadow-elevated: 8 32 22 / 0.35;
-  --felt-base: 14 67 53;
-  --felt-highlight: 42 112 92;
-  --felt-shadow: 5 27 20;
-  --card-cream: 255 252 245;
-}
-
-.theme-light,
-[data-theme='light'] {
-  color-scheme: light;
-}
-
-.theme-dark,
-[data-theme='dark'] {
-  color-scheme: dark;
-  --color-bg: 10 18 16;
-  --color-bg-subtle: 14 28 24;
-  --color-surface: 17 38 32;
-  --color-surface-strong: 11 26 22;
-  --color-border: 38 68 57;
-  --color-ring: 251 188 98;
-  --color-text: 229 244 237;
-  --color-text-muted: 183 205 198;
-  --color-text-subtle: 132 156 149;
-  --color-primary: 255 176 111;
-  --color-primary-foreground: 46 26 12;
-  --color-primary-contrast: 255 249 240;
-  --color-accent: 98 220 189;
-  --color-accent-foreground: 11 30 24;
-  --color-accent-contrast: 236 252 247;
-  --color-danger: 248 113 113;
-  --color-danger-foreground: 48 8 8;
-  --color-success: 120 229 171;
-  --color-success-foreground: 9 36 24;
-  --color-success-contrast: 236 252 247;
-  --color-warning: 253 224 130;
-  --color-warning-foreground: 46 26 12;
-  --color-warning-contrast: 255 231 191;
-  --shadow-elevated: 0 0 0 / 0.45;
-  --felt-base: 6 37 30;
-  --felt-highlight: 26 76 64;
-  --felt-shadow: 2 16 12;
-  --card-cream: 25 31 32;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-user-theme]),
-  :root[data-user-theme='system'] {
-    color-scheme: dark;
-    --color-bg: 10 18 16;
-    --color-bg-subtle: 14 28 24;
-    --color-surface: 17 38 32;
-    --color-surface-strong: 11 26 22;
-    --color-border: 38 68 57;
-    --color-ring: 251 188 98;
-    --color-text: 229 244 237;
-    --color-text-muted: 183 205 198;
-    --color-text-subtle: 132 156 149;
-    --color-primary: 255 176 111;
-    --color-primary-foreground: 46 26 12;
-    --color-primary-contrast: 255 249 240;
-    --color-accent: 98 220 189;
-    --color-accent-foreground: 11 30 24;
-    --color-accent-contrast: 236 252 247;
-    --color-danger: 248 113 113;
-    --color-danger-foreground: 48 8 8;
-    --color-success: 120 229 171;
-    --color-success-foreground: 9 36 24;
-    --color-success-contrast: 236 252 247;
-    --color-warning: 253 224 130;
-    --color-warning-foreground: 46 26 12;
-    --color-warning-contrast: 255 231 191;
-    --shadow-elevated: 0 0 0 / 0.45;
-    --felt-base: 6 37 30;
-    --felt-highlight: 26 76 64;
-    --felt-shadow: 2 16 12;
-    --card-cream: 25 31 32;
-  }
+@theme {
+  --color-border: #becec6;
+  --color-ring: #ffb06f;
+  --color-background: #e9f2f0;
+  --color-foreground: #12231e;
+  --color-muted: #354e46;
+  --color-subtle: #6d847b;
+  --color-surface: #fafcfa;
+  --color-surface-strong: #f4f8f5;
+  --color-primary: #ef954a;
+  --color-primary-foreground: #fffcf8;
+  --color-primary-contrast: #12231e;
+  --color-accent: #2fb294;
+  --color-accent-foreground: #0c2d25;
+  --color-accent-contrast: #0c2d25;
+  --color-danger: #dc5252;
+  --color-danger-foreground: #fff5f4;
+  --color-success: #47b575;
+  --color-success-foreground: #0a3524;
+  --color-success-contrast: #0a3524;
+  --color-warning: #f6c14b;
+  --color-warning-foreground: #5f3c05;
+  --color-warning-contrast: #5f3c05;
+  --color-felt-highlight: #2a705c;
+  --color-felt-base: #0e4335;
+  --color-felt-shadow: #051b14;
 }
 
 @layer base {
+  [data-theme='dark'] {
+    --color-background: #0a1210;
+    --color-surface: #112620;
+    --color-surface-strong: #0b1a16;
+    --color-border: #264439;
+    --color-ring: #fbbc62;
+    --color-foreground: #e5f4ed;
+    --color-muted: #b7cdc6;
+    --color-subtle: #849c95;
+    --color-primary: #ffb06f;
+    --color-primary-foreground: #2e1a0c;
+    --color-primary-contrast: #fff9f0;
+    --color-accent: #62dcbd;
+    --color-accent-foreground: #0b1e18;
+    --color-accent-contrast: #ecfcf7;
+    --color-danger: #f87171;
+    --color-danger-foreground: #300808;
+    --color-success: #78e5ab;
+    --color-success-foreground: #092418;
+    --color-success-contrast: #ecfcf7;
+    --color-warning: #fde082;
+    --color-warning-foreground: #2e1a0c;
+    --color-warning-contrast: #ffe7bf;
+    --color-felt-highlight: #1a4c40;
+    --color-felt-base: #06251e;
+    --color-felt-shadow: #02100c;
+  }
+
   *,
   *::before,
   *::after {
-    border-color: rgb(var(--color-border) / 0.6);
+    border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
   }
 
   ::selection {
-    background-color: rgb(var(--color-accent) / 0.3);
-    color: rgb(var(--color-text));
+    background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+    color: var(--color-foreground);
   }
 
   html {
@@ -126,12 +76,12 @@
     @apply text-foreground antialiased;
     min-height: 100vh;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'liga', 'kern';
-    background-color: rgb(var(--color-bg));
+    background-color: var(--color-background);
     scrollbar-gutter: stable both-edges;
   }
 
   body::backdrop {
-    background-color: rgb(var(--color-bg));
+    background-color: var(--color-background);
   }
 
   a,
@@ -154,31 +104,35 @@
     position: relative;
     isolation: isolate;
     min-height: 100vh;
-    background:
+    background-color: var(--color-background);
+  }
+
+  [data-theme='dark'] .tabletop-shell {
+    background-image:
       radial-gradient(
         circle at 20% 20%,
-        rgba(var(--felt-highlight), 0.4),
+        color-mix(in srgb, var(--color-felt-highlight) 40%, transparent),
         transparent 45%
       ),
       radial-gradient(
         circle at 80% 0%,
-        rgba(var(--felt-highlight), 0.25),
+        color-mix(in srgb, var(--color-felt-highlight) 25%, transparent),
         transparent 50%
       ),
       linear-gradient(
         135deg,
-        rgba(var(--felt-base), 0.9),
-        rgba(var(--felt-shadow), 0.85)
+        color-mix(in srgb, var(--color-felt-base) 90%, transparent),
+        color-mix(in srgb, var(--color-felt-shadow) 85%, transparent)
       );
   }
 
-  .tabletop-shell::before {
+  [data-theme='dark'] .tabletop-shell::before {
     content: '';
     position: fixed;
     inset: 0;
     background: radial-gradient(
       circle at center,
-      rgba(var(--felt-highlight), 0.18),
+      color-mix(in srgb, var(--color-felt-highlight) 18%, transparent),
       transparent 65%
     );
     opacity: 0.9;
@@ -186,7 +140,7 @@
     z-index: -1;
   }
 
-  .tabletop-shell::after {
+  [data-theme='dark'] .tabletop-shell::after {
     content: '';
     position: fixed;
     inset: 0;
@@ -213,13 +167,48 @@
     flex-direction: column;
   }
 
+  .card-wrapper {
+    background: linear-gradient(
+      to bottom,
+      var(--color-surface-strong),
+      var(--color-surface),
+      var(--color-surface-strong)
+    );
+  }
+
+  [data-theme='dark'] .card-wrapper {
+    background: color-mix(in srgb, var(--color-felt-base) 95%, transparent);
+  }
+
+  .card-wrapper-home {
+    background: linear-gradient(
+      to bottom,
+      var(--color-surface-strong),
+      var(--color-surface),
+      var(--color-surface-strong)
+    );
+  }
+
+  [data-theme='dark'] .card-wrapper-home {
+    background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-felt-highlight) 85%, transparent),
+      color-mix(in srgb, var(--color-felt-base) 95%, transparent)
+    );
+  }
+
   @media (max-width: 768px) {
     .tabletop-shell {
+      --bg-subtle: #dfece7;
       background: linear-gradient(
         180deg,
-        rgba(var(--color-bg-subtle), 1) 0%,
-        rgba(var(--color-bg), 1) 100%
+        var(--bg-subtle) 0%,
+        var(--color-background) 100%
       );
+    }
+
+    [data-theme='dark'] .tabletop-shell {
+      --bg-subtle: #0e1c18;
     }
 
     .tabletop-shell::before,
@@ -231,10 +220,32 @@
 
 @layer utilities {
   .text-card-cream {
-    color: rgb(var(--card-cream));
+    --card-cream: #fffcf5;
+    color: var(--card-cream);
+  }
+
+  [data-theme='dark'] .text-card-cream {
+    --card-cream: #191f20;
   }
 
   .bg-card-cream {
-    background-color: rgb(var(--card-cream));
+    --card-cream: #fffcf5;
+    background-color: var(--card-cream);
+  }
+
+  [data-theme='dark'] .bg-card-cream {
+    --card-cream: #191f20;
+  }
+
+  .shadow-elevated {
+    --shadow-color: #082016;
+    box-shadow: 0 24px 70px -32px
+      color-mix(in srgb, var(--shadow-color) 35%, transparent);
+  }
+
+  [data-theme='dark'] .shadow-elevated {
+    --shadow-color: #000000;
+    box-shadow: 0 24px 70px -32px
+      color-mix(in srgb, var(--shadow-color) 45%, transparent);
   }
 }
