@@ -213,18 +213,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **19. CI Pipeline**
-**Dependencies:** 4, 5, 6, 7, 9, 14, 15  
-**Details:**
-- Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.
-- Planned CI: GitHub Actions gates merges with lint, tests, and schema checks.
-- Security: Automated container image vulnerability scanning (e.g., Trivy, Snyk) for backend and frontend images.
-**Progress:** Local grep gates and lint/test guards complete; container vulnerability scanning task defined; remote CI integration pending.  
-**Acceptance:** CI green gate required for merges; schema re-applies cleanly; image scans run on CI and block merges on critical vulnerabilities.
-
----
-
-### ✅ **20. Observability & Stability**
+### ✅ **19. Observability & Stability**
 **Dependencies:** 5, 11  
 **Details:**
 - **Trace Context Enrichment:** Logs always include `trace_id`, `user_id`, and `game_id` when relevant.
@@ -240,8 +229,8 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🕓 **21. Open Source Observability Stack**
-**Dependencies:** 19, 10  
+### 🕓 **20. Open Source Observability Stack**
+**Dependencies:** 10
 **Details:**
 - **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus in Docker Compose for full observability.
 **Progress:** Docker baseline complete; observability stack not yet deployed.  
@@ -249,26 +238,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### **22. Accessibility (a11y)**
-**Dependencies:** 11, 15  
-**Details:**
-- **Keyboard-First Play:** Full keyboard navigation and control for all game interactions (card selection, bidding, trump selection, card play).  
-  - Lobby: Tab navigation through toolbar → header → game rows; Arrow Up/Down navigate rows; Enter joins; `r` refresh; `c` create; `f` focus search.
-  - Game Room: `?` shortcuts menu; `g l` Lobby; `s` Sidebar; Hand (Arrows/Home/End/Enter/Esc); Bidding (number keys/Up/Down/Enter/Esc); Ready `y`; Start `Shift+S` (host confirm).
-- **Focus Management:** Visible focus indicators, logical tab order, focus trapping in dialogs, focus restoration after actions.
-- **ARIA Labels & Semantics:** 
-  - All interactive elements have descriptive `aria-label` attributes (e.g., "Seven of Hearts, legal" for cards).
-  - Semantic HTML (`<table>` for lobby, proper heading hierarchy, live regions for phase/turn announcements).
-  - Contextual aria-labels that describe button state (pending, disabled, selected).
-- **Color Contrast:** Minimum 4.5:1 contrast ratio for all text and interactive elements.
-- **Motion Preferences:** Honor `prefers-reduced-motion` for animations (150–200ms ease-out for play/trick-win animations).
-- **Screen Reader Support:** Live regions for phase/turn changes, proper announcements for game state updates.
-- **Enhanced Accessibility:** Continue improving beyond current aria-label implementation (form inputs, complex interactions, error states).
-**Acceptance:** Fully keyboard-operable gameplay; a11y checks pass basic audit (WCAG 2.1 Level AA); screen reader testing confirms usability; motion preferences respected.
-
----
-
-### **23. Internationalisation Foundations**
+### **21. Internationalisation Foundations**
 **Dependencies:** 11, 15  
 **Details:**
 - **Internationalisation Foundations:** Define and implement the initial i18n strategy (framework choice, locale loading, placeholder translations) with scope finalised before execution.  
@@ -276,7 +246,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### ✅ **24. Email Allowlist & Access Control**
+### ✅ **22. Email Allowlist & Access Control**
 **Dependencies:** 7  
 **Details:**
 - **Email Allowlist:** Implement email allowlist for signup and login to restrict access to authorized email addresses.
@@ -289,7 +259,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### ✅ **25. Security Hardening**
+### ✅ **23. Security Hardening**
 **Dependencies:** 2, 7  
 **Details:**
 - **Docker Image Hardening:** Non-root users and pinned base images for backend and frontend containers.
@@ -306,7 +276,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **26. Documentation Maintenance (Ongoing)**
+### 🟨 **24. Documentation Maintenance (Ongoing)**
 **Dependencies:** 11  
 **Status:** Long-standing milestone — documentation is continuously maintained and updated as the project evolves.
 
@@ -333,9 +303,9 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **1. Code Organization & Refactoring**
-- **Refactor `game-room-client.tsx`:** The component is 791 lines with complex state management that could benefit from a reducer pattern.  
-  *Acceptance:* Component is refactored with improved state management; complexity is reduced; maintainability is improved.
+### ✅ **1. Code Organization & Refactoring**
+- **Refactor `game-room-client.tsx`:** ✅ **Completed** — The component has been refactored from 791 lines to 155 lines (80% reduction). State management extracted into focused custom hooks: `useGameRoomReadyState`, `useGameRoomActions`, `useGameRoomControls`, `useAiSeatManagement`, and `useSlowSyncIndicator`. View logic separated into `GameRoomView` component.  
+  *Acceptance:* ✅ Component is refactored with improved state management; complexity is reduced; maintainability is improved.
 
 ---
 
@@ -360,17 +330,16 @@ Independent improvements that enhance robustness, performance, and developer exp
 - **Data & Auth Hygiene:** Email normalization (trim, lowercase, Unicode NFKC), validation, username cleaning, skip redundant writes.  
 - **PII-Safe Logging:** Mask or hash sensitive identifiers in logs.  
 - **Error Code Catalog:** Centralize all SCREAMING_SNAKE error codes.  
-- ~~**Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.~~ ✅ **Completed:** Rate limiting middleware implemented with security-specific logging (see Milestone 25).
+- ~~**Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.~~ ✅ **Completed:** Rate limiting middleware implemented with security-specific logging (see Milestone 23).
 
 *Progress:* Transactional harness and DTO structure already support deterministic time injection and data hygiene hooks. Rate limiting implemented and active.
 
 ---
 
-### **4. Testing & Validation Enhancements**
-- **Golden Snapshot Fixtures:** Canonical JSON snapshots for all game phases, shared between frontend and backend.  
-  *Acceptance:* Schema or logic changes surface as test diffs.  
-- **Deterministic AI Simulation:** Replay identical seeded games for regression testing.  
-  *Acceptance:* Identical seeds yield identical results.
+### ✅ **4. Testing & Validation Enhancements**
+- **Deterministic AI Simulation:** ✅ **Completed** — Replay identical seeded games for regression testing.  
+  *Status:* Seed infrastructure implemented (`rng_seed` field, seed derivation utilities). Tests verify identical seeds produce identical results for AI decisions (bidding, playing, trump selection), game state, and memory degradation. `test_seed()` utility provides deterministic seed generation from test names.  
+  *Acceptance:* ✅ Identical seeds yield identical results.
 
 ---
 
@@ -420,4 +389,15 @@ Independent improvements that enhance robustness, performance, and developer exp
   - `patch_with_stale_if_match_returns_409_with_extensions` - Stale ETag returns 409 with version details in extensions.
   - `patch_missing_if_match_returns_428` - Missing `If-Match` header returns 428 Precondition Required (consistent with POST gameplay endpoints).
 **Acceptance:** PATCH endpoints enforce ETag validation for configuration changes; gameplay actions continue using POST with existing ETag support; concurrent modification conflicts return structured 409 responses; all test cases pass.
+
+---
+
+### 🟨 **9. CI Pipeline**
+**Dependencies:** 4, 5, 6, 7, 9, 14, 15  
+**Details:**
+- Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.
+- Planned CI: GitHub Actions gates merges with lint, tests, and schema checks.
+- Security: Automated container image vulnerability scanning (e.g., Trivy, Snyk) for backend and frontend images.
+**Progress:** Local grep gates and lint/test guards complete; container vulnerability scanning task defined; remote CI integration pending.  
+**Acceptance:** CI green gate required for merges; schema re-applies cleanly; image scans run on CI and block merges on critical vulnerabilities.
 
