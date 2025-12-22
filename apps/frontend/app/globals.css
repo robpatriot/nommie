@@ -187,14 +187,15 @@
       var(--color-surface),
       var(--color-surface-strong)
     );
+    position: relative;
   }
 
   [data-theme='dark'] .card-wrapper-home {
-    background: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--color-felt-highlight) 85%, transparent),
-      color-mix(in srgb, var(--color-felt-base) 95%, transparent)
-    );
+    background: color-mix(in srgb, var(--color-felt-base) 95%, transparent);
+  }
+
+  .bg-gradient-radial {
+    background: radial-gradient(circle, var(--tw-gradient-stops));
   }
 
   @media (max-width: 768px) {
@@ -225,7 +226,8 @@
   }
 
   [data-theme='dark'] .text-card-cream {
-    --card-cream: #191f20;
+    --card-cream: #e5f4ed;
+    color: var(--card-cream);
   }
 
   .bg-card-cream {
