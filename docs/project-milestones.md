@@ -365,38 +365,14 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **7. Trace ID Logging Strategy Review**
+### ✅ **7. Trace ID Logging Strategy Review**
 - **Trace ID Logging Strategy Review:** Decide on a single source of truth for `trace_id` emission (span-only vs. event field vs. conditional) so console and aggregated logs stay consistent without duplicate IDs.  
-  *Acceptance:* Preferred logging strategy is chosen, documented, and implemented across middleware/tests.
+  **Progress:** ✅ Complete. Implemented span-only approach for handler code (removed explicit `trace_id` from error.rs, db_errors.rs, validated_json.rs). Kept explicit `trace_id` for code outside spans (StructuredLogger middleware, security logging). Added ephemeral `trace_id` logging in WebSocket upgrade to bridge HTTP request `trace_id` to WebSocket `session_id` for end-to-end traceability.  
+  **Acceptance:** ✅ `trace_id` appears once per log line; handler logs inherit from spans; request completion and security logs use explicit fields; WebSocket upgrade logs bridge HTTP `trace_id` to session lifecycle via `session_id`.
 
 ---
 
-### 🟨 **8. PATCH Endpoints with ETag Support**
-**Dependencies:** 5, 9, 12  
-**Details:**
-- Implement PATCH endpoints for **game configuration only** (not gameplay actions) with conditional request support via ETags.
-- **Context:** Gameplay actions (bidding, playing cards, selecting trump) already use ETags via POST endpoints with `If-Match` headers (implemented in earlier milestones). This milestone adds PATCH endpoints for configuration changes.
-- **Scope:** PATCH is used for game configuration changes such as:
-  - Adding/removing AI seats
-  - Updating game settings/options
-  - Modifying game metadata (name, visibility, etc.)
-- **Not in scope:** Gameplay actions (bidding, playing cards, selecting trump, marking ready) already use POST endpoints with ETag/If-Match support and remain unchanged.
-- **ETag generation:** Generate strong ETags from resource version/state (e.g., using `lock_version` or content hash), consistent with existing POST gameplay endpoints.
-- **If-Match header handling:** Require `If-Match` header for PATCH requests; validate ETag matches current resource version (same pattern as POST gameplay endpoints).
-- **Error responses:**
-  - `409 Conflict` with `OptimisticLock` error code when `If-Match` ETag is stale (resource modified concurrently).
-  - `428 Precondition Required` when `If-Match` header is missing (required for PATCH operations, consistent with POST gameplay endpoints).
-  - Include version information in error extensions for client retry logic.
-- **Success behavior:** PATCH with matching ETag succeeds and increments resource version/ETag (returns new ETag in response header).
-- **Test coverage:**
-  - `patch_with_matching_if_match_succeeds_and_bumps_etag` - Valid PATCH updates resource and returns new ETag.
-  - `patch_with_stale_if_match_returns_409_with_extensions` - Stale ETag returns 409 with version details in extensions.
-  - `patch_missing_if_match_returns_428` - Missing `If-Match` header returns 428 Precondition Required (consistent with POST gameplay endpoints).
-**Acceptance:** PATCH endpoints enforce ETag validation for configuration changes; gameplay actions continue using POST with existing ETag support; concurrent modification conflicts return structured 409 responses; all test cases pass.
-
----
-
-### 🟨 **9. CI Pipeline**
+### 🟨 **8. CI Pipeline**
 **Dependencies:** 4, 5, 6, 7, 9, 14, 15  
 **Details:**
 - Local: pre-commit hooks with FE lint/format and BE clippy/rustfmt.

@@ -7,7 +7,6 @@ use tracing::{error, warn};
 
 use crate::errors::domain::{ConflictKind, DomainError, InfraErrorKind, NotFoundKind};
 use crate::logging::pii::Redacted;
-use crate::trace_ctx;
 
 fn mentions_sqlstate(msg: &str, code: &str) -> bool {
     msg.contains(code) || msg.contains(&format!("SQLSTATE({code})"))
@@ -64,7 +63,6 @@ fn map_postgres_constraint_to_conflict(error_msg: &str) -> Option<(ConflictKind,
 /// Translate a `DbErr` into a `DomainError` with sanitized, PII-safe detail.
 pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
     let error_msg = e.to_string();
-    let trace_id = trace_ctx::trace_id();
 
     match &e {
         sea_orm::DbErr::RecordNotFound(_) => {
@@ -78,7 +76,7 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
             // Structured game not found error from adapter layer
             if let Some(game_id_str) = msg.strip_prefix("GAME_NOT_FOUND:") {
                 if let Ok(game_id) = game_id_str.parse::<i64>() {
-                    warn!(trace_id = %trace_id, game_id, "Game not found");
+                    warn!(game_id, "Game not found");
                     return DomainError::not_found(
                         NotFoundKind::Game,
                         format!("Game {game_id} not found"),
@@ -86,7 +84,7 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
                 }
             }
             // Fallback if parsing fails
-            warn!(trace_id = %trace_id, raw_error = %Redacted(msg), "Failed to parse GAME_NOT_FOUND error");
+            warn!(raw_error = %Redacted(msg), "Failed to parse GAME_NOT_FOUND error");
             return DomainError::not_found(NotFoundKind::Game, "Game not found");
         }
         sea_orm::DbErr::Custom(msg) if msg.starts_with("OPTIMISTIC_LOCK:") => {
@@ -101,7 +99,6 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
                 if let Ok(info) = serde_json::from_str::<LockInfo>(json_str) {
                     // Log with version details for observability
                     warn!(
-                        trace_id = %trace_id,
                         expected = info.expected,
                         actual = info.actual,
                         "Optimistic lock conflict detected"
@@ -118,14 +115,14 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
             }
 
             // Fallback for back-compat or parsing failures
-            warn!(trace_id = %trace_id, "Optimistic lock conflict detected (version info unavailable)");
+            warn!("Optimistic lock conflict detected (version info unavailable)");
             return DomainError::conflict(
                 ConflictKind::OptimisticLock,
                 "Resource was modified by another transaction; please retry",
             );
         }
         sea_orm::DbErr::ConnectionAcquire(_) | sea_orm::DbErr::Conn(_) => {
-            warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Database unavailable");
+            warn!(raw_error = %Redacted(&error_msg), "Database unavailable");
             return DomainError::infra(InfraErrorKind::DbUnavailable, "Database unavailable");
         }
         _ => {}
@@ -135,7 +132,7 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
         || error_msg.contains("duplicate key value violates unique constraint")
         || error_msg.contains("UNIQUE constraint failed")
     {
-        warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Unique constraint violation");
+        warn!(raw_error = %Redacted(&error_msg), "Unique constraint violation");
 
         // Try to extract table.column from SQLite format errors first
         if let Some(table_column) = extract_sqlite_table_column(&error_msg) {
@@ -156,12 +153,12 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
     }
 
     if mentions_sqlstate(&error_msg, "23503") {
-        warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Foreign key constraint violation");
+        warn!(raw_error = %Redacted(&error_msg), "Foreign key constraint violation");
         return DomainError::validation_other("Foreign key constraint violation");
     }
 
     if mentions_sqlstate(&error_msg, "23514") {
-        warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Check constraint violation");
+        warn!(raw_error = %Redacted(&error_msg), "Check constraint violation");
         return DomainError::validation_other("Check constraint violation");
     }
 
@@ -169,11 +166,11 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
         || error_msg.contains("pool")
         || error_msg.contains("unavailable")
     {
-        warn!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Database timeout or pool issue");
+        warn!(raw_error = %Redacted(&error_msg), "Database timeout or pool issue");
         return DomainError::infra(InfraErrorKind::Timeout, "Database timeout");
     }
 
-    error!(trace_id = %trace_id, raw_error = %Redacted(&error_msg), "Unhandled database error");
+    error!(raw_error = %Redacted(&error_msg), "Unhandled database error");
     DomainError::infra(
         InfraErrorKind::Other("DbErr".into()),
         "Database operation failed",

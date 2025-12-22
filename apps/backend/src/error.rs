@@ -641,7 +641,6 @@ impl ResponseError for AppError {
             | AppError::UnauthorizedInvalidJwt
             | AppError::UnauthorizedExpiredJwt => {
                 warn!(
-                    trace_id = %trace_id,
                     code = %self.code(),
                     status = %status.as_u16(),
                     detail = %problem_details.detail,
@@ -655,7 +654,6 @@ impl ResponseError for AppError {
             | AppError::Internal { .. }
             | AppError::Config { .. } => {
                 error!(
-                    trace_id = %trace_id,
                     code = %self.code(),
                     status = %status.as_u16(),
                     detail = %problem_details.detail,

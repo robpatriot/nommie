@@ -11,7 +11,6 @@ use tracing::{debug, warn};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::logging::pii::Redacted;
-use crate::trace_ctx;
 
 /// Validated JSON extractor that provides standardized error handling for JSON parse/validation failures
 ///
@@ -62,14 +61,11 @@ where
             .to_string();
 
         Box::pin(async move {
-            let trace_id = trace_ctx::trace_id();
-
             // Collect the request body into BytesMut
             let mut body = BytesMut::new();
             while let Some(chunk) = payload.next().await {
                 let chunk = chunk.map_err(|e| {
                     warn!(
-                        trace_id = %trace_id,
                         error = %e,
                         "Failed to read request body chunk"
                     );
@@ -86,7 +82,6 @@ where
                 let detail = classify_json_error(&e);
 
                 debug!(
-                    trace_id = %trace_id,
                     error = %Redacted(&e.to_string()),
                     content_type = %content_type,
                     body_size = body.len(),

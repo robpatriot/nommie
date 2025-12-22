@@ -18,6 +18,7 @@ use crate::routes::games::{
     build_snapshot_response, build_snapshot_response_in_txn, GameSnapshotResponse,
 };
 use crate::state::app_state::AppState;
+use crate::trace_ctx;
 use crate::ws::hub::{GameSessionRegistry, SnapshotBroadcast};
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(20);
@@ -59,13 +60,24 @@ pub async fn upgrade(
     let initial_lock_version = snapshot_response.lock_version;
     let shared_txn = SharedTxn::from_req(&req);
 
-    let session = GameWsSession::new(
-        app_state.clone(),
+    // Generate session_id early so we can log it with trace_id while still in span context
+    let session_id = Uuid::new_v4();
+    let trace_id = trace_ctx::trace_id();
+    info!(
+        session_id = %session_id,
+        game_id = game_id.0,
+        user_id = current_user.id,
+        trace_id = %trace_id,
+        "Websocket upgrade initiating session"
+    );
+
+    let config = GameWsSessionConfig {
+        app_state: app_state.clone(),
         registry,
-        game_id.0,
+        game_id: game_id.0,
         current_user,
         shared_txn,
-        vec![
+        pending_messages: vec![
             OutgoingMessage::Ack {
                 message: "connected",
             },
@@ -75,7 +87,9 @@ pub async fn upgrade(
             },
         ],
         initial_lock_version,
-    );
+    };
+
+    let session = GameWsSession::new_with_id(session_id, config);
 
     ws::start(session, &req, stream)
 }
@@ -95,29 +109,30 @@ pub struct GameWsSession {
     heartbeat_handle: Option<actix::SpawnHandle>,
 }
 
+struct GameWsSessionConfig {
+    app_state: web::Data<AppState>,
+    registry: Option<Arc<GameSessionRegistry>>,
+    game_id: i64,
+    current_user: CurrentUser,
+    shared_txn: Option<SharedTxn>,
+    pending_messages: Vec<OutgoingMessage>,
+    initial_lock_version: i32,
+}
+
 impl GameWsSession {
-    #[allow(dead_code)]
-    fn new(
-        app_state: web::Data<AppState>,
-        registry: Option<Arc<GameSessionRegistry>>,
-        game_id: i64,
-        current_user: CurrentUser,
-        shared_txn: Option<SharedTxn>,
-        pending_messages: Vec<OutgoingMessage>,
-        initial_lock_version: i32,
-    ) -> Self {
+    fn new_with_id(session_id: Uuid, config: GameWsSessionConfig) -> Self {
         Self {
-            session_id: Uuid::new_v4(),
-            game_id,
-            user_id: current_user.id,
-            current_user,
-            app_state,
-            shared_txn,
+            session_id,
+            game_id: config.game_id,
+            user_id: config.current_user.id,
+            current_user: config.current_user,
+            app_state: config.app_state,
+            shared_txn: config.shared_txn,
             last_heartbeat: Instant::now(),
-            pending_messages,
-            registry,
+            pending_messages: config.pending_messages,
+            registry: config.registry,
             registry_token: None,
-            last_lock_version: initial_lock_version,
+            last_lock_version: config.initial_lock_version,
             heartbeat_handle: None,
         }
     }
