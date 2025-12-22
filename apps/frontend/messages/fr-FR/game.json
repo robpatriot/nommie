@@ -304,6 +304,9 @@
         "pending": "(en attente)",
         "bid": "Annonce {bid}",
         "total": "Cumul"
+      },
+      "error": {
+        "loadFailed": "Impossible de charger l’historique des scores"
       }
     },
     "error": {

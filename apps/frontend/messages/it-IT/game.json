@@ -304,6 +304,9 @@
         "pending": "(in attesa)",
         "bid": "Puntata {bid}",
         "total": "Totale"
+      },
+      "error": {
+        "loadFailed": "Impossibile caricare lo storico dei punteggi"
       }
     },
     "error": {

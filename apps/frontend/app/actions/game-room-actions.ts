@@ -121,17 +121,19 @@ export async function submitBidAction(
   const bidValue = Math.trunc(request.bid)
 
   if (!Number.isFinite(bidValue) || bidValue < 0) {
+    const t = await getTranslations('errors.validation')
     return {
       kind: 'error',
-      message: 'Invalid bid value',
+      message: t('invalidBidValue'),
       status: 400,
     }
   }
 
   if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
+    const t = await getTranslations('errors.validation')
     return {
       kind: 'error',
-      message: 'Invalid lock version',
+      message: t('invalidLockVersion'),
       status: 400,
     }
   }
@@ -155,9 +157,10 @@ export async function selectTrumpAction(
   request: SelectTrumpRequest
 ): Promise<SimpleActionResult> {
   if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
+    const t = await getTranslations('errors.validation')
     return {
       kind: 'error',
-      message: 'Invalid lock version',
+      message: t('invalidLockVersion'),
       status: 400,
     }
   }
@@ -181,11 +184,12 @@ export async function submitPlayAction(
   request: SubmitPlayRequest
 ): Promise<SimpleActionResult> {
   const card = request.card.trim()
+  const t = await getTranslations('errors.validation')
 
   if (!card) {
     return {
       kind: 'error',
-      message: 'Card selection required',
+      message: t('cardSelectionRequired'),
       status: 400,
       code: 'VALIDATION_ERROR',
     }
@@ -194,7 +198,7 @@ export async function submitPlayAction(
   if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
     return {
       kind: 'error',
-      message: 'Invalid lock version',
+      message: t('invalidLockVersion'),
       status: 400,
     }
   }

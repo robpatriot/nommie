@@ -304,6 +304,9 @@
         "pending": "(ausstehend)",
         "bid": "Gebot {bid}",
         "total": "Summe"
+      },
+      "error": {
+        "loadFailed": "Spielverlauf konnte nicht geladen werden"
       }
     },
     "error": {

@@ -96,7 +96,19 @@
     "failedToUpdateAiSeatNoSnapshot": "Impossibile aggiornare posto IA: impossibile caricare lo stato della partita",
     "failedToFetchAiRegistry": "Impossibile caricare il registro IA",
     "failedToDeleteGameNoVersion": "Impossibile eliminare la partita: impossibile determinare la versione",
-    "failedToDeleteGameNoSnapshot": "Impossibile eliminare la partita: impossibile caricare lo stato"
+    "failedToDeleteGameNoSnapshot": "Impossibile eliminare la partita: impossibile caricare lo stato",
+    "failedToRefreshGamesList": "Impossibile aggiornare l’elenco delle partite",
+    "failedToCreateGame": "Impossibile creare la partita",
+    "failedToJoinGame": "Impossibile unirsi alla partita",
+    "failedToDeleteGame": "Impossibile eliminare la partita",
+    "failedToFetchGameHistory": "Impossibile caricare la cronologia della partita",
+    "failedToUpdateSettings": "Impossibile aggiornare le impostazioni"
+  },
+  "validation": {
+    "invalidBidValue": "Valore di puntata non valido",
+    "invalidLockVersion": "Versione di blocco non valida",
+    "cardSelectionRequired": "Seleziona una carta",
+    "noSettingsProvided": "Nessuna impostazione fornita"
   },
   "page": {
     "failedToLoadGameSnapshot": "Impossibile caricare lo stato della partita: risposta inattesa"

@@ -96,7 +96,19 @@
     "failedToUpdateAiSeatNoSnapshot": "KI-Sitzplatz konnte nicht aktualisiert werden: Spielzustand konnte nicht geladen werden",
     "failedToFetchAiRegistry": "KI-Register konnte nicht geladen werden",
     "failedToDeleteGameNoVersion": "Spiel konnte nicht gelöscht werden: Spielversion konnte nicht ermittelt werden",
-    "failedToDeleteGameNoSnapshot": "Spiel konnte nicht gelöscht werden: Spielzustand konnte nicht geladen werden"
+    "failedToDeleteGameNoSnapshot": "Spiel konnte nicht gelöscht werden: Spielzustand konnte nicht geladen werden",
+    "failedToRefreshGamesList": "Spielliste konnte nicht aktualisiert werden",
+    "failedToCreateGame": "Spiel konnte nicht erstellt werden",
+    "failedToJoinGame": "Spiel konnte nicht beigetreten werden",
+    "failedToDeleteGame": "Spiel konnte nicht gelöscht werden",
+    "failedToFetchGameHistory": "Spielverlauf konnte nicht geladen werden",
+    "failedToUpdateSettings": "Einstellungen konnten nicht aktualisiert werden"
+  },
+  "validation": {
+    "invalidBidValue": "Ungültiger Gebotswert",
+    "invalidLockVersion": "Ungültige Sperrversion",
+    "cardSelectionRequired": "Kartenauswahl erforderlich",
+    "noSettingsProvided": "Keine Einstellungen angegeben"
   },
   "page": {
     "failedToLoadGameSnapshot": "Spielzustand konnte nicht geladen werden: unerwartete Antwort"

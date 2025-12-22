@@ -20,7 +20,8 @@ export async function refreshGamesListAction(): Promise<ActionResult<Game[]>> {
     const games = await getAvailableGames()
     return { kind: 'ok', data: games }
   } catch (error) {
-    return toErrorResult(error, 'Failed to refresh games list')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToRefreshGamesList'))
   }
 }
 
@@ -43,7 +44,8 @@ export async function createGameAction(
     const data: { game: Game } = await response.json()
     return { kind: 'ok', data: data.game }
   } catch (error) {
-    return toErrorResult(error, 'Failed to create game')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToCreateGame'))
   }
 }
 
@@ -59,7 +61,8 @@ export async function joinGameAction(
     const data: { game: Game } = await response.json()
     return { kind: 'ok', data: data.game }
   } catch (error) {
-    return toErrorResult(error, 'Failed to join game')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToJoinGame'))
   }
 }
 
@@ -96,7 +99,8 @@ export async function deleteGameAction(
     await deleteGame(gameId, finalLockVersion)
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to delete game')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToDeleteGame'))
   }
 }
 
@@ -123,6 +127,7 @@ export async function getGameHistoryAction(
     const data = (await response.json()) as GameHistoryApiResponse
     return { kind: 'ok', data }
   } catch (error) {
-    return toErrorResult(error, 'Failed to fetch game history')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToFetchGameHistory'))
   }
 }

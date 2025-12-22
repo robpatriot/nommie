@@ -1,6 +1,7 @@
 'use server'
 
 import { cookies } from 'next/headers'
+import { getTranslations } from 'next-intl/server'
 import { fetchWithAuth } from '@/lib/api'
 import { toErrorResult } from '@/lib/api/action-helpers'
 import type { SimpleActionResult } from '@/lib/api/action-helpers'
@@ -26,9 +27,11 @@ export async function updateUserOptionsAction(
       payload.require_card_confirmation === undefined &&
       payload.locale === undefined)
   ) {
+    // This is a validation error that should be localized
+    const t = await getTranslations('errors.validation')
     return {
       kind: 'error',
-      message: 'No settings provided',
+      message: t('noSettingsProvided'),
       status: 400,
       code: 'INVALID_SETTINGS_PAYLOAD',
     }
@@ -60,7 +63,8 @@ export async function updateUserOptionsAction(
 
     return { kind: 'ok' }
   } catch (error) {
-    return toErrorResult(error, 'Failed to update settings')
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToUpdateSettings'))
   }
 }
 

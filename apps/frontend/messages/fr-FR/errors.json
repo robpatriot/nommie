@@ -96,7 +96,19 @@
     "failedToUpdateAiSeatNoSnapshot": "Échec de la mise à jour d'un siège IA : impossible de charger l'état de la partie",
     "failedToFetchAiRegistry": "Échec du chargement du registre IA",
     "failedToDeleteGameNoVersion": "Échec de la suppression de la partie : impossible de déterminer la version",
-    "failedToDeleteGameNoSnapshot": "Échec de la suppression de la partie : impossible de charger l'état"
+    "failedToDeleteGameNoSnapshot": "Échec de la suppression de la partie : impossible de charger l'état",
+    "failedToRefreshGamesList": "Échec de l’actualisation de la liste des parties",
+    "failedToCreateGame": "Échec de la création de la partie",
+    "failedToJoinGame": "Échec de la jonction à la partie",
+    "failedToDeleteGame": "Échec de la suppression de la partie",
+    "failedToFetchGameHistory": "Échec du chargement de l’historique de la partie",
+    "failedToUpdateSettings": "Échec de la mise à jour des paramètres"
+  },
+  "validation": {
+    "invalidBidValue": "Valeur d’annonce invalide",
+    "invalidLockVersion": "Version de verrouillage invalide",
+    "cardSelectionRequired": "Sélection d’une carte requise",
+    "noSettingsProvided": "Aucun paramètre fourni"
   },
   "page": {
     "failedToLoadGameSnapshot": "Échec du chargement de l'état de la partie : réponse inattendue"

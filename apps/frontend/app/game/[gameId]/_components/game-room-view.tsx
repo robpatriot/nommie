@@ -98,13 +98,16 @@ export function GameRoomView(props: GameRoomViewProps) {
   const effectiveViewerSeat: Seat | null = viewerSeat ?? null
 
   const tYou = t('you')
+  const tStatusWaiting = t('status.waiting')
   const seatDisplayName = useCallback(
     (seat: Seat) =>
       getPlayerDisplayName(seat, effectiveViewerSeat, playerNames, tYou),
     [playerNames, effectiveViewerSeat, tYou]
   )
   const activeName =
-    typeof activeSeat === 'number' ? seatDisplayName(activeSeat) : 'Waiting'
+    typeof activeSeat === 'number'
+      ? seatDisplayName(activeSeat)
+      : tStatusWaiting
 
   const setupSeatEntries = useMemo(
     () =>
@@ -205,8 +208,8 @@ export function GameRoomView(props: GameRoomViewProps) {
     }
     return historyQueryError instanceof Error
       ? historyQueryError.message
-      : 'Unable to load score history'
-  }, [historyQueryError])
+      : t('history.error.loadFailed')
+  }, [historyQueryError, t])
 
   useEffect(() => {
     if (!selectedCard) {

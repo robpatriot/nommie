@@ -304,6 +304,9 @@
         "pending": "(pendiente)",
         "bid": "Puja {bid}",
         "total": "Acumulado"
+      },
+      "error": {
+        "loadFailed": "No se pudo cargar el historial de puntuación"
       }
     },
     "error": {

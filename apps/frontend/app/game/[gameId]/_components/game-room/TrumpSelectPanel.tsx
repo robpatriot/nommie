@@ -61,10 +61,10 @@ export function TrumpSelectPanel({
   }
 
   const submitLabel = isPending
-    ? 'Choosing…'
+    ? t('submit.choosing')
     : canSelect
-      ? 'Confirm Trump'
-      : `Waiting for ${activeName}`
+      ? t('submit.confirm')
+      : t('submit.waitingFor', { name: activeName })
 
   // Helper to get suit symbol
   const getSuitSymbol = (trump: Trump): string => {

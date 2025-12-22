@@ -292,6 +292,9 @@
       "closeAria": "Close score history",
       "loading": "Loading history…",
       "empty": "No completed rounds yet. Start playing to build the score sheet.",
+      "error": {
+        "loadFailed": "Unable to load score history"
+      },
       "table": {
         "round": "Round"
       },

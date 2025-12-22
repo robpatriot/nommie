@@ -96,7 +96,19 @@
     "failedToUpdateAiSeatNoSnapshot": "Error al actualizar asiento de IA: no se pudo cargar el estado de la partida",
     "failedToFetchAiRegistry": "Error al cargar el registro de IA",
     "failedToDeleteGameNoVersion": "Error al eliminar la partida: no se pudo determinar la versión",
-    "failedToDeleteGameNoSnapshot": "Error al eliminar la partida: no se pudo cargar el estado"
+    "failedToDeleteGameNoSnapshot": "Error al eliminar la partida: no se pudo cargar el estado",
+    "failedToRefreshGamesList": "Error al actualizar la lista de partidas",
+    "failedToCreateGame": "Error al crear la partida",
+    "failedToJoinGame": "Error al unirse a la partida",
+    "failedToDeleteGame": "Error al eliminar la partida",
+    "failedToFetchGameHistory": "Error al cargar el historial de la partida",
+    "failedToUpdateSettings": "Error al actualizar la configuración"
+  },
+  "validation": {
+    "invalidBidValue": "Valor de puja no válido",
+    "invalidLockVersion": "Versión de bloqueo no válida",
+    "cardSelectionRequired": "Debes seleccionar una carta",
+    "noSettingsProvided": "No se proporcionaron ajustes"
   },
   "page": {
     "failedToLoadGameSnapshot": "Error al cargar el estado de la partida: respuesta inesperada"

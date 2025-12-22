@@ -96,7 +96,19 @@
     "failedToUpdateAiSeatNoSnapshot": "Failed to update AI seat: could not fetch game snapshot",
     "failedToFetchAiRegistry": "Failed to fetch AI registry",
     "failedToDeleteGameNoVersion": "Failed to delete game: could not determine game version",
-    "failedToDeleteGameNoSnapshot": "Failed to delete game: could not fetch game snapshot"
+    "failedToDeleteGameNoSnapshot": "Failed to delete game: could not fetch game snapshot",
+    "failedToRefreshGamesList": "Failed to refresh games list",
+    "failedToCreateGame": "Failed to create game",
+    "failedToJoinGame": "Failed to join game",
+    "failedToDeleteGame": "Failed to delete game",
+    "failedToFetchGameHistory": "Failed to fetch game history",
+    "failedToUpdateSettings": "Failed to update settings"
+  },
+  "validation": {
+    "invalidBidValue": "Invalid bid value",
+    "invalidLockVersion": "Invalid lock version",
+    "cardSelectionRequired": "Card selection required",
+    "noSettingsProvided": "No settings provided"
   },
   "page": {
     "failedToLoadGameSnapshot": "Failed to load game snapshot: unexpected response"
