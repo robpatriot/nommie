@@ -238,14 +238,14 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **21. Internationalisation & Frontend Localisation**
+### ✅ **21. Internationalisation & Frontend Localisation**
 **Dependencies:** 11, 15  
 **Details:**
 - **End-to-End Frontend Internationalisation:** Implement a code-driven i18n strategy using `next-intl`, with locale-aware request handling, message loading, and per-namespace translation files for all user-facing UI.  
 - **Error Localisation via Codes:** Backend exposes structured Problem Details with stable `code` values; frontend maps codes through a single source of truth (`i18n/errors.ts` + `errors.*` namespaces) to derive localized messages for toasts, error boundaries, and inline surfaces.  
 - **Coverage & Tooling:** All interactive frontend flows (lobby, game room, settings, actions, toasts) use translations instead of hard-coded strings; multiple locales (`en-GB`, `fr-FR`, `de-DE`, `es-ES`, `it-IT`) are kept in sync via i18n lint scripts (`i18n-check`, `i18n-unused`) wired into `pnpm lint`. Debug/log output remains English-only and is not localized.  
 - **Error Code Enforcement:** Frontend i18n check script verifies that all `KNOWN_ERROR_CODES` have corresponding translation keys in all locale `errors.json` files, ensuring complete coverage. Frontend logs warnings when encountering unknown error codes not present in the i18n key registry.  
-- **Systematic Date/Number Formatting:** ⚠️ **Pending** — Locale-aware formatting for dates, times, and numbers using `Intl` APIs (e.g., `Intl.DateTimeFormat`, `Intl.NumberFormat`) to ensure dates, timestamps, durations, and numeric values are displayed according to the user's locale preferences.  
+- **Systematic Date/Number Formatting:** Locale-aware formatting for dates, times, and numbers using `Intl` APIs (`Intl.DateTimeFormat`, `Intl.NumberFormat`) implemented via centralized utilities (`utils/date-formatting.ts`, `utils/number-formatting.ts`). All user-facing dates, timestamps, durations, and numeric values (round numbers, player counts, hand sizes, performance metrics) are formatted according to the user's locale preferences.  
 **Acceptance:** Frontend UI text is fully localized and driven by error codes and message keys rather than inline strings; adding or updating locales is a data change (messages) rather than a code change, and i18n consistency is enforced in the lint pipeline. Error code coverage is verified automatically. Date and number formatting respects user locale preferences.
 
 ---
