@@ -10,7 +10,6 @@
     "dev": "pnpm be:dev & pnpm fe:dev",
     "start": "pnpm be:start & pnpm fe:build && pnpm fe:start",
     "stop": "pnpm be:down && pnpm fe:down",
-    "status": "for s in be fe; do if [ -f .dev/$s.pid ] && kill -0 $(cat .dev/$s.pid) 2>/dev/null; then echo \"$s: running (pid $(cat .dev/$s.pid))\"; else echo \"$s: stopped\"; fi; done",
     "test": "pnpm be:test && pnpm fe:test",
     "test:v": "pnpm be:test:v && pnpm fe:test",
     "test:q": "pnpm be:test:q && pnpm --silent fe:test",
