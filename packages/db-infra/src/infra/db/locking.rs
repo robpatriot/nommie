@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 // External crate imports
 use async_trait::async_trait;
 use sea_orm::{ConnectionTrait, DatabaseConnection};
-use tracing::{debug, warn};
+use tracing::{trace, warn};
 use xxhash_rust::xxh3::xxh3_64;
 
 // Internal crate imports
@@ -80,12 +80,12 @@ impl Guard {
 
             match file.unlock() {
                 Ok(()) => {
-                    debug!(lock_path = lock_path_display, "SQLite file lock released");
+                    trace!(lock_path = lock_path_display, "SQLite file lock released");
                 }
                 Err(e) => {
                     // Unlock errors are usually benign (e.g., already unlocked, file closed)
-                    // Log as debug, not warning, since the file will be dropped anyway
-                    debug!(
+                    // Log as trace, not warning, since the file will be dropped anyway
+                    trace!(
                         error = %e,
                         lock_path = lock_path_display,
                         "SQLite file unlock returned error (may be benign)"
@@ -280,7 +280,7 @@ impl BootstrapLock for SqliteFileLock {
         match file.try_lock_exclusive() {
             Ok(true) => {
                 // Lock acquired successfully
-                debug!(
+                trace!(
                     lock_path = %self.lock_path.display(),
                     "SQLite file lock acquired"
                 );
@@ -288,7 +288,7 @@ impl BootstrapLock for SqliteFileLock {
             }
             Ok(false) => {
                 // Lock is held by another process - return None (contention)
-                debug!(
+                trace!(
                     lock_path = %self.lock_path.display(),
                     "SQLite file lock contended (would block)"
                 );
@@ -296,7 +296,7 @@ impl BootstrapLock for SqliteFileLock {
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 // Also handle WouldBlock error variant (defensive)
-                debug!(
+                trace!(
                     lock_path = %self.lock_path.display(),
                     "SQLite file lock contended (would block error)"
                 );

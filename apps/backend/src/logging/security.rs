@@ -1,4 +1,4 @@
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::logging::pii::Redacted;
 use crate::trace_ctx;
@@ -7,7 +7,7 @@ use crate::trace_ctx;
 pub fn login_failed(reason: &str, email: Option<&str>) {
     let trace_id = trace_ctx::trace_id();
 
-    warn!(
+    info!(
         event = "SECURITY_LOGIN_FAILED",
         %trace_id,
         email = %email.map(Redacted).unwrap_or(Redacted("")),

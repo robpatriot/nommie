@@ -113,7 +113,7 @@ export async function fetchWithAuth(
       // Rate limit exceeded - parse error response but don't log during startup
       const parsedError = await parseErrorResponse(response)
       if (shouldLogError()) {
-        console.warn(
+        console.info(
           'Rate limit exceeded',
           parsedError.code,
           parsedError.message

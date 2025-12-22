@@ -1,5 +1,5 @@
 use sea_orm::DatabaseTransaction;
-use tracing::{debug, info, warn};
+use tracing::{info, trace, warn};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::config::email_allowlist::EmailAllowlist;
@@ -218,7 +218,7 @@ async fn ensure_from_existing_credential(
 
     user_options_repo::ensure_default_for_user(txn, user.id).await?;
 
-    debug!(
+    trace!(
         user_id = user_id,
         email = %Redacted(email_for_logging),
         "Repeat login for existing user"

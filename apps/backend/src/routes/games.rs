@@ -8,7 +8,7 @@ use actix_web::{web, HttpRequest, HttpResponse, Result};
 use rand::random;
 use serde::{Deserialize, Serialize};
 use time::format_description::well_known::Rfc3339;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::ai::{registry, HeuristicV1, RandomPlayer};
 use crate::db::txn::with_txn;
@@ -386,7 +386,7 @@ async fn get_game_history(
                     .any(|etag| etag == etag_value);
 
             if matches {
-                debug!(game_id = id, "ETag match found, returning 304 Not Modified");
+                info!(game_id = id, "ETag cache hit, returning 304 Not Modified");
                 // Resource hasn't changed, return 304 Not Modified
                 let mut not_modified = HttpResponse::build(StatusCode::NOT_MODIFIED);
                 not_modified.insert_header((ETAG, etag_value));
@@ -472,9 +472,9 @@ async fn get_player_display_name(
                     .any(|etag| etag == etag_value);
 
             if matches {
-                debug!(
+                info!(
                     game_id = game_id,
-                    "ETag match found, returning 304 Not Modified"
+                    "ETag cache hit, returning 304 Not Modified"
                 );
                 // Resource hasn't changed, return 304 Not Modified
                 let mut not_modified = HttpResponse::build(StatusCode::NOT_MODIFIED);

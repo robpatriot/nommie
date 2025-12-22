@@ -5,7 +5,7 @@ use migration::{migrate, MigrationCommand, Migrator, MigratorTrait};
 use rand::Rng;
 use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DbErr};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::config::db::{
     build_connection_settings, build_session_statements, make_conn_spec, validate_db_config,
@@ -148,7 +148,7 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, DbInf
         Ok(migrations) => {
             let count = migrations.len();
             let last = migrations.last().map(|m| m.name().to_string());
-            debug!(
+            trace!(
                 fastpath = "debug",
                 applied_count = count,
                 expected_count = expected_count,
@@ -158,7 +158,7 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, DbInf
             (count, last)
         }
         Err(DbErr::Exec(_)) => {
-            debug!(fastpath = "miss", reason = "migration_table_missing");
+            trace!(fastpath = "miss", reason = "migration_table_missing");
             return Ok(false);
         }
         Err(e) => {
@@ -173,7 +173,7 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, DbInf
 
     if is_up_to_date {
         migration_counters::fast_path_hit();
-        debug!(
+        trace!(
             fastpath = "hit",
             current_count = current_count,
             expected_count = expected_count,
@@ -182,7 +182,7 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, DbInf
         );
     } else {
         migration_counters::fast_path_miss();
-        debug!(
+        trace!(
             fastpath = "miss",
             current_count = current_count,
             expected_count = expected_count,
@@ -337,7 +337,7 @@ where
         if let Some(acquired_guard) = lock.try_acquire().await? {
             migration_counters::add_lock_acquire_attempts(attempts as usize);
             migration_counters::lock_acquired();
-            debug!(
+            trace!(
                 lock = "won",
                 env = ?env,
                 db_kind = ?db_kind,
@@ -351,7 +351,7 @@ where
         let jitter_ms = rand::rng().random::<u64>() % 4;
         let delay_ms = base_delay_ms + jitter_ms;
 
-        debug!(
+        trace!(
             lock = "backoff",
             attempts = attempts,
             delay_ms = delay_ms,

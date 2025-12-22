@@ -13,7 +13,7 @@ use sea_orm::{
 };
 use sqlx::postgres::PgPoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
-use tracing::{debug, info, warn};
+use tracing::{info, trace, warn};
 
 // Use re-exported types from parent module
 use super::{DbKind, DbOwner, RuntimeEnv};
@@ -294,7 +294,7 @@ pub async fn build_pool(
                     let settings = db_settings.clone();
                     Box::pin(async move {
                         apply_sqlite_config(conn, &settings).await?;
-                        debug!("db=sqlite hook=after_connect ok");
+                        trace!("db=sqlite hook=after_connect ok");
                         Ok::<_, sqlx::Error>(())
                     })
                 })
