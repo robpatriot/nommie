@@ -334,20 +334,22 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **2. Frontend Experience Enhancements**
+### ✅ **2. Frontend Experience Enhancements**
 - **React Query Adoption:** ✅ **Completed** — React Query (TanStack Query) has been adopted for client data fetching.
   - ✅ **Completed:** Polling inefficiency addressed (ETag-based caching and not_modified handling).
   - ✅ **Completed:** Request deduplication works automatically via React Query.
   - ✅ **Completed:** Centralized query key factory implemented for cache management.
   - ✅ **Completed:** Consistent error handling across query hooks.
   - ✅ **Completed:** Caching and state synchronization improved with proper invalidation strategies.
-  - ⚠️ **Optional Enhancement:** Optimistic updates for game actions (bid, play, etc.) — can be implemented to improve perceived responsiveness, but not required since WebSocket updates provide real-time state synchronization. Would require implementing optimistic state transformations for mutations like `useMarkPlayerReady`, `useSubmitBid`, `useSelectTrump`, and `useSubmitPlay`.  
-  *Acceptance (for optimistic updates):* Mutations use optimistic updates where appropriate (e.g., marking ready, submitting bids) with proper rollback on error.
+  - ✅ **Decision made:** Optimistic updates determined to be unnecessary — WebSocket updates provide real-time state synchronization, making optimistic updates redundant. Decision aligns with track 6 architecture review.
+  *Status:* ✅ Complete. All React Query enhancements implemented; optimistic updates decided against.  
+  *Acceptance:* ✅ React Query fully adopted with all planned enhancements; decision on optimistic updates documented.
 - **Import Hygiene:** ✅ **Completed** — Type-only imports are now enforced via ESLint rule `@typescript-eslint/consistent-type-imports`. All type-only imports use `import type` syntax, improving tree-shaking and build performance. Lazy loading removed from scope (not needed per track 6 decision).  
   *Status:* ✅ Complete. ESLint rule added and all violations auto-fixed. All tests pass.  
   *Acceptance:* ✅ Type-only imports are enforced; consistent import syntax across codebase.
-- **Tailwind CSS v3 to v4 Migration:** Migrate from Tailwind CSS v3 to v4, updating configuration, utilities, and any breaking changes.  
-  *Acceptance:* Application successfully runs on Tailwind v4 with all styling preserved; configuration updated; breaking changes addressed.
+- **Tailwind CSS v3 to v4 Migration:** ✅ **Completed** — Migrated from Tailwind CSS v3.4.19 to v4.0.6. Replaced PostCSS plugin with `@tailwindcss/postcss`, removed autoprefixer (now handled automatically), migrated CSS imports to `@import "tailwindcss"` with `@config` directive, and added preflight overrides for button cursor and dialog margins. Theme configuration preserved using CSS-first approach.  
+  *Status:* ✅ Complete. Production build passes; all styling preserved.  
+  *Acceptance:* ✅ Application successfully runs on Tailwind v4 with all styling preserved; configuration updated; breaking changes addressed.
 
 ---
 
