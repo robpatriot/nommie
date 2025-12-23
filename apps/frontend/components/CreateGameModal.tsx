@@ -47,12 +47,12 @@ export default function CreateGameModal({
 
     try {
       await onCreateGame(name.trim())
-      setName('')
-      onClose()
+      // Don't close modal or reset name - navigation will unmount this component
+      // Modal will stay visible with loading state until navigation completes
     } catch (error) {
       const { logError } = await import('@/lib/logging/error-logger')
       logError('Failed to create game', error, { action: 'createGame' })
-    } finally {
+      // On error, keep modal open and reset submitting state so user can try again
       setIsSubmitting(false)
     }
   }
