@@ -1,6 +1,6 @@
 'use client'
 
-import { startTransition, useEffect, useState } from 'react'
+import { startTransition, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type { BackendApiError } from '@/lib/errors'
 
@@ -58,20 +58,37 @@ function ToastItem({
 }) {
   const t = useTranslations('errors.toast')
   const [expanded, setExpanded] = useState(false)
+  const [isExiting, setIsExiting] = useState(false)
+  const exitTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Use startTransition to mark as non-urgent update to avoid cascading renders
     startTransition(() => {
       setExpanded(false)
     })
-    // Auto-dismiss success messages after 3 seconds
-    if (toast.type === 'success') {
-      const timer = setTimeout(() => {
+    // Auto-dismiss all toast types after 3 seconds
+    const timer = setTimeout(() => {
+      setIsExiting(true)
+      exitTimerRef.current = setTimeout(() => {
         onClose()
-      }, 3000)
-      return () => clearTimeout(timer)
+      }, 1000)
+    }, 3000)
+    return () => {
+      clearTimeout(timer)
+      if (exitTimerRef.current) {
+        clearTimeout(exitTimerRef.current)
+        exitTimerRef.current = null
+      }
     }
   }, [toast, onClose])
+
+  const handleClose = () => {
+    if (isExiting) return
+    setIsExiting(true)
+    exitTimerRef.current = setTimeout(() => {
+      onClose()
+    }, 1000)
+  }
 
   const isError = toast.type === 'error'
   const isWarning = toast.type === 'warning'
@@ -79,7 +96,9 @@ function ToastItem({
 
   return (
     <div
-      className={`rounded-lg border p-4 shadow-elevated ${
+      className={`rounded-lg border p-4 shadow-elevated transition-opacity duration-1000 ${
+        isExiting ? 'opacity-0' : 'opacity-100'
+      } ${
         isError
           ? 'border-danger/40 bg-danger/10'
           : isWarning
@@ -94,8 +113,8 @@ function ToastItem({
               isError
                 ? 'text-danger'
                 : isWarning
-                  ? 'text-warning-foreground'
-                  : 'text-success-foreground'
+                  ? '[color:color-mix(in_srgb,var(--color-warning)_75%,var(--color-warning-contrast)_25%)]'
+                  : '[color:color-mix(in_srgb,var(--color-success)_75%,var(--color-success-contrast)_25%)]'
             }`}
           >
             {toast.message}
@@ -141,13 +160,13 @@ function ToastItem({
           )}
         </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className={`ml-4 text-sm font-semibold transition-colors ${
             isError
               ? 'text-danger hover:text-danger/80'
               : isWarning
-                ? 'text-warning-foreground hover:text-warning-foreground/80'
-                : 'text-success-foreground hover:text-success-foreground/80'
+                ? '[color:color-mix(in_srgb,var(--color-warning)_75%,var(--color-warning-contrast)_25%)] hover:[color:color-mix(in_srgb,var(--color-warning)_60%,var(--color-warning-contrast)_40%)]'
+                : '[color:color-mix(in_srgb,var(--color-success)_75%,var(--color-success-contrast)_25%)] hover:[color:color-mix(in_srgb,var(--color-success)_60%,var(--color-success-contrast)_40%)]'
           }`}
           aria-label={t('closeAria')}
         >
