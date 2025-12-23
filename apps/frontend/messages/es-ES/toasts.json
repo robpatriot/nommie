@@ -7,6 +7,7 @@
     "aiSeatRemoved": "Asiento de IA eliminado",
     "aiSeatUpdated": "Asiento de IA actualizado",
     "errors": {
+      "lockVersionRequired": "Se requiere la versión de bloqueo",
       "lockVersionRequiredBid": "Se requiere la versión de bloqueo para enviar una puja",
       "lockVersionRequiredTrump": "Se requiere la versión de bloqueo para seleccionar el triunfo",
       "lockVersionRequiredCard": "Se requiere la versión de bloqueo para jugar una carta",

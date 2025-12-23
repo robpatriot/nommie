@@ -7,6 +7,7 @@
     "aiSeatRemoved": "AI seat removed",
     "aiSeatUpdated": "AI seat updated",
     "errors": {
+      "lockVersionRequired": "Lock version is required",
       "lockVersionRequiredBid": "Lock version is required to submit bid",
       "lockVersionRequiredTrump": "Lock version is required to select trump",
       "lockVersionRequiredCard": "Lock version is required to play card",

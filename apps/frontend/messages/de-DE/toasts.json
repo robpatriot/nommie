@@ -7,6 +7,7 @@
     "aiSeatRemoved": "KI-Sitzplatz entfernt",
     "aiSeatUpdated": "KI-Sitzplatz aktualisiert",
     "errors": {
+      "lockVersionRequired": "Sperrversion ist erforderlich",
       "lockVersionRequiredBid": "Sperrversion ist erforderlich, um ein Gebot abzugeben",
       "lockVersionRequiredTrump": "Sperrversion ist erforderlich, um den Trumpf zu wählen",
       "lockVersionRequiredCard": "Sperrversion ist erforderlich, um eine Karte zu spielen",

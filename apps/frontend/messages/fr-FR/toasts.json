@@ -7,6 +7,7 @@
     "aiSeatRemoved": "Siège IA supprimé",
     "aiSeatUpdated": "Siège IA mis à jour",
     "errors": {
+      "lockVersionRequired": "La version de verrouillage est requise",
       "lockVersionRequiredBid": "La version de verrouillage est requise pour soumettre une enchère",
       "lockVersionRequiredTrump": "La version de verrouillage est requise pour sélectionner l'atout",
       "lockVersionRequiredCard": "La version de verrouillage est requise pour jouer une carte",

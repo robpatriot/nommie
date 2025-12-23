@@ -7,6 +7,7 @@
     "aiSeatRemoved": "Posto IA rimosso",
     "aiSeatUpdated": "Posto IA aggiornato",
     "errors": {
+      "lockVersionRequired": "La versione di blocco è richiesta",
       "lockVersionRequiredBid": "La versione di blocco è richiesta per inviare una puntata",
       "lockVersionRequiredTrump": "La versione di blocco è richiesta per selezionare la briscola",
       "lockVersionRequiredCard": "La versione di blocco è richiesta per giocare una carta",
