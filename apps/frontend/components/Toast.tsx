@@ -19,26 +19,9 @@ interface ToastProps {
 export default function Toast({ toasts, onClose }: ToastProps) {
   if (toasts.length === 0) return null
 
-  // Sort toasts so warnings always appear at the top (to prevent UI shifting when
-  // warnings flash on/off), followed by errors, then success messages.
-  // This ensures errors stay in a stable position even when warnings toggle.
-  // Note: flex-col-reverse means the last item in the array appears at the top visually,
-  // so we sort warnings LAST in the array to make them appear at the TOP visually.
-  const sortedToasts = [...toasts].sort((a, b) => {
-    // Warnings last (highest priority) - will appear at top due to flex-col-reverse
-    if (a.type === 'warning' && b.type !== 'warning') return 1
-    if (a.type !== 'warning' && b.type === 'warning') return -1
-    // Errors second (will appear in middle)
-    if (a.type === 'error' && b.type !== 'error') return 1
-    if (a.type !== 'error' && b.type === 'error') return -1
-    // Success messages first (will appear at bottom)
-    // If same type, maintain original order
-    return 0
-  })
-
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex max-w-md flex-col-reverse gap-2">
-      {sortedToasts.map((toast) => (
+    <div className="fixed bottom-4 right-4 z-[100] flex max-w-md flex-col gap-2">
+      {toasts.map((toast) => (
         <ToastItem
           key={toast.id}
           toast={toast}
