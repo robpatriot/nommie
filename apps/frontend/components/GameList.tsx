@@ -119,7 +119,7 @@ export default function GameList({
             return (
               <article
                 key={game.id}
-                className="group rounded-2xl border border-border/60 bg-surface px-4 py-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)] transition hover:-translate-y-0.5 hover:border-primary/40"
+                className="group card-hover-shadow rounded-2xl border border-border/60 bg-surface px-4 py-5 transition-transform duration-200 hover:-translate-y-1 hover:border-primary/40"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
