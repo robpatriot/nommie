@@ -69,7 +69,7 @@ export default function CreateGameModal({
         onClick={handleCancel}
         aria-hidden
       />
-      <div className="relative z-10 w-full max-w-lg rounded-[32px] border border-white/20 bg-surface/90 p-6 shadow-[0_30px_120px_rgba(0,0,0,0.4)]">
+      <div className="relative z-10 w-full max-w-lg rounded-[32px] border border-white/20 bg-surface/90 p-6 shadow-elevated">
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">

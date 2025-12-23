@@ -241,13 +241,36 @@
 
   .shadow-elevated {
     --shadow-color: #082016;
-    box-shadow: 0 24px 70px -32px
-      color-mix(in srgb, var(--shadow-color) 35%, transparent);
+    box-shadow: 0 22px 55px -26px
+      color-mix(in srgb, var(--shadow-color) 42%, transparent);
   }
 
   [data-theme='dark'] .shadow-elevated {
     --shadow-color: #000000;
-    box-shadow: 0 24px 70px -32px
-      color-mix(in srgb, var(--shadow-color) 45%, transparent);
+    box-shadow: 0 22px 55px -26px
+      color-mix(in srgb, var(--shadow-color) 52%, transparent);
+  }
+
+  .card-hover-shadow {
+    position: relative;
+  }
+
+  .card-hover-shadow::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity 0.2s ease-out,
+      transform 0.2s ease-out;
+    transform: translate3d(0, 4px, 0);
+  }
+
+  .card-hover-shadow:hover::before {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
   }
 }

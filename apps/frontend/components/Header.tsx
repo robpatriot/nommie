@@ -64,7 +64,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
   }, [isUserMenuOpen])
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-surface-strong/70 px-3 py-3 shadow-[0_20px_60px_rgba(0,0,0,0.25)] backdrop-blur-lg">
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-surface-strong/70 px-3 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-lg">
       <div className="mx-auto flex w-full max-w-6xl flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link

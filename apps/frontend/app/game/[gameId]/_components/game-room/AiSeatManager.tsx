@@ -38,7 +38,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
       : t('waitingSeatLabel.openSeats', { count: waitingSeatCount })
 
   return (
-    <div className="rounded-xl border border-border/60 bg-surface/70 p-4 text-sm">
+    <div className="rounded-xl border border-border/60 bg-surface/70 p-4 text-sm shadow-elevated">
       <header className="mb-4 space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
