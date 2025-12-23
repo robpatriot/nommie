@@ -46,7 +46,7 @@ export function ReadyPanel({
 
   return (
     <div
-      className={`rounded-2xl border border-success/40 bg-success/15 text-success-contrast shadow-inner shadow-success/20 ${
+      className={`rounded-2xl border border-border/60 bg-surface/70 ${
         isCompact
           ? 'flex flex-col gap-3 p-4 text-xs sm:flex-row sm:items-center sm:justify-between'
           : 'p-4 text-sm'
@@ -54,16 +54,14 @@ export function ReadyPanel({
     >
       <div>
         <h3
-          className={`font-semibold uppercase tracking-[0.4em] text-success-contrast ${
-            isCompact ? 'text-[11px]' : 'mb-2 text-sm'
+          className={`mb-1 font-semibold text-foreground ${
+            isCompact ? 'text-xs' : 'mb-2 text-sm'
           }`}
         >
           {t('ready.title')}
         </h3>
         <p
-          className={`text-success-contrast/80 ${
-            isCompact ? 'text-[11px]' : 'mb-3 text-xs'
-          }`}
+          className={`text-muted ${isCompact ? 'text-[11px]' : 'mb-3 text-xs'}`}
         >
           {t('ready.description')}
         </p>
@@ -73,7 +71,7 @@ export function ReadyPanel({
         onClick={() => {
           readyState.onReady()
         }}
-        className={`rounded-2xl bg-success text-sm font-semibold text-success-foreground shadow-lg shadow-success/30 transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70 ${
+        className={`rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/80 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70 ${
           isCompact ? 'w-full px-4 py-2 sm:w-auto' : 'w-full px-3 py-2'
         }`}
         disabled={readyState.isPending || readyState.hasMarked}
