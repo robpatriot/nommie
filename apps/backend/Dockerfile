@@ -40,6 +40,9 @@ COPY . .
 # Build the actual backend binary
 RUN cargo build --locked --release --manifest-path apps/backend/Cargo.toml
 
+# Build migration-cli binary
+RUN cargo build --locked --release --manifest-path apps/migration-cli/Cargo.toml
+
 FROM rust:1.91.1-slim AS runtime
 
 RUN apt-get update \
@@ -65,6 +68,7 @@ ARG PORT=3001
 EXPOSE ${PORT}
 
 COPY --from=builder /app/target/release/backend /usr/local/bin/backend
+COPY --from=builder /app/target/release/migration /usr/local/bin/migration-cli
 
 CMD ["backend"]
 
