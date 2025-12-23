@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import type { Seat } from '@/lib/game-room/types'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
@@ -8,6 +9,7 @@ import {
   useUpdateAiSeat,
   useRemoveAiSeat,
 } from '@/hooks/mutations/useGameRoomMutations'
+import { queryKeys } from '@/lib/queries/query-keys'
 import type { ToastMessage } from '@/components/Toast'
 import type { BackendApiError } from '@/lib/errors'
 import { toQueryError } from '@/lib/queries/query-error-handler'
@@ -41,6 +43,7 @@ export function useAiSeatManagement({
   canViewAiManager,
   showToast,
 }: UseAiSeatManagementProps) {
+  const queryClient = useQueryClient()
   const t = useTranslations('toasts.gameRoom')
   const tErrors = useTranslations('toasts.gameRoom.errors')
 
@@ -80,6 +83,17 @@ export function useAiSeatManagement({
         return
       }
 
+      // Read lock_version directly from cache at request time to avoid stale closures
+      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
+        queryKeys.games.snapshot(gameId)
+      )
+      const currentLockVersion = cachedSnapshot?.lockVersion
+
+      if (currentLockVersion === undefined) {
+        showToast(tErrors('lockVersionRequired'), 'error')
+        return
+      }
+
       const registryName =
         selection?.registryName ??
         aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
@@ -94,7 +108,7 @@ export function useAiSeatManagement({
           registryName,
           registryVersion,
           seed: selection?.seed,
-          lockVersion: snapshot.lockVersion,
+          lockVersion: currentLockVersion,
         })
         showToast(t('aiSeatAdded'), 'success')
       } catch (err) {
@@ -109,7 +123,7 @@ export function useAiSeatManagement({
       isAiPending,
       addAiSeatMutation,
       showToast,
-      snapshot.lockVersion,
+      queryClient,
       t,
       tErrors,
     ]
@@ -121,11 +135,22 @@ export function useAiSeatManagement({
         return
       }
 
+      // Read lock_version directly from cache at request time to avoid stale closures
+      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
+        queryKeys.games.snapshot(gameId)
+      )
+      const currentLockVersion = cachedSnapshot?.lockVersion
+
+      if (currentLockVersion === undefined) {
+        showToast(tErrors('lockVersionRequired'), 'error')
+        return
+      }
+
       try {
         await removeAiSeatMutation.mutateAsync({
           gameId,
           seat,
-          lockVersion: snapshot.lockVersion,
+          lockVersion: currentLockVersion,
         })
         showToast(t('aiSeatRemoved'), 'success')
       } catch (err) {
@@ -139,7 +164,7 @@ export function useAiSeatManagement({
       isAiPending,
       removeAiSeatMutation,
       showToast,
-      snapshot.lockVersion,
+      queryClient,
       t,
       tErrors,
     ]
@@ -151,6 +176,17 @@ export function useAiSeatManagement({
         return
       }
 
+      // Read lock_version directly from cache at request time to avoid stale closures
+      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
+        queryKeys.games.snapshot(gameId)
+      )
+      const currentLockVersion = cachedSnapshot?.lockVersion
+
+      if (currentLockVersion === undefined) {
+        showToast(tErrors('lockVersionRequired'), 'error')
+        return
+      }
+
       try {
         await updateAiSeatMutation.mutateAsync({
           gameId,
@@ -158,7 +194,7 @@ export function useAiSeatManagement({
           registryName: selection.registryName,
           registryVersion: selection.registryVersion,
           seed: selection.seed,
-          lockVersion: snapshot.lockVersion,
+          lockVersion: currentLockVersion,
         })
         showToast(t('aiSeatUpdated'), 'success')
       } catch (err) {
@@ -172,7 +208,7 @@ export function useAiSeatManagement({
       isAiPending,
       updateAiSeatMutation,
       showToast,
-      snapshot.lockVersion,
+      queryClient,
       t,
       tErrors,
     ]

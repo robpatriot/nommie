@@ -96,7 +96,6 @@ export function GameRoomClient({
     isPlayPending,
   } = useGameRoomActions({
     gameId,
-    snapshot,
     canMarkReady,
     hasMarkedReady,
     setHasMarkedReady,

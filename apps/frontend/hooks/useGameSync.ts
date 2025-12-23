@@ -74,7 +74,6 @@ export function useGameSync({
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY_MS)
   const shouldReconnectRef = useRef(true)
   const etagRef = useRef<string | undefined>(initialData.etag)
-  const lockVersionRef = useRef<number | undefined>(initialData.lockVersion)
   // Use refs for message handlers to avoid recreating connect callback unnecessarily
   const handleMessageEventRef = useRef<
     ((event: MessageEvent<string>) => void) | undefined
@@ -91,7 +90,6 @@ export function useGameSync({
   const applySnapshot = useCallback(
     (payload: GameRoomSnapshotPayload) => {
       etagRef.current = payload.etag ?? buildEtag(payload.lockVersion)
-      lockVersionRef.current = payload.lockVersion ?? lockVersionRef.current
       setSyncError(null)
       // Update query cache - this is the single source of truth
       // Components using useGameRoomSnapshot will automatically re-render

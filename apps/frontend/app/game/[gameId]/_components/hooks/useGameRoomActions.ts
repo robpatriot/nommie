@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import type { Trump } from '@/lib/game-room/types'
@@ -9,12 +10,12 @@ import {
   useSelectTrump,
   useSubmitPlay,
 } from '@/hooks/mutations/useGameRoomMutations'
+import { queryKeys } from '@/lib/queries/query-keys'
 import { toQueryError } from '@/lib/queries/query-error-handler'
 import type { BackendApiError } from '@/lib/errors'
 
 interface UseGameRoomActionsProps {
   gameId: number
-  snapshot: GameRoomSnapshotPayload
   canMarkReady: boolean
   hasMarkedReady: boolean
   setHasMarkedReady: (value: boolean) => void
@@ -31,12 +32,12 @@ interface UseGameRoomActionsProps {
  */
 export function useGameRoomActions({
   gameId,
-  snapshot,
   canMarkReady,
   hasMarkedReady,
   setHasMarkedReady,
   showToast,
 }: UseGameRoomActionsProps) {
+  const queryClient = useQueryClient()
   const t = useTranslations('toasts')
   const tErrors = useTranslations('toasts.gameRoom.errors')
 
@@ -81,7 +82,13 @@ export function useGameRoomActions({
         return
       }
 
-      if (snapshot.lockVersion === undefined) {
+      // Read lock_version directly from cache at request time to avoid stale closures
+      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
+        queryKeys.games.snapshot(gameId)
+      )
+      const currentLockVersion = cachedSnapshot?.lockVersion
+
+      if (currentLockVersion === undefined) {
         showToast(tErrors('lockVersionRequiredBid'), 'error')
         return
       }
@@ -90,7 +97,7 @@ export function useGameRoomActions({
         await submitBidMutation.mutateAsync({
           gameId,
           bid,
-          lockVersion: snapshot.lockVersion!,
+          lockVersion: currentLockVersion,
         })
         showToast(t('gameRoom.bidSubmitted'), 'success')
       } catch (err) {
@@ -101,7 +108,7 @@ export function useGameRoomActions({
     [
       gameId,
       isBidPending,
-      snapshot.lockVersion,
+      queryClient,
       submitBidMutation,
       showToast,
       t,
@@ -115,7 +122,13 @@ export function useGameRoomActions({
         return
       }
 
-      if (snapshot.lockVersion === undefined) {
+      // Read lock_version directly from cache at request time to avoid stale closures
+      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
+        queryKeys.games.snapshot(gameId)
+      )
+      const currentLockVersion = cachedSnapshot?.lockVersion
+
+      if (currentLockVersion === undefined) {
         showToast(tErrors('lockVersionRequiredTrump'), 'error')
         return
       }
@@ -124,7 +137,7 @@ export function useGameRoomActions({
         await selectTrumpMutation.mutateAsync({
           gameId,
           trump,
-          lockVersion: snapshot.lockVersion!,
+          lockVersion: currentLockVersion,
         })
         showToast(t('gameRoom.trumpSelected'), 'success')
       } catch (err) {
@@ -135,7 +148,7 @@ export function useGameRoomActions({
     [
       gameId,
       isTrumpPending,
-      snapshot.lockVersion,
+      queryClient,
       selectTrumpMutation,
       showToast,
       t,
@@ -149,7 +162,13 @@ export function useGameRoomActions({
         return
       }
 
-      if (snapshot.lockVersion === undefined) {
+      // Read lock_version directly from cache at request time to avoid stale closures
+      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
+        queryKeys.games.snapshot(gameId)
+      )
+      const currentLockVersion = cachedSnapshot?.lockVersion
+
+      if (currentLockVersion === undefined) {
         showToast(tErrors('lockVersionRequiredCard'), 'error')
         return
       }
@@ -158,7 +177,7 @@ export function useGameRoomActions({
         await submitPlayMutation.mutateAsync({
           gameId,
           card,
-          lockVersion: snapshot.lockVersion!,
+          lockVersion: currentLockVersion,
         })
         showToast(t('gameRoom.cardPlayed'), 'success')
       } catch (err) {
@@ -169,7 +188,7 @@ export function useGameRoomActions({
     [
       gameId,
       isPlayPending,
-      snapshot.lockVersion,
+      queryClient,
       submitPlayMutation,
       showToast,
       t,
