@@ -45,7 +45,7 @@ export function PlayPanel({
   }
 
   return (
-    <section className="flex w-full flex-col gap-4 rounded-3xl border border-primary/40 bg-primary/15 p-5 text-foreground shadow-[0_30px_90px_rgba(239,149,74,0.25)]">
+    <section className="flex w-full flex-col gap-4 rounded-3xl border border-primary/40 bg-primary/15 p-5 text-foreground shadow-elevated">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">

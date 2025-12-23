@@ -17,7 +17,7 @@ interface SetupSeatListProps {
 export function SetupSeatList({ seats }: SetupSeatListProps) {
   const t = useTranslations('game.gameRoom')
   return (
-    <div className="rounded-3xl border border-white/10 bg-surface/80 p-5 shadow-[0_35px_100px_rgba(0,0,0,0.35)] backdrop-blur">
+    <div className="rounded-3xl border border-white/10 bg-surface/80 p-5 shadow-elevated backdrop-blur">
       <header className="mb-4 flex flex-col gap-1">
         <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
           {t('setupSeats.kicker')}

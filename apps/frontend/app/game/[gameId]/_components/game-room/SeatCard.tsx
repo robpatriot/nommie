@@ -42,7 +42,7 @@ export function SeatCard({
   return (
     <div
       className={cn(
-        'flex w-fit flex-col gap-1.5 rounded-xl border border-white/10 bg-surface/80 px-3 py-2 text-sm text-muted shadow-[0_18px_65px_rgba(0,0,0,0.35)] backdrop-blur transition',
+        'flex w-fit flex-col gap-1.5 rounded-xl border border-white/10 bg-surface/80 px-3 py-2 text-sm text-muted shadow-elevated backdrop-blur transition',
         baseClasses,
         isActive
           ? 'ring-2 ring-success/80 ring-offset-1 ring-offset-surface'

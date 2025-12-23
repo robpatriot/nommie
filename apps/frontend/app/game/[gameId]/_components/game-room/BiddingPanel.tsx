@@ -187,7 +187,7 @@ export function BiddingPanel({
   }
 
   return (
-    <section className="flex w-full flex-col gap-4 rounded-3xl border border-success/50 bg-success/10 p-5 text-success-contrast shadow-[0_30px_90px_rgba(56,189,116,0.25)]">
+    <section className="flex w-full flex-col gap-4 rounded-3xl border border-success/50 bg-success/10 p-5 text-success-contrast shadow-elevated">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">

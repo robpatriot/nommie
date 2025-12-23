@@ -365,7 +365,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                     description={t('setup.stats.readyPlayers.description')}
                   />
                 </div>
-                <div className="rounded-3xl border border-white/10 bg-surface/70 p-4 shadow-elevated">
+                <div className="rounded-2xl border border-border/60 bg-surface/70 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
                     <span>{t('setup.quickActions.title')}</span>
                     <span className="text-[10px] font-normal tracking-[0.2em] text-muted">

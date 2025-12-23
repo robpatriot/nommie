@@ -105,7 +105,7 @@ export function TrumpSelectPanel({
   const hasNoTrump = allowedTrumps.includes('NO_TRUMPS')
 
   return (
-    <section className="flex w-full flex-col gap-4 rounded-3xl border border-accent/50 bg-accent/15 p-5 text-accent-contrast shadow-[0_30px_90px_rgba(94,234,212,0.25)]">
+    <section className="flex w-full flex-col gap-4 rounded-3xl border border-accent/50 bg-accent/15 p-5 text-accent-contrast shadow-elevated">
       <header>
         <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
           {t('title')}

@@ -969,7 +969,7 @@ export function PlayerHand({
   return (
     <section
       className={cn(
-        'flex w-full flex-col gap-3 rounded-[28px] border border-white/15 bg-surface/80 p-4 text-foreground shadow-[0_35px_80px_rgba(0,0,0,0.4)] backdrop-blur',
+        'flex w-full flex-col gap-3 rounded-[28px] border border-white/15 bg-surface/80 p-4 text-foreground shadow-elevated backdrop-blur',
         className
       )}
     >

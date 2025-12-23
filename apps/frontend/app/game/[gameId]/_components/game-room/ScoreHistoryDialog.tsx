@@ -60,7 +60,7 @@ export function ScoreHistoryDialog({
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative z-10 w-full max-w-5xl rounded-[36px] border border-white/15 bg-surface/95 p-6 text-foreground shadow-[0_40px_160px_rgba(0,0,0,0.55)]">
+      <div className="relative z-10 w-full max-w-5xl rounded-[36px] border border-white/15 bg-surface/95 p-6 text-foreground shadow-elevated">
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">

@@ -66,7 +66,7 @@ export function ScoreSidebar({
   return (
     <aside
       className={cn(
-        'flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-[0_25px_80px_rgba(0,0,0,0.35)] backdrop-blur',
+        'flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/85 p-5 shadow-elevated backdrop-blur',
         className
       )}
     >
