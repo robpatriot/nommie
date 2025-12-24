@@ -10,6 +10,7 @@ import { HeaderBreadcrumbProvider } from '@/components/header-breadcrumbs'
 import { getLastActiveGame } from '@/lib/api'
 import { auth } from '@/auth'
 import type { Session } from 'next-auth'
+import { getBackendJwtFromCookie } from '@/lib/auth/backend-jwt-cookie'
 import { NextIntlClientProvider } from 'next-intl'
 
 import {
@@ -57,13 +58,18 @@ export default async function RootLayout({
   const session: Session | null = await auth()
 
   // Try to get last active game (will refresh JWT if needed)
+  // Only make the API call if we have a backend JWT - if login failed (e.g., EMAIL_NOT_ALLOWED),
+  // there won't be a backend JWT and we should skip this call to avoid unnecessary API requests
   let lastActiveGameId: number | null = null
   if (session) {
-    try {
-      lastActiveGameId = await getLastActiveGame()
-    } catch {
-      // Silently handle errors - the endpoint might not exist or JWT might be missing
-      // The header will just not show the resume button
+    const backendJwt = await getBackendJwtFromCookie()
+    if (backendJwt) {
+      try {
+        lastActiveGameId = await getLastActiveGame()
+      } catch {
+        // Silently handle errors - the endpoint might not exist or JWT might be missing
+        // The header will just not show the resume button
+      }
     }
   }
 

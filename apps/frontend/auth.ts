@@ -46,6 +46,52 @@ const nextAuthResult = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ account, profile }) {
+      // Check allowlist BEFORE creating session to prevent unnecessary
+      // API calls and session creation for non-allowed emails
+      if (account?.provider === 'google' && profile?.email) {
+        const backendBase = getBackendBaseUrlOrThrow()
+
+        try {
+          const checkResponse = await fetch(
+            `${backendBase}/api/auth/check-allowlist`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: profile.email }),
+            }
+          )
+
+          if (!checkResponse.ok) {
+            // Email not allowed - redirect to home with accessDenied parameter
+            // This prevents NextAuth from treating it as an error
+            if (checkResponse.status === 403) {
+              return '/?accessDenied=true'
+            }
+            // Other errors: log and redirect
+            const { logError } = await import('@/lib/logging/error-logger')
+            logError(
+              'Failed to check allowlist',
+              new Error(`HTTP ${checkResponse.status}`),
+              {
+                action: 'checkAllowlist',
+              }
+            )
+            return '/?accessDenied=true'
+          }
+        } catch (error) {
+          // Network or other errors: log and redirect
+          const { logError } = await import('@/lib/logging/error-logger')
+          logError('Failed to check allowlist', error, {
+            action: 'checkAllowlist',
+          })
+          return '/?accessDenied=true'
+        }
+      }
+
+      // Allow sign-in to proceed
+      return true
+    },
     async jwt({ token, account, profile, trigger }) {
       // Store user info in token for refreshing backend JWT
       if (account?.provider === 'google' && profile) {
@@ -59,7 +105,7 @@ const nextAuthResult = NextAuth({
         token.googleSub = profile.sub
         token.name = profile.name || token.name
 
-        // Store backend JWT in cookie and token on initial login
+        // Email is allowed (signIn callback already checked), proceed with backend login
         const backendBase = getBackendBaseUrlOrThrow()
 
         try {
@@ -89,7 +135,7 @@ const nextAuthResult = NextAuth({
           logError('Failed to get backend JWT on initial login', error, {
             action: 'initialLogin',
           })
-          // Don't fail the login if backend JWT fetch fails
+          // Don't fail the login if backend JWT fetch fails (allowlist already passed)
         }
       }
 
