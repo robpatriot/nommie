@@ -892,23 +892,31 @@ async fn get_last_active_game(
     Ok(web::Json(LastActiveGameResponse { game_id }))
 }
 
+#[derive(serde::Deserialize)]
+struct MarkReadyRequest {
+    is_ready: bool,
+}
+
 /// POST /api/games/{game_id}/ready
 ///
-/// Marks the current player as ready. When all four seats are ready, the game
+/// Sets the ready status of the current player. When all four seats are ready, the game
 /// automatically transitions into the first round.
 async fn mark_ready(
     http_req: HttpRequest,
     game_id: GameId,
     current_user: CurrentUser,
+    body: ValidatedJson<MarkReadyRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
     let user_id = current_user.id;
+    let is_ready = body.is_ready;
 
     let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
-            service.mark_ready(txn, id, user_id).await?;
+            service.set_ready_status(txn, id, user_id, is_ready).await?;
+
             let game = games_repo::require_game(txn, id).await?;
             Ok(game.lock_version)
         })

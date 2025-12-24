@@ -97,11 +97,15 @@
       "button": {
         "label": "Estoy listo",
         "marking": "Marcando…",
+        "markNotReady": "Marcar como no listo",
+        "unmarking": "Desmarcando…",
         "readyWaiting": "Listo — esperando a los demás",
         "aria": {
           "marking": "Marcando como listo",
+          "unmarking": "Desmarcando como listo",
           "readyWaiting": "Listo, esperando a otros jugadores",
-          "markReady": "Marcarte como listo"
+          "markReady": "Marcarte como listo",
+          "markNotReady": "Marcarte como no listo"
         }
       }
     },

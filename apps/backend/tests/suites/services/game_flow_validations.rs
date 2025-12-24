@@ -421,7 +421,9 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     let service = GameFlowService;
 
     for user_id in &setup.user_ids {
-        service.mark_ready(txn, game_id, *user_id).await?;
+        service
+            .set_ready_status(txn, game_id, *user_id, true)
+            .await?;
     }
 
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;

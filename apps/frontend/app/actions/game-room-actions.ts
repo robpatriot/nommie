@@ -98,10 +98,11 @@ export async function getGameRoomSnapshotAction(
 }
 
 export async function markPlayerReadyAction(
-  gameId: number
+  gameId: number,
+  isReady: boolean
 ): Promise<SimpleActionResult> {
   try {
-    await markPlayerReady(gameId)
+    await markPlayerReady(gameId, isReady)
     return { kind: 'ok' }
   } catch (error) {
     const t = await getTranslations('errors.actions')

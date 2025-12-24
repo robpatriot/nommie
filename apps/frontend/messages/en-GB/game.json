@@ -97,11 +97,15 @@
       "button": {
         "label": "I'm ready",
         "marking": "Marking…",
+        "markNotReady": "Mark not ready",
+        "unmarking": "Unmarking…",
         "readyWaiting": "Ready — waiting for others",
         "aria": {
           "marking": "Marking as ready",
+          "unmarking": "Unmarking as ready",
           "readyWaiting": "Ready, waiting for other players",
-          "markReady": "Mark yourself as ready"
+          "markReady": "Mark yourself as ready",
+          "markNotReady": "Mark yourself as not ready"
         }
       }
     },

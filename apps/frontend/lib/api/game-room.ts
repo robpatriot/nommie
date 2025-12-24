@@ -99,9 +99,16 @@ export async function fetchGameSnapshot(
   }
 }
 
-export async function markPlayerReady(gameId: number): Promise<void> {
+export async function markPlayerReady(
+  gameId: number,
+  isReady: boolean
+): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ready`, {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ is_ready: isReady }),
   })
 }
 

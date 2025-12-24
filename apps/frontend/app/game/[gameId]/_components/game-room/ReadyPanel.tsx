@@ -71,22 +71,28 @@ export function ReadyPanel({
         onClick={() => {
           readyState.onReady()
         }}
-        className={`rounded-2xl bg-primary text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/80 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70 ${
-          isCompact ? 'w-full px-4 py-2 sm:w-auto' : 'w-full px-3 py-2'
-        }`}
-        disabled={readyState.isPending || readyState.hasMarked}
+        className={`rounded-2xl text-sm font-semibold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
+          readyState.hasMarked
+            ? 'bg-muted text-muted-foreground shadow-muted/30 hover:bg-muted/80'
+            : 'bg-primary text-primary-foreground shadow-primary/30 hover:bg-primary/80'
+        } ${isCompact ? 'w-full px-4 py-2 sm:w-auto' : 'w-full px-3 py-2'}`}
+        disabled={readyState.isPending}
         aria-label={
           readyState.isPending
-            ? t('ready.button.aria.marking')
+            ? readyState.hasMarked
+              ? t('ready.button.aria.unmarking')
+              : t('ready.button.aria.marking')
             : readyState.hasMarked
-              ? t('ready.button.aria.readyWaiting')
+              ? t('ready.button.aria.markNotReady')
               : t('ready.button.aria.markReady')
         }
       >
         {readyState.isPending
-          ? t('ready.button.marking')
+          ? readyState.hasMarked
+            ? t('ready.button.unmarking')
+            : t('ready.button.marking')
           : readyState.hasMarked
-            ? t('ready.button.readyWaiting')
+            ? t('ready.button.markNotReady')
             : t('ready.button.label')}
       </button>
     </div>

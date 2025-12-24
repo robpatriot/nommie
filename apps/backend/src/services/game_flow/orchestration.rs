@@ -76,16 +76,27 @@ impl GameFlowService {
         Ok(())
     }
 
-    /// Mark a player as ready and check if game should start.
+    /// Set the ready status of a player and check if game should start.
     ///
-    /// If all players are ready after this call, automatically deals the first round.
-    pub async fn mark_ready(
+    /// If all players are ready after setting ready to true, automatically deals the first round.
+    /// Ready status can only be changed when the game is in Lobby state.
+    pub async fn set_ready_status(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         user_id: i64,
+        is_ready: bool,
     ) -> Result<(), AppError> {
-        info!(game_id, user_id, "Marking player ready");
+        // Validate game is in Lobby state
+        let game = games::require_game(txn, game_id).await?;
+
+        if game.state != DbGameState::Lobby {
+            return Err(DomainError::validation(
+                ValidationKind::PhaseMismatch,
+                "Ready status can only be changed in Lobby state",
+            )
+            .into());
+        }
 
         // Find membership
         let membership = memberships::find_membership(txn, game_id, user_id)
@@ -97,13 +108,16 @@ impl GameFlowService {
                 )
             })?;
 
-        // Mark ready (automatically updates game updated_at)
-        memberships::set_membership_ready(txn, membership.id, true).await?;
+        // Set ready status
+        memberships::set_membership_ready(txn, membership.id, is_ready).await?;
 
-        info!(game_id, user_id, "Player marked ready");
+        // Touch game to increment lock_version so WebSocket clients receive the update
+        games::touch_game(txn, game_id, game.lock_version).await?;
 
-        // Check if all players are ready and start game if so
-        self.check_and_start_game_if_ready(txn, game_id).await?;
+        if is_ready {
+            // Check if all players are ready and start game if so
+            self.check_and_start_game_if_ready(txn, game_id).await?;
+        }
 
         Ok(())
     }

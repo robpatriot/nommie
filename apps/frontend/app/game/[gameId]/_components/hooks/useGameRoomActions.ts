@@ -54,13 +54,18 @@ export function useGameRoomActions({
   const isPlayPending = submitPlayMutation.isPending
 
   const markReady = useCallback(async () => {
-    if (!canMarkReady || isReadyPending || hasMarkedReady) {
+    if (!canMarkReady || isReadyPending) {
       return
     }
 
+    const newReadyState = !hasMarkedReady
+
     try {
-      await markPlayerReadyMutation.mutateAsync(gameId)
-      setHasMarkedReady(true)
+      await markPlayerReadyMutation.mutateAsync({
+        gameId,
+        isReady: newReadyState,
+      })
+      setHasMarkedReady(newReadyState)
     } catch (err) {
       const backendError = toQueryError(err, tErrors('unableToMarkReady'))
       showToast(backendError.message, 'error', backendError)

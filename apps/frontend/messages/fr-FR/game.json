@@ -97,11 +97,15 @@
       "button": {
         "label": "Je suis prêt",
         "marking": "En cours…",
+        "markNotReady": "Marquer comme non prêt",
+        "unmarking": "Démarquage…",
         "readyWaiting": "Prêt — en attente des autres",
         "aria": {
           "marking": "Marquage en prêt",
+          "unmarking": "Démarquage comme non prêt",
           "readyWaiting": "Prêt, en attente des autres joueurs",
-          "markReady": "Se marquer comme prêt"
+          "markReady": "Se marquer comme prêt",
+          "markNotReady": "Se marquer comme non prêt"
         }
       }
     },

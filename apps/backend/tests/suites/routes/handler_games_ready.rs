@@ -4,10 +4,10 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState};
-use backend::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
 use backend::state::security_config::SecurityConfig;
+use backend::AppError;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::support::app_builder::create_test_app;
@@ -47,6 +47,7 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ready"))
         .insert_header(("Authorization", format!("Bearer {token}")))
+        .set_json(serde_json::json!({ "is_ready": true }))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -106,6 +107,7 @@ async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ready"))
         .insert_header(("Authorization", format!("Bearer {token}")))
+        .set_json(serde_json::json!({ "is_ready": true }))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 

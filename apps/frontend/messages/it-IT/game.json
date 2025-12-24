@@ -97,11 +97,15 @@
       "button": {
         "label": "Sono pronto",
         "marking": "Impostazione…",
+        "markNotReady": "Segna come non pronto",
+        "unmarking": "Rimozione…",
         "readyWaiting": "Pronto — in attesa degli altri",
         "aria": {
           "marking": "Impostazione come pronto",
+          "unmarking": "Rimozione come pronto",
           "readyWaiting": "Pronto, in attesa degli altri giocatori",
-          "markReady": "Segnarti come pronto"
+          "markReady": "Segnarti come pronto",
+          "markNotReady": "Segnarti come non pronto"
         }
       }
     },

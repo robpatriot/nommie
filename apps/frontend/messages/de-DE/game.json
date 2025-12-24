@@ -97,11 +97,15 @@
       "button": {
         "label": "Ich bin bereit",
         "marking": "Wird markiert…",
+        "markNotReady": "Als nicht bereit markieren",
+        "unmarking": "Wird entfernt…",
         "readyWaiting": "Bereit — warte auf andere",
         "aria": {
           "marking": "Wird als bereit markiert",
+          "unmarking": "Wird als nicht bereit markiert",
           "readyWaiting": "Bereit, warte auf andere Spieler",
-          "markReady": "Dich als bereit markieren"
+          "markReady": "Dich als bereit markieren",
+          "markNotReady": "Dich als nicht bereit markieren"
         }
       }
     },

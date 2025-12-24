@@ -18,20 +18,26 @@ import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
 
 /**
- * Mutation hook to mark player as ready.
+ * Mutation hook to set player ready status.
  * Invalidates game snapshot cache on success.
  */
 export function useMarkPlayerReady() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (gameId: number): Promise<void> => {
-      const result = await markPlayerReadyAction(gameId)
+    mutationFn: async ({
+      gameId,
+      isReady,
+    }: {
+      gameId: number
+      isReady: boolean
+    }): Promise<void> => {
+      const result = await markPlayerReadyAction(gameId, isReady)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: (_, gameId) => {
+    onSuccess: (_, { gameId }) => {
       // Invalidate game snapshot so it refreshes with updated state
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(gameId),
