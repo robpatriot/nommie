@@ -6,7 +6,10 @@ import { AppearanceSelector } from '@/components/AppearanceSelector'
 import { CardConfirmationToggle } from '@/components/CardConfirmationToggle'
 import { LanguageSelector } from '@/components/LanguageSelector'
 import { getUserOptions } from '@/lib/api/user-options'
-import { handleAllowlistError } from '@/lib/auth/allowlist'
+import {
+  handleAllowlistError,
+  handleStaleSessionError,
+} from '@/lib/auth/allowlist'
 import type { ThemeMode } from '@/components/theme-provider'
 
 export default async function SettingsPage() {
@@ -29,6 +32,7 @@ export default async function SettingsPage() {
       options.appearance_mode === 'system' ? null : options.appearance_mode
   } catch (error) {
     await handleAllowlistError(error)
+    await handleStaleSessionError(error)
     // Swallow other errors and fall back to default
   }
 

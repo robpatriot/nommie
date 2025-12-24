@@ -11,6 +11,7 @@ import { getLastActiveGame } from '@/lib/api'
 import { auth } from '@/auth'
 import type { Session } from 'next-auth'
 import { getBackendJwtFromCookie } from '@/lib/auth/backend-jwt-cookie'
+import { handleStaleSessionError } from '@/lib/auth/allowlist'
 import { NextIntlClientProvider } from 'next-intl'
 
 import {
@@ -66,8 +67,9 @@ export default async function RootLayout({
     if (backendJwt) {
       try {
         lastActiveGameId = await getLastActiveGame()
-      } catch {
-        // Silently handle errors - the endpoint might not exist or JWT might be missing
+      } catch (error) {
+        await handleStaleSessionError(error)
+        // Silently handle other errors - the endpoint might not exist or JWT might be missing
         // The header will just not show the resume button
       }
     }

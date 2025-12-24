@@ -5,7 +5,10 @@ import LobbyClient from '@/components/LobbyClient'
 import ErrorBoundaryWithTranslations from '@/components/ErrorBoundaryWithTranslations'
 import { getAvailableGames } from '@/lib/api'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
-import { handleAllowlistError } from '@/lib/auth/allowlist'
+import {
+  handleAllowlistError,
+  handleStaleSessionError,
+} from '@/lib/auth/allowlist'
 
 export default async function LobbyPage() {
   const t = await getTranslations('lobby')
@@ -26,6 +29,7 @@ export default async function LobbyPage() {
     allGames = await getAvailableGames()
   } catch (error) {
     await handleAllowlistError(error)
+    await handleStaleSessionError(error)
     // Silently handle other errors - centralized error handling in fetchWithAuth
     // will log appropriately based on startup window and backend status.
     // The client component can handle refresh once backend is available.

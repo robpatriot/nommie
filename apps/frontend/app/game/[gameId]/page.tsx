@@ -14,6 +14,7 @@ import { getUserOptions } from '@/lib/api/user-options'
 import { BackendApiError } from '@/lib/api'
 import { isInStartupWindow } from '@/lib/server/backend-status'
 import { isBackendStartupError } from '@/lib/server/connection-errors'
+import { handleStaleSessionError } from '@/lib/auth/allowlist'
 
 export default async function GamePage({
   params,
@@ -38,6 +39,7 @@ export default async function GamePage({
   try {
     snapshotResult = await fetchGameSnapshot(resolvedGameId)
   } catch (error) {
+    await handleStaleSessionError(error)
     if (error instanceof BackendApiError) {
       const isStartupError =
         error.status === 503 ||
@@ -90,7 +92,8 @@ export default async function GamePage({
   try {
     const options = await getUserOptions()
     requireCardConfirmation = options.require_card_confirmation
-  } catch {
+  } catch (error) {
+    await handleStaleSessionError(error)
     // Fallback to default behavior if options cannot be loaded
   }
 
