@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 
 /**
@@ -12,8 +12,12 @@ export function useGameRoomReadyState(
 ) {
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
   const canMarkReady = phaseName === 'Init'
+  // Track the last synced snapshot value to avoid unnecessary updates
+  const lastSyncedReadyState = useRef<boolean | null>(null)
 
   // Initialize hasMarkedReady from snapshot on mount and when snapshot updates
+  // Only sync when the actual is_ready value in the snapshot differs from what we last synced
+  // to avoid overwriting optimistic updates during mutations
   useEffect(() => {
     if (viewerSeatForInteractions !== null && canMarkReady) {
       const viewerSeatAssignment = snapshot.snapshot.game.seating.find(
@@ -26,7 +30,13 @@ export function useGameRoomReadyState(
         }
       )
       if (viewerSeatAssignment) {
-        setHasMarkedReady(viewerSeatAssignment.is_ready)
+        const snapshotReadyState = viewerSeatAssignment.is_ready
+        // Only update if the snapshot value differs from what we last synced
+        // This prevents overwriting optimistic updates during mutations
+        if (lastSyncedReadyState.current !== snapshotReadyState) {
+          lastSyncedReadyState.current = snapshotReadyState
+          setHasMarkedReady(snapshotReadyState)
+        }
       }
     }
   }, [snapshot.snapshot.game.seating, viewerSeatForInteractions, canMarkReady])
@@ -36,6 +46,7 @@ export function useGameRoomReadyState(
   useEffect(() => {
     if (phaseName !== 'Init' && hasMarkedReady) {
       setHasMarkedReady(false)
+      lastSyncedReadyState.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phaseName])
