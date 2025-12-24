@@ -4,11 +4,10 @@ use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::AppError;
-use backend::CurrentUser;
 use backend::infra::state::build_state;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::state::security_config::SecurityConfig;
+use backend::{AppError, CurrentUser};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use serde_json::Value;
 
@@ -150,11 +149,11 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
 
     let resp = call_service_or_error(&mut app, req).await;
 
-    // Assert 403
-    assert_eq!(resp.status().as_u16(), 403);
+    // Assert 401 Unauthorized (user not found in database)
+    assert_eq!(resp.status().as_u16(), 401);
 
     // Validate error structure
-    assert_problem_details_structure(resp, 403, "FORBIDDEN_USER_NOT_FOUND", "Access denied").await;
+    assert_problem_details_structure(resp, 401, "FORBIDDEN_USER_NOT_FOUND", "Access denied").await;
 
     Ok(())
 }

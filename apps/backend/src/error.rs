@@ -201,7 +201,7 @@ impl AppError {
             AppError::UnauthorizedInvalidJwt => StatusCode::UNAUTHORIZED,
             AppError::UnauthorizedExpiredJwt => StatusCode::UNAUTHORIZED,
             AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
-            AppError::ForbiddenUserNotFound => StatusCode::FORBIDDEN,
+            AppError::ForbiddenUserNotFound => StatusCode::UNAUTHORIZED,
             AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
             AppError::Internal { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,

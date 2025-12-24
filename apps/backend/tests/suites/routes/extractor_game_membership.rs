@@ -10,9 +10,9 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::{CurrentUser, GameId, GameMembership};
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::state::security_config::SecurityConfig;
+use backend::{CurrentUser, GameId, GameMembership};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
@@ -251,11 +251,11 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
 
     let resp = test::call_service(&app, req).await;
 
-    // Assert 403 Forbidden (user not found)
-    assert_eq!(resp.status().as_u16(), 403);
+    // Assert 401 Unauthorized (user not found in database)
+    assert_eq!(resp.status().as_u16(), 401);
 
     // Validate error structure
-    assert_problem_details_structure(resp, 403, "FORBIDDEN_USER_NOT_FOUND", "Access denied").await;
+    assert_problem_details_structure(resp, 401, "FORBIDDEN_USER_NOT_FOUND", "Access denied").await;
 
     shared.rollback().await?;
 
