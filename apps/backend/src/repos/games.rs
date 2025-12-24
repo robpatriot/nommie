@@ -69,6 +69,15 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
     Ok(game.map(Game::from))
 }
 
+pub async fn exists<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<bool, DomainError> {
+    games_adapter::exists(conn, game_id)
+        .await
+        .map_err(DomainError::from)
+}
+
 pub async fn create_game(
     txn: &DatabaseTransaction,
     dto: games_adapter::GameCreate,

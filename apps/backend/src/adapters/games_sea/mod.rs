@@ -2,7 +2,7 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, NotSet,
-    QueryFilter, Set,
+    PaginatorTrait, QueryFilter, Set,
 };
 
 use crate::entities::games;
@@ -77,6 +77,17 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
         .filter(games::Column::Id.eq(game_id))
         .one(conn)
         .await
+}
+
+pub async fn exists<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<bool, sea_orm::DbErr> {
+    let count = games::Entity::find()
+        .filter(games::Column::Id.eq(game_id))
+        .count(conn)
+        .await?;
+    Ok(count > 0)
 }
 
 /// Find game by ID or return RecordNotFound error.
