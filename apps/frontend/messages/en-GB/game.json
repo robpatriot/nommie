@@ -66,7 +66,9 @@
         "manualSync": "Manual sync",
         "copyInviteAria": "Copy invite link to clipboard",
         "shareLink": "Share link",
-        "copyInvite": "Copy invite"
+        "copyInvite": "Copy invite",
+        "copySuccess": "Invite link copied",
+        "copyError": "Could not copy link. Please copy from the address bar."
       }
     },
     "setupSeats": {
@@ -311,6 +313,17 @@
     },
     "error": {
       "traceIdLabel": "traceId"
+    },
+    "joinError": {
+      "genericTitle": "Unable to join game",
+      "genericMessage": "Something went wrong while joining this game. Please return to the lobby and try again.",
+      "notFoundTitle": "Game not found",
+      "notFoundMessage": "This invite link no longer points to an active game. It may have been deleted or never existed.",
+      "phaseTitle": "Game already in progress",
+      "phaseMessage": "This game has already started or finished, so new players can no longer join via this link.",
+      "fullTitle": "Game is full",
+      "fullMessage": "This game is already full with human players and cannot accept more seats.",
+      "okButton": "Back to lobby"
     },
     "ai": {
       "noAccess": "The host is configuring AI players for this game. Seating updates will appear once the match begins.",

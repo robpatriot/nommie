@@ -5,7 +5,6 @@ use backend::domain::{Suit, Trump};
 use backend::repos::{games, rounds, tricks};
 use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
-use backend::utils::join_code::generate_join_code;
 use backend::AppError;
 
 use crate::support::build_test_state;
@@ -414,8 +413,7 @@ async fn test_load_state_lobby() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
 
             let game_service = GameService;
 

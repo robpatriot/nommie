@@ -80,8 +80,6 @@ pub enum ErrorCode {
     // Business Logic Conflicts
     /// Google sub mismatch for existing email
     GoogleSubMismatch,
-    /// Join code already exists
-    JoinCodeConflict,
     /// Seat already taken
     SeatTaken,
     /// Unique email constraint
@@ -181,7 +179,6 @@ impl ErrorCode {
 
             // Business Logic Conflicts
             Self::GoogleSubMismatch => "GOOGLE_SUB_MISMATCH",
-            Self::JoinCodeConflict => "JOIN_CODE_CONFLICT",
             Self::SeatTaken => "SEAT_TAKEN",
             Self::UniqueEmail => "UNIQUE_EMAIL",
             Self::OptimisticLock => "OPTIMISTIC_LOCK",
@@ -276,7 +273,6 @@ mod tests {
         assert_eq!(ErrorCode::PlayerNotFound.as_str(), "PLAYER_NOT_FOUND");
         assert_eq!(ErrorCode::NotFound.as_str(), "NOT_FOUND");
         assert_eq!(ErrorCode::GoogleSubMismatch.as_str(), "GOOGLE_SUB_MISMATCH");
-        assert_eq!(ErrorCode::JoinCodeConflict.as_str(), "JOIN_CODE_CONFLICT");
         assert_eq!(ErrorCode::DbError.as_str(), "DB_ERROR");
         assert_eq!(ErrorCode::DbUnavailable.as_str(), "DB_UNAVAILABLE");
         assert_eq!(ErrorCode::DbPoolExhausted.as_str(), "DB_POOL_EXHAUSTED");

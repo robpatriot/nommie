@@ -2,4 +2,4 @@
 //!
 //! This module contains utility functions used throughout the backend application.
 
-pub mod join_code;
+// join_code module removed; no remaining utilities yet.

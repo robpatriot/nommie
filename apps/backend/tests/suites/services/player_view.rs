@@ -5,8 +5,8 @@
 
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::AppError;
 use backend::repos::player_view;
+use backend::AppError;
 
 use crate::support::build_test_state;
 use crate::support::factory::create_fresh_lobby_game;
@@ -55,7 +55,6 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),
-        join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("game_hist_rounds"))),
         current_round: Set(Some(2i16)),
@@ -198,7 +197,6 @@ async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),
-        join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("trump_sel_tie_break"))),
         current_round: Set(Some(1i16)),

@@ -98,17 +98,6 @@ pub async fn require_game<C: ConnectionTrait + Send + Sync>(
         .ok_or_else(|| sea_orm::DbErr::Custom(format!("GAME_NOT_FOUND:{}", game_id)))
 }
 
-#[allow(dead_code)] // Will be used when join-by-code feature is implemented
-pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    join_code: &str,
-) -> Result<Option<games::Model>, sea_orm::DbErr> {
-    games::Entity::find()
-        .filter(games::Column::JoinCode.eq(join_code))
-        .one(conn)
-        .await
-}
-
 pub async fn create_game(
     txn: &DatabaseTransaction,
     dto: GameCreate,
@@ -129,7 +118,6 @@ pub async fn create_game(
         started_at: NotSet,
         ended_at: NotSet,
         name: Set(dto.name),
-        join_code: Set(Some(dto.join_code)),
         rules_version: Set("1.0".to_string()),
         rng_seed: Set(Some(rng_seed)),
         current_round: NotSet,

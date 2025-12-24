@@ -52,8 +52,6 @@ pub struct Model {
     #[sea_orm(column_name = "ended_at")]
     pub ended_at: Option<OffsetDateTime>,
     pub name: Option<String>,
-    #[sea_orm(column_name = "join_code")]
-    pub join_code: Option<String>,
     #[sea_orm(column_name = "rules_version")]
     pub rules_version: String,
     #[sea_orm(column_name = "rng_seed")]

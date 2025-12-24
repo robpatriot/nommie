@@ -49,7 +49,6 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),
-        join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("round_card_plays_empty"))),
         current_round: Set(Some(1i16)),
@@ -83,8 +82,14 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
     assert!(plays.is_empty());
 
     // Test with Partial mode - should return empty vec
-    let plays =
-        get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42), false).await?;
+    let plays = get_round_card_plays(
+        txn,
+        round.id,
+        MemoryMode::Partial { level: 50 },
+        Some(42),
+        false,
+    )
+    .await?;
     assert!(plays.is_empty());
 
     // Rollback the transaction immediately after last DB access
@@ -117,7 +122,6 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),
-        join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("round_card_plays_tricks"))),
         current_round: Set(Some(1i16)),
@@ -220,8 +224,14 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     assert!(plays.is_empty());
 
     // Test Partial mode with seed - should return degraded memory
-    let plays_partial =
-        get_round_card_plays(txn, round.id, MemoryMode::Partial { level: 50 }, Some(42), false).await?;
+    let plays_partial = get_round_card_plays(
+        txn,
+        round.id,
+        MemoryMode::Partial { level: 50 },
+        Some(42),
+        false,
+    )
+    .await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;

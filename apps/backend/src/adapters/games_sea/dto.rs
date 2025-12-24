@@ -3,18 +3,16 @@
 use crate::entities::games::{GameState, GameVisibility};
 
 /// DTO for creating a new game.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct GameCreate {
-    pub join_code: String,
     pub created_by: Option<i64>,
     pub visibility: Option<GameVisibility>,
     pub name: Option<String>,
 }
 
 impl GameCreate {
-    pub fn new(join_code: impl Into<String>) -> Self {
+    pub fn new() -> Self {
         Self {
-            join_code: join_code.into(),
             created_by: None,
             visibility: None,
             name: None,

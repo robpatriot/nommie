@@ -12,7 +12,7 @@ async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create test data
-            let game_id = create_test_game_with_options(txn, None, Some(true)).await?;
+            let game_id = create_test_game_with_options(txn).await?;
             let user_id =
                 create_test_user_with_randomization(txn, "test_user", Some("TestUser"), true)
                     .await?;
@@ -61,7 +61,7 @@ async fn test_set_ready_updates_only_updated_at() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create test data
-            let game_id = create_test_game_with_options(txn, None, Some(true)).await?;
+            let game_id = create_test_game_with_options(txn).await?;
             let user_id =
                 create_test_user_with_randomization(txn, "test_user", Some("TestUser"), true)
                     .await?;

@@ -34,7 +34,6 @@
     "NOT_FOUND": "Wir konnten das nicht finden.",
 
     "GOOGLE_SUB_MISMATCH": "Diese E-Mail ist mit einem anderen Google-Konto verknüpft.",
-    "JOIN_CODE_CONFLICT": "Dieser Beitrittscode ist bereits vergeben. Bitte versuche es erneut.",
     "SEAT_TAKEN": "Dieser Sitzplatz ist bereits belegt.",
     "UNIQUE_EMAIL": "Diese E-Mail wird bereits verwendet.",
     "OPTIMISTIC_LOCK": "Das Spiel hat sich geändert. Bitte aktualisiere und versuche es erneut.",

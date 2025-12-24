@@ -66,7 +66,9 @@
         "manualSync": "Sincronizzazione manuale",
         "copyInviteAria": "Copia il link d’invito negli appunti",
         "shareLink": "Condividi link",
-        "copyInvite": "Copia invito"
+        "copyInvite": "Copia invito",
+        "copySuccess": "Link d’invito copiato",
+        "copyError": "Impossibile copiare il link. Copialo dalla barra degli indirizzi."
       }
     },
     "setupSeats": {
@@ -311,6 +313,17 @@
     },
     "error": {
       "traceIdLabel": "ID traccia"
+    },
+    "joinError": {
+      "genericTitle": "Impossibile unirsi alla partita",
+      "genericMessage": "Si è verificato un errore durante il tentativo di unirti a questa partita. Torna alla lobby e riprova.",
+      "notFoundTitle": "Partita non trovata",
+      "notFoundMessage": "Questo link di invito non punta più a una partita attiva. Potrebbe essere stata eliminata o non essere mai esistita.",
+      "phaseTitle": "Partita già in corso",
+      "phaseMessage": "Questa partita è già iniziata o è terminata, quindi non può accettare nuovi giocatori tramite questo link.",
+      "fullTitle": "La partita è al completo",
+      "fullMessage": "Questa partita è già al completo con giocatori umani e non può accettare altri posti.",
+      "okButton": "Torna alla lobby"
     },
     "ai": {
       "noAccess": "L’host sta configurando i giocatori IA. Gli aggiornamenti dei posti appariranno quando la partita inizierà.",

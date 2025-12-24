@@ -20,7 +20,6 @@ pub async fn insert_minimal_game_for_test<C: ConnectionTrait>(
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some(name.to_string())),
-        join_code: Set(None),
         rules_version: Set("nommie-1.0.0".to_string()),
         rng_seed: Set(None),
         current_round: Set(None),
@@ -45,19 +44,6 @@ pub async fn delete_games_by_name<C: ConnectionTrait>(
 ) -> Result<u64, AppError> {
     let res = games::Entity::delete_many()
         .filter(games::Column::Name.eq(Some(name.to_string())))
-        .exec(conn)
-        .await
-        .map_err(|e| AppError::from(map_db_err(e)))?;
-    Ok(res.rows_affected)
-}
-
-// Delete by join_code via txn-aware connection; returns affected count
-pub async fn delete_games_by_join_code<C: ConnectionTrait>(
-    conn: &C,
-    join_code: &str,
-) -> Result<u64, AppError> {
-    let res = games::Entity::delete_many()
-        .filter(games::Column::JoinCode.eq(Some(join_code.to_string())))
         .exec(conn)
         .await
         .map_err(|e| AppError::from(map_db_err(e)))?;

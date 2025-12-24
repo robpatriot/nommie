@@ -9,7 +9,6 @@ use sea_orm::DatabaseTransaction;
 /// Excludes id (or normalizes it) so two separate creations can be compared.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GameProbe {
-    pub join_code: String,
     pub state: GameState,
     pub visibility: GameVisibility,
     pub lock_version: i32,
@@ -21,7 +20,6 @@ impl GameProbe {
     /// Create a GameProbe from a game model, excluding the id for comparison
     pub fn from_model(model: &backend::entities::games::Model) -> Self {
         Self {
-            join_code: model.join_code.clone().unwrap_or_default(),
             state: model.state.clone(),
             visibility: model.visibility.clone(),
             lock_version: model.lock_version,
@@ -34,9 +32,9 @@ impl GameProbe {
 /// Returns a GameProbe for equivalence testing.
 ///
 /// Flow:
-/// 1. Create game with unique marker (used for both join_code and name)
+/// 1. Create game with unique marker (used for the name)
 /// 2. Assert timestamps on create
-/// 3. Fetch by id and by join_code; assert consistency
+/// 3. Fetch by id; assert consistency
 /// 4. Update state (Lobby -> Bidding)
 /// 5. Assert created_at unchanged, updated_at advanced
 /// 6. Update state again (Bidding -> TrickPlay)
@@ -48,8 +46,8 @@ pub async fn run_game_flow(
     txn: &DatabaseTransaction,
     unique_marker: &str,
 ) -> Result<GameProbe, AppError> {
-    // 1. Create game (use unique_marker for both join_code and name for easy cleanup)
-    let dto = GameCreate::new(unique_marker)
+    // 1. Create game (use unique_marker for name for easy cleanup)
+    let dto = GameCreate::new()
         .with_visibility(GameVisibility::Private)
         .with_name(unique_marker);
     let created = games_sea::create_game(txn, dto)
@@ -73,24 +71,11 @@ pub async fn run_game_flow(
     let original_created_at = created.created_at;
     let original_updated_at = created.updated_at;
 
-    // 2. Fetch by id and by join_code; assert consistency
-    let by_id = games_sea::find_by_id(txn, created.id)
+    // 2. Fetch by id and assert consistency
+    let _by_id = games_sea::find_by_id(txn, created.id)
         .await
         .map_err(|e| AppError::db("failed to fetch game", e))?
         .expect("game should exist by id");
-    let by_join_code = games_sea::find_by_join_code(txn, unique_marker)
-        .await
-        .map_err(|e| AppError::db("failed to fetch game by join code", e))?
-        .expect("game should exist by join_code");
-
-    assert_eq!(
-        by_id.id, by_join_code.id,
-        "id should match when fetched by id vs join_code"
-    );
-    assert_eq!(
-        by_id.join_code, by_join_code.join_code,
-        "join_code should match"
-    );
 
     // Small sleep to ensure time progresses for timestamp tests
     // (in practice, DB operations may be fast enough to get same timestamp)

@@ -9,8 +9,8 @@
 use backend::adapters::games_sea::{self, GameCreate, GameUpdate};
 use backend::db::txn::with_txn;
 use backend::entities::games::GameState;
-use backend::AppError;
 use backend::errors::domain::{ConflictKind, DomainError, NotFoundKind};
+use backend::AppError;
 
 use crate::support::build_test_state;
 
@@ -25,9 +25,8 @@ async fn test_update_nonexistent_game_returns_not_found() -> Result<(), AppError
             let expected_lock_version = 0;
 
             // Attempt to update a game that doesn't exist
-            let update_dto =
-                GameUpdate::new(non_existent_id, expected_lock_version)
-                    .with_state(GameState::Bidding);
+            let update_dto = GameUpdate::new(non_existent_id, expected_lock_version)
+                .with_state(GameState::Bidding);
             let result = games_sea::update_game(txn, update_dto).await;
 
             // Should return an error
@@ -70,7 +69,7 @@ async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(
     let result = with_txn(None, &state, |txn| {
         Box::pin(async move {
             // 1. Create a game (initial lock_version should be 1)
-            let create_dto = GameCreate::new("LOCK001").with_name("OptimisticLockTest");
+            let create_dto = GameCreate::new().with_name("OptimisticLockTest");
             let game = games_sea::create_game(txn, create_dto)
                 .await
                 .map_err(|e| AppError::db("failed to create game", e))?;
@@ -79,8 +78,8 @@ async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(
             assert_eq!(initial_lock_version, 1, "initial lock_version should be 1");
 
             // 2. First update: succeed with correct lock_version
-            let update1 = GameUpdate::new(game.id, initial_lock_version)
-                .with_state(GameState::Bidding);
+            let update1 =
+                GameUpdate::new(game.id, initial_lock_version).with_state(GameState::Bidding);
             let game_after_update1 = games_sea::update_game(txn, update1)
                 .await
                 .map_err(|e| AppError::db("failed to update game state", e))?;
@@ -98,8 +97,7 @@ async fn test_optimistic_lock_conflict_returns_expected_and_actual() -> Result<(
 
             // 3. Second update: attempt with stale lock_version (use the original version 1)
             let stale_version = initial_lock_version; // Still 1, but actual is now 2
-            let update2 = GameUpdate::new(game.id, stale_version)
-                .with_state(GameState::TrickPlay);
+            let update2 = GameUpdate::new(game.id, stale_version).with_state(GameState::TrickPlay);
             let result = games_sea::update_game(txn, update2).await;
 
             // Should fail with optimistic lock conflict
@@ -161,7 +159,7 @@ async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
     let result = with_txn(None, &state, |txn| {
         Box::pin(async move {
             // Create a game
-            let create_dto = GameCreate::new("LOCK002").with_name("MultipleStaleTest");
+            let create_dto = GameCreate::new().with_name("MultipleStaleTest");
             let game = games_sea::create_game(txn, create_dto)
                 .await
                 .map_err(|e| AppError::db("failed to create game", e))?;
@@ -169,8 +167,7 @@ async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
             let initial_version = game.lock_version;
 
             // Successfully update once
-            let update1 = GameUpdate::new(game.id, initial_version)
-                .with_state(GameState::Bidding);
+            let update1 = GameUpdate::new(game.id, initial_version).with_state(GameState::Bidding);
             let game_v2 = games_sea::update_game(txn, update1)
                 .await
                 .map_err(|e| AppError::db("failed to update game state", e))?;
@@ -178,8 +175,8 @@ async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
             assert_eq!(game_v2.lock_version, initial_version + 1);
 
             // Successfully update again
-            let update2 = GameUpdate::new(game.id, game_v2.lock_version)
-                .with_state(GameState::TrickPlay);
+            let update2 =
+                GameUpdate::new(game.id, game_v2.lock_version).with_state(GameState::TrickPlay);
             let game_v3 = games_sea::update_game(txn, update2)
                 .await
                 .map_err(|e| AppError::db("failed to update game state", e))?;
@@ -188,14 +185,14 @@ async fn test_multiple_stale_updates_all_fail() -> Result<(), AppError> {
 
             // Now try multiple stale updates - all should fail
             // Try with version 1 (actual is 3)
-            let stale_update_1 = GameUpdate::new(game.id, initial_version)
-                .with_state(GameState::Scoring);
+            let stale_update_1 =
+                GameUpdate::new(game.id, initial_version).with_state(GameState::Scoring);
             let result1 = games_sea::update_game(txn, stale_update_1).await;
             assert!(result1.is_err(), "stale update with v1 should fail");
 
             // Try with version 2 (actual is still 3)
-            let stale_update_2 = GameUpdate::new(game.id, initial_version + 1)
-                .with_state(GameState::Scoring);
+            let stale_update_2 =
+                GameUpdate::new(game.id, initial_version + 1).with_state(GameState::Scoring);
             let result2 = games_sea::update_game(txn, stale_update_2).await;
             assert!(result2.is_err(), "stale update with v2 should fail");
 

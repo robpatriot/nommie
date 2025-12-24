@@ -34,7 +34,6 @@
     "NOT_FOUND": "We couldn't find what you were looking for.",
 
     "GOOGLE_SUB_MISMATCH": "This email is linked to a different Google account.",
-    "JOIN_CODE_CONFLICT": "That join code is already taken. Please try again.",
     "SEAT_TAKEN": "That seat is already taken.",
     "UNIQUE_EMAIL": "That email is already in use.",
     "OPTIMISTIC_LOCK": "This game changed. Please refresh and try again.",

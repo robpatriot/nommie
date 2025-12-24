@@ -34,7 +34,6 @@
     "NOT_FOUND": "Élément introuvable.",
 
     "GOOGLE_SUB_MISMATCH": "Cet e-mail est lié à un autre compte Google.",
-    "JOIN_CODE_CONFLICT": "Ce code de participation est déjà utilisé. Réessayez.",
     "SEAT_TAKEN": "Cette place est déjà prise.",
     "UNIQUE_EMAIL": "Cet e-mail est déjà utilisé.",
     "OPTIMISTIC_LOCK": "La partie a changé. Actualisez puis réessayez.",

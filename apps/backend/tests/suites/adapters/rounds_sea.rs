@@ -2,7 +2,6 @@ use backend::adapters::games_sea::GameCreate;
 use backend::db::txn::with_txn;
 use backend::domain::Trump;
 use backend::repos::{games, rounds};
-use backend::utils::join_code::generate_join_code;
 use backend::AppError;
 
 use crate::support::build_test_state;
@@ -14,8 +13,7 @@ async fn test_create_round_and_find_by_id_roundtrip() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
 
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
@@ -49,8 +47,7 @@ async fn test_find_by_game_and_round() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
 
             let round1 = rounds::create_round(txn, game.id, 1, 13, 0).await?;
             let round2 = rounds::create_round(txn, game.id, 2, 12, 1).await?;
@@ -83,8 +80,7 @@ async fn test_find_by_game_and_round_not_found() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
 
             let found = rounds::find_by_game_and_round(txn, game.id, 99).await?;
             assert!(found.is_none(), "Non-existent round should return None");
@@ -104,8 +100,7 @@ async fn test_update_trump() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             assert_eq!(round.trump, None);
@@ -133,8 +128,7 @@ async fn test_update_trump_no_trump() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             let updated = rounds::update_trump(txn, round.id, Trump::NoTrumps).await?;
@@ -155,8 +149,7 @@ async fn test_complete_round() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             assert_eq!(round.completed_at, None);
@@ -184,8 +177,7 @@ async fn test_unique_constraint_game_round() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
 
             rounds::create_round(txn, game.id, 1, 13, 0).await?;
 

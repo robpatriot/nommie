@@ -12,8 +12,9 @@ use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::games::Game;
 use crate::repos::memberships::GameRole;
-use crate::repos::{bids, games as games_repo, hands, memberships, plays, rounds, scores, tricks};
-use crate::utils::join_code::generate_join_code;
+use crate::repos::{
+    ai_overrides, bids, games as games_repo, hands, memberships, plays, rounds, scores, tricks,
+};
 
 /// Game domain service (stateless).
 #[derive(Default)]
@@ -336,7 +337,6 @@ impl GameService {
     /// Create a game with the creator as the first member.
     ///
     /// This method handles:
-    /// - Generating a unique join code (with retry logic)
     /// - Creating the game
     /// - Adding the creator as a member (turn_order: 0)
     /// - Returning the game entity and all memberships
@@ -356,77 +356,39 @@ impl GameService {
         user_id: i64,
         name: Option<String>,
     ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
-        const MAX_RETRIES: usize = 5;
+        // Create a new public game without join codes and add the creator as the first member.
+        let dto = GameCreate::new()
+            .with_visibility(GameVisibility::Public)
+            .by(user_id);
 
-        // Generate join code and create game with retry logic.
-        // The database unique constraint on `games.join_code` ensures uniqueness atomically.
-        // If a conflict occurs (race condition), we generate a new code and retry.
-        for attempt in 0..MAX_RETRIES {
-            // Generate a random join code
-            let join_code = generate_join_code();
+        let dto = if let Some(ref n) = name {
+            dto.with_name(n.clone())
+        } else {
+            dto
+        };
 
-            // Try to create game with this code
-            let dto = GameCreate::new(&join_code)
-                .with_visibility(GameVisibility::Public)
-                .by(user_id);
+        let game = games_repo::create_game(txn, dto)
+            .await
+            .map_err(AppError::from)?;
 
-            let dto = if let Some(ref n) = name {
-                dto.with_name(n.clone())
-            } else {
-                dto
-            };
+        // Add creator as first member
+        memberships::create_membership(
+            txn,
+            game.id,
+            user_id,
+            0,     // turn_order: 0 for creator
+            false, // is_ready: false
+            GameRole::Player,
+        )
+        .await
+        .map_err(AppError::from)?;
 
-            match games_repo::create_game(txn, dto)
-                .await
-                .map_err(AppError::from)
-            {
-                Ok(game) => {
-                    // Successfully created game, add creator as first member
-                    memberships::create_membership(
-                        txn,
-                        game.id,
-                        user_id,
-                        0,     // turn_order: 0 for creator
-                        false, // is_ready: false
-                        GameRole::Player,
-                    )
-                    .await
-                    .map_err(AppError::from)?;
+        // Fetch game and all memberships
+        let all_memberships = memberships::find_all_by_game(txn, game.id)
+            .await
+            .map_err(AppError::from)?;
 
-                    // Fetch game and all memberships
-                    let all_memberships = memberships::find_all_by_game(txn, game.id)
-                        .await
-                        .map_err(AppError::from)?;
-
-                    return Ok((game, all_memberships));
-                }
-                Err(AppError::Conflict {
-                    code: crate::errors::ErrorCode::JoinCodeConflict,
-                    ..
-                }) => {
-                    // Join code conflict (unique constraint violation), retry with new code
-                    if attempt == MAX_RETRIES - 1 {
-                        return Err(AppError::internal(
-                            crate::errors::ErrorCode::InternalError,
-                            "Failed to create game: maximum retries exceeded for join code conflicts".to_string(),
-                            std::io::Error::other("join code generation retry limit exceeded"),
-                        ));
-                    }
-                    continue;
-                }
-                Err(e) => {
-                    // Other error, return immediately
-                    return Err(e);
-                }
-            }
-        }
-
-        // Should never reach here, but just in case
-        Err(AppError::internal(
-            crate::errors::ErrorCode::InternalError,
-            "Failed to create game: maximum retries exceeded".to_string(),
-            std::io::Error::other("join code generation retry limit exceeded"),
-        ))
+        Ok((game, all_memberships))
     }
 
     /// List all public games in the lobby that still have open seats.
@@ -612,8 +574,8 @@ impl GameService {
     /// This method handles:
     /// - Validating game exists and is in LOBBY state
     /// - Checking user is not already a member
-    /// - Checking game is not full (max 4 players)
-    /// - Finding next available turn_order
+    /// - Checking capacity, replacing lowest-seat AI if needed
+    /// - Finding next available turn_order (when seats are free)
     /// - Creating membership
     /// - Returning updated game and memberships
     ///
@@ -677,41 +639,83 @@ impl GameService {
             .await
             .map_err(AppError::from)?;
 
-        let player_count = all_memberships
-            .iter()
+        let player_memberships: Vec<memberships::GameMembership> = all_memberships
+            .into_iter()
             .filter(|m| m.role == GameRole::Player)
-            .count();
+            .collect();
 
-        // Check if game is full
-        if player_count >= 4 {
-            return Err(AppError::bad_request(
-                crate::errors::ErrorCode::ValidationError,
-                "Game is full (maximum 4 players)".to_string(),
-            ));
+        let ai_players: Vec<memberships::GameMembership> = player_memberships
+            .iter()
+            .filter(|m| m.player_kind == crate::entities::game_players::PlayerKind::Ai)
+            .cloned()
+            .collect();
+
+        let total_players = player_memberships.len();
+
+        if total_players >= 4 {
+            if ai_players.is_empty() {
+                // Game is full with human players only
+                return Err(AppError::bad_request(
+                    crate::errors::ErrorCode::ValidationError,
+                    "Game is full (maximum 4 human players)".to_string(),
+                ));
+            }
+
+            // Replace the AI with the lowest seat number (turn_order)
+            let ai_to_replace = ai_players
+                .iter()
+                .min_by_key(|m| m.turn_order)
+                .cloned()
+                .ok_or_else(|| {
+                    AppError::internal(
+                        crate::errors::ErrorCode::InternalError,
+                        "Failed to select AI seat for replacement".to_string(),
+                        std::io::Error::other("no AI seat found despite non-empty list"),
+                    )
+                })?;
+
+            // Remove any overrides and the AI membership itself
+            ai_overrides::delete_by_game_player_id(txn, ai_to_replace.id)
+                .await
+                .map_err(AppError::from)?;
+            memberships::delete_membership(txn, ai_to_replace.id)
+                .await
+                .map_err(AppError::from)?;
+
+            // Create human membership in the freed seat
+            memberships::create_membership(
+                txn,
+                game_id,
+                user_id,
+                ai_to_replace.turn_order,
+                false,
+                GameRole::Player,
+            )
+            .await
+            .map_err(AppError::from)?;
+        } else {
+            // Seats available: find next free seat and join there
+            let next_turn_order = self
+                .find_next_available_seat(&player_memberships)
+                .ok_or_else(|| {
+                    AppError::internal(
+                        crate::errors::ErrorCode::InternalError,
+                        "No available turn order found".to_string(),
+                        std::io::Error::other("turn order calculation failed"),
+                    )
+                })?;
+
+            memberships::create_membership(
+                txn,
+                game_id,
+                user_id,
+                next_turn_order,
+                false,
+                GameRole::Player,
+            )
+            .await
+            .map_err(AppError::from)?;
         }
-
-        // Find next available turn_order
-        let next_turn_order = self
-            .find_next_available_seat(&all_memberships)
-            .ok_or_else(|| {
-                AppError::internal(
-                    crate::errors::ErrorCode::InternalError,
-                    "No available turn order found".to_string(),
-                    std::io::Error::other("turn order calculation failed"),
-                )
-            })?;
-
-        // Create membership (automatically updates game updated_at)
-        memberships::create_membership(
-            txn,
-            game_id,
-            user_id,
-            next_turn_order,
-            false, // is_ready: false
-            GameRole::Player,
-        )
-        .await
-        .map_err(AppError::from)?;
 
         // Fetch updated memberships and reload game
         let updated_memberships = memberships::find_all_by_game(txn, game_id)

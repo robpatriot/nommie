@@ -54,7 +54,6 @@ pub enum ConflictKind {
     SeatTaken,
     UniqueEmail,
     OptimisticLock,
-    JoinCodeConflict,
     GoogleSubMismatch,
     Other(String),
 }

@@ -38,7 +38,6 @@ fn map_sqlite_table_column_to_conflict(table_column: &str) -> Option<(ConflictKi
             ConflictKind::Other("UniqueGoogleSub".into()),
             "Google account already linked to another user",
         )),
-        "games.join_code" => Some((ConflictKind::JoinCodeConflict, "Join code already exists")),
         _ => None,
     }
 }
@@ -53,9 +52,6 @@ fn map_postgres_constraint_to_conflict(error_msg: &str) -> Option<(ConflictKind,
             ConflictKind::Other("UniqueGoogleSub".into()),
             "Google account already linked to another user",
         ));
-    }
-    if error_msg.contains("games_join_code_key") {
-        return Some((ConflictKind::JoinCodeConflict, "Join code already exists"));
     }
     None
 }

@@ -66,7 +66,9 @@
         "manualSync": "Sincronización manual",
         "copyInviteAria": "Copiar enlace de invitación al portapapeles",
         "shareLink": "Compartir enlace",
-        "copyInvite": "Copiar invitación"
+        "copyInvite": "Copiar invitación",
+        "copySuccess": "Enlace de invitación copiado",
+        "copyError": "No se pudo copiar el enlace. Copia la URL desde la barra de direcciones."
       }
     },
     "setupSeats": {
@@ -311,6 +313,17 @@
     },
     "error": {
       "traceIdLabel": "ID de traza"
+    },
+    "joinError": {
+      "genericTitle": "No se puede unir a la partida",
+      "genericMessage": "Se ha producido un error al intentar unirte a esta partida. Vuelve al vestíbulo e inténtalo de nuevo.",
+      "notFoundTitle": "Partida no encontrada",
+      "notFoundMessage": "Este enlace de invitación ya no apunta a una partida activa. Es posible que se haya eliminado o que nunca existiera.",
+      "phaseTitle": "Partida ya en curso",
+      "phaseMessage": "Esta partida ya ha empezado o ha terminado, por lo que no se pueden unir nuevos jugadores con este enlace.",
+      "fullTitle": "La partida está completa",
+      "fullMessage": "Esta partida ya está completa con jugadores humanos y no puede aceptar más plazas.",
+      "okButton": "Volver al vestíbulo"
     },
     "ai": {
       "noAccess": "El anfitrión está configurando los jugadores IA. Las actualizaciones aparecerán cuando empiece la partida.",

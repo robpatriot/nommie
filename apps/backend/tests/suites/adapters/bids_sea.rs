@@ -1,8 +1,7 @@
 use backend::adapters::games_sea::GameCreate;
 use backend::db::txn::with_txn;
-use backend::AppError;
 use backend::repos::{bids, games, rounds};
-use backend::utils::join_code::generate_join_code;
+use backend::AppError;
 
 use crate::support::build_test_state;
 
@@ -13,8 +12,7 @@ async fn test_create_bid_and_find_all() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             let bid1 = bids::create_bid(txn, round.id, 0, 5, 0).await?;
@@ -48,8 +46,7 @@ async fn test_count_bids() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             let count = bids::count_bids_by_round(txn, round.id).await?;
@@ -76,8 +73,7 @@ async fn test_find_winning_bid_highest() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             bids::create_bid(txn, round.id, 0, 5, 0).await?;
@@ -105,8 +101,7 @@ async fn test_find_winning_bid_tiebreaker() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             bids::create_bid(txn, round.id, 0, 7, 0).await?; // First - should win tie
@@ -135,8 +130,7 @@ async fn test_find_winning_bid_none() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             let winner = bids::find_winning_bid(txn, round.id).await?;
@@ -157,8 +151,7 @@ async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             bids::create_bid(txn, round.id, 0, 5, 0).await?;
@@ -187,8 +180,7 @@ async fn test_unique_constraint_round_order() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             bids::create_bid(txn, round.id, 0u8, 5u8, 0u8).await?;

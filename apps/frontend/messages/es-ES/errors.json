@@ -34,7 +34,6 @@
     "NOT_FOUND": "No pudimos encontrar lo que buscas.",
 
     "GOOGLE_SUB_MISMATCH": "Ese correo está vinculado a otra cuenta de Google.",
-    "JOIN_CODE_CONFLICT": "Ese código ya está en uso. Inténtalo de nuevo.",
     "SEAT_TAKEN": "Ese asiento ya está ocupado.",
     "UNIQUE_EMAIL": "Ese correo ya está en uso.",
     "OPTIMISTIC_LOCK": "La partida cambió. Actualiza e inténtalo de nuevo.",

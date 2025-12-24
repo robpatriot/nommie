@@ -37,7 +37,6 @@ export const KNOWN_ERROR_CODES = [
 
   // Conflict
   'GOOGLE_SUB_MISMATCH',
-  'JOIN_CODE_CONFLICT',
   'SEAT_TAKEN',
   'UNIQUE_EMAIL',
   'OPTIMISTIC_LOCK',

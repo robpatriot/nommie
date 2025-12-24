@@ -66,7 +66,9 @@
         "manualSync": "Manuell synchronisieren",
         "copyInviteAria": "Einladungslink in die Zwischenablage kopieren",
         "shareLink": "Link teilen",
-        "copyInvite": "Einladung kopieren"
+        "copyInvite": "Einladung kopieren",
+        "copySuccess": "Einladungslink kopiert",
+        "copyError": "Link konnte nicht kopiert werden. Bitte kopiere ihn aus der Adressleiste."
       }
     },
     "setupSeats": {
@@ -311,6 +313,17 @@
     },
     "error": {
       "traceIdLabel": "Trace-Kennung"
+    },
+    "joinError": {
+      "genericTitle": "Spielbeitritt nicht möglich",
+      "genericMessage": "Beim Beitritt zu diesem Spiel ist ein Fehler aufgetreten. Bitte gehe zurück in die Lobby und versuche es erneut.",
+      "notFoundTitle": "Spiel nicht gefunden",
+      "notFoundMessage": "Dieser Einladungslink führt nicht mehr zu einem aktiven Spiel. Es wurde möglicherweise gelöscht oder hat nie existiert.",
+      "phaseTitle": "Spiel bereits im Gange",
+      "phaseMessage": "Dieses Spiel hat bereits begonnen oder ist beendet, daher können über diesen Link keine neuen Spieler mehr beitreten.",
+      "fullTitle": "Spiel ist voll",
+      "fullMessage": "Dieses Spiel ist bereits mit menschlichen Spielern voll besetzt und kann keine weiteren Plätze aufnehmen.",
+      "okButton": "Zur Lobby zurückkehren"
     },
     "ai": {
       "noAccess": "Der Host konfiguriert KI-Spieler für dieses Spiel. Sitzplatz-Updates erscheinen, sobald das Match beginnt.",

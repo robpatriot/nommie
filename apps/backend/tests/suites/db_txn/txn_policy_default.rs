@@ -15,9 +15,6 @@ fn init_logging() {
 
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, set_txn_policy, TxnPolicy};
-use backend::entities::games::{self, GameState, GameVisibility};
-use backend::{AppError, ErrorCode};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use ulid::Ulid;
 
 use crate::support::build_test_state;
@@ -123,83 +120,4 @@ async fn test_default_commit_policy_on_error() -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-/// Test that verifies the unique join_code constraint works correctly.
-/// This test needs committed data, so it runs in this file with CommitOnOk policy.
-#[tokio::test]
-async fn test_join_code_unique_constraint() -> Result<(), Box<dyn std::error::Error>> {
-    // Verify we're using the commit policy
-    assert_eq!(current(), TxnPolicy::CommitOnOk);
-
-    let state = build_test_state().await?;
-
-    // Use a unique join code to avoid conflicts with other test runs (max 10 chars)
-    let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
-    let join_code = format!("T{}", timestamp % 100000000); // Keep it under 10 chars
-
-    // First transaction: insert a game with a specific join_code (will commit on Ok)
-    with_txn(None, &state, |txn| {
-        let join_code = join_code.clone();
-        Box::pin(async move {
-            let now = time::OffsetDateTime::now_utc();
-            let game1 = games::ActiveModel {
-                visibility: Set(GameVisibility::Public),
-                state: Set(GameState::Lobby),
-                rules_version: Set("nommie-1.0.0".to_string()),
-                join_code: Set(Some(join_code)),
-                created_at: Set(now),
-                updated_at: Set(now),
-                ..Default::default()
-            };
-
-            let inserted = games::Entity::insert(game1).exec(txn).await?;
-            assert!(inserted.last_insert_id > 0);
-
-            Ok::<_, AppError>(())
-        })
-    })
-    .await?;
-
-    // Second transaction: try to insert another game with same join_code
-    // This should fail with JoinCodeConflict
-    let result = with_txn(None, &state, |txn| {
-        let join_code = join_code.clone();
-        Box::pin(async move {
-            let now = time::OffsetDateTime::now_utc();
-            let game2 = games::ActiveModel {
-                visibility: Set(GameVisibility::Private),
-                state: Set(GameState::Lobby),
-                rules_version: Set("nommie-1.0.0".to_string()),
-                join_code: Set(Some(join_code)), // Same join_code
-                created_at: Set(now),
-                updated_at: Set(now),
-                ..Default::default()
-            };
-
-            games::Entity::insert(game2)
-                .exec(txn)
-                .await
-                .map_err(|e| AppError::from(backend::infra::db_errors::map_db_err(e)))
-        })
-    })
-    .await;
-
-    // Assert the insert fails with JoinCodeConflict
-    assert!(result.is_err(), "Expected duplicate join_code to fail");
-    assert_eq!(result.unwrap_err().code(), ErrorCode::JoinCodeConflict);
-
-    // Cleanup: delete the game we inserted to leave DB unchanged
-    // Uses with_txn to mirror the insert pattern; commits due to CommitOnOk policy
-    with_txn(None, &state, |txn| {
-        let join_code = join_code.clone();
-        Box::pin(async move {
-            games::Entity::delete_many()
-                .filter(games::Column::JoinCode.eq(join_code))
-                .exec(txn)
-                .await?;
-            Ok::<_, AppError>(())
-        })
-    })
-    .await?;
-
-    Ok(())
-}
+// Join code uniqueness tests have been removed along with join code support.

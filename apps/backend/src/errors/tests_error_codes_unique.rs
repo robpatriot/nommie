@@ -23,7 +23,6 @@ fn error_codes_are_unique() {
         ErrorCode::UserNotFound,
         ErrorCode::NotFound,
         ErrorCode::GoogleSubMismatch,
-        ErrorCode::JoinCodeConflict,
         ErrorCode::SeatTaken,
         ErrorCode::UniqueEmail,
         ErrorCode::OptimisticLock,

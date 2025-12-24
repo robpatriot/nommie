@@ -1,8 +1,7 @@
 use backend::adapters::games_sea::GameCreate;
 use backend::db::txn::with_txn;
-use backend::AppError;
 use backend::repos::{games, hands, rounds};
-use backend::utils::join_code::generate_join_code;
+use backend::AppError;
 
 use crate::support::build_test_state;
 
@@ -13,8 +12,7 @@ async fn test_create_hands_and_find_by_seat() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 3, 0).await?;
 
             // Create hands for players
@@ -82,8 +80,7 @@ async fn test_find_all_by_round() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 2, 0).await?;
 
             // Create hands for 4 players
@@ -146,8 +143,7 @@ async fn test_find_by_round_and_seat_not_found() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
 
             // No hands created, should return None
@@ -169,8 +165,7 @@ async fn test_empty_hand() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 0, 0).await?;
 
             // Create hand with no cards
@@ -196,8 +191,7 @@ async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            let join_code = generate_join_code();
-            let game = games::create_game(txn, GameCreate::new(&join_code)).await?;
+            let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1, 3, 0).await?;
 
             // Create first hand for seat 0

@@ -66,7 +66,9 @@
         "manualSync": "Synchronisation manuelle",
         "copyInviteAria": "Copier le lien d’invitation dans le presse-papiers",
         "shareLink": "Partager le lien",
-        "copyInvite": "Copier l’invitation"
+        "copyInvite": "Copier l’invitation",
+        "copySuccess": "Lien d’invitation copié",
+        "copyError": "Impossible de copier le lien. Copiez-le depuis la barre d’adresse."
       }
     },
     "setupSeats": {
@@ -311,6 +313,17 @@
     },
     "error": {
       "traceIdLabel": "ID de trace"
+    },
+    "joinError": {
+      "genericTitle": "Impossible de rejoindre la partie",
+      "genericMessage": "Une erreur s’est produite lors de la tentative de rejoindre cette partie. Retournez au salon puis réessayez.",
+      "notFoundTitle": "Partie introuvable",
+      "notFoundMessage": "Ce lien d’invitation ne pointe plus vers une partie active. Elle a peut-être été supprimée ou n’a jamais existé.",
+      "phaseTitle": "Partie déjà en cours",
+      "phaseMessage": "Cette partie a déjà commencé ou est terminée, de nouveaux joueurs ne peuvent plus la rejoindre via ce lien.",
+      "fullTitle": "La partie est complète",
+      "fullMessage": "Cette partie est déjà complète avec des joueurs humains et ne peut pas accepter de places supplémentaires.",
+      "okButton": "Retour au salon"
     },
     "ai": {
       "noAccess": "L’hôte configure les joueurs IA pour cette partie. Les mises à jour de placement apparaîtront au début du match.",

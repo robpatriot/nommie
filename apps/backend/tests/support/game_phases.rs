@@ -268,11 +268,6 @@ pub async fn setup_game_at_round(
         }),
         ended_at: Set(None),
         name: Set(Some(format!("Test Game at Round {}", completed_rounds))),
-        join_code: Set(Some(format!(
-            "R{}{}",
-            completed_rounds,
-            rand::random::<u32>() % 100000
-        ))),
         rules_version: Set("1.0".to_string()),
         rng_seed: Set(Some(super::test_utils::test_seed(test_name))),
         current_round: Set(if completed_rounds > 0 {

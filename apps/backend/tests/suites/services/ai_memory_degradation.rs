@@ -107,8 +107,14 @@ async fn test_memory_levels() -> Result<(), AppError> {
     }
 
     // Level 10 - very poor memory (should forget most)
-    let plays =
-        get_round_card_plays(txn, round_id, MemoryMode::Partial { level: 10 }, Some(42), false).await?;
+    let plays = get_round_card_plays(
+        txn,
+        round_id,
+        MemoryMode::Partial { level: 10 },
+        Some(42),
+        false,
+    )
+    .await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;
@@ -141,8 +147,14 @@ async fn test_partial_memory_types() -> Result<(), AppError> {
     let (round_id, _game_id) = create_test_round_with_plays(txn).await?;
 
     // Level 50 - moderate memory (should have mix of types)
-    let plays =
-        get_round_card_plays(txn, round_id, MemoryMode::Partial { level: 50 }, Some(42), false).await?;
+    let plays = get_round_card_plays(
+        txn,
+        round_id,
+        MemoryMode::Partial { level: 50 },
+        Some(42),
+        false,
+    )
+    .await?;
 
     // Rollback the transaction immediately after last DB access
     shared.rollback().await?;
@@ -200,7 +212,6 @@ async fn create_test_round_with_plays(
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),
-        join_code: Set(None),
         rules_version: Set("1".to_string()),
         rng_seed: Set(Some(test_seed("helper_round_plays"))),
         current_round: Set(Some(1i16)),

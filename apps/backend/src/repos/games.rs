@@ -24,7 +24,6 @@ pub struct Game {
     pub started_at: Option<time::OffsetDateTime>,
     pub ended_at: Option<time::OffsetDateTime>,
     pub name: Option<String>,
-    pub join_code: Option<String>,
     pub rules_version: String,
     pub rng_seed: Option<i64>,
     pub current_round: Option<u8>,
@@ -67,16 +66,6 @@ pub async fn find_by_id<C: ConnectionTrait + Send + Sync>(
     game_id: i64,
 ) -> Result<Option<Game>, DomainError> {
     let game = games_adapter::find_by_id(conn, game_id).await?;
-    Ok(game.map(Game::from))
-}
-
-/// Find game by join code (test-only helper)
-#[allow(dead_code)] // Used in adapter tests and test helpers
-pub async fn find_by_join_code<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    join_code: &str,
-) -> Result<Option<Game>, DomainError> {
-    let game = games_adapter::find_by_join_code(conn, join_code).await?;
     Ok(game.map(Game::from))
 }
 
@@ -219,7 +208,6 @@ impl From<games::Model> for Game {
             started_at: model.started_at,
             ended_at: model.ended_at,
             name: model.name,
-            join_code: model.join_code,
             rules_version: model.rules_version,
             rng_seed: model.rng_seed,
             current_round: model.current_round.map(|v| v as u8),

@@ -546,7 +546,6 @@ impl From<crate::errors::domain::DomainError> for AppError {
                     ConflictKind::SeatTaken => ErrorCode::SeatTaken,
                     ConflictKind::UniqueEmail => ErrorCode::UniqueEmail,
                     ConflictKind::OptimisticLock => ErrorCode::OptimisticLock,
-                    ConflictKind::JoinCodeConflict => ErrorCode::JoinCodeConflict,
                     ConflictKind::GoogleSubMismatch => ErrorCode::GoogleSubMismatch,
                     ConflictKind::Other(_) => ErrorCode::Conflict, // generic conflict fallback
                 };

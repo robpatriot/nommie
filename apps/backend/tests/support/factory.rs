@@ -125,7 +125,6 @@ pub async fn create_fresh_lobby_game(
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),
-        join_code: Set(None),
         rules_version: Set("1.0".to_string()),
         rng_seed: Set(Some(rng_seed)),
         current_round: Set(None),
@@ -150,26 +149,20 @@ pub async fn create_fresh_lobby_game(
 /// # Returns
 /// ID of the created game
 pub async fn create_test_game(conn: &impl ConnectionTrait) -> Result<i64, AppError> {
-    create_test_game_with_options(conn, None, None).await
+    create_test_game_with_options(conn).await
 }
 
-/// Create a test game with custom join code and randomization options.
+/// Create a test game with round 1 and dealer position already set.
 ///
 /// This builds on `create_fresh_lobby_game()` and then configures the game
 /// with round 1 and dealer position already set.
 ///
 /// # Arguments
 /// * `conn` - Database connection or transaction
-/// * `join_code` - Optional join code (if None, uses "ABC123")
-/// * `randomize_join_code` - If true, generates random join code
 ///
 /// # Returns
 /// ID of the created game
-pub async fn create_test_game_with_options(
-    conn: &impl ConnectionTrait,
-    join_code: Option<String>,
-    randomize_join_code: Option<bool>,
-) -> Result<i64, AppError> {
+pub async fn create_test_game_with_options(conn: &impl ConnectionTrait) -> Result<i64, AppError> {
     // Start with a fresh lobby game
     let game_id = create_fresh_lobby_game(conn, "test_game_with_opts").await?;
 
@@ -191,14 +184,7 @@ pub async fn create_test_game_with_options(
             )
         })?;
 
-    let final_join_code = if randomize_join_code.unwrap_or(false) {
-        format!("C{}", rand::random::<u32>() % 1000000)
-    } else {
-        join_code.unwrap_or_else(|| "ABC123".to_string())
-    };
-
     let mut active_game = game.into_active_model();
-    active_game.join_code = Set(Some(final_join_code));
     active_game.current_round = Set(Some(1));
     active_game.starting_dealer_pos = Set(Some(0));
     active_game.lock_version = Set(1);
