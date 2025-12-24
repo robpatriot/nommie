@@ -6,7 +6,7 @@
 //! 4) Determinism: same seed ⇒ same behavior (where applicable).
 //! 5) Profile fields are out of scope in Step 1; they will be added later as metadata.
 
-use crate::ai::{AiPlayer, HeuristicV1, RandomPlayer};
+use crate::ai::{AiPlayer, Heuristic, RandomPlayer};
 
 /// Factory definition for constructing AI implementations.
 pub struct AiFactory {
@@ -22,9 +22,9 @@ static AI_FACTORIES: &[AiFactory] = &[
         make: make_random_player,
     },
     AiFactory {
-        name: HeuristicV1::NAME,
-        version: HeuristicV1::VERSION,
-        make: make_heuristic_v1,
+        name: Heuristic::NAME,
+        version: Heuristic::VERSION,
+        make: make_heuristic,
     },
 ];
 
@@ -42,8 +42,8 @@ fn make_random_player(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
     Box::new(RandomPlayer::new(seed))
 }
 
-fn make_heuristic_v1(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
-    Box::new(HeuristicV1::new(seed))
+fn make_heuristic(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
+    Box::new(Heuristic::new(seed))
 }
 
 #[cfg(test)]
@@ -62,8 +62,8 @@ mod ai_registry_smoke {
             "RandomPlayer factory should be present"
         );
         assert!(
-            ais.iter().any(|factory| factory.name == HeuristicV1::NAME),
-            "HeuristicV1 factory should be present"
+            ais.iter().any(|factory| factory.name == Heuristic::NAME),
+            "Heuristic factory should be present"
         );
     }
 
@@ -82,7 +82,7 @@ mod ai_registry_smoke {
     #[test]
     fn lookup_helper_behaves() {
         assert!(by_name(RandomPlayer::NAME).is_some());
-        assert!(by_name(HeuristicV1::NAME).is_some());
+        assert!(by_name(Heuristic::NAME).is_some());
         assert!(by_name("NotARealAI").is_none());
     }
 }

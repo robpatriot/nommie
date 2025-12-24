@@ -319,7 +319,7 @@ describe('GameRoomClient', () => {
     mockFetchAiRegistryAction.mockResolvedValue({
       kind: 'ok',
       data: [
-        { name: 'HeuristicV1', version: '1.0.0' },
+        { name: 'Heuristic', version: '1.0.0' },
         { name: 'RandomPlayer', version: '1.0.0' },
       ],
     })

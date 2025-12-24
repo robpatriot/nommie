@@ -254,7 +254,7 @@ describe('GameRoomClient', () => {
     mockFetchAiRegistryAction.mockResolvedValue({
       kind: 'ok',
       data: [
-        { name: 'HeuristicV1', version: '1.0.0' },
+        { name: 'Heuristic', version: '1.0.0' },
         { name: 'RandomPlayer', version: '1.0.0' },
       ],
     })
@@ -366,7 +366,7 @@ describe('GameRoomClient', () => {
         resolveRegistry = () =>
           resolve({
             kind: 'ok',
-            data: [{ name: 'HeuristicV1', version: '1.0.0' }],
+            data: [{ name: 'Heuristic', version: '1.0.0' }],
           })
       })
       mockFetchAiRegistryAction.mockReturnValueOnce(registryPromise)

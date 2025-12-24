@@ -23,9 +23,9 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
   const registryError = registry?.error ?? null
   const preferredDefaultName =
     registry?.defaultName ??
-    registryEntries.find((entry) => entry.name === 'HeuristicV1')?.name ??
+    registryEntries.find((entry) => entry.name === 'Heuristic')?.name ??
     registryEntries[0]?.name ??
-    'HeuristicV1'
+    'Heuristic'
   const addDisabled =
     !aiState.canAdd ||
     aiState.isPending ||

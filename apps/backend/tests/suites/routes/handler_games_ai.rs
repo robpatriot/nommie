@@ -1,6 +1,6 @@
 use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
-use backend::ai::{HeuristicV1, RandomPlayer};
+use backend::ai::{Heuristic, RandomPlayer};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::{ai_profiles, game_players, games};
@@ -60,7 +60,7 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
         .uri(&format!("/api/games/{game_id}/ai/add"))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
-            "registry_name": HeuristicV1::NAME,
+            "registry_name": Heuristic::NAME,
             "lock_version": lock_version
         }))
         .to_request();
@@ -90,8 +90,8 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
     .one(shared.transaction())
     .await?
     .expect("AI profile exists");
-    assert_eq!(profile.registry_name, HeuristicV1::NAME);
-    assert_eq!(profile.registry_version, HeuristicV1::VERSION);
+    assert_eq!(profile.registry_name, Heuristic::NAME);
+    assert_eq!(profile.registry_version, Heuristic::VERSION);
 
     shared.rollback().await?;
     Ok(())
@@ -140,7 +140,7 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
         .uri(&format!("/api/games/{game_id}/ai/add"))
         .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
-            "registry_name": HeuristicV1::NAME,
+            "registry_name": Heuristic::NAME,
             "lock_version": lock_version
         }))
         .to_request();
@@ -397,8 +397,8 @@ async fn ai_registry_endpoint_lists_factories() -> Result<(), AppError> {
         .collect();
 
     assert!(
-        names.contains(&HeuristicV1::NAME),
-        "registry should include HeuristicV1"
+        names.contains(&Heuristic::NAME),
+        "registry should include Heuristic"
     );
     assert!(
         names.contains(&RandomPlayer::NAME),

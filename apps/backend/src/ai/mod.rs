@@ -78,7 +78,7 @@ mod random;
 pub mod registry;
 mod trait_def;
 
-pub use chatgpt_heuristic::HeuristicV1;
+pub use chatgpt_heuristic::Heuristic;
 pub use config::AiConfig;
 pub use memory::MemoryMode;
 pub use random::RandomPlayer;

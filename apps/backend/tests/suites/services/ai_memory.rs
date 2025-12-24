@@ -329,8 +329,8 @@ async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppEr
 
     let heuristic_profile = ai_profiles::find_by_registry_variant(
         txn,
-        backend::ai::HeuristicV1::NAME,
-        backend::ai::HeuristicV1::VERSION,
+        backend::ai::Heuristic::NAME,
+        backend::ai::Heuristic::VERSION,
         "default",
     )
     .await?

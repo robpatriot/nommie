@@ -1,4 +1,4 @@
-//! HeuristicV1 — a stronger, deterministic baseline AI for Nommie.
+//! Heuristic — a stronger, deterministic baseline AI for Nommie.
 //!
 //! Goals:
 //! - Stay 100% legal using the engine’s `legal_*()` helpers.
@@ -30,12 +30,12 @@ use crate::domain::player_view::CurrentRoundInfo;
 use crate::domain::{Card, GameContext, Suit, Trump};
 
 #[derive(Clone)]
-pub struct HeuristicV1 {
+pub struct Heuristic {
     _seed: Option<u64>, // reserved, currently unused for strict determinism
 }
 
-impl HeuristicV1 {
-    pub const NAME: &'static str = "HeuristicV1";
+impl Heuristic {
+    pub const NAME: &'static str = "Heuristic";
     pub const VERSION: &'static str = "1.0.0";
 
     pub fn new(seed: Option<u64>) -> Self {
@@ -304,7 +304,7 @@ impl HeuristicV1 {
     }
 }
 
-impl AiPlayer for HeuristicV1 {
+impl AiPlayer for Heuristic {
     fn choose_bid(&self, state: &CurrentRoundInfo, _cx: &GameContext) -> Result<u8, AiError> {
         let legal = state.legal_bids();
         if legal.is_empty() {

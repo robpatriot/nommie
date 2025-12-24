@@ -639,7 +639,7 @@ impl MigrationTrait for Migration {
                         "INSERT INTO ai_profiles \
                          (registry_name, registry_version, variant, display_name, playstyle, difficulty, config, memory_level, created_at, updated_at) VALUES \
                          ('RandomPlayer','1.0.0','default','Random Player','random',NULL,'{}',50,now(),now()), \
-                         ('HeuristicV1','1.0.0','default','Heuristic V1','heuristic',NULL,'{}',80,now(),now()) \
+                         ('Heuristic','1.0.0','default','Heuristic','heuristic',NULL,'{}',80,now(),now()) \
                          ON CONFLICT (registry_name, registry_version, variant) DO NOTHING;",
                     ))
                     .await?;
@@ -652,7 +652,7 @@ impl MigrationTrait for Migration {
                         "INSERT OR IGNORE INTO ai_profiles \
                          (registry_name, registry_version, variant, display_name, playstyle, difficulty, config, memory_level, created_at, updated_at) VALUES \
                          ('RandomPlayer','1.0.0','default','Random Player','random',NULL,'{}',50,datetime('now'),datetime('now')), \
-                         ('HeuristicV1','1.0.0','default','Heuristic V1','heuristic',NULL,'{}',80,datetime('now'),datetime('now'));",
+                         ('Heuristic','1.0.0','default','Heuristic','heuristic',NULL,'{}',80,datetime('now'),datetime('now'));",
                     ))
                     .await?;
             }
