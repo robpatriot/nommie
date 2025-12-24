@@ -1191,7 +1191,9 @@ async fn add_ai_seat(
     let request = body.into_inner();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
-    let lock_version = request.lock_version;
+    // Note: lock_version from request is not used - we fetch current game state
+    // after add_ai_to_game which may have started the game and updated lock_version
+    let _lock_version = request.lock_version;
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
@@ -1329,25 +1331,41 @@ async fn add_ai_seat(
                 config: override_config,
             };
 
+            // Check if adding this AI will complete all 4 players and start the game
+            // This determines whether we need to touch_game after (game won't start) or not (game will start)
+            let will_complete_players = existing_memberships.len() == 3;
+            let all_existing_ready = existing_memberships.iter().all(|m| m.is_ready);
+            let game_will_start = will_complete_players && all_existing_ready;
+
             ai_service
                 .add_ai_to_game(txn, id, ai_profile.id, seat_to_fill, Some(overrides))
                 .await
                 .map_err(AppError::from)?;
 
-            // Touch game to increment lock_version so websocket clients receive the update
-            tracing::debug!(
-                game_id = id,
-                expected_lock_version = lock_version,
-                "DEBUG: add_ai_seat - touching game"
-            );
-            let updated_game = games_repo::touch_game(txn, id, lock_version)
-                .await
-                .map_err(AppError::from)?;
-            tracing::debug!(
-                game_id = id,
-                new_lock_version = updated_game.lock_version,
-                "DEBUG: add_ai_seat - lock_version updated"
-            );
+            // Only touch game if it didn't start (not all 4 players ready, or not all existing were ready)
+            // If game started, lock_version was already updated by deal_round/process_game_state
+            if !game_will_start {
+                // Use lock_version from request (consistent with leave_game pattern)
+                // The game state hasn't changed (still in Lobby), so lock_version is still valid
+                tracing::debug!(
+                    game_id = id,
+                    expected_lock_version = _lock_version,
+                    "DEBUG: add_ai_seat - touching game (lobby, game didn't start)"
+                );
+                let updated_game = games_repo::touch_game(txn, id, _lock_version)
+                    .await
+                    .map_err(AppError::from)?;
+                tracing::debug!(
+                    game_id = id,
+                    new_lock_version = updated_game.lock_version,
+                    "DEBUG: add_ai_seat - lock_version updated (lobby)"
+                );
+            } else {
+                tracing::debug!(
+                    game_id = id,
+                    "DEBUG: add_ai_seat - game will start, skipping touch_game (lock_version updated by deal_round/process_game_state)"
+                );
+            }
             Ok(())
         })
     })
