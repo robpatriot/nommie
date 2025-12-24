@@ -38,7 +38,7 @@ export function PlayerActions({
     )
   }
 
-  if (phase.phase === 'TrumpSelect') {
+  if (phase.phase === 'TrumpSelect' && trump?.canSelect) {
     return (
       <TrumpSelectPanel
         phase={phase.data}
