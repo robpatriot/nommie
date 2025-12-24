@@ -68,7 +68,12 @@
         "shareLink": "Share link",
         "copyInvite": "Copy invite",
         "copySuccess": "Invite link copied",
-        "copyError": "Could not copy link. Please copy from the address bar."
+        "copyError": "Could not copy link. Please copy from the address bar.",
+        "leaveGame": "Leave game",
+        "leaveGameLabel": "Leave",
+        "leaveGameAria": "Leave this game and return to lobby",
+        "leaving": "Leaving...",
+        "leavingAria": "Leaving game"
       }
     },
     "setupSeats": {

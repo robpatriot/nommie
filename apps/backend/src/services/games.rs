@@ -595,21 +595,7 @@ impl GameService {
         user_id: i64,
     ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
         // Fetch game and verify it exists
-        let game = games_repo::find_by_id(txn, game_id)
-            .await
-            .map_err(|e| {
-                AppError::internal(
-                    crate::errors::ErrorCode::InternalError,
-                    format!("failed to fetch game: {e}"),
-                    e,
-                )
-            })?
-            .ok_or_else(|| {
-                AppError::not_found(
-                    crate::errors::ErrorCode::GameNotFound,
-                    format!("Game {game_id} not found"),
-                )
-            })?;
+        let game = games_repo::require_game(txn, game_id).await?;
 
         // Verify game is in LOBBY state
         if game.state != DbGameState::Lobby {
@@ -723,6 +709,56 @@ impl GameService {
             .map_err(AppError::from)?;
 
         let game = games_repo::require_game(txn, game_id)
+            .await
+            .map_err(AppError::from)?;
+
+        Ok((game, updated_memberships))
+    }
+
+    /// Remove a user from a game.
+    ///
+    /// This deletes the user's membership and returns the updated game state.
+    /// Only allowed when the game is in Lobby state.
+    ///
+    /// Returns the updated game and remaining memberships.
+    pub async fn leave_game(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        user_id: i64,
+    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
+        // Fetch game and verify it exists
+        let game = games_repo::require_game(txn, game_id).await?;
+
+        // Verify game is in LOBBY state
+        if game.state != DbGameState::Lobby {
+            return Err(AppError::bad_request(
+                crate::errors::ErrorCode::PhaseMismatch,
+                format!(
+                    "Cannot leave game: game is not in LOBBY state (current state: {:?})",
+                    game.state
+                ),
+            ));
+        }
+
+        // Find the user's membership
+        let membership = memberships::find_membership(txn, game_id, user_id)
+            .await
+            .map_err(AppError::from)?
+            .ok_or_else(|| {
+                AppError::bad_request(
+                    crate::errors::ErrorCode::ValidationError,
+                    format!("User {} is not a member of game {}", user_id, game_id),
+                )
+            })?;
+
+        // Delete the membership
+        memberships::delete_membership(txn, membership.id)
+            .await
+            .map_err(AppError::from)?;
+
+        // Fetch updated memberships (game record hasn't changed, so reuse the one we already have)
+        let updated_memberships = memberships::find_all_by_game(txn, game_id)
             .await
             .map_err(AppError::from)?;
 

@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   markPlayerReadyAction,
+  leaveGameAction,
   submitBidAction,
   selectTrumpAction,
   submitPlayAction,
@@ -38,6 +39,29 @@ export function useMarkPlayerReady() {
       }
     },
     onSuccess: (_, { gameId }) => {
+      // Invalidate game snapshot so it refreshes with updated state
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.snapshot(gameId),
+      })
+    },
+  })
+}
+
+/**
+ * Mutation hook to leave a game.
+ * Invalidates game snapshot cache on success and navigates to lobby.
+ */
+export function useLeaveGame() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (gameId: number): Promise<void> => {
+      const result = await leaveGameAction(gameId)
+      if (result.kind === 'error') {
+        throw handleActionResultError(result)
+      }
+    },
+    onSuccess: (_, gameId) => {
       // Invalidate game snapshot so it refreshes with updated state
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(gameId),

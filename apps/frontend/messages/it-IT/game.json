@@ -68,7 +68,12 @@
         "shareLink": "Condividi link",
         "copyInvite": "Copia invito",
         "copySuccess": "Link d’invito copiato",
-        "copyError": "Impossibile copiare il link. Copialo dalla barra degli indirizzi."
+        "copyError": "Impossibile copiare il link. Copialo dalla barra degli indirizzi.",
+        "leaveGame": "Lascia partita",
+        "leaveGameLabel": "Lascia",
+        "leaveGameAria": "Lascia questa partita e torna al lobby",
+        "leaving": "Lasciando...",
+        "leavingAria": "Lasciando la partita"
       }
     },
     "setupSeats": {

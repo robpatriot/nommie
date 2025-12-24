@@ -5,6 +5,7 @@ import { BackendApiError } from '@/lib/api'
 import {
   fetchGameSnapshot,
   markPlayerReady,
+  leaveGame,
   submitBid,
   selectTrump,
   submitPlay,
@@ -107,6 +108,18 @@ export async function markPlayerReadyAction(
   } catch (error) {
     const t = await getTranslations('errors.actions')
     return toErrorResult(error, t('failedToMarkPlayerReady'))
+  }
+}
+
+export async function leaveGameAction(
+  gameId: number
+): Promise<SimpleActionResult> {
+  try {
+    await leaveGame(gameId)
+    return { kind: 'ok' }
+  } catch (error) {
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToLeaveGame'))
   }
 }
 

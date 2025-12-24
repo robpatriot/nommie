@@ -49,6 +49,8 @@ export interface UseGameSyncResult {
   connectionState: ConnectionState
   syncError: GameRoomError | null
   isRefreshing: boolean
+  disconnect: () => void
+  connect: () => Promise<void>
 }
 
 interface UseGameSyncOptions {
@@ -303,6 +305,15 @@ export function useGameSync({
     }
   }, [fetchWsToken, gameId, resolveWsUrl, scheduleReconnect])
 
+  const disconnect = useCallback(() => {
+    shouldReconnectRef.current = false
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
+    }
+    wsRef.current?.close()
+  }, [])
+
   useEffect(() => {
     void connect()
     return () => {
@@ -320,5 +331,7 @@ export function useGameSync({
     connectionState,
     syncError,
     isRefreshing,
+    disconnect,
+    connect,
   }
 }

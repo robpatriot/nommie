@@ -61,13 +61,35 @@ async fn join_game_and_touch(
     initial_lock_version: i32,
 ) -> Result<(games_repo::Game, Vec<memberships::GameMembership>, i32), AppError> {
     let service = GameService;
-    let (_updated_game, memberships) = service.join_game(txn, game_id, user_id).await?;
+    let (_game, memberships) = service.join_game(txn, game_id, user_id).await?;
 
     // Touch game to increment lock_version so WebSocket clients receive the update
     let final_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
     let lock_version = final_game.lock_version;
 
     Ok((final_game, memberships, lock_version))
+}
+
+/// Helper that leaves a game and touches it to increment lock_version.
+///
+/// This helper encapsulates the common pattern of removing a user from a game
+/// and incrementing the game's lock_version so that WebSocket clients receive
+/// updates about the player leaving.
+///
+/// Returns the new lock_version.
+async fn leave_game_and_touch(
+    txn: &sea_orm::DatabaseTransaction,
+    game_id: i64,
+    user_id: i64,
+    initial_lock_version: i32,
+) -> Result<i32, AppError> {
+    let service = GameService;
+    service.leave_game(txn, game_id, user_id).await?;
+
+    // Touch game to increment lock_version so WebSocket clients receive the update
+    let final_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
+
+    Ok(final_game.lock_version)
 }
 
 async fn build_snapshot_parts(
@@ -81,49 +103,11 @@ async fn build_snapshot_parts(
         Option<Seat>,
         Option<Vec<String>>,
         Option<BidConstraintsResponse>,
-        bool,
     ),
     AppError,
 > {
     // Fetch game from database to get lock_version
-    let mut game = games_repo::require_game(txn, game_id).await?;
-    let initial_lock_version = game.lock_version;
-    let mut join_occurred = false;
-
-    // Ensure the current user is a member for lobby games when possible.
-    // This powers the invite-link flow: navigating to the game URL will join
-    // the user into the lobby if the game is joinable.
-    if game.state == GameState::Lobby {
-        let existing_memberships = memberships::find_all_by_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-
-        let already_member = existing_memberships
-            .iter()
-            .any(|m| m.user_id == Some(current_user_id));
-
-        if !already_member {
-            // Ignore specific "already a member" conflicts just in case of races;
-            // other errors propagate so the caller can surface them.
-            match join_game_and_touch(txn, game_id, current_user_id, initial_lock_version).await {
-                Ok((updated_game, _, _)) => {
-                    game = updated_game;
-                    join_occurred = true;
-                }
-                Err(err) => {
-                    if !matches!(
-                        err,
-                        AppError::Conflict {
-                            code: ErrorCode::Conflict,
-                            ..
-                        }
-                    ) {
-                        return Err(err);
-                    }
-                }
-            }
-        }
-    }
+    let game = games_repo::require_game(txn, game_id).await?;
 
     // Create game service and load game state
     let game_service = crate::services::games::GameService;
@@ -251,7 +235,6 @@ async fn build_snapshot_parts(
         viewer_seat,
         viewer_hand,
         bid_constraints,
-        join_occurred,
     ))
 }
 
@@ -262,16 +245,11 @@ pub(crate) async fn build_snapshot_response(
     current_user: &CurrentUser,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
     let current_user_id = current_user.id;
-    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints, join_occurred) =
+    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
         with_txn(http_req, app_state, |txn| {
             Box::pin(async move { build_snapshot_parts(txn, game_id, current_user_id).await })
         })
         .await?;
-
-    // If a join occurred, publish a snapshot broadcast so other players' UIs update
-    if join_occurred {
-        publish_snapshot_with_lock(app_state, game_id, lock_version).await?;
-    }
 
     let response = GameSnapshotResponse {
         snapshot,
@@ -288,7 +266,7 @@ pub(crate) async fn build_snapshot_response_in_txn(
     game_id: i64,
     current_user_id: i64,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
-    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints, _join_occurred) =
+    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
         build_snapshot_parts(txn, game_id, current_user_id).await?;
 
     // Note: We don't publish broadcasts here since we're inside a transaction.
@@ -771,6 +749,36 @@ async fn join_game(
     let response = game_to_response(&game_model, &memberships, Some(user_id))?;
 
     Ok(web::Json(JoinGameResponse { game: response }))
+}
+
+/// DELETE /api/games/{gameId}/leave
+///
+/// Removes the current user from the specified game.
+async fn leave_game(
+    http_req: HttpRequest,
+    game_id: GameId,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let user_id = current_user.id;
+    let id = game_id.0;
+
+    // Leave game using service layer
+    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            // Fetch game to get initial lock_version
+            let game = games_repo::require_game(txn, id).await?;
+            let initial_lock_version = game.lock_version;
+
+            leave_game_and_touch(txn, id, user_id, initial_lock_version).await
+        })
+    })
+    .await?;
+
+    // Publish snapshot broadcast so other players' UIs update
+    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
+
+    Ok(HttpResponse::NoContent().finish())
 }
 
 /// GET /api/games/joinable
@@ -1680,6 +1688,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/in-progress").route(web::get().to(list_in_progress_games)));
     cfg.service(web::resource("/last-active").route(web::get().to(get_last_active_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
+    cfg.service(web::resource("/{game_id}/leave").route(web::delete().to(leave_game)));
     cfg.service(web::resource("/{game_id}/ready").route(web::post().to(mark_ready)));
     cfg.service(web::resource("/ai/registry").route(web::get().to(list_registered_ais)));
     cfg.service(web::resource("/{game_id}/ai/add").route(web::post().to(add_ai_seat)));

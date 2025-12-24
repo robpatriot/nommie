@@ -97,8 +97,14 @@ const mockUseRemoveAiSeat = vi.fn(() => ({
   isPending: false,
 }))
 
+const mockUseLeaveGame = vi.fn(() => ({
+  mutateAsync: (_gameId: number) => Promise.resolve(),
+  isPending: false,
+}))
+
 vi.mock('@/hooks/mutations/useGameRoomMutations', () => ({
   useMarkPlayerReady: () => mockUseMarkPlayerReady(),
+  useLeaveGame: () => mockUseLeaveGame(),
   useSubmitBid: () => mockUseSubmitBid(),
   useSelectTrump: () => mockUseSelectTrump(),
   useSubmitPlay: () => mockUseSubmitPlay(),

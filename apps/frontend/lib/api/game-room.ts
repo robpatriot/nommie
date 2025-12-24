@@ -112,6 +112,12 @@ export async function markPlayerReady(
   })
 }
 
+export async function leaveGame(gameId: number): Promise<void> {
+  await fetchWithAuth(`/api/games/${gameId}/leave`, {
+    method: 'DELETE',
+  })
+}
+
 export async function submitBid(
   gameId: number,
   bid: number,

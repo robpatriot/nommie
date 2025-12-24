@@ -68,7 +68,12 @@
         "shareLink": "Link teilen",
         "copyInvite": "Einladung kopieren",
         "copySuccess": "Einladungslink kopiert",
-        "copyError": "Link konnte nicht kopiert werden. Bitte kopiere ihn aus der Adressleiste."
+        "copyError": "Link konnte nicht kopiert werden. Bitte kopiere ihn aus der Adressleiste.",
+        "leaveGame": "Spiel verlassen",
+        "leaveGameLabel": "Verlassen",
+        "leaveGameAria": "Dieses Spiel verlassen und zur Lobby zurückkehren",
+        "leaving": "Verlassen...",
+        "leavingAria": "Spiel wird verlassen"
       }
     },
     "setupSeats": {

@@ -69,6 +69,8 @@ export interface GameRoomViewProps {
   }
   requireCardConfirmation?: boolean
   onCopyInvite?: () => void
+  onLeaveGame?: () => void
+  isLeavePending?: boolean
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
@@ -89,6 +91,8 @@ export function GameRoomView(props: GameRoomViewProps) {
     aiSeatState,
     requireCardConfirmation = true,
     onCopyInvite,
+    onLeaveGame,
+    isLeavePending = false,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -416,37 +420,79 @@ export function GameRoomView(props: GameRoomViewProps) {
                         </span>
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={onCopyInvite}
-                      className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                      aria-label={t('setup.quickActions.copyInviteAria')}
-                    >
-                      <div className="space-y-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
-                          {t('setup.quickActions.shareLink')}
-                        </p>
-                        <p className="text-base font-semibold text-foreground">
-                          {t('setup.quickActions.copyInvite')}
-                        </p>
-                      </div>
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
-                        <svg
-                          aria-hidden="true"
-                          className="h-5 w-5"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.8}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                          <path d="M15 3h6v6" />
-                          <path d="m10 14 11-11" />
-                        </svg>
-                      </span>
-                    </button>
+                    {onCopyInvite ? (
+                      <button
+                        type="button"
+                        onClick={onCopyInvite}
+                        className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                        aria-label={t('setup.quickActions.copyInviteAria')}
+                      >
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                            {t('setup.quickActions.shareLink')}
+                          </p>
+                          <p className="text-base font-semibold text-foreground">
+                            {t('setup.quickActions.copyInvite')}
+                          </p>
+                        </div>
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
+                          <svg
+                            aria-hidden="true"
+                            className="h-5 w-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <path d="M15 3h6v6" />
+                            <path d="m10 14 11-11" />
+                          </svg>
+                        </span>
+                      </button>
+                    ) : null}
+                    {onLeaveGame ? (
+                      <button
+                        type="button"
+                        onClick={onLeaveGame}
+                        disabled={isLeavePending}
+                        className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-destructive/50 hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label={
+                          isLeavePending
+                            ? t('setup.quickActions.leavingAria')
+                            : t('setup.quickActions.leaveGameAria')
+                        }
+                      >
+                        <div className="space-y-1">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                            {t('setup.quickActions.leaveGame')}
+                          </p>
+                          <p className="text-base font-semibold text-foreground">
+                            {isLeavePending
+                              ? t('setup.quickActions.leaving')
+                              : t('setup.quickActions.leaveGameLabel')}
+                          </p>
+                        </div>
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
+                          <svg
+                            aria-hidden="true"
+                            className="h-5 w-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={1.8}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" x2="9" y1="12" y2="12" />
+                          </svg>
+                        </span>
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </>

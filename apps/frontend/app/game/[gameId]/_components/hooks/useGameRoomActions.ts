@@ -1,11 +1,13 @@
 import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
+import { useRouter } from 'next/navigation'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import type { Trump } from '@/lib/game-room/types'
 import type { ToastMessage } from '@/components/Toast'
 import {
   useMarkPlayerReady,
+  useLeaveGame,
   useSubmitBid,
   useSelectTrump,
   useSubmitPlay,
@@ -24,6 +26,8 @@ interface UseGameRoomActionsProps {
     type: ToastMessage['type'],
     error?: BackendApiError
   ) => string
+  disconnect: () => void
+  connect: () => Promise<void>
 }
 
 /**
@@ -36,19 +40,24 @@ export function useGameRoomActions({
   hasMarkedReady,
   setHasMarkedReady,
   showToast,
+  disconnect,
+  connect,
 }: UseGameRoomActionsProps) {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const t = useTranslations('toasts')
   const tErrors = useTranslations('toasts.gameRoom.errors')
 
   // Mutations
   const markPlayerReadyMutation = useMarkPlayerReady()
+  const leaveGameMutation = useLeaveGame()
   const submitBidMutation = useSubmitBid()
   const selectTrumpMutation = useSelectTrump()
   const submitPlayMutation = useSubmitPlay()
 
   // Pending states from mutations
   const isReadyPending = markPlayerReadyMutation.isPending
+  const isLeavePending = leaveGameMutation.isPending
   const isBidPending = submitBidMutation.isPending
   const isTrumpPending = selectTrumpMutation.isPending
   const isPlayPending = submitPlayMutation.isPending
@@ -201,14 +210,57 @@ export function useGameRoomActions({
     ]
   )
 
+  const handleLeaveGame = useCallback(async () => {
+    if (isLeavePending) {
+      return
+    }
+
+    // Close WebSocket BEFORE leaving to prevent broadcasts from reaching non-member
+    disconnect()
+
+    try {
+      await leaveGameMutation.mutateAsync(gameId)
+      showToast(t('gameRoom.leftGameSuccess'), 'success')
+      router.push('/lobby')
+    } catch (err) {
+      // First, understand what error occurred
+      const backendError = toQueryError(err, tErrors('unableToLeaveGame'))
+
+      // Then, determine the appropriate message based on the error
+      let message = backendError.message
+      if (backendError.code === 'PHASE_MISMATCH') {
+        message = tErrors('gameStartedCannotLeave')
+      }
+
+      // Now reconnect since leave failed (they're still in the game)
+      connect()
+
+      // Finally, show the error message
+      showToast(message, 'error', backendError)
+      // Don't navigate - keep them on the game page since they're still in it
+    }
+  }, [
+    gameId,
+    isLeavePending,
+    leaveGameMutation,
+    router,
+    showToast,
+    t,
+    tErrors,
+    disconnect,
+    connect,
+  ])
+
   return {
     // Action handlers
     markReady,
+    handleLeaveGame,
     handleSubmitBid,
     handleSelectTrump,
     handlePlayCard,
     // Pending states from mutations
     isReadyPending,
+    isLeavePending,
     isBidPending,
     isTrumpPending,
     isPlayPending,

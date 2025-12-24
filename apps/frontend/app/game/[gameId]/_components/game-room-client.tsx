@@ -45,6 +45,8 @@ export function GameRoomClient({
     refreshSnapshot,
     syncError,
     isRefreshing: syncIsRefreshing,
+    disconnect,
+    connect,
   } = useGameSync({ initialData, gameId })
 
   const { toasts, showToast, hideToast } = useToast()
@@ -89,10 +91,12 @@ export function GameRoomClient({
   // Game room actions
   const {
     markReady,
+    handleLeaveGame,
     handleSubmitBid,
     handleSelectTrump,
     handlePlayCard,
     isReadyPending,
+    isLeavePending,
     isBidPending,
     isTrumpPending,
     isPlayPending,
@@ -102,6 +106,8 @@ export function GameRoomClient({
     hasMarkedReady,
     setHasMarkedReady,
     showToast,
+    disconnect,
+    connect,
   })
 
   // Game room controls
@@ -162,6 +168,8 @@ export function GameRoomClient({
         aiSeatState={aiSeatState}
         requireCardConfirmation={requireCardConfirmation}
         onCopyInvite={handleCopyInvite}
+        onLeaveGame={handleLeaveGame}
+        isLeavePending={isLeavePending}
       />
       <Toast toasts={toasts} onClose={hideToast} />
     </>
