@@ -1,10 +1,19 @@
 'use client'
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import {
+  QueryClient,
+  QueryClientProvider,
+  MutationCache,
+  QueryCache,
+} from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState } from 'react'
 import { BackendApiError } from '@/lib/errors'
 import { isNetworkError } from '@/lib/retry'
+import {
+  clearBackendSessionClient,
+  redirectToHomeClient,
+} from '@/lib/auth/clear-session-client'
 
 /**
  * Helper to check if a 5xx error is transient (should be retried).
@@ -33,6 +42,32 @@ export function AppQueryClientProvider({
   const [queryClient] = useState(
     () =>
       new QueryClient({
+        mutationCache: new MutationCache({
+          onError: (error) => {
+            // Handle session clearing for stale user sessions
+            if (
+              error instanceof BackendApiError &&
+              error.status === 401 &&
+              error.code === 'FORBIDDEN_USER_NOT_FOUND'
+            ) {
+              clearBackendSessionClient()
+              redirectToHomeClient()
+            }
+          },
+        }),
+        queryCache: new QueryCache({
+          onError: (error) => {
+            // Handle session clearing for stale user sessions
+            if (
+              error instanceof BackendApiError &&
+              error.status === 401 &&
+              error.code === 'FORBIDDEN_USER_NOT_FOUND'
+            ) {
+              clearBackendSessionClient()
+              redirectToHomeClient()
+            }
+          },
+        }),
         defaultOptions: {
           queries: {
             // Stale time: how long data is considered fresh
