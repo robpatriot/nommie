@@ -68,6 +68,7 @@ export interface GameRoomViewProps {
     lastSyncedAt?: string
   }
   requireCardConfirmation?: boolean
+  onCopyInvite?: () => void
 }
 
 export function GameRoomView(props: GameRoomViewProps) {
@@ -87,6 +88,7 @@ export function GameRoomView(props: GameRoomViewProps) {
     playState,
     aiSeatState,
     requireCardConfirmation = true,
+    onCopyInvite,
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
@@ -416,10 +418,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => {
-                        const url = window.location.href
-                        void navigator.clipboard.writeText(url)
-                      }}
+                      onClick={onCopyInvite}
                       className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                       aria-label={t('setup.quickActions.copyInviteAria')}
                     >

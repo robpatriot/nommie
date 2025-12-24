@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 
 import { GameRoomClient } from './_components/game-room-client'
+import { GameJoinErrorClient } from './_components/GameJoinErrorClient'
 import ErrorBoundaryWithTranslations from '@/components/ErrorBoundaryWithTranslations'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
@@ -37,18 +38,23 @@ export default async function GamePage({
   try {
     snapshotResult = await fetchGameSnapshot(resolvedGameId)
   } catch (error) {
-    // Check if this is a backend startup error
-    const isStartupError =
-      (error instanceof BackendApiError &&
-        (error.status === 503 || error.code === 'BACKEND_STARTING')) ||
-      isBackendStartupError(error, isInStartupWindow)
+    if (error instanceof BackendApiError) {
+      const isStartupError =
+        error.status === 503 ||
+        error.code === 'BACKEND_STARTING' ||
+        isBackendStartupError(error, isInStartupWindow)
 
-    if (isStartupError) {
-      // Backend is starting up - redirect to lobby where user can retry
+      if (isStartupError) {
+        redirect('/lobby')
+      }
+
+      return <GameJoinErrorClient code={error.code} status={error.status} />
+    }
+
+    if (isBackendStartupError(error, isInStartupWindow)) {
       redirect('/lobby')
     }
 
-    // For other errors (game not found, auth issues, etc.), let ErrorBoundary handle it
     throw error
   }
 

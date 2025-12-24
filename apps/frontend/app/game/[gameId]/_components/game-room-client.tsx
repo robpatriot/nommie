@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import { useTranslations } from 'next-intl'
 
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import Toast from '@/components/Toast'
@@ -47,6 +48,7 @@ export function GameRoomClient({
   } = useGameSync({ initialData, gameId })
 
   const { toasts, showToast, hideToast } = useToast()
+  const tGame = useTranslations('game.gameRoom')
 
   // Combine errors from query and WebSocket (mutations handle their own errors)
   const combinedError = syncError ?? getGameRoomError(queryError)
@@ -123,6 +125,18 @@ export function GameRoomClient({
     showToast,
   })
 
+  const handleCopyInvite = () => {
+    const url = window.location.href
+    void navigator.clipboard
+      .writeText(url)
+      .then(() => {
+        showToast(tGame('setup.quickActions.copySuccess'), 'success')
+      })
+      .catch(() => {
+        showToast(tGame('setup.quickActions.copyError'), 'error')
+      })
+  }
+
   return (
     <>
       <GameRoomView
@@ -147,6 +161,7 @@ export function GameRoomClient({
         playState={playControls}
         aiSeatState={aiSeatState}
         requireCardConfirmation={requireCardConfirmation}
+        onCopyInvite={handleCopyInvite}
       />
       <Toast toasts={toasts} onClose={hideToast} />
     </>
