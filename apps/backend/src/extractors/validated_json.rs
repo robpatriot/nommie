@@ -6,11 +6,10 @@ use bytes::BytesMut;
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 use serde_json::Error as JsonError;
-use tracing::{debug, warn};
+use tracing::warn;
 
 use crate::error::AppError;
 use crate::errors::ErrorCode;
-use crate::logging::pii::Redacted;
 
 /// Validated JSON extractor that provides standardized error handling for JSON parse/validation failures
 ///
@@ -48,17 +47,8 @@ where
     type Error = AppError;
     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self, Self::Error>>>>;
 
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let req = req.clone();
+    fn from_request(_req: &HttpRequest, payload: &mut Payload) -> Self::Future {
         let mut payload = payload.take();
-
-        // Extract content type before creating the async future to avoid borrow-across-await
-        let content_type = req
-            .headers()
-            .get("content-type")
-            .and_then(|ct| ct.to_str().ok())
-            .unwrap_or("")
-            .to_string();
 
         Box::pin(async move {
             // Collect the request body into BytesMut
@@ -80,14 +70,6 @@ where
             // Attempt to parse JSON
             let parsed = serde_json::from_slice::<T>(&body).map_err(|e| {
                 let detail = classify_json_error(&e);
-
-                debug!(
-                    error = %Redacted(&e.to_string()),
-                    content_type = %content_type,
-                    body_size = body.len(),
-                    "JSON parsing failed"
-                );
-
                 AppError::bad_request(ErrorCode::BadRequest, detail)
             })?;
 
