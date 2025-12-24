@@ -47,6 +47,29 @@ pub(crate) struct BidConstraintsResponse {
     zero_bid_locked: bool,
 }
 
+/// Join a user to a game and touch the game to trigger WebSocket broadcasts.
+///
+/// This helper encapsulates the common pattern of joining a user to a game
+/// and incrementing the game's lock_version so that WebSocket clients receive
+/// updates about the new player.
+///
+/// Returns the updated game, all memberships, and the new lock_version.
+async fn join_game_and_touch(
+    txn: &sea_orm::DatabaseTransaction,
+    game_id: i64,
+    user_id: i64,
+    initial_lock_version: i32,
+) -> Result<(games_repo::Game, Vec<memberships::GameMembership>, i32), AppError> {
+    let service = GameService;
+    let (_updated_game, memberships) = service.join_game(txn, game_id, user_id).await?;
+
+    // Touch game to increment lock_version so WebSocket clients receive the update
+    let final_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
+    let lock_version = final_game.lock_version;
+
+    Ok((final_game, memberships, lock_version))
+}
+
 async fn build_snapshot_parts(
     txn: &sea_orm::DatabaseTransaction,
     game_id: i64,
@@ -80,15 +103,11 @@ async fn build_snapshot_parts(
             .any(|m| m.user_id == Some(current_user_id));
 
         if !already_member {
-            let service = crate::services::games::GameService;
             // Ignore specific "already a member" conflicts just in case of races;
             // other errors propagate so the caller can surface them.
-            match service.join_game(txn, game_id, current_user_id).await {
-                Ok(_) => {
-                    // Touch game to increment lock_version so websocket clients receive the update
-                    game = games_repo::touch_game(txn, game_id, initial_lock_version)
-                        .await
-                        .map_err(AppError::from)?;
+            match join_game_and_touch(txn, game_id, current_user_id, initial_lock_version).await {
+                Ok((updated_game, _, _)) => {
+                    game = updated_game;
                     join_occurred = true;
                 }
                 Err(err) => {
@@ -735,13 +754,19 @@ async fn join_game(
     let id = game_id.0;
 
     // Join game using service layer (handles validation, seat assignment, membership creation)
-    let (game_model, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
+    let (game_model, memberships, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let service = GameService;
-            service.join_game(txn, id, user_id).await
+            // Fetch game to get initial lock_version
+            let game = games_repo::require_game(txn, id).await?;
+            let initial_lock_version = game.lock_version;
+
+            join_game_and_touch(txn, id, user_id, initial_lock_version).await
         })
     })
     .await?;
+
+    // Publish snapshot broadcast so other players' UIs update
+    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
 
     let response = game_to_response(&game_model, &memberships, Some(user_id))?;
 
