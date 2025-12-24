@@ -127,10 +127,9 @@ function main() {
       if (!rawKey) continue
       if (rawKey.includes('${')) continue // skip template literals
       if (!rawKey.includes('.')) continue // skip bare keys we can't namespace
-      // Only treat as fully qualified if it actually exists in the default locale
-      if (knownKeys.has(rawKey)) {
-        usedKeys.add(rawKey)
-      }
+      // Track all literal keys used in translation calls, regardless of whether they exist
+      // This allows us to detect missing keys that are used but not yet defined
+      usedKeys.add(rawKey)
     }
 
     // 2) useTranslations('game') + t('foo.bar') → assume 'game.foo.bar'
@@ -157,10 +156,9 @@ function main() {
           if (!NAMESPACES.includes(ns)) continue
           if (!suffix.includes('.')) continue
           const candidate = `${ns}.${suffix}`
-          // Only record candidates that actually exist in the default locale keys
-          if (knownKeys.has(candidate)) {
-            usedKeys.add(candidate)
-          }
+          // Track all literal keys used in translation calls, regardless of whether they exist
+          // This allows us to detect missing keys that are used but not yet defined
+          usedKeys.add(candidate)
         }
       }
     }
@@ -173,7 +171,34 @@ function main() {
     if (!NAMESPACES.some((ns) => key.startsWith(`${ns}.`))) continue
     if (DYNAMIC_PREFIXES.some((p) => key.startsWith(p))) continue
 
-    if (!knownKeys.has(key)) {
+    // Skip if the key already exists
+    if (knownKeys.has(key)) continue
+
+    // Check if a longer path exists that would make this a false positive
+    // For example, if "lobby.gameList.fields.players" exists, don't report "lobby.fields.players" as missing
+    let isFalsePositive = false
+    for (const existingKey of knownKeys) {
+      // If an existing key is a longer path that contains this key's suffix, it's likely a false positive
+      // e.g., "lobby.gameList.fields.players" contains "fields.players" which matches "lobby.fields.players"
+      const keyParts = key.split('.')
+      const existingParts = existingKey.split('.')
+
+      if (existingParts.length > keyParts.length) {
+        // Check if the suffix of the key matches the suffix of the existing key
+        const keySuffix = keyParts.slice(1).join('.') // Remove namespace prefix
+        const existingSuffix = existingParts.slice(1).join('.') // Remove namespace prefix
+
+        if (
+          existingSuffix === keySuffix ||
+          existingSuffix.endsWith('.' + keySuffix)
+        ) {
+          isFalsePositive = true
+          break
+        }
+      }
+    }
+
+    if (!isFalsePositive) {
       missing.push(key)
     }
   }
