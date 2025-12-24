@@ -56,7 +56,12 @@ impl GameFlowService {
 
         // Update DB: state and round number
         let starting_dealer_pos = if next_round == 1 { Some(0) } else { None };
-        games::update_game(
+        tracing::debug!(
+            game_id = game_id,
+            expected_lock_version = game.lock_version,
+            "DEBUG: start_round - updating game"
+        );
+        let updated_game = games::update_game(
             txn,
             game_id,
             game.lock_version,
@@ -66,6 +71,11 @@ impl GameFlowService {
             None,
         )
         .await?;
+        tracing::debug!(
+            game_id = game_id,
+            new_lock_version = updated_game.lock_version,
+            "DEBUG: start_round - lock_version updated"
+        );
 
         // Reload game to get updated values for hand_size and dealer_pos computation
         let updated_game = games::require_game(txn, game_id).await?;
@@ -240,7 +250,12 @@ impl GameFlowService {
             DbGameState::Bidding
         };
 
-        games::update_game(
+        tracing::debug!(
+            game_id = game_id,
+            expected_lock_version = game.lock_version,
+            "DEBUG: score_round_internal - updating game"
+        );
+        let updated_game = games::update_game(
             txn,
             game_id,
             game.lock_version,
@@ -250,6 +265,11 @@ impl GameFlowService {
             None,
         )
         .await?;
+        tracing::debug!(
+            game_id = game_id,
+            new_lock_version = updated_game.lock_version,
+            "DEBUG: score_round_internal - lock_version updated"
+        );
 
         if is_game_complete {
             info!(

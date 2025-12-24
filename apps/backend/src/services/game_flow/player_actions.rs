@@ -132,6 +132,11 @@ impl GameFlowService {
             .filter(|phase| matches!(phase, crate::domain::state::Phase::TrumpSelect))
             .map(|_| DbGameState::TrumpSelection);
 
+        tracing::debug!(
+            game_id = game_id,
+            expected_lock_version = expected_lock_version,
+            "DEBUG: submit_bid - updating game"
+        );
         let updated_game = games::update_game(
             txn,
             game_id,
@@ -142,6 +147,11 @@ impl GameFlowService {
             None,
         )
         .await?;
+        tracing::debug!(
+            game_id = game_id,
+            new_lock_version = updated_game.lock_version,
+            "DEBUG: submit_bid - lock_version updated"
+        );
 
         Ok(updated_game)
     }
@@ -216,6 +226,11 @@ impl GameFlowService {
         );
 
         // Update game state: set_trump always transitions to Trick phase
+        tracing::debug!(
+            game_id = game_id,
+            expected_lock_version = expected_lock_version,
+            "DEBUG: set_trump - updating game"
+        );
         let updated_game = games::update_game(
             txn,
             game_id,
@@ -226,6 +241,11 @@ impl GameFlowService {
             Some(result.trick_no),
         )
         .await?;
+        tracing::debug!(
+            game_id = game_id,
+            new_lock_version = updated_game.lock_version,
+            "DEBUG: set_trump - lock_version updated"
+        );
 
         Ok(updated_game)
     }
@@ -361,6 +381,11 @@ impl GameFlowService {
                 None
             };
 
+        tracing::debug!(
+            game_id = game_id,
+            expected_lock_version = expected_lock_version,
+            "DEBUG: play_card - updating game"
+        );
         let updated_game = games::update_game(
             txn,
             game_id,
@@ -371,6 +396,11 @@ impl GameFlowService {
             trick_no_update,
         )
         .await?;
+        tracing::debug!(
+            game_id = game_id,
+            new_lock_version = updated_game.lock_version,
+            "DEBUG: play_card - lock_version updated"
+        );
 
         // If phase transitioned to Scoring, score the round immediately (action-driven pattern)
         if result.phase_transitioned == Some(crate::domain::state::Phase::Scoring) {
