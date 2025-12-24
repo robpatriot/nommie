@@ -53,7 +53,6 @@ enum Games {
     StartedAt,
     EndedAt,
     Name,
-    JoinCode,
     RulesVersion,
     RngSeed,
     CurrentRound,
@@ -497,12 +496,6 @@ impl MigrationTrait for Migration {
                             .null(),
                     )
                     .col(ColumnDef::new(Games::Name).text().null())
-                    .col(
-                        ColumnDef::new(Games::JoinCode)
-                            .string_len(10)
-                            .unique_key()
-                            .null(),
-                    )
                     .col(
                         ColumnDef::new(Games::RulesVersion)
                             .text()
