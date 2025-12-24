@@ -273,4 +273,25 @@
     opacity: 1;
     transform: translate3d(0, 0, 0);
   }
+
+  .table-circle-ring {
+    /* Light theme: use foreground color (dark green #12231e = rgb(18, 35, 30)) */
+    border: 1px solid rgba(18, 35, 30, 0.25);
+    background: radial-gradient(
+      circle,
+      rgba(18, 35, 30, 0.18) 0%,
+      rgba(18, 35, 30, 0.1) 50%,
+      transparent 70%
+    );
+  }
+
+  [data-theme='dark'] .table-circle-ring {
+    /* Dark theme: use white with low opacity */
+    border-color: rgba(255, 255, 255, 0.1);
+    background: radial-gradient(
+      circle,
+      rgba(255, 255, 255, 0.05) 0%,
+      transparent 70%
+    );
+  }
 }

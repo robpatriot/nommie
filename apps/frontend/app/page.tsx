@@ -104,11 +104,11 @@ export default async function Home({
           </div>
           <div className="mt-6 flex flex-1 items-center justify-center">
             <div className="card-wrapper-home relative w-full max-w-xs rounded-[32px] border border-white/20 p-6 shadow-2xl before:absolute before:inset-0 before:rounded-[32px] before:bg-gradient-to-br before:from-white/5 before:to-transparent before:pointer-events-none overflow-hidden">
-              <div className="relative flex h-full flex-col text-card-cream z-10 p-4 justify-center gap-4">
+              <div className="relative flex h-full flex-col text-foreground z-10 p-4 justify-center gap-4">
                 {/* Header with round info */}
                 <div className="text-center relative px-2">
                   <div className="absolute inset-0 -top-2 -bottom-2 bg-gradient-to-b from-white/5 via-transparent to-transparent rounded-full blur-xl" />
-                  <p className="text-xs uppercase tracking-[0.4em] text-card-cream opacity-80 relative">
+                  <p className="text-xs uppercase tracking-[0.4em] text-foreground opacity-80 relative">
                     {t('home.aside.roundLabel')}
                   </p>
                   <p className="mt-1.5 text-xl font-bold tracking-tight relative">
@@ -119,13 +119,7 @@ export default async function Home({
                 {/* Table view with player positions */}
                 <div className="relative flex items-center justify-center overflow-visible">
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div
-                      className="w-28 h-28 rounded-full border border-white/10"
-                      style={{
-                        background:
-                          'radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%)',
-                      }}
-                    />
+                    <div className="table-circle-ring w-28 h-28 rounded-full z-10" />
                   </div>
                   <div className="relative w-full aspect-square max-w-[140px] mx-auto">
                     {/* Center card display */}
@@ -200,7 +194,7 @@ export default async function Home({
                       >
                         {t('home.aside.trumpSuitIcon')}
                       </span>
-                      <p className="text-[10px] uppercase tracking-wider text-card-cream opacity-80 font-medium">
+                      <p className="text-[10px] uppercase tracking-wider text-foreground opacity-80 font-medium">
                         {t('home.aside.trumpLabel')}
                       </p>
                     </div>
@@ -210,7 +204,7 @@ export default async function Home({
                   </div>
                   <div className="grid grid-cols-2 gap-2.5">
                     <div className="rounded-xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-md p-2.5 border border-white/20 shadow-md">
-                      <p className="text-[10px] uppercase tracking-wider text-card-cream opacity-80 mb-1 font-medium">
+                      <p className="text-[10px] uppercase tracking-wider text-foreground opacity-80 mb-1 font-medium">
                         {t('home.aside.trickLabel')}
                       </p>
                       <p className="text-base font-bold">
@@ -218,7 +212,7 @@ export default async function Home({
                       </p>
                     </div>
                     <div className="rounded-xl bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-md p-2.5 border border-white/20 shadow-md">
-                      <p className="text-[10px] uppercase tracking-wider text-card-cream opacity-80 mb-1 font-medium">
+                      <p className="text-[10px] uppercase tracking-wider text-foreground opacity-80 mb-1 font-medium">
                         {t('home.aside.bidLabel')}
                       </p>
                       <p className="text-base font-bold">
@@ -231,7 +225,7 @@ export default async function Home({
                 {/* Footer */}
                 <div className="text-center pt-2 relative px-1">
                   <div className="absolute inset-x-1 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-                  <p className="text-[10px] uppercase tracking-[0.5em] text-card-cream opacity-70 font-medium relative pt-2.5">
+                  <p className="text-[10px] uppercase tracking-[0.5em] text-foreground opacity-70 font-medium relative pt-2.5">
                     {t('home.aside.footer')}
                   </p>
                 </div>
