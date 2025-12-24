@@ -6,7 +6,7 @@
     "up": "next dev",
     "build": "next build",
     "start": "node .next/standalone/apps/frontend/server.js",
-    "lint": "eslint . --max-warnings=0 && node scripts/i18n-check.cjs && node scripts/i18n-unused.cjs",
+    "lint": "eslint . --max-warnings=0 && node scripts/i18n-check.cjs && node scripts/i18n-missing.cjs && node scripts/i18n-unused.cjs",
     "lint:files": "eslint --max-warnings=0",
     "format": "prettier --write .",
     "format:files": "prettier --write",
