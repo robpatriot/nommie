@@ -108,6 +108,7 @@ export function GameRoomClient({
     showToast,
     disconnect,
     connect,
+    phase,
   })
 
   // Game room controls

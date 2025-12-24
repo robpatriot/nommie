@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
-import type { Trump } from '@/lib/game-room/types'
+import type { PhaseSnapshot, Trump } from '@/lib/game-room/types'
 import type { ToastMessage } from '@/components/Toast'
 import {
   useMarkPlayerReady,
@@ -28,6 +28,7 @@ interface UseGameRoomActionsProps {
   ) => string
   disconnect: () => void
   connect: () => Promise<void>
+  phase: PhaseSnapshot
 }
 
 /**
@@ -42,6 +43,7 @@ export function useGameRoomActions({
   showToast,
   disconnect,
   connect,
+  phase,
 }: UseGameRoomActionsProps) {
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -215,28 +217,57 @@ export function useGameRoomActions({
       return
     }
 
+    // Check if game is active (not in Init/Lobby phase)
+    const isActiveGame = phase.phase !== 'Init'
+
+    // If game is active, show confirmation dialog
+    if (isActiveGame) {
+      const confirmed = window.confirm(
+        tErrors('leaveActiveGameConfirmation') ||
+          'Are you sure you want to leave? An AI will take over your seat and continue playing.'
+      )
+      if (!confirmed) {
+        return
+      }
+    }
+
     // Close WebSocket BEFORE leaving to prevent broadcasts from reaching non-member
     disconnect()
 
     try {
-      await leaveGameMutation.mutateAsync(gameId)
+      // Read lock_version directly from cache at request time to avoid stale closures
+      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
+        queryKeys.games.snapshot(gameId)
+      )
+      const currentLockVersion = cachedSnapshot?.lockVersion
+
+      // DEBUG: Log what version the frontend thinks it's on
+      console.debug('[DEBUG] leave_game - frontend lock_version:', {
+        gameId,
+        cachedLockVersion: currentLockVersion,
+        cachedSnapshotTimestamp: cachedSnapshot?.timestamp,
+        hasCachedSnapshot: !!cachedSnapshot,
+      })
+
+      if (currentLockVersion === undefined) {
+        showToast(tErrors('lockVersionRequired'), 'error')
+        connect() // Reconnect since we didn't leave
+        return
+      }
+
+      await leaveGameMutation.mutateAsync({
+        gameId,
+        lockVersion: currentLockVersion,
+      })
       showToast(t('gameRoom.leftGameSuccess'), 'success')
       router.push('/lobby')
     } catch (err) {
-      // First, understand what error occurred
-      const backendError = toQueryError(err, tErrors('unableToLeaveGame'))
-
-      // Then, determine the appropriate message based on the error
-      let message = backendError.message
-      if (backendError.code === 'PHASE_MISMATCH') {
-        message = tErrors('gameStartedCannotLeave')
-      }
-
-      // Now reconnect since leave failed (they're still in the game)
+      // Reconnect since leave failed (they're still in the game)
       connect()
 
-      // Finally, show the error message
-      showToast(message, 'error', backendError)
+      // Show error message
+      const backendError = toQueryError(err, tErrors('unableToLeaveGame'))
+      showToast(backendError.message, 'error', backendError)
       // Don't navigate - keep them on the game page since they're still in it
     }
   }, [
@@ -249,6 +280,8 @@ export function useGameRoomActions({
     tErrors,
     disconnect,
     connect,
+    phase,
+    queryClient,
   ])
 
   return {

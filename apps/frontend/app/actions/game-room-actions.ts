@@ -112,10 +112,31 @@ export async function markPlayerReadyAction(
 }
 
 export async function leaveGameAction(
-  gameId: number
+  gameId: number,
+  lockVersion?: number
 ): Promise<SimpleActionResult> {
   try {
-    await leaveGame(gameId)
+    // If no lock_version is provided, fetch the game snapshot to get it
+    let finalLockVersion = lockVersion
+    if (finalLockVersion === undefined) {
+      const snapshotResult = await getGameRoomSnapshotAction({ gameId })
+      if (
+        snapshotResult.kind === 'ok' &&
+        snapshotResult.data.lockVersion !== undefined
+      ) {
+        finalLockVersion = snapshotResult.data.lockVersion
+      }
+    }
+
+    if (finalLockVersion === undefined) {
+      const t = await getTranslations('errors.actions')
+      return toErrorResult(
+        new Error('Lock version required'),
+        t('failedToLeaveGameNoVersion')
+      )
+    }
+
+    await leaveGame(gameId, finalLockVersion)
     return { kind: 'ok' }
   } catch (error) {
     const t = await getTranslations('errors.actions')

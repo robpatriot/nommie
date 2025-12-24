@@ -112,9 +112,13 @@ export async function markPlayerReady(
   })
 }
 
-export async function leaveGame(gameId: number): Promise<void> {
+export async function leaveGame(
+  gameId: number,
+  lockVersion: number
+): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/leave`, {
     method: 'DELETE',
+    body: JSON.stringify({ lock_version: lockVersion }),
   })
 }
 

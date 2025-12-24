@@ -55,16 +55,19 @@ export function useLeaveGame() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (gameId: number): Promise<void> => {
-      const result = await leaveGameAction(gameId)
+    mutationFn: async (request: {
+      gameId: number
+      lockVersion: number
+    }): Promise<void> => {
+      const result = await leaveGameAction(request.gameId, request.lockVersion)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: (_, gameId) => {
+    onSuccess: (_, request) => {
       // Invalidate game snapshot so it refreshes with updated state
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(gameId),
+        queryKey: queryKeys.games.snapshot(request.gameId),
       })
     },
   })
