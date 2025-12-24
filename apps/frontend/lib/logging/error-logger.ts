@@ -16,6 +16,45 @@ type ErrorContext = {
 // type LogLevel = 'error' | 'warn' | 'info'
 
 /**
+ * Extract serializable properties from an error object.
+ * Error objects don't serialize their custom properties when logged,
+ * so we extract them into a plain object.
+ */
+function serializeError(error: unknown): Record<string, unknown> | unknown {
+  if (error instanceof Error) {
+    const serialized: Record<string, unknown> = {
+      name: error.name,
+      message: error.message,
+    }
+
+    // Include stack trace if available
+    if (error.stack) {
+      serialized.stack = error.stack
+    }
+
+    // Extract custom properties from Error instances (e.g., BackendApiError)
+    if ('status' in error) {
+      serialized.status = (error as { status?: unknown }).status
+    }
+    if ('code' in error) {
+      serialized.code = (error as { code?: unknown }).code
+    }
+    if ('traceId' in error) {
+      serialized.traceId = (error as { traceId?: unknown }).traceId
+    }
+
+    return serialized
+  }
+
+  // If it's a plain object, return it as-is
+  if (error && typeof error === 'object') {
+    return error
+  }
+
+  return error
+}
+
+/**
  * Log an error with optional context.
  * In development, logs to console with full details.
  * In production, can be extended to send to error tracking service.
@@ -36,7 +75,7 @@ export function logError(
   }
 
   if (error) {
-    errorDetails.error = error
+    errorDetails.error = serializeError(error)
   }
 
   if (context) {
@@ -45,6 +84,7 @@ export function logError(
 
   // In development, log with full details
   if (process.env.NODE_ENV === 'development') {
+    // Log the serialized error details (error has already been serialized)
     console.error('[Error Logger]', errorDetails)
 
     // Also log traceId if available for easier debugging
@@ -94,7 +134,30 @@ export function logBackendError(
   error: { message: string; traceId?: string; status?: number; code?: string },
   additionalContext?: Omit<ErrorContext, 'traceId'>
 ): void {
-  logError(message, error, {
+  // Extract error properties into a plain object for consistent serialization
+  // The error parameter may be a BackendApiError instance or a plain object
+  const errorDetails: Record<string, unknown> = {
+    message: error.message,
+  }
+  if (error.traceId !== undefined) {
+    errorDetails.traceId = error.traceId
+  }
+  if (error.status !== undefined) {
+    errorDetails.status = error.status
+  }
+  if (error.code !== undefined) {
+    errorDetails.code = error.code
+  }
+
+  // If it's an Error instance, include standard Error properties
+  if (error instanceof Error) {
+    errorDetails.name = error.name
+    if (error.stack) {
+      errorDetails.stack = error.stack
+    }
+  }
+
+  logError(message, errorDetails, {
     traceId: error.traceId,
     status: error.status,
     code: error.code,
