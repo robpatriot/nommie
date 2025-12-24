@@ -6,6 +6,7 @@ use actix_web::http::header::{ETAG, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use rand::random;
+use sea_orm::TransactionTrait;
 use serde::{Deserialize, Serialize};
 use time::format_description::well_known::Rfc3339;
 use tracing::{debug, info, warn};
@@ -53,21 +54,30 @@ pub(crate) struct BidConstraintsResponse {
 /// and incrementing the game's lock_version so that WebSocket clients receive
 /// updates about the new player.
 ///
-/// Returns the updated game, all memberships, and the new lock_version.
+/// Returns the updated game and all memberships.
 async fn join_game_and_touch(
     txn: &sea_orm::DatabaseTransaction,
     game_id: i64,
     user_id: i64,
     initial_lock_version: i32,
-) -> Result<(games_repo::Game, Vec<memberships::GameMembership>, i32), AppError> {
+) -> Result<(games_repo::Game, Vec<memberships::GameMembership>), AppError> {
     let service = GameService;
     let (_game, memberships) = service.join_game(txn, game_id, user_id).await?;
 
     // Touch game to increment lock_version so WebSocket clients receive the update
+    tracing::debug!(
+        game_id = game_id,
+        expected_lock_version = initial_lock_version,
+        "DEBUG: join_game_and_touch - touching game"
+    );
     let final_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
-    let lock_version = final_game.lock_version;
+    tracing::debug!(
+        game_id = game_id,
+        new_lock_version = final_game.lock_version,
+        "DEBUG: join_game_and_touch - lock_version updated"
+    );
 
-    Ok((final_game, memberships, lock_version))
+    Ok((final_game, memberships))
 }
 
 /// Helper that leaves a game and touches it to increment lock_version.
@@ -76,20 +86,52 @@ async fn join_game_and_touch(
 /// and incrementing the game's lock_version so that WebSocket clients receive
 /// updates about the player leaving.
 ///
-/// Returns the new lock_version.
+/// For active games, converts the human to AI, touches the game (incrementing lock_version),
+/// then processes game state (AIs may act, each incrementing lock_version further).
 async fn leave_game_and_touch(
     txn: &sea_orm::DatabaseTransaction,
     game_id: i64,
     user_id: i64,
     initial_lock_version: i32,
-) -> Result<i32, AppError> {
+) -> Result<(), AppError> {
+    // Check game state before leaving to determine if we need AI processing
+    let game_before = games_repo::require_game(txn, game_id).await?;
+    let was_active = game_before.state != crate::entities::games::GameState::Lobby;
+
     let service = GameService;
     service.leave_game(txn, game_id, user_id).await?;
 
-    // Touch game to increment lock_version so WebSocket clients receive the update
-    let final_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
+    // If game was active, the human was converted to AI
+    if was_active {
+        // Touch game to increment lock_version for the conversion (unit of work)
+        tracing::debug!(
+            game_id = game_id,
+            expected_lock_version = initial_lock_version,
+            "DEBUG: leave_game_and_touch - touching game after conversion"
+        );
+        let _updated_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
+        tracing::debug!(
+            game_id = game_id,
+            new_lock_version = _updated_game.lock_version,
+            "DEBUG: leave_game_and_touch - lock_version updated after conversion"
+        );
+        // Note: AI processing is handled in a background task after transaction commits
+    } else {
+        // Game was in Lobby - just touch to increment lock_version
+        tracing::debug!(
+            game_id = game_id,
+            expected_lock_version = initial_lock_version,
+            "DEBUG: leave_game_and_touch - touching game (lobby)"
+        );
+        let _updated_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
+        tracing::debug!(
+            game_id = game_id,
+            new_lock_version = _updated_game.lock_version,
+            "DEBUG: leave_game_and_touch - lock_version updated (lobby)"
+        );
+    }
 
-    Ok(final_game.lock_version)
+    Ok(())
 }
 
 async fn build_snapshot_parts(
@@ -623,6 +665,25 @@ fn format_rfc3339(dt: &time::OffsetDateTime) -> String {
     dt.format(&Rfc3339).unwrap_or_else(|_| dt.to_string())
 }
 
+/// Check if a viewer is a human member of the game.
+///
+/// Returns true if the viewer has a human player membership in the game.
+/// This excludes AI players and spectators.
+fn is_human_member(
+    viewer_user_id: Option<i64>,
+    memberships: &[memberships::GameMembership],
+) -> bool {
+    viewer_user_id
+        .and_then(|id| {
+            memberships.iter().find(|m| {
+                m.user_id == Some(id)
+                    && m.role == GameRole::Player
+                    && m.player_kind == crate::entities::game_players::PlayerKind::Human
+            })
+        })
+        .is_some()
+}
+
 /// Helper function to convert game domain model + memberships to frontend Game format
 ///
 /// Returns an error if the game does not have a creator (created_by is None).
@@ -649,13 +710,7 @@ fn game_to_response(
         .filter(|m| m.role == GameRole::Player)
         .count() as i32;
 
-    let viewer_is_member = viewer_user_id
-        .and_then(|id| {
-            memberships
-                .iter()
-                .find(|m| m.user_id == Some(id) && m.role == GameRole::Player)
-        })
-        .is_some();
+    let viewer_is_member = is_human_member(viewer_user_id, memberships);
 
     // Check if viewer is the host (creator of the game)
     let viewer_is_host = viewer_user_id.map(|id| created_by == id).unwrap_or(false);
@@ -732,7 +787,7 @@ async fn join_game(
     let id = game_id.0;
 
     // Join game using service layer (handles validation, seat assignment, membership creation)
-    let (game_model, memberships, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
+    let (game_model, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             // Fetch game to get initial lock_version
             let game = games_repo::require_game(txn, id).await?;
@@ -744,7 +799,7 @@ async fn join_game(
     .await?;
 
     // Publish snapshot broadcast so other players' UIs update
-    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
+    publish_snapshot(&app_state, id).await?;
 
     let response = game_to_response(&game_model, &memberships, Some(user_id))?;
 
@@ -754,29 +809,115 @@ async fn join_game(
 /// DELETE /api/games/{gameId}/leave
 ///
 /// Removes the current user from the specified game.
+///
+/// Requires lock_version in request body for optimistic locking.
 async fn leave_game(
     http_req: HttpRequest,
     game_id: GameId,
     current_user: CurrentUser,
+    body: ValidatedJson<LeaveGameRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let user_id = current_user.id;
     let id = game_id.0;
+    let expected_lock_version = body.lock_version;
+    tracing::debug!(
+        game_id = id,
+        user_id = user_id,
+        frontend_lock_version = expected_lock_version,
+        "DEBUG: leave_game endpoint - received lock_version from frontend"
+    );
+
+    // Check if game is active before leaving (needed to determine if background task is needed)
+    let db = crate::db::require_db(&app_state)?;
+    let game_before = games_repo::require_game(db, id).await?;
+    let was_active = game_before.state != crate::entities::games::GameState::Lobby;
 
     // Leave game using service layer
-    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
-        Box::pin(async move {
-            // Fetch game to get initial lock_version
-            let game = games_repo::require_game(txn, id).await?;
-            let initial_lock_version = game.lock_version;
-
-            leave_game_and_touch(txn, id, user_id, initial_lock_version).await
-        })
+    with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move { leave_game_and_touch(txn, id, user_id, expected_lock_version).await })
     })
     .await?;
 
     // Publish snapshot broadcast so other players' UIs update
-    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
+    publish_snapshot(&app_state, id).await?;
+
+    // If game was active, spawn background task to process AI actions
+    if was_active {
+        // Clone AppState for background task (web::Data is Arc internally)
+        let app_state_clone = app_state.clone();
+        let game_id_for_task = id;
+
+        tokio::spawn(async move {
+            // Use a fresh database connection for the background task
+            let db = match crate::db::require_db(&app_state_clone) {
+                Ok(db) => db,
+                Err(err) => {
+                    tracing::error!(
+                        game_id = game_id_for_task,
+                        error = %err,
+                        "Failed to get database connection for background AI processing"
+                    );
+                    return;
+                }
+            };
+
+            // Begin a new transaction for AI processing
+            let txn = match db.begin().await {
+                Ok(txn) => txn,
+                Err(err) => {
+                    tracing::error!(
+                        game_id = game_id_for_task,
+                        error = %err,
+                        "Failed to begin transaction for background AI processing"
+                    );
+                    return;
+                }
+            };
+
+            // Process game state - AIs may act, each incrementing lock_version
+            let game_flow_service = crate::services::game_flow::GameFlowService;
+            match game_flow_service
+                .process_game_state(&txn, game_id_for_task)
+                .await
+            {
+                Ok(()) => {
+                    // Commit the transaction
+                    if let Err(err) = txn.commit().await {
+                        tracing::error!(
+                            game_id = game_id_for_task,
+                            error = %err,
+                            "Failed to commit transaction after background AI processing"
+                        );
+                    } else {
+                        tracing::debug!(
+                            game_id = game_id_for_task,
+                            "Background AI processing completed successfully"
+                        );
+
+                        // Publish snapshot broadcast so clients receive the AI action updates
+                        if let Err(err) = publish_snapshot(&app_state_clone, game_id_for_task).await
+                        {
+                            tracing::error!(
+                                game_id = game_id_for_task,
+                                error = %err,
+                                "Failed to publish snapshot after background AI processing"
+                            );
+                        }
+                    }
+                }
+                Err(err) => {
+                    tracing::error!(
+                        game_id = game_id_for_task,
+                        error = %err,
+                        "Background AI processing failed"
+                    );
+                    // Best-effort rollback
+                    let _ = txn.rollback().await;
+                }
+            }
+        });
+    }
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -832,7 +973,7 @@ async fn list_in_progress_games(
     let mut visible_games = Vec::new();
 
     for (game_model, memberships) in games {
-        let viewer_is_member = memberships.iter().any(|m| m.user_id == Some(viewer_id));
+        let viewer_is_member = is_human_member(Some(viewer_id), &memberships);
 
         if game_model.visibility == GameVisibility::Public || viewer_is_member {
             visible_games.push(game_to_response(
@@ -885,7 +1026,7 @@ async fn list_overview_games(
     }
 
     for (game_model, memberships) in active_games {
-        let viewer_is_member = memberships.iter().any(|m| m.user_id == Some(viewer_id));
+        let viewer_is_member = is_human_member(Some(viewer_id), &memberships);
         if game_model.visibility == GameVisibility::Public || viewer_is_member {
             combined_games.push(game_to_response(
                 &game_model,
@@ -945,18 +1086,17 @@ async fn mark_ready(
     let user_id = current_user.id;
     let is_ready = body.is_ready;
 
-    let lock_version = with_txn(Some(&http_req), &app_state, |txn| {
+    with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
             service.set_ready_status(txn, id, user_id, is_ready).await?;
-
-            let game = games_repo::require_game(txn, id).await?;
-            Ok(game.lock_version)
+            Ok(())
         })
     })
     .await?;
 
-    publish_snapshot_with_lock(&app_state, id, lock_version).await?;
+    // Publish snapshot broadcast so other players' UIs update
+    publish_snapshot(&app_state, id).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -976,6 +1116,11 @@ struct SetTrumpRequest {
 #[derive(serde::Deserialize)]
 struct PlayCardRequest {
     card: String,
+    lock_version: i32,
+}
+
+#[derive(serde::Deserialize)]
+struct LeaveGameRequest {
     lock_version: i32,
 }
 
@@ -1048,7 +1193,7 @@ async fn add_ai_seat(
     let host_user_id = membership.user_id;
     let lock_version = request.lock_version;
 
-    let updated_lock_version = with_txn(Some(&http_req), &app_state, |txn| {
+    with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1134,23 +1279,30 @@ async fn add_ai_seat(
                 seed = Some(random::<u64>());
             }
 
-            let ai_profile = ai_profiles::find_by_registry_variant(
-                txn,
-                factory.name,
-                &registry_version,
-                "default",
-            )
-            .await
-            .map_err(AppError::from)?
-            .ok_or_else(|| {
-                AppError::bad_request(
-                    ErrorCode::ValidationError,
-                    format!(
-                        "AI profile for {} v{} not found",
-                        factory.name, registry_version
-                    ),
+            // Use the shared default AI lookup when appropriate
+            let ai_profile = if factory.name == Heuristic::NAME {
+                let game_service = GameService;
+                game_service.find_default_ai_profile(txn).await?
+            } else {
+                // For other AI types, use the standard lookup
+                ai_profiles::find_by_registry_variant(
+                    txn,
+                    factory.name,
+                    &registry_version,
+                    "default",
                 )
-            })?;
+                .await
+                .map_err(AppError::from)?
+                .ok_or_else(|| {
+                    AppError::bad_request(
+                        ErrorCode::ValidationError,
+                        format!(
+                            "AI profile for {} v{} not found",
+                            factory.name, registry_version
+                        ),
+                    )
+                })?
+            };
 
             // Generate a random seed for name generation to ensure names vary between games
             let name_seed = random::<u64>() as i64;
@@ -1183,15 +1335,26 @@ async fn add_ai_seat(
                 .map_err(AppError::from)?;
 
             // Touch game to increment lock_version so websocket clients receive the update
+            tracing::debug!(
+                game_id = id,
+                expected_lock_version = lock_version,
+                "DEBUG: add_ai_seat - touching game"
+            );
             let updated_game = games_repo::touch_game(txn, id, lock_version)
                 .await
                 .map_err(AppError::from)?;
-            Ok(updated_game.lock_version)
+            tracing::debug!(
+                game_id = id,
+                new_lock_version = updated_game.lock_version,
+                "DEBUG: add_ai_seat - lock_version updated"
+            );
+            Ok(())
         })
     })
     .await?;
 
-    publish_snapshot_with_lock(&app_state, id, updated_lock_version).await?;
+    // Publish snapshot broadcast so other players' UIs update
+    publish_snapshot(&app_state, id).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1209,7 +1372,7 @@ async fn remove_ai_seat(
     let host_user_id = membership.user_id;
     let lock_version = request.lock_version;
 
-    let updated_lock_version = with_txn(Some(&http_req), &app_state, |txn| {
+    with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1302,15 +1465,26 @@ async fn remove_ai_seat(
                 .map_err(AppError::from)?;
 
             // Touch game to increment lock_version so websocket clients receive the update
+            tracing::debug!(
+                game_id = id,
+                expected_lock_version = lock_version,
+                "DEBUG: remove_ai_seat - touching game"
+            );
             let updated_game = games_repo::touch_game(txn, id, lock_version)
                 .await
                 .map_err(AppError::from)?;
-            Ok(updated_game.lock_version)
+            tracing::debug!(
+                game_id = id,
+                new_lock_version = updated_game.lock_version,
+                "DEBUG: remove_ai_seat - lock_version updated"
+            );
+            Ok(())
         })
     })
     .await?;
 
-    publish_snapshot_with_lock(&app_state, id, updated_lock_version).await?;
+    // Publish snapshot broadcast so other players' UIs update
+    publish_snapshot(&app_state, id).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1341,7 +1515,7 @@ async fn update_ai_seat(
 
     let lock_version = request.lock_version;
 
-    let updated_lock_version = with_txn(Some(&http_req), &app_state, |txn| {
+    with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1439,15 +1613,26 @@ async fn update_ai_seat(
             }
 
             // Touch game to increment lock_version so websocket clients receive the update
+            tracing::debug!(
+                game_id = id,
+                expected_lock_version = lock_version,
+                "DEBUG: update_ai_seat - touching game"
+            );
             let updated_game = games_repo::touch_game(txn, id, lock_version)
                 .await
                 .map_err(AppError::from)?;
-            Ok(updated_game.lock_version)
+            tracing::debug!(
+                game_id = id,
+                new_lock_version = updated_game.lock_version,
+                "DEBUG: update_ai_seat - lock_version updated"
+            );
+            Ok(())
         })
     })
     .await?;
 
-    publish_snapshot_with_lock(&app_state, id, updated_lock_version).await?;
+    // Publish snapshot broadcast so other players' UIs update
+    publish_snapshot(&app_state, id).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -1469,7 +1654,7 @@ async fn submit_bid(
     let seat = membership.turn_order;
     let bid_value = body.bid;
 
-    let updated_game = with_txn(Some(&http_req), &app_state, |txn| {
+    let game = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
             service
@@ -1479,8 +1664,8 @@ async fn submit_bid(
     })
     .await?;
 
-    let etag = game_etag(updated_game.id, updated_game.lock_version);
-    publish_snapshot_with_lock(&app_state, id, updated_game.lock_version).await?;
+    let etag = game_etag(game.id, game.lock_version);
+    publish_snapshot_with_lock(&app_state, id, game.lock_version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1515,7 +1700,7 @@ async fn select_trump(
         }
     };
 
-    let updated_game = with_txn(Some(&http_req), &app_state, |txn| {
+    let game = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
             service
@@ -1525,8 +1710,8 @@ async fn select_trump(
     })
     .await?;
 
-    let etag = game_etag(updated_game.id, updated_game.lock_version);
-    publish_snapshot_with_lock(&app_state, id, updated_game.lock_version).await?;
+    let etag = game_etag(game.id, game.lock_version);
+    publish_snapshot_with_lock(&app_state, id, game.lock_version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1557,7 +1742,7 @@ async fn play_card(
 
     let card = normalized.parse::<Card>().map_err(AppError::from)?;
 
-    let updated_game = with_txn(Some(&http_req), &app_state, |txn| {
+    let game = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
             service
@@ -1567,8 +1752,8 @@ async fn play_card(
     })
     .await?;
 
-    let etag = game_etag(updated_game.id, updated_game.lock_version);
-    publish_snapshot_with_lock(&app_state, id, updated_game.lock_version).await?;
+    let etag = game_etag(game.id, game.lock_version);
+    publish_snapshot_with_lock(&app_state, id, game.lock_version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1582,12 +1767,12 @@ async fn play_card(
 async fn delete_game(
     http_req: HttpRequest,
     game_id: GameId,
-    membership: GameMembership,
+    current_user: CurrentUser,
     body: ValidatedJson<DeleteGameRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
-    let host_user_id = membership.user_id;
+    let user_id = current_user.id;
     let lock_version = body.lock_version;
 
     with_txn(Some(&http_req), &app_state, |txn| {
@@ -1595,9 +1780,9 @@ async fn delete_game(
             // Load game to verify it exists, check host authorization, and validate lock version
             let game = games_repo::require_game(txn, id).await?;
 
-            // Check host authorization
+            // Check host authorization (based on created_by, not membership)
             let game_service = GameService;
-            if !game_service.is_host(&game, host_user_id) {
+            if !game_service.is_host(&game, Some(user_id)) {
                 return Err(AppError::forbidden_with_code(
                     ErrorCode::Forbidden,
                     "Only the host can delete a game",
@@ -1670,6 +1855,10 @@ fn trump_to_api_value(trump: Trump) -> &'static str {
     }
 }
 
+/// Publish a snapshot broadcast with a known lock_version.
+///
+/// This is the core function that actually publishes to Redis.
+/// Use this when you already have the lock_version (e.g., from a transaction return value).
 async fn publish_snapshot_with_lock(
     app_state: &web::Data<AppState>,
     game_id: i64,
@@ -1679,6 +1868,39 @@ async fn publish_snapshot_with_lock(
         realtime.publish_snapshot(game_id, lock_version).await?;
     }
     Ok(())
+}
+
+/// Publish a snapshot broadcast by fetching the game's current lock_version.
+///
+/// This is a convenience wrapper that fetches the game from the database
+/// to get the current lock_version, then calls `publish_snapshot_with_lock`.
+///
+/// In tests with SharedTxn, the game may not be visible to pooled connections,
+/// so prefer `publish_snapshot_with_lock` when you already have the lock_version.
+async fn publish_snapshot(app_state: &web::Data<AppState>, game_id: i64) -> Result<(), AppError> {
+    // Fetch game to get current lock_version for broadcast
+    let db = match crate::db::require_db(app_state) {
+        Ok(db) => db,
+        Err(_) => {
+            // Database not available (e.g., in some test scenarios)
+            return Ok(());
+        }
+    };
+
+    // Try to fetch the game, but don't fail if it doesn't exist (e.g., in tests with SharedTxn)
+    let game = match games_repo::find_by_id(db, game_id).await {
+        Ok(Some(game)) => game,
+        Ok(None) => {
+            // Game not found - likely in a test with uncommitted SharedTxn
+            return Ok(());
+        }
+        Err(e) => {
+            // Other error - propagate it
+            return Err(AppError::from(e));
+        }
+    };
+
+    publish_snapshot_with_lock(app_state, game_id, game.lock_version).await
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {

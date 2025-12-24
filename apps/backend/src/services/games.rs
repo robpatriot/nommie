@@ -13,7 +13,8 @@ use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::games::Game;
 use crate::repos::memberships::GameRole;
 use crate::repos::{
-    ai_overrides, bids, games as games_repo, hands, memberships, plays, rounds, scores, tricks,
+    ai_overrides, ai_profiles, bids, games as games_repo, hands, memberships, plays, rounds,
+    scores, tricks,
 };
 
 /// Game domain service (stateless).
@@ -715,10 +716,132 @@ impl GameService {
         Ok((game, updated_memberships))
     }
 
+    /// Find the default AI profile.
+    ///
+    /// Returns the AI profile for the default AI player (currently Heuristic).
+    /// This is used both for player-to-AI conversion and as the default when adding AI seats.
+    pub async fn find_default_ai_profile(
+        &self,
+        txn: &DatabaseTransaction,
+    ) -> Result<ai_profiles::AiProfile, AppError> {
+        use crate::ai::Heuristic;
+        let profile = ai_profiles::find_by_registry_variant(
+            txn,
+            Heuristic::NAME,
+            Heuristic::VERSION,
+            "default",
+        )
+        .await
+        .map_err(AppError::from)?
+        .ok_or_else(|| {
+            AppError::internal(
+                crate::errors::ErrorCode::InternalError,
+                format!(
+                    "Default Heuristic AI profile not found (registry_name: {}, version: {}, variant: default)",
+                    Heuristic::NAME,
+                    Heuristic::VERSION
+                ),
+                std::io::Error::other("AI profile not found"),
+            )
+        })?;
+        Ok(profile)
+    }
+
+    /// Convert a human player membership to an AI player.
+    ///
+    /// This preserves the seat position and all game state, but converts the player
+    /// from human to AI. The AI will use the default Heuristic profile.
+    ///
+    /// # Arguments
+    /// * `txn` - Database transaction
+    /// * `membership` - The human membership to convert
+    ///
+    /// # Returns
+    /// The updated membership (now AI)
+    async fn convert_human_to_ai(
+        &self,
+        txn: &DatabaseTransaction,
+        membership: memberships::GameMembership,
+    ) -> Result<memberships::GameMembership, AppError> {
+        // Verify this is a human membership
+        if membership.player_kind != crate::entities::game_players::PlayerKind::Human {
+            return Err(AppError::bad_request(
+                crate::errors::ErrorCode::ValidationError,
+                format!(
+                    "Cannot convert: membership {} is not a human player",
+                    membership.id
+                ),
+            ));
+        }
+
+        // Find the default AI profile
+        let ai_profile = self.find_default_ai_profile(txn).await?;
+
+        // Collect existing display names to ensure uniqueness
+        use crate::repos::players::{friendly_ai_name, resolve_display_name_for_membership};
+        let all_memberships = memberships::find_all_by_game(txn, membership.game_id)
+            .await
+            .map_err(AppError::from)?;
+        let mut existing_display_names: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+
+        for m in &all_memberships {
+            if m.id == membership.id {
+                continue; // Skip the membership we're converting
+            }
+            let display_name = resolve_display_name_for_membership(
+                txn,
+                m,
+                m.turn_order,
+                false, // No final fallback needed for uniqueness check
+            )
+            .await
+            .map_err(AppError::from)?;
+            existing_display_names.insert(display_name);
+        }
+
+        // Generate a friendly AI name for this seat
+        use rand::random;
+        let name_seed = random::<u64>() as i64;
+        let base_name = friendly_ai_name(name_seed, membership.turn_order as usize);
+
+        // Ensure uniqueness
+        let unique_name = if !existing_display_names.contains(&base_name) {
+            base_name.clone()
+        } else {
+            let mut counter = 2;
+            loop {
+                let candidate = format!("{base_name} {counter}");
+                if !existing_display_names.contains(&candidate) {
+                    break candidate;
+                }
+                counter += 1;
+            }
+        };
+
+        // Update membership to AI
+        let mut updated_membership = membership.clone();
+        updated_membership.player_kind = crate::entities::game_players::PlayerKind::Ai;
+        updated_membership.user_id = None;
+        updated_membership.ai_profile_id = Some(ai_profile.id);
+        // Keep is_ready as is (if game is active, player was ready)
+
+        let updated = memberships::update_membership(txn, updated_membership.clone())
+            .await
+            .map_err(AppError::from)?;
+
+        // Create AI override for the display name
+        ai_overrides::create_override(txn, updated.id, Some(unique_name), None, None)
+            .await
+            .map_err(AppError::from)?;
+
+        Ok(updated)
+    }
+
     /// Remove a user from a game.
     ///
-    /// This deletes the user's membership and returns the updated game state.
-    /// Only allowed when the game is in Lobby state.
+    /// If the game is in Lobby state, deletes the membership.
+    /// If the game is active, converts the human player to an AI player.
     ///
     /// Returns the updated game and remaining memberships.
     pub async fn leave_game(
@@ -729,17 +852,6 @@ impl GameService {
     ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
         // Fetch game and verify it exists
         let game = games_repo::require_game(txn, game_id).await?;
-
-        // Verify game is in LOBBY state
-        if game.state != DbGameState::Lobby {
-            return Err(AppError::bad_request(
-                crate::errors::ErrorCode::PhaseMismatch,
-                format!(
-                    "Cannot leave game: game is not in LOBBY state (current state: {:?})",
-                    game.state
-                ),
-            ));
-        }
 
         // Find the user's membership
         let membership = memberships::find_membership(txn, game_id, user_id)
@@ -752,16 +864,24 @@ impl GameService {
                 )
             })?;
 
-        // Delete the membership
-        memberships::delete_membership(txn, membership.id)
-            .await
-            .map_err(AppError::from)?;
+        // If game is in Lobby, delete the membership (existing behavior)
+        if game.state == DbGameState::Lobby {
+            memberships::delete_membership(txn, membership.id)
+                .await
+                .map_err(AppError::from)?;
+        } else {
+            // Game is active: convert human to AI
+            self.convert_human_to_ai(txn, membership).await?;
+        }
 
-        // Fetch updated memberships (game record hasn't changed, so reuse the one we already have)
+        // Fetch updated memberships
         let updated_memberships = memberships::find_all_by_game(txn, game_id)
             .await
             .map_err(AppError::from)?;
 
-        Ok((game, updated_memberships))
+        // Reload game to get latest state
+        let updated_game = games_repo::require_game(txn, game_id).await?;
+
+        Ok((updated_game, updated_memberships))
     }
 }
