@@ -58,11 +58,53 @@ async fn build_snapshot_parts(
         Option<Seat>,
         Option<Vec<String>>,
         Option<BidConstraintsResponse>,
+        bool,
     ),
     AppError,
 > {
     // Fetch game from database to get lock_version
-    let game = games_repo::require_game(txn, game_id).await?;
+    let mut game = games_repo::require_game(txn, game_id).await?;
+    let initial_lock_version = game.lock_version;
+    let mut join_occurred = false;
+
+    // Ensure the current user is a member for lobby games when possible.
+    // This powers the invite-link flow: navigating to the game URL will join
+    // the user into the lobby if the game is joinable.
+    if game.state == GameState::Lobby {
+        let existing_memberships = memberships::find_all_by_game(txn, game_id)
+            .await
+            .map_err(AppError::from)?;
+
+        let already_member = existing_memberships
+            .iter()
+            .any(|m| m.user_id == Some(current_user_id));
+
+        if !already_member {
+            let service = crate::services::games::GameService;
+            // Ignore specific "already a member" conflicts just in case of races;
+            // other errors propagate so the caller can surface them.
+            match service.join_game(txn, game_id, current_user_id).await {
+                Ok(_) => {
+                    // Touch game to increment lock_version so websocket clients receive the update
+                    game = games_repo::touch_game(txn, game_id, initial_lock_version)
+                        .await
+                        .map_err(AppError::from)?;
+                    join_occurred = true;
+                }
+                Err(err) => {
+                    if !matches!(
+                        err,
+                        AppError::Conflict {
+                            code: ErrorCode::Conflict,
+                            ..
+                        }
+                    ) {
+                        return Err(err);
+                    }
+                }
+            }
+        }
+    }
 
     // Create game service and load game state
     let game_service = crate::services::games::GameService;
@@ -190,6 +232,7 @@ async fn build_snapshot_parts(
         viewer_seat,
         viewer_hand,
         bid_constraints,
+        join_occurred,
     ))
 }
 
@@ -200,11 +243,16 @@ pub(crate) async fn build_snapshot_response(
     current_user: &CurrentUser,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
     let current_user_id = current_user.id;
-    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
+    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints, join_occurred) =
         with_txn(http_req, app_state, |txn| {
             Box::pin(async move { build_snapshot_parts(txn, game_id, current_user_id).await })
         })
         .await?;
+
+    // If a join occurred, publish a snapshot broadcast so other players' UIs update
+    if join_occurred {
+        publish_snapshot_with_lock(app_state, game_id, lock_version).await?;
+    }
 
     let response = GameSnapshotResponse {
         snapshot,
@@ -221,8 +269,11 @@ pub(crate) async fn build_snapshot_response_in_txn(
     game_id: i64,
     current_user_id: i64,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
-    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
+    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints, _join_occurred) =
         build_snapshot_parts(txn, game_id, current_user_id).await?;
+
+    // Note: We don't publish broadcasts here since we're inside a transaction.
+    // The caller should handle broadcasting after the transaction commits if needed.
 
     let response = GameSnapshotResponse {
         snapshot,
