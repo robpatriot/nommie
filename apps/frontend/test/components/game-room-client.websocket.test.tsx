@@ -51,8 +51,14 @@ const initializedGameIds = new Set<number>()
 // Mock mutation hooks - mutateAsync should call the corresponding server action
 // If the action returns an error, mutateAsync should throw
 const mockUseMarkPlayerReady = vi.fn(() => ({
-  mutateAsync: async (gameId: number) => {
-    const result = await mockMarkPlayerReadyAction(gameId)
+  mutateAsync: async ({
+    gameId,
+    isReady,
+  }: {
+    gameId: number
+    isReady: boolean
+  }) => {
+    const result = await mockMarkPlayerReadyAction(gameId, isReady)
     if (result.kind === 'error') {
       throw new Error(result.message)
     }
@@ -370,7 +376,7 @@ describe('GameRoomClient', () => {
       // Wait for ready action to complete
       await waitFor(
         () => {
-          expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42)
+          expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42, true)
         },
         { timeout: 2000 }
       )

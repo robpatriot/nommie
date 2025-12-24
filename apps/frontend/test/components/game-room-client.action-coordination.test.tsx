@@ -49,13 +49,19 @@ const initializedGameIds = new Set<number>()
 const markPlayerReadyState = { isPending: false }
 const mockUseMarkPlayerReady = vi.fn(() => {
   return {
-    mutateAsync: async (gameId: number) => {
+    mutateAsync: async ({
+      gameId,
+      isReady,
+    }: {
+      gameId: number
+      isReady: boolean
+    }) => {
       if (markPlayerReadyState.isPending) {
         return // Don't call if already pending
       }
       markPlayerReadyState.isPending = true
       try {
-        const result = await mockMarkPlayerReadyAction(gameId)
+        const result = await mockMarkPlayerReadyAction(gameId, isReady)
         if (result.kind === 'error') {
           throw new Error(result.message)
         }

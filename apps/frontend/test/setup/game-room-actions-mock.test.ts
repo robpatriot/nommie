@@ -40,8 +40,8 @@ describe('game-room-actions mock guard', () => {
     expect(result1).toEqual({ kind: 'ok', data: null })
 
     mockMarkPlayerReadyAction.mockReturnValueOnce({ kind: 'ok' })
-    const result2 = markPlayerReadyAction(42)
-    expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42)
+    const result2 = markPlayerReadyAction(42, true)
+    expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42, true)
     expect(result2).toEqual({ kind: 'ok' })
 
     mockFetchAiRegistryAction.mockReturnValueOnce({ kind: 'ok', data: [] })

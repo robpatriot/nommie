@@ -50,16 +50,37 @@ const initializedGameIds = new Set<number>()
 
 // Mock mutation hooks - mutateAsync should call the corresponding server action
 // If the action returns an error, mutateAsync should throw
-const mockUseMarkPlayerReady = vi.fn(() => ({
-  mutateAsync: async (gameId: number) => {
-    const result = await mockMarkPlayerReadyAction(gameId)
-    if (result.kind === 'error') {
-      throw new Error(result.message)
+// Use shared pending state to prevent duplicate calls
+let markPlayerReadyPendingState = false
+const mockUseMarkPlayerReadyInstance = {
+  mutateAsync: async ({
+    gameId,
+    isReady,
+  }: {
+    gameId: number
+    isReady: boolean
+  }) => {
+    if (markPlayerReadyPendingState) {
+      return // Don't call if already pending
     }
-    return result
+    markPlayerReadyPendingState = true
+    try {
+      // Add a small delay to simulate async behavior and allow isPending to be checked
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      const result = await mockMarkPlayerReadyAction(gameId, isReady)
+      if (result.kind === 'error') {
+        throw new Error(result.message)
+      }
+      return result
+    } finally {
+      markPlayerReadyPendingState = false
+    }
   },
-  isPending: false,
-}))
+  get isPending() {
+    return markPlayerReadyPendingState
+  },
+}
+const mockUseMarkPlayerReady = vi.fn(() => mockUseMarkPlayerReadyInstance)
 
 const mockUseSubmitBid = vi.fn(() => ({
   mutateAsync: (request: unknown) => mockSubmitBidAction(request),
@@ -250,6 +271,9 @@ describe('GameRoomClient', () => {
     initializedGameIds.clear()
     // Query client is reset automatically by test utils
 
+    // Reset pending state
+    markPlayerReadyPendingState = false
+
     // Explicitly reset all mocks to clear any queued implementations from previous tests
     // mockReset() clears both call history AND implementation queues
     mockGetGameRoomSnapshotAction.mockReset()
@@ -348,13 +372,16 @@ describe('GameRoomClient', () => {
         { timeout: 2000 }
       )
 
-      expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42)
+      expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42, true)
 
       // Note: No manual refresh expected - WebSocket will handle updates
     })
 
     it('prevents duplicate ready calls', async () => {
       const initialData = createInitialData()
+
+      // Reset pending state before test
+      markPlayerReadyPendingState = false
 
       await act(async () => {
         const { queryClient: _ } = render(
@@ -366,9 +393,11 @@ describe('GameRoomClient', () => {
         name: /Mark yourself as ready/i,
       })
 
-      // Click multiple times quickly
+      // Click multiple times quickly (but with small delays to allow state updates)
       await userEvent.click(readyButton)
+      await new Promise((resolve) => setTimeout(resolve, 10))
       await userEvent.click(readyButton)
+      await new Promise((resolve) => setTimeout(resolve, 10))
       await userEvent.click(readyButton)
 
       // Wait for async operations
@@ -379,8 +408,9 @@ describe('GameRoomClient', () => {
         { timeout: 2000 }
       )
 
-      // Should only call once
+      // Should only call once (subsequent clicks should be prevented by isPending)
       expect(mockMarkPlayerReadyAction).toHaveBeenCalledTimes(1)
+      expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42, true)
     })
 
     it('handles ready action errors', async () => {
