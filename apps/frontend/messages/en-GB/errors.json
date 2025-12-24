@@ -96,6 +96,8 @@
     "failedToFetchAiRegistry": "Failed to fetch AI registry",
     "failedToDeleteGameNoVersion": "Failed to delete game: could not determine game version",
     "failedToDeleteGameNoSnapshot": "Failed to delete game: could not fetch game snapshot",
+    "failedToLeaveGame": "Failed to leave game",
+    "failedToLeaveGameNoVersion": "Failed to leave game: could not determine game version",
     "failedToRefreshGamesList": "Failed to refresh games list",
     "failedToCreateGame": "Failed to create game",
     "failedToJoinGame": "Failed to join game",

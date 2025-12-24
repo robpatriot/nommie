@@ -15,6 +15,7 @@
       "unableToMarkReady": "No se puede marcar como listo",
       "unableToLeaveGame": "No se puede abandonar la partida",
       "gameStartedCannotLeave": "No se puede abandonar la partida: la partida ya ha comenzado",
+      "leaveActiveGameConfirmation": "¿Está seguro de que desea salir? Una IA tomará su asiento y continuará jugando.",
       "failedToSubmitBid": "Error al enviar la puja",
       "failedToSelectTrump": "Error al seleccionar el triunfo",
       "failedToPlayCard": "Error al jugar la carta",

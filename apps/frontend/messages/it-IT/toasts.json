@@ -15,6 +15,7 @@
       "unableToMarkReady": "Impossibile segnare come pronto",
       "unableToLeaveGame": "Impossibile lasciare la partita",
       "gameStartedCannotLeave": "Impossibile lasciare la partita: la partita è già iniziata",
+      "leaveActiveGameConfirmation": "Sei sicuro di voler uscire? Un'IA prenderà il tuo posto e continuerà a giocare.",
       "failedToSubmitBid": "Impossibile inviare la puntata",
       "failedToSelectTrump": "Impossibile selezionare la briscola",
       "failedToPlayCard": "Impossibile giocare la carta",

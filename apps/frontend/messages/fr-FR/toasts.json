@@ -15,6 +15,7 @@
       "unableToMarkReady": "Impossible de marquer comme prêt",
       "unableToLeaveGame": "Impossible de quitter la partie",
       "gameStartedCannotLeave": "Impossible de quitter la partie : la partie a déjà commencé",
+      "leaveActiveGameConfirmation": "Êtes-vous sûr de vouloir quitter ? Une IA prendra votre place et continuera à jouer.",
       "failedToSubmitBid": "Échec de la soumission de l'enchère",
       "failedToSelectTrump": "Échec de la sélection de l'atout",
       "failedToPlayCard": "Échec du jeu de la carte",

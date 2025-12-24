@@ -15,6 +15,7 @@
       "unableToMarkReady": "Unable to mark ready",
       "unableToLeaveGame": "Unable to leave game",
       "gameStartedCannotLeave": "Cannot leave game: the game has already started",
+      "leaveActiveGameConfirmation": "Are you sure you want to leave? An AI will take over your seat and continue playing.",
       "failedToSubmitBid": "Failed to submit bid",
       "failedToSelectTrump": "Failed to select trump",
       "failedToPlayCard": "Failed to play card",
