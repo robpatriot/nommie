@@ -34,8 +34,6 @@ async fn test_bid_entity_direct() -> Result<(), AppError> {
                 id: sea_orm::NotSet,
                 game_id: Set(inserted_game.id),
                 round_no: Set(1i16),
-                hand_size: Set(13i16),
-                dealer_pos: Set(0i16),
                 trump: Set(None),
                 created_at: Set(now),
                 completed_at: Set(None),

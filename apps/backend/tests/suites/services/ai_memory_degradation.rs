@@ -227,8 +227,6 @@ async fn create_test_round_with_plays(
         id: NotSet,
         game_id: Set(game.id),
         round_no: Set(1i16),
-        hand_size: Set(13i16),
-        dealer_pos: Set(0i16),
         trump: Set(None),
         created_at: Set(OffsetDateTime::now_utc()),
         completed_at: Set(None),

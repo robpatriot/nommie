@@ -14,7 +14,7 @@ async fn test_create_score_and_find() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
 
             // Create a score
             let score = scores::create_score(
@@ -66,7 +66,7 @@ async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
 
             // Create scores out of order
             scores::create_score(
@@ -156,7 +156,7 @@ async fn test_get_current_totals() -> Result<(), AppError> {
             let game = games::create_game(txn, GameCreate::new()).await?;
 
             // Round 1
-            let round1 = rounds::create_round(txn, game.id, 1, 13, 0).await?;
+            let round1 = rounds::create_round(txn, game.id, 1).await?;
             scores::create_score(
                 txn,
                 scores::ScoreData {
@@ -221,7 +221,7 @@ async fn test_get_current_totals() -> Result<(), AppError> {
             rounds::complete_round(txn, round1.id).await?;
 
             // Round 2 (cumulative totals)
-            let round2 = rounds::create_round(txn, game.id, 2, 12, 1).await?;
+            let round2 = rounds::create_round(txn, game.id, 2).await?;
             scores::create_score(
                 txn,
                 scores::ScoreData {
@@ -326,7 +326,7 @@ async fn test_unique_constraint_round_seat() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
 
             // Create first score for seat 0
             scores::create_score(
@@ -387,7 +387,7 @@ async fn test_bid_met_flag() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
 
             // Met bid
             let met = scores::create_score(

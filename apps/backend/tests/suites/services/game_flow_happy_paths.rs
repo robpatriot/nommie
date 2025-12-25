@@ -122,7 +122,6 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
                 .await?
                 .unwrap();
             assert_eq!(round.round_no, 1);
-            assert_eq!(round.hand_size, 13);
             assert_eq!(round.completed_at, None);
 
             // Submit bids: Round 1, dealer at seat 0, bidding starts at seat 1
@@ -387,7 +386,7 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
             let round = rounds::find_by_game_and_round(txn, setup.game_id, 26)
                 .await?
                 .expect("Round 26 should exist");
-            assert_eq!(round.hand_size, 13);
+            assert_eq!(round.round_no, 26);
 
             // Submit bids: Round 26, dealer at seat 1, bidding starts at seat 2
             // Bids: 3 + 3 + 4 + 2 = 12 (not 13, dealer rule OK)

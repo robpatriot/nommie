@@ -186,7 +186,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
 
             // Manually create a round with hand_size = 2
             // Round 13 has hand_size 2, and with starting_dealer=0, dealer_pos=(0+13-1)%4=0
-            let _round = rounds::create_round(txn, game_setup.game_id, 13, 2, 0).await?;
+            let _round = rounds::create_round(txn, game_setup.game_id, 13).await?;
 
             let update_state =
                 GameUpdate::new(game_setup.game_id, 1).with_state(DbGameState::Bidding);

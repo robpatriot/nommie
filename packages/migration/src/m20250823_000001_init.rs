@@ -134,8 +134,6 @@ enum GameRounds {
     Id,
     GameId,
     RoundNo,
-    HandSize,
-    DealerPos,
     Trump,
     CreatedAt,
     CompletedAt,
@@ -825,16 +823,6 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(GameRounds::GameId).big_integer().not_null())
                     .col(
                         ColumnDef::new(GameRounds::RoundNo)
-                            .small_integer()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(GameRounds::HandSize)
-                            .small_integer()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(GameRounds::DealerPos)
                             .small_integer()
                             .not_null(),
                     )

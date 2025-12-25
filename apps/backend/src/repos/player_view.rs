@@ -153,12 +153,37 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     game_id: i64,
 ) -> Result<GameHistory, AppError> {
+    // Load game to compute hand_size and dealer_pos for each round
+    let game = games::require_game(conn, game_id).await?;
+
     // Load all rounds for this game
     let all_rounds = rounds::find_all_by_game(conn, game_id).await?;
+
+    // Only require starting_dealer_pos if we have rounds to process
+    let starting_dealer_pos = if all_rounds.is_empty() {
+        0 // Default value, won't be used
+    } else {
+        game.starting_dealer_pos.ok_or_else(|| {
+            DomainError::validation(
+                ValidationKind::Other("NO_STARTING_DEALER".into()),
+                "Game missing starting dealer position",
+            )
+        })?
+    };
 
     let mut round_histories = Vec::new();
 
     for round in all_rounds {
+        // Compute hand_size and dealer_pos from round_no
+        let hand_size =
+            crate::domain::rules::hand_size_for_round(round.round_no).ok_or_else(|| {
+                DomainError::validation(
+                    ValidationKind::InvalidHandSize,
+                    format!("Invalid round number: {}", round.round_no),
+                )
+            })?;
+        let dealer_pos = (starting_dealer_pos + (round.round_no - 1)) % 4;
+
         // Load bids for this round
         let bid_records = bids::find_all_by_round(conn, round.id).await?;
         let mut bids = [None; 4];
@@ -171,7 +196,7 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
         // Calculate trump_selector_seat (winning bidder) from bids
         // Only calculate if all bids are present
         let trump_selector_seat = if bids.iter().all(|b| b.is_some()) {
-            calculate_winning_bidder(&bids, round.dealer_pos)
+            calculate_winning_bidder(&bids, dealer_pos)
         } else {
             None
         };
@@ -197,8 +222,8 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
 
         round_histories.push(RoundHistory {
             round_no: round.round_no,
-            hand_size: round.hand_size,
-            dealer_seat: round.dealer_pos,
+            hand_size,
+            dealer_seat: dealer_pos,
             bids,
             trump_selector_seat,
             trump,

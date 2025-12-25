@@ -305,18 +305,7 @@ pub async fn setup_game_at_round(
     // This is much faster than creating all previous rounds
     if completed_rounds > 0 {
         let round_no = completed_rounds;
-        let hand_size =
-            backend::domain::rules::hand_size_for_round(round_no as u8).ok_or_else(|| {
-                AppError::from(backend::errors::domain::DomainError::validation(
-                    backend::errors::domain::ValidationKind::InvalidHandSize,
-                    format!("Invalid round number: {}", round_no),
-                ))
-            })?;
-
-        let dealer_pos = ((round_no - 1) % 4) as u8;
-
-        let round =
-            rounds::create_round(txn, game_id, round_no as u8, hand_size, dealer_pos).await?;
+        let round = rounds::create_round(txn, game_id, round_no as u8).await?;
 
         last_round_id = round.id;
 

@@ -15,13 +15,11 @@ async fn test_create_round_and_find_by_id_roundtrip() -> Result<(), AppError> {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
 
-            let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
 
             assert!(round.id > 0, "Round ID should be positive");
             assert_eq!(round.game_id, game.id);
             assert_eq!(round.round_no, 1);
-            assert_eq!(round.hand_size, 13);
-            assert_eq!(round.dealer_pos, 0);
             assert_eq!(round.trump, None);
             assert_eq!(round.completed_at, None);
 
@@ -49,15 +47,14 @@ async fn test_find_by_game_and_round() -> Result<(), AppError> {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
 
-            let round1 = rounds::create_round(txn, game.id, 1, 13, 0).await?;
-            let round2 = rounds::create_round(txn, game.id, 2, 12, 1).await?;
+            let round1 = rounds::create_round(txn, game.id, 1).await?;
+            let round2 = rounds::create_round(txn, game.id, 2).await?;
 
             let found = rounds::find_by_game_and_round(txn, game.id, 2).await?;
             assert!(found.is_some(), "Round 2 should be found");
             let found = found.unwrap();
             assert_eq!(found.id, round2.id);
             assert_eq!(found.round_no, 2);
-            assert_eq!(found.hand_size, 12);
 
             let found1 = rounds::find_by_game_and_round(txn, game.id, 1).await?;
             assert!(found1.is_some());
@@ -101,7 +98,7 @@ async fn test_update_trump() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
 
             assert_eq!(round.trump, None);
 
@@ -129,7 +126,7 @@ async fn test_update_trump_no_trump() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
 
             let updated = rounds::update_trump(txn, round.id, Trump::NoTrumps).await?;
             assert_eq!(updated.trump, Some(Trump::NoTrumps));
@@ -150,7 +147,7 @@ async fn test_complete_round() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 13, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
 
             assert_eq!(round.completed_at, None);
 
@@ -179,9 +176,9 @@ async fn test_unique_constraint_game_round() -> Result<(), AppError> {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
 
-            rounds::create_round(txn, game.id, 1, 13, 0).await?;
+            rounds::create_round(txn, game.id, 1).await?;
 
-            let result = rounds::create_round(txn, game.id, 1, 12, 1).await;
+            let result = rounds::create_round(txn, game.id, 1).await;
 
             assert!(result.is_err(), "Duplicate round should fail");
 

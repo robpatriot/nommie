@@ -57,8 +57,6 @@ pub async fn create_round(
         id: sea_orm::NotSet,
         game_id: Set(dto.game_id),
         round_no: Set(dto.round_no as i16),
-        hand_size: Set(dto.hand_size as i16),
-        dealer_pos: Set(dto.dealer_pos as i16),
         trump: Set(None),
         created_at: Set(now),
         completed_at: Set(None),

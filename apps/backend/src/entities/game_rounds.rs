@@ -26,10 +26,6 @@ pub struct Model {
     pub game_id: i64,
     #[sea_orm(column_name = "round_no", column_type = "SmallInteger")]
     pub round_no: i16,
-    #[sea_orm(column_name = "hand_size", column_type = "SmallInteger")]
-    pub hand_size: i16,
-    #[sea_orm(column_name = "dealer_pos", column_type = "SmallInteger")]
-    pub dealer_pos: i16,
     pub trump: Option<CardTrump>,
     #[sea_orm(column_name = "created_at")]
     pub created_at: OffsetDateTime,

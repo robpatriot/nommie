@@ -13,8 +13,6 @@ pub struct Round {
     pub id: i64,
     pub game_id: i64,
     pub round_no: u8,
-    pub hand_size: u8,
-    pub dealer_pos: u8,
     pub trump: Option<Trump>,
     pub created_at: time::OffsetDateTime,
     pub completed_at: Option<time::OffsetDateTime>,
@@ -46,15 +44,8 @@ pub async fn create_round(
     txn: &DatabaseTransaction,
     game_id: i64,
     round_no: u8,
-    hand_size: u8,
-    dealer_pos: u8,
 ) -> Result<Round, DomainError> {
-    let dto = rounds_adapter::RoundCreate {
-        game_id,
-        round_no,
-        hand_size,
-        dealer_pos,
-    };
+    let dto = rounds_adapter::RoundCreate { game_id, round_no };
     let round = rounds_adapter::create_round(txn, dto).await?;
     Ok(Round::from(round))
 }
@@ -90,8 +81,6 @@ impl From<game_rounds::Model> for Round {
             id: model.id,
             game_id: model.game_id,
             round_no: model.round_no as u8,
-            hand_size: model.hand_size as u8,
-            dealer_pos: model.dealer_pos as u8,
             trump: model.trump.map(Trump::from),
             created_at: model.created_at,
             completed_at: model.completed_at,

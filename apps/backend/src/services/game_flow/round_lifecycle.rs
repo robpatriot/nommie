@@ -77,20 +77,8 @@ impl GameFlowService {
             "DEBUG: start_round - lock_version updated"
         );
 
-        // Reload game to get updated values for hand_size and dealer_pos computation
-        let updated_game = games::require_game(txn, game_id).await?;
-        let computed_hand_size = updated_game.hand_size().unwrap_or(0);
-        let computed_dealer_pos = updated_game.dealer_pos().unwrap_or(0);
-
         // Create round record in DB
-        let round = rounds::create_round(
-            txn,
-            game_id,
-            next_round,
-            computed_hand_size,
-            computed_dealer_pos,
-        )
-        .await?;
+        let round = rounds::create_round(txn, game_id, next_round).await?;
 
         // Persist dealt hands to DB
         let hands_to_store: Vec<(u8, Vec<hands::Card>)> = dealt_hands
@@ -113,8 +101,8 @@ impl GameFlowService {
         info!(
             game_id,
             round = next_round,
-            hand_size = computed_hand_size,
-            dealer_pos = computed_dealer_pos,
+            hand_size = hand_size,
+            dealer_pos = updated_game.dealer_pos().unwrap_or(0),
             "Round dealt successfully"
         );
         debug!(game_id, round = next_round, "Transition: -> Bidding");

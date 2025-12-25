@@ -164,7 +164,9 @@ impl GameService {
                     }
                 }
 
-                let prev_hand_size = prev_round.hand_size;
+                // Compute hand_size from round_no
+                let prev_hand_size =
+                    crate::domain::rules::hand_size_for_round(prev_round_no).unwrap_or(0);
 
                 previous_round_summary = Some(PreviousRound {
                     round_no: prev_round_no,

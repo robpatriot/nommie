@@ -14,7 +14,7 @@ async fn test_create_play_and_find_all() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 3, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
             let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Create plays
@@ -59,7 +59,7 @@ async fn test_count_plays() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 4, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
             let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Initially 0 plays
@@ -94,7 +94,7 @@ async fn test_complete_trick_with_four_plays() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
             let trick = tricks::create_trick(txn, round.id, 0, Suit::Spades, 1).await?;
 
             // Create 4 plays
@@ -165,7 +165,7 @@ async fn test_unique_constraint_trick_seat() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
             let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Create first play for seat 0
@@ -219,7 +219,7 @@ async fn test_unique_constraint_trick_order() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 5, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
             let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Create first play with order 0
@@ -273,7 +273,7 @@ async fn test_plays_ordering() -> Result<(), AppError> {
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games::create_game(txn, GameCreate::new()).await?;
-            let round = rounds::create_round(txn, game.id, 1, 4, 0).await?;
+            let round = rounds::create_round(txn, game.id, 1).await?;
             let trick = tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
 
             // Create plays out of sequential order
