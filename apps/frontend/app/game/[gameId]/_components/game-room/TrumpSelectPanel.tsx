@@ -94,7 +94,7 @@ export function TrumpSelectPanel({
       case 'SPADES':
         return 'text-slate-900'
       case 'NO_TRUMPS':
-        return 'text-accent-contrast'
+        return 'text-panel-primary-accent'
       default:
         return ''
     }
@@ -105,16 +105,18 @@ export function TrumpSelectPanel({
   const hasNoTrump = allowedTrumps.includes('NO_TRUMPS')
 
   return (
-    <section className="flex w-full flex-col gap-4 rounded-3xl border border-accent/50 bg-accent/15 p-5 text-accent-contrast shadow-elevated">
+    <section className="flex w-full flex-col gap-4 rounded-3xl border border-panel-primary-accent/50 bg-panel-primary-accent/15 p-5 text-panel-primary-accent shadow-elevated">
       <header>
         <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
           {t('title')}
         </h2>
-        <p className="text-xs text-accent-contrast/80">{t('description')}</p>
+        <p className="text-xs text-panel-primary-accent/80">
+          {t('description')}
+        </p>
       </header>
 
       <form
-        className="flex flex-col gap-3 rounded-2xl border border-accent/30 bg-surface/85 p-4 shadow-inner shadow-accent/20"
+        className="flex flex-col gap-3 rounded-2xl border border-panel-primary-accent/30 bg-surface/85 p-4 shadow-inner shadow-panel-primary-accent/20"
         onSubmit={handleSubmit}
       >
         <div className="flex flex-col gap-3">
@@ -142,9 +144,9 @@ export function TrumpSelectPanel({
                     disabled={disabled}
                     className={`flex items-center justify-center rounded-2xl border px-4 py-3 text-center transition ${
                       isSelected
-                        ? 'border-accent bg-accent/30 text-accent-contrast shadow-md shadow-accent/30'
+                        ? 'border-panel-primary-accent bg-panel-primary-accent/30 text-panel-primary-accent shadow-md shadow-panel-primary-accent/30'
                         : canSelect
-                          ? 'border-accent/40 bg-surface text-accent-contrast hover:border-accent hover:bg-accent/15'
+                          ? 'border-panel-primary-accent/40 bg-surface text-panel-primary-accent hover:border-panel-primary-accent hover:bg-panel-primary-accent/15'
                           : 'border-border bg-surface text-muted'
                     } ${
                       disabled
@@ -187,9 +189,9 @@ export function TrumpSelectPanel({
                 disabled={!canSelect || isPending}
                 className={`flex items-center justify-center rounded-2xl border px-4 py-3 text-center transition ${
                   selectedTrump === 'NO_TRUMPS'
-                    ? 'border-accent bg-accent/30 text-accent-contrast shadow-md shadow-accent/30'
+                    ? 'border-panel-primary-accent bg-panel-primary-accent/30 text-panel-primary-accent shadow-md shadow-panel-primary-accent/30'
                     : canSelect
-                      ? 'border-accent/40 bg-surface text-accent-contrast hover:border-accent hover:bg-accent/15'
+                      ? 'border-panel-primary-accent/40 bg-surface text-panel-primary-accent hover:border-panel-primary-accent hover:bg-panel-primary-accent/15'
                       : 'border-border bg-surface text-muted'
                 } ${
                   !canSelect || isPending
@@ -205,7 +207,7 @@ export function TrumpSelectPanel({
                 }
                 aria-pressed={selectedTrump === 'NO_TRUMPS'}
               >
-                <span className="text-xl font-semibold text-accent-contrast">
+                <span className="text-xl font-semibold text-panel-primary-accent">
                   {tTrump('NO_TRUMPS')}
                 </span>
               </button>
@@ -215,7 +217,7 @@ export function TrumpSelectPanel({
 
         <button
           type="submit"
-          className="w-full rounded-2xl bg-accent px-4 py-3 text-sm font-semibold text-accent-foreground shadow-lg shadow-accent/40 transition hover:bg-accent/80 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-accent-foreground/70"
+          className="w-full rounded-2xl bg-panel-primary-accent px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-panel-primary-accent/40 transition hover:bg-panel-primary-accent/80 disabled:cursor-not-allowed disabled:bg-panel-primary-accent/40 disabled:text-primary-foreground/70 dark:text-accent-foreground dark:disabled:text-accent-foreground/70"
           disabled={!canSelect || isPending || !selectedTrump}
           aria-label={
             isPending
@@ -230,7 +232,7 @@ export function TrumpSelectPanel({
           {submitLabel}
         </button>
 
-        <p className="text-xs text-accent-contrast/75">
+        <p className="text-xs text-panel-primary-accent/75">
           {canSelect
             ? t('hint.canSelect')
             : t('hint.waitingForPlayer', { name: activeName })}

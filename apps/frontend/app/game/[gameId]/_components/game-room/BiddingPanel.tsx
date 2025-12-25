@@ -187,26 +187,26 @@ export function BiddingPanel({
   }
 
   return (
-    <section className="flex w-full flex-col gap-4 rounded-3xl border border-success/50 bg-success/10 p-5 text-success-contrast shadow-elevated">
+    <section className="flex w-full flex-col gap-4 rounded-3xl border border-panel-primary/50 bg-panel-primary/10 p-5 text-panel-primary shadow-elevated">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
             {t('title')}
           </h2>
-          <p className="text-xs text-success-contrast/80">{t('subtitle')}</p>
+          <p className="text-xs text-panel-primary/80">{t('subtitle')}</p>
         </div>
         <div
-          className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 ${
+          className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 border ${
             isViewerTurn
-              ? 'bg-success/25 border-success/60'
-              : 'bg-success/15 border-success/40'
-          } border`}
+              ? 'bg-panel-primary/25 border-panel-primary/60'
+              : 'bg-panel-primary/15 border-panel-primary/40'
+          }`}
         >
-          <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-success-contrast/80">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.3em] text-panel-primary/80">
             {isViewerTurn ? t('turn.yourTurn') : t('turn.waiting')}
           </span>
           {!isViewerTurn && (
-            <span className="text-sm font-bold text-success-contrast/90">
+            <span className="text-sm font-bold text-panel-primary/90">
               {activeName}
             </span>
           )}
@@ -214,7 +214,7 @@ export function BiddingPanel({
       </header>
 
       <form
-        className="flex flex-col gap-3 rounded-2xl border border-success/30 bg-surface/85 p-4 shadow-inner shadow-success/20"
+        className="flex flex-col gap-3 rounded-2xl border border-panel-primary/30 bg-surface/85 p-4 shadow-inner shadow-panel-primary/20"
         onSubmit={handleSubmit}
       >
         <label
@@ -235,7 +235,7 @@ export function BiddingPanel({
             className={`w-24 rounded-xl border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
               hasValidationIssue
                 ? 'border-warning/70 focus:border-warning focus:ring focus:ring-warning/30'
-                : 'border-success/40 focus:border-success focus:ring focus:ring-success/40'
+                : 'border-panel-primary/40 focus:border-panel-primary focus:ring focus:ring-panel-primary/40'
             } ${flashValidation && hasValidationIssue ? 'animate-pulse' : ''}`}
             disabled={viewerBid !== null || bidding.isPending || !isViewerTurn}
             aria-label={t('bidValueAria')}
@@ -245,7 +245,7 @@ export function BiddingPanel({
           />
           <button
             type="submit"
-            className="rounded-2xl bg-success px-4 py-2 text-sm font-semibold text-success-foreground shadow-lg shadow-success/40 transition hover:bg-success/80 disabled:cursor-not-allowed disabled:bg-success/40 disabled:text-success-foreground/70"
+            className="rounded-2xl bg-panel-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-panel-primary/40 transition hover:bg-panel-primary/80 disabled:cursor-not-allowed disabled:bg-panel-primary/40 disabled:text-primary-foreground/70 dark:text-success-foreground dark:disabled:text-success-foreground/70"
             disabled={isSubmitDisabled}
             aria-label={
               bidding.isPending
@@ -258,7 +258,7 @@ export function BiddingPanel({
             {bidding.isPending ? t('submit.submitting') : t('submit.label')}
           </button>
         </div>
-        <p id="bid-range-hint" className="text-xs text-success-contrast/80">
+        <p id="bid-range-hint" className="text-xs text-panel-primary/80">
           {t('allowedRange', { minBid, maxBid })}{' '}
           {isViewerTurn
             ? viewerBid === null
@@ -279,7 +279,7 @@ export function BiddingPanel({
         ) : null}
       </form>
 
-      <div className="rounded-2xl border border-success/20 bg-surface/70 p-4">
+      <div className="rounded-2xl border border-panel-primary/20 bg-surface/70 p-4">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide">
           {t('tableBids')}
         </h3>
@@ -289,7 +289,7 @@ export function BiddingPanel({
               key={seat}
               className={`flex items-center justify-between rounded-2xl px-3 py-2 text-sm ${
                 seat === phase.to_act
-                  ? 'bg-success/20 text-success-contrast'
+                  ? 'bg-panel-primary/20 text-panel-primary'
                   : 'bg-surface text-muted'
               }`}
             >

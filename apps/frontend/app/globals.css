@@ -29,7 +29,7 @@
 }
 
 @layer base {
-  [data-theme='dark'] {
+  .dark {
     --color-background: #0a1210;
     --color-surface: #112620;
     --color-surface-strong: #0b1a16;
@@ -107,7 +107,7 @@
     background-color: var(--color-background);
   }
 
-  [data-theme='dark'] .tabletop-shell {
+  .dark .tabletop-shell {
     background-image:
       radial-gradient(
         circle at 20% 20%,
@@ -126,7 +126,7 @@
       );
   }
 
-  [data-theme='dark'] .tabletop-shell::before {
+  .dark .tabletop-shell::before {
     content: '';
     position: fixed;
     inset: 0;
@@ -140,7 +140,7 @@
     z-index: -1;
   }
 
-  [data-theme='dark'] .tabletop-shell::after {
+  .dark .tabletop-shell::after {
     content: '';
     position: fixed;
     inset: 0;
@@ -176,7 +176,7 @@
     );
   }
 
-  [data-theme='dark'] .card-wrapper {
+  .dark .card-wrapper {
     background: color-mix(in srgb, var(--color-felt-base) 95%, transparent);
   }
 
@@ -190,7 +190,7 @@
     position: relative;
   }
 
-  [data-theme='dark'] .card-wrapper-home {
+  .dark .card-wrapper-home {
     background: color-mix(in srgb, var(--color-felt-base) 95%, transparent);
   }
 
@@ -208,7 +208,7 @@
       );
     }
 
-    [data-theme='dark'] .tabletop-shell {
+    .dark .tabletop-shell {
       --bg-subtle: #0e1c18;
     }
 
@@ -225,7 +225,7 @@
     color: var(--card-cream);
   }
 
-  [data-theme='dark'] .text-card-cream {
+  .dark .text-card-cream {
     --card-cream: #e5f4ed;
     color: var(--card-cream);
   }
@@ -235,7 +235,7 @@
     background-color: var(--card-cream);
   }
 
-  [data-theme='dark'] .bg-card-cream {
+  .dark .bg-card-cream {
     --card-cream: #191f20;
   }
 
@@ -245,7 +245,7 @@
       color-mix(in srgb, var(--shadow-color) 42%, transparent);
   }
 
-  [data-theme='dark'] .shadow-elevated {
+  .dark .shadow-elevated {
     --shadow-color: #000000;
     box-shadow: 0 22px 55px -26px
       color-mix(in srgb, var(--shadow-color) 52%, transparent);
@@ -275,7 +275,6 @@
   }
 
   .table-circle-ring {
-    /* Light theme: use foreground color (dark green #12231e = rgb(18, 35, 30)) */
     border: 1px solid rgba(18, 35, 30, 0.25);
     background: radial-gradient(
       circle,
@@ -285,13 +284,359 @@
     );
   }
 
-  [data-theme='dark'] .table-circle-ring {
-    /* Dark theme: use white with low opacity */
+  .dark .table-circle-ring {
     border-color: rgba(255, 255, 255, 0.1);
     background: radial-gradient(
       circle,
       rgba(255, 255, 255, 0.05) 0%,
       transparent 70%
     );
+  }
+
+  /* Panel colors: primary (orange) in light mode, success (green) in dark mode */
+  /* These utilities map to different colors in light vs dark mode */
+  .bg-panel-primary {
+    background-color: color-mix(
+      in srgb,
+      var(--color-primary) 100%,
+      transparent
+    );
+  }
+
+  .dark .bg-panel-primary {
+    background-color: color-mix(
+      in srgb,
+      var(--color-success) 100%,
+      transparent
+    );
+  }
+
+  .bg-panel-primary\/10 {
+    background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+
+  .dark .bg-panel-primary\/10 {
+    background-color: color-mix(in srgb, var(--color-success) 10%, transparent);
+  }
+
+  .bg-panel-primary\/15 {
+    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  }
+
+  .dark .bg-panel-primary\/15 {
+    background-color: color-mix(in srgb, var(--color-success) 15%, transparent);
+  }
+
+  .bg-panel-primary\/20 {
+    background-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  }
+
+  .dark .bg-panel-primary\/20 {
+    background-color: color-mix(in srgb, var(--color-success) 20%, transparent);
+  }
+
+  .bg-panel-primary\/25 {
+    background-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
+  }
+
+  .dark .bg-panel-primary\/25 {
+    background-color: color-mix(in srgb, var(--color-success) 25%, transparent);
+  }
+
+  .bg-panel-primary\/30 {
+    background-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+
+  .dark .bg-panel-primary\/30 {
+    background-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+  }
+
+  .bg-panel-primary\/40 {
+    background-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .dark .bg-panel-primary\/40 {
+    background-color: color-mix(in srgb, var(--color-success) 40%, transparent);
+  }
+
+  .bg-panel-primary\/50 {
+    background-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+  }
+
+  .dark .bg-panel-primary\/50 {
+    background-color: color-mix(in srgb, var(--color-success) 50%, transparent);
+  }
+
+  .bg-panel-primary\/60 {
+    background-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
+  }
+
+  .dark .bg-panel-primary\/60 {
+    background-color: color-mix(in srgb, var(--color-success) 60%, transparent);
+  }
+
+  .bg-panel-primary\/80 {
+    background-color: color-mix(in srgb, var(--color-primary) 80%, transparent);
+  }
+
+  .dark .bg-panel-primary\/80 {
+    background-color: color-mix(in srgb, var(--color-success) 80%, transparent);
+  }
+
+  .border-panel-primary {
+    border-color: color-mix(in srgb, var(--color-primary) 100%, transparent);
+  }
+
+  .dark .border-panel-primary {
+    border-color: color-mix(in srgb, var(--color-success) 100%, transparent);
+  }
+
+  .border-panel-primary\/20 {
+    border-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  }
+
+  .dark .border-panel-primary\/20 {
+    border-color: color-mix(in srgb, var(--color-success) 20%, transparent);
+  }
+
+  .border-panel-primary\/30 {
+    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+
+  .dark .border-panel-primary\/30 {
+    border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+  }
+
+  .border-panel-primary\/40 {
+    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .dark .border-panel-primary\/40 {
+    border-color: color-mix(in srgb, var(--color-success) 40%, transparent);
+  }
+
+  .border-panel-primary\/50 {
+    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+  }
+
+  .dark .border-panel-primary\/50 {
+    border-color: color-mix(in srgb, var(--color-success) 50%, transparent);
+  }
+
+  .border-panel-primary\/60 {
+    border-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
+  }
+
+  .dark .border-panel-primary\/60 {
+    border-color: color-mix(in srgb, var(--color-success) 60%, transparent);
+  }
+
+  .text-panel-primary {
+    color: var(--color-primary-contrast);
+  }
+
+  .dark .text-panel-primary {
+    color: var(--color-success-contrast);
+  }
+
+  .text-panel-primary\/75 {
+    color: color-mix(in srgb, var(--color-primary-contrast) 75%, transparent);
+  }
+
+  .dark .text-panel-primary\/75 {
+    color: color-mix(in srgb, var(--color-success-contrast) 75%, transparent);
+  }
+
+  .text-panel-primary\/80 {
+    color: color-mix(in srgb, var(--color-primary-contrast) 80%, transparent);
+  }
+
+  .dark .text-panel-primary\/80 {
+    color: color-mix(in srgb, var(--color-success-contrast) 80%, transparent);
+  }
+
+  .text-panel-primary\/90 {
+    color: color-mix(in srgb, var(--color-primary-contrast) 90%, transparent);
+  }
+
+  .dark .text-panel-primary\/90 {
+    color: color-mix(in srgb, var(--color-success-contrast) 90%, transparent);
+  }
+
+  .shadow-panel-primary\/20 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-primary) 20%, transparent);
+  }
+
+  .dark .shadow-panel-primary\/20 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-success) 20%, transparent);
+  }
+
+  .shadow-panel-primary\/30 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+
+  .dark .shadow-panel-primary\/30 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-success) 30%, transparent);
+  }
+
+  .shadow-panel-primary\/40 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .dark .shadow-panel-primary\/40 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-success) 40%, transparent);
+  }
+
+  .ring-panel-primary {
+    --tw-ring-color: color-mix(in srgb, var(--color-primary) 100%, transparent);
+  }
+
+  .dark .ring-panel-primary {
+    --tw-ring-color: color-mix(in srgb, var(--color-success) 100%, transparent);
+  }
+
+  .ring-panel-primary\/40 {
+    --tw-ring-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .dark .ring-panel-primary\/40 {
+    --tw-ring-color: color-mix(in srgb, var(--color-success) 40%, transparent);
+  }
+
+  /* Panel accent colors: primary (orange) in light mode, accent (teal) in dark mode */
+  .bg-panel-primary-accent {
+    background-color: color-mix(
+      in srgb,
+      var(--color-primary) 100%,
+      transparent
+    );
+  }
+
+  .dark .bg-panel-primary-accent {
+    background-color: color-mix(in srgb, var(--color-accent) 100%, transparent);
+  }
+
+  .bg-panel-primary-accent\/15 {
+    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  }
+
+  .dark .bg-panel-primary-accent\/15 {
+    background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  }
+
+  .bg-panel-primary-accent\/30 {
+    background-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+
+  .dark .bg-panel-primary-accent\/30 {
+    background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+
+  .border-panel-primary-accent {
+    border-color: color-mix(in srgb, var(--color-primary) 100%, transparent);
+  }
+
+  .dark .border-panel-primary-accent {
+    border-color: color-mix(in srgb, var(--color-accent) 100%, transparent);
+  }
+
+  .border-panel-primary-accent\/30 {
+    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+
+  .dark .border-panel-primary-accent\/30 {
+    border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+
+  .border-panel-primary-accent\/40 {
+    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .dark .border-panel-primary-accent\/40 {
+    border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+
+  .border-panel-primary-accent\/50 {
+    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+  }
+
+  .dark .border-panel-primary-accent\/50 {
+    border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  }
+
+  .text-panel-primary-accent {
+    color: var(--color-primary-contrast);
+  }
+
+  .dark .text-panel-primary-accent {
+    color: var(--color-accent-contrast);
+  }
+
+  .text-panel-primary-accent\/75 {
+    color: color-mix(in srgb, var(--color-primary-contrast) 75%, transparent);
+  }
+
+  .dark .text-panel-primary-accent\/75 {
+    color: color-mix(in srgb, var(--color-accent-contrast) 75%, transparent);
+  }
+
+  .text-panel-primary-accent\/80 {
+    color: color-mix(in srgb, var(--color-primary-contrast) 80%, transparent);
+  }
+
+  .dark .text-panel-primary-accent\/80 {
+    color: color-mix(in srgb, var(--color-accent-contrast) 80%, transparent);
+  }
+
+  .shadow-panel-primary-accent\/20 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-primary) 20%, transparent);
+  }
+
+  .dark .shadow-panel-primary-accent\/20 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-accent) 20%, transparent);
+  }
+
+  .shadow-panel-primary-accent\/30 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+
+  .dark .shadow-panel-primary-accent\/30 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-accent) 30%, transparent);
+  }
+
+  .shadow-panel-primary-accent\/40 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .dark .shadow-panel-primary-accent\/40 {
+    box-shadow: 0 10px 25px -5px
+      color-mix(in srgb, var(--color-accent) 40%, transparent);
+  }
+
+  .ring-panel-primary-accent {
+    --tw-ring-color: color-mix(in srgb, var(--color-primary) 100%, transparent);
+  }
+
+  .dark .ring-panel-primary-accent {
+    --tw-ring-color: color-mix(in srgb, var(--color-accent) 100%, transparent);
+  }
+
+  .ring-panel-primary-accent\/40 {
+    --tw-ring-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
+  }
+
+  .dark .ring-panel-primary-accent\/40 {
+    --tw-ring-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
   }
 }
