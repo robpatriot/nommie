@@ -1,9 +1,9 @@
 use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::ai::RandomPlayer;
-use backend::AppError;
 use backend::repos::ai_profiles;
 use backend::routes::games::configure_routes;
+use backend::AppError;
 
 use crate::support::app_builder::create_test_app;
 use crate::support::build_test_state;
