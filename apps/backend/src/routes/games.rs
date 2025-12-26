@@ -1834,13 +1834,30 @@ fn trump_to_api_value(trump: Trump) -> &'static str {
 ///
 /// This is the core function that actually publishes to Redis.
 /// Use this when you already have the version (e.g., from a transaction return value).
+/// Publish a snapshot broadcast (best-effort).
+///
+/// This function logs errors but does not fail the HTTP request.
+/// The database mutation has already succeeded, so the user's action
+/// should succeed even if Redis is temporarily unavailable.
+///
+/// Clients will receive updates via:
+/// - WebSocket when Redis recovers (subscriber reconnects automatically)
+/// - Next HTTP poll/refresh
+/// - WebSocket reconnect
 async fn publish_snapshot_with_lock(
     app_state: &web::Data<AppState>,
     game_id: i64,
     version: i32,
 ) -> Result<(), AppError> {
     if let Some(realtime) = &app_state.realtime {
-        realtime.publish_snapshot(game_id, version).await?;
+        if let Err(err) = realtime.publish_snapshot(game_id, version).await {
+            tracing::error!(
+                game_id,
+                version,
+                error = %err,
+                "Failed to publish snapshot broadcast (Redis may be unavailable). Mutation succeeded, but clients may not receive real-time updates until Redis recovers."
+            );
+        }
     }
     Ok(())
 }

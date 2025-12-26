@@ -1,12 +1,16 @@
+use std::error::Error as StdError;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use actix::prelude::*;
 use dashmap::DashMap;
+use rand::random;
 use redis::aio::{ConnectionManager, PubSub};
 use redis::{AsyncCommands, Client};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
+use tokio::time::sleep;
 use tokio_stream::StreamExt;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -170,7 +174,6 @@ impl RealtimeBroker {
     }
 
     pub async fn publish_snapshot(&self, game_id: i64, version: i32) -> Result<(), AppError> {
-        let mut publisher = self.publisher.lock().await;
         let envelope = RedisEnvelope { game_id, version };
         let encoded = serde_json::to_string(&envelope).map_err(|err| AppError::Internal {
             code: ErrorCode::InternalError,
@@ -178,15 +181,51 @@ impl RealtimeBroker {
             source: Box::new(err),
         })?;
         let channel = format!("game:{game_id}");
-        publisher
-            .publish::<_, _, ()>(channel, encoded)
-            .await
-            .map_err(|err| AppError::Internal {
-                code: ErrorCode::InternalError,
-                detail: "Failed to publish snapshot to Redis".to_string(),
-                source: Box::new(err),
-            })?;
-        Ok(())
+
+        // Retry with exponential backoff for transient errors
+        // Use shorter delays since we're in the HTTP request path
+        let mut attempt = 0u32;
+        loop {
+            attempt += 1;
+
+            let mut publisher = self.publisher.lock().await;
+            match publisher
+                .publish::<_, _, ()>(channel.clone(), encoded.clone())
+                .await
+            {
+                Ok(_) => return Ok(()),
+                Err(err) => {
+                    let app_err = AppError::Internal {
+                        code: ErrorCode::InternalError,
+                        detail: "Failed to publish snapshot to Redis".to_string(),
+                        source: Box::new(err),
+                    };
+
+                    // Check if we should retry
+                    if attempt >= PUBLISHER_MAX_ATTEMPTS || !is_transient_error(&app_err) {
+                        return Err(app_err);
+                    }
+
+                    // Calculate retry delay (shorter than subscriber since we're in HTTP path)
+                    let delay_ms = PUBLISHER_INITIAL_RETRY_DELAY_MS
+                        .saturating_mul(2_u64.pow(attempt - 1))
+                        .min(PUBLISHER_MAX_RETRY_DELAY_MS);
+                    let delay = Duration::from_millis(delay_ms);
+
+                    warn!(
+                        error = %app_err,
+                        attempt,
+                        max_attempts = PUBLISHER_MAX_ATTEMPTS,
+                        retry_delay_ms = delay_ms,
+                        "Redis publish failed, retrying"
+                    );
+
+                    // Drop the lock before sleeping
+                    drop(publisher);
+                    sleep(delay).await;
+                }
+            }
+        }
     }
 }
 
@@ -196,15 +235,145 @@ struct RedisEnvelope {
     version: i32,
 }
 
+// Retry configuration constants for subscriber (long-running background task)
+const INITIAL_RETRY_DELAY_SECS: u64 = 1;
+const MAX_RETRY_DELAY_SECS: u64 = 60;
+const RETRY_DELAY_MULTIPLIER: f64 = 2.0;
+const JITTER_PERCENT: f64 = 0.2; // ±20% jitter
+
+// Retry configuration constants for publisher (HTTP request path - must be fast)
+const PUBLISHER_MAX_ATTEMPTS: u32 = 3;
+const PUBLISHER_INITIAL_RETRY_DELAY_MS: u64 = 50;
+const PUBLISHER_MAX_RETRY_DELAY_MS: u64 = 200;
+
 fn spawn_subscriber(redis_url: &str, registry: Arc<GameSessionRegistry>) {
     let redis_url = redis_url.to_string();
     tokio::spawn(async move {
-        if let Err(err) = run_subscription_loop(&redis_url, registry).await {
-            error!(error = %err, "Redis subscription loop exited");
-        }
+        run_subscription_loop_with_retry(&redis_url, registry).await;
     });
 }
 
+/// Determine if an error is transient and should trigger a retry
+fn is_transient_error(err: &AppError) -> bool {
+    // Check error variant first - config errors are permanent
+    if let AppError::Config { .. } = err {
+        return false;
+    }
+
+    // Check the underlying error source using the Error trait
+    let error_msg = err.to_string().to_lowercase();
+
+    // Check for permanent error indicators in the message
+    if error_msg.contains("authentication failed")
+        || error_msg.contains("invalid redis_url")
+        || error_msg.contains("unsupported")
+        || error_msg.contains("non-tcp protocol")
+    {
+        return false;
+    }
+
+    // Check for transient error indicators
+    if error_msg.contains("connection refused")
+        || error_msg.contains("connection reset")
+        || error_msg.contains("connection aborted")
+        || error_msg.contains("timed out")
+        || error_msg.contains("timeout")
+        || error_msg.contains("broken pipe")
+        || error_msg.contains("network")
+        || error_msg.contains("io error")
+        || error_msg.contains("stream ended")
+    {
+        return true;
+    }
+
+    // Check the underlying error source
+    if let Some(source) = StdError::source(err) {
+        // Check for IO errors (typically transient)
+        if let Some(io_err) = source.downcast_ref::<std::io::Error>() {
+            match io_err.kind() {
+                std::io::ErrorKind::ConnectionRefused => return true,
+                std::io::ErrorKind::ConnectionAborted => return true,
+                std::io::ErrorKind::ConnectionReset => return true,
+                std::io::ErrorKind::TimedOut => return true,
+                std::io::ErrorKind::WouldBlock => return true,
+                std::io::ErrorKind::Interrupted => return true,
+                std::io::ErrorKind::PermissionDenied => return false,
+                std::io::ErrorKind::Unsupported => return false,
+                _ => {}
+            }
+        }
+    }
+
+    // Default to transient for safety - better to retry than give up
+    true
+}
+
+/// Calculate exponential backoff delay with jitter
+fn calculate_retry_delay(attempt: u32) -> Duration {
+    let base_delay =
+        INITIAL_RETRY_DELAY_SECS as f64 * RETRY_DELAY_MULTIPLIER.powi(attempt as i32 - 1);
+    let capped_delay = base_delay.min(MAX_RETRY_DELAY_SECS as f64);
+
+    // Add jitter: ±20% random variation
+    let jitter_range = capped_delay * JITTER_PERCENT;
+    let jitter = (random::<f64>() * 2.0 - 1.0) * jitter_range;
+    let final_delay = (capped_delay + jitter).max(0.1); // Minimum 100ms
+
+    Duration::from_secs_f64(final_delay)
+}
+
+/// Main retry loop that handles reconnection logic
+async fn run_subscription_loop_with_retry(redis_url: &str, registry: Arc<GameSessionRegistry>) {
+    let mut attempt = 0u32;
+    let mut consecutive_failures = 0u32;
+
+    loop {
+        attempt += 1;
+
+        match run_subscription_loop(redis_url, registry.clone()).await {
+            Ok(()) => {
+                // Normal completion (shouldn't happen in production, but handle gracefully)
+                info!("Redis subscription loop completed normally");
+                break;
+            }
+            Err(err) => {
+                consecutive_failures += 1;
+
+                // Check if error is permanent (should not retry)
+                if !is_transient_error(&err) {
+                    error!(
+                        error = %err,
+                        attempt,
+                        "Redis subscription failed with permanent error, exiting"
+                    );
+                    break;
+                }
+
+                // Calculate retry delay
+                let delay = calculate_retry_delay(attempt);
+
+                warn!(
+                    error = %err,
+                    attempt,
+                    consecutive_failures,
+                    retry_delay_secs = delay.as_secs_f64(),
+                    "Redis subscription failed, retrying"
+                );
+
+                // Wait before retrying
+                sleep(delay).await;
+
+                // Reset attempt counter periodically to prevent overflow
+                // After 20 attempts, we're at max delay anyway, so reset
+                if attempt >= 20 {
+                    attempt = 10; // Reset to a point where we're near max delay
+                }
+            }
+        }
+    }
+}
+
+/// Inner function that performs a single connection attempt and message processing
 async fn run_subscription_loop(
     redis_url: &str,
     registry: Arc<GameSessionRegistry>,
@@ -233,6 +402,11 @@ async fn run_subscription_loop(
         }
     };
 
+    info!(
+        "Connecting to Redis for subscription at {}:{}",
+        addr.0, addr.1
+    );
+
     let stream = tokio::net::TcpStream::connect(addr)
         .await
         .map_err(|err| AppError::Internal {
@@ -250,6 +424,8 @@ async fn run_subscription_loop(
             source: Box::new(err),
         })?;
 
+    info!("Subscribing to Redis pattern 'game:*'");
+
     pubsub
         .psubscribe("game:*")
         .await
@@ -258,6 +434,8 @@ async fn run_subscription_loop(
             detail: "Failed to subscribe to Redis channel pattern".to_string(),
             source: Box::new(err),
         })?;
+
+    info!("Redis subscription established, processing messages");
 
     let mut stream = pubsub.into_on_message();
     while let Some(msg) = stream.next().await {
@@ -282,8 +460,16 @@ async fn run_subscription_loop(
         }
     }
 
-    info!("Redis subscription loop completed");
-    Ok(())
+    // Stream ended (connection lost)
+    warn!("Redis subscription stream ended, connection lost");
+    Err(AppError::Internal {
+        code: ErrorCode::InternalError,
+        detail: "Redis subscription stream ended unexpectedly".to_string(),
+        source: Box::new(std::io::Error::new(
+            std::io::ErrorKind::ConnectionAborted,
+            "Stream ended",
+        )),
+    })
 }
 
 fn parse_channel(channel: &str) -> Option<i64> {
