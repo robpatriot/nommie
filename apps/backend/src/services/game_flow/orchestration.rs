@@ -111,17 +111,17 @@ impl GameFlowService {
         // Set ready status
         memberships::set_membership_ready(txn, membership.id, is_ready).await?;
 
-        // Touch game to increment lock_version so WebSocket clients receive the update
+        // Touch game to increment version so WebSocket clients receive the update
         tracing::debug!(
             game_id = game_id,
-            expected_lock_version = game.lock_version,
+            expected_version = game.version,
             "DEBUG: process_game_state (mark_ready) - touching game"
         );
-        let updated_game = games::touch_game(txn, game_id, game.lock_version).await?;
+        let updated_game = games::touch_game(txn, game_id, game.version).await?;
         tracing::debug!(
             game_id = game_id,
-            new_lock_version = updated_game.lock_version,
-            "DEBUG: process_game_state (mark_ready) - lock_version updated"
+            new_version = updated_game.version,
+            "DEBUG: process_game_state (mark_ready) - version updated"
         );
 
         if is_ready {
@@ -246,7 +246,7 @@ impl GameFlowService {
                 .await?;
 
             if ai_acted {
-                // AI acted - reload game to get updated state and lock_version
+                // AI acted - reload game to get updated state and version
                 game = games::require_game(txn, game_id).await?;
                 // Loop again (cache remains valid for next iteration!)
                 // Note: Game can't be Completed here - completion only happens through

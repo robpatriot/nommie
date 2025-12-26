@@ -83,14 +83,14 @@ export function useAiSeatManagement({
         return
       }
 
-      // Read lock_version directly from cache at request time to avoid stale closures
+      // Read version directly from cache at request time to avoid stale closures
       const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
         queryKeys.games.snapshot(gameId)
       )
-      const currentLockVersion = cachedSnapshot?.lockVersion
+      const currentVersion = cachedSnapshot?.version
 
-      if (currentLockVersion === undefined) {
-        showToast(tErrors('lockVersionRequired'), 'error')
+      if (currentVersion === undefined) {
+        showToast(tErrors('versionRequired'), 'error')
         return
       }
 
@@ -108,7 +108,7 @@ export function useAiSeatManagement({
           registryName,
           registryVersion,
           seed: selection?.seed,
-          lockVersion: currentLockVersion,
+          version: currentVersion,
         })
         showToast(t('aiSeatAdded'), 'success')
       } catch (err) {
@@ -135,14 +135,14 @@ export function useAiSeatManagement({
         return
       }
 
-      // Read lock_version directly from cache at request time to avoid stale closures
+      // Read version directly from cache at request time to avoid stale closures
       const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
         queryKeys.games.snapshot(gameId)
       )
-      const currentLockVersion = cachedSnapshot?.lockVersion
+      const currentVersion = cachedSnapshot?.version
 
-      if (currentLockVersion === undefined) {
-        showToast(tErrors('lockVersionRequired'), 'error')
+      if (currentVersion === undefined) {
+        showToast(tErrors('versionRequired'), 'error')
         return
       }
 
@@ -150,7 +150,7 @@ export function useAiSeatManagement({
         await removeAiSeatMutation.mutateAsync({
           gameId,
           seat,
-          lockVersion: currentLockVersion,
+          version: currentVersion,
         })
         showToast(t('aiSeatRemoved'), 'success')
       } catch (err) {
@@ -176,14 +176,14 @@ export function useAiSeatManagement({
         return
       }
 
-      // Read lock_version directly from cache at request time to avoid stale closures
+      // Read version directly from cache at request time to avoid stale closures
       const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
         queryKeys.games.snapshot(gameId)
       )
-      const currentLockVersion = cachedSnapshot?.lockVersion
+      const currentVersion = cachedSnapshot?.version
 
-      if (currentLockVersion === undefined) {
-        showToast(tErrors('lockVersionRequired'), 'error')
+      if (currentVersion === undefined) {
+        showToast(tErrors('versionRequired'), 'error')
         return
       }
 
@@ -194,7 +194,7 @@ export function useAiSeatManagement({
           registryName: selection.registryName,
           registryVersion: selection.registryVersion,
           seed: selection.seed,
-          lockVersion: currentLockVersion,
+          version: currentVersion,
         })
         showToast(t('aiSeatUpdated'), 'success')
       } catch (err) {

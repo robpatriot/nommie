@@ -57,9 +57,9 @@ export function useLeaveGame() {
   return useMutation({
     mutationFn: async (request: {
       gameId: number
-      lockVersion: number
+      version: number
     }): Promise<void> => {
-      const result = await leaveGameAction(request.gameId, request.lockVersion)
+      const result = await leaveGameAction(request.gameId, request.version)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }

@@ -181,10 +181,10 @@ export async function getLastActiveGame(): Promise<number | null> {
 
 export async function deleteGame(
   gameId: number,
-  lockVersion: number
+  version: number
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}`, {
     method: 'DELETE',
-    body: JSON.stringify({ lock_version: lockVersion }),
+    body: JSON.stringify({ version: version }),
   })
 }

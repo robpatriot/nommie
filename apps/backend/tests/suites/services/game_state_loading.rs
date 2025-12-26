@@ -225,7 +225,7 @@ async fn test_load_state_second_trick_turn_advances() -> Result<(), AppError> {
             // Advance DB state to trick #2
             let game = games_sea::require_game(txn, setup.game_id).await?;
             let update_round =
-                GameUpdate::new(setup.game_id, game.lock_version).with_current_trick_no(2);
+                GameUpdate::new(setup.game_id, game.version).with_current_trick_no(2);
             games_sea::update_game(txn, update_round).await?;
 
             // Create trick #2 with first play by seat 3 (winner of trick #1)
@@ -295,7 +295,7 @@ async fn test_load_state_removes_played_cards_from_hands() -> Result<(), AppErro
                     card_to_play,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
 
@@ -341,7 +341,7 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
                     3,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
             flow_service
@@ -352,7 +352,7 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
                     2,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
             flow_service
@@ -363,7 +363,7 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
                     0,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
             flow_service
@@ -374,7 +374,7 @@ async fn test_load_state_with_scores() -> Result<(), AppError> {
                     7,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?; // Dealer
 

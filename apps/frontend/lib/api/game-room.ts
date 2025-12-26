@@ -16,7 +16,7 @@ export type GameSnapshotResult =
       kind: 'ok'
       snapshot: GameSnapshot
       etag?: string
-      lockVersion?: number
+      version?: number
       viewerSeat?: Seat | null
       viewerHand: Card[]
       bidConstraints?: BidConstraints | null
@@ -25,7 +25,7 @@ export type GameSnapshotResult =
 
 export interface SnapshotEnvelope {
   snapshot: GameSnapshot
-  lock_version?: number
+  version?: number
   viewer_hand?: Card[] | null
   bid_constraints?: {
     zero_bid_locked?: boolean[]
@@ -79,14 +79,13 @@ export async function fetchGameSnapshot(
         ? (body.viewer_hand as Card[])
         : []
     const bidConstraints = toBidConstraints(body.bid_constraints) ?? null
-    const lockVersion =
-      typeof body.lock_version === 'number' ? body.lock_version : undefined
+    const version = typeof body.version === 'number' ? body.version : undefined
 
     return {
       kind: 'ok',
       snapshot: body.snapshot,
       etag,
-      lockVersion,
+      version,
       viewerSeat: parsedViewerSeat,
       viewerHand,
       bidConstraints,
@@ -114,44 +113,44 @@ export async function markPlayerReady(
 
 export async function leaveGame(
   gameId: number,
-  lockVersion: number
+  version: number
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/leave`, {
     method: 'DELETE',
-    body: JSON.stringify({ lock_version: lockVersion }),
+    body: JSON.stringify({ version: version }),
   })
 }
 
 export async function submitBid(
   gameId: number,
   bid: number,
-  lockVersion: number
+  version: number
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/bid`, {
     method: 'POST',
-    body: JSON.stringify({ bid, lock_version: lockVersion }),
+    body: JSON.stringify({ bid, version: version }),
   })
 }
 
 export async function selectTrump(
   gameId: number,
   trump: Trump,
-  lockVersion: number
+  version: number
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/trump`, {
     method: 'POST',
-    body: JSON.stringify({ trump, lock_version: lockVersion }),
+    body: JSON.stringify({ trump, version: version }),
   })
 }
 
 export async function submitPlay(
   gameId: number,
   card: string,
-  lockVersion: number
+  version: number
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/play`, {
     method: 'POST',
-    body: JSON.stringify({ card, lock_version: lockVersion }),
+    body: JSON.stringify({ card, version: version }),
   })
 }
 
@@ -164,10 +163,10 @@ export interface ManageAiSeatPayload {
 
 function buildAiSeatBody(
   payload: ManageAiSeatPayload | undefined,
-  lockVersion: number
+  version: number
 ) {
   const body: Record<string, unknown> = {
-    lock_version: lockVersion,
+    version: version,
   }
 
   if (payload) {
@@ -190,34 +189,34 @@ function buildAiSeatBody(
 
 export async function addAiSeat(
   gameId: number,
-  lockVersion: number,
+  version: number,
   payload?: ManageAiSeatPayload
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ai/add`, {
     method: 'POST',
-    body: JSON.stringify(buildAiSeatBody(payload, lockVersion)),
+    body: JSON.stringify(buildAiSeatBody(payload, version)),
   })
 }
 
 export async function updateAiSeat(
   gameId: number,
-  lockVersion: number,
+  version: number,
   payload: ManageAiSeatPayload
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ai/update`, {
     method: 'POST',
-    body: JSON.stringify(buildAiSeatBody(payload, lockVersion)),
+    body: JSON.stringify(buildAiSeatBody(payload, version)),
   })
 }
 
 export async function removeAiSeat(
   gameId: number,
-  lockVersion: number,
+  version: number,
   payload?: ManageAiSeatPayload
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ai/remove`, {
     method: 'POST',
-    body: JSON.stringify(buildAiSeatBody(payload, lockVersion)),
+    body: JSON.stringify(buildAiSeatBody(payload, version)),
   })
 }
 

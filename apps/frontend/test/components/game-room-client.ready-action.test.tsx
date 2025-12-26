@@ -216,13 +216,13 @@ function sendWebSocketSnapshot(
   queryClient: QueryClient,
   overrides?: {
     viewerSeat?: number
-    lockVersion?: number
+    version?: number
     viewerHand?: string[]
   }
 ) {
   // Transform the snapshot message to GameRoomSnapshotPayload format
   // This simulates what useGameSync.transformSnapshotMessage does
-  const lockVersion = overrides?.lockVersion ?? 1
+  const version = overrides?.version ?? 1
   const viewerSeat = overrides?.viewerSeat ?? 0
   const viewerHand = overrides?.viewerHand ?? []
   const playerNames: [string, string, string, string] = [
@@ -240,8 +240,8 @@ function sendWebSocketSnapshot(
     timestamp: new Date().toISOString(),
     hostSeat: snapshot.game.host_seat as any,
     bidConstraints: null,
-    lockVersion,
-    etag: `"game-${gameId}-v${lockVersion}"`,
+    version,
+    etag: `"game-${gameId}-v${version}"`,
   }
 
   // Update the real query cache (simulating what useGameSync does)
@@ -251,7 +251,7 @@ function sendWebSocketSnapshot(
     type: 'snapshot',
     data: {
       snapshot,
-      lock_version: lockVersion,
+      version: version,
       viewer_hand: viewerHand,
       bid_constraints: null,
     },
@@ -480,7 +480,7 @@ describe('GameRoomClient', () => {
       const ws = await waitForWebSocketConnection()
       sendWebSocketSnapshot(ws, biddingSnapshotFixture, 42, queryClient, {
         viewerSeat: 0,
-        lockVersion: 1,
+        version: 1,
       })
 
       // Wait for phase change

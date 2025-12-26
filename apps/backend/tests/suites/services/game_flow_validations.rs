@@ -36,9 +36,7 @@ async fn test_submit_bid_rejects_wrong_phase() -> Result<(), AppError> {
 
             let service = GameFlowService;
             let game = backend::repos::games::require_game(txn, game_id).await?;
-            let result = service
-                .submit_bid(txn, game_id, 1, 5, game.lock_version)
-                .await;
+            let result = service.submit_bid(txn, game_id, 1, 5, game.version).await;
 
             assert!(result.is_err());
             let err = result.unwrap_err();
@@ -74,14 +72,14 @@ async fn test_dealer_bid_restriction_rejects_exact_sum() -> Result<(), AppError>
             for (seat, bid) in [(1u8, 5u8), (2, 4), (3, 3)] {
                 let game = backend::repos::games::require_game(txn, setup.game_id).await?;
                 service
-                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, setup.game_id, seat, bid, game.version)
                     .await?;
             }
 
             // Dealer (seat 0) tries to bid 1, which would make sum = 13 (not allowed)
             let game = backend::repos::games::require_game(txn, setup.game_id).await?;
             let result = service
-                .submit_bid(txn, setup.game_id, 0, 1, game.lock_version)
+                .submit_bid(txn, setup.game_id, 0, 1, game.version)
                 .await;
 
             assert!(result.is_err(), "Dealer bid creating exact sum should fail");
@@ -114,14 +112,14 @@ async fn test_dealer_bid_restriction_allows_non_exact_sum() -> Result<(), AppErr
             for (seat, bid) in [(1u8, 5u8), (2, 4), (3, 3)] {
                 let game = backend::repos::games::require_game(txn, setup.game_id).await?;
                 service
-                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, setup.game_id, seat, bid, game.version)
                     .await?;
             }
 
             // Dealer (seat 0) bids 0 (sum = 12, OK)
             let game = backend::repos::games::require_game(txn, setup.game_id).await?;
             let result = service
-                .submit_bid(txn, setup.game_id, 0, 0, game.lock_version)
+                .submit_bid(txn, setup.game_id, 0, 0, game.version)
                 .await;
             assert!(
                 result.is_ok(),
@@ -148,12 +146,12 @@ async fn test_dealer_bid_restriction_only_applies_to_dealer() -> Result<(), AppE
             // Non-dealer players can bid any valid value
             let game = backend::repos::games::require_game(txn, setup.game_id).await?;
             service
-                .submit_bid(txn, setup.game_id, 1, 13, game.lock_version)
+                .submit_bid(txn, setup.game_id, 1, 13, game.version)
                 .await?; // Max bid OK for non-dealer
             for (seat, bid) in [(2u8, 0u8), (3, 0)] {
                 let game = backend::repos::games::require_game(txn, setup.game_id).await?;
                 service
-                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, setup.game_id, seat, bid, game.version)
                     .await?;
             }
 
@@ -161,7 +159,7 @@ async fn test_dealer_bid_restriction_only_applies_to_dealer() -> Result<(), AppE
             // sum = 13 + 0 + 0 + X, so dealer cannot bid 0
             let game = backend::repos::games::require_game(txn, setup.game_id).await?;
             let result = service
-                .submit_bid(txn, setup.game_id, 0, 0, game.lock_version)
+                .submit_bid(txn, setup.game_id, 0, 0, game.version)
                 .await;
             assert!(result.is_err(), "Dealer bid with exact sum should fail");
 
@@ -192,7 +190,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
                 GameUpdate::new(game_setup.game_id, 1).with_state(DbGameState::Bidding);
             let updated = backend::adapters::games_sea::update_game(txn, update_state).await?;
 
-            let update_round = GameUpdate::new(game_setup.game_id, updated.lock_version)
+            let update_round = GameUpdate::new(game_setup.game_id, updated.version)
                 .with_current_round(13)
                 .with_starting_dealer_pos(0);
             backend::adapters::games_sea::update_game(txn, update_round).await?;
@@ -208,7 +206,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
                     0,
                     backend::repos::games::require_game(txn, game_setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
             service
@@ -219,7 +217,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
                     1,
                     backend::repos::games::require_game(txn, game_setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
             service
@@ -230,7 +228,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
                     0,
                     backend::repos::games::require_game(txn, game_setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
 
@@ -242,7 +240,7 @@ async fn test_dealer_bid_restriction_in_small_hand() -> Result<(), AppError> {
                     1,
                     backend::repos::games::require_game(txn, game_setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await;
             assert!(result.is_err(), "Dealer bid creating sum=2 should fail");
@@ -285,7 +283,7 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
                     Trump::Hearts,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await;
 
@@ -306,7 +304,7 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
                     Trump::Spades,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await;
             assert!(result.is_err());
@@ -319,7 +317,7 @@ async fn test_only_bid_winner_can_choose_trump() -> Result<(), AppError> {
                     Trump::Diamonds,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await;
             assert!(result.is_ok(), "Winning bidder should be able to set trump");
@@ -364,7 +362,7 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
                     Trump::Hearts,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await;
             assert!(
@@ -380,7 +378,7 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
                     Trump::Clubs,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await;
             assert!(
@@ -462,25 +460,19 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
         let bid_value = if i < 3 { 1 } else { 0 };
         let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
         service
-            .submit_bid(txn, game_id, seat, bid_value, game.lock_version)
+            .submit_bid(txn, game_id, seat, bid_value, game.version)
             .await?;
     }
 
     let trump_selector = ((dealer as u16 + 1) % 4) as u8;
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
     service
-        .set_trump(
-            txn,
-            game_id,
-            trump_selector,
-            Trump::Hearts,
-            game.lock_version,
-        )
+        .set_trump(txn, game_id, trump_selector, Trump::Hearts, game.version)
         .await?;
 
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
     service
-        .play_card(txn, game_id, leader, first_card, game.lock_version)
+        .play_card(txn, game_id, leader, first_card, game.version)
         .await?;
 
     for i in 1..4 {
@@ -494,13 +486,13 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
         )?;
         let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
         service
-            .play_card(txn, game_id, seat, card, game.lock_version)
+            .play_card(txn, game_id, seat, card, game.version)
             .await?;
     }
 
     let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
     let result = service
-        .play_card(txn, game_id, leader, first_card, game.lock_version)
+        .play_card(txn, game_id, leader, first_card, game.version)
         .await;
 
     match result {

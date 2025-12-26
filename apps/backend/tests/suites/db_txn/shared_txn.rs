@@ -8,9 +8,8 @@ use backend::auth::claims::BackendClaims;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::CurrentUser;
-use backend::GameId;
 use backend::state::security_config::SecurityConfig;
+use backend::{CurrentUser, GameId};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
 use time::OffsetDateTime;
@@ -28,7 +27,7 @@ async fn insert_test_game(
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         rules_version: Set("1.0.0".to_string()),
-        lock_version: Set(1),
+        version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()

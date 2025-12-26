@@ -24,7 +24,7 @@ async fn test_bid_entity_direct() -> Result<(), AppError> {
                 created_at: Set(now),
                 updated_at: Set(now),
                 current_trick_no: Set(0i16),
-                lock_version: Set(1),
+                version: Set(1),
                 ..Default::default()
             };
             let inserted_game = game.insert(txn).await?;

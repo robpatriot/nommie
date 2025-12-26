@@ -102,7 +102,7 @@ pub async fn setup_game_with_players_ex<C: ConnectionTrait>(
         created_at: Set(now),
         updated_at: Set(now),
         rng_seed: Set(Some(rng_seed)),
-        lock_version: Set(1),
+        version: Set(1),
         ..Default::default()
     };
 

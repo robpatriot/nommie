@@ -107,7 +107,7 @@
   },
   "validation": {
     "invalidBidValue": "Ungültiger Gebotswert",
-    "invalidLockVersion": "Ungültige Sperrversion",
+    "invalidVersion": "Ungültige Version",
     "cardSelectionRequired": "Kartenauswahl erforderlich",
     "noSettingsProvided": "Keine Einstellungen angegeben"
   },

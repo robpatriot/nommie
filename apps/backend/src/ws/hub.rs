@@ -23,7 +23,7 @@ type SessionMap = DashMap<Uuid, SessionHandle>;
 #[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct SnapshotBroadcast {
-    pub lock_version: i32,
+    pub version: i32,
 }
 
 pub struct GameSessionRegistry {
@@ -169,12 +169,9 @@ impl RealtimeBroker {
         self.registry.clone()
     }
 
-    pub async fn publish_snapshot(&self, game_id: i64, lock_version: i32) -> Result<(), AppError> {
+    pub async fn publish_snapshot(&self, game_id: i64, version: i32) -> Result<(), AppError> {
         let mut publisher = self.publisher.lock().await;
-        let envelope = RedisEnvelope {
-            game_id,
-            lock_version,
-        };
+        let envelope = RedisEnvelope { game_id, version };
         let encoded = serde_json::to_string(&envelope).map_err(|err| AppError::Internal {
             code: ErrorCode::InternalError,
             detail: "Failed to serialize snapshot broadcast".to_string(),
@@ -196,7 +193,7 @@ impl RealtimeBroker {
 #[derive(Serialize, Deserialize)]
 struct RedisEnvelope {
     game_id: i64,
-    lock_version: i32,
+    version: i32,
 }
 
 fn spawn_subscriber(redis_url: &str, registry: Arc<GameSessionRegistry>) {
@@ -273,7 +270,7 @@ async fn run_subscription_loop(
                         registry.broadcast(
                             game_id,
                             SnapshotBroadcast {
-                                lock_version: envelope.lock_version,
+                                version: envelope.version,
                             },
                         );
                     }

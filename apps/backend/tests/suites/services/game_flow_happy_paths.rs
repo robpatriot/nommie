@@ -95,9 +95,7 @@ async fn test_submit_bid_succeeds_after_deal() -> Result<(), AppError> {
             service.deal_round(txn, game_id).await?;
 
             let game = backend::repos::games::require_game(txn, game_id).await?;
-            let result = service
-                .submit_bid(txn, game_id, 1, 5, game.lock_version)
-                .await;
+            let result = service.submit_bid(txn, game_id, 1, 5, game.version).await;
 
             assert!(result.is_ok());
 
@@ -129,7 +127,7 @@ async fn test_complete_round_flow_with_scoring() -> Result<(), AppError> {
             for (seat, bid) in [(1u8, 4u8), (2, 3), (3, 0), (0, 5)] {
                 let game = backend::repos::games::require_game(txn, setup.game_id).await?;
                 service
-                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, setup.game_id, seat, bid, game.version)
                     .await?;
             }
 
@@ -206,7 +204,7 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
             for (seat, bid) in [(1u8, 3u8), (2, 2), (3, 0), (0, 7)] {
                 let game = backend::repos::games::require_game(txn, setup.game_id).await?;
                 service
-                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, setup.game_id, seat, bid, game.version)
                     .await?;
             }
 
@@ -231,7 +229,7 @@ async fn test_multi_round_cumulative_scoring() -> Result<(), AppError> {
             for (seat, bid) in [(2u8, 2u8), (3, 0), (0, 5), (1, 4)] {
                 let game = backend::repos::games::require_game(txn, setup.game_id).await?;
                 service
-                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, setup.game_id, seat, bid, game.version)
                     .await?;
             }
 
@@ -393,7 +391,7 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
             for (seat, bid) in [(2u8, 3u8), (3, 3), (0, 4), (1, 2)] {
                 let game = backend::repos::games::require_game(txn, setup.game_id).await?;
                 service
-                    .submit_bid(txn, setup.game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, setup.game_id, seat, bid, game.version)
                     .await?;
             }
 
@@ -408,7 +406,7 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
                     Trump::Hearts,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
 

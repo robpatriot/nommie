@@ -9,10 +9,10 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::{CurrentUser, GameId, GameMembership};
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::repos::memberships::GameRole;
 use backend::state::security_config::SecurityConfig;
+use backend::{CurrentUser, GameId, GameMembership};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
@@ -99,7 +99,7 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         rules_version: Set("1.0.0".to_string()),
-        lock_version: Set(1),
+        version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()
@@ -178,7 +178,7 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         rules_version: Set("1.0.0".to_string()),
-        lock_version: Set(1),
+        version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()
@@ -233,4 +233,3 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
 
     Ok(())
 }
-

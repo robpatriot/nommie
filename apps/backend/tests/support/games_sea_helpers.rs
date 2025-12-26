@@ -11,7 +11,7 @@ use sea_orm::DatabaseTransaction;
 pub struct GameProbe {
     pub state: GameState,
     pub visibility: GameVisibility,
-    pub lock_version: i32,
+    pub version: i32,
     pub name: Option<String>,
     // Timestamp ordering assertions done in-flow; not compared here
 }
@@ -22,7 +22,7 @@ impl GameProbe {
         Self {
             state: model.state.clone(),
             visibility: model.visibility.clone(),
-            lock_version: model.lock_version,
+            version: model.version,
             name: model.name.clone(),
         }
     }
@@ -82,8 +82,7 @@ pub async fn run_game_flow(
     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
     // 3. First update: change state to Bidding
-    let update_dto =
-        GameUpdate::new(created.id, created.lock_version).with_state(GameState::Bidding);
+    let update_dto = GameUpdate::new(created.id, created.version).with_state(GameState::Bidding);
     let updated1 = games_sea::update_game(txn, update_dto)
         .await
         .map_err(|e| AppError::db("failed to update game state", e))?;
@@ -108,7 +107,7 @@ pub async fn run_game_flow(
 
     // 4. Second update: change state to TrickPlay
     let update_dto2 =
-        GameUpdate::new(created.id, updated1.lock_version).with_state(GameState::TrickPlay);
+        GameUpdate::new(created.id, updated1.version).with_state(GameState::TrickPlay);
     let updated2 = games_sea::update_game(txn, update_dto2)
         .await
         .map_err(|e| AppError::db("failed to update game state", e))?;
@@ -132,8 +131,7 @@ pub async fn run_game_flow(
     tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
     // 5. Third update: change state to Scoring (to test timestamp behavior)
-    let update_dto3 =
-        GameUpdate::new(created.id, updated2.lock_version).with_state(GameState::Scoring);
+    let update_dto3 = GameUpdate::new(created.id, updated2.version).with_state(GameState::Scoring);
     let updated3 = games_sea::update_game(txn, update_dto3)
         .await
         .map_err(|e| AppError::db("failed to update game state", e))?;

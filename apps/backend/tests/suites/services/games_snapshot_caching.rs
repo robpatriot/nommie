@@ -10,10 +10,10 @@ use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games;
 use backend::state::app_state::AppState;
+use backend::AppError;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
@@ -57,7 +57,7 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
     } = setup_snapshot_test("snapshot_returns_etag_header").await?;
 
     let game =
-        create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(5)).await?;
+        create_snapshot_game(&shared, SnapshotGameOptions::default().with_version(5)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -95,22 +95,22 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
     let _body = test::read_body(resp).await;
 
     // Verify ETag format: "game-{id}-v{version}"
-    let expected_etag = format!(r#""game-{}-v{}""#, game.game_id, game.lock_version);
+    let expected_etag = format!(r#""game-{}-v{}""#, game.game_id, game.version);
     assert_eq!(
         etag_str, expected_etag,
         "ETag should be in format \"game-{{id}}-v{{version}}\""
     );
 
-    // Verify lock_version is present in JSON response body
+    // Verify version is present in JSON response body
     let json: Value = serde_json::from_slice(&_body).expect("Body should be valid JSON");
-    let response_lock_version = json
-        .get("lock_version")
-        .expect("Response should include lock_version field")
+    let response_version = json
+        .get("version")
+        .expect("Response should include version field")
         .as_i64()
-        .expect("lock_version should be an integer") as i32;
+        .expect("version should be an integer") as i32;
     assert_eq!(
-        response_lock_version, game.lock_version,
-        "lock_version in JSON response should match game lock_version"
+        response_version, game.version,
+        "version in JSON response should match game version"
     );
 
     shared.rollback().await?;
@@ -126,7 +126,7 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
     } = setup_snapshot_test("snapshot_with_if_none_match_returns_304").await?;
 
     let game =
-        create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(3)).await?;
+        create_snapshot_game(&shared, SnapshotGameOptions::default().with_version(3)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -212,7 +212,7 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
     } = setup_snapshot_test("snapshot_with_if_none_match_mismatch_returns_200").await?;
 
     let game =
-        create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(5)).await?;
+        create_snapshot_game(&shared, SnapshotGameOptions::default().with_version(5)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -285,7 +285,7 @@ async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), A
     } = setup_snapshot_test("snapshot_with_if_none_match_wildcard_returns_304").await?;
 
     let game =
-        create_snapshot_game(&shared, SnapshotGameOptions::default().with_lock_version(7)).await?;
+        create_snapshot_game(&shared, SnapshotGameOptions::default().with_version(7)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -349,11 +349,8 @@ async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<
         bearer,
     } = setup_snapshot_test("snapshot_with_if_none_match_comma_separated_one_match").await?;
 
-    let game = create_snapshot_game(
-        &shared,
-        SnapshotGameOptions::default().with_lock_version(10),
-    )
-    .await?;
+    let game =
+        create_snapshot_game(&shared, SnapshotGameOptions::default().with_version(10)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -405,11 +402,8 @@ async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(
         bearer,
     } = setup_snapshot_test("snapshot_with_if_none_match_comma_separated_no_match").await?;
 
-    let game = create_snapshot_game(
-        &shared,
-        SnapshotGameOptions::default().with_lock_version(15),
-    )
-    .await?;
+    let game =
+        create_snapshot_game(&shared, SnapshotGameOptions::default().with_version(15)).await?;
 
     let app = create_test_app(state)
         .with_routes(|cfg| {

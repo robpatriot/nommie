@@ -43,7 +43,7 @@ export type GameRoomSnapshotActionResult =
 export interface GameRoomSnapshotPayload {
   snapshot: GameSnapshot
   etag?: string
-  lockVersion?: number
+  version?: number
   playerNames: [string, string, string, string]
   viewerSeat: Seat | null
   viewerHand: Card[]
@@ -79,7 +79,7 @@ export async function getGameRoomSnapshotAction(
       data: {
         snapshot: snapshotResult.snapshot,
         etag: snapshotResult.etag,
-        lockVersion: snapshotResult.lockVersion,
+        version: snapshotResult.version,
         playerNames,
         viewerSeat,
         viewerHand: snapshotResult.viewerHand ?? [],
@@ -113,22 +113,22 @@ export async function markPlayerReadyAction(
 
 export async function leaveGameAction(
   gameId: number,
-  lockVersion?: number
+  version?: number
 ): Promise<SimpleActionResult> {
   try {
-    // If no lock_version is provided, fetch the game snapshot to get it
-    let finalLockVersion = lockVersion
-    if (finalLockVersion === undefined) {
+    // If no version is provided, fetch the game snapshot to get it
+    let finalVersion = version
+    if (finalVersion === undefined) {
       const snapshotResult = await getGameRoomSnapshotAction({ gameId })
       if (
         snapshotResult.kind === 'ok' &&
-        snapshotResult.data.lockVersion !== undefined
+        snapshotResult.data.version !== undefined
       ) {
-        finalLockVersion = snapshotResult.data.lockVersion
+        finalVersion = snapshotResult.data.version
       }
     }
 
-    if (finalLockVersion === undefined) {
+    if (finalVersion === undefined) {
       const t = await getTranslations('errors.actions')
       return toErrorResult(
         new Error('Lock version required'),
@@ -136,7 +136,7 @@ export async function leaveGameAction(
       )
     }
 
-    await leaveGame(gameId, finalLockVersion)
+    await leaveGame(gameId, finalVersion)
     return { kind: 'ok' }
   } catch (error) {
     const t = await getTranslations('errors.actions')
@@ -147,7 +147,7 @@ export async function leaveGameAction(
 export interface SubmitBidRequest {
   gameId: number
   bid: number
-  lockVersion: number
+  version: number
 }
 
 export async function submitBidAction(
@@ -164,17 +164,17 @@ export async function submitBidAction(
     }
   }
 
-  if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
+  if (!Number.isFinite(request.version) || request.version < 0) {
     const t = await getTranslations('errors.validation')
     return {
       kind: 'error',
-      message: t('invalidLockVersion'),
+      message: t('invalidVersion'),
       status: 400,
     }
   }
 
   try {
-    await submitBid(request.gameId, bidValue, request.lockVersion)
+    await submitBid(request.gameId, bidValue, request.version)
     return { kind: 'ok' }
   } catch (error) {
     const t = await getTranslations('errors.actions')
@@ -185,23 +185,23 @@ export async function submitBidAction(
 export interface SelectTrumpRequest {
   gameId: number
   trump: Trump
-  lockVersion: number
+  version: number
 }
 
 export async function selectTrumpAction(
   request: SelectTrumpRequest
 ): Promise<SimpleActionResult> {
-  if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
+  if (!Number.isFinite(request.version) || request.version < 0) {
     const t = await getTranslations('errors.validation')
     return {
       kind: 'error',
-      message: t('invalidLockVersion'),
+      message: t('invalidVersion'),
       status: 400,
     }
   }
 
   try {
-    await selectTrump(request.gameId, request.trump, request.lockVersion)
+    await selectTrump(request.gameId, request.trump, request.version)
     return { kind: 'ok' }
   } catch (error) {
     const t = await getTranslations('errors.actions')
@@ -212,7 +212,7 @@ export async function selectTrumpAction(
 export interface SubmitPlayRequest {
   gameId: number
   card: string
-  lockVersion: number
+  version: number
 }
 
 export async function submitPlayAction(
@@ -230,16 +230,16 @@ export async function submitPlayAction(
     }
   }
 
-  if (!Number.isFinite(request.lockVersion) || request.lockVersion < 0) {
+  if (!Number.isFinite(request.version) || request.version < 0) {
     return {
       kind: 'error',
-      message: t('invalidLockVersion'),
+      message: t('invalidVersion'),
       status: 400,
     }
   }
 
   try {
-    await submitPlay(request.gameId, card, request.lockVersion)
+    await submitPlay(request.gameId, card, request.version)
     return { kind: 'ok' }
   } catch (error) {
     const t = await getTranslations('errors.actions')
@@ -253,7 +253,7 @@ export interface ManageAiSeatRequest {
   registryName?: string
   registryVersion?: string
   seed?: number
-  lockVersion?: number
+  version?: number
 }
 
 export async function addAiSeatAction(
@@ -269,16 +269,16 @@ export async function addAiSeatAction(
     }
   }
 
-  // If no lock_version is provided, fetch the game snapshot to get it
-  let finalLockVersion = request.lockVersion
-  if (finalLockVersion === undefined) {
+  // If no version is provided, fetch the game snapshot to get it
+  let finalVersion = request.version
+  if (finalVersion === undefined) {
     try {
       const snapshotResult = await fetchGameSnapshot(request.gameId)
       if (
         snapshotResult.kind === 'ok' &&
-        snapshotResult.lockVersion !== undefined
+        snapshotResult.version !== undefined
       ) {
-        finalLockVersion = snapshotResult.lockVersion
+        finalVersion = snapshotResult.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(
@@ -293,7 +293,7 @@ export async function addAiSeatAction(
   }
 
   try {
-    await addAiSeat(request.gameId, finalLockVersion, {
+    await addAiSeat(request.gameId, finalVersion, {
       seat: request.seat,
       registryName: request.registryName,
       registryVersion: request.registryVersion,
@@ -319,16 +319,16 @@ export async function removeAiSeatAction(
     }
   }
 
-  // If no lock_version is provided, fetch the game snapshot to get it
-  let finalLockVersion = request.lockVersion
-  if (finalLockVersion === undefined) {
+  // If no version is provided, fetch the game snapshot to get it
+  let finalVersion = request.version
+  if (finalVersion === undefined) {
     try {
       const snapshotResult = await fetchGameSnapshot(request.gameId)
       if (
         snapshotResult.kind === 'ok' &&
-        snapshotResult.lockVersion !== undefined
+        snapshotResult.version !== undefined
       ) {
-        finalLockVersion = snapshotResult.lockVersion
+        finalVersion = snapshotResult.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(
@@ -343,7 +343,7 @@ export async function removeAiSeatAction(
   }
 
   try {
-    await removeAiSeat(request.gameId, finalLockVersion, {
+    await removeAiSeat(request.gameId, finalVersion, {
       seat: request.seat,
     })
     return { kind: 'ok' }
@@ -366,16 +366,16 @@ export async function updateAiSeatAction(
     }
   }
 
-  // If no lock_version is provided, fetch the game snapshot to get it
-  let finalLockVersion = request.lockVersion
-  if (finalLockVersion === undefined) {
+  // If no version is provided, fetch the game snapshot to get it
+  let finalVersion = request.version
+  if (finalVersion === undefined) {
     try {
       const snapshotResult = await fetchGameSnapshot(request.gameId)
       if (
         snapshotResult.kind === 'ok' &&
-        snapshotResult.lockVersion !== undefined
+        snapshotResult.version !== undefined
       ) {
-        finalLockVersion = snapshotResult.lockVersion
+        finalVersion = snapshotResult.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(
@@ -390,7 +390,7 @@ export async function updateAiSeatAction(
   }
 
   try {
-    await updateAiSeat(request.gameId, finalLockVersion, {
+    await updateAiSeat(request.gameId, finalVersion, {
       seat: request.seat,
       registryName: request.registryName,
       registryVersion: request.registryVersion,

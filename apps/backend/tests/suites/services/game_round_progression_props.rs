@@ -1,6 +1,6 @@
 // Integration property tests for round progression using services and DB transactions.
 //
-// These tests verify state monotonicity, lock_version increments, and timestamp invariants
+// These tests verify state monotonicity, version increments, and timestamp invariants
 // across granular service steps (deal, bid, play tricks).
 
 use backend::db::txn::with_txn;
@@ -54,9 +54,9 @@ async fn test_state_monotonicity() -> Result<(), AppError> {
     Ok(())
 }
 
-/// Test: lock_version increments across persisted steps
+/// Test: version increments across persisted steps
 #[tokio::test]
-async fn test_lock_version_increments() -> Result<(), AppError> {
+async fn test_version_increments() -> Result<(), AppError> {
     let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
@@ -65,9 +65,9 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
                 .await?
                 .game_id;
 
-            // Capture initial lock_version
+            // Capture initial version
             let game_before = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
-            let lock_version_before = game_before.lock_version;
+            let version_before = game_before.version;
 
             // Step 1: Deal round
             let service = GameFlowService;
@@ -75,21 +75,19 @@ async fn test_lock_version_increments() -> Result<(), AppError> {
 
             let game_after_deal = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
             assert!(
-                game_after_deal.lock_version > lock_version_before,
-                "lock_version should increment after deal"
+                game_after_deal.version > version_before,
+                "version should increment after deal"
             );
 
             // Step 2: Submit a bid
-            let lock_before_bid = game_after_deal.lock_version;
+            let lock_before_bid = game_after_deal.version;
             let game = backend::repos::games::require_game(txn, game_id).await?;
-            service
-                .submit_bid(txn, game_id, 1, 5, game.lock_version)
-                .await?;
+            service.submit_bid(txn, game_id, 1, 5, game.version).await?;
 
             let game_after_bid = games::Entity::find_by_id(game_id).one(txn).await?.unwrap();
             assert!(
-                game_after_bid.lock_version > lock_before_bid,
-                "lock_version should increment after bid"
+                game_after_bid.version > lock_before_bid,
+                "version should increment after bid"
             );
 
             Ok::<_, AppError>(())
@@ -165,7 +163,7 @@ async fn test_deterministic_first_trick() -> Result<(), AppError> {
             for (seat, bid) in [(1u8, 6u8), (2, 3), (3, 4), (0, 5)] {
                 let game = backend::repos::games::require_game(txn, game_id).await?;
                 service
-                    .submit_bid(txn, game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, game_id, seat, bid, game.version)
                     .await?;
             }
 
@@ -217,7 +215,7 @@ async fn test_granular_round_progression() -> Result<(), AppError> {
             for (seat, bid) in [(1u8, 5u8), (2, 3), (3, 2), (0, 4)] {
                 let game = backend::repos::games::require_game(txn, game_id).await?;
                 service
-                    .submit_bid(txn, game_id, seat, bid, game.lock_version)
+                    .submit_bid(txn, game_id, seat, bid, game.version)
                     .await?;
             }
 
@@ -326,9 +324,7 @@ async fn test_invalid_bid_fails() -> Result<(), AppError> {
 
             // Try to submit an invalid bid (> hand_size)
             let game = backend::repos::games::require_game(txn, game_id).await?;
-            let result = service
-                .submit_bid(txn, game_id, 1, 100, game.lock_version)
-                .await;
+            let result = service.submit_bid(txn, game_id, 1, 100, game.version).await;
 
             assert!(result.is_err(), "Invalid bid should fail");
 
@@ -368,9 +364,7 @@ async fn test_out_of_turn_bid_fails() -> Result<(), AppError> {
             // Try to submit a bid for player 2 when it's player 0's turn
             // (Assuming turn starts at player 0 or dealer+1)
             let game = backend::repos::games::require_game(txn, game_id).await?;
-            let result = service
-                .submit_bid(txn, game_id, 2, 5, game.lock_version)
-                .await;
+            let result = service.submit_bid(txn, game_id, 2, 5, game.version).await;
 
             // This should fail (assuming turn order enforcement is implemented)
             // If not yet implemented, this test will fail and guide implementation
@@ -408,9 +402,7 @@ async fn test_bid_in_wrong_phase_fails() -> Result<(), AppError> {
 
             // Try to bid without dealing first (still in Lobby)
             let game = backend::repos::games::require_game(txn, game_id).await?;
-            let result = service
-                .submit_bid(txn, game_id, 1, 5, game.lock_version)
-                .await;
+            let result = service.submit_bid(txn, game_id, 1, 5, game.version).await;
 
             assert!(result.is_err(), "Bid in Lobby phase should fail");
 

@@ -93,7 +93,7 @@ pub async fn create_test_user_with_randomization(
 /// **NOTE: This function bypasses the repository layer and uses ActiveModel directly.**
 /// This is intentional for:
 /// - Performance: Faster setup when creating many games in tests
-/// - Control: Full control over all fields including lock_version, state, etc.
+/// - Control: Full control over all fields including version, state, etc.
 /// - Complex scenarios: Setting up games in non-standard states (e.g., already in BIDDING)
 ///
 /// For simple game creation in integration/service tests, use `repos::games::create_game()`
@@ -131,7 +131,7 @@ pub async fn create_fresh_lobby_game(
         starting_dealer_pos: Set(None),
         current_trick_no: Set(0i16),
         current_round_id: Set(None),
-        lock_version: Set(1), // New games start at lock_version 1
+        version: Set(1), // New games start at version 1
     };
 
     let inserted = game.insert(conn).await?;
@@ -187,7 +187,7 @@ pub async fn create_test_game_with_options(conn: &impl ConnectionTrait) -> Resul
     let mut active_game = game.into_active_model();
     active_game.current_round = Set(Some(1));
     active_game.starting_dealer_pos = Set(Some(0));
-    active_game.lock_version = Set(1);
+    active_game.version = Set(1);
 
     active_game.update(conn).await?;
 

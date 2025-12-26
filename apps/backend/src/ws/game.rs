@@ -57,7 +57,7 @@ pub async fn upgrade(
             .map_err(Error::from)?;
 
     let registry = app_state.websocket_registry();
-    let initial_lock_version = snapshot_response.lock_version;
+    let initial_version = snapshot_response.version;
     let shared_txn = SharedTxn::from_req(&req);
 
     // Generate session_id early so we can log it with trace_id while still in span context
@@ -86,7 +86,7 @@ pub async fn upgrade(
                 viewer_seat,
             },
         ],
-        initial_lock_version,
+        initial_version,
     };
 
     let session = GameWsSession::new_with_id(session_id, config);
@@ -105,7 +105,7 @@ pub struct GameWsSession {
     pending_messages: Vec<OutgoingMessage>,
     registry: Option<Arc<GameSessionRegistry>>,
     registry_token: Option<Uuid>,
-    last_lock_version: i32,
+    last_version: i32,
     heartbeat_handle: Option<actix::SpawnHandle>,
 }
 
@@ -116,7 +116,7 @@ struct GameWsSessionConfig {
     current_user: CurrentUser,
     shared_txn: Option<SharedTxn>,
     pending_messages: Vec<OutgoingMessage>,
-    initial_lock_version: i32,
+    initial_version: i32,
 }
 
 impl GameWsSession {
@@ -132,7 +132,7 @@ impl GameWsSession {
             pending_messages: config.pending_messages,
             registry: config.registry,
             registry_token: None,
-            last_lock_version: config.initial_lock_version,
+            last_version: config.initial_version,
             heartbeat_handle: None,
         }
     }
@@ -279,7 +279,7 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
     type Result = ();
 
     fn handle(&mut self, msg: SnapshotBroadcast, ctx: &mut Self::Context) -> Self::Result {
-        if msg.lock_version <= self.last_lock_version {
+        if msg.version <= self.last_version {
             return;
         }
 
@@ -300,7 +300,7 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
             .into_actor(self)
             .map(|result, actor, ctx| match result {
                 Ok((snapshot, viewer_seat)) => {
-                    actor.last_lock_version = snapshot.lock_version;
+                    actor.last_version = snapshot.version;
                     let outgoing = OutgoingMessage::Snapshot {
                         data: snapshot,
                         viewer_seat,

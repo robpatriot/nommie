@@ -304,7 +304,7 @@ describe('GameRoomClient', () => {
       const biddingData = createInitialData(biddingSnapshotWithNoBid, {
         viewerSeat: 0,
         viewerHand: ['2H', '3C'],
-        lockVersion: 1,
+        version: 1,
       })
 
       // Initialize query cache with bidding data BEFORE rendering
@@ -360,7 +360,7 @@ describe('GameRoomClient', () => {
           expect(mockSubmitBidAction).toHaveBeenCalledWith({
             gameId: 42,
             bid: 3,
-            lockVersion: 1,
+            version: 1,
           })
         },
         { timeout: 2000 }

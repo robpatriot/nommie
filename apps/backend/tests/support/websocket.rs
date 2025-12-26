@@ -34,8 +34,8 @@ pub fn attach_test_registry(state: AppState) -> (AppState, Arc<GameSessionRegist
 ///
 /// In production, game mutations call publish_snapshot which uses Redis pub/sub.
 /// In tests, we call this directly to trigger broadcasts to connected WebSocket clients.
-pub fn broadcast_snapshot(registry: &GameSessionRegistry, game_id: i64, lock_version: i32) {
-    registry.broadcast(game_id, SnapshotBroadcast { lock_version });
+pub fn broadcast_snapshot(registry: &GameSessionRegistry, game_id: i64, version: i32) {
+    registry.broadcast(game_id, SnapshotBroadcast { version });
 }
 
 pub async fn wait_for_connections(

@@ -68,21 +68,21 @@ export async function joinGameAction(
 
 export async function deleteGameAction(
   gameId: number,
-  lockVersion?: number
+  version?: number
 ): Promise<SimpleActionResult> {
   try {
     // Auth is enforced centrally in fetchWithAuth
 
-    // If no lock_version is provided, fetch the game snapshot to get it
-    let finalLockVersion = lockVersion
-    if (finalLockVersion === undefined) {
+    // If no version is provided, fetch the game snapshot to get it
+    let finalVersion = version
+    if (finalVersion === undefined) {
       try {
         const snapshotResult = await fetchGameSnapshot(gameId)
         if (
           snapshotResult.kind === 'ok' &&
-          snapshotResult.lockVersion !== undefined
+          snapshotResult.version !== undefined
         ) {
-          finalLockVersion = snapshotResult.lockVersion
+          finalVersion = snapshotResult.version
         } else {
           const t = await getTranslations('errors.actions')
           return toErrorResult(
@@ -96,7 +96,7 @@ export async function deleteGameAction(
       }
     }
 
-    await deleteGame(gameId, finalLockVersion)
+    await deleteGame(gameId, finalVersion)
     return { kind: 'ok' }
   } catch (error) {
     const t = await getTranslations('errors.actions')

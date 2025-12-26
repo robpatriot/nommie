@@ -25,7 +25,7 @@ async fn test_create_and_find_by_id() -> Result<(), AppError> {
             assert_eq!(created.state, GameState::Lobby);
             assert_eq!(created.visibility, GameVisibility::Private);
             assert_eq!(created.name, Some("Test Game".to_string()));
-            assert_eq!(created.lock_version, 1);
+            assert_eq!(created.version, 1);
 
             // Find by id
             let found = games_sea::find_by_id(txn, created.id).await?;
@@ -122,7 +122,7 @@ async fn test_update_round() -> Result<(), AppError> {
             assert_eq!(game.current_trick_no, 0);
 
             // Update round fields
-            let update = GameUpdate::new(game.id, game.lock_version)
+            let update = GameUpdate::new(game.id, game.version)
                 .with_current_round(1)
                 .with_starting_dealer_pos(2)
                 .with_current_trick_no(3);
@@ -132,7 +132,7 @@ async fn test_update_round() -> Result<(), AppError> {
             assert_eq!(updated.current_round, Some(1));
             assert_eq!(updated.starting_dealer_pos, Some(2));
             assert_eq!(updated.current_trick_no, 3);
-            assert_eq!(updated.lock_version, game.lock_version + 1);
+            assert_eq!(updated.version, game.version + 1);
 
             Ok::<_, AppError>(())
         })
@@ -193,7 +193,7 @@ async fn test_update_timestamps() -> Result<(), AppError> {
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
 
             // Update state
-            let update = GameUpdate::new(game.id, game.lock_version).with_state(GameState::Bidding);
+            let update = GameUpdate::new(game.id, game.version).with_state(GameState::Bidding);
             let updated = games_sea::update_game(txn, update).await?;
 
             // created_at must remain constant
@@ -216,34 +216,32 @@ async fn test_update_timestamps() -> Result<(), AppError> {
     Ok(())
 }
 
-/// Test: lock_version increments on each update
+/// Test: version increments on each update
 #[tokio::test]
-async fn test_lock_version_increments() -> Result<(), AppError> {
+async fn test_version_increments() -> Result<(), AppError> {
     let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let game = games_sea::create_game(txn, GameCreate::new()).await?;
 
-            assert_eq!(game.lock_version, 1, "initial lock_version should be 1");
+            assert_eq!(game.version, 1, "initial version should be 1");
 
             // First update
-            let update1 =
-                GameUpdate::new(game.id, game.lock_version).with_state(GameState::Bidding);
+            let update1 = GameUpdate::new(game.id, game.version).with_state(GameState::Bidding);
             let after1 = games_sea::update_game(txn, update1).await?;
-            assert_eq!(after1.lock_version, 2);
+            assert_eq!(after1.version, 2);
 
             // Second update
             let update2 =
-                GameUpdate::new(after1.id, after1.lock_version).with_state(GameState::TrickPlay);
+                GameUpdate::new(after1.id, after1.version).with_state(GameState::TrickPlay);
             let after2 = games_sea::update_game(txn, update2).await?;
-            assert_eq!(after2.lock_version, 3);
+            assert_eq!(after2.version, 3);
 
             // Round update should also increment
-            let update_round =
-                GameUpdate::new(after2.id, after2.lock_version).with_current_round(1);
+            let update_round = GameUpdate::new(after2.id, after2.version).with_current_round(1);
             let after3 = games_sea::update_game(txn, update_round).await?;
-            assert_eq!(after3.lock_version, 4);
+            assert_eq!(after3.version, 4);
 
             Ok::<_, AppError>(())
         })
@@ -263,7 +261,7 @@ async fn test_update_round_partial() -> Result<(), AppError> {
             let game = games_sea::create_game(txn, GameCreate::new()).await?;
 
             // Update only current_round
-            let update1 = GameUpdate::new(game.id, game.lock_version).with_current_round(5);
+            let update1 = GameUpdate::new(game.id, game.version).with_current_round(5);
             let updated1 = games_sea::update_game(txn, update1).await?;
 
             assert_eq!(updated1.current_round, Some(5));
@@ -272,7 +270,7 @@ async fn test_update_round_partial() -> Result<(), AppError> {
 
             // Now update only starting_dealer_pos
             let update2 =
-                GameUpdate::new(updated1.id, updated1.lock_version).with_starting_dealer_pos(3);
+                GameUpdate::new(updated1.id, updated1.version).with_starting_dealer_pos(3);
             let updated2 = games_sea::update_game(txn, update2).await?;
 
             assert_eq!(updated2.current_round, Some(5)); // Unchanged
@@ -299,20 +297,19 @@ async fn test_update_state_transitions() -> Result<(), AppError> {
             assert_eq!(game.state, GameState::Lobby);
 
             // Lobby -> Bidding
-            let update1 =
-                GameUpdate::new(game.id, game.lock_version).with_state(GameState::Bidding);
+            let update1 = GameUpdate::new(game.id, game.version).with_state(GameState::Bidding);
             let after1 = games_sea::update_game(txn, update1).await?;
             assert_eq!(after1.state, GameState::Bidding);
 
             // Bidding -> TrumpSelection
-            let update2 = GameUpdate::new(after1.id, after1.lock_version)
-                .with_state(GameState::TrumpSelection);
+            let update2 =
+                GameUpdate::new(after1.id, after1.version).with_state(GameState::TrumpSelection);
             let after2 = games_sea::update_game(txn, update2).await?;
             assert_eq!(after2.state, GameState::TrumpSelection);
 
             // TrumpSelection -> TrickPlay
             let update3 =
-                GameUpdate::new(after2.id, after2.lock_version).with_state(GameState::TrickPlay);
+                GameUpdate::new(after2.id, after2.version).with_state(GameState::TrickPlay);
             let after3 = games_sea::update_game(txn, update3).await?;
             assert_eq!(after3.state, GameState::TrickPlay);
 
@@ -345,7 +342,7 @@ async fn test_create_game_defaults() -> Result<(), AppError> {
             assert_eq!(game.current_round, None);
             assert_eq!(game.starting_dealer_pos, None);
             assert_eq!(game.current_trick_no, 0);
-            assert_eq!(game.lock_version, 1);
+            assert_eq!(game.version, 1);
 
             Ok::<_, AppError>(())
         })

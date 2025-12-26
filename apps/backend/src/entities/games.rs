@@ -64,8 +64,8 @@ pub struct Model {
     pub current_trick_no: i16,
     #[sea_orm(column_name = "current_round_id")]
     pub current_round_id: Option<i64>,
-    #[sea_orm(column_name = "lock_version")]
-    pub lock_version: i32,
+    #[sea_orm(column_name = "version")]
+    pub version: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

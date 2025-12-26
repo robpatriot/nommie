@@ -30,7 +30,7 @@ pub struct Game {
     pub starting_dealer_pos: Option<u8>,
     pub current_trick_no: u8,
     pub current_round_id: Option<i64>,
-    pub lock_version: i32,
+    pub version: i32,
 }
 
 impl Game {
@@ -101,19 +101,19 @@ pub async fn require_game<C: ConnectionTrait + Send + Sync>(
 /// Update game with optimistic locking.
 ///
 /// Updates any combination of state and round-related fields (current_round, starting_dealer_pos, current_trick_no)
-/// atomically with a single lock_version increment. Returns the updated game model.
+/// atomically with a single version increment. Returns the updated game model.
 ///
-/// `expected_lock_version` validates that the current lock_version matches before updating.
+/// `expected_version` validates that the current version matches before updating.
 pub async fn update_game(
     txn: &DatabaseTransaction,
     id: i64,
-    expected_lock_version: i32,
+    expected_version: i32,
     state: Option<DbGameState>,
     current_round: Option<u8>,
     starting_dealer_pos: Option<u8>,
     current_trick_no: Option<u8>,
 ) -> Result<Game, DomainError> {
-    let mut dto = games_adapter::GameUpdate::new(id, expected_lock_version);
+    let mut dto = games_adapter::GameUpdate::new(id, expected_version);
     if let Some(s) = state {
         dto = dto.with_state(s);
     }
@@ -130,28 +130,28 @@ pub async fn update_game(
     Ok(Game::from(game))
 }
 
-/// Touch game to increment lock_version without changing any game fields.
+/// Touch game to increment version without changing any game fields.
 ///
 /// This is useful when membership or other related data changes that affect the game snapshot
-/// but don't require updating any fields on the games table itself. Increments lock_version
+/// but don't require updating any fields on the games table itself. Increments version
 /// and updates updated_at to trigger websocket broadcasts.
 ///
-/// `expected_lock_version` validates that the current lock_version matches before updating.
+/// `expected_version` validates that the current version matches before updating.
 pub async fn touch_game(
     txn: &DatabaseTransaction,
     id: i64,
-    expected_lock_version: i32,
+    expected_version: i32,
 ) -> Result<Game, DomainError> {
-    update_game(txn, id, expected_lock_version, None, None, None, None).await
+    update_game(txn, id, expected_version, None, None, None, None).await
 }
 
 /// Delete game with optimistic locking.
 ///
-/// `expected_lock_version` validates that the current lock_version matches before deleting.
+/// `expected_version` validates that the current version matches before deleting.
 pub async fn delete_game(
     txn: &DatabaseTransaction,
     id: i64,
-    expected_lock_version: i32,
+    expected_version: i32,
 ) -> Result<(), DomainError> {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
@@ -159,7 +159,7 @@ pub async fn delete_game(
 
     let delete_result = games::Entity::delete_many()
         .filter(games::Column::Id.eq(id))
-        .filter(games::Column::LockVersion.eq(expected_lock_version))
+        .filter(games::Column::Version.eq(expected_version))
         .exec(txn)
         .await?;
 
@@ -172,7 +172,7 @@ pub async fn delete_game(
                 crate::errors::domain::ConflictKind::OptimisticLock,
                 format!(
                     "Game lock version mismatch: expected {}, but game has version {}",
-                    expected_lock_version, game.lock_version
+                    expected_version, game.version
                 ),
             ));
         }
@@ -223,7 +223,7 @@ impl From<games::Model> for Game {
             starting_dealer_pos: model.starting_dealer_pos.map(|v| v as u8),
             current_trick_no: model.current_trick_no as u8,
             current_round_id: model.current_round_id,
-            lock_version: model.lock_version,
+            version: model.version,
         }
     }
 }

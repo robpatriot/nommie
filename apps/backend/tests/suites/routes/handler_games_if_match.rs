@@ -1,16 +1,16 @@
-// HTTP-level tests for lock_version support on mutation endpoints.
+// HTTP-level tests for version support on mutation endpoints.
 //
 // Tests include:
-// - POST /api/games/{id}/bid with matching lock_version succeeds and bumps ETag
-// - POST /api/games/{id}/bid with stale lock_version returns 409 Conflict
-// - POST /api/games/{id}/bid missing lock_version returns 400 Bad Request
-// - POST /api/games/{id}/trump with matching lock_version succeeds and bumps ETag
-// - POST /api/games/{id}/trump with stale lock_version returns 409 Conflict
-// - POST /api/games/{id}/play with matching lock_version succeeds and bumps ETag
-// - POST /api/games/{id}/play with stale lock_version returns 409 Conflict
-// - DELETE /api/games/{id} with matching lock_version succeeds
-// - DELETE /api/games/{id} with stale lock_version returns 409 Conflict
-// - DELETE /api/games/{id} missing lock_version returns 400 Bad Request
+// - POST /api/games/{id}/bid with matching version succeeds and bumps ETag
+// - POST /api/games/{id}/bid with stale version returns 409 Conflict
+// - POST /api/games/{id}/bid missing version returns 400 Bad Request
+// - POST /api/games/{id}/trump with matching version succeeds and bumps ETag
+// - POST /api/games/{id}/trump with stale version returns 409 Conflict
+// - POST /api/games/{id}/play with matching version succeeds and bumps ETag
+// - POST /api/games/{id}/play with stale version returns 409 Conflict
+// - DELETE /api/games/{id} with matching version succeeds
+// - DELETE /api/games/{id} with stale version returns 409 Conflict
+// - DELETE /api/games/{id} missing version returns 400 Bad Request
 use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
@@ -225,20 +225,20 @@ async fn setup_delete_test(test_name: &str) -> Result<IfMatchTestContext, AppErr
     })
 }
 
-fn get_current_etag(game_id: i64, lock_version: i32) -> String {
-    game_etag(game_id, lock_version)
+fn get_current_etag(game_id: i64, version: i32) -> String {
+    game_etag(game_id, version)
 }
 
 #[tokio::test]
-async fn test_bid_with_matching_lock_version_succeeds_and_bumps_etag() -> Result<(), AppError> {
-    let ctx = setup_bidding_test("bid_matching_lock_version").await?;
+async fn test_bid_with_matching_version_succeeds_and_bumps_etag() -> Result<(), AppError> {
+    let ctx = setup_bidding_test("bid_matching_version").await?;
 
-    // Get initial lock_version
+    // Get initial version
     let game = games::Entity::find_by_id(ctx.game_id)
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let initial_lock_version = game.lock_version;
+    let initial_version = game.version;
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -254,7 +254,7 @@ async fn test_bid_with_matching_lock_version_succeeds_and_bumps_etag() -> Result
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/bid", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
-        .set_json(serde_json::json!({ "bid": 3, "lock_version": initial_lock_version }))
+        .set_json(serde_json::json!({ "bid": 3, "version": initial_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
 
@@ -278,12 +278,12 @@ async fn test_bid_with_matching_lock_version_succeeds_and_bumps_etag() -> Result
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let expected_etag = get_current_etag(ctx.game_id, game_after.lock_version);
+    let expected_etag = get_current_etag(ctx.game_id, game_after.version);
 
     assert_eq!(etag_header, expected_etag);
     assert!(
-        game_after.lock_version > game.lock_version,
-        "lock_version should increment after operation"
+        game_after.version > game.version,
+        "version should increment after operation"
     );
 
     drop(app);
@@ -292,15 +292,15 @@ async fn test_bid_with_matching_lock_version_succeeds_and_bumps_etag() -> Result
 }
 
 #[tokio::test]
-async fn test_bid_with_stale_lock_version_returns_409() -> Result<(), AppError> {
-    let ctx = setup_bidding_test("bid_stale_lock_version").await?;
+async fn test_bid_with_stale_version_returns_409() -> Result<(), AppError> {
+    let ctx = setup_bidding_test("bid_stale_version").await?;
 
-    // Get initial lock_version
+    // Get initial version
     let game = games::Entity::find_by_id(ctx.game_id)
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let stale_lock_version = game.lock_version - 1; // Stale version
+    let stale_version = game.version - 1; // Stale version
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -316,7 +316,7 @@ async fn test_bid_with_stale_lock_version_returns_409() -> Result<(), AppError> 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/bid", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
-        .set_json(serde_json::json!({ "bid": 3, "lock_version": stale_lock_version }))
+        .set_json(serde_json::json!({ "bid": 3, "version": stale_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
 
@@ -333,8 +333,8 @@ async fn test_bid_with_stale_lock_version_returns_409() -> Result<(), AppError> 
 }
 
 #[tokio::test]
-async fn test_bid_missing_lock_version_returns_400() -> Result<(), AppError> {
-    let ctx = setup_bidding_test("bid_missing_lock_version").await?;
+async fn test_bid_missing_version_returns_400() -> Result<(), AppError> {
+    let ctx = setup_bidding_test("bid_missing_version").await?;
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -350,7 +350,7 @@ async fn test_bid_missing_lock_version_returns_400() -> Result<(), AppError> {
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/bid", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
-        // No lock_version in body
+        // No version in body
         .set_json(serde_json::json!({ "bid": 3 }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
@@ -367,15 +367,15 @@ async fn test_bid_missing_lock_version_returns_400() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-async fn test_trump_with_matching_lock_version_succeeds_and_bumps_etag() -> Result<(), AppError> {
-    let ctx = setup_trump_test("trump_matching_lock_version").await?;
+async fn test_trump_with_matching_version_succeeds_and_bumps_etag() -> Result<(), AppError> {
+    let ctx = setup_trump_test("trump_matching_version").await?;
 
-    // Get initial lock_version
+    // Get initial version
     let game = games::Entity::find_by_id(ctx.game_id)
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let initial_lock_version = game.lock_version;
+    let initial_version = game.version;
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -391,7 +391,7 @@ async fn test_trump_with_matching_lock_version_succeeds_and_bumps_etag() -> Resu
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/trump", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
-        .set_json(serde_json::json!({ "trump": "HEARTS", "lock_version": initial_lock_version }))
+        .set_json(serde_json::json!({ "trump": "HEARTS", "version": initial_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
 
@@ -415,12 +415,12 @@ async fn test_trump_with_matching_lock_version_succeeds_and_bumps_etag() -> Resu
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let expected_etag = get_current_etag(ctx.game_id, game_after.lock_version);
+    let expected_etag = get_current_etag(ctx.game_id, game_after.version);
 
     assert_eq!(etag_header, expected_etag);
     assert!(
-        game_after.lock_version > game.lock_version,
-        "lock_version should increment after operation"
+        game_after.version > game.version,
+        "version should increment after operation"
     );
 
     drop(app);
@@ -429,15 +429,15 @@ async fn test_trump_with_matching_lock_version_succeeds_and_bumps_etag() -> Resu
 }
 
 #[tokio::test]
-async fn test_trump_with_stale_lock_version_returns_409() -> Result<(), AppError> {
-    let ctx = setup_trump_test("trump_stale_lock_version").await?;
+async fn test_trump_with_stale_version_returns_409() -> Result<(), AppError> {
+    let ctx = setup_trump_test("trump_stale_version").await?;
 
-    // Get initial lock_version
+    // Get initial version
     let game = games::Entity::find_by_id(ctx.game_id)
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let stale_lock_version = game.lock_version - 1; // Stale version
+    let stale_version = game.version - 1; // Stale version
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -453,7 +453,7 @@ async fn test_trump_with_stale_lock_version_returns_409() -> Result<(), AppError
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/trump", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
-        .set_json(serde_json::json!({ "trump": "HEARTS", "lock_version": stale_lock_version }))
+        .set_json(serde_json::json!({ "trump": "HEARTS", "version": stale_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
 
@@ -470,8 +470,8 @@ async fn test_trump_with_stale_lock_version_returns_409() -> Result<(), AppError
 }
 
 #[tokio::test]
-async fn test_play_with_matching_lock_version_succeeds_and_bumps_etag() -> Result<(), AppError> {
-    let (ctx, card_to_play) = setup_play_test("play_matching_lock_version").await?;
+async fn test_play_with_matching_version_succeeds_and_bumps_etag() -> Result<(), AppError> {
+    let (ctx, card_to_play) = setup_play_test("play_matching_version").await?;
 
     // Format card as string (e.g., "AH" for Ace of Hearts)
     use backend::domain::{Rank, Suit};
@@ -498,12 +498,12 @@ async fn test_play_with_matching_lock_version_succeeds_and_bumps_etag() -> Resul
     };
     let card_str = format!("{rank_char}{suit_char}");
 
-    // Get initial lock_version
+    // Get initial version
     let game = games::Entity::find_by_id(ctx.game_id)
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let initial_lock_version = game.lock_version;
+    let initial_version = game.version;
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -519,7 +519,7 @@ async fn test_play_with_matching_lock_version_succeeds_and_bumps_etag() -> Resul
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/play", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
-        .set_json(serde_json::json!({ "card": card_str, "lock_version": initial_lock_version }))
+        .set_json(serde_json::json!({ "card": card_str, "version": initial_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
 
@@ -543,12 +543,12 @@ async fn test_play_with_matching_lock_version_succeeds_and_bumps_etag() -> Resul
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let expected_etag = get_current_etag(ctx.game_id, game_after.lock_version);
+    let expected_etag = get_current_etag(ctx.game_id, game_after.version);
 
     assert_eq!(etag_header, expected_etag);
     assert!(
-        game_after.lock_version > game.lock_version,
-        "lock_version should increment after operation"
+        game_after.version > game.version,
+        "version should increment after operation"
     );
 
     drop(app);
@@ -557,8 +557,8 @@ async fn test_play_with_matching_lock_version_succeeds_and_bumps_etag() -> Resul
 }
 
 #[tokio::test]
-async fn test_play_with_stale_lock_version_returns_409() -> Result<(), AppError> {
-    let (ctx, card_to_play) = setup_play_test("play_stale_lock_version").await?;
+async fn test_play_with_stale_version_returns_409() -> Result<(), AppError> {
+    let (ctx, card_to_play) = setup_play_test("play_stale_version").await?;
 
     // Format card as string
     use backend::domain::{Rank, Suit};
@@ -585,12 +585,12 @@ async fn test_play_with_stale_lock_version_returns_409() -> Result<(), AppError>
     };
     let card_str = format!("{rank_char}{suit_char}");
 
-    // Get initial lock_version
+    // Get initial version
     let game = games::Entity::find_by_id(ctx.game_id)
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let stale_lock_version = game.lock_version - 1; // Stale version
+    let stale_version = game.version - 1; // Stale version
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -606,7 +606,7 @@ async fn test_play_with_stale_lock_version_returns_409() -> Result<(), AppError>
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/play", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
-        .set_json(serde_json::json!({ "card": card_str, "lock_version": stale_lock_version }))
+        .set_json(serde_json::json!({ "card": card_str, "version": stale_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
 
@@ -623,15 +623,15 @@ async fn test_play_with_stale_lock_version_returns_409() -> Result<(), AppError>
 }
 
 #[tokio::test]
-async fn test_delete_with_matching_lock_version_succeeds() -> Result<(), AppError> {
-    let ctx = setup_delete_test("delete_matching_lock_version").await?;
+async fn test_delete_with_matching_version_succeeds() -> Result<(), AppError> {
+    let ctx = setup_delete_test("delete_matching_version").await?;
 
-    // Get initial lock_version
+    // Get initial version
     let game = games::Entity::find_by_id(ctx.game_id)
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let initial_lock_version = game.lock_version;
+    let initial_version = game.version;
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -648,7 +648,7 @@ async fn test_delete_with_matching_lock_version_succeeds() -> Result<(), AppErro
         .uri(&format!("/api/games/{}", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
         .insert_header(("Content-Type", "application/json"))
-        .set_json(serde_json::json!({ "lock_version": initial_lock_version }))
+        .set_json(serde_json::json!({ "version": initial_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
 
@@ -668,15 +668,15 @@ async fn test_delete_with_matching_lock_version_succeeds() -> Result<(), AppErro
 }
 
 #[tokio::test]
-async fn test_delete_with_stale_lock_version_returns_409() -> Result<(), AppError> {
-    let ctx = setup_delete_test("delete_stale_lock_version").await?;
+async fn test_delete_with_stale_version_returns_409() -> Result<(), AppError> {
+    let ctx = setup_delete_test("delete_stale_version").await?;
 
-    // Get initial lock_version
+    // Get initial version
     let game = games::Entity::find_by_id(ctx.game_id)
         .one(ctx.shared.transaction())
         .await?
         .expect("game should exist");
-    let stale_lock_version = game.lock_version - 1; // Stale version
+    let stale_version = game.version - 1; // Stale version
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -693,7 +693,7 @@ async fn test_delete_with_stale_lock_version_returns_409() -> Result<(), AppErro
         .uri(&format!("/api/games/{}", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
         .insert_header(("Content-Type", "application/json"))
-        .set_json(serde_json::json!({ "lock_version": stale_lock_version }))
+        .set_json(serde_json::json!({ "version": stale_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
 
@@ -715,8 +715,8 @@ async fn test_delete_with_stale_lock_version_returns_409() -> Result<(), AppErro
 }
 
 #[tokio::test]
-async fn test_delete_missing_lock_version_returns_400() -> Result<(), AppError> {
-    let ctx = setup_delete_test("delete_missing_lock_version").await?;
+async fn test_delete_missing_version_returns_400() -> Result<(), AppError> {
+    let ctx = setup_delete_test("delete_missing_version").await?;
 
     let app = create_test_app(ctx.state)
         .with_routes(|cfg| {
@@ -733,7 +733,7 @@ async fn test_delete_missing_lock_version_returns_400() -> Result<(), AppError> 
         .uri(&format!("/api/games/{}", ctx.game_id))
         .insert_header(("Authorization", ctx.bearer.clone()))
         .insert_header(("Content-Type", "application/json"))
-        // No lock_version in body
+        // No version in body
         .set_json(serde_json::json!({}))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());

@@ -384,7 +384,7 @@ impl AppError {
 
     /// Parse lock version numbers from an optimistic lock error detail string
     /// Expects format: "...expected version X, actual version Y..."
-    fn parse_lock_versions(detail: &str) -> Option<serde_json::Value> {
+    fn parse_versions(detail: &str) -> Option<serde_json::Value> {
         let expected_prefix = "expected version ";
         let actual_prefix = ", actual version ";
 
@@ -553,7 +553,7 @@ impl From<crate::errors::domain::DomainError> for AppError {
                 // For OptimisticLock, try to extract version info from detail string
                 let extensions = if matches!(kind, ConflictKind::OptimisticLock) {
                     // Parse "expected version X, actual version Y" from detail
-                    Self::parse_lock_versions(&detail)
+                    Self::parse_versions(&detail)
                 } else {
                     None
                 };

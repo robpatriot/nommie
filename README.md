@@ -283,7 +283,7 @@ DTOs are request/response types used at the HTTP boundary. They serve as a contr
 
 **DTO Policies:**
 - **Separation from Domain:** DTOs are separate from domain types (e.g., `BidRequest` vs domain `Bid`)
-- **Optimistic Locking:** Mutation request DTOs must include `lock_version: i32` for concurrent update safety
+- **Optimistic Locking:** Mutation request DTOs must include `version: i32` for concurrent update safety
 - **Serialization:** Use `serde` derive macros; prefer `snake_case` for JSON field names
 - **Validation:** Validate in routes using extractors; domain logic validates business rules
 - **Transformation:** Convert between DTOs and domain types in the orchestration layer, not in routes
@@ -294,7 +294,7 @@ DTOs are request/response types used at the HTTP boundary. They serve as a contr
 #[derive(Deserialize)]
 struct BidRequest {
     bid: u8,
-    lock_version: i32,  // Required for optimistic locking
+    version: i32,  // Required for optimistic locking
 }
 
 // Domain type (pure logic)
@@ -306,7 +306,7 @@ async fn submit_bid(
     // ... extractors ...
 ) -> Result<HttpResponse, AppError> {
     let domain_bid = Bid(body.bid);
-    service.place_bid(txn, game_id, seat, domain_bid, body.lock_version).await?;
+    service.place_bid(txn, game_id, seat, domain_bid, body.version).await?;
     // ...
 }
 ```
@@ -323,32 +323,32 @@ async fn submit_bid(
 
 ## 🔒 Backend: Optimistic Concurrency
 
-The backend uses optimistic locking with `lock_version` in JSON request bodies for safe concurrent updates. ETags are used separately for HTTP cache validation on GET endpoints.
+The backend uses optimistic locking with `version` in JSON request bodies for safe concurrent updates. ETags are used separately for HTTP cache validation on GET endpoints.
 
 ### How It Works
 
 1. **Reading Resources**: GET endpoints return both:
    - An `ETag` header for HTTP cache validation (`If-None-Match`)
-   - A `lock_version` field in the JSON response body for optimistic locking
+   - A `version` field in the JSON response body for optimistic locking
    ```json
    {
      "snapshot": {...},
-     "lock_version": 5
+     "version": 5
    }
    ```
    ```
    ETag: "game-123-v5"
    ```
 
-2. **Updating Resources**: Mutation endpoints require `lock_version` in the JSON request body:
+2. **Updating Resources**: Mutation endpoints require `version` in the JSON request body:
    ```json
    {
      "bid": 3,
-     "lock_version": 5
+     "version": 5
    }
    ```
    
-   The `lock_version` must match the current resource version for the update to succeed.
+   The `version` must match the current resource version for the update to succeed.
 
 3. **Conflict Detection**: If the resource has been modified since the client last read it, the server returns `409 Conflict`:
    ```json
@@ -377,13 +377,13 @@ The backend uses optimistic locking with `lock_version` in JSON request bodies f
 
 **For Developers Adding Mutation Endpoints:**
 
-Request DTOs must include a `lock_version` field, which is used for optimistic locking:
+Request DTOs must include a `version` field, which is used for optimistic locking:
 
 ```rust
 #[derive(serde::Deserialize)]
 struct UpdateGameRequest {
     // ... other fields ...
-    lock_version: i32,
+    version: i32,
 }
 
 async fn update_game(
@@ -391,22 +391,22 @@ async fn update_game(
     body: ValidatedJson<UpdateGameRequest>,
     // ... other params ...
 ) -> Result<HttpResponse, AppError> {
-    // Use body.lock_version when calling the repository
+    // Use body.version when calling the repository
     let updated_game = game_service::update(
         txn, 
         game_id.0, 
-        body.lock_version,
+        body.version,
         // ... other params ...
     ).await?;
     
     // Return new ETag in response (for GET caching only)
     Ok(HttpResponse::Ok()
-        .insert_header((ETAG, game_etag(game_id.0, updated_game.lock_version)))
+        .insert_header((ETAG, game_etag(game_id.0, updated_game.version)))
         .json(result))
 }
 ```
 
-**For GET endpoints**, ETags are generated from `lock_version` but are only used for HTTP cache validation (`If-None-Match`).
+**For GET endpoints**, ETags are generated from `version` but are only used for HTTP cache validation (`If-None-Match`).
 
 **Observability:**
 

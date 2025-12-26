@@ -35,7 +35,7 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         rules_version: Set("1.0.0".to_string()),
-        lock_version: Set(1),
+        version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()

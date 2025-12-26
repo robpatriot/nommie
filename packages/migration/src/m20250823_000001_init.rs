@@ -59,7 +59,7 @@ enum Games {
     StartingDealerPos,
     CurrentTrickNo,
     CurrentRoundId,
-    LockVersion,
+    Version,
 }
 
 #[derive(Iden)]
@@ -515,7 +515,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(Games::CurrentRoundId).big_integer().null())
                     .col(
-                        ColumnDef::new(Games::LockVersion)
+                        ColumnDef::new(Games::Version)
                             .integer()
                             .not_null()
                             .default(0),

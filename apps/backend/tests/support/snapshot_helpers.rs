@@ -12,7 +12,7 @@ use time::OffsetDateTime;
 /// Result of creating a game for snapshot testing
 pub struct SnapshotGameSetup {
     pub game_id: i64,
-    pub lock_version: i32,
+    pub version: i32,
 }
 
 /// Options for customizing snapshot game creation
@@ -20,7 +20,7 @@ pub struct SnapshotGameSetup {
 pub struct SnapshotGameOptions {
     pub state: GameState,
     pub visibility: GameVisibility,
-    pub lock_version: i32,
+    pub version: i32,
 }
 
 impl Default for SnapshotGameOptions {
@@ -28,7 +28,7 @@ impl Default for SnapshotGameOptions {
         Self {
             state: GameState::Bidding,
             visibility: GameVisibility::Public,
-            lock_version: 1,
+            version: 1,
         }
     }
 }
@@ -44,8 +44,8 @@ impl SnapshotGameOptions {
         self
     }
 
-    pub fn with_lock_version(mut self, version: i32) -> Self {
-        self.lock_version = version;
+    pub fn with_version(mut self, version: i32) -> Self {
+        self.version = version;
         self
     }
 }
@@ -57,20 +57,20 @@ impl SnapshotGameOptions {
 /// * `options` - Configuration options for the game
 ///
 /// # Returns
-/// SnapshotGameSetup with game_id and lock_version
+/// SnapshotGameSetup with game_id and version
 ///
 /// # Example
 /// ```
 /// let options = SnapshotGameOptions::default()
 ///     .with_state(GameState::Bidding)
-///     .with_lock_version(5);
+///     .with_version(5);
 /// let game = create_snapshot_game(&shared, options).await?;
 /// ```
 ///
 /// **NOTE: This function bypasses the repository layer and uses ActiveModel directly.**
 /// This is intentional for:
 /// - Performance: Faster setup for snapshot testing
-/// - Control: Full control over state, lock_version, and other fields for snapshot edge cases
+/// - Control: Full control over state, version, and other fields for snapshot edge cases
 /// - Arbitrary states: Creating games in any state for snapshot validation
 ///
 /// For simple game creation, use `repos::games::create_game()` instead.
@@ -85,7 +85,7 @@ pub async fn create_snapshot_game(
         rules_version: Set("nommie-1.0.0".to_string()),
         created_at: Set(now),
         updated_at: Set(now),
-        lock_version: Set(options.lock_version),
+        version: Set(options.version),
         ..Default::default()
     };
 
@@ -93,6 +93,6 @@ pub async fn create_snapshot_game(
 
     Ok(SnapshotGameSetup {
         game_id: inserted.id,
-        lock_version: inserted.lock_version,
+        version: inserted.version,
     })
 }

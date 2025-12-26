@@ -79,7 +79,7 @@ export default async function GamePage({
   const initialPayload: GameRoomSnapshotPayload = {
     snapshot: snapshotResult.snapshot,
     etag: snapshotResult.etag,
-    lockVersion: snapshotResult.lockVersion,
+    version: snapshotResult.version,
     playerNames,
     viewerSeat,
     viewerHand: snapshotResult.viewerHand ?? [],

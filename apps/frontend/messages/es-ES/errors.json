@@ -107,7 +107,7 @@
   },
   "validation": {
     "invalidBidValue": "Valor de puja no válido",
-    "invalidLockVersion": "Versión de bloqueo no válida",
+    "invalidVersion": "Versión no válida",
     "cardSelectionRequired": "Debes seleccionar una carta",
     "noSettingsProvided": "No se proporcionaron ajustes"
   },

@@ -107,7 +107,7 @@
   },
   "validation": {
     "invalidBidValue": "Valore di puntata non valido",
-    "invalidLockVersion": "Versione di blocco non valida",
+    "invalidVersion": "Versione non valida",
     "cardSelectionRequired": "Seleziona una carta",
     "noSettingsProvided": "Nessuna impostazione fornita"
   },

@@ -53,8 +53,8 @@ Realtime fan-out is implemented with two layers:
 - **Redis pub/sub**: a cross-process signal bus so any instance can notify all other instances of updates.
 
 The broadcast contract is intentionally minimal:
-- When a game changes, the backend publishes `{ game_id, lock_version }` to Redis.
-- Each instance that receives that signal forwards a `SnapshotBroadcast { lock_version }` to local sessions.
+- When a game changes, the backend publishes `{ game_id, version }` to Redis.
+- Each instance that receives that signal forwards a `SnapshotBroadcast { version }` to local sessions.
 - Each session rebuilds the latest snapshot on-demand and sends it to the client.
 
 This keeps Redis messages small and avoids having to serialize/deserialize the full snapshot into Redis.
@@ -72,7 +72,7 @@ Where `data` is equivalent to the HTTP snapshot response:
 - `snapshot`: public game snapshot (no private hands)
 - `viewer_hand`: optional viewer hand (only for the viewing player when available)
 - `bid_constraints`: optional constraints payload (e.g. consecutive zero-bid lock)
-- `lock_version`: optimistic lock version for the game
+- `version`: optimistic lock version for the game
 
 ### Client → Server
 The current client does not send application messages. Any client traffic is treated as a heartbeat indicator (and otherwise ignored).
@@ -112,4 +112,4 @@ Backend integration tests cover:
 
 ## Operational Notes
 - Websocket payloads use full snapshots (not diffs). This is intentional: snapshots are idempotent and simplify correctness.
-- Ordering: clients should treat snapshots as “latest lock_version wins”.
+- Ordering: clients should treat snapshots as “latest version wins”.

@@ -162,7 +162,7 @@ Status-specific headers are automatically added:
 
 **Location:** `apps/backend/src/adapters/games_sea/mod.rs`
 
-Optimistic locking is implemented using a `lock_version` column (i32) that increments on every update.
+Optimistic locking is implemented using a `version` column (i32) that increments on every update.
 
 #### Detection Pattern
 

@@ -40,7 +40,7 @@ pub(crate) struct GameSnapshotResponse {
     viewer_hand: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     bid_constraints: Option<BidConstraintsResponse>,
-    pub(crate) lock_version: i32,
+    pub(crate) version: i32,
 }
 
 #[derive(Clone, Serialize)]
@@ -51,7 +51,7 @@ pub(crate) struct BidConstraintsResponse {
 /// Join a user to a game and touch the game to trigger WebSocket broadcasts.
 ///
 /// This helper encapsulates the common pattern of joining a user to a game
-/// and incrementing the game's lock_version so that WebSocket clients receive
+/// and incrementing the game's version so that WebSocket clients receive
 /// updates about the new player.
 ///
 /// Returns the updated game and all memberships.
@@ -59,40 +59,40 @@ async fn join_game_and_touch(
     txn: &sea_orm::DatabaseTransaction,
     game_id: i64,
     user_id: i64,
-    initial_lock_version: i32,
+    initial_version: i32,
 ) -> Result<(games_repo::Game, Vec<memberships::GameMembership>), AppError> {
     let service = GameService;
     let (_game, memberships) = service.join_game(txn, game_id, user_id).await?;
 
-    // Touch game to increment lock_version so WebSocket clients receive the update
+    // Touch game to increment version so WebSocket clients receive the update
     tracing::debug!(
         game_id = game_id,
-        expected_lock_version = initial_lock_version,
+        expected_version = initial_version,
         "DEBUG: join_game_and_touch - touching game"
     );
-    let final_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
+    let final_game = games_repo::touch_game(txn, game_id, initial_version).await?;
     tracing::debug!(
         game_id = game_id,
-        new_lock_version = final_game.lock_version,
-        "DEBUG: join_game_and_touch - lock_version updated"
+        new_version = final_game.version,
+        "DEBUG: join_game_and_touch - version updated"
     );
 
     Ok((final_game, memberships))
 }
 
-/// Helper that leaves a game and touches it to increment lock_version.
+/// Helper that leaves a game and touches it to increment version.
 ///
 /// This helper encapsulates the common pattern of removing a user from a game
-/// and incrementing the game's lock_version so that WebSocket clients receive
+/// and incrementing the game's version so that WebSocket clients receive
 /// updates about the player leaving.
 ///
-/// For active games, converts the human to AI, touches the game (incrementing lock_version),
-/// then processes game state (AIs may act, each incrementing lock_version further).
+/// For active games, converts the human to AI, touches the game (incrementing version),
+/// then processes game state (AIs may act, each incrementing version further).
 async fn leave_game_and_touch(
     txn: &sea_orm::DatabaseTransaction,
     game_id: i64,
     user_id: i64,
-    initial_lock_version: i32,
+    initial_version: i32,
 ) -> Result<(), AppError> {
     // Check game state before leaving to determine if we need AI processing
     let game_before = games_repo::require_game(txn, game_id).await?;
@@ -103,31 +103,31 @@ async fn leave_game_and_touch(
 
     // If game was active, the human was converted to AI
     if was_active {
-        // Touch game to increment lock_version for the conversion (unit of work)
+        // Touch game to increment version for the conversion (unit of work)
         tracing::debug!(
             game_id = game_id,
-            expected_lock_version = initial_lock_version,
+            expected_version = initial_version,
             "DEBUG: leave_game_and_touch - touching game after conversion"
         );
-        let _updated_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
+        let _updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
         tracing::debug!(
             game_id = game_id,
-            new_lock_version = _updated_game.lock_version,
-            "DEBUG: leave_game_and_touch - lock_version updated after conversion"
+            new_version = _updated_game.version,
+            "DEBUG: leave_game_and_touch - version updated after conversion"
         );
         // Note: AI processing is handled in a background task after transaction commits
     } else {
-        // Game was in Lobby - just touch to increment lock_version
+        // Game was in Lobby - just touch to increment version
         tracing::debug!(
             game_id = game_id,
-            expected_lock_version = initial_lock_version,
+            expected_version = initial_version,
             "DEBUG: leave_game_and_touch - touching game (lobby)"
         );
-        let _updated_game = games_repo::touch_game(txn, game_id, initial_lock_version).await?;
+        let _updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
         tracing::debug!(
             game_id = game_id,
-            new_lock_version = _updated_game.lock_version,
-            "DEBUG: leave_game_and_touch - lock_version updated (lobby)"
+            new_version = _updated_game.version,
+            "DEBUG: leave_game_and_touch - version updated (lobby)"
         );
     }
 
@@ -148,7 +148,7 @@ async fn build_snapshot_parts(
     ),
     AppError,
 > {
-    // Fetch game from database to get lock_version
+    // Fetch game from database to get version
     let game = games_repo::require_game(txn, game_id).await?;
 
     // Create game service and load game state
@@ -273,7 +273,7 @@ async fn build_snapshot_parts(
 
     Ok((
         snap,
-        game.lock_version,
+        game.version,
         viewer_seat,
         viewer_hand,
         bid_constraints,
@@ -287,7 +287,7 @@ pub(crate) async fn build_snapshot_response(
     current_user: &CurrentUser,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
     let current_user_id = current_user.id;
-    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
+    let (snapshot, version, viewer_seat, viewer_hand, bid_constraints) =
         with_txn(http_req, app_state, |txn| {
             Box::pin(async move { build_snapshot_parts(txn, game_id, current_user_id).await })
         })
@@ -297,7 +297,7 @@ pub(crate) async fn build_snapshot_response(
         snapshot,
         viewer_hand,
         bid_constraints,
-        lock_version,
+        version,
     };
 
     Ok((response, viewer_seat))
@@ -308,7 +308,7 @@ pub(crate) async fn build_snapshot_response_in_txn(
     game_id: i64,
     current_user_id: i64,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
-    let (snapshot, lock_version, viewer_seat, viewer_hand, bid_constraints) =
+    let (snapshot, version, viewer_seat, viewer_hand, bid_constraints) =
         build_snapshot_parts(txn, game_id, current_user_id).await?;
 
     // Note: We don't publish broadcasts here since we're inside a transaction.
@@ -318,7 +318,7 @@ pub(crate) async fn build_snapshot_response_in_txn(
         snapshot,
         viewer_hand,
         bid_constraints,
-        lock_version,
+        version,
     };
 
     Ok((response, viewer_seat))
@@ -384,7 +384,7 @@ async fn get_snapshot(
         build_snapshot_response(Some(&http_req), &app_state, id, &current_user).await?;
 
     // Generate ETag from game ID and lock version
-    let etag_value = game_etag(id, snapshot_response.lock_version);
+    let etag_value = game_etag(id, snapshot_response.version);
 
     // Check If-None-Match header for HTTP caching
     if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
@@ -441,22 +441,22 @@ async fn get_game_history(
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
 
-    // Load game to get lock_version and history within a transaction
-    let (history, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
+    // Load game to get version and history within a transaction
+    let (history, version) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            // Fetch game from database to get lock_version
+            // Fetch game from database to get version
             let game = games_repo::require_game(txn, id).await?;
 
             // Load game history
             let history = player_view::load_game_history(txn, id).await?;
 
-            Ok((history, game.lock_version))
+            Ok((history, game.version))
         })
     })
     .await?;
 
     // Generate ETag from game ID and lock version
-    let etag_value = game_etag(id, lock_version);
+    let etag_value = game_etag(id, version);
 
     // Check If-None-Match header for HTTP caching
     if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
@@ -526,23 +526,23 @@ async fn get_player_display_name(
 ) -> Result<HttpResponse, AppError> {
     let (game_id, seat) = path.into_inner();
 
-    // Get display name and game lock_version within a transaction
-    let (display_name, lock_version) = with_txn(Some(&http_req), &app_state, |txn| {
+    // Get display name and game version within a transaction
+    let (display_name, version) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            // Fetch game from database to get lock_version
+            // Fetch game from database to get version
             let game = games_repo::require_game(txn, game_id).await?;
 
             // Get display name
             let service = PlayerService;
             let display_name = service.get_display_name_by_seat(txn, game_id, seat).await?;
 
-            Ok((display_name, game.lock_version))
+            Ok((display_name, game.version))
         })
     })
     .await?;
 
     // Generate ETag from game ID and lock version
-    let etag_value = game_etag(game_id, lock_version);
+    let etag_value = game_etag(game_id, version);
 
     // Check If-None-Match header for HTTP caching
     if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
@@ -789,11 +789,11 @@ async fn join_game(
     // Join game using service layer (handles validation, seat assignment, membership creation)
     let (game_model, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            // Fetch game to get initial lock_version
+            // Fetch game to get initial version
             let game = games_repo::require_game(txn, id).await?;
-            let initial_lock_version = game.lock_version;
+            let initial_version = game.version;
 
-            join_game_and_touch(txn, id, user_id, initial_lock_version).await
+            join_game_and_touch(txn, id, user_id, initial_version).await
         })
     })
     .await?;
@@ -810,7 +810,7 @@ async fn join_game(
 ///
 /// Removes the current user from the specified game.
 ///
-/// Requires lock_version in request body for optimistic locking.
+/// Requires version in request body for optimistic locking.
 async fn leave_game(
     http_req: HttpRequest,
     game_id: GameId,
@@ -820,12 +820,12 @@ async fn leave_game(
 ) -> Result<HttpResponse, AppError> {
     let user_id = current_user.id;
     let id = game_id.0;
-    let expected_lock_version = body.lock_version;
+    let expected_version = body.version;
     tracing::debug!(
         game_id = id,
         user_id = user_id,
-        frontend_lock_version = expected_lock_version,
-        "DEBUG: leave_game endpoint - received lock_version from frontend"
+        frontend_version = expected_version,
+        "DEBUG: leave_game endpoint - received version from frontend"
     );
 
     // Check if game is active before leaving (needed to determine if background task is needed)
@@ -835,7 +835,7 @@ async fn leave_game(
 
     // Leave game using service layer
     with_txn(Some(&http_req), &app_state, |txn| {
-        Box::pin(async move { leave_game_and_touch(txn, id, user_id, expected_lock_version).await })
+        Box::pin(async move { leave_game_and_touch(txn, id, user_id, expected_version).await })
     })
     .await?;
 
@@ -875,7 +875,7 @@ async fn leave_game(
                 }
             };
 
-            // Process game state - AIs may act, each incrementing lock_version
+            // Process game state - AIs may act, each incrementing version
             let game_flow_service = crate::services::game_flow::GameFlowService;
             match game_flow_service
                 .process_game_state(&txn, game_id_for_task)
@@ -1104,29 +1104,29 @@ async fn mark_ready(
 #[derive(serde::Deserialize)]
 struct SubmitBidRequest {
     bid: u8,
-    lock_version: i32,
+    version: i32,
 }
 
 #[derive(serde::Deserialize)]
 struct SetTrumpRequest {
     trump: String,
-    lock_version: i32,
+    version: i32,
 }
 
 #[derive(serde::Deserialize)]
 struct PlayCardRequest {
     card: String,
-    lock_version: i32,
+    version: i32,
 }
 
 #[derive(serde::Deserialize)]
 struct LeaveGameRequest {
-    lock_version: i32,
+    version: i32,
 }
 
 #[derive(serde::Deserialize)]
 struct DeleteGameRequest {
-    lock_version: i32,
+    version: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1135,7 +1135,7 @@ struct ManageAiSeatRequest {
     registry_name: Option<String>,
     registry_version: Option<String>,
     seed: Option<u64>,
-    lock_version: i32,
+    version: i32,
 }
 
 fn resolve_registry_selection(
@@ -1191,9 +1191,9 @@ async fn add_ai_seat(
     let request = body.into_inner();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
-    // Note: lock_version from request is not used - we fetch current game state
-    // after add_ai_to_game which may have started the game and updated lock_version
-    let _lock_version = request.lock_version;
+    // Note: version from request is not used - we fetch current game state
+    // after add_ai_to_game which may have started the game and updated version
+    let _version = request.version;
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
@@ -1343,27 +1343,27 @@ async fn add_ai_seat(
                 .map_err(AppError::from)?;
 
             // Only touch game if it didn't start (not all 4 players ready, or not all existing were ready)
-            // If game started, lock_version was already updated by deal_round/process_game_state
+            // If game started, version was already updated by deal_round/process_game_state
             if !game_will_start {
-                // Use lock_version from request (consistent with leave_game pattern)
-                // The game state hasn't changed (still in Lobby), so lock_version is still valid
+                // Use version from request (consistent with leave_game pattern)
+                // The game state hasn't changed (still in Lobby), so version is still valid
                 tracing::debug!(
                     game_id = id,
-                    expected_lock_version = _lock_version,
+                    expected_version = _version,
                     "DEBUG: add_ai_seat - touching game (lobby, game didn't start)"
                 );
-                let updated_game = games_repo::touch_game(txn, id, _lock_version)
+                let updated_game = games_repo::touch_game(txn, id, _version)
                     .await
                     .map_err(AppError::from)?;
                 tracing::debug!(
                     game_id = id,
-                    new_lock_version = updated_game.lock_version,
-                    "DEBUG: add_ai_seat - lock_version updated (lobby)"
+                    new_version = updated_game.version,
+                    "DEBUG: add_ai_seat - version updated (lobby)"
                 );
             } else {
                 tracing::debug!(
                     game_id = id,
-                    "DEBUG: add_ai_seat - game will start, skipping touch_game (lock_version updated by deal_round/process_game_state)"
+                    "DEBUG: add_ai_seat - game will start, skipping touch_game (version updated by deal_round/process_game_state)"
                 );
             }
             Ok(())
@@ -1388,7 +1388,7 @@ async fn remove_ai_seat(
     let request = body.into_inner();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
-    let lock_version = request.lock_version;
+    let version = request.version;
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
@@ -1482,19 +1482,19 @@ async fn remove_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            // Touch game to increment lock_version so websocket clients receive the update
+            // Touch game to increment version so websocket clients receive the update
             tracing::debug!(
                 game_id = id,
-                expected_lock_version = lock_version,
+                expected_version = version,
                 "DEBUG: remove_ai_seat - touching game"
             );
-            let updated_game = games_repo::touch_game(txn, id, lock_version)
+            let updated_game = games_repo::touch_game(txn, id, version)
                 .await
                 .map_err(AppError::from)?;
             tracing::debug!(
                 game_id = id,
-                new_lock_version = updated_game.lock_version,
-                "DEBUG: remove_ai_seat - lock_version updated"
+                new_version = updated_game.version,
+                "DEBUG: remove_ai_seat - version updated"
             );
             Ok(())
         })
@@ -1531,7 +1531,7 @@ async fn update_ai_seat(
         ));
     }
 
-    let lock_version = request.lock_version;
+    let version = request.version;
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
@@ -1630,19 +1630,19 @@ async fn update_ai_seat(
                 }
             }
 
-            // Touch game to increment lock_version so websocket clients receive the update
+            // Touch game to increment version so websocket clients receive the update
             tracing::debug!(
                 game_id = id,
-                expected_lock_version = lock_version,
+                expected_version = version,
                 "DEBUG: update_ai_seat - touching game"
             );
-            let updated_game = games_repo::touch_game(txn, id, lock_version)
+            let updated_game = games_repo::touch_game(txn, id, version)
                 .await
                 .map_err(AppError::from)?;
             tracing::debug!(
                 game_id = id,
-                new_lock_version = updated_game.lock_version,
-                "DEBUG: update_ai_seat - lock_version updated"
+                new_version = updated_game.version,
+                "DEBUG: update_ai_seat - version updated"
             );
             Ok(())
         })
@@ -1660,7 +1660,7 @@ async fn update_ai_seat(
 /// Submits a bid for the current player. Bidding order and validation are enforced
 /// by the service layer.
 ///
-/// Requires lock_version in request body for optimistic locking.
+/// Requires version in request body for optimistic locking.
 async fn submit_bid(
     http_req: HttpRequest,
     game_id: GameId,
@@ -1676,14 +1676,14 @@ async fn submit_bid(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .submit_bid(txn, id, seat, bid_value, body.lock_version)
+                .submit_bid(txn, id, seat, bid_value, body.version)
                 .await
         })
     })
     .await?;
 
-    let etag = game_etag(game.id, game.lock_version);
-    publish_snapshot_with_lock(&app_state, id, game.lock_version).await?;
+    let etag = game_etag(game.id, game.version);
+    publish_snapshot_with_lock(&app_state, id, game.version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1691,7 +1691,7 @@ async fn submit_bid(
 
 /// Sets the trump suit for the current round. Only the winning bidder can set trump.
 ///
-/// Requires lock_version in request body for optimistic locking.
+/// Requires version in request body for optimistic locking.
 async fn select_trump(
     http_req: HttpRequest,
     game_id: GameId,
@@ -1722,14 +1722,14 @@ async fn select_trump(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .set_trump(txn, id, seat, trump, payload.lock_version)
+                .set_trump(txn, id, seat, trump, payload.version)
                 .await
         })
     })
     .await?;
 
-    let etag = game_etag(game.id, game.lock_version);
-    publish_snapshot_with_lock(&app_state, id, game.lock_version).await?;
+    let etag = game_etag(game.id, game.version);
+    publish_snapshot_with_lock(&app_state, id, game.version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1737,7 +1737,7 @@ async fn select_trump(
 
 /// Plays a card for the current player in the current trick.
 ///
-/// Requires lock_version in request body for optimistic locking.
+/// Requires version in request body for optimistic locking.
 async fn play_card(
     http_req: HttpRequest,
     game_id: GameId,
@@ -1764,14 +1764,14 @@ async fn play_card(
         Box::pin(async move {
             let service = GameFlowService;
             service
-                .play_card(txn, id, seat, card, payload.lock_version)
+                .play_card(txn, id, seat, card, payload.version)
                 .await
         })
     })
     .await?;
 
-    let etag = game_etag(game.id, game.lock_version);
-    publish_snapshot_with_lock(&app_state, id, game.lock_version).await?;
+    let etag = game_etag(game.id, game.version);
+    publish_snapshot_with_lock(&app_state, id, game.version).await?;
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1781,7 +1781,7 @@ async fn play_card(
 ///
 /// Deletes a game. Only the host can delete a game.
 ///
-/// Requires lock_version in request body for optimistic locking.
+/// Requires version in request body for optimistic locking.
 async fn delete_game(
     http_req: HttpRequest,
     game_id: GameId,
@@ -1791,7 +1791,7 @@ async fn delete_game(
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
     let user_id = current_user.id;
-    let lock_version = body.lock_version;
+    let version = body.version;
 
     with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
@@ -1809,7 +1809,7 @@ async fn delete_game(
 
             // Delete the game with optimistic locking
             // Cascade delete will handle related records automatically
-            games_repo::delete_game(txn, id, lock_version)
+            games_repo::delete_game(txn, id, version)
                 .await
                 .map_err(AppError::from)?;
 
@@ -1873,30 +1873,30 @@ fn trump_to_api_value(trump: Trump) -> &'static str {
     }
 }
 
-/// Publish a snapshot broadcast with a known lock_version.
+/// Publish a snapshot broadcast with a known version.
 ///
 /// This is the core function that actually publishes to Redis.
-/// Use this when you already have the lock_version (e.g., from a transaction return value).
+/// Use this when you already have the version (e.g., from a transaction return value).
 async fn publish_snapshot_with_lock(
     app_state: &web::Data<AppState>,
     game_id: i64,
-    lock_version: i32,
+    version: i32,
 ) -> Result<(), AppError> {
     if let Some(realtime) = &app_state.realtime {
-        realtime.publish_snapshot(game_id, lock_version).await?;
+        realtime.publish_snapshot(game_id, version).await?;
     }
     Ok(())
 }
 
-/// Publish a snapshot broadcast by fetching the game's current lock_version.
+/// Publish a snapshot broadcast by fetching the game's current version.
 ///
 /// This is a convenience wrapper that fetches the game from the database
-/// to get the current lock_version, then calls `publish_snapshot_with_lock`.
+/// to get the current version, then calls `publish_snapshot_with_lock`.
 ///
 /// In tests with SharedTxn, the game may not be visible to pooled connections,
-/// so prefer `publish_snapshot_with_lock` when you already have the lock_version.
+/// so prefer `publish_snapshot_with_lock` when you already have the version.
 async fn publish_snapshot(app_state: &web::Data<AppState>, game_id: i64) -> Result<(), AppError> {
-    // Fetch game to get current lock_version for broadcast
+    // Fetch game to get current version for broadcast
     let db = match crate::db::require_db(app_state) {
         Ok(db) => db,
         Err(_) => {
@@ -1918,7 +1918,7 @@ async fn publish_snapshot(app_state: &web::Data<AppState>, game_id: i64) -> Resu
         }
     };
 
-    publish_snapshot_with_lock(app_state, game_id, game.lock_version).await
+    publish_snapshot_with_lock(app_state, game_id, game.version).await
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {

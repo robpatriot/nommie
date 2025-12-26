@@ -107,7 +107,7 @@
   },
   "validation": {
     "invalidBidValue": "Valeur d’annonce invalide",
-    "invalidLockVersion": "Version de verrouillage invalide",
+    "invalidVersion": "Version invalide",
     "cardSelectionRequired": "Sélection d’une carte requise",
     "noSettingsProvided": "Aucun paramètre fourni"
   },

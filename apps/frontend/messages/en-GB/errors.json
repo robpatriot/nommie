@@ -107,7 +107,7 @@
   },
   "validation": {
     "invalidBidValue": "Invalid bid value",
-    "invalidLockVersion": "Invalid lock version",
+    "invalidVersion": "Invalid version",
     "cardSelectionRequired": "Card selection required",
     "noSettingsProvided": "No settings provided"
   },

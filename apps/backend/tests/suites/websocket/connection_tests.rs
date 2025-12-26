@@ -188,7 +188,7 @@ async fn websocket_receives_initial_snapshot() -> Result<(), Box<dyn std::error:
     assert_eq!(snapshot_msg["type"], "snapshot");
     let data = snapshot_msg.get("data").expect("snapshot should have data");
     assert!(data.get("snapshot").is_some());
-    assert!(data.get("lock_version").is_some());
+    assert!(data.get("version").is_some());
 
     // Close client and stop server to release all references to SharedTxn
     client.close().await?;

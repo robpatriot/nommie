@@ -90,7 +90,7 @@ pub async fn setup_game_in_trump_selection_phase(
     let phase_setup = setup_game_in_bidding_phase(txn, test_name).await?;
     let service = GameFlowService;
 
-    // Submit all bids in dealer order, using the current lock_version for each mutation
+    // Submit all bids in dealer order, using the current version for each mutation
     // Bidding starts at (dealer_pos + 1) % 4
     let first_bidder = ((phase_setup.dealer_pos + 1) % 4) as usize;
     for i in 0..4 {
@@ -102,7 +102,7 @@ pub async fn setup_game_in_trump_selection_phase(
                 phase_setup.game_id,
                 seat as u8,
                 bids[seat],
-                game.lock_version,
+                game.version,
             )
             .await?;
     }
@@ -142,7 +142,7 @@ pub async fn setup_game_in_trick_play_phase(
     // Determine winning bidder (highest bid, ties go to earliest bidder)
     let winning_bidder = find_winning_bidder(&bids, phase_setup.dealer_pos);
 
-    // Set trump, using the current lock_version for this mutation
+    // Set trump, using the current version for this mutation
     let game = backend::repos::games::require_game(txn, phase_setup.game_id).await?;
     service
         .set_trump(
@@ -150,7 +150,7 @@ pub async fn setup_game_in_trick_play_phase(
             phase_setup.game_id,
             winning_bidder,
             trump,
-            game.lock_version,
+            game.version,
         )
         .await?;
 
@@ -282,7 +282,7 @@ pub async fn setup_game_at_round(
         }),
         current_trick_no: Set(0i16),
         current_round_id: Set(None), // No active round
-        lock_version: Set(0),
+        version: Set(0),
     };
     let game_id = game.insert(txn).await?.id;
 

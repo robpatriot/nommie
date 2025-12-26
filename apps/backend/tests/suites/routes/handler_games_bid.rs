@@ -35,7 +35,7 @@ async fn submit_bid_success() -> Result<(), AppError> {
             setup.game_id,
             actor_seat,
             1,
-            game.lock_version,
+            game.version,
         )
         .await?;
 
@@ -83,7 +83,7 @@ async fn submit_bid_out_of_turn_rejected() -> Result<(), AppError> {
             setup.game_id,
             actor_seat,
             1,
-            game.lock_version,
+            game.version,
         )
         .await;
 

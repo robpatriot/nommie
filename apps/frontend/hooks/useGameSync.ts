@@ -27,7 +27,7 @@ interface SnapshotEnvelopeFromWs {
   bid_constraints?: {
     zero_bid_locked?: boolean
   } | null
-  lock_version: number
+  version: number
 }
 
 interface SnapshotMessage {
@@ -82,16 +82,14 @@ export function useGameSync({
   >(undefined)
 
   const buildEtag = useCallback(
-    (lockVersion?: number) =>
-      typeof lockVersion === 'number'
-        ? `"game-${gameId}-v${lockVersion}"`
-        : undefined,
+    (version?: number) =>
+      typeof version === 'number' ? `"game-${gameId}-v${version}"` : undefined,
     [gameId]
   )
 
   const applySnapshot = useCallback(
     (payload: GameRoomSnapshotPayload) => {
-      etagRef.current = payload.etag ?? buildEtag(payload.lockVersion)
+      etagRef.current = payload.etag ?? buildEtag(payload.version)
       setSyncError(null)
       // Update query cache - this is the single source of truth
       // Components using useGameRoomSnapshot will automatically re-render
@@ -140,7 +138,7 @@ export function useGameSync({
   const transformSnapshotMessage = useCallback(
     (message: SnapshotMessage): GameRoomSnapshotPayload => {
       const { data, viewer_seat } = message
-      const lockVersion = data.lock_version
+      const version = data.version
       const viewerSeat =
         typeof viewer_seat === 'number' && viewer_seat >= 0 && viewer_seat <= 3
           ? (viewer_seat as Seat)
@@ -166,8 +164,8 @@ export function useGameSync({
         timestamp: new Date().toISOString(),
         hostSeat: data.snapshot.game.host_seat as Seat,
         bidConstraints,
-        lockVersion,
-        etag: buildEtag(lockVersion),
+        version,
+        etag: buildEtag(version),
       }
     },
     [buildEtag]

@@ -98,14 +98,14 @@ export function useGameRoomActions({
         return
       }
 
-      // Read lock_version directly from cache at request time to avoid stale closures
+      // Read version directly from cache at request time to avoid stale closures
       const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
         queryKeys.games.snapshot(gameId)
       )
-      const currentLockVersion = cachedSnapshot?.lockVersion
+      const currentVersion = cachedSnapshot?.version
 
-      if (currentLockVersion === undefined) {
-        showToast(tErrors('lockVersionRequiredBid'), 'error')
+      if (currentVersion === undefined) {
+        showToast(tErrors('versionRequiredBid'), 'error')
         return
       }
 
@@ -113,7 +113,7 @@ export function useGameRoomActions({
         await submitBidMutation.mutateAsync({
           gameId,
           bid,
-          lockVersion: currentLockVersion,
+          version: currentVersion,
         })
         showToast(t('gameRoom.bidSubmitted'), 'success')
       } catch (err) {
@@ -138,14 +138,14 @@ export function useGameRoomActions({
         return
       }
 
-      // Read lock_version directly from cache at request time to avoid stale closures
+      // Read version directly from cache at request time to avoid stale closures
       const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
         queryKeys.games.snapshot(gameId)
       )
-      const currentLockVersion = cachedSnapshot?.lockVersion
+      const currentVersion = cachedSnapshot?.version
 
-      if (currentLockVersion === undefined) {
-        showToast(tErrors('lockVersionRequiredTrump'), 'error')
+      if (currentVersion === undefined) {
+        showToast(tErrors('versionRequiredTrump'), 'error')
         return
       }
 
@@ -153,7 +153,7 @@ export function useGameRoomActions({
         await selectTrumpMutation.mutateAsync({
           gameId,
           trump,
-          lockVersion: currentLockVersion,
+          version: currentVersion,
         })
         showToast(t('gameRoom.trumpSelected'), 'success')
       } catch (err) {
@@ -178,14 +178,14 @@ export function useGameRoomActions({
         return
       }
 
-      // Read lock_version directly from cache at request time to avoid stale closures
+      // Read version directly from cache at request time to avoid stale closures
       const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
         queryKeys.games.snapshot(gameId)
       )
-      const currentLockVersion = cachedSnapshot?.lockVersion
+      const currentVersion = cachedSnapshot?.version
 
-      if (currentLockVersion === undefined) {
-        showToast(tErrors('lockVersionRequiredCard'), 'error')
+      if (currentVersion === undefined) {
+        showToast(tErrors('versionRequiredCard'), 'error')
         return
       }
 
@@ -193,7 +193,7 @@ export function useGameRoomActions({
         await submitPlayMutation.mutateAsync({
           gameId,
           card,
-          lockVersion: currentLockVersion,
+          version: currentVersion,
         })
         showToast(t('gameRoom.cardPlayed'), 'success')
       } catch (err) {
@@ -235,29 +235,29 @@ export function useGameRoomActions({
     disconnect()
 
     try {
-      // Read lock_version directly from cache at request time to avoid stale closures
+      // Read version directly from cache at request time to avoid stale closures
       const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
         queryKeys.games.snapshot(gameId)
       )
-      const currentLockVersion = cachedSnapshot?.lockVersion
+      const currentVersion = cachedSnapshot?.version
 
       // DEBUG: Log what version the frontend thinks it's on
-      console.debug('[DEBUG] leave_game - frontend lock_version:', {
+      console.debug('[DEBUG] leave_game - frontend version:', {
         gameId,
-        cachedLockVersion: currentLockVersion,
+        cachedVersion: currentVersion,
         cachedSnapshotTimestamp: cachedSnapshot?.timestamp,
         hasCachedSnapshot: !!cachedSnapshot,
       })
 
-      if (currentLockVersion === undefined) {
-        showToast(tErrors('lockVersionRequired'), 'error')
+      if (currentVersion === undefined) {
+        showToast(tErrors('versionRequired'), 'error')
         connect() // Reconnect since we didn't leave
         return
       }
 
       await leaveGameMutation.mutateAsync({
         gameId,
-        lockVersion: currentLockVersion,
+        version: currentVersion,
       })
       showToast(t('gameRoom.leftGameSuccess'), 'success')
       router.push('/lobby')

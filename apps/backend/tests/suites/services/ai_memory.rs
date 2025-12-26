@@ -55,7 +55,7 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
         starting_dealer_pos: Set(Some(0i16)),
         current_trick_no: Set(0i16),
         current_round_id: Set(None),
-        lock_version: Set(0),
+        version: Set(0),
     }
     .insert(txn)
     .await?;
@@ -126,7 +126,7 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
         starting_dealer_pos: Set(Some(0i16)),
         current_trick_no: Set(3i16),
         current_round_id: Set(None),
-        lock_version: Set(0),
+        version: Set(0),
     }
     .insert(txn)
     .await?;

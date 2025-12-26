@@ -71,7 +71,7 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         rules_version: Set("1.0.0".to_string()),
-        lock_version: Set(1),
+        version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()
@@ -152,7 +152,7 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         rules_version: Set("1.0.0".to_string()),
-        lock_version: Set(1),
+        version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()
@@ -218,7 +218,7 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         rules_version: Set("1.0.0".to_string()),
-        lock_version: Set(1),
+        version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()
@@ -286,7 +286,7 @@ async fn test_membership_composition_with_current_user_and_game_id(
         visibility: Set(GameVisibility::Public),
         state: Set(GameState::Lobby),
         rules_version: Set("1.0.0".to_string()),
-        lock_version: Set(1),
+        version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
         ..Default::default()

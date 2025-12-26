@@ -354,7 +354,7 @@ Independent improvements that enhance robustness, performance, and developer exp
 ---
 
 ### ✅ **3. Behavioral & Infrastructure Improvements**
-- **Data & Auth Hygiene:** ✅ **Completed** — Email normalization (trim, lowercase, Unicode NFKC) implemented in `normalize_email()`; email validation implemented in `validate_email()`; username cleaning/derivation implemented in `derive_username()`. Skip redundant writes determined to be not needed — analysis shows all `update_game` calls either have actual field changes or intentionally need `lock_version` increments for WebSocket broadcasts. ETag-based caching handles read optimization (304 Not Modified).  
+- **Data & Auth Hygiene:** ✅ **Completed** — Email normalization (trim, lowercase, Unicode NFKC) implemented in `normalize_email()`; email validation implemented in `validate_email()`; username cleaning/derivation implemented in `derive_username()`. Skip redundant writes determined to be not needed — analysis shows all `update_game` calls either have actual field changes or intentionally need `version` increments for WebSocket broadcasts. ETag-based caching handles read optimization (304 Not Modified).  
   *Status:* ✅ Complete. Email normalization, validation, and username cleaning are production-ready. Skip redundant writes not needed per codebase analysis.  
   *Acceptance:* ✅ Email normalization, validation, and username cleaning implemented and tested.
 - **PII-Safe Logging:** ✅ **Completed** — Comprehensive PII redaction implemented in `apps/backend/src/logging/pii.rs`. `Redacted` wrapper type automatically masks emails (keeps first char, masks rest), base64/hex tokens, and google_sub values. Used in security logging (`login_failed`, `rate_limit_hit`) and throughout user service.  

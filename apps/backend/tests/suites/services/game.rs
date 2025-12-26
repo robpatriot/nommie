@@ -22,9 +22,10 @@ async fn insert_defaults_and_fetch() -> Result<(), AppError> {
                 ..Default::default()
             };
 
-            let inserted_game = games::Entity::insert(game).exec(txn).await.map_err(|e| {
-                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-            })?;
+            let inserted_game = games::Entity::insert(game)
+                .exec(txn)
+                .await
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
 
             // Assert id > 0
             assert!(inserted_game.last_insert_id > 0);
@@ -33,16 +34,14 @@ async fn insert_defaults_and_fetch() -> Result<(), AppError> {
             let fetched_game = games::Entity::find_by_id(inserted_game.last_insert_id)
                 .one(txn)
                 .await
-                .map_err(|e| {
-                    backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-                })?
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?
                 .expect("should have game row");
 
             // Assert state round-trips correctly
             assert_eq!(fetched_game.state, GameState::Lobby);
             assert_eq!(fetched_game.visibility, GameVisibility::Public);
             assert_eq!(fetched_game.rules_version, "nommie-1.0.0");
-            assert_eq!(fetched_game.lock_version, 0);
+            assert_eq!(fetched_game.version, 0);
 
             Ok::<_, AppError>(())
         })

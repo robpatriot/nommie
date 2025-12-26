@@ -82,7 +82,7 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
                     3,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
             flow_service
@@ -93,7 +93,7 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
                     4,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
             flow_service
@@ -104,7 +104,7 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
                     2,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
             flow_service
@@ -115,7 +115,7 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
                     2,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
 
@@ -128,7 +128,7 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
                     Trump::Spades,
                     backend::repos::games::require_game(txn, setup.game_id)
                         .await?
-                        .lock_version,
+                        .version,
                 )
                 .await?;
 

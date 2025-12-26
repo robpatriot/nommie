@@ -186,11 +186,11 @@ pub async fn place_bid(
     game_id: i32,
     seat: Seat,
     bid: Bid,  // Domain type
-    lock_version: i32,
+    version: i32,
 ) -> Result<(), AppError> {
     let mut state = load_game_state(txn, game_id).await?;
     domain::bidding::place_bid(&mut state, seat, bid)?;  // Domain logic
-    save_game_state(txn, game_id, &state, lock_version).await?;  // Persist
+    save_game_state(txn, game_id, &state, version).await?;  // Persist
     Ok(())
 }
 ```
@@ -216,7 +216,7 @@ async fn submit_bid(
     // ...
 ) -> Result<HttpResponse, AppError> {
     let domain_bid = Bid(body.bid);  // Convert DTO → domain
-    service.place_bid(txn, game_id.0, seat, domain_bid, body.lock_version).await?;
+    service.place_bid(txn, game_id.0, seat, domain_bid, body.version).await?;
     Ok(HttpResponse::Ok().json(response_dto))
 }
 ```
@@ -229,7 +229,7 @@ DTOs are request/response types used at the HTTP boundary. They provide a stable
 
 **Request DTOs:**
 - All POST/PATCH/PUT request bodies
-- Must include `lock_version: i32` for mutation endpoints (optimistic locking)
+- Must include `version: i32` for mutation endpoints (optimistic locking)
 - Use `ValidatedJson<T>` extractor for automatic JSON validation
 
 **Response DTOs:**
@@ -245,7 +245,7 @@ DTOs are request/response types used at the HTTP boundary. They provide a stable
    #[derive(Deserialize)]
    struct BidRequest {
        bid: u8,
-       lock_version: i32,
+       version: i32,
    }
    
    // Domain type (different purpose)
@@ -265,15 +265,15 @@ DTOs are request/response types used at the HTTP boundary. They provide a stable
    ```rust
    // ✅ Correct: Route converts DTO → domain, service uses domain
    let domain_bid = Bid(body.bid);
-   service.place_bid(txn, game_id, seat, domain_bid, body.lock_version).await?;
+   service.place_bid(txn, game_id, seat, domain_bid, body.version).await?;
    ```
 
-4. **Optimistic Locking:** All mutation request DTOs must include `lock_version`
+4. **Optimistic Locking:** All mutation request DTOs must include `version`
    ```rust
    #[derive(Deserialize)]
    struct UpdateGameRequest {
        // ... other fields ...
-       lock_version: i32,  // Required for concurrent update safety
+       version: i32,  // Required for concurrent update safety
    }
    ```
 
@@ -287,7 +287,7 @@ async fn submit_bid(
     // ...
 ) -> Result<HttpResponse, AppError> {
     let domain_bid = Bid(body.bid);  // Convert to domain type
-    service.place_bid(txn, game_id, seat, domain_bid, body.lock_version).await?;
+    service.place_bid(txn, game_id, seat, domain_bid, body.version).await?;
     // ...
 }
 
@@ -297,11 +297,11 @@ pub async fn place_bid(
     game_id: i32,
     seat: Seat,
     bid: Bid,  // Domain type
-    lock_version: i32,
+    version: i32,
 ) -> Result<(), AppError> {
     let mut state = load_game_state(txn, game_id).await?;
     domain::bidding::place_bid(&mut state, seat, bid)?;  // Domain logic
-    save_game_state(txn, game_id, &state, lock_version).await?;
+    save_game_state(txn, game_id, &state, version).await?;
     Ok(())
 }
 

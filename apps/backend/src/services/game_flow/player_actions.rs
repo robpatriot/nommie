@@ -16,22 +16,22 @@ impl GameFlowService {
     /// Public method that records the bid and processes game state (transitions + AI).
     ///
     /// # Parameters
-    /// - `expected_lock_version`: Validates that the game's current lock_version matches this value.
+    /// - `expected_version`: Validates that the game's current version matches this value.
     ///
     /// # Returns
-    /// Returns the updated game model with the new lock_version after the mutation.
+    /// Returns the updated game model with the new version after the mutation.
     pub async fn submit_bid(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: u8,
         bid_value: u8,
-        expected_lock_version: i32,
+        expected_version: i32,
     ) -> Result<Game, AppError> {
-        self.submit_bid_internal(txn, game_id, player_seat, bid_value, expected_lock_version)
+        self.submit_bid_internal(txn, game_id, player_seat, bid_value, expected_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
-        // Reload game after state processing to get final lock_version
+        // Reload game after state processing to get final version
         let final_game = games::require_game(txn, game_id).await?;
         Ok(final_game)
     }
@@ -51,7 +51,7 @@ impl GameFlowService {
         game_id: i64,
         player_seat: u8,
         bid_value: u8,
-        expected_lock_version: i32,
+        expected_version: i32,
     ) -> Result<Game, AppError> {
         debug!(game_id, player_seat, bid_value, "Submitting bid");
 
@@ -134,13 +134,13 @@ impl GameFlowService {
 
         tracing::debug!(
             game_id = game_id,
-            expected_lock_version = expected_lock_version,
+            expected_version = expected_version,
             "DEBUG: submit_bid - updating game"
         );
         let updated_game = games::update_game(
             txn,
             game_id,
-            expected_lock_version,
+            expected_version,
             state_update,
             None,
             None,
@@ -149,8 +149,8 @@ impl GameFlowService {
         .await?;
         tracing::debug!(
             game_id = game_id,
-            new_lock_version = updated_game.lock_version,
-            "DEBUG: submit_bid - lock_version updated"
+            new_version = updated_game.version,
+            "DEBUG: submit_bid - version updated"
         );
 
         Ok(updated_game)
@@ -161,22 +161,22 @@ impl GameFlowService {
     /// Public method that sets trump and processes game state (transitions + AI).
     ///
     /// # Parameters
-    /// - `expected_lock_version`: Validates that the game's current lock_version matches this value.
+    /// - `expected_version`: Validates that the game's current version matches this value.
     ///
     /// # Returns
-    /// Returns the updated game model with the new lock_version after the mutation and state transitions.
+    /// Returns the updated game model with the new version after the mutation and state transitions.
     pub async fn set_trump(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: u8,
         trump: crate::domain::Trump,
-        expected_lock_version: i32,
+        expected_version: i32,
     ) -> Result<Game, AppError> {
-        self.set_trump_internal(txn, game_id, player_seat, trump, expected_lock_version)
+        self.set_trump_internal(txn, game_id, player_seat, trump, expected_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
-        // Reload game after state processing to get final lock_version
+        // Reload game after state processing to get final version
         let final_game = games::require_game(txn, game_id).await?;
         Ok(final_game)
     }
@@ -190,7 +190,7 @@ impl GameFlowService {
         game_id: i64,
         player_seat: u8,
         trump: crate::domain::Trump,
-        expected_lock_version: i32,
+        expected_version: i32,
     ) -> Result<Game, AppError> {
         info!(game_id, player_seat, trump = ?trump, "Setting trump");
 
@@ -228,13 +228,13 @@ impl GameFlowService {
         // Update game state: set_trump always transitions to Trick phase
         tracing::debug!(
             game_id = game_id,
-            expected_lock_version = expected_lock_version,
+            expected_version = expected_version,
             "DEBUG: set_trump - updating game"
         );
         let updated_game = games::update_game(
             txn,
             game_id,
-            expected_lock_version,
+            expected_version,
             Some(DbGameState::TrickPlay),
             None,
             None,
@@ -243,8 +243,8 @@ impl GameFlowService {
         .await?;
         tracing::debug!(
             game_id = game_id,
-            new_lock_version = updated_game.lock_version,
-            "DEBUG: set_trump - lock_version updated"
+            new_version = updated_game.version,
+            "DEBUG: set_trump - version updated"
         );
 
         Ok(updated_game)
@@ -255,22 +255,22 @@ impl GameFlowService {
     /// Public method that records the card play and processes game state (transitions + AI).
     ///
     /// # Parameters
-    /// - `expected_lock_version`: Validates that the game's current lock_version matches this value.
+    /// - `expected_version`: Validates that the game's current version matches this value.
     ///
     /// # Returns
-    /// Returns the updated game model with the new lock_version after the mutation.
+    /// Returns the updated game model with the new version after the mutation.
     pub async fn play_card(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         player_seat: u8,
         card: Card,
-        expected_lock_version: i32,
+        expected_version: i32,
     ) -> Result<Game, AppError> {
-        self.play_card_internal(txn, game_id, player_seat, card, expected_lock_version)
+        self.play_card_internal(txn, game_id, player_seat, card, expected_version)
             .await?;
         self.process_game_state(txn, game_id).await?;
-        // Reload game after state processing to get final lock_version
+        // Reload game after state processing to get final version
         let final_game = games::require_game(txn, game_id).await?;
         Ok(final_game)
     }
@@ -284,7 +284,7 @@ impl GameFlowService {
         game_id: i64,
         player_seat: u8,
         card: Card,
-        expected_lock_version: i32,
+        expected_version: i32,
     ) -> Result<Game, AppError> {
         debug!(game_id, player_seat, "Playing card");
 
@@ -383,13 +383,13 @@ impl GameFlowService {
 
         tracing::debug!(
             game_id = game_id,
-            expected_lock_version = expected_lock_version,
+            expected_version = expected_version,
             "DEBUG: play_card - updating game"
         );
         let updated_game = games::update_game(
             txn,
             game_id,
-            expected_lock_version,
+            expected_version,
             state_update,
             None,
             None,
@@ -398,8 +398,8 @@ impl GameFlowService {
         .await?;
         tracing::debug!(
             game_id = game_id,
-            new_lock_version = updated_game.lock_version,
-            "DEBUG: play_card - lock_version updated"
+            new_version = updated_game.version,
+            "DEBUG: play_card - version updated"
         );
 
         // If phase transitioned to Scoring, score the round immediately (action-driven pattern)
