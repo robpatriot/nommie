@@ -63,9 +63,10 @@ USER appuser
 
 WORKDIR /app
 
-# Default port matches backend default (can be overridden via BACKEND_PORT at runtime)
-ARG PORT=3001
-EXPOSE ${PORT}
+# EXPOSE documents the default port (3001) for documentation purposes only
+# The actual runtime port is controlled by BACKEND_PORT environment variable
+# If BACKEND_PORT differs from 3001, use that value for docker run -p mappings
+EXPOSE 3001
 
 COPY --from=builder /app/target/release/backend /usr/local/bin/backend
 COPY --from=builder /app/target/release/migration /usr/local/bin/migration-cli
