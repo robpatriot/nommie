@@ -89,17 +89,34 @@ async fn handler(body: ValidatedJson<CreateRequest>) -> Result<web::Json<Respons
 
 ## Caching and ETags
 
-**Mutable endpoints (`PATCH`, `DELETE`):**
-- MUST enforce `If-Match`/`ETag`
+**Version field:**
+- Games use `version` (i32) for optimistic locking
+- `version` is stored in the database, exposed in entity/domain models, and included in all JSON request/response bodies
+
+**Mutable endpoints (`POST`, `PATCH`, `DELETE`):**
+- MUST accept `version` in request body JSON for optimistic locking
+- MUST return `version` in response body JSON (or ETag header for 204 responses)
+- MUST NOT require, parse, or validate `If-Match` headers
+- MUST return `409 Conflict` with `OPTIMISTIC_LOCK` code when version mismatch occurs
 
 **Safe endpoints (`GET`, `HEAD`):**
-- MUST support `If-None-Match`
-- MUST return `304` when applicable
+- MUST include `version` in response body JSON
+- MUST send `ETag` header derived from version (format: `"game-{id}-v{version}"`)
+- MUST support `If-None-Match` header
+- MUST return `304 Not Modified` when `If-None-Match` matches current ETag
 
 **ETag requirements:**
+- `ETag` MUST be derived from `version` using `game_etag(game_id, version)`
 - `ETag` MUST uniquely identify resource state
 - MUST NOT issue weak ETags
 - MUST NOT combine with `Last-Modified`
+
+**WebSocket architecture:**
+- Mutations MUST be performed via HTTP endpoints only — MUST NOT implement mutations over WebSocket
+- WebSocket is read-only from client perspective (server→client broadcasts only)
+- Outbound WS messages representing game state MUST include `version` in JSON payload (for client state tracking)
+- Clients use HTTP endpoints for all mutations (bid, play card, select trump, etc.)
+- WebSocket broadcasts are triggered by HTTP mutations to notify all connected clients of state changes
 
 ## Logging
 
