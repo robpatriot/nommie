@@ -112,17 +112,7 @@ impl GameFlowService {
         memberships::set_membership_ready(txn, membership.id, is_ready).await?;
 
         // Touch game to increment version so WebSocket clients receive the update
-        tracing::debug!(
-            game_id = game_id,
-            expected_version = game.version,
-            "DEBUG: process_game_state (mark_ready) - touching game"
-        );
-        let updated_game = games::touch_game(txn, game_id, game.version).await?;
-        tracing::debug!(
-            game_id = game_id,
-            new_version = updated_game.version,
-            "DEBUG: process_game_state (mark_ready) - version updated"
-        );
+        games::touch_game(txn, game_id, game.version).await?;
 
         if is_ready {
             // Check if all players are ready and start game if so

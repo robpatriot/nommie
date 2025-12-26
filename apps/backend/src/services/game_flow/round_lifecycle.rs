@@ -56,11 +56,6 @@ impl GameFlowService {
 
         // Update DB: state and round number
         let starting_dealer_pos = if next_round == 1 { Some(0) } else { None };
-        tracing::debug!(
-            game_id = game_id,
-            expected_version = game.version,
-            "DEBUG: start_round - updating game"
-        );
         let updated_game = games::update_game(
             txn,
             game_id,
@@ -71,11 +66,6 @@ impl GameFlowService {
             None,
         )
         .await?;
-        tracing::debug!(
-            game_id = game_id,
-            new_version = updated_game.version,
-            "DEBUG: start_round - version updated"
-        );
 
         // Create round record in DB
         let round = rounds::create_round(txn, game_id, next_round).await?;
@@ -238,12 +228,7 @@ impl GameFlowService {
             DbGameState::Bidding
         };
 
-        tracing::debug!(
-            game_id = game_id,
-            expected_version = game.version,
-            "DEBUG: score_round_internal - updating game"
-        );
-        let updated_game = games::update_game(
+        games::update_game(
             txn,
             game_id,
             game.version,
@@ -253,11 +238,6 @@ impl GameFlowService {
             None,
         )
         .await?;
-        tracing::debug!(
-            game_id = game_id,
-            new_version = updated_game.version,
-            "DEBUG: score_round_internal - version updated"
-        );
 
         if is_game_complete {
             info!(

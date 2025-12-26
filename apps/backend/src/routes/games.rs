@@ -65,17 +65,7 @@ async fn join_game_and_touch(
     let (_game, memberships) = service.join_game(txn, game_id, user_id).await?;
 
     // Touch game to increment version so WebSocket clients receive the update
-    tracing::debug!(
-        game_id = game_id,
-        expected_version = initial_version,
-        "DEBUG: join_game_and_touch - touching game"
-    );
     let final_game = games_repo::touch_game(txn, game_id, initial_version).await?;
-    tracing::debug!(
-        game_id = game_id,
-        new_version = final_game.version,
-        "DEBUG: join_game_and_touch - version updated"
-    );
 
     Ok((final_game, memberships))
 }
@@ -104,31 +94,11 @@ async fn leave_game_and_touch(
     // If game was active, the human was converted to AI
     if was_active {
         // Touch game to increment version for the conversion (unit of work)
-        tracing::debug!(
-            game_id = game_id,
-            expected_version = initial_version,
-            "DEBUG: leave_game_and_touch - touching game after conversion"
-        );
         let _updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
-        tracing::debug!(
-            game_id = game_id,
-            new_version = _updated_game.version,
-            "DEBUG: leave_game_and_touch - version updated after conversion"
-        );
         // Note: AI processing is handled in a background task after transaction commits
     } else {
         // Game was in Lobby - just touch to increment version
-        tracing::debug!(
-            game_id = game_id,
-            expected_version = initial_version,
-            "DEBUG: leave_game_and_touch - touching game (lobby)"
-        );
         let _updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
-        tracing::debug!(
-            game_id = game_id,
-            new_version = _updated_game.version,
-            "DEBUG: leave_game_and_touch - version updated (lobby)"
-        );
     }
 
     Ok(())
@@ -821,12 +791,6 @@ async fn leave_game(
     let user_id = current_user.id;
     let id = game_id.0;
     let expected_version = body.version;
-    tracing::debug!(
-        game_id = id,
-        user_id = user_id,
-        frontend_version = expected_version,
-        "DEBUG: leave_game endpoint - received version from frontend"
-    );
 
     // Check if game is active before leaving (needed to determine if background task is needed)
     let db = crate::db::require_db(&app_state)?;
@@ -1361,24 +1325,9 @@ async fn add_ai_seat(
             if !game_will_start {
                 // Use version from request (consistent with leave_game pattern)
                 // The game state hasn't changed (still in Lobby), so version is still valid
-                tracing::debug!(
-                    game_id = id,
-                    expected_version = _version,
-                    "DEBUG: add_ai_seat - touching game (lobby, game didn't start)"
-                );
-                let updated_game = games_repo::touch_game(txn, id, _version)
+                games_repo::touch_game(txn, id, _version)
                     .await
                     .map_err(AppError::from)?;
-                tracing::debug!(
-                    game_id = id,
-                    new_version = updated_game.version,
-                    "DEBUG: add_ai_seat - version updated (lobby)"
-                );
-            } else {
-                tracing::debug!(
-                    game_id = id,
-                    "DEBUG: add_ai_seat - game will start, skipping touch_game (version updated by deal_round/process_game_state)"
-                );
             }
             Ok(())
         })
@@ -1504,19 +1453,9 @@ async fn remove_ai_seat(
                 .map_err(AppError::from)?;
 
             // Touch game to increment version so websocket clients receive the update
-            tracing::debug!(
-                game_id = id,
-                expected_version = version,
-                "DEBUG: remove_ai_seat - touching game"
-            );
-            let updated_game = games_repo::touch_game(txn, id, version)
+            games_repo::touch_game(txn, id, version)
                 .await
                 .map_err(AppError::from)?;
-            tracing::debug!(
-                game_id = id,
-                new_version = updated_game.version,
-                "DEBUG: remove_ai_seat - version updated"
-            );
             Ok(())
         })
     })
@@ -1659,19 +1598,9 @@ async fn update_ai_seat(
             }
 
             // Touch game to increment version so websocket clients receive the update
-            tracing::debug!(
-                game_id = id,
-                expected_version = version,
-                "DEBUG: update_ai_seat - touching game"
-            );
-            let updated_game = games_repo::touch_game(txn, id, version)
+            games_repo::touch_game(txn, id, version)
                 .await
                 .map_err(AppError::from)?;
-            tracing::debug!(
-                game_id = id,
-                new_version = updated_game.version,
-                "DEBUG: update_ai_seat - version updated"
-            );
             Ok(())
         })
     })

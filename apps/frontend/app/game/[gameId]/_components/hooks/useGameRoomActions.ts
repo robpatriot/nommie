@@ -241,14 +241,6 @@ export function useGameRoomActions({
       )
       const currentVersion = cachedSnapshot?.version
 
-      // DEBUG: Log what version the frontend thinks it's on
-      console.debug('[DEBUG] leave_game - frontend version:', {
-        gameId,
-        cachedVersion: currentVersion,
-        cachedSnapshotTimestamp: cachedSnapshot?.timestamp,
-        hasCachedSnapshot: !!cachedSnapshot,
-      })
-
       if (currentVersion === undefined) {
         showToast(tErrors('versionRequired'), 'error')
         connect() // Reconnect since we didn't leave
