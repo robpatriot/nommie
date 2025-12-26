@@ -4,6 +4,7 @@ use sea_orm::DatabaseConnection;
 
 use super::security_config::SecurityConfig;
 use crate::config::email_allowlist::EmailAllowlist;
+use crate::routes::snapshot_cache::SnapshotCache;
 use crate::ws::hub::{GameSessionRegistry, RealtimeBroker};
 
 /// Application state containing shared resources
@@ -21,6 +22,11 @@ pub struct AppState {
     /// In production this is sourced from `realtime` (and is backed by Redis pub/sub fan-out).
     /// In tests it can be set directly to an in-memory registry to avoid Redis.
     pub(crate) websocket_registry: Option<Arc<GameSessionRegistry>>,
+    /// Snapshot cache for optimizing WebSocket broadcasts.
+    ///
+    /// Caches shared snapshot parts (game state, seating) to avoid redundant
+    /// database queries when multiple users receive broadcasts for the same game version.
+    pub snapshot_cache: Arc<SnapshotCache>,
 }
 
 impl AppState {
@@ -31,12 +37,14 @@ impl AppState {
         realtime: Option<Arc<RealtimeBroker>>,
     ) -> Self {
         let websocket_registry = realtime.as_ref().map(|broker| broker.registry());
+        let snapshot_cache = Arc::new(SnapshotCache::new());
         Self {
             db,
             security,
             email_allowlist,
             realtime,
             websocket_registry,
+            snapshot_cache,
         }
     }
 
@@ -81,5 +89,17 @@ impl AppState {
     /// Get the WebSocket session registry, if configured.
     pub fn websocket_registry(&self) -> Option<Arc<GameSessionRegistry>> {
         self.websocket_registry.clone()
+    }
+
+    /// Get a reference to the snapshot cache.
+    pub fn snapshot_cache(&self) -> &SnapshotCache {
+        &self.snapshot_cache
+    }
+
+    /// Get an Arc clone of the snapshot cache.
+    ///
+    /// Useful when the cache needs to be moved into async closures.
+    pub fn snapshot_cache_arc(&self) -> Arc<SnapshotCache> {
+        self.snapshot_cache.clone()
     }
 }

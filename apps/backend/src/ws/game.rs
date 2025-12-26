@@ -291,8 +291,13 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
         ctx.spawn(
             async move {
                 if let Some(shared) = shared_txn.as_ref() {
-                    build_snapshot_response_in_txn(shared.transaction(), game_id, current_user.id)
-                        .await
+                    build_snapshot_response_in_txn(
+                        shared.transaction(),
+                        &app_state,
+                        game_id,
+                        current_user.id,
+                    )
+                    .await
                 } else {
                     build_snapshot_response(None, &app_state, game_id, &current_user).await
                 }

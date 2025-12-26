@@ -28,6 +28,7 @@ use crate::http::etag::game_etag;
 use crate::repos::memberships::{self, GameRole};
 use crate::repos::players::{friendly_ai_name, resolve_display_name_for_membership};
 use crate::repos::{ai_overrides, ai_profiles, games as games_repo, player_view, users};
+use crate::routes::snapshot_cache::SharedSnapshotParts;
 use crate::services::ai::{AiInstanceOverrides, AiService};
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
@@ -104,20 +105,15 @@ async fn leave_game_and_touch(
     }
 }
 
-async fn build_snapshot_parts(
+/// Build shared snapshot parts (cacheable by game_id + version).
+///
+/// This is the expensive part that loads game state, memberships, and builds
+/// the public snapshot and seating array. The result is cached to avoid redundant
+/// work when multiple users receive broadcasts for the same game version.
+async fn build_shared_snapshot_parts(
     txn: &sea_orm::DatabaseTransaction,
     game_id: i64,
-    current_user_id: i64,
-) -> Result<
-    (
-        GameSnapshot,
-        i32,
-        Option<Seat>,
-        Option<Vec<String>>,
-        Option<BidConstraintsResponse>,
-    ),
-    AppError,
-> {
+) -> Result<SharedSnapshotParts, AppError> {
     // Fetch game from database to get version
     let game = games_repo::require_game(txn, game_id).await?;
 
@@ -129,7 +125,6 @@ async fn build_snapshot_parts(
         .await
         .map_err(AppError::from)?;
 
-    let mut viewer_seat: Option<Seat> = None;
     // Produce the snapshot via the domain function
     let mut snap = crate::domain::snapshot::snapshot(&state);
 
@@ -180,10 +175,6 @@ async fn build_snapshot_parts(
                     if creator_user_id == Some(user_id) {
                         host_seat = seat;
                     }
-
-                    if user_id == current_user_id {
-                        viewer_seat = Some(seat);
-                    }
                 }
             }
             crate::entities::game_players::PlayerKind::Ai => {
@@ -206,13 +197,50 @@ async fn build_snapshot_parts(
         seating[seat_idx as usize] = seat_public;
     }
 
-    snap.game.seating = seating;
+    snap.game.seating = seating.clone();
     snap.game.host_seat = host_seat;
 
+    let version = game.version;
+    Ok(SharedSnapshotParts {
+        game,
+        snapshot: snap,
+        seating,
+        version,
+    })
+}
+
+/// Build user-specific snapshot parts (not cacheable, per-user).
+///
+/// Determines viewer_seat, loads viewer_hand, and computes bid_constraints
+/// for a specific user. This is called after getting shared parts from cache.
+async fn build_user_specific_parts(
+    txn: &sea_orm::DatabaseTransaction,
+    game_id: i64,
+    current_user_id: i64,
+    shared: &SharedSnapshotParts,
+) -> Result<
+    (
+        Option<Seat>,
+        Option<Vec<String>>,
+        Option<BidConstraintsResponse>,
+    ),
+    AppError,
+> {
+    // Determine viewer_seat from memberships (check if current_user_id matches any seat)
+    let mut viewer_seat: Option<Seat> = None;
+    for (seat_idx, seat_public) in shared.seating.iter().enumerate() {
+        if let Some(user_id) = seat_public.user_id {
+            if user_id == current_user_id {
+                viewer_seat = Some(seat_idx as Seat);
+                break;
+            }
+        }
+    }
+
+    // Load viewer hand if viewer is a player
+    // Only load if game has started (current_round is Some and > 0)
     let viewer_hand = if let Some(seat) = viewer_seat {
-        if state.round_no == 0 {
-            None
-        } else {
+        if shared.game.current_round.is_some() {
             match player_view::load_current_round_info(txn, game_id, seat).await {
                 Ok(info) => Some(info.hand.into_iter().map(format_card).collect::<Vec<_>>()),
                 Err(err) => {
@@ -220,17 +248,20 @@ async fn build_snapshot_parts(
                     None
                 }
             }
+        } else {
+            None
         }
     } else {
         None
     };
 
+    // Compute bid_constraints if in bidding phase
     let mut bid_constraints: Option<BidConstraintsResponse> = None;
     if matches!(
-        &snap.phase,
+        &shared.snapshot.phase,
         crate::domain::snapshot::PhaseSnapshot::Bidding(_)
     ) {
-        if let Some(current_round_no) = game.current_round {
+        if let Some(current_round_no) = shared.game.current_round {
             if let Some(viewer_seat_value) = viewer_seat {
                 let history = player_view::load_game_history(txn, game_id).await?;
                 let zero_bid_locked =
@@ -241,13 +272,7 @@ async fn build_snapshot_parts(
         }
     }
 
-    Ok((
-        snap,
-        game.version,
-        viewer_seat,
-        viewer_hand,
-        bid_constraints,
-    ))
+    Ok((viewer_seat, viewer_hand, bid_constraints))
 }
 
 pub(crate) async fn build_snapshot_response(
@@ -257,17 +282,47 @@ pub(crate) async fn build_snapshot_response(
     current_user: &CurrentUser,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
     let current_user_id = current_user.id;
-    let (snapshot, version, viewer_seat, viewer_hand, bid_constraints) =
-        with_txn(http_req, app_state, |txn| {
-            Box::pin(async move { build_snapshot_parts(txn, game_id, current_user_id).await })
+    let cache = app_state.snapshot_cache_arc();
+
+    // Get shared parts from cache (with deduplication)
+    // We need to get the version first to form the cache key, then get or build
+    let shared = with_txn(http_req, app_state, |txn| {
+        let cache = cache.clone();
+        Box::pin(async move {
+            // Get current version first to form cache key
+            let game = games_repo::require_game(txn, game_id).await?;
+            let cache_key = (game_id, game.version);
+
+            // Check cache first
+            if let Some(cached) = cache.get(cache_key) {
+                return Ok(cached);
+            }
+
+            // Cache miss - build shared parts
+            let shared_parts = build_shared_snapshot_parts(txn, game_id).await?;
+
+            // Insert into cache with deduplication (get_or_insert handles double-check)
+            Ok(cache.get_or_insert(cache_key, shared_parts).await)
         })
-        .await?;
+    })
+    .await?;
+
+    // Clone shared before moving into closure
+    let shared_clone = shared.clone();
+
+    // Build user-specific parts
+    let (viewer_seat, viewer_hand, bid_constraints) = with_txn(http_req, app_state, |txn| {
+        Box::pin(async move {
+            build_user_specific_parts(txn, game_id, current_user_id, &shared_clone).await
+        })
+    })
+    .await?;
 
     let response = GameSnapshotResponse {
-        snapshot,
+        snapshot: shared.snapshot.clone(),
         viewer_hand,
         bid_constraints,
-        version,
+        version: shared.version,
     };
 
     Ok((response, viewer_seat))
@@ -275,20 +330,39 @@ pub(crate) async fn build_snapshot_response(
 
 pub(crate) async fn build_snapshot_response_in_txn(
     txn: &sea_orm::DatabaseTransaction,
+    app_state: &AppState,
     game_id: i64,
     current_user_id: i64,
 ) -> Result<(GameSnapshotResponse, Option<Seat>), AppError> {
-    let (snapshot, version, viewer_seat, viewer_hand, bid_constraints) =
-        build_snapshot_parts(txn, game_id, current_user_id).await?;
+    let cache = app_state.snapshot_cache();
+
+    // Get current version to form cache key
+    let game = games_repo::require_game(txn, game_id).await?;
+    let cache_key = (game_id, game.version);
+
+    // Check cache first
+    let shared = if let Some(cached) = cache.get(cache_key) {
+        cached
+    } else {
+        // Cache miss - build shared parts
+        let shared_parts = build_shared_snapshot_parts(txn, game_id).await?;
+
+        // Insert into cache with deduplication (get_or_insert handles double-check)
+        cache.get_or_insert(cache_key, shared_parts).await
+    };
+
+    // Build user-specific parts
+    let (viewer_seat, viewer_hand, bid_constraints) =
+        build_user_specific_parts(txn, game_id, current_user_id, &shared).await?;
 
     // Note: We don't publish broadcasts here since we're inside a transaction.
     // The caller should handle broadcasting after the transaction commits if needed.
 
     let response = GameSnapshotResponse {
-        snapshot,
+        snapshot: shared.snapshot.clone(),
         viewer_hand,
         bid_constraints,
-        version,
+        version: shared.version,
     };
 
     Ok((response, viewer_seat))
@@ -1849,6 +1923,12 @@ async fn publish_snapshot_with_lock(
     game_id: i64,
     version: i32,
 ) -> Result<(), AppError> {
+    // Invalidate old version from cache (version just incremented, so old version is version - 1)
+    // This is a safety measure - we also invalidate right after touch_game where possible
+    if version > 1 {
+        app_state.snapshot_cache().remove((game_id, version - 1));
+    }
+
     if let Some(realtime) = &app_state.realtime {
         if let Err(err) = realtime.publish_snapshot(game_id, version).await {
             tracing::error!(
