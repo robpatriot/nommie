@@ -839,6 +839,11 @@ async fn leave_game(
     })
     .await?;
 
+    // Fetch game to get updated version for ETag
+    let db = crate::db::require_db(&app_state)?;
+    let game_after = games_repo::require_game(db, id).await?;
+    let etag = game_etag(id, game_after.version);
+
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
 
@@ -919,7 +924,9 @@ async fn leave_game(
         });
     }
 
-    Ok(HttpResponse::NoContent().finish())
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
 /// GET /api/games/joinable
@@ -1095,10 +1102,17 @@ async fn mark_ready(
     })
     .await?;
 
+    // Fetch game to get updated version for ETag
+    let db = crate::db::require_db(&app_state)?;
+    let game_after = games_repo::require_game(db, id).await?;
+    let etag = game_etag(id, game_after.version);
+
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
 #[derive(serde::Deserialize)]
@@ -1371,10 +1385,17 @@ async fn add_ai_seat(
     })
     .await?;
 
+    // Fetch game to get updated version for ETag
+    let db = crate::db::require_db(&app_state)?;
+    let game_after = games_repo::require_game(db, id).await?;
+    let etag = game_etag(id, game_after.version);
+
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
 async fn remove_ai_seat(
@@ -1501,10 +1522,17 @@ async fn remove_ai_seat(
     })
     .await?;
 
+    // Fetch game to get updated version for ETag
+    let db = crate::db::require_db(&app_state)?;
+    let game_after = games_repo::require_game(db, id).await?;
+    let etag = game_etag(id, game_after.version);
+
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
 async fn update_ai_seat(
@@ -1649,10 +1677,17 @@ async fn update_ai_seat(
     })
     .await?;
 
+    // Fetch game to get updated version for ETag
+    let db = crate::db::require_db(&app_state)?;
+    let game_after = games_repo::require_game(db, id).await?;
+    let etag = game_etag(id, game_after.version);
+
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
 /// POST /api/games/{game_id}/bid
@@ -1818,7 +1853,12 @@ async fn delete_game(
     })
     .await?;
 
-    Ok(HttpResponse::NoContent().finish())
+    // For deleted resources, use version + 1 to indicate the version it would have been
+    // (the delete operation validated version, so we know it was that version when deleted)
+    let etag = game_etag(id, version + 1);
+    Ok(HttpResponse::NoContent()
+        .insert_header((ETAG, etag))
+        .finish())
 }
 
 fn unique_ai_display_name(existing: &HashSet<String>, base: &str) -> String {
