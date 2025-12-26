@@ -83,7 +83,7 @@ async fn leave_game_and_touch(
     game_id: i64,
     user_id: i64,
     initial_version: i32,
-) -> Result<(), AppError> {
+) -> Result<i32, AppError> {
     // Check game state before leaving to determine if we need AI processing
     let game_before = games_repo::require_game(txn, game_id).await?;
     let was_active = game_before.state != crate::entities::games::GameState::Lobby;
@@ -94,14 +94,14 @@ async fn leave_game_and_touch(
     // If game was active, the human was converted to AI
     if was_active {
         // Touch game to increment version for the conversion (unit of work)
-        let _updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
+        let updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
         // Note: AI processing is handled in a background task after transaction commits
+        Ok(updated_game.version)
     } else {
         // Game was in Lobby - just touch to increment version
-        let _updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
+        let updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
+        Ok(updated_game.version)
     }
-
-    Ok(())
 }
 
 async fn build_snapshot_parts(
@@ -798,15 +798,12 @@ async fn leave_game(
     let was_active = game_before.state != crate::entities::games::GameState::Lobby;
 
     // Leave game using service layer
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move { leave_game_and_touch(txn, id, user_id, expected_version).await })
     })
     .await?;
 
-    // Fetch game to get updated version for ETag
-    let db = crate::db::require_db(&app_state)?;
-    let game_after = games_repo::require_game(db, id).await?;
-    let etag = game_etag(id, game_after.version);
+    let etag = game_etag(id, updated_version);
 
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
@@ -1057,19 +1054,18 @@ async fn mark_ready(
     let user_id = current_user.id;
     let is_ready = body.is_ready;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
             service.set_ready_status(txn, id, user_id, is_ready).await?;
-            Ok(())
+            // Fetch game to get updated version for ETag
+            let game = games_repo::require_game(txn, id).await?;
+            Ok(game.version)
         })
     })
     .await?;
 
-    // Fetch game to get updated version for ETag
-    let db = crate::db::require_db(&app_state)?;
-    let game_after = games_repo::require_game(db, id).await?;
-    let etag = game_etag(id, game_after.version);
+    let etag = game_etag(id, updated_version);
 
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
@@ -1173,7 +1169,7 @@ async fn add_ai_seat(
     // after add_ai_to_game which may have started the game and updated version
     let _version = request.version;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1325,19 +1321,20 @@ async fn add_ai_seat(
             if !game_will_start {
                 // Use version from request (consistent with leave_game pattern)
                 // The game state hasn't changed (still in Lobby), so version is still valid
-                games_repo::touch_game(txn, id, _version)
+                let updated_game = games_repo::touch_game(txn, id, _version)
                     .await
                     .map_err(AppError::from)?;
+                Ok(updated_game.version)
+            } else {
+                // Game started - fetch to get the updated version from deal_round/process_game_state
+                let game = games_repo::require_game(txn, id).await?;
+                Ok(game.version)
             }
-            Ok(())
         })
     })
     .await?;
 
-    // Fetch game to get updated version for ETag
-    let db = crate::db::require_db(&app_state)?;
-    let game_after = games_repo::require_game(db, id).await?;
-    let etag = game_etag(id, game_after.version);
+    let etag = game_etag(id, updated_version);
 
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
@@ -1360,7 +1357,7 @@ async fn remove_ai_seat(
     let host_user_id = membership.user_id;
     let version = request.version;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1453,18 +1450,15 @@ async fn remove_ai_seat(
                 .map_err(AppError::from)?;
 
             // Touch game to increment version so websocket clients receive the update
-            games_repo::touch_game(txn, id, version)
+            let updated_game = games_repo::touch_game(txn, id, version)
                 .await
                 .map_err(AppError::from)?;
-            Ok(())
+            Ok(updated_game.version)
         })
     })
     .await?;
 
-    // Fetch game to get updated version for ETag
-    let db = crate::db::require_db(&app_state)?;
-    let game_after = games_repo::require_game(db, id).await?;
-    let etag = game_etag(id, game_after.version);
+    let etag = game_etag(id, updated_version);
 
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
@@ -1500,7 +1494,7 @@ async fn update_ai_seat(
 
     let version = request.version;
 
-    with_txn(Some(&http_req), &app_state, |txn| {
+    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let game = games_repo::require_game(txn, id).await?;
 
@@ -1598,18 +1592,15 @@ async fn update_ai_seat(
             }
 
             // Touch game to increment version so websocket clients receive the update
-            games_repo::touch_game(txn, id, version)
+            let updated_game = games_repo::touch_game(txn, id, version)
                 .await
                 .map_err(AppError::from)?;
-            Ok(())
+            Ok(updated_game.version)
         })
     })
     .await?;
 
-    // Fetch game to get updated version for ETag
-    let db = crate::db::require_db(&app_state)?;
-    let game_after = games_repo::require_game(db, id).await?;
-    let etag = game_etag(id, game_after.version);
+    let etag = game_etag(id, updated_version);
 
     // Publish snapshot broadcast so other players' UIs update
     publish_snapshot(&app_state, id).await?;
@@ -1782,12 +1773,9 @@ async fn delete_game(
     })
     .await?;
 
-    // For deleted resources, use version + 1 to indicate the version it would have been
-    // (the delete operation validated version, so we know it was that version when deleted)
-    let etag = game_etag(id, version + 1);
-    Ok(HttpResponse::NoContent()
-        .insert_header((ETAG, etag))
-        .finish())
+    // DELETE responses should not include ETag headers per HTTP/REST best practices
+    // since the resource no longer exists after deletion
+    Ok(HttpResponse::NoContent().finish())
 }
 
 fn unique_ai_display_name(existing: &HashSet<String>, base: &str) -> String {
