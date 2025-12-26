@@ -1,4 +1,4 @@
-nommie-dev.blim.org {
+${CADDY_DOMAIN} {
 	# Enable compression ONLY for non-API routes
 	@no_api {
 		not path /api/*
@@ -52,3 +52,5 @@ nommie-dev.blim.org {
 		reverse_proxy frontend:3000
 	}
 }
+
+

@@ -12,6 +12,11 @@ FROM caddy:2.10.2
 # Use the custom-built Caddy binary
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
-# Default Caddyfile path (will be overridden if you also mount it via volumes)
-COPY Caddyfile /etc/caddy/Caddyfile
+# Copy Caddyfile template and entrypoint script
+COPY Caddyfile.template /etc/caddy/Caddyfile.template
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
 

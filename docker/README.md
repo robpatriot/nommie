@@ -32,12 +32,14 @@ All Postgres instances (dev-db and local-prod) use TLS encryption by default. Se
    cp docker/local-prod/backend.env.example docker/local-prod/backend.env
    cp docker/local-prod/frontend.env.example docker/local-prod/frontend.env
    cp docker/local-prod/db.env.example docker/local-prod/db.env
+   cp docker/local-prod/caddy.env.example docker/local-prod/caddy.env
    ```
 
 2. Edit each `.env` file with your actual values:
    - **backend.env**: Set `BACKEND_JWT_SECRET` (generate with `openssl rand -hex 32`)
    - **frontend.env**: Set `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and URLs
    - **db.env**: Set database passwords (generate with `openssl rand -hex 16`)
+   - **caddy.env**: Set `CADDY_DOMAIN` (your domain name) and `CF_API_TOKEN` (Cloudflare API token for TLS)
 
 ## Generating Secure Secrets
 
@@ -74,7 +76,9 @@ docker/
     ├── frontend.env.example     # Example for frontend
     ├── frontend.env             # Your actual frontend config (gitignored)
     ├── db.env.example           # Example for production database
-    └── db.env                   # Your actual prod config (gitignored)
+    ├── db.env                   # Your actual prod config (gitignored)
+    ├── caddy.env.example        # Example for Caddy reverse proxy
+    └── caddy.env                # Your actual Caddy config (gitignored)
 ```
 
 
