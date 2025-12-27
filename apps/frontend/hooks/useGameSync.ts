@@ -204,17 +204,15 @@ export function useGameSync({
         }
 
         if (parsed.type === 'error' && 'message' in parsed) {
-          const errorMsg = parsed as ErrorMessage
-          setSyncError({
-            message: errorMsg.message ?? 'Realtime connection error',
-            traceId: errorMsg.code,
-          })
+          // Don't show error to user yet - automatically retry via HTTP
+          // Only show error if HTTP retry also fails (handled by refreshSnapshot)
+          void refreshSnapshot()
         }
       } catch (error) {
         logError('Failed to parse websocket payload', error, { gameId })
       }
     },
-    [handleSnapshotMessage, gameId]
+    [handleSnapshotMessage, gameId, refreshSnapshot]
   )
 
   // Keep the ref in sync with the latest handler

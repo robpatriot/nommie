@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::db::txn::SharedTxn;
 use crate::domain::state::Seat;
+use crate::error::AppError;
 use crate::extractors::current_user::CurrentUser;
 use crate::extractors::game_id::GameId;
 use crate::extractors::game_membership::GameMembership;
@@ -38,6 +39,10 @@ enum OutgoingMessage {
     },
     Ack {
         message: &'static str,
+    },
+    Error {
+        message: String,
+        code: Option<String>,
     },
 }
 
@@ -327,6 +332,39 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
                         error = %err,
                         "Failed to build snapshot for websocket client"
                     );
+
+                    // Send error message to client so it can retry via HTTP
+                    let error_code = match &err {
+                        AppError::Internal { code, .. }
+                        | AppError::Validation { code, .. }
+                        | AppError::NotFound { code, .. }
+                        | AppError::Forbidden { code, .. }
+                        | AppError::BadRequest { code, .. }
+                        | AppError::Conflict { code, .. }
+                        | AppError::Timeout { code, .. } => Some(code.as_str().to_string()),
+                        AppError::Db { .. }
+                        | AppError::DbUnavailable { .. }
+                        | AppError::Config { .. } => Some(err.code().as_str().to_string()),
+                        AppError::Unauthorized
+                        | AppError::UnauthorizedMissingBearer
+                        | AppError::UnauthorizedInvalidJwt
+                        | AppError::UnauthorizedExpiredJwt
+                        | AppError::ForbiddenUserNotFound => Some(err.code().as_str().to_string()),
+                    };
+
+                    let outgoing = OutgoingMessage::Error {
+                        message: format!("Failed to build snapshot: {err}"),
+                        code: error_code,
+                    };
+                    match to_string(&outgoing) {
+                        Ok(serialized) => ctx.text(serialized),
+                        Err(ser_err) => warn!(
+                            session_id = %actor.session_id,
+                            game_id = actor.game_id,
+                            error = %ser_err,
+                            "Failed to serialize error message"
+                        ),
+                    }
                 }
             }),
         );

@@ -407,7 +407,7 @@ describe('GameRoomClient', () => {
       expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
     })
 
-    it('handles WebSocket error messages', async () => {
+    it('automatically retries via HTTP when WebSocket error received', async () => {
       const initialData = createInitialData()
 
       await act(async () => {
@@ -419,26 +419,133 @@ describe('GameRoomClient', () => {
       // Wait for WebSocket to connect
       const ws = await waitForWebSocketConnection()
 
+      // Clear any previous calls
+      mockGetGameRoomSnapshotAction.mockClear()
+
       // Send error message
       act(() => {
         ws.onmessage?.(
           new MessageEvent('message', {
             data: JSON.stringify({
               type: 'error',
-              message: 'WebSocket error',
-              code: 'WS_ERROR',
+              message: 'Failed to build snapshot',
+              code: 'INTERNAL_ERROR',
             }),
           })
         )
       })
 
-      // Verify error is displayed
+      // Verify HTTP refresh was automatically triggered
       await waitFor(
         () => {
-          expect(screen.getByText(/WebSocket error/i)).toBeInTheDocument()
+          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
         },
         { timeout: 2000 }
       )
+
+      // Verify error is NOT displayed yet (HTTP retry should succeed)
+      expect(
+        screen.queryByText(/Failed to build snapshot/i)
+      ).not.toBeInTheDocument()
+    })
+
+    it('shows error only if HTTP retry also fails', async () => {
+      const initialData = createInitialData()
+
+      await act(async () => {
+        const { queryClient: _ } = render(
+          <GameRoomClient initialData={initialData} gameId={42} />
+        )
+      })
+
+      // Wait for WebSocket to connect
+      const ws = await waitForWebSocketConnection()
+
+      // Mock HTTP refresh to fail
+      mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
+        kind: 'error',
+        message: 'HTTP refresh also failed',
+        traceId: 'test-trace-id',
+      })
+
+      // Send error message
+      act(() => {
+        ws.onmessage?.(
+          new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'error',
+              message: 'Failed to build snapshot',
+              code: 'INTERNAL_ERROR',
+            }),
+          })
+        )
+      })
+
+      // Verify HTTP refresh was triggered
+      await waitFor(
+        () => {
+          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+        },
+        { timeout: 2000 }
+      )
+
+      // Verify error is now displayed (both WS and HTTP failed)
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(/HTTP refresh also failed/i)
+          ).toBeInTheDocument()
+        },
+        { timeout: 2000 }
+      )
+    })
+
+    it('clears error when HTTP retry succeeds', async () => {
+      const initialData = createInitialData()
+
+      await act(async () => {
+        const { queryClient: _ } = render(
+          <GameRoomClient initialData={initialData} gameId={42} />
+        )
+      })
+
+      // Wait for WebSocket to connect
+      const ws = await waitForWebSocketConnection()
+
+      // Mock HTTP refresh to succeed
+      const refreshedData = createInitialData(initSnapshotFixture, {
+        version: 2,
+      })
+      mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
+        kind: 'ok',
+        data: refreshedData,
+      })
+
+      // Send error message
+      act(() => {
+        ws.onmessage?.(
+          new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'error',
+              message: 'Failed to build snapshot',
+              code: 'INTERNAL_ERROR',
+            }),
+          })
+        )
+      })
+
+      // Wait for HTTP retry to complete
+      await waitFor(
+        () => {
+          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+        },
+        { timeout: 2000 }
+      )
+
+      // Verify error is NOT displayed (HTTP retry succeeded)
+      expect(
+        screen.queryByText(/Failed to build snapshot/i)
+      ).not.toBeInTheDocument()
     })
   })
 })
