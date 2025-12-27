@@ -38,7 +38,7 @@ export function useGameRoomSnapshot(
       })
 
       if (result.kind === 'not_modified') {
-        // Get the current cached data - this is what we want to return
+        // 304 means we already have the current data
         const cachedData = queryClient.getQueryData<GameRoomSnapshotPayload>(
           queryKeys.games.snapshot(gameId)
         )
@@ -47,29 +47,17 @@ export function useGameRoomSnapshot(
           return cachedData
         }
 
-        // If no cached data exists (shouldn't happen with ETag, but handle gracefully)
-        // Fall back to initialData if provided
+        // If we got 304 but have no cache, use initialData if available
+        // This handles the edge case where cache was cleared between mount and query
         if (options?.initialData) {
           return options.initialData
         }
 
-        // Last resort: re-fetch without ETag to get fresh data
-        // This handles the edge case where cache was cleared but we got 304
-        const freshResult = await getGameRoomSnapshotAction({
-          gameId,
-          etag: undefined, // Force fresh fetch
-        })
-
-        if (freshResult.kind === 'error') {
-          throw handleActionResultError(freshResult)
-        }
-
-        if (freshResult.kind === 'not_modified') {
-          // Still not modified even without ETag - this is an error state
-          throw new Error('Game snapshot data not available')
-        }
-
-        return freshResult.data
+        // This shouldn't happen: we sent an ETag but have no cached data
+        // Return a clear error rather than making another network request
+        throw new Error(
+          'Received 304 Not Modified but no cached data available'
+        )
       }
 
       if (result.kind === 'error') {
