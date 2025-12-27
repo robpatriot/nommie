@@ -305,7 +305,9 @@ impl Handler<SnapshotBroadcast> for GameWsSession {
             .into_actor(self)
             .map(|result, actor, ctx| match result {
                 Ok((snapshot, viewer_seat)) => {
-                    actor.last_version = snapshot.version;
+                    // Use max() to ensure last_version always moves forward monotonically,
+                    // preventing race conditions when concurrent snapshot builds complete out of order
+                    actor.last_version = actor.last_version.max(snapshot.version);
                     let outgoing = OutgoingMessage::Snapshot {
                         data: snapshot,
                         viewer_seat,

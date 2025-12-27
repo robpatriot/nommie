@@ -89,6 +89,21 @@ export function useGameSync({
 
   const applySnapshot = useCallback(
     (payload: GameRoomSnapshotPayload) => {
+      // Defensive check: ignore older snapshots to prevent out-of-order updates
+      // This handles cases where WebSocket messages arrive out of order
+      const current = queryClient.getQueryData<GameRoomSnapshotPayload>(
+        queryKeys.games.snapshot(gameId)
+      )
+      if (
+        current &&
+        current.version !== undefined &&
+        payload.version !== undefined &&
+        current.version > payload.version
+      ) {
+        // Ignore older snapshot - current cache is already newer
+        return
+      }
+
       etagRef.current = payload.etag ?? buildEtag(payload.version)
       setSyncError(null)
       // Update query cache - this is the single source of truth
