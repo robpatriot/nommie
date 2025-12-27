@@ -23,5 +23,7 @@ export function useUserOptions() {
         throw toQueryError(error, 'Failed to fetch user options')
       }
     },
+    // Infinity - changes very rarely, mutations invalidate cache when updates occur
+    staleTime: Infinity,
   })
 }

@@ -52,6 +52,8 @@ export function useLastActiveGame() {
         throw toQueryError(error, 'Failed to fetch last active game')
       }
     },
+    // 60 seconds - changes infrequently (only when user joins/leaves games)
+    staleTime: 60 * 1000,
   })
 }
 
@@ -75,5 +77,7 @@ export function useGameHistory(gameId: number | undefined) {
       return result.data
     },
     enabled: !!gameId,
+    // 30 seconds - changes after each round completes
+    staleTime: 30 * 1000,
   })
 }

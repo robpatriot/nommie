@@ -22,5 +22,7 @@ export function useAiRegistry(enabled: boolean = true) {
       return result.data
     },
     enabled,
+    // Infinity - changes very rarely, mutations invalidate cache when updates occur
+    staleTime: Infinity,
   })
 }
