@@ -14,6 +14,7 @@ import {
   clearBackendSessionClient,
   redirectToHomeClient,
 } from '@/lib/auth/clear-session-client'
+import { logError, logBackendError } from '@/lib/logging/error-logger'
 
 /**
  * Helper to check if a 5xx error is transient (should be retried).
@@ -43,7 +44,7 @@ export function AppQueryClientProvider({
     () =>
       new QueryClient({
         mutationCache: new MutationCache({
-          onError: (error) => {
+          onError: (error, _variables, _context, mutation) => {
             // Handle session clearing for stale user sessions
             if (
               error instanceof BackendApiError &&
@@ -52,11 +53,30 @@ export function AppQueryClientProvider({
             ) {
               clearBackendSessionClient()
               redirectToHomeClient()
+              return // Don't log handled errors
+            }
+
+            // Log all other errors for debugging and observability
+            const mutationKey =
+              mutation && typeof mutation === 'object' && 'options' in mutation
+                ? (mutation.options as { mutationKey?: unknown }).mutationKey
+                : undefined
+
+            if (error instanceof BackendApiError) {
+              logBackendError('Mutation error in TanStack Query', error, {
+                action: 'mutation',
+                mutationKey,
+              })
+            } else {
+              logError('Mutation error in TanStack Query', error, {
+                action: 'mutation',
+                mutationKey,
+              })
             }
           },
         }),
         queryCache: new QueryCache({
-          onError: (error) => {
+          onError: (error, query) => {
             // Handle session clearing for stale user sessions
             if (
               error instanceof BackendApiError &&
@@ -65,6 +85,25 @@ export function AppQueryClientProvider({
             ) {
               clearBackendSessionClient()
               redirectToHomeClient()
+              return // Don't log handled errors
+            }
+
+            // Log all other errors for debugging and observability
+            const queryKey =
+              query && typeof query === 'object' && 'queryKey' in query
+                ? (query as { queryKey: unknown }).queryKey
+                : undefined
+
+            if (error instanceof BackendApiError) {
+              logBackendError('Query error in TanStack Query', error, {
+                action: 'query',
+                queryKey,
+              })
+            } else {
+              logError('Query error in TanStack Query', error, {
+                action: 'query',
+                queryKey,
+              })
             }
           },
         }),
