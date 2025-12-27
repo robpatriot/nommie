@@ -13,7 +13,6 @@ pub use dto::{AiProfileCreate, AiProfileUpdate};
 
 // Adapter functions return DbErr; repos layer maps to DomainError via From<DbErr>.
 
-#[allow(dead_code)] // Will be used when AI profile management feature is implemented
 pub async fn create_profile(
     txn: &DatabaseTransaction,
     dto: AiProfileCreate,
