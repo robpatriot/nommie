@@ -172,6 +172,13 @@ async function fetchNewBackendJwt(
         : 'authjs.session-token',
   })
 
+  // If getToken returns null, the NextAuth session is expired or invalid
+  // In this case, we cannot refresh the backend JWT, so return null
+  // The caller should clear the backend JWT cookie and allow the request to proceed
+  if (!token) {
+    return null
+  }
+
   const googleSub =
     (token?.googleSub && typeof token.googleSub === 'string'
       ? token.googleSub
