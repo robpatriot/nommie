@@ -107,7 +107,7 @@ export function useGameSync({
       etagRef.current = payload.etag ?? buildEtag(payload.version)
       setSyncError(null)
       // Update query cache - this is the single source of truth
-      // Components using useGameRoomSnapshot will automatically re-render
+      // Components using useGameSnapshot will automatically re-render
       queryClient.setQueryData(queryKeys.games.snapshot(gameId), payload)
     },
     [buildEtag, gameId, queryClient]

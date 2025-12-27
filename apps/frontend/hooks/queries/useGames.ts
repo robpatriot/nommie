@@ -5,7 +5,6 @@ import {
   refreshGamesListAction,
   getGameHistoryAction,
 } from '@/app/actions/game-actions'
-import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { getLastActiveGame } from '@/lib/api'
 import {
   handleActionResultError,
@@ -13,7 +12,6 @@ import {
 } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
 import type { Game } from '@/lib/types'
-import type { GameSnapshotResult } from '@/lib/api/game-room'
 import type { GameHistoryApiResponse } from '@/app/actions/game-actions'
 
 /**
@@ -54,23 +52,6 @@ export function useLastActiveGame() {
         throw toQueryError(error, 'Failed to fetch last active game')
       }
     },
-  })
-}
-
-/**
- * Query hook to fetch game snapshot with ETag support.
- * Uses the fetchGameSnapshot server function.
- */
-export function useGameSnapshot(
-  gameId: number,
-  options?: { etag?: string; enabled?: boolean }
-) {
-  return useQuery({
-    queryKey: queryKeys.games.snapshot(gameId),
-    queryFn: async (): Promise<GameSnapshotResult> => {
-      return await fetchGameSnapshot(gameId, { etag: options?.etag })
-    },
-    enabled: options?.enabled !== false && !!gameId,
   })
 }
 

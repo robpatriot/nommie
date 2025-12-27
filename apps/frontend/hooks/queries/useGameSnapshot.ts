@@ -19,7 +19,7 @@ import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
  * system relies on WebSocket updates or explicit refresh calls for real-time
  * synchronization.
  */
-export function useGameRoomSnapshot(
+export function useGameSnapshot(
   gameId: number,
   options?: {
     etag?: string

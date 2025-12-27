@@ -7,7 +7,7 @@ import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import { useGameSync } from '@/hooks/useGameSync'
-import { useGameRoomSnapshot } from '@/hooks/queries/useGameRoomSnapshot'
+import { useGameSnapshot } from '@/hooks/queries/useGameSnapshot'
 import type { Seat } from '@/lib/game-room/types'
 
 import { GameRoomView } from './game-room-view'
@@ -35,7 +35,7 @@ export function GameRoomClient({
     data: snapshot = initialData,
     error: queryError,
     isLoading: isSnapshotLoading,
-  } = useGameRoomSnapshot(gameId, {
+  } = useGameSnapshot(gameId, {
     initialData,
     etag: initialData.etag,
   })
