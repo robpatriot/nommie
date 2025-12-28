@@ -37,7 +37,7 @@
 use crate::ai::{AiError, AiPlayer};
 use crate::domain::player_view::{CurrentRoundInfo, GameHistory};
 use crate::domain::round_memory::{PlayMemory, RoundMemory};
-use crate::domain::{Card, GameContext, Suit, Trump};
+use crate::domain::{Card, GameContext, Rank, Suit, Trump};
 
 #[derive(Clone)]
 pub struct Strategic {
@@ -254,68 +254,6 @@ impl Strategic {
         false
     }
 
-    /// Given legal plays and current trick context, pick the smallest winning card if
-    /// winning is possible; otherwise the lowest legal card.
-    ///
-    /// Note: This is the basic version; strategic AI uses pick_memory_aware_play instead.
-    #[allow(dead_code)] // Kept for reference, but strategic AI uses pick_memory_aware_play
-    fn pick_smallest_winning_or_low(
-        legal: &[Card],
-        current_plays: &[(u8, Card)],
-        trump: Trump,
-        lead: Option<Suit>,
-    ) -> Card {
-        debug_assert!(!legal.is_empty(), "No legal plays provided to strategic AI");
-
-        // Determine current winner (if any)
-        let (lead_suit, cur_winner) = if let Some(ls) = lead {
-            if current_plays.is_empty() {
-                (Some(ls), None)
-            } else {
-                let mut winner = current_plays[0].1;
-                for &(_, c) in &current_plays[1..] {
-                    if Self::wins_over(c, winner, ls, trump) {
-                        winner = c;
-                    }
-                }
-                (Some(ls), Some(winner))
-            }
-        } else {
-            (None, None)
-        };
-
-        // Try to beat current winner using the cheapest winning card.
-        if let (Some(ls), Some(w)) = (lead_suit, cur_winner) {
-            let mut winners: Vec<Card> = legal
-                .iter()
-                .copied()
-                .filter(|&c| Self::wins_over(c, w, ls, trump))
-                .collect();
-            if !winners.is_empty() {
-                winners.sort(); // ascending; cheapest winning
-                return winners[0];
-            }
-        }
-
-        // Otherwise, if following suit is required and possible, shed low in the lead suit.
-        if let Some(ls) = lead_suit {
-            if let Some(low) = Self::lowest_in_suit(legal.iter(), ls) {
-                return low;
-            }
-        }
-
-        // Otherwise, if void: consider ruffing cheaply if it might help tempo later.
-        if let Some(low_trump) = Self::lowest_trump(legal.iter(), trump) {
-            // Only ruff if not first or early player in trick (avoid wasting trump early).
-            if current_plays.len() >= 2 {
-                return low_trump;
-            }
-        }
-
-        // Fallback: discard overall lowest legal card.
-        Self::lowest(legal).unwrap_or(legal[0])
-    }
-
     // ---------- Memory Analysis Helpers ----------
 
     /// Track which suits opponents are void in based on RoundMemory.
@@ -365,72 +303,82 @@ impl Strategic {
         voids
     }
 
-    /// Count cards that have been played in a suit based on memory.
-    /// Returns approximate count (may be lower than actual due to imperfect memory).
-    #[allow(dead_code)] // Useful helper for future enhancements
-    fn count_played_in_suit(memory: Option<&RoundMemory>, suit: Suit) -> usize {
-        let mut count = 0;
-        if let Some(mem) = memory {
-            for trick in &mem.tricks {
-                for (_, play_mem) in &trick.plays {
-                    match play_mem {
-                        PlayMemory::Exact(card) if card.suit == suit => count += 1,
-                        PlayMemory::Suit(s) if *s == suit => count += 1,
-                        _ => {}
-                    }
-                }
-            }
-        }
-        count
+    /// Check if a rank is in the tracked range (10, J, Q, K, A).
+    fn is_tracked_rank(rank: Rank) -> bool {
+        matches!(
+            rank,
+            Rank::Ten | Rank::Jack | Rank::Queen | Rank::King | Rank::Ace
+        )
     }
 
-    /// Estimate remaining high cards in a suit based on memory and hand.
-    /// Returns approximate count of remaining high cards (Ace, King, Queen, Jack).
-    fn estimate_remaining_high_cards(
-        memory: Option<&RoundMemory>,
-        suit: Suit,
-        my_hand: &[Card],
-    ) -> f32 {
-        // Count high cards we have
-        let my_high_count = my_hand
+    /// Comprehensive card counting for ranks 10-A with all memory fidelity levels.
+    ///
+    /// Returns estimated count of remaining tracked cards (10-A) in the specified suit.
+    /// Handles all memory fidelity levels: Exact, Suit, RankCategory, and Forgotten.
+    fn count_tracked_cards(memory: Option<&RoundMemory>, suit: Suit, my_hand: &[Card]) -> f32 {
+        use crate::domain::round_memory::PlayMemory;
+
+        const TOTAL_TRACKED_PER_SUIT: f32 = 5.0; // 10, J, Q, K, A
+
+        // Count cards we have in this suit (rank 10+)
+        let my_count = my_hand
             .iter()
-            .filter(|c| {
-                c.suit == suit
-                    && matches!(
-                        c.rank,
-                        crate::domain::Rank::Jack
-                            | crate::domain::Rank::Queen
-                            | crate::domain::Rank::King
-                            | crate::domain::Rank::Ace
-                    )
-            })
+            .filter(|c| c.suit == suit && Self::is_tracked_rank(c.rank))
             .count() as f32;
 
-        // Count high cards we remember being played
-        let mut played_high = 0.0;
+        // Track what we remember being played
+        let mut exact_played = 0.0; // Exact cards we saw
+        let mut suit_only_count = 0.0; // Suit known but rank unknown
+
         if let Some(mem) = memory {
             for trick in &mem.tricks {
                 for (_, play_mem) in &trick.plays {
                     match play_mem {
-                        PlayMemory::Exact(card) if card.suit == suit => {
-                            if matches!(
-                                card.rank,
-                                crate::domain::Rank::Jack
-                                    | crate::domain::Rank::Queen
-                                    | crate::domain::Rank::King
-                                    | crate::domain::Rank::Ace
-                            ) {
-                                played_high += 1.0;
+                        PlayMemory::Exact(card) => {
+                            if card.suit == suit && Self::is_tracked_rank(card.rank) {
+                                exact_played += 1.0;
                             }
                         }
-                        _ => {}
+                        PlayMemory::Suit(s) => {
+                            if *s == suit {
+                                // Suit known, rank unknown - could be any of the 5 tracked ranks
+                                // We'll count this probabilistically using fractional counting
+                                suit_only_count += 1.0;
+                            }
+                        }
+                        // RankCategory (High/Medium/Low) doesn't include suit information,
+                        // so we can't use it for suit-specific counting. This is a limitation
+                        // of the memory system - we can't know which suit a RankCategory memory
+                        // refers to, so we must ignore it for deterministic counting.
+                        PlayMemory::RankCategory(_) => {
+                            // Cannot use - no suit information
+                        }
+                        PlayMemory::Forgotten => {
+                            // Forgotten - no information
+                        }
                     }
                 }
             }
         }
 
-        // Estimate remaining: 16 total high cards (4 per suit), minus what we have, minus what we remember
-        (16.0 - my_high_count - played_high).max(0.0)
+        // Calculate estimated remaining
+        // Known: exact_played are definitely out
+        // Uncertain: suit_only_count cards of this suit were played, but we don't know which ranks
+        // For deterministic counting, we estimate that suit_only_count reduces available tracked cards
+        // by suit_only_count * (5 tracked ranks / 13 total ranks) ≈ suit_only_count * 0.385
+        // But to be conservative and deterministic, we'll use a simpler approach:
+        // Treat each suit-only memory as potentially removing a tracked card with probability
+        // Since we need deterministic behavior, we'll use a fractional count
+
+        // Fractional reduction: on average, suit_only_count plays remove
+        // (suit_only_count * 5 / 13) tracked cards from this suit
+        let estimated_suit_only_removal = suit_only_count * (5.0 / 13.0);
+
+        // Total known to be out: exact_played + estimated_suit_only_removal
+        let estimated_removed = exact_played + estimated_suit_only_removal;
+
+        // Remaining = total - what we have - what we estimate is out
+        (TOTAL_TRACKED_PER_SUIT - my_count - estimated_removed).max(0.0)
     }
 
     // ---------- Opponent Modeling Helpers ----------
@@ -556,33 +504,27 @@ impl Strategic {
 
         // Following suit: use memory to decide if we should conserve or shed
         if let Some(following) = Self::lowest_in_suit(legal.iter(), lead_suit) {
-            // Check remaining high cards in this suit using memory
-            let remaining_high = Self::estimate_remaining_high_cards(memory, lead_suit, my_hand);
+            // Use comprehensive card counting (tracks 10-A) to inform decision
+            let remaining_tracked = Self::count_tracked_cards(memory, lead_suit, my_hand);
             let suit_in_hand: Vec<Card> = legal
                 .iter()
                 .filter(|c| c.suit == lead_suit)
                 .copied()
                 .collect();
-            let my_high_in_suit = suit_in_hand
+            // Count tracked cards (10-A) we hold in this suit
+            let my_tracked_in_suit = suit_in_hand
                 .iter()
-                .filter(|c| {
-                    matches!(
-                        c.rank,
-                        crate::domain::Rank::Jack
-                            | crate::domain::Rank::Queen
-                            | crate::domain::Rank::King
-                            | crate::domain::Rank::Ace
-                    )
-                })
+                .filter(|c| Self::is_tracked_rank(c.rank))
                 .count();
 
-            // If many high cards remain and we have some, be more conservative (play low)
-            // If few high cards remain or we don't have many, it's safe to play higher
-            if remaining_high > 8.0 && my_high_in_suit > 1 {
-                // Many high cards still out - play low to conserve
+            // Decision logic: if many tracked cards remain (10+) and we have some,
+            // be more conservative (play low) to preserve our high cards
+            // Threshold: >10.0 means more than half of tracked cards (out of 20 total) remain
+            if remaining_tracked > 10.0 && my_tracked_in_suit > 1 {
+                // Many tracked cards still out - play low to conserve
                 return following;
             } else {
-                // Few high cards remain - safe to play higher
+                // Few tracked cards remain - safe to play higher
                 let mut suit_cards: Vec<Card> = legal
                     .iter()
                     .filter(|c| c.suit == lead_suit)
