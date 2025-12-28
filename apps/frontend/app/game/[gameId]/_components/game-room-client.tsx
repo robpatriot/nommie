@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
@@ -47,6 +47,9 @@ export function GameRoomClient({
     isRefreshing: syncIsRefreshing,
     disconnect,
     connect,
+    connectionState,
+    reconnectAttempts,
+    maxReconnectAttempts,
   } = useGameSync({ initialData, gameId })
 
   const { toasts, showToast, hideToast } = useToast()
@@ -87,6 +90,35 @@ export function GameRoomClient({
     showToast,
     hideToast,
   })
+
+  // Reconnection status indicator
+  const reconnectingToastIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (connectionState === 'reconnecting' && reconnectAttempts > 0) {
+      // Update or show reconnection toast
+      if (reconnectingToastIdRef.current) {
+        // Hide old toast and show new one with updated count
+        hideToast(reconnectingToastIdRef.current)
+      }
+      const toastId = showToast(
+        `Reconnecting... (${reconnectAttempts}/${maxReconnectAttempts})`,
+        'warning'
+      )
+      reconnectingToastIdRef.current = toastId
+    } else if (connectionState === 'connected') {
+      // Clear reconnecting toast when successfully connected
+      if (reconnectingToastIdRef.current) {
+        hideToast(reconnectingToastIdRef.current)
+        reconnectingToastIdRef.current = null
+      }
+    }
+  }, [
+    connectionState,
+    reconnectAttempts,
+    maxReconnectAttempts,
+    showToast,
+    hideToast,
+  ])
 
   // Game room actions
   const {
