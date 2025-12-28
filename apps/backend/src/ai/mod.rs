@@ -71,17 +71,19 @@
 //!     .expect("Unknown AI type");
 //! ```
 
-mod chatgpt_heuristic;
 mod config;
+mod heuristic;
 pub mod memory;
 mod random;
 pub mod registry;
+mod strategic;
 mod trait_def;
 
-pub use chatgpt_heuristic::Heuristic;
 pub use config::AiConfig;
+pub use heuristic::Heuristic;
 pub use memory::MemoryMode;
 pub use random::RandomPlayer;
+pub use strategic::Strategic;
 pub use trait_def::{AiError, AiPlayer};
 
 /// Create an AI player from ai_type string and configuration.

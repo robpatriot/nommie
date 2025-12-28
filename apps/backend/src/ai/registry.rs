@@ -4,15 +4,33 @@
 //! 2) Add a new `AiFactory` entry to the static list with stable `name` and `version`.
 //! 3) Keep ordering stable; avoid side effects in constructors.
 //! 4) Determinism: same seed ⇒ same behavior (where applicable).
-//! 5) Profile fields are out of scope in Step 1; they will be added later as metadata.
+//! 5) Include profile metadata (display_name, playstyle, memory_level, etc.) in the factory.
 
-use crate::ai::{AiPlayer, Heuristic, RandomPlayer};
+use crate::ai::{AiPlayer, Heuristic, RandomPlayer, Strategic};
 
 /// Factory definition for constructing AI implementations.
 pub struct AiFactory {
     pub name: &'static str,
     pub version: &'static str,
     pub make: fn(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync>,
+    /// Default profile metadata for this AI type.
+    pub profile: AiProfileDefaults,
+}
+
+/// Default profile metadata for an AI type.
+pub struct AiProfileDefaults {
+    /// Variant name (typically "default")
+    pub variant: &'static str,
+    /// Display name for the AI profile
+    pub display_name: &'static str,
+    /// Optional playstyle descriptor
+    pub playstyle: Option<&'static str>,
+    /// Optional difficulty level
+    pub difficulty: Option<i32>,
+    /// Optional JSON configuration
+    pub config: Option<serde_json::Value>,
+    /// Optional memory level (0-100)
+    pub memory_level: Option<i32>,
 }
 
 static AI_FACTORIES: &[AiFactory] = &[
@@ -20,11 +38,40 @@ static AI_FACTORIES: &[AiFactory] = &[
         name: RandomPlayer::NAME,
         version: RandomPlayer::VERSION,
         make: make_random_player,
+        profile: AiProfileDefaults {
+            variant: "default",
+            display_name: "Random Player",
+            playstyle: Some("random"),
+            difficulty: None,
+            config: None,
+            memory_level: Some(50),
+        },
     },
     AiFactory {
         name: Heuristic::NAME,
         version: Heuristic::VERSION,
         make: make_heuristic,
+        profile: AiProfileDefaults {
+            variant: "default",
+            display_name: "Heuristic",
+            playstyle: Some("heuristic"),
+            difficulty: None,
+            config: None,
+            memory_level: Some(80),
+        },
+    },
+    AiFactory {
+        name: Strategic::NAME,
+        version: Strategic::VERSION,
+        make: make_strategic,
+        profile: AiProfileDefaults {
+            variant: "default",
+            display_name: "Strategic",
+            playstyle: Some("strategic"),
+            difficulty: None,
+            config: None,
+            memory_level: Some(90),
+        },
     },
 ];
 
@@ -46,6 +93,10 @@ fn make_heuristic(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
     Box::new(Heuristic::new(seed))
 }
 
+fn make_strategic(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
+    Box::new(Strategic::new(seed))
+}
+
 #[cfg(test)]
 mod ai_registry_smoke {
     use super::*;
@@ -65,6 +116,10 @@ mod ai_registry_smoke {
             ais.iter().any(|factory| factory.name == Heuristic::NAME),
             "Heuristic factory should be present"
         );
+        assert!(
+            ais.iter().any(|factory| factory.name == Strategic::NAME),
+            "Strategic factory should be present"
+        );
     }
 
     #[test]
@@ -83,6 +138,7 @@ mod ai_registry_smoke {
     fn lookup_helper_behaves() {
         assert!(by_name(RandomPlayer::NAME).is_some());
         assert!(by_name(Heuristic::NAME).is_some());
+        assert!(by_name(Strategic::NAME).is_some());
         assert!(by_name("NotARealAI").is_none());
     }
 }

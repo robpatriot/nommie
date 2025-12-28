@@ -33,8 +33,7 @@ pub fn determine_trick_leader(
 /// This is the primary interface between the game engine and AI players. It provides
 /// complete visible game state and helper methods to query legal moves.
 ///
-/// Used by both AI players (passed to [`crate::ai::AiPlayer`] trait methods) and
-/// to render UI for human players.
+/// This is passed to [`crate::ai::AiPlayer`] trait methods for AI decision-making.
 ///
 /// # For AI Developers
 ///
@@ -128,7 +127,6 @@ pub struct CurrentRoundInfo {
     /// Each round has exactly `hand_size` tricks.
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub trick_no: u8,
 
     /// Cards played in the current trick so far
@@ -145,7 +143,6 @@ pub struct CurrentRoundInfo {
     /// Scores from all completed rounds. Current round score not yet included.
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub scores: [i16; 4],
 
     /// Player who should lead the current trick

@@ -2,7 +2,7 @@
 //!
 //! This module provides GameContext, which unifies game identification,
 //! historical data, and optional player-specific round information into
-//! a single cohesive structure used by both HTTP handlers and AI systems.
+//! a single cohesive structure.
 
 use super::player_view::{CurrentRoundInfo, GameHistory};
 use super::round_memory::RoundMemory;
@@ -11,7 +11,7 @@ use crate::errors::domain::{DomainError, ValidationKind};
 /// Complete game context available at any point in a game.
 ///
 /// Combines game-wide data (id, history) with optional player-specific
-/// current round information. Used by both HTTP handlers and AI systems.
+/// current round information.
 ///
 /// # Progressive Enhancement
 ///
@@ -63,7 +63,6 @@ pub struct GameContext {
     /// Current round state from a specific player's perspective
     ///
     /// Only available when context is loaded for a specific player.
-    /// Used by HTTP handlers to render UI and by services for player actions.
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
     #[allow(dead_code)]
@@ -113,7 +112,6 @@ impl GameContext {
     /// Returns `None` if game hasn't started yet (lobby state).
     ///
     /// Part of the public API for AI players.
-    #[allow(dead_code)]
     pub fn game_history(&self) -> Option<&GameHistory> {
         self.history.as_ref()
     }
@@ -202,7 +200,6 @@ impl GameContext {
     /// ```
     ///
     /// Part of the public API for AI players.
-    #[allow(dead_code)]
     pub fn round_memory(&self) -> Option<&RoundMemory> {
         self.round_memory.as_ref()
     }

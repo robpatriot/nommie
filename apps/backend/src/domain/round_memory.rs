@@ -21,7 +21,6 @@ pub struct RoundMemory {
     /// Completed tricks with potentially degraded card information
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub tricks: Vec<TrickMemory>,
 }
 
@@ -43,7 +42,6 @@ pub struct TrickMemory {
     /// What the AI remembers about each play (seat, card memory)
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub plays: Vec<(u8, PlayMemory)>,
 }
 
