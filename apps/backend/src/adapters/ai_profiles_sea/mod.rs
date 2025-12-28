@@ -28,6 +28,7 @@ pub async fn create_profile(
         difficulty: Set(dto.difficulty),
         config: Set(dto.config),
         memory_level: Set(dto.memory_level),
+        deprecated: Set(dto.deprecated),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -55,6 +56,7 @@ pub async fn find_by_registry_variant<C: ConnectionTrait + Send + Sync>(
         .filter(ai_profiles::Column::RegistryName.eq(registry_name))
         .filter(ai_profiles::Column::RegistryVersion.eq(registry_version))
         .filter(ai_profiles::Column::Variant.eq(variant))
+        .filter(ai_profiles::Column::Deprecated.eq(false))
         .one(conn)
         .await
 }
@@ -80,6 +82,7 @@ pub async fn update_profile(
         difficulty: Set(dto.difficulty),
         config: Set(dto.config),
         memory_level: Set(dto.memory_level),
+        deprecated: NotSet,
         created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
@@ -95,6 +98,9 @@ pub async fn update_profile(
     }
     if let Some(display_name) = dto.display_name {
         profile.display_name = Set(display_name);
+    }
+    if let Some(deprecated) = dto.deprecated {
+        profile.deprecated = Set(deprecated);
     }
 
     profile.update(txn).await

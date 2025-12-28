@@ -18,6 +18,7 @@ pub struct AiProfile {
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
     pub memory_level: Option<i32>,
+    pub deprecated: bool,
     pub created_at: time::OffsetDateTime,
     pub updated_at: time::OffsetDateTime,
 }
@@ -33,6 +34,7 @@ pub struct AiProfileDraft {
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
     pub memory_level: Option<i32>,
+    pub deprecated: bool,
 }
 
 impl AiProfileDraft {
@@ -52,6 +54,7 @@ impl AiProfileDraft {
             difficulty: None,
             config: None,
             memory_level: None,
+            deprecated: false,
         }
     }
 
@@ -88,6 +91,7 @@ impl From<ai_profiles::Model> for AiProfile {
             difficulty: model.difficulty,
             config: model.config,
             memory_level: model.memory_level,
+            deprecated: model.deprecated,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
@@ -117,6 +121,8 @@ pub async fn create_profile(
     if let Some(ml) = draft.memory_level {
         dto = dto.with_memory_level(ml);
     }
+    // Set deprecated field directly (not using builder since it's not Option)
+    dto.deprecated = draft.deprecated;
     let profile = ai_profiles_adapter::create_profile(txn, dto).await?;
     Ok(AiProfile::from(profile))
 }
@@ -194,8 +200,25 @@ pub async fn update_profile(
     if let Some(ml) = profile.memory_level {
         dto = dto.with_memory_level(ml);
     }
+    let dto = dto.with_deprecated(profile.deprecated);
     let updated = ai_profiles_adapter::update_profile(txn, dto).await?;
     Ok(AiProfile::from(updated))
+}
+
+/// Check if an existing profile matches the expected defaults from the registry.
+///
+/// Compares all profile values (display_name, playstyle, difficulty, config, memory_level)
+/// to determine if an update is needed. Keys (registry_name, registry_version, variant)
+/// are not compared here as they're used for lookup.
+pub fn profile_matches_defaults(
+    existing: &AiProfile,
+    defaults: &crate::ai::registry::AiProfileDefaults,
+) -> bool {
+    existing.display_name == defaults.display_name
+        && existing.playstyle == defaults.playstyle.map(|s| s.to_string())
+        && existing.difficulty == defaults.difficulty
+        && existing.config == defaults.config
+        && existing.memory_level == defaults.memory_level
 }
 
 /// Ensure default AI profiles exist and are up-to-date with canonical values from the AI registry.
@@ -240,6 +263,20 @@ pub async fn ensure_default_ai_profiles(
         profile_map.insert(key, profile);
     }
 
+    // Build set of registry keys for checking deprecated profiles
+    use std::collections::HashSet;
+    let registry_keys: HashSet<(String, String, String)> = registry::registered_ais()
+        .iter()
+        .map(|factory| {
+            (
+                factory.name.to_string(),
+                factory.version.to_string(),
+                factory.profile.variant.to_string(),
+            )
+        })
+        .collect();
+
+    // Process all registry profiles (create/update/un-deprecate)
     for factory in registry::registered_ais() {
         let profile_defaults = &factory.profile;
 
@@ -253,6 +290,7 @@ pub async fn ensure_default_ai_profiles(
             difficulty: profile_defaults.difficulty,
             config: profile_defaults.config.clone(),
             memory_level: profile_defaults.memory_level,
+            deprecated: false,
         };
 
         // Look up existing profile in memory (instead of database query)
@@ -266,14 +304,11 @@ pub async fn ensure_default_ai_profiles(
             Some(existing) => {
                 // Profile exists - check if update is needed by comparing values
                 // Note: registry_name, registry_version, and variant are already matched by the lookup key
-                let needs_update = existing.display_name != draft.display_name
-                    || existing.playstyle != draft.playstyle
-                    || existing.difficulty != draft.difficulty
-                    || existing.config != draft.config
-                    || existing.memory_level != draft.memory_level;
-
+                // If profile was deprecated but is now back in registry, un-deprecate it
+                let needs_update =
+                    !profile_matches_defaults(existing, profile_defaults) || existing.deprecated;
                 if needs_update {
-                    // Profile exists but values changed - update to match defaults
+                    // Profile exists but values changed, or was deprecated - update to match defaults
                     let updated = AiProfile {
                         id: existing.id,
                         registry_name: draft.registry_name.clone(),
@@ -284,6 +319,7 @@ pub async fn ensure_default_ai_profiles(
                         difficulty: draft.difficulty,
                         config: draft.config.clone(),
                         memory_level: draft.memory_level,
+                        deprecated: false, // Profile is in registry, so not deprecated
                         created_at: existing.created_at, // Preserve original creation time
                         updated_at: time::OffsetDateTime::now_utc(),
                     };
@@ -295,6 +331,17 @@ pub async fn ensure_default_ai_profiles(
                 // Profile doesn't exist - create it
                 create_profile(&txn, draft).await?;
             }
+        }
+    }
+
+    // Mark profiles as deprecated if they're not in the registry
+    // Do this after processing registry profiles so we don't deprecate and then immediately un-deprecate
+    for (key, existing_profile) in profile_map.iter() {
+        if !registry_keys.contains(key) && !existing_profile.deprecated {
+            let mut updated = existing_profile.clone();
+            updated.deprecated = true;
+            updated.updated_at = time::OffsetDateTime::now_utc();
+            update_profile(&txn, updated).await?;
         }
     }
 

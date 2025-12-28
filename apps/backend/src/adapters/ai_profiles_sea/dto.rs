@@ -11,6 +11,7 @@ pub struct AiProfileCreate {
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
     pub memory_level: Option<i32>,
+    pub deprecated: bool,
 }
 
 impl AiProfileCreate {
@@ -29,6 +30,7 @@ impl AiProfileCreate {
             difficulty: None,
             config: None,
             memory_level: None,
+            deprecated: false,
         }
     }
 
@@ -65,6 +67,7 @@ pub struct AiProfileUpdate {
     pub difficulty: Option<i32>,
     pub config: Option<serde_json::Value>,
     pub memory_level: Option<i32>,
+    pub deprecated: Option<bool>,
 }
 
 impl AiProfileUpdate {
@@ -79,6 +82,7 @@ impl AiProfileUpdate {
             difficulty: None,
             config: None,
             memory_level: None,
+            deprecated: None,
         }
     }
 
@@ -119,6 +123,11 @@ impl AiProfileUpdate {
 
     pub fn with_memory_level(mut self, memory_level: i32) -> Self {
         self.memory_level = Some(memory_level);
+        self
+    }
+
+    pub fn with_deprecated(mut self, deprecated: bool) -> Self {
+        self.deprecated = Some(deprecated);
         self
     }
 }

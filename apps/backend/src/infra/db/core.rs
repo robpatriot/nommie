@@ -178,40 +178,50 @@ fn sqlite_ai_profiles_lock_path(
 
 /// Fast-path check: verify if all required AI profiles already exist and match expected values
 async fn fast_path_ai_profiles_check(conn: &DatabaseConnection) -> Result<bool, AppError> {
-    use std::collections::HashSet;
+    use std::collections::HashMap;
 
     use crate::ai::registry;
-    use crate::repos::ai_profiles::list_all;
+    use crate::repos::ai_profiles::{list_all, profile_matches_defaults};
 
     let existing_profiles = list_all(conn)
         .await
         .map_err(|e| AppError::config("failed to list AI profiles for fast-path check", e))?;
 
-    // Build set of expected profile keys
-    let mut expected_keys = HashSet::new();
+    // Build lookup map: (registry_name, registry_version, variant) -> AiProfile
+    let mut profile_map: HashMap<(String, String, String), crate::repos::ai_profiles::AiProfile> =
+        HashMap::new();
+    for profile in existing_profiles {
+        let key = (
+            profile.registry_name.clone(),
+            profile.registry_version.clone(),
+            profile.variant.clone(),
+        );
+        profile_map.insert(key, profile);
+    }
+
+    // Check each expected profile - must exist AND match values
     for factory in registry::registered_ais() {
+        let profile_defaults = &factory.profile;
         let key = (
             factory.name.to_string(),
             factory.version.to_string(),
-            factory.profile.variant.to_string(),
+            profile_defaults.variant.to_string(),
         );
-        expected_keys.insert(key);
+
+        match profile_map.get(&key) {
+            Some(existing) => {
+                // Profile exists - check if values match
+                if !profile_matches_defaults(existing, profile_defaults) {
+                    return Ok(false); // Values don't match - need update
+                }
+            }
+            None => {
+                return Ok(false); // Profile missing - need creation
+            }
+        }
     }
 
-    // Build set of existing profile keys
-    let existing_keys: HashSet<_> = existing_profiles
-        .iter()
-        .map(|p| {
-            (
-                p.registry_name.clone(),
-                p.registry_version.clone(),
-                p.variant.clone(),
-            )
-        })
-        .collect();
-
-    // Fast-path succeeds if all expected profiles exist
-    Ok(expected_keys.is_subset(&existing_keys))
+    Ok(true) // All profiles exist and all values match
 }
 
 /// Ensure default AI profiles with database-level locking for coordination across processes
