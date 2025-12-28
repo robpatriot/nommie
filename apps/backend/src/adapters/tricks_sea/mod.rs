@@ -2,7 +2,7 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, Order,
-    PaginatorTrait, QueryFilter, QueryOrder, Set,
+    QueryFilter, QueryOrder, Set,
 };
 
 use crate::entities::round_tricks;
@@ -33,21 +33,6 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
         .filter(round_tricks::Column::RoundId.eq(round_id))
         .order_by(round_tricks::Column::TrickNo, Order::Asc)
         .all(conn)
-        .await
-}
-
-/// Count tricks for a round
-/// Count tricks for a round.
-///
-/// Test-only utility. Not used in production binary.
-#[allow(dead_code)]
-pub async fn count_tricks_by_round<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    round_id: i64,
-) -> Result<u64, sea_orm::DbErr> {
-    round_tricks::Entity::find()
-        .filter(round_tricks::Column::RoundId.eq(round_id))
-        .count(conn)
         .await
 }
 

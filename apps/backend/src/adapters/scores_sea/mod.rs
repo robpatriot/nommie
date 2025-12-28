@@ -23,23 +23,6 @@ pub async fn find_all_by_round<C: ConnectionTrait + Send + Sync>(
         .await
 }
 
-/// Find score for a specific player in a round
-/// Find a score by round and seat.
-///
-/// Test-only utility. Not used in production binary.
-#[allow(dead_code)]
-pub async fn find_by_round_and_seat<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    round_id: i64,
-    player_seat: u8,
-) -> Result<Option<round_scores::Model>, sea_orm::DbErr> {
-    round_scores::Entity::find()
-        .filter(round_scores::Column::RoundId.eq(round_id))
-        .filter(round_scores::Column::PlayerSeat.eq(player_seat as i16))
-        .one(conn)
-        .await
-}
-
 /// Create a score record
 pub async fn create_score(
     txn: &DatabaseTransaction,

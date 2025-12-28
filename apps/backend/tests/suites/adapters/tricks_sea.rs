@@ -71,7 +71,7 @@ async fn test_find_all_by_round_ordered() -> Result<(), AppError> {
     Ok(())
 }
 
-/// Test: count_tricks_by_round
+/// Test: count_tricks_by_round (using production path)
 #[tokio::test]
 async fn test_count_tricks() -> Result<(), AppError> {
     let state = build_test_state().await?;
@@ -81,15 +81,15 @@ async fn test_count_tricks() -> Result<(), AppError> {
             let game = games::create_game(txn, GameCreate::new()).await?;
             let round = rounds::create_round(txn, game.id, 1).await?;
 
-            // Initially 0 tricks (using adapter directly)
-            let count = tricks_sea::count_tricks_by_round(txn, round.id).await?;
+            // Initially 0 tricks (using production path)
+            let count = tricks_sea::find_all_by_round(txn, round.id).await?.len();
             assert_eq!(count, 0);
 
             // Add tricks
             tricks::create_trick(txn, round.id, 0, Suit::Hearts, 0).await?;
             tricks::create_trick(txn, round.id, 1, Suit::Spades, 1).await?;
 
-            let count = tricks_sea::count_tricks_by_round(txn, round.id).await?;
+            let count = tricks_sea::find_all_by_round(txn, round.id).await?.len();
             assert_eq!(count, 2);
 
             Ok::<_, AppError>(())

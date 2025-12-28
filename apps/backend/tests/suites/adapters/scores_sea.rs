@@ -43,8 +43,9 @@ async fn test_create_score_and_find() -> Result<(), AppError> {
             assert_eq!(score.round_score, 15);
             assert_eq!(score.total_score_after, 15);
 
-            // Find by round and seat (using adapter directly)
-            let found = scores_sea::find_by_round_and_seat(txn, round.id, 0).await?;
+            // Find by round and seat (using production path)
+            let all_scores = scores_sea::find_all_by_round(txn, round.id).await?;
+            let found = all_scores.iter().find(|s| s.player_seat == 0);
             assert!(found.is_some());
             let found = found.unwrap();
             assert_eq!(found.id, score.id);
