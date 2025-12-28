@@ -36,18 +36,6 @@ impl MemoryMode {
             Some(_) => MemoryMode::Full, // Invalid values default to Full
         }
     }
-
-    /// Convert to database value.
-    ///
-    /// Used for database storage of AI memory mode settings.
-    #[allow(dead_code)]
-    pub fn to_db_value(self) -> Option<i32> {
-        match self {
-            MemoryMode::Full => Some(100),
-            MemoryMode::Partial { level } => Some(level),
-            MemoryMode::None => Some(0),
-        }
-    }
 }
 
 /// Card plays for a single trick (undegraded format for internal use).

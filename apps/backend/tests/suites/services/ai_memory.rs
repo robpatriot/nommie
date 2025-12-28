@@ -6,6 +6,7 @@ use backend::db::txn::SharedTxn;
 use backend::AppError;
 use uuid::Uuid;
 
+use crate::support::ai_memory_helpers::memory_mode_to_db_value;
 use crate::support::build_test_state;
 use crate::support::test_utils::test_seed;
 
@@ -20,10 +21,13 @@ async fn test_memory_mode_conversions() {
         MemoryMode::Partial { level: 50 }
     );
 
-    // Test to_db_value
-    assert_eq!(MemoryMode::Full.to_db_value(), Some(100));
-    assert_eq!(MemoryMode::None.to_db_value(), Some(0));
-    assert_eq!(MemoryMode::Partial { level: 75 }.to_db_value(), Some(75));
+    // Test to_db_value conversion
+    assert_eq!(memory_mode_to_db_value(MemoryMode::Full), Some(100));
+    assert_eq!(memory_mode_to_db_value(MemoryMode::None), Some(0));
+    assert_eq!(
+        memory_mode_to_db_value(MemoryMode::Partial { level: 75 }),
+        Some(75)
+    );
 }
 
 #[actix_web::test]

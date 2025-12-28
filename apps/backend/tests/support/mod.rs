@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_imports)]
 
+pub mod ai_memory_helpers;
 pub mod app_builder;
 pub mod auth;
 pub mod card_helpers;
