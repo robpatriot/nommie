@@ -24,7 +24,7 @@ function serializeError(error: unknown): Record<string, unknown> | unknown {
   if (error instanceof Error) {
     const serialized: Record<string, unknown> = {
       name: error.name,
-      message: error.message,
+      message: error.message || 'Unknown error',
     }
 
     // Include stack trace if available
@@ -46,12 +46,25 @@ function serializeError(error: unknown): Record<string, unknown> | unknown {
     return serialized
   }
 
-  // If it's a plain object, return it as-is
+  // If it's a plain object, check if it's empty and add fallback info
   if (error && typeof error === 'object') {
+    const keys = Object.keys(error)
+    if (keys.length === 0) {
+      return {
+        message: 'Empty error object received',
+        type: typeof error,
+        constructor: error.constructor?.name || 'Unknown',
+      }
+    }
     return error
   }
 
-  return error
+  // For primitives, wrap in an object with a message
+  if (error === null || error === undefined) {
+    return { message: 'Null or undefined error' }
+  }
+
+  return { message: String(error), type: typeof error }
 }
 
 /**
