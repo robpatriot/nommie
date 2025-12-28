@@ -79,8 +79,7 @@ impl AppState {
 
     /// Attach a WebSocket session registry.
     ///
-    /// This is primarily used in integration tests to provide an in-memory registry
-    /// without enabling Redis.
+    /// Provides an in-memory registry without requiring Redis.
     pub fn with_websocket_registry(mut self, registry: Arc<GameSessionRegistry>) -> Self {
         self.websocket_registry = Some(registry);
         self

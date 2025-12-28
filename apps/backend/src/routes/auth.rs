@@ -101,8 +101,8 @@ async fn login(
 }
 
 /// Lightweight endpoint to check if an email is allowed by the allowlist.
-/// This is used by the frontend to check allowlist status before attempting login,
-/// preventing unnecessary backend API calls and session creation for non-allowed emails.
+///
+/// Prevents unnecessary backend API calls and session creation for non-allowed emails.
 /// No authentication required - this is a public endpoint.
 async fn check_allowlist(
     req: ValidatedJson<CheckAllowlistRequest>,
