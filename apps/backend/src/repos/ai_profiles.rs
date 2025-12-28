@@ -23,9 +23,6 @@ pub struct AiProfile {
 }
 
 /// Draft data for creating a new AI profile
-///
-/// Test-only helper used by `create_profile` for AI memory tests.
-#[allow(dead_code)] // Used in AI memory tests via create_profile
 #[derive(Debug, Clone, PartialEq)]
 pub struct AiProfileDraft {
     pub registry_name: String,
@@ -39,8 +36,7 @@ pub struct AiProfileDraft {
 }
 
 impl AiProfileDraft {
-    /// Test-only helper method
-    #[allow(dead_code)] // Used in AI memory tests via create_profile
+    /// Create a new AiProfileDraft with the required fields.
     pub fn new(
         registry_name: impl Into<String>,
         registry_version: impl Into<String>,
@@ -59,29 +55,21 @@ impl AiProfileDraft {
         }
     }
 
-    /// Test-only helper method
-    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn with_playstyle(mut self, playstyle: impl Into<String>) -> Self {
         self.playstyle = Some(playstyle.into());
         self
     }
 
-    /// Test-only helper method
-    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn with_difficulty(mut self, difficulty: i32) -> Self {
         self.difficulty = Some(difficulty);
         self
     }
 
-    /// Test-only helper method
-    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn with_config(mut self, config: serde_json::Value) -> Self {
         self.config = Some(config);
         self
     }
 
-    /// Test-only helper method
-    #[allow(dead_code)] // Used in AI memory tests via create_profile
     pub fn with_memory_level(mut self, memory_level: i32) -> Self {
         self.memory_level = Some(memory_level);
         self
@@ -106,8 +94,7 @@ impl From<ai_profiles::Model> for AiProfile {
     }
 }
 
-/// Create a new AI profile in the catalog (test-only helper).
-#[allow(dead_code)] // Used in AI memory tests
+/// Create a new AI profile in the catalog.
 pub async fn create_profile(
     txn: &DatabaseTransaction,
     draft: AiProfileDraft,
@@ -160,8 +147,7 @@ pub async fn find_by_registry_variant<C: ConnectionTrait + Send + Sync>(
     Ok(profile.map(AiProfile::from))
 }
 
-/// List all AI profiles (test-only helper).
-#[allow(dead_code)] // Used in AI memory tests
+/// List all AI profiles.
 pub async fn list_all<C: ConnectionTrait + Send + Sync>(
     conn: &C,
 ) -> Result<Vec<AiProfile>, DomainError> {
@@ -185,8 +171,7 @@ pub async fn find_batch_by_ids<C: ConnectionTrait + Send + Sync>(
     Ok(profiles)
 }
 
-/// Update an AI profile's configuration (test-only helper).
-#[allow(dead_code)] // Used in AI memory tests
+/// Update an AI profile's configuration.
 pub async fn update_profile(
     txn: &DatabaseTransaction,
     profile: AiProfile,
@@ -211,4 +196,112 @@ pub async fn update_profile(
     }
     let updated = ai_profiles_adapter::update_profile(txn, dto).await?;
     Ok(AiProfile::from(updated))
+}
+
+/// Ensure default AI profiles exist and are up-to-date with canonical values from the AI registry.
+///
+/// This function reads the canonical list of AI profiles from the AI registry and ensures
+/// they exist in the database with the correct default values. If a profile exists, it is
+/// updated to match the defaults. If it doesn't exist, it is created.
+///
+/// This should be called once at application startup after the database is connected.
+///
+/// Optimized to:
+/// - Fetch all existing profiles in a single query (instead of N queries)
+/// - Skip UPDATE queries when profile values haven't changed
+///
+/// This reduces overhead during test runs where profiles rarely change.
+pub async fn ensure_default_ai_profiles(
+    conn: &sea_orm::DatabaseConnection,
+) -> Result<(), DomainError> {
+    use std::collections::HashMap;
+
+    use sea_orm::TransactionTrait;
+
+    use crate::ai::registry;
+
+    // Use a transaction to ensure all profiles are created/updated atomically
+    let txn = conn
+        .begin()
+        .await
+        .map_err(crate::infra::db_errors::map_db_err)?;
+
+    // Fetch all existing profiles in a single query
+    let existing_profiles = list_all(&txn).await?;
+
+    // Build a lookup map: (registry_name, registry_version, variant) -> AiProfile
+    let mut profile_map: HashMap<(String, String, String), AiProfile> = HashMap::new();
+    for profile in existing_profiles {
+        let key = (
+            profile.registry_name.clone(),
+            profile.registry_version.clone(),
+            profile.variant.clone(),
+        );
+        profile_map.insert(key, profile);
+    }
+
+    for factory in registry::registered_ais() {
+        let profile_defaults = &factory.profile;
+
+        // Convert profile defaults to AiProfileDraft
+        let draft = AiProfileDraft {
+            registry_name: factory.name.to_string(),
+            registry_version: factory.version.to_string(),
+            variant: profile_defaults.variant.to_string(),
+            display_name: profile_defaults.display_name.to_string(),
+            playstyle: profile_defaults.playstyle.map(|s| s.to_string()),
+            difficulty: profile_defaults.difficulty,
+            config: profile_defaults.config.clone(),
+            memory_level: profile_defaults.memory_level,
+        };
+
+        // Look up existing profile in memory (instead of database query)
+        let lookup_key = (
+            draft.registry_name.clone(),
+            draft.registry_version.clone(),
+            draft.variant.clone(),
+        );
+
+        match profile_map.get(&lookup_key) {
+            Some(existing) => {
+                // Profile exists - check if update is needed by comparing values
+                // Note: registry_name, registry_version, and variant are already matched by the lookup key
+                let needs_update = existing.display_name != draft.display_name
+                    || existing.playstyle != draft.playstyle
+                    || existing.difficulty != draft.difficulty
+                    || existing.config != draft.config
+                    || existing.memory_level != draft.memory_level;
+
+                if needs_update {
+                    // Profile exists but values changed - update to match defaults
+                    let updated = AiProfile {
+                        id: existing.id,
+                        registry_name: draft.registry_name.clone(),
+                        registry_version: draft.registry_version.clone(),
+                        variant: draft.variant.clone(),
+                        display_name: draft.display_name.clone(),
+                        playstyle: draft.playstyle.clone(),
+                        difficulty: draft.difficulty,
+                        config: draft.config.clone(),
+                        memory_level: draft.memory_level,
+                        created_at: existing.created_at, // Preserve original creation time
+                        updated_at: time::OffsetDateTime::now_utc(),
+                    };
+                    update_profile(&txn, updated).await?;
+                }
+                // If no update needed, skip the database write
+            }
+            None => {
+                // Profile doesn't exist - create it
+                create_profile(&txn, draft).await?;
+            }
+        }
+    }
+
+    // Commit the transaction
+    txn.commit()
+        .await
+        .map_err(crate::infra::db_errors::map_db_err)?;
+
+    Ok(())
 }

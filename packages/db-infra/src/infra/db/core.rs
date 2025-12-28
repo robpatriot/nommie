@@ -113,7 +113,9 @@ pub async fn build_admin_pool(
     Ok(pool)
 }
 
-fn sanitize_db_url(url: &str) -> String {
+/// Sanitize database URL by masking password in connection strings.
+/// Used for generating lock keys and logging.
+pub fn sanitize_db_url(url: &str) -> String {
     if url.contains("@") && url.contains(":") {
         let parts: Vec<&str> = url.split("@").collect();
         if parts.len() == 2 {

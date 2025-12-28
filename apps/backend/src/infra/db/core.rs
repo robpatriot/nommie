@@ -2,12 +2,17 @@
 use std::future::Future;
 use std::process;
 use std::str::FromStr;
-use std::time::Duration;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
+use db_infra::error::DbInfraError;
 // Local / external db-infra module imports
 use db_infra::infra::db::diagnostics::{migration_counters, sqlite_diagnostics};
+use db_infra::infra::db::locking::{BootstrapLock, InMemoryLock, PgAdvisoryLock, SqliteFileLock};
+use db_infra::sanitize_db_url;
 // External crate imports
 use migration::MigrationCommand;
+use rand::Rng;
 use sea_orm::{
     ConnectOptions, Database, DatabaseConnection, SqlxPostgresConnector, SqlxSqliteConnector,
 };
@@ -152,17 +157,188 @@ async fn apply_postgres_config(
     Ok(())
 }
 
+/// Get SQLite lock file path for AI profile initialization (`<db>.ai_profiles.lock`)
+fn sqlite_ai_profiles_lock_path(
+    db_kind: DbKind,
+    env: RuntimeEnv,
+) -> Result<std::path::PathBuf, AppError> {
+    use db_infra::sqlite_file_spec;
+
+    match db_kind {
+        DbKind::SqliteFile => {
+            let file_spec = sqlite_file_spec(db_kind, env).map_err(AppError::from)?;
+            Ok(std::path::Path::new(&file_spec).with_extension("ai_profiles.lock"))
+        }
+        _ => Err(AppError::config(
+            "sqlite_ai_profiles_lock_path",
+            crate::error::Sentinel("only works with SqliteFile database kind"),
+        )),
+    }
+}
+
+/// Fast-path check: verify if all required AI profiles already exist and match expected values
+async fn fast_path_ai_profiles_check(conn: &DatabaseConnection) -> Result<bool, AppError> {
+    use std::collections::HashSet;
+
+    use crate::ai::registry;
+    use crate::repos::ai_profiles::list_all;
+
+    let existing_profiles = list_all(conn)
+        .await
+        .map_err(|e| AppError::config("failed to list AI profiles for fast-path check", e))?;
+
+    // Build set of expected profile keys
+    let mut expected_keys = HashSet::new();
+    for factory in registry::registered_ais() {
+        let key = (
+            factory.name.to_string(),
+            factory.version.to_string(),
+            factory.profile.variant.to_string(),
+        );
+        expected_keys.insert(key);
+    }
+
+    // Build set of existing profile keys
+    let existing_keys: HashSet<_> = existing_profiles
+        .iter()
+        .map(|p| {
+            (
+                p.registry_name.clone(),
+                p.registry_version.clone(),
+                p.variant.clone(),
+            )
+        })
+        .collect();
+
+    // Fast-path succeeds if all expected profiles exist
+    Ok(expected_keys.is_subset(&existing_keys))
+}
+
+/// Ensure default AI profiles with database-level locking for coordination across processes
+async fn ensure_ai_profiles_with_lock(
+    pool: &DatabaseConnection, // admin_pool for Postgres/SqliteFile, shared_pool for SqliteMemory
+    env: RuntimeEnv,
+    db_kind: DbKind,
+) -> Result<(), AppError> {
+    // Fast-path: skip lock acquisition if profiles already exist
+    if fast_path_ai_profiles_check(pool).await? {
+        info!("ai_profiles_init=skipped up_to_date=true");
+        return Ok(());
+    }
+
+    // Acquire lock with timeout and retry logic (same pattern as migrations)
+    let lock_acquire_ms = std::env::var("NOMMIE_AI_PROFILES_INIT_TIMEOUT_MS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(match env {
+            RuntimeEnv::Test => 3000,
+            _ => 900,
+        });
+
+    let start = Instant::now();
+    let mut attempts: u32 = 0;
+    let guard = loop {
+        attempts += 1;
+
+        // Try to acquire lock based on database type
+        let maybe_guard = match db_kind {
+            DbKind::Postgres => {
+                let url = make_conn_spec(env, db_kind, DbOwner::App).map_err(AppError::from)?;
+                let sanitized_url = sanitize_db_url(&url);
+                let key = format!("nommie:ai_profiles_init:{:?}:{}", db_kind, sanitized_url);
+                let mut lock = PgAdvisoryLock::new(pool.clone(), &key);
+                lock.try_acquire().await.map_err(AppError::from)?
+            }
+            DbKind::SqliteMemory => {
+                let mut lock = InMemoryLock;
+                lock.try_acquire().await.map_err(AppError::from)?
+            }
+            DbKind::SqliteFile => {
+                let lock_path = sqlite_ai_profiles_lock_path(db_kind, env)?;
+                let mut lock = SqliteFileLock::new(&lock_path).map_err(AppError::from)?;
+                lock.try_acquire().await.map_err(AppError::from)?
+            }
+        };
+
+        if let Some(acquired_guard) = maybe_guard {
+            trace!(
+                lock = "won",
+                operation = "ai_profiles_init",
+                env = ?env,
+                db_kind = ?db_kind,
+                attempts = attempts,
+                elapsed_ms = start.elapsed().as_millis()
+            );
+            break acquired_guard;
+        }
+
+        let base_delay_ms = (5u64 << attempts.saturating_sub(1)).min(80);
+        let jitter_ms = rand::rng().random::<u64>() % 4;
+        let delay_ms = base_delay_ms + jitter_ms;
+
+        trace!(
+            lock = "backoff",
+            operation = "ai_profiles_init",
+            attempts = attempts,
+            delay_ms = delay_ms,
+            elapsed_ms = start.elapsed().as_millis()
+        );
+
+        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+
+        if start.elapsed() >= Duration::from_millis(lock_acquire_ms) {
+            let detail = format!(
+                "AI profiles initialization lock acquisition timeout after {:?} ({} attempts)",
+                start.elapsed(),
+                attempts
+            );
+            return Err(AppError::config(
+                detail,
+                crate::error::Sentinel("ai_profiles_init_lock_timeout"),
+            ));
+        }
+    };
+
+    // Double-check after acquiring lock (another process might have initialized)
+    if fast_path_ai_profiles_check(pool).await? {
+        info!("ai_profiles_init=skipped up_to_date=true (after lock acquisition)");
+        if let Err(release_err) = guard.release().await {
+            warn!(error = %format!("{}", match release_err {
+                DbInfraError::Config { message } => message,
+            }), "Failed to release AI profiles initialization guard");
+        }
+        return Ok(());
+    }
+
+    // Actually initialize the profiles (while holding the lock)
+    crate::repos::ai_profiles::ensure_default_ai_profiles(pool)
+        .await
+        .map_err(AppError::from)?;
+
+    info!("ai_profiles_init=complete");
+
+    // Release lock
+    if let Err(release_err) = guard.release().await {
+        warn!(error = %format!("{}", match release_err {
+            DbInfraError::Config { message } => message,
+        }), "Failed to release AI profiles initialization guard");
+    }
+
+    Ok(())
+}
+
 /// Determine database engine type for logging
 /// Build the app DB *and* guarantee schema is current.
 /// Uses unified migration orchestration with appropriate pool creation strategy.
 ///
 /// FLOW:
-/// - InMemory: Create shared pool → migrate on shared pool → validate schema → return shared pool
-/// - Others: Create admin pool → migrate on admin pool → create shared pool → validate schema → return shared pool
+/// - InMemory: Create shared pool → migrate on shared pool → init AI profiles on shared pool → return shared pool
+/// - Others: Create admin pool → migrate on admin pool → init AI profiles on admin pool → create shared pool → return shared pool
 ///
 /// INVARIANTS:
 /// - InMemory: Must migrate on shared pool since each connection is its own database instance
-/// - Others: Migrate on admin pool, then create separate shared pool for runtime use
+/// - SqliteFile: Database-level PRAGMAs (journal_mode, synchronous) must be set before other connections exist
+/// - Postgres: Migrations use admin pool for consistency; no technical requirement but maintains pattern
 /// - Schema validation uses fast_path_schema_check to ensure migrations completed correctly
 #[allow(clippy::explicit_auto_deref)]
 pub async fn bootstrap_db(
@@ -182,43 +358,39 @@ pub async fn bootstrap_db(
         env, db_kind, engine, path, pid
     );
 
-    let shared_pool = match db_kind {
+    // Build migration pool (shared for SqliteMemory, admin for others)
+    let migration_pool = match db_kind {
         DbKind::SqliteMemory => {
             // CRITICAL: For SQLite in-memory, we must migrate on the same connection
             // that will be returned, since each connection gets its own database instance
-
-            // Create the shared pool first for in-memory databases
-            let shared_pool = get_or_create_shared_pool(env, db_kind).await?;
-
-            // Run migration orchestration on the shared pool for in-memory databases
-            db_infra::infra::db::core::orchestrate_migration_internal(
-                &shared_pool,
-                env,
-                db_kind,
-                MigrationCommand::Up,
-            )
-            .await?;
-
-            shared_pool
+            get_or_create_shared_pool(env, db_kind).await?
         }
         _ => {
-            // For non-in-memory databases, create admin pool, run migration, then create shared pool
-            let admin_pool = db_infra::infra::db::core::build_admin_pool(env, db_kind)
-                .await
-                .map_err(AppError::from)?;
+            // For non-in-memory databases, use admin pool for migrations
+            // This ensures database-level settings (e.g., SQLite PRAGMAs) are set before other connections exist
+            let admin_pool = db_infra::infra::db::core::build_admin_pool(env, db_kind).await?;
+            Arc::new(admin_pool)
+        }
+    };
 
-            // Run migration orchestration - handles all database types with locking and fast-path
-            db_infra::infra::db::core::orchestrate_migration_internal(
-                &admin_pool,
-                env,
-                db_kind,
-                MigrationCommand::Up,
-            )
-            .await
-            .map_err(AppError::from)?;
+    // Common: run migrations and initialize AI profiles on the migration pool
+    // For SqliteFile: Sets database-level PRAGMAs (journal_mode, synchronous) which require exclusive access
+    db_infra::infra::db::core::orchestrate_migration_internal(
+        &migration_pool,
+        env,
+        db_kind,
+        MigrationCommand::Up,
+    )
+    .await?;
 
-            // CRITICAL INVARIANT: Shared pool is only created/reused AFTER migration and lock phases complete
-            // The shared pool is never used for migration, locking, or admin operations
+    ensure_ai_profiles_with_lock(&migration_pool, env, db_kind).await?;
+
+    // Build final shared pool (reuse for SqliteMemory, create new for others)
+    let shared_pool = match db_kind {
+        DbKind::SqliteMemory => migration_pool, // reuse - same pool
+        _ => {
+            // Create shared pool AFTER migrations and admin operations complete
+            // For SqliteFile: PRAGMAs are now set, so safe to create multiple connections
             get_or_create_shared_pool(env, db_kind).await?
         }
     };

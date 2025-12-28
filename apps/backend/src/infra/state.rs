@@ -6,7 +6,7 @@ use crate::state::app_state::AppState;
 use crate::state::security_config::SecurityConfig;
 use crate::ws::hub::RealtimeBroker;
 
-/// Builder for creating AppState instances (used in both tests and main)
+/// Builder for creating AppState instances
 #[derive(Default)]
 pub struct StateBuilder {
     security_config: SecurityConfig,
@@ -49,6 +49,7 @@ impl StateBuilder {
             (Some(env), Some(db_kind)) => {
                 // Bootstrap database directly with env and db_kind
                 let conn = bootstrap_db(env, db_kind).await?;
+
                 AppState::new(conn, self.security_config, self.email_allowlist)
             }
             _ => AppState::new_without_db(self.security_config, self.email_allowlist),
