@@ -353,8 +353,10 @@ pub async fn setup_game_at_round(
 /// Score a round for testing purposes.
 ///
 /// This is a test helper that loads the game and scores the current round.
-/// In production, scoring happens automatically when the last trick is resolved.
+/// In production, scoring happens automatically when the last card is played.
 pub async fn score_round(txn: &DatabaseTransaction, game_id: i64) -> Result<(), AppError> {
     let service = GameFlowService;
-    service.score_round(txn, game_id).await
+    let game = backend::repos::games::require_game(txn, game_id).await?;
+    // Use the internal method (accessible via the service module)
+    service.score_round_internal(txn, &game).await
 }

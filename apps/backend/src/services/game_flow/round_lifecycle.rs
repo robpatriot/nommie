@@ -100,23 +100,10 @@ impl GameFlowService {
         Ok(())
     }
 
-    /// Score the current round for a game by id.
-    ///
-    /// This is a public entrypoint that loads the game and delegates to the internal
-    /// scorer. In production flows, scoring is typically driven indirectly via
-    /// `play_card`, but this helper is useful for tests and maintenance tasks.
-    #[allow(dead_code)]
-    pub async fn score_round(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-    ) -> Result<(), AppError> {
-        let game = games::require_game(txn, game_id).await?;
-        self.score_round_internal(txn, &game).await
-    }
-
     /// Internal version that accepts game object to avoid redundant loads.
-    pub(super) async fn score_round_internal(
+    /// Used by production code (player_actions) and accessible to test helpers.
+    /// Note: Public for test access (integration tests are separate crate).
+    pub async fn score_round_internal(
         &self,
         txn: &DatabaseTransaction,
         game: &games::Game,

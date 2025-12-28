@@ -31,10 +31,10 @@ fn skip_if_sqlite_memory(test_name: &str) -> Option<DbKind> {
     Some(db_kind)
 }
 
-#[allow(dead_code)]
 enum TestLock {
     Postgres {
         lock: PgAdvisoryLock,
+        #[allow(dead_code)] // Stored to keep connection alive, but not directly accessed
         pool: sea_orm::DatabaseConnection,
     },
     SqliteFile {
