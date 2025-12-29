@@ -980,64 +980,60 @@ export function PlayerHand({
               {tHand('title')}
             </span>
           )}
-          {handStatus !== readOnlyPreviewText && (
+          {showTitle && handStatus !== readOnlyPreviewText && (
             <p className="text-xs text-muted" aria-live="polite">
               {handStatus}
             </p>
           )}
         </div>
-        {isTrickPhase && playState ? (
+        {isTrickPhase && playState && requireCardConfirmation ? (
           <div className="flex justify-center flex-1 min-w-0">
-            {requireCardConfirmation ? (
-              <button
-                type="button"
-                data-selected-card-exempt
-                onClick={async () => {
-                  if (onPlayCard && selectedCard && viewerTurn) {
-                    await onPlayCard(selectedCard)
-                    onSelectCard(null)
-                  }
-                }}
-                disabled={
-                  !viewerTurn ||
-                  playState.isPending ||
-                  !selectedCard ||
-                  !playState.playable.includes(selectedCard)
+            <button
+              type="button"
+              data-selected-card-exempt
+              onClick={async () => {
+                if (onPlayCard && selectedCard && viewerTurn) {
+                  await onPlayCard(selectedCard)
+                  onSelectCard(null)
                 }
-                className="rounded-2xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
-                aria-label={
-                  playState.isPending
-                    ? t('button.aria.playing')
-                    : selectedCard
-                      ? t('button.aria.playSelected', { card: selectedCard })
-                      : t('button.aria.selectCard')
-                }
-              >
-                {playState.isPending ? (
-                  t('button.playing')
-                ) : viewerTurn ? (
-                  <>
-                    <span className="sm:hidden">{t('button.playCard')}</span>
-                    <span className="hidden sm:inline">
-                      {t('button.playSelectedCard')}
-                    </span>
-                  </>
-                ) : waitingOnName ? (
-                  t('button.waitingFor', { name: waitingOnName })
-                ) : (
-                  t('button.waitingForNext')
-                )}
-              </button>
-            ) : (
-              <span className="rounded-full border border-white/15 bg-surface px-4 py-1 text-xs font-semibold text-subtle">
-                {t('status.tapToPlay')}
-              </span>
-            )}
+              }}
+              disabled={
+                !viewerTurn ||
+                playState.isPending ||
+                !selectedCard ||
+                !playState.playable.includes(selectedCard)
+              }
+              className="rounded-2xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
+              aria-label={
+                playState.isPending
+                  ? t('button.aria.playing')
+                  : selectedCard
+                    ? t('button.aria.playSelected', { card: selectedCard })
+                    : t('button.aria.selectCard')
+              }
+            >
+              {playState.isPending ? (
+                t('button.playing')
+              ) : viewerTurn ? (
+                <>
+                  <span className="sm:hidden">{t('button.playCard')}</span>
+                  <span className="hidden sm:inline">
+                    {t('button.playSelectedCard')}
+                  </span>
+                </>
+              ) : waitingOnName ? (
+                t('button.waitingFor', { name: waitingOnName })
+              ) : (
+                t('button.waitingForNext')
+              )}
+            </button>
           </div>
         ) : null}
-        {isTrickPhase && playState && showLegalPlays ? (
+        {isTrickPhase &&
+        playState &&
+        (showLegalPlays || !requireCardConfirmation) ? (
           <div
-            className="flex items-center justify-end gap-2 flex-shrink-0"
+            className="ml-auto flex items-center justify-end gap-2 flex-shrink-0"
             style={{ minWidth: 'max-content' }}
           >
             {playState.playable.length > 0 &&
@@ -1059,9 +1055,7 @@ export function PlayerHand({
               </span>
             ) : null}
           </div>
-        ) : (
-          <div />
-        )}
+        ) : null}
       </header>
 
       <div
