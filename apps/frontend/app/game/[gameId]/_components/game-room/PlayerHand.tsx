@@ -868,7 +868,8 @@ export function PlayerHand({
 
   if (!viewerHand.length) {
     handStatus = t('status.handWillAppear')
-  } else if (isTrickPhase && !viewerTurn) {
+  } else if (isTrickPhase && !viewerTurn && !requireCardConfirmation) {
+    // Show waiting message when confirmation is disabled and not viewer's turn
     handStatus = waitingOnName
       ? t('status.waitingFor', { name: waitingOnName })
       : t('status.waitingForNext')
@@ -1023,18 +1024,24 @@ export function PlayerHand({
       )}
     >
       <header className="flex items-center gap-3">
-        <div className="flex flex-col gap-1 flex-shrink-0">
-          {showTitle && (
-            <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
-              {tHand('title')}
-            </span>
-          )}
-          {showTitle && handStatus !== readOnlyPreviewText && (
-            <p className="text-xs text-muted" aria-live="polite">
-              {handStatus}
-            </p>
-          )}
-        </div>
+        {/* Title and subtitle: only show when not waiting (or when requireCardConfirmation is false and waiting) */}
+        {(!isTrickPhase ||
+          !playState ||
+          viewerTurn ||
+          !requireCardConfirmation) && (
+          <div className="flex flex-col gap-1 flex-shrink-0">
+            {showTitle && (
+              <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+                {tHand('title')}
+              </span>
+            )}
+            {showTitle && handStatus !== readOnlyPreviewText && (
+              <p className="text-xs text-muted break-words" aria-live="polite">
+                {handStatus}
+              </p>
+            )}
+          </div>
+        )}
         {isTrickPhase && playState && requireCardConfirmation ? (
           <div className="flex justify-center flex-1 min-w-0">
             <button
@@ -1080,14 +1087,13 @@ export function PlayerHand({
         ) : null}
         {isTrickPhase &&
         playState &&
+        viewerTurn &&
         (showLegalPlays || !requireCardConfirmation) ? (
           <div
             className="ml-auto flex items-center justify-end gap-2 flex-shrink-0"
             style={{ minWidth: 'max-content' }}
           >
-            {playState.playable.length > 0 &&
-            viewerTurn &&
-            legalCardsDisplay ? (
+            {playState.playable.length > 0 && legalCardsDisplay ? (
               <div className="rounded-full bg-black/20 px-3 py-1">
                 <span className="text-sm font-medium text-muted">
                   <span className="sm:hidden">{t('legal.short')}</span>
@@ -1097,11 +1103,6 @@ export function PlayerHand({
                   {legalCardsDisplay}
                 </span>
               </div>
-            ) : null}
-            {!viewerTurn ? (
-              <span className="rounded-full border border-white/15 bg-surface px-3 py-1 text-xs font-semibold text-subtle">
-                {tHand('waitingOn', { name: waitingOnName ?? '—' })}
-              </span>
             ) : null}
           </div>
         ) : null}
