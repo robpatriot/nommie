@@ -1,6 +1,13 @@
 'use client'
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslations } from 'next-intl'
 import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
 import type { GameRoomViewProps } from '../game-room-view'
@@ -35,11 +42,12 @@ const MIN_OVERLAP = 4
 const MAX_OVERLAP = CARD_WIDTH - 17
 const AESTHETIC_OVERLAP = 8
 const BLEND_THRESHOLD = 20 // Pixels of remaining space before we start blending
-// Second row overlaps top row by 25% of card height
+// Second row overlaps top row by 40% of card height
 // Increased to account for card shadows that create visual gap
 const ROW_OVERLAP = CARD_HEIGHT * 0.4
 const SELECTED_CARD_LIFT = 8 // How much selected card lifts (translateY)
 const MAX_CARDS_PER_ROW = 7 // Maximum cards allowed in a single row
+const OVERLAP_TOLERANCE = 0.1 // Tolerance for comparing overlap values (in pixels)
 
 type LayoutMode = 'singleRow' | 'twoRow'
 
@@ -54,6 +62,9 @@ interface LayoutResult {
   positions: CardPosition[]
   minHeight: number
   scale?: number // Optional scale factor for card scaling
+  twoRowSplit?: TwoRowSplit // The split used for two-row layouts (to avoid recomputation)
+  topOverlap?: number // Overlap value for top row (to avoid recomputation)
+  bottomOverlap?: number // Overlap value for bottom row (to avoid recomputation)
 }
 
 // Suit-aware layout types
@@ -135,8 +146,21 @@ function canFitInOneRow(viewportWidth: number, cardCount: number): boolean {
 }
 
 // Suit-aware layout helper functions
+// Cache for card suit extraction to avoid repeated string operations
+const cardSuitCache = new Map<Card, string>()
+
 function getCardSuit(card: Card): string {
-  return card.slice(-1).toUpperCase()
+  let suit = cardSuitCache.get(card)
+  if (suit === undefined) {
+    suit = card.slice(-1).toUpperCase()
+    cardSuitCache.set(card, suit)
+  }
+  return suit
+}
+
+// Clear suit cache when hand changes significantly (called from component)
+export function clearCardSuitCache(): void {
+  cardSuitCache.clear()
 }
 
 function computeHandHash(cards: Card[]): string {
@@ -330,19 +354,23 @@ function computeBestSplitLayout(
   return bestSolution
 }
 
-function computeOptimalLayout(cards: Card[]): TwoRowSplit {
-  const suitGroups = groupCardsBySuit(cards)
+function computeOptimalLayout(
+  cards: Card[],
+  suitGroups?: SuitGroup[]
+): TwoRowSplit {
+  // Accept pre-computed suit groups to avoid recomputation
+  const groups = suitGroups ?? groupCardsBySuit(cards)
 
   // Check if any suit > 7 (must be split)
-  const suitOver7 = suitGroups.find((sg) => sg.count > MAX_CARDS_PER_ROW)
+  const suitOver7 = groups.find((sg) => sg.count > MAX_CARDS_PER_ROW)
 
   if (suitOver7) {
     // Must split this suit
-    return computeBestSplitLayout(suitGroups, suitOver7)
+    return computeBestSplitLayout(groups, suitOver7)
   }
 
   // Try perfect layout (all suits together)
-  const perfect = computePerfectLayout(suitGroups)
+  const perfect = computePerfectLayout(groups)
   if (perfect) {
     return perfect
   }
@@ -382,14 +410,16 @@ export function createSignature(
 
 function maintainPattern(
   cards: Card[],
-  previous: LayoutSignature
+  previous: LayoutSignature,
+  suitGroups?: SuitGroup[]
 ): TwoRowSplit {
-  const suitGroups = groupCardsBySuit(cards)
+  // Accept pre-computed suit groups to avoid recomputation
+  const groups = suitGroups ?? groupCardsBySuit(cards)
   const topRow: Card[] = []
   const bottomRow: Card[] = []
 
   // Assign suits to rows based on previous pattern
-  for (const suitGroup of suitGroups) {
+  for (const suitGroup of groups) {
     const wasOnTop = previous.topRowSuits.some((s) => s.suit === suitGroup.suit)
 
     if (wasOnTop) {
@@ -405,7 +435,7 @@ function maintainPattern(
     bottomRow.length > MAX_CARDS_PER_ROW
   ) {
     // Fallback to optimal if somehow invalid
-    return computeOptimalLayout(cards)
+    return computeOptimalLayout(cards, groups)
   }
 
   return {
@@ -418,17 +448,22 @@ function maintainPattern(
 
 function maintainSplitPattern(
   cards: Card[],
-  previous: LayoutSignature
+  previous: LayoutSignature,
+  suitGroups?: SuitGroup[]
 ): TwoRowSplit {
-  const suitGroups = groupCardsBySuit(cards)
+  // Accept pre-computed suit groups to avoid recomputation
+  const groups = suitGroups ?? groupCardsBySuit(cards)
   const topRow: Card[] = []
   const bottomRow: Card[] = []
 
   // Assign suits based on previous pattern
-  for (const suitGroup of suitGroups) {
-    if (suitGroup.suit === previous.splitSuit) {
+  for (const suitGroup of groups) {
+    if (
+      suitGroup.suit === previous.splitSuit &&
+      previous.splitTopCount !== null
+    ) {
       // Split this suit the same way
-      const splitPoint = previous.splitTopCount!
+      const splitPoint = previous.splitTopCount
       topRow.push(...suitGroup.cards.slice(0, splitPoint))
       bottomRow.push(...suitGroup.cards.slice(splitPoint))
     } else {
@@ -450,7 +485,7 @@ function maintainSplitPattern(
     bottomRow.length > MAX_CARDS_PER_ROW
   ) {
     // Fallback to optimal if somehow invalid
-    return computeOptimalLayout(cards)
+    return computeOptimalLayout(cards, groups)
   }
 
   return {
@@ -464,7 +499,8 @@ function maintainSplitPattern(
 // Export for testing - main layout algorithm entry point
 export function getTwoRowLayout(
   cards: Card[],
-  previousSignature: LayoutSignature | null
+  previousSignature: LayoutSignature | null,
+  suitGroups?: SuitGroup[]
 ): TwoRowSplit {
   const currentHash = computeHandHash(cards)
 
@@ -472,14 +508,14 @@ export function getTwoRowLayout(
   if (previousSignature && previousSignature.handHash === currentHash) {
     // Rebuild from signature
     if (previousSignature.splitSuit === null) {
-      return maintainPattern(cards, previousSignature)
+      return maintainPattern(cards, previousSignature, suitGroups)
     } else {
-      return maintainSplitPattern(cards, previousSignature)
+      return maintainSplitPattern(cards, previousSignature, suitGroups)
     }
   }
 
-  // Compute optimal for current hand
-  const optimal = computeOptimalLayout(cards)
+  // Compute optimal for current hand (pass suit groups if provided)
+  const optimal = computeOptimalLayout(cards, suitGroups)
 
   // No previous state - use optimal
   if (!previousSignature) {
@@ -488,7 +524,7 @@ export function getTwoRowLayout(
 
   // Previous was perfect - maintain pattern
   if (previousSignature.splitSuit === null) {
-    return maintainPattern(cards, previousSignature)
+    return maintainPattern(cards, previousSignature, suitGroups)
   }
 
   // Previous had split - check for improvement
@@ -500,7 +536,7 @@ export function getTwoRowLayout(
       return optimal
     } else {
       // Maintain previous split pattern
-      return maintainSplitPattern(cards, previousSignature)
+      return maintainSplitPattern(cards, previousSignature, suitGroups)
     }
   }
 
@@ -579,7 +615,9 @@ class DefaultLayoutStrategy implements LayoutStrategy {
     }
 
     // Two row layout - use suit-aware algorithm
-    const twoRowSplit = getTwoRowLayout(cards, previousSignature)
+    // Group cards by suit once and pass to avoid recomputation
+    const suitGroups = groupCardsBySuit(cards)
+    const twoRowSplit = getTwoRowLayout(cards, previousSignature, suitGroups)
     const topRowCount = twoRowSplit.topRow.length
     const bottomRowCount = twoRowSplit.bottomRow.length
 
@@ -658,6 +696,9 @@ class DefaultLayoutStrategy implements LayoutStrategy {
       positions,
       minHeight:
         CARD_HEIGHT + (CARD_HEIGHT - ROW_OVERLAP) + 16 + SELECTED_CARD_LIFT,
+      twoRowSplit: twoRowSplit,
+      topOverlap: topOverlap,
+      bottomOverlap: bottomOverlap,
     }
   }
 }
@@ -691,22 +732,18 @@ class ScaledLayoutStrategy implements LayoutStrategy {
     }
 
     // Two-row mode: check if scaling is needed
-    // Get row counts from the actual split (not just cardCount / 2)
-    const twoRowSplit = getTwoRowLayout(cards, previousSignature)
+    // Reuse split and overlaps from baseLayout to avoid recomputation
+    const twoRowSplit = baseLayout.twoRowSplit!
+    const topOverlap = baseLayout.topOverlap!
+    const bottomOverlap = baseLayout.bottomOverlap ?? 0
     const topRowCount = twoRowSplit.topRow.length
     const bottomRowCount = twoRowSplit.bottomRow.length
 
-    // Check overlaps with actual viewport to determine if max overlap is reached
-    const topOverlap = calculateOverlapForRow(viewportWidth, topRowCount)
-    const bottomOverlap =
-      bottomRowCount > 0
-        ? calculateOverlapForRow(viewportWidth, bottomRowCount)
-        : 0
-
     const topRowAtMaxOverlap =
-      topRowCount > 1 && Math.abs(topOverlap - MAX_OVERLAP) < 0.1
+      topRowCount > 1 && Math.abs(topOverlap - MAX_OVERLAP) < OVERLAP_TOLERANCE
     const bottomRowAtMaxOverlap =
-      bottomRowCount > 1 && Math.abs(bottomOverlap - MAX_OVERLAP) < 0.1
+      bottomRowCount > 1 &&
+      Math.abs(bottomOverlap - MAX_OVERLAP) < OVERLAP_TOLERANCE
     const eitherRowAtMaxOverlap = topRowAtMaxOverlap || bottomRowAtMaxOverlap
 
     // Calculate the width where max overlap would be reached
@@ -734,6 +771,7 @@ class ScaledLayoutStrategy implements LayoutStrategy {
 
     // Calculate positions using effective viewport width to maintain overlap ratio
     // Then scale positions back to actual viewport coordinates
+    // Use the original split to ensure consistency (scaling shouldn't change card rows)
     const effectiveViewportWidth = viewportWidth / scale
     const scaledLayout = this.baseStrategy.computeLayout(
       effectiveViewportWidth,
@@ -746,7 +784,7 @@ class ScaledLayoutStrategy implements LayoutStrategy {
     const scaledSelectedLift = SELECTED_CARD_LIFT * scale
     const scaledRowOverlap = ROW_OVERLAP * scale
 
-    // Determine which row each card is in for proper top position scaling
+    // Reuse card-to-row mapping from original split (scaling shouldn't change row assignment)
     const cardToRowMap = new Map<Card, 'top' | 'bottom'>()
     twoRowSplit.topRow.forEach((card) => {
       cardToRowMap.set(card, 'top')
@@ -777,6 +815,10 @@ class ScaledLayoutStrategy implements LayoutStrategy {
         16 +
         scaledSelectedLift,
       scale,
+      // Preserve original split and overlaps (scaling preserves the split)
+      twoRowSplit: twoRowSplit,
+      topOverlap: topOverlap,
+      bottomOverlap: bottomOverlap,
     }
   }
 }
@@ -805,7 +847,10 @@ export function PlayerHand({
   const tHand = useTranslations('game.gameRoom.hand')
   const tSuitAbbrev = useTranslations('game.gameRoom.hand.suitAbbrev')
   const isTrickPhase = phase.phase === 'Trick' && !!playState
-  const viewerTurn = isTrickPhase && phase.data.to_act === playState!.viewerSeat
+  const viewerTurn =
+    isTrickPhase && playState
+      ? phase.data.to_act === playState.viewerSeat
+      : false
   const playableCards = useMemo(
     () => new Set(playState?.playable ?? []),
     [playState]
@@ -847,7 +892,7 @@ export function PlayerHand({
 
     // Get lead card if trick has started
     const leadCard =
-      phase.phase === 'Trick' && phase.data.current_trick.length > 0
+      phase.data.current_trick.length > 0
         ? phase.data.current_trick[0][1]
         : null
 
@@ -885,6 +930,11 @@ export function PlayerHand({
     minHeight: CARD_HEIGHT + 16,
   })
 
+  // Clear card suit cache when hand changes
+  useEffect(() => {
+    clearCardSuitCache()
+  }, [viewerHand])
+
   useLayoutEffect(() => {
     const viewport = viewportRef.current
     if (!viewport) {
@@ -895,7 +945,6 @@ export function PlayerHand({
 
     const updateLayout = () => {
       const width = viewport.clientWidth
-      const cardCount = viewerHand.length
 
       // Compute layout using previous signature
       const newLayout = strategy.computeLayout(
@@ -905,14 +954,12 @@ export function PlayerHand({
       )
 
       // Update signature after computing layout (for next render)
-      const needsTwoRows = cardCount > 0 && !canFitInOneRow(width, cardCount)
-      if (needsTwoRows) {
-        // Compute the split that was actually used (strategy computed it internally)
-        const twoRowSplit = getTwoRowLayout(
+      // Reuse the split from layout result if available (avoids recomputation)
+      if (newLayout.mode === 'twoRow' && newLayout.twoRowSplit) {
+        layoutSignatureRef.current = createSignature(
           viewerHand,
-          layoutSignatureRef.current
+          newLayout.twoRowSplit
         )
-        layoutSignatureRef.current = createSignature(viewerHand, twoRowSplit)
       } else {
         // Reset signature for single-row layouts
         layoutSignatureRef.current = null
@@ -931,7 +978,9 @@ export function PlayerHand({
     return () => {
       resizeObserver.disconnect()
     }
-  }, [viewerHand, layoutVariant]) // eslint-disable-line react-hooks/exhaustive-deps -- viewportRef is a stable ref object
+    // viewportRef is stable (refs don't change identity), but included so effect re-runs
+    // if a different external ref is passed. ResizeObserver handles size changes.
+  }, [viewerHand, layoutVariant, viewportRef])
 
   const handleCardClick = useCallback(
     (card: Card) => {
@@ -1094,6 +1143,8 @@ export function PlayerHand({
                   })
 
               const position = layout.positions[index]
+
+              // Skip rendering if position not yet computed (initial render before useLayoutEffect runs)
               if (!position) {
                 return null
               }
@@ -1126,6 +1177,8 @@ export function PlayerHand({
                     transform: isSelected ? selectedTransform : baseTransform,
                     transformOrigin: 'top left',
                   }}
+                  // Direct style manipulation is necessary here because each card has a unique baseZIndex
+                  // that changes dynamically. CSS classes can't express per-instance z-index calculations.
                   onMouseEnter={(e) => {
                     if (!isSelected) {
                       e.currentTarget.style.zIndex = String(baseZIndex + 50)
