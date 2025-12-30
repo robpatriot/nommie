@@ -42,11 +42,11 @@ export function SeatCard({
   return (
     <div
       className={cn(
-        'flex w-fit flex-col gap-1.5 rounded-xl border border-white/10 bg-surface/80 px-3 py-2 text-sm text-muted shadow-elevated backdrop-blur transition',
-        baseClasses,
+        'flex w-fit flex-col gap-1.5 rounded-xl border-2 bg-surface/80 px-3 py-2 text-sm text-muted shadow-elevated backdrop-blur transition',
         isActive
-          ? 'ring-2 ring-success/80 ring-offset-1 ring-offset-surface'
-          : '',
+          ? 'border-primary/60 bg-primary/10 shadow-inner shadow-primary/20'
+          : 'border-white/10',
+        baseClasses,
         variant === 'table' ? positionStyles[orientation] : '',
         className
       )}
