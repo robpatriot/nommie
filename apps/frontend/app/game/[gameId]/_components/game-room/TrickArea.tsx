@@ -41,6 +41,7 @@ const MAX_NAME_LENGTH = 8 // Maximum length for shortened player names in trick 
 const DIAMOND_VERTICAL_OFFSET = 30 // Vertical offset for top/bottom cards in diamond layout
 const DIAMOND_HORIZONTAL_OFFSET = 34 // Horizontal offset for left/right cards in diamond layout
 const DIAMOND_CONTAINER_SIZE = 154 // Size of the diamond layout container (h-[154px] w-[154px])
+const DIAMOND_MAX_RANDOM_OFFSET = 5 // Maximum random offset (in pixels) for card misalignment
 
 // Transform constants
 const CENTER_TRANSFORM = 'translate(-50%, -50%)' // Base transform for centering absolutely positioned elements
@@ -302,6 +303,62 @@ export function TrickArea({
   // Check if viewport is > 640px for responsive top padding
   const isLargeViewport = useMediaQuery('(min-width: 640px)')
 
+  // Generate random offsets for diamond layout cards based on trick number
+  // Offsets change when trick number changes to create subtle misalignment
+  const trickNo = phase.phase === 'Trick' ? phase.data.trick_no : 0
+  const diamondOffsets = useMemo(() => {
+    // Seed random generator with trick number for consistency
+    // Simple seeded random function (linear congruential generator)
+    // Generate seeds for each random value call without mutation
+    const baseSeed = trickNo * 12345 + 67890
+
+    const getRandom = (callIndex: number): number => {
+      // Calculate seed for this specific call index
+      let seed = baseSeed
+      for (let i = 0; i < callIndex; i++) {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff
+      }
+      const nextSeed = (seed * 1103515245 + 12345) & 0x7fffffff
+      return nextSeed / 0x7fffffff
+    }
+
+    // Generate offsets for top/bottom cards (horizontal movement: left/right)
+    const topDirection = getRandom(0) < 0.5 ? -1 : 1 // -1 for left, 1 for right
+    const topAmount = Math.floor(getRandom(1) * DIAMOND_MAX_RANDOM_OFFSET) + 1 // 1 to DIAMOND_MAX_RANDOM_OFFSET px
+
+    const bottomDirection = getRandom(2) < 0.5 ? -1 : 1
+    const bottomAmount =
+      Math.floor(getRandom(3) * DIAMOND_MAX_RANDOM_OFFSET) + 1 // 1 to DIAMOND_MAX_RANDOM_OFFSET px
+
+    // Generate offsets for left/right cards (vertical movement: up/down)
+    const leftDirection = getRandom(4) < 0.5 ? -1 : 1 // -1 for up, 1 for down
+    const leftAmount = Math.floor(getRandom(5) * DIAMOND_MAX_RANDOM_OFFSET) + 1 // 1 to DIAMOND_MAX_RANDOM_OFFSET px
+
+    const rightDirection = getRandom(6) < 0.5 ? -1 : 1
+    const rightAmount = Math.floor(getRandom(7) * DIAMOND_MAX_RANDOM_OFFSET) + 1 // 1 to DIAMOND_MAX_RANDOM_OFFSET px
+
+    // If top and bottom have same direction and amount, reverse bottom
+    const finalTop = topDirection * topAmount
+    const finalBottom =
+      topDirection === bottomDirection && topAmount === bottomAmount
+        ? -bottomDirection * bottomAmount
+        : bottomDirection * bottomAmount
+
+    // If left and right have same direction and amount, reverse right
+    const finalLeft = leftDirection * leftAmount
+    const finalRight =
+      leftDirection === rightDirection && leftAmount === rightAmount
+        ? -rightDirection * rightAmount
+        : rightDirection * rightAmount
+
+    return {
+      top: finalTop,
+      bottom: finalBottom,
+      left: finalLeft,
+      right: finalRight,
+    }
+  }, [trickNo])
+
   // Calculate responsive top padding
   const topPadding = isLargeViewport ? TOP_PADDING_BASE / 2 : TOP_PADDING_BASE
 
@@ -409,16 +466,16 @@ export function TrickArea({
                 let positionTransform = CENTER_TRANSFORM
                 switch (orientation) {
                   case 'top':
-                    positionTransform = `${CENTER_TRANSFORM} translateY(-${DIAMOND_VERTICAL_OFFSET}px)`
+                    positionTransform = `${CENTER_TRANSFORM} translateY(-${DIAMOND_VERTICAL_OFFSET}px) translateX(${diamondOffsets.top}px)`
                     break
                   case 'bottom':
-                    positionTransform = `${CENTER_TRANSFORM} translateY(${DIAMOND_VERTICAL_OFFSET}px)`
+                    positionTransform = `${CENTER_TRANSFORM} translateY(${DIAMOND_VERTICAL_OFFSET}px) translateX(${diamondOffsets.bottom}px)`
                     break
                   case 'left':
-                    positionTransform = `${CENTER_TRANSFORM} translateX(-${DIAMOND_HORIZONTAL_OFFSET}px)`
+                    positionTransform = `${CENTER_TRANSFORM} translateX(-${DIAMOND_HORIZONTAL_OFFSET}px) translateY(${diamondOffsets.left}px)`
                     break
                   case 'right':
-                    positionTransform = `${CENTER_TRANSFORM} translateX(${DIAMOND_HORIZONTAL_OFFSET}px)`
+                    positionTransform = `${CENTER_TRANSFORM} translateX(${DIAMOND_HORIZONTAL_OFFSET}px) translateY(${diamondOffsets.right}px)`
                     break
                 }
                 const scaleTransform =
