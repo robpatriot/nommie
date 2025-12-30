@@ -112,14 +112,14 @@ export function shortenNameForDisplay(name: string, maxLength: number): string {
 
   // Step 2: Abbreviate middle/last name
   if (wordCount >= 3) {
-    // "First Middle Last" -> "First M. Last"
-    const abbreviated = `${words[0]} ${words[1][0]}. ${words[wordCount - 1]}`
+    // "First Middle Last" -> "First M Last"
+    const abbreviated = `${words[0]} ${words[1][0]} ${words[wordCount - 1]}`
     if (abbreviated.length <= maxLength) {
       return abbreviated
     }
   } else if (wordCount === 2) {
-    // "First Last" -> "First L."
-    const abbreviated = `${words[0]} ${words[1][0]}.`
+    // "First Last" -> "First L"
+    const abbreviated = `${words[0]} ${words[1][0]}`
     if (abbreviated.length <= maxLength) {
       return abbreviated
     }
@@ -127,8 +127,8 @@ export function shortenNameForDisplay(name: string, maxLength: number): string {
 
   // Step 3: First initial + last name
   if (wordCount >= 2) {
-    // "First Last" or "First Middle Last" -> "F. Last"
-    const firstInitial = `${words[0][0]}. ${words[wordCount - 1]}`
+    // "First Last" or "First Middle Last" -> "F Last"
+    const firstInitial = `${words[0][0]} ${words[wordCount - 1]}`
     if (firstInitial.length <= maxLength) {
       return firstInitial
     }
