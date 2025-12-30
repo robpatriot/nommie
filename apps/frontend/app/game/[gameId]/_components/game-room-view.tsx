@@ -620,6 +620,20 @@ export function GameRoomView(props: GameRoomViewProps) {
               lastTrick={lastTrick}
               seatDisplayName={seatDisplayName}
             />
+            <ScoreSidebar
+              gameId={gameId}
+              phase={phase}
+              activeName={activeName}
+              playerNames={playerNames}
+              scores={snapshot.game.scores_total}
+              round={round}
+              roundNo={snapshot.game.round_no}
+              dealer={snapshot.game.dealer}
+              seatDisplayName={seatDisplayName}
+              error={error}
+              onShowHistory={handleOpenHistory}
+              isHistoryLoading={isHistoryLoading}
+            />
             {onLeaveGame ? (
               <button
                 type="button"
@@ -660,20 +674,6 @@ export function GameRoomView(props: GameRoomViewProps) {
                 </span>
               </button>
             ) : null}
-            <ScoreSidebar
-              gameId={gameId}
-              phase={phase}
-              activeName={activeName}
-              playerNames={playerNames}
-              scores={snapshot.game.scores_total}
-              round={round}
-              roundNo={snapshot.game.round_no}
-              dealer={snapshot.game.dealer}
-              seatDisplayName={seatDisplayName}
-              error={error}
-              onShowHistory={handleOpenHistory}
-              isHistoryLoading={isHistoryLoading}
-            />
           </aside>
         </div>
       </PageContainer>
