@@ -878,8 +878,11 @@ export function PlayerHand({
   }
 
   // Responsive visibility: hide title below 400px, legal plays below 320px
+  // Exception: always show title when it's not the player's turn (for waiting message)
   const showTitle = useMediaQuery('(min-width: 400px)')
   const showLegalPlays = useMediaQuery('(min-width: 320px)')
+  const isNotViewerTurn = isTrickPhase && playState && !viewerTurn
+  const shouldShowTitle = isNotViewerTurn || showTitle
 
   // Memoize legal cards display calculation
   const legalCardsDisplay = useMemo(() => {
@@ -1029,13 +1032,13 @@ export function PlayerHand({
           !playState ||
           viewerTurn ||
           !requireCardConfirmation) && (
-          <div className="flex flex-col gap-1 flex-shrink-0">
-            {showTitle && (
-              <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+          <div className="flex flex-col gap-1 min-w-0">
+            {shouldShowTitle && (
+              <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle break-words">
                 {tHand('title')}
               </span>
             )}
-            {showTitle && handStatus !== readOnlyPreviewText && (
+            {shouldShowTitle && handStatus !== readOnlyPreviewText && (
               <p className="text-xs text-muted break-words" aria-live="polite">
                 {handStatus}
               </p>
