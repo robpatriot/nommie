@@ -11,15 +11,12 @@ import { LastTrickCards } from './LastTrickCards'
 import { SyncButton } from './SyncButton'
 import { cn } from '@/lib/cn'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { shortenNameForDisplay, getOrientation } from './utils'
+import { shortenNameForDisplay, getOrientation, getActiveSeat } from './utils'
 
 // Dimension constants
 const CARD_HEIGHT = CARD_DIMENSIONS.md.height
 const CARD_WIDTH = CARD_DIMENSIONS.md.width
 const LABEL_HEIGHT = 20
-const TOP_PADDING_BASE = 60
-const BOTTOM_PADDING = 16
-const PADDING_INCREASE_MULTIPLIER = 0.75
 const Z_INDEX_BASE = 20
 
 // Sync button dimensions: py-1.5 (6px) + icon h-4 (16px) + py-1.5 (6px) = 28px total
@@ -123,8 +120,6 @@ interface ScaledDimensions {
   cardHeight: number
   cardWidth: number
   labelHeight: number
-  topPadding: number
-  bottomPadding: number
   gap: number
 }
 
@@ -133,18 +128,12 @@ interface ScaledDimensions {
  *
  * The scaling logic ensures:
  * - Cards and labels scale proportionally with cardScale
- * - Top padding increases as cards scale down to maintain space for sync button
- * - Bottom padding scales down proportionally
  * - Gap between card and label is fixed (not scaled)
  *
  * @param cardScale - Scale factor (0 < cardScale <= 1). Will be clamped to valid range.
- * @param topPadding - Base top padding value (already responsive to viewport)
  * @returns Object containing all scaled dimension values
  */
-function calculateScaledDimensions(
-  cardScale: number,
-  topPadding: number
-): ScaledDimensions {
+function calculateScaledDimensions(cardScale: number): ScaledDimensions {
   // Clamp cardScale to valid range to prevent division by zero and invalid values
   // Expected range: 0 < cardScale <= 1
   const safeCardScale = getSafeCardScale(cardScale)
@@ -153,15 +142,6 @@ function calculateScaledDimensions(
   const scaledCardHeight = CARD_HEIGHT * safeCardScale
   const scaledCardWidth = CARD_WIDTH * safeCardScale
   const scaledLabelHeight = LABEL_HEIGHT * safeCardScale
-  const scaledBottomPadding = BOTTOM_PADDING * safeCardScale
-
-  // Top padding increases as cards scale down to maintain space for sync button
-  // Formula: basePadding + (basePadding * (1 - scale) * multiplier)
-  // This creates an inverse relationship where smaller cards = more padding
-  const scaleDifference = 1 - safeCardScale
-  const paddingIncrease =
-    topPadding * scaleDifference * PADDING_INCREASE_MULTIPLIER
-  const scaledTopPadding = topPadding + paddingIncrease
 
   // Fixed gap between card and label (absolute value, not scaled)
   const scaledGap = CARD_LABEL_GAP
@@ -170,8 +150,6 @@ function calculateScaledDimensions(
     cardHeight: scaledCardHeight,
     cardWidth: scaledCardWidth,
     labelHeight: scaledLabelHeight,
-    topPadding: scaledTopPadding,
-    bottomPadding: scaledBottomPadding,
     gap: scaledGap,
   }
 }
@@ -261,6 +239,28 @@ interface TrickAreaProps {
   onRefresh?: () => void
   isRefreshing?: boolean
   cardScale?: number
+}
+
+function getWaitingMessage(
+  phase: PhaseSnapshot,
+  getSeatName: (seat: Seat) => string,
+  t: (key: string, params?: { name: string }) => string
+): string {
+  const activeSeat = getActiveSeat(phase)
+  if (activeSeat === null) {
+    return t('waitingForLead')
+  }
+  const activeName = getSeatName(activeSeat)
+  switch (phase.phase) {
+    case 'Bidding':
+      return t('waitingForBidding', { name: activeName })
+    case 'TrumpSelect':
+      return t('waitingForTrump', { name: activeName })
+    case 'Trick':
+      return t('waitingForLead', { name: activeName })
+    default:
+      return t('waitingForLead')
+  }
 }
 
 export function TrickArea({
@@ -359,26 +359,16 @@ export function TrickArea({
     }
   }, [trickNo])
 
-  // Calculate responsive top padding
-  const topPadding = isLargeViewport ? TOP_PADDING_BASE / 2 : TOP_PADDING_BASE
-
   // Clamp cardScale once and reuse throughout
   const safeCardScale = getSafeCardScale(cardScale)
 
   // Calculate all scaled dimensions based on cardScale
-  const scaledDimensions = calculateScaledDimensions(safeCardScale, topPadding)
+  const scaledDimensions = calculateScaledDimensions(safeCardScale)
 
   // Determine if we should show last trick
   const isBetweenRounds =
     phase.phase === 'Bidding' || phase.phase === 'TrumpSelect'
   const hasCards = orderedCards.length > 0
-  const showLastTrick = shouldShowLastTrick(
-    showPreviousRoundPosition,
-    isBetweenRounds,
-    hasCards,
-    lastTrick
-  )
-
   // Calculate container height - always based on card dimensions to prevent layout jumps
   const calculatedHeight = calculateContainerHeight(
     scaledDimensions,
@@ -393,6 +383,13 @@ export function TrickArea({
   const paddingBottom = isLargeViewport
     ? DIAMOND_LAYOUT_PADDING
     : MOBILE_BOTTOM_PADDING
+
+  const showLastTrick = shouldShowLastTrick(
+    showPreviousRoundPosition,
+    isBetweenRounds,
+    hasCards,
+    lastTrick
+  )
 
   return (
     <div
@@ -435,11 +432,7 @@ export function TrickArea({
       ) : orderedCards.length === 0 ? (
         <div className="flex flex-col items-center gap-2">
           <span className="text-sm font-medium text-subtle">
-            {phase.phase === 'Bidding'
-              ? t('waitingForBidding')
-              : phase.phase === 'TrumpSelect'
-                ? t('waitingForTrump')
-                : t('waitingForLead')}
+            {getWaitingMessage(phase, getSeatName, t)}
           </span>
           {phase.phase === 'Trick' ? (
             <span className="text-xs text-muted">
