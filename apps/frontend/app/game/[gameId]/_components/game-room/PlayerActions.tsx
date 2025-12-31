@@ -1,8 +1,12 @@
 import { useTranslations } from 'next-intl'
-import type { Card, PhaseSnapshot, Seat } from '@/lib/game-room/types'
+import type {
+  BiddingSnapshot,
+  Card,
+  PhaseSnapshot,
+  Seat,
+} from '@/lib/game-room/types'
 import { BiddingPanel } from './BiddingPanel'
 import { LastTrick } from './LastTrick'
-import { TrumpSelectPanel } from './TrumpSelectPanel'
 import type { GameRoomViewProps } from '../game-room-view'
 
 interface PlayerActionsProps {
@@ -13,6 +17,18 @@ interface PlayerActionsProps {
   trump?: GameRoomViewProps['trumpState']
   lastTrick?: Array<[Seat, Card]> | null
   seatDisplayName: (seat: Seat) => string
+}
+
+// Create a minimal bidding state fallback for viewing bids when no active bidding state exists
+function createBiddingStateFallback(
+  viewerSeat: Seat
+): NonNullable<GameRoomViewProps['biddingState']> {
+  return {
+    viewerSeat: viewerSeat,
+    isPending: false,
+    onSubmit: async () => {},
+    zeroBidLocked: false,
+  }
 }
 
 export function PlayerActions({
@@ -26,24 +42,46 @@ export function PlayerActions({
 }: PlayerActionsProps) {
   const t = useTranslations('game.gameRoom.tableActions')
 
-  if (phase.phase === 'Bidding' && bidding) {
+  if (phase.phase === 'Bidding') {
+    // Always show bidding panel during bidding phase, even if user has submitted
+    // Create a minimal bidding state if one doesn't exist (for viewing bids after submission)
+    const biddingState = bidding ?? createBiddingStateFallback(viewerSeat)
     return (
       <BiddingPanel
         phase={phase.data}
-        viewerSeat={bidding.viewerSeat}
+        viewerSeat={biddingState.viewerSeat}
         layoutSeat={viewerSeat}
         playerNames={playerNames}
-        bidding={bidding}
+        bidding={biddingState}
       />
     )
   }
 
-  if (phase.phase === 'TrumpSelect' && trump?.canSelect) {
+  if (phase.phase === 'TrumpSelect') {
+    // Show bids panel during trump selection (with or without trump selection UI)
+    // If it's your turn, show trump selection UI integrated into bidding panel
+    // If not your turn, show just the bids panel with indication
+    // Always show, even if user has already submitted their bid
+    const biddingState = bidding ?? createBiddingStateFallback(viewerSeat)
+    // Construct a BiddingSnapshot from TrumpSelectSnapshot data
+    // This allows BiddingPanel to display bids during trump selection phase
+    const biddingSnapshot: BiddingSnapshot = {
+      round: phase.data.round,
+      to_act: phase.data.to_act,
+      bids: phase.data.round.bids,
+      min_bid: 0,
+      max_bid: phase.data.round.hand_size,
+      last_trick: phase.data.last_trick,
+      previous_round: null,
+    }
     return (
-      <TrumpSelectPanel
-        phase={phase.data}
-        viewerSeat={viewerSeat}
+      <BiddingPanel
+        phase={biddingSnapshot}
+        viewerSeat={biddingState.viewerSeat}
+        layoutSeat={viewerSeat}
         playerNames={playerNames}
+        bidding={biddingState}
+        trumpPhase={phase.data}
         trump={trump}
       />
     )
