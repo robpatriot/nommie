@@ -136,7 +136,8 @@
       "hint": {
         "chooseAndSubmit": "Choisissez une valeur puis validez quand vous êtes prêt.",
         "submittedWaiting": "Annonce validée — en attente des autres joueurs.",
-        "waitingForPlayer": "En attente de l’annonce de {name}."
+        "waitingForPlayer": "En attente de l'annonce de {name}.",
+        "preEntry": "Vous pouvez saisir votre annonce maintenant - vous pouvez la valider quand c'est votre tour"
       },
       "validation": {
         "enterBid": "Saisissez une annonce avant de valider.",
@@ -148,8 +149,9 @@
       "tableBids": "Annonces de la table"
     },
     "trumpSelect": {
-      "title": "Choisir l’atout",
-      "description": "Choisissez la couleur d’atout pour cette manche. Les atouts battent toutes les autres couleurs.",
+      "title": "Choisir l'atout",
+      "description": "Choisissez la couleur d'atout pour cette manche. Les atouts battent toutes les autres couleurs.",
+      "waitingForPlayerDescription": "{name} choisit la couleur d'atout. Les atouts battent toutes les autres couleurs.",
       "optionAria": "Choisir {trump} comme atout",
       "optionAriaSelected": "Choisir {trump} comme atout, actuellement sélectionné",
       "submit": {
@@ -222,9 +224,9 @@
     },
     "trickArea": {
       "lastRoundFinalPosition": "Position finale de la manche précédente",
-      "waitingForLead": "En attente de l'entame…",
-      "waitingForBidding": "En attente de la fin des annonces…",
-      "waitingForTrump": "En attente du choix de l'atout…",
+      "waitingForLead": "En attente de l'entame de {name}",
+      "waitingForBidding": "En attente de l'annonce de {name}",
+      "waitingForTrump": "En attente du choix de l'atout par {name}",
       "trickOf": "Pli {trickNo} sur {handSize}",
       "ariaLabel": "Cartes du pli actuel"
     },

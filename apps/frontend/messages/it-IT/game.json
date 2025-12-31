@@ -136,7 +136,8 @@
       "hint": {
         "chooseAndSubmit": "Scegli un valore e invia quando sei pronto.",
         "submittedWaiting": "Puntata inviata — in attesa degli altri.",
-        "waitingForPlayer": "In attesa della puntata di {name}."
+        "waitingForPlayer": "In attesa della puntata di {name}.",
+        "preEntry": "Puoi inserire la tua puntata ora - puoi inviarla quando è il tuo turno"
       },
       "validation": {
         "enterBid": "Inserisci una puntata prima di inviare.",
@@ -150,6 +151,7 @@
     "trumpSelect": {
       "title": "Scegli briscola",
       "description": "Scegli il seme di briscola per questa mano. Le briscole battono tutti gli altri semi.",
+      "waitingForPlayerDescription": "{name} sta scegliendo il seme di briscola. Le briscole battono tutti gli altri semi.",
       "optionAria": "Scegli {trump} come briscola",
       "optionAriaSelected": "Scegli {trump} come briscola, attualmente selezionato",
       "submit": {
@@ -222,9 +224,9 @@
     },
     "trickArea": {
       "lastRoundFinalPosition": "Posizione finale della mano precedente",
-      "waitingForLead": "In attesa dell'attacco…",
-      "waitingForBidding": "In attesa della fine delle offerte…",
-      "waitingForTrump": "In attesa della scelta del seme di briscola…",
+      "waitingForLead": "In attesa dell'attacco di {name}",
+      "waitingForBidding": "In attesa dell'offerta di {name}",
+      "waitingForTrump": "In attesa della scelta del seme di briscola da parte di {name}",
       "trickOf": "Presa {trickNo} su {handSize}",
       "ariaLabel": "Carte della presa attuale"
     },

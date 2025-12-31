@@ -136,7 +136,8 @@
       "hint": {
         "chooseAndSubmit": "Choose a value and submit when you're ready.",
         "submittedWaiting": "Bid submitted — waiting for other players.",
-        "waitingForPlayer": "Waiting for {name} to bid."
+        "waitingForPlayer": "Waiting for {name} to bid.",
+        "preEntry": "You can enter your bid now - you can submit when it's your turn"
       },
       "validation": {
         "enterBid": "Enter a bid before submitting.",
@@ -150,6 +151,7 @@
     "trumpSelect": {
       "title": "Select trump",
       "description": "Choose the trump suit for this round. Trump cards outrank all other suits.",
+      "waitingForPlayerDescription": "{name} is choosing the trump suit. Trump cards outrank all other suits.",
       "optionAria": "Select {trump} as trump suit",
       "optionAriaSelected": "Select {trump} as trump suit, currently selected",
       "submit": {
@@ -222,9 +224,9 @@
     },
     "trickArea": {
       "lastRoundFinalPosition": "Last round's final position",
-      "waitingForLead": "Waiting for lead…",
-      "waitingForBidding": "Waiting for bidding to complete…",
-      "waitingForTrump": "Waiting for trumps to be chosen…",
+      "waitingForLead": "Waiting for {name} to lead",
+      "waitingForBidding": "Waiting for {name} to bid",
+      "waitingForTrump": "Waiting for {name} to choose trumps",
       "trickOf": "Trick {trickNo} of {handSize}",
       "ariaLabel": "Current trick cards"
     },

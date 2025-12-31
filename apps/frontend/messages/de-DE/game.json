@@ -136,7 +136,8 @@
       "hint": {
         "chooseAndSubmit": "Wähle einen Wert und gib ab, wenn du bereit bist.",
         "submittedWaiting": "Gebot abgegeben — warte auf andere Spieler.",
-        "waitingForPlayer": "Warten auf {name} für das Gebot."
+        "waitingForPlayer": "Warten auf {name} für das Gebot.",
+        "preEntry": "Du kannst dein Gebot jetzt eingeben - du kannst es abgeben, wenn du dran bist"
       },
       "validation": {
         "enterBid": "Gib ein Gebot ein, bevor du abgibst.",
@@ -150,6 +151,7 @@
     "trumpSelect": {
       "title": "Trumpf wählen",
       "description": "Wähle den Trumpf für diese Runde. Trumpfkarten schlagen alle anderen Farben.",
+      "waitingForPlayerDescription": "{name} wählt den Trumpf. Trumpfkarten schlagen alle anderen Farben.",
       "optionAria": "{trump} als Trumpf wählen",
       "optionAriaSelected": "{trump} als Trumpf wählen, aktuell ausgewählt",
       "submit": {
@@ -222,9 +224,9 @@
     },
     "trickArea": {
       "lastRoundFinalPosition": "Endposition der letzten Runde",
-      "waitingForLead": "Warten auf Ausspiel…",
-      "waitingForBidding": "Warten auf das Ende des Bietens…",
-      "waitingForTrump": "Warten auf die Wahl der Trumpffarbe…",
+      "waitingForLead": "Warten auf Ausspiel von {name}",
+      "waitingForBidding": "Warten auf das Gebot von {name}",
+      "waitingForTrump": "Warten auf die Wahl der Trumpffarbe durch {name}",
       "trickOf": "Stich {trickNo} von {handSize}",
       "ariaLabel": "Aktuelle Stichkarten"
     },

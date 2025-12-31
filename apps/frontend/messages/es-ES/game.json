@@ -136,7 +136,8 @@
       "hint": {
         "chooseAndSubmit": "Elige un valor y envíalo cuando estés listo.",
         "submittedWaiting": "Puja enviada — esperando a los demás.",
-        "waitingForPlayer": "Esperando a {name} para pujar."
+        "waitingForPlayer": "Esperando a {name} para pujar.",
+        "preEntry": "Puedes introducir tu puja ahora - puedes enviarla cuando sea tu turno"
       },
       "validation": {
         "enterBid": "Introduce una puja antes de enviar.",
@@ -150,6 +151,7 @@
     "trumpSelect": {
       "title": "Elegir triunfo",
       "description": "Elige el palo de triunfo de esta ronda. El triunfo gana a los demás palos.",
+      "waitingForPlayerDescription": "{name} está eligiendo el palo de triunfo. El triunfo gana a los demás palos.",
       "optionAria": "Elegir {trump} como triunfo",
       "optionAriaSelected": "Elegir {trump} como triunfo, actualmente seleccionado",
       "submit": {
@@ -222,9 +224,9 @@
     },
     "trickArea": {
       "lastRoundFinalPosition": "Posición final de la ronda anterior",
-      "waitingForLead": "Esperando la salida…",
-      "waitingForBidding": "Esperando a que termine la puja…",
-      "waitingForTrump": "Esperando a que se elija el triunfo…",
+      "waitingForLead": "Esperando la salida de {name}",
+      "waitingForBidding": "Esperando la puja de {name}",
+      "waitingForTrump": "Esperando a que {name} elija el triunfo",
       "trickOf": "Baza {trickNo} de {handSize}",
       "ariaLabel": "Cartas de la baza actual"
     },
