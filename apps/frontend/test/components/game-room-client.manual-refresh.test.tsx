@@ -318,8 +318,9 @@ describe('GameRoomClient', () => {
         etag: 'initial-etag',
       })
 
-      // Should update to bidding phase
-      expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+      // Should update to bidding phase (may appear multiple times - in panel and sidebar)
+      const biddingElements = screen.getAllByText(/Bidding/i)
+      expect(biddingElements.length).toBeGreaterThan(0)
     })
 
     it('handles ETag not modified response', async () => {

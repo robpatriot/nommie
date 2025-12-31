@@ -483,10 +483,11 @@ describe('GameRoomClient', () => {
         version: 1,
       })
 
-      // Wait for phase change
+      // Wait for phase change (may appear multiple times - in panel and sidebar)
       await waitFor(
         () => {
-          expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+          const biddingElements = screen.getAllByText(/Bidding/i)
+          expect(biddingElements.length).toBeGreaterThan(0)
         },
         { timeout: 2000 }
       )

@@ -116,15 +116,16 @@ describe('PlayerHand', () => {
     expect(onSelectCard).toHaveBeenCalledWith('2H')
   })
 
-  it('shows waiting message when not viewer turn', () => {
+  it('shows waiting message in header when not viewer turn and confirmation disabled', () => {
     render(
       <PlayerHand
         viewerHand={['2H', '3H', '5S', '7C']}
-        phase={createTrickPhase(1)} // Not viewer's turn
+        phase={createTrickPhase(1)} // Not viewer's turn (Bailey is seat 1)
         playerNames={playerNames}
         viewerSeat={0}
         selectedCard={null}
         onSelectCard={() => {}}
+        requireCardConfirmation={false}
         playState={{
           viewerSeat: 0,
           playable: ['2H', '3H', '5S', '7C'],
@@ -134,10 +135,34 @@ describe('PlayerHand', () => {
       />
     )
 
-    // Check for waiting messages (there are multiple, which is fine)
-    const waitingMessages = screen.getAllByText(/Waiting for Bailey/)
-    expect(waitingMessages.length).toBeGreaterThan(0)
-    // Also verify the waiting indicator in the header
-    expect(screen.getByText(/Waiting on Bailey/)).toBeInTheDocument()
+    // PlayerHand shows waiting message in header when requireCardConfirmation is false
+    // and it's not the viewer's turn
+    expect(screen.getByText(/Waiting for Bailey/)).toBeInTheDocument()
+  })
+
+  it('shows waiting message in button when not viewer turn and confirmation required', () => {
+    render(
+      <PlayerHand
+        viewerHand={['2H', '3H', '5S', '7C']}
+        phase={createTrickPhase(1)} // Not viewer's turn (Bailey is seat 1)
+        playerNames={playerNames}
+        viewerSeat={0}
+        selectedCard={null}
+        onSelectCard={() => {}}
+        requireCardConfirmation={true} // Default, but explicit for clarity
+        playState={{
+          viewerSeat: 0,
+          playable: ['2H', '3H', '5S', '7C'],
+          isPending: false,
+          onPlay: async () => {},
+        }}
+      />
+    )
+
+    // PlayerHand button shows waiting message when not viewer's turn and confirmation is required
+    // The button text shows "Waiting for Bailey" but aria-label is different, so query by text
+    const playButton = screen.getByText(/Waiting for Bailey/)
+    expect(playButton).toBeInTheDocument()
+    expect(playButton.closest('button')).toBeDisabled()
   })
 })

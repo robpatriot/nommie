@@ -354,10 +354,11 @@ describe('GameRoomClient', () => {
         version: 1,
       })
 
-      // Verify snapshot updated
+      // Verify snapshot updated (may appear multiple times - in panel and sidebar)
       await waitFor(
         () => {
-          expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+          const biddingElements = screen.getAllByText(/Bidding/i)
+          expect(biddingElements.length).toBeGreaterThan(0)
         },
         { timeout: 2000 }
       )
@@ -394,9 +395,11 @@ describe('GameRoomClient', () => {
       })
 
       // Verify snapshot updated via WebSocket (no manual refresh needed)
+      // May appear multiple times - in panel and sidebar
       await waitFor(
         () => {
-          expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+          const biddingElements = screen.getAllByText(/Bidding/i)
+          expect(biddingElements.length).toBeGreaterThan(0)
         },
         { timeout: 2000 }
       )
@@ -404,7 +407,8 @@ describe('GameRoomClient', () => {
       // Verify no manual refresh was called (WebSocket updates the cache directly)
       // Note: useGameSync might call getGameRoomSnapshotAction during initialization,
       // so we just verify the WebSocket update worked
-      expect(screen.getByText(/Bidding/i)).toBeInTheDocument()
+      const biddingElements = screen.getAllByText(/Bidding/i)
+      expect(biddingElements.length).toBeGreaterThan(0)
     })
 
     it('automatically retries via HTTP when WebSocket error received', async () => {
