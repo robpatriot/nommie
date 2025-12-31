@@ -1,7 +1,7 @@
 {
   "gameRoom": {
     "bidSubmitted": "Bid submitted",
-    "trumpSelected": "Trump selected",
+    "trumpSelected": "Trumps selected",
     "cardPlayed": "Card played",
     "leftGameSuccess": "Left game successfully",
     "aiSeatAdded": "AI seat added",
@@ -10,14 +10,14 @@
     "errors": {
       "versionRequired": "Lock version is required",
       "versionRequiredBid": "Lock version is required to submit bid",
-      "versionRequiredTrump": "Lock version is required to select trump",
+      "versionRequiredTrump": "Lock version is required to select trumps",
       "versionRequiredCard": "Lock version is required to play card",
       "unableToMarkReady": "Unable to mark ready",
       "unableToLeaveGame": "Unable to leave game",
       "gameStartedCannotLeave": "Cannot leave game: the game has already started",
       "leaveActiveGameConfirmation": "Are you sure you want to leave? An AI will take over your seat and continue playing.",
       "failedToSubmitBid": "Failed to submit bid",
-      "failedToSelectTrump": "Failed to select trump",
+      "failedToSelectTrump": "Failed to select trumps",
       "failedToPlayCard": "Failed to play card",
       "failedToLoadAiRegistry": "Failed to load AI registry",
       "failedToAddAiSeat": "Failed to add AI seat",

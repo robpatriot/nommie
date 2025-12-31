@@ -27,7 +27,7 @@
     "phase": {
       "init": "Initializing",
       "bidding": "Bidding Round",
-      "trumpSelect": "Select trump",
+      "trumpSelect": "Select trumps",
       "trick": "Trick play",
       "scoring": "Round scoring",
       "complete": "Round complete",
@@ -149,14 +149,14 @@
       "tableBids": "Table bids"
     },
     "trumpSelect": {
-      "title": "Select trump",
+      "title": "Select trumps",
       "description": "Choose the trump suit for this round. Trump cards outrank all other suits.",
       "waitingForPlayerDescription": "{name} is choosing the trump suit. Trump cards outrank all other suits.",
       "optionAria": "Select {trump} as trump suit",
       "optionAriaSelected": "Select {trump} as trump suit, currently selected",
       "submit": {
         "choosing": "Choosing…",
-        "confirm": "Confirm trump",
+        "confirm": "Confirm trumps",
         "waitingFor": "Waiting for {name}",
         "aria": {
           "selecting": "Selecting trump suit",
@@ -288,7 +288,7 @@
         "round": "Round",
         "dealer": "Dealer",
         "handSize": "Hand size",
-        "trump": "Trump"
+        "trump": "Trumps"
       },
       "scoreboard": {
         "title": "Scoreboard",
@@ -301,7 +301,7 @@
       "kicker": "Score archive",
       "title": "Score sheet",
       "description": "Review bids, trump picks, and the running totals for every round.",
-      "trumpCaller": "Trump caller",
+      "trumpCaller": "Trumps caller",
       "closeAria": "Close score history",
       "loading": "Loading history…",
       "empty": "No completed rounds yet. Start playing to build the score sheet.",
@@ -315,7 +315,7 @@
         "roundKicker": "Round {roundNo}",
         "handSize": "{handSize} cards",
         "dealer": "Dealer",
-        "trump": "Trump",
+        "trump": "Trumps",
         "by": "by",
         "pending": "(pending)",
         "bid": "Bid {bid}",
