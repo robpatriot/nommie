@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 import { fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -62,11 +62,10 @@ vi.mock('@/hooks/queries/useGames', () => ({
   },
 }))
 
-afterEach(() => {
-  vi.clearAllMocks()
-})
-
 describe('GameRoomView', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
   const playerNames: [string, string, string, string] = [
     'Alex',
     'Bailey',

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 
 import { PlayerHand } from '@/app/game/[gameId]/_components/game-room/PlayerHand'
@@ -13,11 +13,10 @@ vi.mock('@/hooks/useMediaQuery', () => ({
   },
 }))
 
-afterEach(() => {
-  vi.clearAllMocks()
-})
-
 describe('PlayerHand', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
   const playerNames: [string, string, string, string] = [
     'Alex',
     'Bailey',

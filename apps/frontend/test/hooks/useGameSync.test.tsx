@@ -8,87 +8,9 @@ import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { initSnapshotFixture } from '../mocks/game-snapshot'
 import { queryKeys } from '@/lib/queries/query-keys'
 import { mockGetGameRoomSnapshotAction } from '../../setupGameRoomActionsMock'
-
-// Mock WebSocket API - same pattern as other test files
-class MockWebSocket {
-  static CONNECTING = 0
-  static OPEN = 1
-  static CLOSING = 2
-  static CLOSED = 3
-
-  readyState = MockWebSocket.CONNECTING
-  url: string
-  onopen: ((event: Event) => void) | null = null
-  onerror: ((event: Event) => void) | null = null
-  onclose: ((event: CloseEvent) => void) | null = null
-  onmessage: ((event: MessageEvent) => void) | null = null
-
-  // Event listeners for MSW compatibility
-  private listeners: Map<string, Set<EventListener>> = new Map()
-
-  constructor(url: string) {
-    this.url = url
-    mockWebSocketInstances.push(this)
-    // Simulate async connection
-    Promise.resolve().then(() => {
-      this.readyState = MockWebSocket.OPEN
-      this.onopen?.(new Event('open'))
-      // Also trigger event listeners
-      const openListeners = this.listeners.get('open')
-      if (openListeners) {
-        openListeners.forEach((listener) => {
-          if (typeof listener === 'function') {
-            listener(new Event('open'))
-          }
-        })
-      }
-    })
-  }
-
-  send(_data: string) {
-    // Mock send
-  }
-
-  close(code = 1000, reason = 'Connection closed') {
-    this.readyState = MockWebSocket.CLOSED
-    const closeEvent = new CloseEvent('close', { code, reason })
-    this.onclose?.(closeEvent)
-    // Also trigger event listeners
-    const closeListeners = this.listeners.get('close')
-    if (closeListeners) {
-      closeListeners.forEach((listener) => {
-        if (typeof listener === 'function') {
-          listener(closeEvent)
-        }
-      })
-    }
-  }
-
-  // MSW compatibility methods
-  addEventListener(
-    type: string,
-    listener: EventListener | null,
-    _options?: boolean | AddEventListenerOptions
-  ) {
-    if (!listener) return
-    if (!this.listeners.has(type)) {
-      this.listeners.set(type, new Set())
-    }
-    this.listeners.get(type)!.add(listener)
-  }
-
-  removeEventListener(
-    type: string,
-    listener: EventListener | null,
-    _options?: boolean | EventListenerOptions
-  ) {
-    if (!listener) return
-    this.listeners.get(type)?.delete(listener)
-  }
-}
-
-// Store WebSocket instances for test control
-const mockWebSocketInstances: MockWebSocket[] = []
+import { MockWebSocket, mockWebSocketInstances } from '../setup/mock-websocket'
+import { createInitialDataWithVersion } from '../setup/game-room-client-helpers'
+import { setupFetchMock } from '../setup/game-room-client-mocks'
 
 // Track original fetch
 const originalFetch = globalThis.fetch
@@ -106,25 +28,6 @@ vi.mock('@/lib/config/env-validation', () => ({
 vi.mock('@/lib/logging/error-logger', () => ({
   logError: vi.fn(),
 }))
-
-function createInitialData(
-  gameId: number,
-  version = 1,
-  overrides?: Partial<GameRoomSnapshotPayload>
-): GameRoomSnapshotPayload {
-  return {
-    snapshot: initSnapshotFixture,
-    etag: `"game-${gameId}-v${version}"`,
-    version,
-    playerNames: ['Alex', 'Bailey', 'Casey', 'Dakota'],
-    viewerSeat: 0,
-    viewerHand: [],
-    timestamp: new Date().toISOString(),
-    hostSeat: 0,
-    bidConstraints: null,
-    ...overrides,
-  }
-}
 
 function createWrapper(queryClient: QueryClient) {
   const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -144,25 +47,7 @@ describe('useGameSync', () => {
     vi.useRealTimers()
 
     // Mock fetch for /api/ws-token endpoint
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string | URL | Request) => {
-        const urlString =
-          typeof url === 'string'
-            ? url
-            : url instanceof URL
-              ? url.toString()
-              : url.url
-        if (urlString.includes('/api/ws-token')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ token: 'test-token' }),
-          } as Response)
-        }
-        // Fallback to original fetch for other requests
-        return originalFetch(url)
-      })
-    )
+    setupFetchMock(originalFetch)
 
     // Ensure WebSocket is mocked
     vi.stubGlobal('WebSocket', MockWebSocket)
@@ -170,7 +55,7 @@ describe('useGameSync', () => {
     mockGetGameRoomSnapshotAction.mockImplementation(
       async ({ gameId }: { gameId: number }) => ({
         kind: 'ok' as const,
-        data: createInitialData(gameId),
+        data: createInitialDataWithVersion(gameId),
       })
     )
 
@@ -193,7 +78,7 @@ describe('useGameSync', () => {
 
   describe('Connection Lifecycle', () => {
     it('should create a WebSocket connection on mount', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -213,7 +98,7 @@ describe('useGameSync', () => {
     })
 
     it('should close connection on unmount', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const { result, unmount } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -241,7 +126,10 @@ describe('useGameSync', () => {
     it('should update connection when gameId changes', async () => {
       const { result, rerender } = renderHook(
         ({ gameId }) =>
-          useGameSync({ initialData: createInitialData(gameId), gameId }),
+          useGameSync({
+            initialData: createInitialDataWithVersion(gameId),
+            gameId,
+          }),
         {
           initialProps: { gameId: 1 },
           wrapper: createWrapper(queryClient),
@@ -280,7 +168,7 @@ describe('useGameSync', () => {
 
   describe('Manual Connection Control', () => {
     it('should allow manual disconnect', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -309,7 +197,7 @@ describe('useGameSync', () => {
     })
 
     it('should allow manual reconnect after disconnect', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -348,7 +236,7 @@ describe('useGameSync', () => {
 
   describe('WebSocket Message Handling', () => {
     it('should update query cache when receiving snapshot message', async () => {
-      const initialData = createInitialData(1, 1)
+      const initialData = createInitialDataWithVersion(1, 1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -417,7 +305,7 @@ describe('useGameSync', () => {
         },
       })
 
-      const initialData = createInitialData(1, 1)
+      const initialData = createInitialDataWithVersion(1, 1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -501,7 +389,7 @@ describe('useGameSync', () => {
     })
 
     it('should refresh snapshot on error message', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -544,7 +432,7 @@ describe('useGameSync', () => {
 
   describe('Manual Snapshot Refresh', () => {
     it('should refresh snapshot manually', async () => {
-      const initialData = createInitialData(1, 1)
+      const initialData = createInitialDataWithVersion(1, 1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -561,7 +449,7 @@ describe('useGameSync', () => {
 
       mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
         kind: 'ok',
-        data: createInitialData(1, 2),
+        data: createInitialDataWithVersion(1, 2),
       })
 
       await act(async () => {
@@ -580,7 +468,7 @@ describe('useGameSync', () => {
     })
 
     it('should handle refresh errors', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -610,7 +498,7 @@ describe('useGameSync', () => {
 
   describe('Error Handling', () => {
     it('should handle token fetch timeout', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const mockFetchFn = vi.fn((url: string | URL | Request) => {
         const urlString =
           typeof url === 'string'
@@ -652,7 +540,7 @@ describe('useGameSync', () => {
     })
 
     it('should handle token fetch failure', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const mockFetchFn = vi.fn((url: string | URL | Request) => {
         const urlString =
           typeof url === 'string'
@@ -692,7 +580,7 @@ describe('useGameSync', () => {
     })
 
     it('should handle WebSocket connection errors', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
@@ -722,7 +610,7 @@ describe('useGameSync', () => {
 
   describe('Connection State Management', () => {
     it('should track connection state correctly', async () => {
-      const initialData = createInitialData(1)
+      const initialData = createInitialDataWithVersion(1)
       const { result } = renderHook(
         () => useGameSync({ initialData, gameId: 1 }),
         {
