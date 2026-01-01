@@ -27,7 +27,6 @@ import { PlayerActions } from './game-room/PlayerActions'
 import { ScoreSidebar } from './game-room/ScoreSidebar'
 import { ScoreHistoryDialog } from './game-room/ScoreHistoryDialog'
 import { AiSeatManager } from './game-room/AiSeatManager'
-import { SyncButton } from './game-room/SyncButton'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
 import { ReadyPanel } from './game-room/ReadyPanel'
@@ -613,11 +612,6 @@ export function GameRoomView(props: GameRoomViewProps) {
                 'card-wrapper rounded-[40px] border border-white/10 px-6 pt-[44px] pb-6 shadow-elevated'
             )}
           >
-            {onRefresh ? (
-              <div className="pointer-events-auto absolute right-6 top-6 z-10 hidden sm:block">
-                <SyncButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
-              </div>
-            ) : null}
             {showPreviousRoundPosition ? (
               <div className="text-left text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
                 {t('trickArea.lastRoundFinalPosition')}
@@ -643,8 +637,6 @@ export function GameRoomView(props: GameRoomViewProps) {
                 lastTrick={lastTrick}
                 showPreviousRoundPosition={showPreviousRoundPosition}
                 className="col-start-2 row-start-2 w-full"
-                onRefresh={onRefresh}
-                isRefreshing={isRefreshing}
                 cardScale={cardScale}
               />
             </div>
@@ -667,8 +659,6 @@ export function GameRoomView(props: GameRoomViewProps) {
                 viewerSeat={effectiveViewerSeat ?? 0}
                 lastTrick={lastTrick}
                 showPreviousRoundPosition={showPreviousRoundPosition}
-                onRefresh={onRefresh}
-                isRefreshing={isRefreshing}
                 cardScale={cardScale}
               />
             </div>
