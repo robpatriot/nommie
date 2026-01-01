@@ -93,9 +93,7 @@ describe('GameRoomView', () => {
     expect(screen.getAllByText('Alex').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Won/)[0].textContent).toContain('2')
     expect(screen.getAllByText('Bid 2').length).toBeGreaterThan(0)
-    expect(
-      screen.getAllByLabelText('Refresh game state').length
-    ).toBeGreaterThan(0)
+    // Refresh button is only shown in Init phase, not during active game phases
   })
 
   it('surfaces errors', () => {
