@@ -18,8 +18,15 @@ import {
   getActiveSeat,
   getCurrentTrickMap,
   getRound,
+  normalizeViewerSeat,
   ORIENTATION_ORDER_MOBILE,
 } from './game-room/utils'
+import {
+  getHistoricalStats,
+  getLastTrick,
+  isTrickPhase,
+} from './game-room/phase-helpers'
+import { useGamePhaseState } from './hooks/useGamePhaseState'
 import { SeatCard } from './game-room/SeatCard'
 import { TrickArea } from './game-room/TrickArea'
 import { PlayerHand } from './game-room/PlayerHand'
@@ -95,13 +102,13 @@ export function GameRoomView(props: GameRoomViewProps) {
   } = props
   const phase = snapshot.phase
   const round = getRound(phase)
-  const isPreGame = phase.phase === 'Init'
-  const isGameOver = phase.phase === 'GameOver'
+  const phaseState = useGamePhaseState(phase)
+  const { isPreGame, isGameOver } = phaseState
   const activeSeat = getActiveSeat(phase)
 
-  // Handle viewerSeat explicitly - don't default to 0 to avoid masking missing data.
+  // Normalize viewer seat - don't default to 0 to avoid masking missing data.
   // If viewerSeat is undefined/null, no seat will be marked as "viewer".
-  const effectiveViewerSeat: Seat | null = viewerSeat ?? null
+  const effectiveViewerSeat = normalizeViewerSeat(viewerSeat)
 
   const tYou = t('you')
   const tStatusWaiting = t('status.waiting')
@@ -156,13 +163,7 @@ export function GameRoomView(props: GameRoomViewProps) {
   )
 
   const trickMap = getCurrentTrickMap(phase)
-  const historicalStats =
-    phase.phase === 'Bidding' && phase.data.previous_round
-      ? {
-          bids: phase.data.previous_round.bids,
-          tricksWon: phase.data.previous_round.tricks_won,
-        }
-      : undefined
+  const historicalStats = getHistoricalStats(phase)
 
   const seatSummaries = buildSeatSummaries({
     playerNames,
@@ -242,12 +243,10 @@ export function GameRoomView(props: GameRoomViewProps) {
   // Reset and validate selectedCard when phase or playState changes
   // Use startTransition to mark as non-urgent update to avoid cascading renders
   useEffect(() => {
-    const currentPhase = phase.phase
-
     startTransition(() => {
       setSelectedCard((current) => {
         // Reset when not in Trick phase or playState unavailable
-        if (currentPhase !== 'Trick' || !playState) {
+        if (!isTrickPhase(phase) || !playState) {
           return null
         }
 
@@ -271,12 +270,7 @@ export function GameRoomView(props: GameRoomViewProps) {
   // Get last trick from backend snapshot
   // - In Trick phase: last trick from current round
   // - In Bidding/TrumpSelect: final trick from previous round
-  const lastTrick =
-    phase.phase === 'Trick' ||
-    phase.phase === 'Bidding' ||
-    phase.phase === 'TrumpSelect'
-      ? phase.data.last_trick
-      : null
+  const lastTrick = getLastTrick(phase)
 
   const showPreviousRoundPosition =
     phase.phase === 'Bidding' &&
@@ -499,7 +493,7 @@ export function GameRoomView(props: GameRoomViewProps) {
             }
           />
 
-          <span className="sr-only">{phase.phase}</span>
+          <span className="sr-only">{phaseState.phaseName}</span>
 
           {error ? (
             <div className="mt-6 rounded-2xl border border-warning/60 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">

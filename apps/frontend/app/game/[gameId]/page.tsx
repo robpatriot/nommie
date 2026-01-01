@@ -9,6 +9,7 @@ import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
+import { normalizeViewerSeat } from './_components/game-room/utils'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { getUserOptions } from '@/lib/api/user-options'
 import { BackendApiError } from '@/lib/api'
@@ -72,9 +73,8 @@ export default async function GamePage({
   const hostSeat = (snapshotResult.snapshot.game.host_seat ??
     DEFAULT_VIEWER_SEAT) as typeof DEFAULT_VIEWER_SEAT
   const viewerSeat =
-    typeof snapshotResult.viewerSeat === 'number'
-      ? (snapshotResult.viewerSeat as typeof DEFAULT_VIEWER_SEAT)
-      : DEFAULT_VIEWER_SEAT
+    normalizeViewerSeat(snapshotResult.viewerSeat, DEFAULT_VIEWER_SEAT) ??
+    DEFAULT_VIEWER_SEAT
 
   const initialPayload: GameRoomSnapshotPayload = {
     snapshot: snapshotResult.snapshot,

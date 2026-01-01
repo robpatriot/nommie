@@ -1,6 +1,11 @@
 import { useMemo } from 'react'
 import type { Seat, Trump } from '@/lib/game-room/types'
 import type { GameSnapshot } from '@/lib/game-room/types'
+import {
+  isBiddingPhase,
+  isTrumpSelectPhase,
+  isTrickPhase,
+} from '../game-room/phase-helpers'
 
 interface UseGameRoomControlsProps {
   phase: GameSnapshot['phase']
@@ -33,7 +38,7 @@ export function useGameRoomControls({
 }: UseGameRoomControlsProps) {
   const biddingControls = useMemo(() => {
     if (
-      phase.phase !== 'Bidding' ||
+      !isBiddingPhase(phase) ||
       viewerSeatForInteractions === null ||
       phase.data.bids[viewerSeatForInteractions] !== null
     ) {
@@ -55,7 +60,7 @@ export function useGameRoomControls({
   ])
 
   const trumpControls = useMemo(() => {
-    if (phase.phase !== 'TrumpSelect') {
+    if (!isTrumpSelectPhase(phase)) {
       return undefined
     }
 
@@ -82,7 +87,7 @@ export function useGameRoomControls({
   }, [handleSelectTrump, isTrumpPending, phase, viewerSeatForInteractions])
 
   const playControls = useMemo(() => {
-    if (phase.phase !== 'Trick') {
+    if (!isTrickPhase(phase)) {
       return undefined
     }
 

@@ -12,6 +12,11 @@ import { TrickAreaHeader } from './TrickAreaHeader'
 import { cn } from '@/lib/cn'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { shortenNameForDisplay, getOrientation, getActiveSeat } from './utils'
+import {
+  isBiddingPhase,
+  isTrumpSelectPhase,
+  isTrickPhase,
+} from './phase-helpers'
 
 // Dimension constants
 const CARD_HEIGHT = CARD_DIMENSIONS.md.height
@@ -255,16 +260,16 @@ function getWaitingMessage(
     return t('waitingForLead')
   }
   const activeName = getSeatName(activeSeat)
-  switch (phase.phase) {
-    case 'Bidding':
-      return t('waitingForBidding', { name: activeName })
-    case 'TrumpSelect':
-      return t('waitingForTrump', { name: activeName })
-    case 'Trick':
-      return t('waitingForLead', { name: activeName })
-    default:
-      return t('waitingForLead')
+  if (isBiddingPhase(phase)) {
+    return t('waitingForBidding', { name: activeName })
   }
+  if (isTrumpSelectPhase(phase)) {
+    return t('waitingForTrump', { name: activeName })
+  }
+  if (isTrickPhase(phase)) {
+    return t('waitingForLead', { name: activeName })
+  }
+  return t('waitingForLead')
 }
 
 export function TrickArea({
@@ -282,7 +287,7 @@ export function TrickArea({
   const orderedCards = useMemo(() => {
     // Create a map of seat to play order index from phase.data.current_trick
     const playOrderMap = new Map<Seat, number>()
-    if (phase.phase === 'Trick') {
+    if (isTrickPhase(phase)) {
       phase.data.current_trick.forEach(([seat], playIndex) => {
         playOrderMap.set(seat, playIndex)
       })
@@ -314,7 +319,7 @@ export function TrickArea({
 
   // Generate random offsets for diamond layout cards based on trick number
   // Offsets change when trick number changes to create subtle misalignment
-  const trickNo = phase.phase === 'Trick' ? phase.data.trick_no : 0
+  const trickNo = isTrickPhase(phase) ? phase.data.trick_no : 0
   const diamondOffsets = useMemo(() => {
     // Seed random generator with trick number for consistency
     // Simple seeded random function (linear congruential generator)
@@ -375,8 +380,7 @@ export function TrickArea({
   const scaledDimensions = calculateScaledDimensions(safeCardScale)
 
   // Determine if we should show last trick
-  const isBetweenRounds =
-    phase.phase === 'Bidding' || phase.phase === 'TrumpSelect'
+  const isBetweenRounds = isBiddingPhase(phase) || isTrumpSelectPhase(phase)
   const hasCards = orderedCards.length > 0
   // Calculate container height - always based on card dimensions to prevent layout jumps
   const calculatedHeight = calculateContainerHeight(
@@ -447,7 +451,7 @@ export function TrickArea({
           <span className="text-sm font-medium text-subtle">
             {getWaitingMessage(phase, getSeatName, t)}
           </span>
-          {phase.phase === 'Trick' ? (
+          {isTrickPhase(phase) ? (
             <span className="text-xs text-muted">
               {t('trickOf', {
                 trickNo: phase.data.trick_no,
@@ -466,7 +470,7 @@ export function TrickArea({
               width: `${DIAMOND_CONTAINER_SIZE}px`,
             }}
           >
-            {phase.phase === 'Trick' &&
+            {isTrickPhase(phase) &&
               phase.data.current_trick.map(([seat, card], playOrder) => {
                 const orientation = getOrientation(viewerSeat, seat)
                 let positionTransform = CENTER_TRANSFORM

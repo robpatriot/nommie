@@ -8,6 +8,11 @@ import type {
 import { BiddingPanel } from './BiddingPanel'
 import { LastTrick } from './LastTrick'
 import type { GameRoomViewProps } from '../game-room-view'
+import {
+  isBiddingPhase,
+  isTrumpSelectPhase,
+  isTrickPhase,
+} from './phase-helpers'
 
 interface PlayerActionsProps {
   phase: PhaseSnapshot
@@ -42,7 +47,7 @@ export function PlayerActions({
 }: PlayerActionsProps) {
   const t = useTranslations('game.gameRoom.tableActions')
 
-  if (phase.phase === 'Bidding') {
+  if (isBiddingPhase(phase)) {
     // Always show bidding panel during bidding phase, even if user has submitted
     // Create a minimal bidding state if one doesn't exist (for viewing bids after submission)
     const biddingState = bidding ?? createBiddingStateFallback(viewerSeat)
@@ -57,7 +62,7 @@ export function PlayerActions({
     )
   }
 
-  if (phase.phase === 'TrumpSelect') {
+  if (isTrumpSelectPhase(phase)) {
     // Show bids panel during trump selection (with or without trump selection UI)
     // If it's your turn, show trump selection UI integrated into bidding panel
     // If not your turn, show just the bids panel with indication
@@ -87,7 +92,7 @@ export function PlayerActions({
     )
   }
 
-  if (phase.phase === 'Trick') {
+  if (isTrickPhase(phase)) {
     return (
       <LastTrick
         lastTrick={lastTrick ?? null}

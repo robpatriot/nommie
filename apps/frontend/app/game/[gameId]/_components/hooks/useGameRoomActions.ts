@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import type { PhaseSnapshot, Trump } from '@/lib/game-room/types'
 import type { ToastMessage } from '@/components/Toast'
+import { isActiveGame } from '../game-room/phase-helpers'
 import {
   useMarkPlayerReady,
   useLeaveGame,
@@ -218,10 +219,10 @@ export function useGameRoomActions({
     }
 
     // Check if game is active (not in Init/Lobby phase)
-    const isActiveGame = phase.phase !== 'Init'
+    const gameIsActive = isActiveGame(phase)
 
     // If game is active, show confirmation dialog
-    if (isActiveGame) {
+    if (gameIsActive) {
       const confirmed = window.confirm(
         tErrors('leaveActiveGameConfirmation') ||
           'Are you sure you want to leave? An AI will take over your seat and continue playing.'

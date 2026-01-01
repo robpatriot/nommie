@@ -17,6 +17,8 @@ import { useSlowSyncIndicator } from './hooks/useSlowSyncIndicator'
 import { useGameRoomActions } from './hooks/useGameRoomActions'
 import { useGameRoomControls } from './hooks/useGameRoomControls'
 import { useAiSeatManagement } from './hooks/useAiSeatManagement'
+import { normalizeViewerSeat } from './game-room/utils'
+import { isInitPhase } from './game-room/phase-helpers'
 
 interface GameRoomClientProps {
   initialData: GameRoomSnapshotPayload
@@ -63,12 +65,9 @@ export function GameRoomClient({
   // Background refetches won't trigger loading indicators
   const isRefreshing = syncIsRefreshing || isSnapshotLoading
 
-  // Calculate viewer seat once and reuse
+  // Normalize viewer seat once and reuse
   const viewerSeatForInteractions = useMemo<Seat | null>(
-    () =>
-      typeof snapshot.viewerSeat === 'number'
-        ? (snapshot.viewerSeat as Seat)
-        : null,
+    () => normalizeViewerSeat(snapshot.viewerSeat),
     [snapshot.viewerSeat]
   )
 
@@ -78,7 +77,7 @@ export function GameRoomClient({
   // AI registry query visibility
   const hostSeat: Seat = snapshot.hostSeat
   const viewerIsHost = viewerSeatForInteractions === hostSeat
-  const canViewAiManager = viewerIsHost && phaseName === 'Init'
+  const canViewAiManager = viewerIsHost && isInitPhase(phase)
 
   // Ready state management
   const { hasMarkedReady, setHasMarkedReady, canMarkReady } =

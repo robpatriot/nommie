@@ -4,6 +4,7 @@ import { PhaseFact } from './PhaseFact'
 import { StatCard } from '@/components/StatCard'
 import { cn } from '@/lib/cn'
 import { formatNumber } from '@/utils/number-formatting'
+import { getPhaseTranslationKey, isTrickPhase } from './phase-helpers'
 
 interface ScoreSidebarProps {
   gameId: number
@@ -19,27 +20,6 @@ interface ScoreSidebarProps {
   onShowHistory?: () => void
   isHistoryLoading?: boolean
   className?: string
-}
-
-function getPhaseTranslationKey(phase: PhaseSnapshot['phase']): string {
-  switch (phase) {
-    case 'Init':
-      return 'init'
-    case 'Bidding':
-      return 'bidding'
-    case 'TrumpSelect':
-      return 'trumpSelect'
-    case 'Trick':
-      return 'trick'
-    case 'Scoring':
-      return 'scoring'
-    case 'Complete':
-      return 'complete'
-    case 'GameOver':
-      return 'gameOver'
-    default:
-      return 'unknown'
-  }
 }
 
 export function ScoreSidebar({
@@ -84,7 +64,7 @@ export function ScoreSidebar({
               <span className="font-semibold text-primary">{activeName}</span>
             </p>
           </div>
-          {phase.phase === 'Trick' ? (
+          {isTrickPhase(phase) ? (
             <StatCard
               label={t('trick.label')}
               value={`${phase.data.trick_no} / ${round?.hand_size ?? '?'}`}

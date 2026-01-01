@@ -14,6 +14,7 @@ import type { GameRoomViewProps } from '../game-room-view'
 import { cn } from '@/lib/cn'
 import { PlayingCard, CARD_DIMENSIONS } from './PlayingCard'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { isTrickPhase as checkIsTrickPhase } from './phase-helpers'
 
 export type LayoutVariant = 'default' | 'scaled'
 
@@ -846,7 +847,7 @@ export function PlayerHand({
   const t = useTranslations('game.gameRoom.play')
   const tHand = useTranslations('game.gameRoom.hand')
   const tSuitAbbrev = useTranslations('game.gameRoom.hand.suitAbbrev')
-  const isTrickPhase = phase.phase === 'Trick' && !!playState
+  const isTrickPhase = checkIsTrickPhase(phase) && !!playState
   const viewerTurn =
     isTrickPhase && playState
       ? phase.data.to_act === playState.viewerSeat
