@@ -5,6 +5,7 @@ import type {
   Seat,
 } from '@/lib/game-room/types'
 import { CARD_DIMENSIONS } from './PlayingCard'
+import { isTrickPhase } from './phase-helpers'
 
 export interface SeatSummary {
   seat: Seat
@@ -36,6 +37,29 @@ export const ORIENTATION_ORDER_MOBILE: SeatSummary['orientation'][] = [
 export const ORIENTATION_ORDER_TRICK: Array<
   'bottom' | 'right' | 'top' | 'left'
 > = ['left', 'top', 'right', 'bottom']
+
+/**
+ * Normalize viewer seat value to Seat | null.
+ * Validates that the seat is a valid number between 0-3.
+ *
+ * @param seat - The seat value to normalize (number, null, or undefined)
+ * @param fallback - Optional fallback value (defaults to null)
+ * @returns Normalized Seat or null
+ */
+export function normalizeViewerSeat(
+  seat: number | null | undefined,
+  fallback?: Seat | null
+): Seat | null {
+  if (
+    typeof seat === 'number' &&
+    !Number.isNaN(seat) &&
+    seat >= 0 &&
+    seat <= 3
+  ) {
+    return seat as Seat
+  }
+  return fallback ?? null
+}
 
 export function getOrientation(
   viewerSeat: Seat,
@@ -73,7 +97,7 @@ export function getActiveSeat(phase: PhaseSnapshot): Seat | null {
 }
 
 export function getCurrentTrickMap(phase: PhaseSnapshot): Map<Seat, Card> {
-  if (phase.phase !== 'Trick') {
+  if (!isTrickPhase(phase)) {
     return new Map()
   }
   return new Map(phase.data.current_trick)
