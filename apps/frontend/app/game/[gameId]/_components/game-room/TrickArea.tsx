@@ -8,7 +8,7 @@ import type {
 } from '@/lib/game-room/types'
 import { PlayingCard, CARD_DIMENSIONS } from './PlayingCard'
 import { LastTrickCards } from './LastTrickCards'
-import { SyncButton } from './SyncButton'
+import { TrickAreaHeader } from './TrickAreaHeader'
 import { cn } from '@/lib/cn'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { shortenNameForDisplay, getOrientation, getActiveSeat } from './utils'
@@ -19,8 +19,8 @@ const CARD_WIDTH = CARD_DIMENSIONS.md.width
 const LABEL_HEIGHT = 20
 const Z_INDEX_BASE = 20
 
-// Sync button dimensions: py-1.5 (6px) + icon h-4 (16px) + py-1.5 (6px) = 28px total
-const SYNC_BUTTON_HEIGHT = 28
+// Header row height (h-7 = 28px)
+const HEADER_ROW_HEIGHT = 28
 const DIAMOND_LAYOUT_PADDING = 16 // Equal top and bottom padding for >640px diamond layout
 
 // Card transform multipliers
@@ -31,7 +31,6 @@ const HORIZONTAL_OFFSET_MULTIPLIER = 0.6 // 60% of card width for left/right pos
 const CARD_LABEL_GAP = 13 // Fixed gap between card and label (absolute value, not scaled)
 const MOBILE_TOP_PADDING = 8 // Top padding for <640px
 const MOBILE_BOTTOM_PADDING = 6 // Bottom padding for <640px
-const SYNC_BUTTON_RIGHT_PADDING = 16 // Right padding for sync button (right-4 = 16px)
 const MAX_NAME_LENGTH = 8 // Maximum length for shortened player names in trick area
 
 // Diamond layout constants (>640px)
@@ -171,7 +170,8 @@ function calculateScaledDimensions(cardScale: number): ScaledDimensions {
  */
 function calculateContainerHeight(
   scaledDimensions: ScaledDimensions,
-  isLargeViewport: boolean
+  isLargeViewport: boolean,
+  isMediumViewport: boolean
 ): number {
   if (isLargeViewport) {
     // For >640px diamond layout: distance between north and south card positions
@@ -188,18 +188,24 @@ function calculateContainerHeight(
     // Card extends 50% below center, so card bottom = 60% + 50% = 110% of card height
     // Label bottom = card bottom + gap + labelHeight = 110% of card height + gap + labelHeight
     // Container height = 110% of card height + gap + labelHeight
-    // Height = cardHeight + cardOffset + gap + labelHeight + syncButtonHeight + 2x topOffset + bottomPadding
+    // Height = cardHeight + cardOffset + gap + labelHeight + headerRowHeight + 2x topOffset + bottomPadding
+    // For 380-640px: reduce by headerRowHeight + 1x topPadding since header row is present
     const verticalOffset =
       scaledDimensions.cardHeight * VERTICAL_OFFSET_MULTIPLIER
-    return (
+    const baseHeight =
       scaledDimensions.cardHeight +
       verticalOffset +
       scaledDimensions.gap +
       scaledDimensions.labelHeight +
-      SYNC_BUTTON_HEIGHT +
+      HEADER_ROW_HEIGHT +
       MOBILE_TOP_PADDING * 2 +
       MOBILE_BOTTOM_PADDING
-    )
+
+    if (isMediumViewport) {
+      // Reduce by header row height + 1x top padding for 380-640px
+      return baseHeight - HEADER_ROW_HEIGHT - MOBILE_TOP_PADDING
+    }
+    return baseHeight
   }
 }
 
@@ -236,8 +242,6 @@ interface TrickAreaProps {
   lastTrick?: Array<[Seat, Card]> | null
   showPreviousRoundPosition?: boolean
   className?: string
-  onRefresh?: () => void
-  isRefreshing?: boolean
   cardScale?: number
 }
 
@@ -272,8 +276,6 @@ export function TrickArea({
   lastTrick,
   showPreviousRoundPosition,
   className = '',
-  onRefresh,
-  isRefreshing = false,
   cardScale = 1,
 }: TrickAreaProps) {
   const t = useTranslations('game.gameRoom.trickArea')
@@ -300,8 +302,15 @@ export function TrickArea({
     return cards.slice().sort((a, b) => a.seat - b.seat)
   }, [trickMap, getSeatName, phase])
 
-  // Check if viewport is > 640px for responsive top padding
+  // Calculate total bids
+  const totalBids = useMemo(() => {
+    if (!round) return 0
+    return round.bids.reduce((sum: number, bid) => sum + (bid ?? 0), 0)
+  }, [round])
+
+  // Check viewport sizes for responsive adjustments
   const isLargeViewport = useMediaQuery('(min-width: 640px)')
+  const isMediumViewport = useMediaQuery('(min-width: 380px)')
 
   // Generate random offsets for diamond layout cards based on trick number
   // Offsets change when trick number changes to create subtle misalignment
@@ -372,14 +381,14 @@ export function TrickArea({
   // Calculate container height - always based on card dimensions to prevent layout jumps
   const calculatedHeight = calculateContainerHeight(
     scaledDimensions,
-    isLargeViewport
+    isLargeViewport,
+    isMediumViewport
   )
 
   // Calculate padding values
   const paddingTop = isLargeViewport
     ? DIAMOND_LAYOUT_PADDING
     : MOBILE_TOP_PADDING
-  const paddingRight = isLargeViewport ? undefined : SYNC_BUTTON_RIGHT_PADDING
   const paddingBottom = isLargeViewport
     ? DIAMOND_LAYOUT_PADDING
     : MOBILE_BOTTOM_PADDING
@@ -402,24 +411,28 @@ export function TrickArea({
         height: `${calculatedHeight + paddingTop + paddingBottom}px`,
         paddingTop: `${paddingTop}px`,
         paddingBottom: `${paddingBottom}px`,
-        ...(paddingRight !== undefined && {
-          paddingRight: `${paddingRight}px`,
-        }),
       }}
       role="region"
       aria-label={t('ariaLabel')}
     >
-      {onRefresh ? (
+      {/* Header Row - only visible <1024px, positioned absolutely at top */}
+      {round && (
         <div
-          className="pointer-events-auto absolute z-10 sm:hidden"
+          className="pointer-events-none absolute left-4 right-4 top-0 z-10 lg:hidden"
           style={{
             top: `${paddingTop}px`,
-            right: `${paddingRight ?? SYNC_BUTTON_RIGHT_PADDING}px`,
           }}
         >
-          <SyncButton onRefresh={onRefresh} isRefreshing={isRefreshing} />
+          <div className="pointer-events-auto">
+            <TrickAreaHeader
+              trump={round.trump}
+              totalBids={totalBids}
+              handSize={round.hand_size ?? 0}
+            />
+          </div>
         </div>
-      ) : null}
+      )}
+
       {showLastTrick && lastTrick ? (
         <div className="flex w-full flex-col gap-4">
           <LastTrickCards
@@ -499,7 +512,8 @@ export function TrickArea({
           {(() => {
             // Calculate positioning values once (same for all cards)
             // Center of entire element (card + gap + label) should be positioned so visible gap above top card
-            // is 2 * paddingTop + syncButtonHeight (for <640px only)
+            // is 2 * paddingTop + headerRowHeight (for <640px only)
+            // For 380-640px: reduce by headerRowHeight + 1x topPadding since header row is present
             // After translateY(-verticalOffset), center = centerTop - verticalOffset
             // Top edge = center - (cardHeight + gap + labelHeight) / 2
             // For top edge = visibleGap: centerTop - verticalOffset - (cardHeight + gap + labelHeight) / 2 = visibleGap
@@ -510,7 +524,11 @@ export function TrickArea({
               scaledDimensions.cardHeight +
               scaledDimensions.gap +
               scaledDimensions.labelHeight
-            const visibleGap = paddingTop * 2 + SYNC_BUTTON_HEIGHT
+            let visibleGap = paddingTop * 2 + HEADER_ROW_HEIGHT
+            if (isMediumViewport) {
+              // Reduce by header row height + 1x top padding for 380-640px
+              visibleGap = visibleGap - HEADER_ROW_HEIGHT - MOBILE_TOP_PADDING
+            }
             const centerTop =
               visibleGap + verticalOffset + totalElementHeight / 2
 
