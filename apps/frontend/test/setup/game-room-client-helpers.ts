@@ -1,0 +1,128 @@
+import type { QueryClient } from '@tanstack/react-query'
+import { act } from '@testing-library/react'
+import { waitFor } from '@testing-library/react'
+import { expect } from 'vitest'
+import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import { queryKeys } from '@/lib/queries/query-keys'
+import { initSnapshotFixture } from '../mocks/game-snapshot'
+import { MockWebSocket, mockWebSocketInstances } from './mock-websocket'
+
+/**
+ * Creates initial game room snapshot data for tests.
+ * Most GameRoomClient tests use this variant (simple etag).
+ */
+export function createInitialData(
+  snapshot = initSnapshotFixture,
+  overrides?: Partial<GameRoomSnapshotPayload>
+): GameRoomSnapshotPayload {
+  return {
+    snapshot,
+    etag: 'initial-etag',
+    playerNames: ['Alex', 'Bailey', 'Casey', 'Dakota'],
+    viewerSeat: 0,
+    viewerHand: [],
+    timestamp: new Date().toISOString(),
+    hostSeat: 0,
+    ...overrides,
+  }
+}
+
+/**
+ * Creates initial game room snapshot data with versioned etag.
+ * Used by useGameSync tests which need version tracking.
+ */
+export function createInitialDataWithVersion(
+  gameId: number,
+  version = 1,
+  overrides?: Partial<GameRoomSnapshotPayload>
+): GameRoomSnapshotPayload {
+  return {
+    snapshot: initSnapshotFixture,
+    etag: `"game-${gameId}-v${version}"`,
+    version,
+    playerNames: ['Alex', 'Bailey', 'Casey', 'Dakota'],
+    viewerSeat: 0,
+    viewerHand: [],
+    timestamp: new Date().toISOString(),
+    hostSeat: 0,
+    bidConstraints: null,
+    ...overrides,
+  }
+}
+
+/**
+ * Waits for a WebSocket connection to be established.
+ * Returns the first connected WebSocket instance.
+ */
+export async function waitForWebSocketConnection(): Promise<MockWebSocket> {
+  await waitFor(
+    () => {
+      expect(mockWebSocketInstances.length).toBeGreaterThan(0)
+      const ws = mockWebSocketInstances[0]
+      expect(ws.readyState).toBe(MockWebSocket.OPEN)
+    },
+    { timeout: 2000 }
+  )
+  return mockWebSocketInstances[0]
+}
+
+/**
+ * Sends a WebSocket snapshot message and updates the query cache.
+ * This simulates what useGameSync does when receiving snapshot messages.
+ */
+export function sendWebSocketSnapshot(
+  ws: MockWebSocket,
+  snapshot: typeof initSnapshotFixture,
+  gameId: number,
+  queryClient: QueryClient,
+  overrides?: {
+    viewerSeat?: number
+    version?: number
+    viewerHand?: string[]
+  }
+): void {
+  // Transform the snapshot message to GameRoomSnapshotPayload format
+  // This simulates what useGameSync.transformSnapshotMessage does
+  const version = overrides?.version ?? 1
+  const viewerSeat = overrides?.viewerSeat ?? 0
+  const viewerHand = overrides?.viewerHand ?? []
+  const playerNames: [string, string, string, string] = [
+    'Alex',
+    'Bailey',
+    'Casey',
+    'Dakota',
+  ]
+
+  const payload: GameRoomSnapshotPayload = {
+    snapshot,
+    playerNames,
+    viewerSeat: viewerSeat as any,
+    viewerHand,
+    timestamp: new Date().toISOString(),
+    hostSeat: snapshot.game.host_seat as any,
+    bidConstraints: null,
+    version,
+    etag: `"game-${gameId}-v${version}"`,
+  }
+
+  // Update the real query cache (simulating what useGameSync does)
+  queryClient.setQueryData(queryKeys.games.snapshot(gameId), payload)
+
+  const message = {
+    type: 'snapshot',
+    data: {
+      snapshot,
+      version: version,
+      viewer_hand: viewerHand,
+      bid_constraints: null,
+    },
+    viewer_seat: viewerSeat,
+  }
+  act(() => {
+    ws.onmessage?.(
+      new MessageEvent('message', {
+        data: JSON.stringify(message),
+      })
+    )
+  })
+}
