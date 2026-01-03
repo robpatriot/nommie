@@ -190,6 +190,9 @@ export function GameRoomView(props: GameRoomViewProps) {
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [isTrickPaused, setIsTrickPaused] = useState(false)
+  const [isViewerLeaderDuringPause, setIsViewerLeaderDuringPause] =
+    useState(false)
   const showCardWrapper = useMediaQuery('(min-width: 640px)')
 
   // Use query hook directly
@@ -240,25 +243,50 @@ export function GameRoomView(props: GameRoomViewProps) {
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [selectedCard])
 
+  const handlePauseStateChange = useCallback(
+    (isPaused: boolean, isViewerLeader: boolean) => {
+      setIsTrickPaused(isPaused)
+      setIsViewerLeaderDuringPause(isViewerLeader)
+    },
+    []
+  )
+
+  // Modify playState to prevent playing during pause if viewer is not leader
+  const effectivePlayState = useMemo(() => {
+    if (!playState) {
+      return undefined
+    }
+
+    // If paused and viewer is not leader, disable playing
+    if (isTrickPaused && !isViewerLeaderDuringPause) {
+      return {
+        ...playState,
+        playable: [], // Empty playable array prevents card selection
+      }
+    }
+
+    return playState
+  }, [playState, isTrickPaused, isViewerLeaderDuringPause])
+
   // Reset and validate selectedCard when phase or playState changes
   // Use startTransition to mark as non-urgent update to avoid cascading renders
   useEffect(() => {
     startTransition(() => {
       setSelectedCard((current) => {
         // Reset when not in Trick phase or playState unavailable
-        if (!isTrickPhase(phase) || !playState) {
+        if (!isTrickPhase(phase) || !effectivePlayState) {
           return null
         }
 
         // Reset if current card is not playable
-        if (current && !playState.playable.includes(current)) {
+        if (current && !effectivePlayState.playable.includes(current)) {
           return null
         }
 
         return current
       })
     })
-  }, [phase, playState])
+  }, [phase, effectivePlayState])
 
   useEffect(() => {
     if (!isHistoryOpen) {
@@ -654,6 +682,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 lastTrick={lastTrick}
                 showPreviousRoundPosition={showPreviousRoundPosition}
                 cardScale={cardScale}
+                onPauseStateChange={handlePauseStateChange}
               />
             </div>
             <PlayerHand
@@ -661,7 +690,7 @@ export function GameRoomView(props: GameRoomViewProps) {
               phase={phase}
               playerNames={playerNames}
               viewerSeat={effectiveViewerSeat ?? 0}
-              playState={playState}
+              playState={effectivePlayState}
               selectedCard={selectedCard}
               onSelectCard={setSelectedCard}
               onPlayCard={handlePlayCard}

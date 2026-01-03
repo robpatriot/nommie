@@ -218,6 +218,7 @@ interface TrickAreaProps {
   cardScale?: number
   onTrickCompletePauseStart?: () => void
   onTrickCompletePauseEnd?: () => void
+  onPauseStateChange?: (isPaused: boolean, isViewerLeader: boolean) => void
 }
 
 function getWaitingMessage(
@@ -256,6 +257,7 @@ export function TrickArea({
   cardScale = 1,
   onTrickCompletePauseStart,
   onTrickCompletePauseEnd,
+  onPauseStateChange,
 }: TrickAreaProps) {
   const t = useTranslations('game.gameRoom.trickArea')
 
@@ -297,6 +299,11 @@ export function TrickArea({
 
         setPausedTrick([...completedTrick])
         setIsPaused(true)
+
+        // Check if viewer is the leader of the next trick
+        const isViewerLeader =
+          isTrickPhase(phase) && phase.data.leader === viewerSeat
+        onPauseStateChange?.(true, isViewerLeader)
         onTrickCompletePauseStart?.()
 
         // Set timeout to end pause
@@ -305,6 +312,7 @@ export function TrickArea({
           setIsPaused(false)
           setPausedTrick([])
           setPausedTrickNo(null)
+          onPauseStateChange?.(false, false)
           onTrickCompletePauseEnd?.()
           // Clear the timeout ref
           pauseTimeoutRef.current = null
@@ -312,7 +320,9 @@ export function TrickArea({
       }
     }
 
-    // If user plays a card during pause, cancel pause immediately
+    // If user plays a card during pause, only cancel pause if viewer is the leader
+    // (first player) in the next trick. If viewer is not first, they need to wait
+    // for the pause to complete so they can see cards already played by others.
     // We detect this by checking if current_trick has a card from viewerSeat
     // (if viewer played, their card will be in current_trick)
     if (
@@ -323,8 +333,10 @@ export function TrickArea({
     ) {
       const lastCard =
         phase.data.current_trick[phase.data.current_trick.length - 1]
-      if (lastCard && lastCard[0] === viewerSeat) {
-        // Viewer just played - cancel pause to show their card immediately
+      // Only cancel pause if viewer is the leader (first player) of the current trick
+      const isViewerLeader = phase.data.leader === viewerSeat
+      if (lastCard && lastCard[0] === viewerSeat && isViewerLeader) {
+        // Viewer is leader and just played - cancel pause to show their card immediately
         if (pauseTimeoutRef.current) {
           clearTimeout(pauseTimeoutRef.current)
           pauseTimeoutRef.current = null
@@ -332,6 +344,7 @@ export function TrickArea({
         setIsPaused(false)
         setPausedTrick([])
         setPausedTrickNo(null)
+        onPauseStateChange?.(false, false)
         onTrickCompletePauseEnd?.()
       }
     }
@@ -345,6 +358,7 @@ export function TrickArea({
       setIsPaused(false)
       setPausedTrick([])
       setPausedTrickNo(null)
+      onPauseStateChange?.(false, false)
       onTrickCompletePauseEnd?.()
     }
 
@@ -356,6 +370,7 @@ export function TrickArea({
     viewerSeat,
     onTrickCompletePauseStart,
     onTrickCompletePauseEnd,
+    onPauseStateChange,
   ])
 
   // Separate effect for cleanup to avoid clearing timeout when effect re-runs
@@ -604,7 +619,7 @@ export function TrickArea({
                 return (
                   <div
                     key={`${seat}-${playOrder}`}
-                    className="absolute left-1/2 top-1/2 transition-all duration-300"
+                    className="absolute left-1/2 top-1/2"
                     style={{
                       zIndex: Z_INDEX_BASE + playOrder,
                       transform: combinedTransform,
@@ -704,7 +719,7 @@ export function TrickArea({
                 return (
                   <div
                     key={seat}
-                    className="absolute left-1/2 flex flex-col items-center transition-all duration-300"
+                    className="absolute left-1/2 flex flex-col items-center"
                     style={{
                       top: `${centerTop}px`,
                       zIndex: Z_INDEX_BASE + playOrder,
