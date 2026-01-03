@@ -19,9 +19,6 @@ services:
       - ./db.env
     environment:
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-      # SSL_RENEWAL_THRESHOLD_SECONDS can be set in shell environment for testing
-      # It will be passed to the container if set (used by entrypoint-ssl.sh)
-      SSL_RENEWAL_THRESHOLD_SECONDS: ${SSL_RENEWAL_THRESHOLD_SECONDS:-}
     volumes:
       - nommie_dev_db_data:/var/lib/postgresql/data
       - nommie_dev_db_ssl:/var/lib/postgresql/ssl

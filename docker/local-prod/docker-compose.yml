@@ -16,11 +16,6 @@ services:
     restart: unless-stopped
     env_file:
       - ./db.env
-    environment:
-      # SSL_RENEWAL_THRESHOLD_SECONDS can be set in shell environment for testing/configuration
-      # It will be passed to the container if set (used by entrypoint-ssl.sh)
-      # Defaults to 30 days (2592000 seconds) if not set
-      SSL_RENEWAL_THRESHOLD_SECONDS: ${SSL_RENEWAL_THRESHOLD_SECONDS:-}
     volumes:
       - nommie_local_prod_db_data:/var/lib/postgresql/data
       - nommie_local_prod_ssl:/var/lib/postgresql/ssl
@@ -38,8 +33,6 @@ services:
       context: ../..
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
-    environment:
-      RUST_LOG: ${RUST_LOG:-warn}
     env_file:
       - ./backend.env
       - ./db.env
@@ -59,8 +52,6 @@ services:
     restart: unless-stopped
     env_file:
       - ./frontend.env
-    environment:
-      BACKEND_BASE_URL: ${BACKEND_BASE_URL}
     depends_on:
       - backend
     # frontend must listen on 0.0.0.0:3000 inside the container
