@@ -1,9 +1,11 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useTranslations } from 'next-intl'
 import { updateAppearanceAction } from '@/app/actions/settings-actions'
 import { useTheme, type ThemeMode } from './theme-provider'
+
+const STORAGE_KEY = 'nommie.theme'
 
 const SPECIFIC_OPTIONS: Array<{
   value: ThemeMode
@@ -28,6 +30,35 @@ export function AppearanceSelector({
   const { theme, setTheme, resolvedTheme, hydrated } = useTheme()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Sync backend preference to localStorage on mount
+  // This ensures cross-device sync: if user changes preference on one device,
+  // it will sync to localStorage on other devices when they visit settings
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    try {
+      const backendPreference: ThemeMode = preferredAppearance ?? 'system'
+      const stored = window.localStorage.getItem(STORAGE_KEY)
+
+      // Only sync if backend preference differs from localStorage
+      if (backendPreference === 'system') {
+        // Backend says system, but localStorage might have a value
+        if (stored !== null && stored !== 'system') {
+          window.localStorage.removeItem(STORAGE_KEY)
+        }
+      } else {
+        // Backend has explicit preference
+        if (stored !== backendPreference) {
+          window.localStorage.setItem(STORAGE_KEY, backendPreference)
+        }
+      }
+    } catch {
+      // Ignore storage access errors (e.g., in private browsing)
+    }
+  }, [preferredAppearance])
 
   // null means no explicit preference (use system default)
   // 'system' means explicitly set to system
