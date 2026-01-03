@@ -74,12 +74,16 @@ export interface GameRoomViewProps {
     lastSyncedAt?: string
   }
   requireCardConfirmation?: boolean
+  trickDisplayDurationSeconds?: number | null
   onCopyInvite?: () => void
   onLeaveGame?: () => void
   isLeavePending?: boolean
 }
 
-export function GameRoomView(props: GameRoomViewProps) {
+export function GameRoomView({
+  trickDisplayDurationSeconds,
+  ...props
+}: GameRoomViewProps) {
   const t = useTranslations('game.gameRoom')
   const {
     snapshot,
@@ -660,6 +664,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 showPreviousRoundPosition={showPreviousRoundPosition}
                 className="col-start-2 row-start-2 w-full"
                 cardScale={cardScale}
+                trickDisplayDurationSeconds={trickDisplayDurationSeconds}
               />
             </div>
             <div className="flex flex-col gap-3 sm:hidden">
@@ -682,6 +687,7 @@ export function GameRoomView(props: GameRoomViewProps) {
                 lastTrick={lastTrick}
                 showPreviousRoundPosition={showPreviousRoundPosition}
                 cardScale={cardScale}
+                trickDisplayDurationSeconds={trickDisplayDurationSeconds}
                 onPauseStateChange={handlePauseStateChange}
               />
             </div>

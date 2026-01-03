@@ -8,6 +8,7 @@ export interface UserOptionsResponse {
   appearance_mode: ThemeMode
   require_card_confirmation: boolean
   locale: SupportedLocale | null
+  trick_display_duration_seconds: number | null
   updated_at: string
 }
 

@@ -24,12 +24,14 @@ interface GameRoomClientProps {
   initialData: GameRoomSnapshotPayload
   gameId: number
   requireCardConfirmation?: boolean
+  trickDisplayDurationSeconds?: number | null
 }
 
 export function GameRoomClient({
   initialData,
   gameId,
   requireCardConfirmation = true,
+  trickDisplayDurationSeconds = null,
 }: GameRoomClientProps) {
   // Read snapshot from TanStack Query cache (single source of truth)
   // WebSocket updates will automatically update the cache and trigger re-renders
@@ -199,6 +201,7 @@ export function GameRoomClient({
         playState={playControls}
         aiSeatState={aiSeatState}
         requireCardConfirmation={requireCardConfirmation}
+        trickDisplayDurationSeconds={trickDisplayDurationSeconds}
         onCopyInvite={handleCopyInvite}
         onLeaveGame={handleLeaveGame}
         isLeavePending={isLeavePending}

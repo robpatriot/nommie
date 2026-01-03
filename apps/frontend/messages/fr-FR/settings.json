@@ -20,6 +20,10 @@
       "cardConfirmation": {
         "title": "Confirmation des cartes",
         "description": "Conservez le bouton de confirmation si vous préférez une action en deux étapes, ou désactivez-le pour jouer immédiatement une carte valide en cliquant dessus."
+      },
+      "trickDisplayDuration": {
+        "title": "Durée d'affichage du pli",
+        "description": "Durée d'affichage du pli terminé avant le début du pli suivant. Réglez sur 0 pour désactiver."
       }
     }
   },
@@ -95,8 +99,23 @@
     },
     "status": {
       "saving": "Enregistrement de la préférence de jeu…",
-      "couldNotSave": "Impossible d’enregistrer : {error}",
+      "couldNotSave": "Impossible d'enregistrer : {error}",
       "saved": "Les modifications sont enregistrées automatiquement."
+    }
+  },
+  "trickDisplayDuration": {
+    "label": "Durée (secondes)",
+    "description": "Durée d'affichage du pli terminé avant le début du pli suivant",
+    "help": "Laissez vide pour utiliser la valeur par défaut ({defaultValue} secondes). Réglez sur 0 pour désactiver l'affichage.",
+    "validation": {
+      "invalid": "Veuillez entrer un nombre valide (0 ou supérieur)"
+    },
+    "status": {
+      "saving": "Enregistrement de la préférence de durée…",
+      "couldNotSave": "Impossible d'enregistrer : {error}",
+      "usingDefault": "Utilisation de la valeur par défaut : {value} secondes",
+      "usingCustom": "Utilisation de la valeur personnalisée : {value} secondes",
+      "disabled": "Affichage du pli désactivé (0 secondes)"
     }
   }
 }

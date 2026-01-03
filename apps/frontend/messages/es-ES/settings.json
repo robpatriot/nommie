@@ -20,6 +20,10 @@
       "cardConfirmation": {
         "title": "Confirmación de cartas",
         "description": "Mantén el botón de confirmación si prefieres una acción en dos pasos, o desactívalo para jugar una carta válida inmediatamente al hacer clic."
+      },
+      "trickDisplayDuration": {
+        "title": "Duración de visualización del truco",
+        "description": "Tiempo que se muestra el truco completado antes de que comience el siguiente. Establece en 0 para desactivar."
       }
     }
   },
@@ -97,6 +101,21 @@
       "saving": "Guardando la preferencia de juego…",
       "couldNotSave": "No se pudo guardar: {error}",
       "saved": "Los cambios se guardan automáticamente."
+    }
+  },
+  "trickDisplayDuration": {
+    "label": "Duración (segundos)",
+    "description": "Tiempo que se muestra el truco completado antes de que comience el siguiente",
+    "help": "Deja vacío para usar el valor predeterminado ({defaultValue} segundos). Establece en 0 para desactivar la visualización.",
+    "validation": {
+      "invalid": "Por favor, introduce un número válido (0 o mayor)"
+    },
+    "status": {
+      "saving": "Guardando la preferencia de duración…",
+      "couldNotSave": "No se pudo guardar: {error}",
+      "usingDefault": "Usando el valor predeterminado: {value} segundos",
+      "usingCustom": "Usando valor personalizado: {value} segundos",
+      "disabled": "Visualización del truco desactivada (0 segundos)"
     }
   }
 }

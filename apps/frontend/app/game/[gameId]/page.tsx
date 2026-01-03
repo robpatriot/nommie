@@ -89,9 +89,11 @@ export default async function GamePage({
   }
 
   let requireCardConfirmation = true
+  let trickDisplayDurationSeconds: number | null = null
   try {
     const options = await getUserOptions()
     requireCardConfirmation = options.require_card_confirmation
+    trickDisplayDurationSeconds = options.trick_display_duration_seconds
   } catch (error) {
     await handleStaleSessionError(error)
     // Fallback to default behavior if options cannot be loaded
@@ -113,6 +115,7 @@ export default async function GamePage({
         initialData={initialPayload}
         gameId={resolvedGameId}
         requireCardConfirmation={requireCardConfirmation}
+        trickDisplayDurationSeconds={trickDisplayDurationSeconds}
       />
     </ErrorBoundaryWithTranslations>
   )

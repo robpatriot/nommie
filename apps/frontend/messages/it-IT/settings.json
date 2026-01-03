@@ -19,7 +19,11 @@
       "kicker": "Gioco",
       "cardConfirmation": {
         "title": "Conferma delle carte",
-        "description": "Mantieni il pulsante di conferma se preferisci un’azione in due passaggi, oppure disattivalo per giocare subito una carta valida quando la selezioni."
+        "description": "Mantieni il pulsante di conferma se preferisci un'azione in due passaggi, oppure disattivalo per giocare subito una carta valida quando la selezioni."
+      },
+      "trickDisplayDuration": {
+        "title": "Durata visualizzazione giro",
+        "description": "Quanto tempo viene mostrato il giro completato prima dell'inizio del giro successivo. Imposta su 0 per disattivare."
       }
     }
   },
@@ -97,6 +101,21 @@
       "saving": "Salvataggio della preferenza di gioco…",
       "couldNotSave": "Impossibile salvare: {error}",
       "saved": "Le modifiche vengono salvate automaticamente."
+    }
+  },
+  "trickDisplayDuration": {
+    "label": "Durata (secondi)",
+    "description": "Tempo di visualizzazione del giro completato prima dell'inizio del giro successivo",
+    "help": "Lascia vuoto per usare il valore predefinito ({defaultValue} secondi). Imposta su 0 per disattivare la visualizzazione.",
+    "validation": {
+      "invalid": "Inserisci un numero valido (0 o maggiore)"
+    },
+    "status": {
+      "saving": "Salvataggio della preferenza di durata…",
+      "couldNotSave": "Impossibile salvare: {error}",
+      "usingDefault": "Uso del valore predefinito: {value} secondi",
+      "usingCustom": "Uso del valore personalizzato: {value} secondi",
+      "disabled": "Visualizzazione del giro disattivata (0 secondi)"
     }
   }
 }

@@ -216,6 +216,7 @@ interface TrickAreaProps {
   showPreviousRoundPosition?: boolean
   className?: string
   cardScale?: number
+  trickDisplayDurationSeconds?: number | null
   onTrickCompletePauseStart?: () => void
   onTrickCompletePauseEnd?: () => void
   onPauseStateChange?: (isPaused: boolean, isViewerLeader: boolean) => void
@@ -243,7 +244,7 @@ function getWaitingMessage(
   return t('waitingForLead')
 }
 
-const TRICK_COMPLETE_PAUSE_MS = 2000 // 2 seconds
+const DEFAULT_TRICK_DISPLAY_DURATION_SECONDS = 2.0
 
 export function TrickArea({
   trickMap: _trickMap,
@@ -255,6 +256,7 @@ export function TrickArea({
   showPreviousRoundPosition,
   className = '',
   cardScale = 1,
+  trickDisplayDurationSeconds = null,
   onTrickCompletePauseStart,
   onTrickCompletePauseEnd,
   onPauseStateChange,
@@ -289,6 +291,17 @@ export function TrickArea({
       // Trick just completed - use lastTrick data which contains all 4 cards
       const completedTrick = getLastTrick(phase)
       if (completedTrick && completedTrick.length === 4) {
+        // Calculate pause duration: null = default, 0 = no pause, other = use value
+        const durationSeconds =
+          trickDisplayDurationSeconds === null
+            ? DEFAULT_TRICK_DISPLAY_DURATION_SECONDS
+            : trickDisplayDurationSeconds
+
+        // If duration is 0, skip the pause entirely
+        if (durationSeconds === 0) {
+          return
+        }
+
         // Clear any existing timeout before setting a new one
         if (pauseTimeoutRef.current) {
           clearTimeout(pauseTimeoutRef.current)
@@ -306,6 +319,9 @@ export function TrickArea({
         onPauseStateChange?.(true, isViewerLeader)
         onTrickCompletePauseStart?.()
 
+        // Convert seconds to milliseconds for setTimeout
+        const durationMs = durationSeconds * 1000
+
         // Set timeout to end pause
         pauseTimeoutRef.current = setTimeout(() => {
           // Clear pause state
@@ -316,7 +332,7 @@ export function TrickArea({
           onTrickCompletePauseEnd?.()
           // Clear the timeout ref
           pauseTimeoutRef.current = null
-        }, TRICK_COMPLETE_PAUSE_MS)
+        }, durationMs)
       }
     }
 
@@ -368,6 +384,7 @@ export function TrickArea({
     phase,
     isPaused,
     viewerSeat,
+    trickDisplayDurationSeconds,
     onTrickCompletePauseStart,
     onTrickCompletePauseEnd,
     onPauseStateChange,

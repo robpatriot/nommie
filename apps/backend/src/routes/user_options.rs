@@ -18,6 +18,7 @@ pub struct UserOptionsResponse {
     pub appearance_mode: AppearanceMode,
     pub require_card_confirmation: bool,
     pub locale: Option<UserLocale>,
+    pub trick_display_duration_seconds: Option<f64>,
     pub updated_at: String,
 }
 
@@ -27,6 +28,7 @@ impl From<UserOptions> for UserOptionsResponse {
             appearance_mode: value.appearance_mode,
             require_card_confirmation: value.require_card_confirmation,
             locale: value.locale,
+            trick_display_duration_seconds: value.trick_display_duration_seconds,
             updated_at: value.updated_at.to_string(),
         }
     }
@@ -44,6 +46,12 @@ pub struct UpdateUserOptionsRequest {
     // - Some(Some(locale)) = field provided with value
     #[serde(default, with = "double_option")]
     pub locale: Option<Option<UserLocale>>,
+    // Option<Option<f64>> allows distinguishing:
+    // - None = field not provided (don't update)
+    // - Some(None) = field provided as null (explicitly unset to default)
+    // - Some(Some(value)) = field provided with value
+    #[serde(default, with = "double_option")]
+    pub trick_display_duration_seconds: Option<Option<f64>>,
 }
 
 async fn get_user_options(
@@ -83,11 +91,12 @@ async fn update_user_options(
         tracing::info!(user_id = user_id, "user_options.locale_unset");
     }
 
-    // Allow request if any field is provided (including locale explicitly set to null)
-    // For locale: None = not provided, Some(None) = explicitly set to null, Some(Some(_)) = set to value
+    // Allow request if any field is provided (including locale/trick_duration explicitly set to null)
+    // For locale/duration: None = not provided, Some(None) = explicitly set to null, Some(Some(_)) = set to value
     let has_any_option = payload.appearance_mode.is_some()
         || payload.require_card_confirmation.is_some()
-        || payload.locale.is_some(); // is_some() is true for both Some(None) and Some(Some(_))
+        || payload.locale.is_some() // is_some() is true for both Some(None) and Some(Some(_))
+        || payload.trick_display_duration_seconds.is_some(); // is_some() is true for both Some(None) and Some(Some(_))
 
     if !has_any_option {
         return Err(AppError::Validation {
@@ -101,6 +110,7 @@ async fn update_user_options(
         appearance_mode: payload.appearance_mode,
         require_card_confirmation: payload.require_card_confirmation,
         locale: payload.locale,
+        trick_display_duration_seconds: payload.trick_display_duration_seconds,
     };
 
     let options = with_txn(Some(&req), &app_state, move |txn| {

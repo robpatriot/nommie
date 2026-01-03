@@ -20,6 +20,10 @@
       "cardConfirmation": {
         "title": "Kartenbestätigung",
         "description": "Behalte den Bestätigungsbutton, wenn du eine Aktion in zwei Schritten bevorzugst, oder deaktiviere ihn, um eine erlaubte Karte sofort zu spielen."
+      },
+      "trickDisplayDuration": {
+        "title": "Stich-Anzeigedauer",
+        "description": "Wie lange der abgeschlossene Stich angezeigt wird, bevor der nächste Stich beginnt. Auf 0 setzen, um zu deaktivieren."
       }
     }
   },
@@ -97,6 +101,21 @@
       "saving": "Spieleinstellung wird gespeichert…",
       "couldNotSave": "Speichern fehlgeschlagen: {error}",
       "saved": "Änderungen werden automatisch gespeichert."
+    }
+  },
+  "trickDisplayDuration": {
+    "label": "Dauer (Sekunden)",
+    "description": "Dauer der Anzeige des abgeschlossenen Stichs vor Beginn des nächsten Stichs",
+    "help": "Leer lassen, um den Standardwert ({defaultValue} Sekunden) zu verwenden. Auf 0 setzen, um die Anzeige zu deaktivieren.",
+    "validation": {
+      "invalid": "Bitte geben Sie eine gültige Zahl ein (0 oder größer)"
+    },
+    "status": {
+      "saving": "Dauereinstellung wird gespeichert…",
+      "couldNotSave": "Speichern fehlgeschlagen: {error}",
+      "usingDefault": "Verwende Standardwert: {value} Sekunden",
+      "usingCustom": "Verwende benutzerdefinierten Wert: {value} Sekunden",
+      "disabled": "Stich-Anzeige deaktiviert (0 Sekunden)"
     }
   }
 }

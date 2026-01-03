@@ -38,6 +38,7 @@ enum UserOptions {
     AppearanceMode,
     RequireCardConfirmation,
     Locale,
+    TrickDisplayDurationSeconds,
     UpdatedAt,
 }
 
@@ -335,6 +336,11 @@ impl MigrationTrait for Migration {
                             .default(true),
                     )
                     .col(ColumnDef::new(UserOptions::Locale).string().null())
+                    .col(
+                        ColumnDef::new(UserOptions::TrickDisplayDurationSeconds)
+                            .double()
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(UserOptions::UpdatedAt)
                             .timestamp_with_time_zone()

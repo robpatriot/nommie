@@ -25,6 +25,7 @@ pub async fn ensure_default_for_user(
         appearance_mode: Set("system".to_string()),
         require_card_confirmation: Set(true),
         locale: Set(None),
+        trick_display_duration_seconds: Set(None),
         updated_at: Set(OffsetDateTime::now_utc()),
     };
 
@@ -50,10 +51,19 @@ pub async fn update_options(
     // - Some(None) = field provided as null (explicitly unset to null)
     // - Some(Some(str)) = field provided with value
     locale: Option<Option<&str>>,
+    // Option<Option<f64>> allows distinguishing:
+    // - None = field not provided (don't update)
+    // - Some(None) = field provided as null (explicitly unset to default)
+    // - Some(Some(value)) = field provided with value
+    trick_display_duration_seconds: Option<Option<f64>>,
 ) -> Result<user_options::Model, sea_orm::DbErr> {
     let existing = ensure_default_for_user(txn, user_id).await?;
 
-    if appearance_mode.is_none() && require_card_confirmation.is_none() && locale.is_none() {
+    if appearance_mode.is_none()
+        && require_card_confirmation.is_none()
+        && locale.is_none()
+        && trick_display_duration_seconds.is_none()
+    {
         return Ok(existing);
     }
 
@@ -67,6 +77,10 @@ pub async fn update_options(
     // Handle locale: Some(None) = set to null, Some(Some(str)) = set to value
     if let Some(locale_opt) = locale {
         active.locale = Set(locale_opt.map(|s| s.to_string()));
+    }
+    // Handle trick_display_duration_seconds: Some(None) = set to null, Some(Some(value)) = set to value
+    if let Some(duration_opt) = trick_display_duration_seconds {
+        active.trick_display_duration_seconds = Set(duration_opt);
     }
     active.updated_at = Set(OffsetDateTime::now_utc());
     active.update(txn).await

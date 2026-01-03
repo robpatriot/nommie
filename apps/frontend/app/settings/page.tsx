@@ -5,6 +5,7 @@ import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { AppearanceSelector } from '@/components/AppearanceSelector'
 import { CardConfirmationToggle } from '@/components/CardConfirmationToggle'
 import { LanguageSelector } from '@/components/LanguageSelector'
+import { TrickDisplayDurationInput } from '@/components/TrickDisplayDurationInput'
 import { getUserOptions } from '@/lib/api/user-options'
 import {
   handleAllowlistError,
@@ -25,10 +26,12 @@ export default async function SettingsPage() {
   let requireCardConfirmation = true
   let preferredLocale: SupportedLocale | null = null
   let preferredAppearance: ThemeMode | null = null
+  let trickDisplayDurationSeconds: number | null = null
   try {
     const options = await getUserOptions()
     requireCardConfirmation = options.require_card_confirmation
     preferredLocale = options.locale
+    trickDisplayDurationSeconds = options.trick_display_duration_seconds
     // Treat 'system' as null (no explicit preference) for consistency with locale
     preferredAppearance =
       options.appearance_mode === 'system' ? null : options.appearance_mode
@@ -90,6 +93,20 @@ export default async function SettingsPage() {
           </p>
         </div>
         <CardConfirmationToggle initialEnabled={requireCardConfirmation} />
+      </section>
+      <section className="rounded-3xl border border-border/50 bg-surface/70 p-8 shadow-elevated">
+        <div className="mb-6">
+          <p className="text-sm uppercase tracking-wide text-subtle">
+            {t('sections.gameplay.kicker')}
+          </p>
+          <h2 className="text-2xl font-semibold text-foreground">
+            {t('sections.gameplay.trickDisplayDuration.title')}
+          </h2>
+          <p className="mt-2 text-sm text-muted">
+            {t('sections.gameplay.trickDisplayDuration.description')}
+          </p>
+        </div>
+        <TrickDisplayDurationInput initialValue={trickDisplayDurationSeconds} />
       </section>
     </div>
   )

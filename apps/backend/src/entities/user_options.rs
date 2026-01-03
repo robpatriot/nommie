@@ -13,6 +13,8 @@ pub struct Model {
     pub require_card_confirmation: bool,
     #[sea_orm(column_name = "locale")]
     pub locale: Option<String>,
+    #[sea_orm(column_name = "trick_display_duration_seconds")]
+    pub trick_display_duration_seconds: Option<f64>,
     #[sea_orm(column_name = "updated_at")]
     pub updated_at: OffsetDateTime,
 }

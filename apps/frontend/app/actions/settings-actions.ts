@@ -16,6 +16,7 @@ export type UpdateUserOptionsPayload = {
   appearance_mode?: ThemeMode
   require_card_confirmation?: boolean
   locale?: SupportedLocale | null
+  trick_display_duration_seconds?: number | null
 }
 
 export async function updateUserOptionsAction(
@@ -25,7 +26,8 @@ export async function updateUserOptionsAction(
     !payload ||
     (payload.appearance_mode === undefined &&
       payload.require_card_confirmation === undefined &&
-      payload.locale === undefined)
+      payload.locale === undefined &&
+      payload.trick_display_duration_seconds === undefined)
   ) {
     // This is a validation error that should be localized
     const t = await getTranslations('errors.validation')

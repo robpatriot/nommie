@@ -20,6 +20,10 @@
       "cardConfirmation": {
         "title": "Card confirmation",
         "description": "Keep the confirmation button if you prefer a two-step action, or turn it off to play a legal card immediately when you click it."
+      },
+      "trickDisplayDuration": {
+        "title": "Trick display duration",
+        "description": "How long the completed trick is shown before the next trick starts. Set to 0 to disable."
       }
     }
   },
@@ -97,6 +101,21 @@
       "saving": "Saving gameplay preference…",
       "couldNotSave": "Could not save: {error}",
       "saved": "Changes are saved automatically."
+    }
+  },
+  "trickDisplayDuration": {
+    "label": "Duration (seconds)",
+    "description": "Time to display the completed trick before starting the next one",
+    "help": "Leave empty to use the default ({defaultValue} seconds). Set to 0 to disable the display.",
+    "validation": {
+      "invalid": "Please enter a valid number (0 or greater)"
+    },
+    "status": {
+      "saving": "Saving duration preference…",
+      "couldNotSave": "Could not save: {error}",
+      "usingDefault": "Using default: {value} seconds",
+      "usingCustom": "Using custom: {value} seconds",
+      "disabled": "Trick display disabled (0 seconds)"
     }
   }
 }

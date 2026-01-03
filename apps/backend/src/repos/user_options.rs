@@ -7,6 +7,8 @@ use time::OffsetDateTime;
 use crate::adapters::user_options_sea as adapter;
 use crate::errors::domain::{DomainError, InfraErrorKind};
 
+pub const DEFAULT_TRICK_DISPLAY_DURATION_SECONDS: f64 = 2.0;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AppearanceMode {
@@ -83,10 +85,11 @@ pub struct UserOptions {
     pub appearance_mode: AppearanceMode,
     pub require_card_confirmation: bool,
     pub locale: Option<UserLocale>,
+    pub trick_display_duration_seconds: Option<f64>,
     pub updated_at: OffsetDateTime,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct UpdateUserOptions {
     pub appearance_mode: Option<AppearanceMode>,
     pub require_card_confirmation: Option<bool>,
@@ -95,6 +98,11 @@ pub struct UpdateUserOptions {
     // - Some(None) = field provided as null (explicitly unset)
     // - Some(Some(locale)) = field provided with value
     pub locale: Option<Option<UserLocale>>,
+    // Option<Option<f64>> allows distinguishing:
+    // - None = field not provided (don't update)
+    // - Some(None) = field provided as null (explicitly unset to default)
+    // - Some(Some(value)) = field provided with value
+    pub trick_display_duration_seconds: Option<Option<f64>>,
 }
 
 pub async fn ensure_default_for_user(
@@ -119,6 +127,7 @@ pub async fn update_options(
         options.appearance_mode.map(|mode| mode.as_str()),
         options.require_card_confirmation,
         locale_for_adapter,
+        options.trick_display_duration_seconds,
     )
     .await?;
     UserOptions::try_from(model)
@@ -138,6 +147,7 @@ impl TryFrom<crate::entities::user_options::Model> for UserOptions {
             appearance_mode,
             require_card_confirmation: model.require_card_confirmation,
             locale,
+            trick_display_duration_seconds: model.trick_display_duration_seconds,
             updated_at: model.updated_at,
         })
     }
