@@ -15,7 +15,7 @@ import {
 export function LanguageSelector({
   preferredLocale,
 }: {
-  preferredLocale: string | null
+  preferredLocale: SupportedLocale | null
 }) {
   const t = useTranslations()
   const router = useRouter()

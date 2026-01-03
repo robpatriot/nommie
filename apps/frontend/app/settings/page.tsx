@@ -10,7 +10,9 @@ import {
   handleAllowlistError,
   handleStaleSessionError,
 } from '@/lib/auth/allowlist'
+import { logError } from '@/lib/logging/error-logger'
 import type { ThemeMode } from '@/components/theme-provider'
+import type { SupportedLocale } from '@/i18n/locale'
 
 export default async function SettingsPage() {
   const t = await getTranslations('settings')
@@ -21,7 +23,7 @@ export default async function SettingsPage() {
   }
 
   let requireCardConfirmation = true
-  let preferredLocale: string | null = null
+  let preferredLocale: SupportedLocale | null = null
   let preferredAppearance: ThemeMode | null = null
   try {
     const options = await getUserOptions()
@@ -31,9 +33,17 @@ export default async function SettingsPage() {
     preferredAppearance =
       options.appearance_mode === 'system' ? null : options.appearance_mode
   } catch (error) {
+    // Try to handle allowlist/session errors (these will redirect if they match)
     await handleAllowlistError(error)
     await handleStaleSessionError(error)
-    // Swallow other errors and fall back to default
+
+    // If we reach here, the error wasn't handled by allowlist/session handlers
+    // (they redirect if they match, so execution stops there)
+    // Log unexpected errors for debugging
+    logError('Failed to load user options on settings page', error, {
+      action: 'getUserOptions',
+    })
+    // Fall back to defaults
   }
 
   return (
