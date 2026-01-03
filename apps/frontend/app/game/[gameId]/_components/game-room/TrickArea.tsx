@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import type {
   Card,
@@ -16,6 +16,7 @@ import {
   isBiddingPhase,
   isTrumpSelectPhase,
   isTrickPhase,
+  getLastTrick,
 } from './phase-helpers'
 
 // Dimension constants
@@ -30,7 +31,7 @@ const DIAMOND_LAYOUT_PADDING = 16 // Equal top and bottom padding for >640px dia
 
 // Card transform multipliers
 const VERTICAL_OFFSET_MULTIPLIER = 0.1 // 10% of card height for top/bottom positioning
-const HORIZONTAL_OFFSET_MULTIPLIER = 0.6 // 60% of card width for left/right positioning
+const CARD_OVERLAP_MULTIPLIER = 0.4 // 40% of card width - overlap between cards for centering
 
 // Gap and padding constants
 const CARD_LABEL_GAP = 13 // Fixed gap between card and label (absolute value, not scaled)
@@ -44,14 +45,23 @@ const DIAMOND_HORIZONTAL_OFFSET = 34 // Horizontal offset for left/right cards i
 const DIAMOND_CONTAINER_SIZE = 154 // Size of the diamond layout container (h-[154px] w-[154px])
 const DIAMOND_MAX_RANDOM_OFFSET = 5 // Maximum random offset (in pixels) for card misalignment
 
+// Linear congruential generator constants for seeded random number generation
+const LCG_MULTIPLIER = 1103515245
+const LCG_INCREMENT = 12345
+const LCG_MODULUS_MASK = 0x7fffffff
+const LCG_SEED_MULTIPLIER = 12345
+const LCG_SEED_OFFSET = 67890
+
 // Transform constants
 const CENTER_TRANSFORM = 'translate(-50%, -50%)' // Base transform for centering absolutely positioned elements
 
 type Orientation = 'top' | 'bottom' | 'left' | 'right'
 
 /**
- * Maps play order to fixed position layout.
- * First card (playOrder 0) = left, second (1) = top, third (2) = right, fourth (3) = bottom.
+ * Maps play order to fixed position layout for <640px viewport.
+ * Pattern: lower, higher, lower, higher (left to right).
+ * First card (playOrder 0) = left (lower), second (1) = top (higher),
+ * third (2) = right (lower), fourth (3) = top (higher, continuing pattern).
  */
 function getFixedPosition(playOrder: number): Orientation {
   switch (playOrder) {
@@ -62,9 +72,9 @@ function getFixedPosition(playOrder: number): Orientation {
     case 2:
       return 'right'
     case 3:
-      return 'bottom'
+      return 'top' // Changed from 'bottom' to 'top' to continue lower/higher pattern
     default:
-      return 'bottom'
+      return 'top'
   }
 }
 
@@ -76,48 +86,6 @@ function getFixedPosition(playOrder: number): Orientation {
  */
 function getSafeCardScale(cardScale: number): number {
   return Math.max(0.01, Math.min(1, cardScale))
-}
-
-/**
- * Builds the CSS transform string for a card based on its orientation and scale.
- * Offsets are calculated as proportions of card dimensions:
- * - Top/bottom: VERTICAL_OFFSET_MULTIPLIER (10%) of card height (scaled)
- * - Left/right: HORIZONTAL_OFFSET_MULTIPLIER (60%) of card width (scaled)
- *
- * @param orientation - Card orientation (left, top, right, bottom)
- * @param cardScale - Scale factor (should be pre-clamped via getSafeCardScale)
- * @param scaledCardWidth - Scaled card width
- * @param scaledCardHeight - Scaled card height
- * @returns CSS transform string, or 'none' if no transforms are needed
- */
-function buildCardTransform(
-  orientation: Orientation,
-  cardScale: number,
-  scaledCardWidth: number,
-  scaledCardHeight: number
-): string {
-  const transforms: string[] = []
-
-  // Calculate offsets as proportions of scaled card dimensions
-  const verticalOffset = scaledCardHeight * VERTICAL_OFFSET_MULTIPLIER
-  const horizontalOffset = scaledCardWidth * HORIZONTAL_OFFSET_MULTIPLIER
-
-  if (orientation === 'top') {
-    transforms.push(`translateY(${-verticalOffset}px)`)
-  } else if (orientation === 'bottom') {
-    transforms.push(`translateY(${verticalOffset}px)`)
-  } else if (orientation === 'left') {
-    transforms.push(`translateX(${-horizontalOffset}px)`)
-  } else if (orientation === 'right') {
-    transforms.push(`translateX(${horizontalOffset}px)`)
-  }
-
-  // Apply scale transform (applied last)
-  if (cardScale !== 1) {
-    transforms.push(`scale(${cardScale})`)
-  }
-
-  return transforms.length > 0 ? transforms.join(' ') : 'none'
 }
 
 interface ScaledDimensions {
@@ -248,6 +216,8 @@ interface TrickAreaProps {
   showPreviousRoundPosition?: boolean
   className?: string
   cardScale?: number
+  onTrickCompletePauseStart?: () => void
+  onTrickCompletePauseEnd?: () => void
 }
 
 function getWaitingMessage(
@@ -272,8 +242,10 @@ function getWaitingMessage(
   return t('waitingForLead')
 }
 
+const TRICK_COMPLETE_PAUSE_MS = 2000 // 2 seconds
+
 export function TrickArea({
-  trickMap,
+  trickMap: _trickMap,
   getSeatName,
   round,
   phase,
@@ -282,18 +254,147 @@ export function TrickArea({
   showPreviousRoundPosition,
   className = '',
   cardScale = 1,
+  onTrickCompletePauseStart,
+  onTrickCompletePauseEnd,
 }: TrickAreaProps) {
   const t = useTranslations('game.gameRoom.trickArea')
-  const orderedCards = useMemo(() => {
-    // Create a map of seat to play order index from phase.data.current_trick
-    const playOrderMap = new Map<Seat, number>()
-    if (isTrickPhase(phase)) {
-      phase.data.current_trick.forEach(([seat], playIndex) => {
-        playOrderMap.set(seat, playIndex)
-      })
+
+  // Track pause state for completed tricks
+  const [isPaused, setIsPaused] = useState(false)
+  const [pausedTrick, setPausedTrick] = useState<Array<[Seat, Card]>>([])
+  const [pausedTrickNo, setPausedTrickNo] = useState<number | null>(null)
+  const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const previousTrickNoRef = useRef<number | null>(null)
+
+  // Detect trick completion by tracking trick number changes
+  useEffect(() => {
+    const currentTrickNo = isTrickPhase(phase) ? phase.data.trick_no : null
+
+    // Initialize previousTrickNoRef on first render if we're in trick phase
+    // This ensures we can detect trick completions from the start
+    if (currentTrickNo !== null && previousTrickNoRef.current === null) {
+      previousTrickNoRef.current = currentTrickNo
     }
 
-    const cards = Array.from(trickMap.entries()).map(([seat, card]) => {
+    // Detect trick completion: trick number increased
+    if (
+      currentTrickNo !== null &&
+      previousTrickNoRef.current !== null &&
+      currentTrickNo > previousTrickNoRef.current &&
+      !isPaused &&
+      isTrickPhase(phase)
+    ) {
+      // Trick just completed - use lastTrick data which contains all 4 cards
+      const completedTrick = getLastTrick(phase)
+      if (completedTrick && completedTrick.length === 4) {
+        // Clear any existing timeout before setting a new one
+        if (pauseTimeoutRef.current) {
+          clearTimeout(pauseTimeoutRef.current)
+        }
+
+        // Store the trick number for the paused trick to maintain consistent offsets
+        setPausedTrickNo(previousTrickNoRef.current)
+
+        setPausedTrick([...completedTrick])
+        setIsPaused(true)
+        onTrickCompletePauseStart?.()
+
+        // Set timeout to end pause
+        pauseTimeoutRef.current = setTimeout(() => {
+          // Clear pause state
+          setIsPaused(false)
+          setPausedTrick([])
+          setPausedTrickNo(null)
+          onTrickCompletePauseEnd?.()
+          // Clear the timeout ref
+          pauseTimeoutRef.current = null
+        }, TRICK_COMPLETE_PAUSE_MS)
+      }
+    }
+
+    // If user plays a card during pause, cancel pause immediately
+    // We detect this by checking if current_trick has a card from viewerSeat
+    // (if viewer played, their card will be in current_trick)
+    if (
+      isPaused &&
+      isTrickPhase(phase) &&
+      viewerSeat !== null &&
+      phase.data.current_trick.length > 0
+    ) {
+      const lastCard =
+        phase.data.current_trick[phase.data.current_trick.length - 1]
+      if (lastCard && lastCard[0] === viewerSeat) {
+        // Viewer just played - cancel pause to show their card immediately
+        if (pauseTimeoutRef.current) {
+          clearTimeout(pauseTimeoutRef.current)
+          pauseTimeoutRef.current = null
+        }
+        setIsPaused(false)
+        setPausedTrick([])
+        setPausedTrickNo(null)
+        onTrickCompletePauseEnd?.()
+      }
+    }
+
+    // If we're no longer in trick phase, cancel any pause
+    if (!isTrickPhase(phase) && isPaused) {
+      if (pauseTimeoutRef.current) {
+        clearTimeout(pauseTimeoutRef.current)
+        pauseTimeoutRef.current = null
+      }
+      setIsPaused(false)
+      setPausedTrick([])
+      setPausedTrickNo(null)
+      onTrickCompletePauseEnd?.()
+    }
+
+    // Update previous trick number
+    previousTrickNoRef.current = currentTrickNo
+  }, [
+    phase,
+    isPaused,
+    viewerSeat,
+    onTrickCompletePauseStart,
+    onTrickCompletePauseEnd,
+  ])
+
+  // Separate effect for cleanup to avoid clearing timeout when effect re-runs
+  useEffect(() => {
+    return () => {
+      if (pauseTimeoutRef.current) {
+        clearTimeout(pauseTimeoutRef.current)
+        pauseTimeoutRef.current = null
+      }
+    }
+  }, [])
+
+  // Use paused trick if in pause state, otherwise use current trick
+  // When paused, show the paused trick; when not paused, show current trick (which will be empty after trick completes)
+  const displayTrick = useMemo(() => {
+    return isPaused && pausedTrick.length > 0
+      ? pausedTrick
+      : isTrickPhase(phase)
+        ? phase.data.current_trick
+        : []
+  }, [isPaused, pausedTrick, phase])
+
+  const displayTrickMap = useMemo(() => {
+    // Only use paused trick if we're actually paused
+    if (isPaused && pausedTrick.length > 0) {
+      return new Map(pausedTrick)
+    }
+    // Otherwise use current trick (empty after trick completes)
+    return new Map(displayTrick)
+  }, [displayTrick, isPaused, pausedTrick])
+
+  const orderedCards = useMemo(() => {
+    // Create a map of seat to play order index from display trick
+    const playOrderMap = new Map<Seat, number>()
+    displayTrick.forEach(([seat], playIndex) => {
+      playOrderMap.set(seat, playIndex)
+    })
+
+    const cards = Array.from(displayTrickMap.entries()).map(([seat, card]) => {
       const playOrder = playOrderMap.get(seat) ?? 0
       const fullName = getSeatName(seat)
       return {
@@ -305,7 +406,7 @@ export function TrickArea({
       }
     })
     return cards.slice().sort((a, b) => a.seat - b.seat)
-  }, [trickMap, getSeatName, phase])
+  }, [displayTrickMap, displayTrick, getSeatName])
 
   // Calculate total bids
   const totalBids = useMemo(() => {
@@ -319,21 +420,28 @@ export function TrickArea({
 
   // Generate random offsets for diamond layout cards based on trick number
   // Offsets change when trick number changes to create subtle misalignment
-  const trickNo = isTrickPhase(phase) ? phase.data.trick_no : 0
+  // When paused, use the trick number from the paused trick to maintain consistent offsets
+  const trickNo =
+    isPaused && pausedTrickNo !== null
+      ? pausedTrickNo
+      : isTrickPhase(phase)
+        ? phase.data.trick_no
+        : 0
   const diamondOffsets = useMemo(() => {
     // Seed random generator with trick number for consistency
     // Simple seeded random function (linear congruential generator)
     // Generate seeds for each random value call without mutation
-    const baseSeed = trickNo * 12345 + 67890
+    const baseSeed = trickNo * LCG_SEED_MULTIPLIER + LCG_SEED_OFFSET
 
     const getRandom = (callIndex: number): number => {
       // Calculate seed for this specific call index
       let seed = baseSeed
       for (let i = 0; i < callIndex; i++) {
-        seed = (seed * 1103515245 + 12345) & 0x7fffffff
+        seed = (seed * LCG_MULTIPLIER + LCG_INCREMENT) & LCG_MODULUS_MASK
       }
-      const nextSeed = (seed * 1103515245 + 12345) & 0x7fffffff
-      return nextSeed / 0x7fffffff
+      const nextSeed =
+        (seed * LCG_MULTIPLIER + LCG_INCREMENT) & LCG_MODULUS_MASK
+      return nextSeed / LCG_MODULUS_MASK
     }
 
     // Generate offsets for top/bottom cards (horizontal movement: left/right)
@@ -470,8 +578,9 @@ export function TrickArea({
               width: `${DIAMOND_CONTAINER_SIZE}px`,
             }}
           >
-            {isTrickPhase(phase) &&
-              phase.data.current_trick.map(([seat, card], playOrder) => {
+            {(isTrickPhase(phase) || isPaused) &&
+              displayTrick.length > 0 &&
+              displayTrick.map(([seat, card], playOrder) => {
                 const orientation = getOrientation(viewerSeat, seat)
                 let positionTransform = CENTER_TRANSFORM
                 switch (orientation) {
@@ -522,7 +631,7 @@ export function TrickArea({
             // Top edge = center - (cardHeight + gap + labelHeight) / 2
             // For top edge = visibleGap: centerTop - verticalOffset - (cardHeight + gap + labelHeight) / 2 = visibleGap
             // So: centerTop = visibleGap + verticalOffset + (cardHeight + gap + labelHeight) / 2
-            const verticalOffset =
+            const cardVerticalOffset =
               scaledDimensions.cardHeight * VERTICAL_OFFSET_MULTIPLIER
             const totalElementHeight =
               scaledDimensions.cardHeight +
@@ -534,16 +643,59 @@ export function TrickArea({
               visibleGap = visibleGap - HEADER_ROW_HEIGHT - MOBILE_TOP_PADDING
             }
             const centerTop =
-              visibleGap + verticalOffset + totalElementHeight / 2
+              visibleGap + cardVerticalOffset + totalElementHeight / 2
+
+            // Calculate final horizontal offsets once for all cards
+            // Pattern: left-to-right, lower-then-higher-then-lower, centered accounting for overlap
+            // All calculations start from container center (50% across)
+            const cardWidth = scaledDimensions.cardWidth
+            const cardHeight = scaledDimensions.cardHeight
+            const cardHalfWidth = cardWidth / 2
+            const cardVerticalOffsetValue =
+              cardHeight * VERTICAL_OFFSET_MULTIPLIER
+
+            // Overlap between cards (proportional to card width)
+            const overlap = CARD_OVERLAP_MULTIPLIER * cardWidth
+            const overlapHalf = overlap / 2
+            // Adjustment for overlap: move by (1 - overlapMultiplier) to account for actual overlap
+            const overlapAdjustment = (1 - CARD_OVERLAP_MULTIPLIER) * cardWidth
+
+            // Calculate horizontal offsets from container center
+            // Cards 2 and 3: symmetric inner positions
+            // Cards 1 and 4: outer positions adjusted for overlap
+            const finalHorizontalOffsets: Record<string, number> = {
+              'left-0': -cardHalfWidth + overlapHalf - overlapAdjustment, // Card 1: -0.5 + 0.2 - 0.6 = -0.9 * cardWidth
+              'top-1': -(cardHalfWidth - overlapHalf), // Card 2: -(0.5 - 0.2) = -0.3 * cardWidth
+              'right-2': cardHalfWidth - overlapHalf, // Card 3: (0.5 - 0.2) = 0.3 * cardWidth
+              'top-3': cardHalfWidth - overlapHalf + overlapAdjustment, // Card 4: 0.5 - 0.2 + 0.6 = 0.9 * cardWidth
+            }
+
+            // Pre-calculated vertical offsets (only for top positions)
+            const finalVerticalOffsets: Record<string, number> = {
+              'top-1': -cardVerticalOffsetValue,
+              'top-3': -cardVerticalOffsetValue * 1.2,
+            }
 
             return orderedCards.map(
               ({ seat, card, label, fixedPosition, playOrder }) => {
-                const positionTransform = buildCardTransform(
-                  fixedPosition,
-                  safeCardScale,
-                  scaledDimensions.cardWidth,
-                  scaledDimensions.cardHeight
-                )
+                // Get pre-calculated transforms - all positions are defined, so no fallback needed
+                const key = `${fixedPosition}-${playOrder}`
+                const horizontalOffsetValue = finalHorizontalOffsets[key]
+                const verticalOffsetValue = finalVerticalOffsets[key] ?? 0
+
+                const transforms: string[] = []
+                if (horizontalOffsetValue !== 0) {
+                  transforms.push(`translateX(${horizontalOffsetValue}px)`)
+                }
+                if (verticalOffsetValue !== 0) {
+                  transforms.push(`translateY(${verticalOffsetValue}px)`)
+                }
+                if (safeCardScale !== 1) {
+                  transforms.push(`scale(${safeCardScale})`)
+                }
+
+                const positionTransform =
+                  transforms.length > 0 ? transforms.join(' ') : 'none'
                 const combinedTransform =
                   positionTransform === 'none'
                     ? CENTER_TRANSFORM
