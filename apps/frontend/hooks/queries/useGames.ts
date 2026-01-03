@@ -40,7 +40,7 @@ export function useAvailableGames(initialData?: Game[]) {
  * Uses the getLastActiveGame server function.
  * Errors are handled consistently through toQueryError.
  */
-export function useLastActiveGame() {
+export function useLastActiveGame(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: queryKeys.games.lastActive(),
     queryFn: async () => {
@@ -54,6 +54,7 @@ export function useLastActiveGame() {
     },
     // 60 seconds - changes infrequently (only when user joins/leaves games)
     staleTime: 60 * 1000,
+    enabled: options?.enabled ?? true,
   })
 }
 

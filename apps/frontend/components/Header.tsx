@@ -31,18 +31,24 @@ import {
   signOutAction,
 } from '@/app/actions/auth-actions'
 import { useHeaderBreadcrumbs } from './header-breadcrumbs'
+import { useLastActiveGame } from '@/hooks/queries/useGames'
 
 type HeaderProps = {
   session: { user?: { email?: string | null } } | null
-  lastActiveGameId?: number | null
 }
 
-export default function Header({ session, lastActiveGameId }: HeaderProps) {
+export default function Header({ session }: HeaderProps) {
   const t = useTranslations('nav')
   const { crumbs } = useHeaderBreadcrumbs()
   const hasBreadcrumbs = session?.user && crumbs.length > 0
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
+
+  // Fetch last active game on client side for real-time updates
+  // Only fetch if user is logged in
+  const { data: activeGameId } = useLastActiveGame({
+    enabled: !!session?.user,
+  })
 
   useEffect(() => {
     if (!isUserMenuOpen) {
@@ -119,7 +125,7 @@ export default function Header({ session, lastActiveGameId }: HeaderProps) {
           {session?.user ? (
             <>
               <ResumeGameButton
-                lastActiveGameId={lastActiveGameId ?? null}
+                lastActiveGameId={activeGameId ?? null}
                 className="bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary"
               />
               <div className="relative" ref={userMenuRef}>
