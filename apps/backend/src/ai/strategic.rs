@@ -15,16 +15,15 @@
 //!
 //! Trump selection:
 //! - Prefer the suit with the best (count, high-card) tuple.
-//! - Consider opponent trump preferences from history.
 //! - Consider No Trump (if legal) when the hand is balanced and has enough top cards.
 //!
-//! Play strategy (memory-aware):
-//! - Track played cards via RoundMemory for better decisions.
-//! - Detect opponent voids to avoid wasting trump.
-//! - Adjust aggressiveness based on trick number and bid progress.
-//! - If following suit: try to win cheaply when late and profitable, else conserve (play low).
-//! - If void in lead suit: consider ruffing cheaply if it can win; otherwise discard lowest.
-//! - On lead: prefer long suit; lead low from length to preserve high cards.
+//! Play strategy (bid-target-driven):
+//! - Every play decision is anchored to the bid target (exact tricks for +10 bonus).
+//! - Track tricks won via RoundMemory to compute remaining need.
+//! - Compute target policy: need = bid - tricks_won, avoid = tricks_won >= bid.
+//! - Pressure scaling: need == 0 → strongly prefer losing; need >= tricks_remaining → strongly prefer winning.
+//! - Score cards by target alignment (win vs lose desirability) with heuristics as tie-breakers.
+//! - Prefer cheap wins (low cards when winning needed) and conserve highs when losing needed.
 //!
 //! Notes & assumptions:
 //! - Uses public fields (`state.hand`, `state.trump`, `state.current_trick_plays`, etc.)
@@ -42,6 +41,22 @@ use crate::domain::{Card, GameContext, Rank, Suit, Trump};
 #[derive(Clone)]
 pub struct Strategic {
     _seed: Option<u64>, // reserved, currently unused for strict determinism
+}
+
+/// Context for scoring cards in bid-target-driven play selection.
+struct ScoringContext<'a> {
+    legal: &'a [Card],
+    current_plays: &'a [(u8, Card)],
+    lead_suit: Option<Suit>,
+    trump: Trump,
+    pressure: f32,
+    avoid: bool,
+    memory: Option<&'a RoundMemory>,
+    my_hand: &'a [Card],
+    opponent_voids: [Vec<Suit>; 4],
+    my_seat: u8,
+    is_endgame: bool,
+    need: u8,
 }
 
 impl Strategic {
@@ -83,48 +98,47 @@ impl Strategic {
         }
     }
 
-    fn lowest(cards: &[Card]) -> Option<Card> {
-        // Assumes `Card: Ord` with ascending order by rank (then suit) if applicable.
-        cards.iter().copied().min()
-    }
-
-    fn by_suit<'a>(cards: impl Iterator<Item = &'a Card>, suit: Suit) -> Vec<Card> {
-        cards.filter(|c| c.suit == suit).copied().collect()
-    }
-
-    fn lowest_in_suit<'a>(cards: impl Iterator<Item = &'a Card>, suit: Suit) -> Option<Card> {
-        let mut v = Self::by_suit(cards, suit);
-        if v.is_empty() {
-            None
-        } else {
-            v.sort(); // ascending
-            v.first().copied()
-        }
-    }
-
-    fn lowest_trump<'a>(cards: impl Iterator<Item = &'a Card>, trump: Trump) -> Option<Card> {
-        if let Some(ts) = Self::trump_suit(trump) {
-            Self::lowest_in_suit(cards, ts)
-        } else {
-            None
-        }
-    }
-
-    /// High-card score of a suit: uses the top 2 cards in that suit
-    /// as a proxy for control; relies on `Ord` within a suit.
+    /// High-card score of a suit: evaluates top 5 cards (10, J, Q, K, A).
+    /// Ace = 6, King = 5, Queen = 2, Jack = 1, Ten = 1.
+    /// Relies on `Ord` within a suit.
     fn suit_high_score(suit_cards: &mut [Card]) -> usize {
         if suit_cards.is_empty() {
             return 0;
         }
         suit_cards.sort(); // ascending
-        let n = suit_cards.len();
-        // Give 2 points for the top card, 1 for the second (if present).
         let mut score = 0;
-        if n >= 1 {
-            score += 2; // top
-        }
-        if n >= 2 {
-            score += 1; // second
+        let mut high_cards_counted = 0;
+
+        // Score from highest to lowest, but only count top 5 high cards (10-A)
+        for card in suit_cards.iter().rev() {
+            if high_cards_counted >= 5 {
+                break;
+            }
+            match card.rank {
+                Rank::Ace => {
+                    score += 6;
+                    high_cards_counted += 1;
+                }
+                Rank::King => {
+                    score += 5;
+                    high_cards_counted += 1;
+                }
+                Rank::Queen => {
+                    score += 2;
+                    high_cards_counted += 1;
+                }
+                Rank::Jack => {
+                    score += 1;
+                    high_cards_counted += 1;
+                }
+                Rank::Ten => {
+                    score += 1;
+                    high_cards_counted += 1;
+                }
+                _ => {
+                    // Below Ten, don't count
+                }
+            }
         }
         score
     }
@@ -172,6 +186,78 @@ impl Strategic {
         scaled * 0.9 // slight conservative bias
     }
 
+    /// Compute "exactness difficulty" - how hard it is to hit exactly the estimated number of tricks.
+    /// Higher difficulty means more swinginess, making it harder to control the exact trick count.
+    /// Returns a factor: >1.0 = harder to control (nudge bid down), <1.0 = easier to control (closer to estimate).
+    fn compute_exactness_difficulty(state: &CurrentRoundInfo) -> f32 {
+        let hand = &state.hand;
+        let hand_size = hand.len() as f32;
+
+        if hand_size == 0.0 {
+            return 1.0;
+        }
+
+        // Count cards by suit
+        let mut by_suit_cards: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
+        for c in hand.iter() {
+            by_suit_cards[Self::suit_index(c.suit)].push(*c);
+        }
+        let counts = [
+            by_suit_cards[0].len(),
+            by_suit_cards[1].len(),
+            by_suit_cards[2].len(),
+            by_suit_cards[3].len(),
+        ];
+
+        // Factor 1: Void count (more voids → higher swinginess)
+        let void_count = counts.iter().filter(|&&c| c == 0).count() as f32;
+        let void_difficulty = 1.0 + (void_count * 0.15); // +15% per void
+
+        // Factor 2: Longest suit length (very long suits → forced wins late, harder to control)
+        let longest = *counts.iter().max().unwrap_or(&0) as f32;
+        let avg_suit_length = hand_size / 4.0;
+        let length_difficulty = if longest > avg_suit_length * 1.5 {
+            // Very long suit (e.g., 6+ in a 13-card hand) = harder to control
+            1.0 + ((longest - avg_suit_length * 1.5) * 0.1)
+        } else {
+            1.0
+        };
+
+        // Factor 3: Number of top winners (A/K) relative to hand size
+        // More A/K = easier to control (can choose when to win)
+        let ace_king_count = hand
+            .iter()
+            .filter(|c| matches!(c.rank, Rank::Ace | Rank::King))
+            .count() as f32;
+        let control_ratio = ace_king_count / hand_size;
+        // Higher control ratio = easier to hit exactly (lower difficulty)
+        // Normalize: at 0 A/K → difficulty 1.2, at hand_size/4 A/K → difficulty 0.9
+        let control_difficulty = 1.2 - (control_ratio * 1.2); // Scale down as control increases
+        let control_difficulty = control_difficulty.clamp(0.8, 1.3); // Clamp reasonable range
+
+        // Factor 4: Suit balance vs extreme shapes
+        // Extreme shapes (e.g., 7-3-2-1) are harder to control than balanced (4-3-3-3)
+        let variance = counts
+            .iter()
+            .map(|&c| {
+                let diff = c as f32 - avg_suit_length;
+                diff * diff
+            })
+            .sum::<f32>()
+            / 4.0;
+        // Normalize variance - higher variance = more extreme shape = higher difficulty
+        // For a 13-card hand: balanced (4-3-3-3) has variance ~0.25, extreme (7-3-2-1) has ~4.25
+        let balance_difficulty = 1.0 + (variance * 0.05); // Scale variance impact
+
+        // Combine factors (multiplicative, but keep in reasonable range)
+        let combined =
+            void_difficulty * length_difficulty * control_difficulty * balance_difficulty;
+
+        // Normalize to reasonable range: 0.85 to 1.15
+        // This means: easy hands allow closer to estimate, hard hands nudge down by up to 15%
+        combined.clamp(0.85, 1.15)
+    }
+
     /// Pick the legal bid closest to the estimate (bias downward on ties).
     fn choose_bid_from_estimate(legal: &[u8], estimate: f32) -> Option<u8> {
         if legal.is_empty() {
@@ -198,23 +284,55 @@ impl Strategic {
         count * 10 + hi
     }
 
-    /// Consider No Trump if available: prefer when hand is balanced and has some top cards.
-    fn prefer_no_trump(hand: &[Card]) -> bool {
-        // Balanced if no suit has >= 6 and none <= 1
+    /// Consider No Trump only when hand is extremely balanced with exceptional high cards
+    /// and the best suit is weak (score < 45).
+    fn prefer_no_trump(hand: &[Card], best_suit_score: i32) -> bool {
+        // Best suit must be weak - if we have a decent trump suit, prefer it
+        if best_suit_score >= 45 {
+            return false;
+        }
+
+        // Extremely balanced: no suit >= 4 and no suit <= 1 (all suits 2-3)
         let mut counts = [0usize; 4];
+        let mut total_aces_and_kings = 0;
+
         for c in hand {
             counts[Self::suit_index(c.suit)] += 1;
+            if matches!(c.rank, Rank::Ace | Rank::King) {
+                total_aces_and_kings += 1;
+            }
         }
-        let balanced = counts.iter().all(|&c| (2..=5).contains(&c));
+
+        let balanced = counts.iter().all(|&c| (2..=3).contains(&c));
         if !balanced {
             return false;
         }
-        // Top-card density proxy: look at the top ~quartile overall.
-        let mut sorted = hand.to_vec();
-        sorted.sort(); // ascending
-        let k = sorted.len().max(1).div_ceil(4); // ceil(n/4)
-                                                 // Require at least some "control": here just check size threshold.
-        k >= 3
+
+        // Count unique suits with Ace or King
+        let mut suits_with_ace_or_king = 0;
+        for suit_idx in 0..4 {
+            let suit = Suit::from_index(suit_idx);
+            let has_ace_or_king = hand
+                .iter()
+                .any(|c| c.suit == suit && matches!(c.rank, Rank::Ace | Rank::King));
+            if has_ace_or_king {
+                suits_with_ace_or_king += 1;
+            }
+        }
+
+        // Exceptional high-card quality: at least 4 total Aces and Kings (or 3 if hand is small)
+        let hand_size = hand.len();
+        let min_aces_kings = if hand_size <= 6 { 3 } else { 4 };
+        if total_aces_and_kings < min_aces_kings {
+            return false;
+        }
+
+        // Additional check: hand has at least one Ace or King in at least 3 of the 4 suits
+        if suits_with_ace_or_king < 3 {
+            return false;
+        }
+
+        true
     }
 
     /// Compare trick cards: does `a` beat `b` given (lead, trump)?
@@ -252,6 +370,79 @@ impl Strategic {
             return true;
         }
         false
+    }
+
+    // ---------- Bid Target Tracking ----------
+
+    /// Check if we're in the endgame (final tricks where exact bid matters most).
+    /// Returns true if tricks_remaining <= 4.
+    fn is_endgame(tricks_remaining: u8, _hand_size: u8) -> bool {
+        tricks_remaining <= 4
+    }
+
+    /// Count tricks won by this player from completed tricks in RoundMemory.
+    /// Only counts tricks where we have exact card information (can determine winner reliably).
+    fn count_tricks_won(memory: Option<&RoundMemory>, my_seat: u8, trump: Trump) -> u8 {
+        let mut count = 0;
+        if let Some(mem) = memory {
+            for trick in &mem.tricks {
+                // Only count if we have exact cards for all plays (can determine winner)
+                let mut all_exact = true;
+                let mut plays_with_cards = Vec::new();
+                for (seat, play_mem) in &trick.plays {
+                    match play_mem {
+                        PlayMemory::Exact(card) => {
+                            plays_with_cards.push((*seat, *card));
+                        }
+                        _ => {
+                            all_exact = false;
+                            break;
+                        }
+                    }
+                }
+                if all_exact && plays_with_cards.len() == 4 {
+                    // Determine winner: first card is lead
+                    let lead_suit = plays_with_cards[0].1.suit;
+                    let mut winner = plays_with_cards[0];
+                    for &(seat, card) in &plays_with_cards[1..] {
+                        if Self::wins_over(card, winner.1, lead_suit, trump) {
+                            winner = (seat, card);
+                        }
+                    }
+                    if winner.0 == my_seat {
+                        count += 1;
+                    }
+                }
+            }
+        }
+        count
+    }
+
+    /// Compute bid target state: how many tricks we still need and whether to avoid winning.
+    fn bid_target_state(state: &CurrentRoundInfo, tricks_won_so_far: u8) -> (u8, bool, f32) {
+        let my_bid = state.bids[state.player_seat as usize].unwrap_or(0);
+        let tricks_remaining = state.hand_size.saturating_sub(state.trick_no - 1);
+
+        let need = my_bid.saturating_sub(tricks_won_so_far);
+        let avoid = tricks_won_so_far >= my_bid;
+
+        // Compute pressure: how urgent it is to win tricks
+        // If need == 0 → strongly prefer losing (pressure = -2.0)
+        // If need >= tricks_remaining → strongly prefer winning (pressure = 2.0)
+        // Otherwise → neutral (pressure = 0.0, or scale based on need/tricks_remaining)
+        let pressure = if need == 0 {
+            -2.0 // Strongly prefer losing
+        } else if tricks_remaining > 0 && need >= tricks_remaining {
+            2.0 // Strongly prefer winning
+        } else if tricks_remaining > 0 {
+            // Scale pressure based on how critical the need is
+            let criticality = need as f32 / tricks_remaining as f32;
+            criticality * 1.5 // Scale to 0.0-1.5 range
+        } else {
+            0.0
+        };
+
+        (need, avoid, pressure)
     }
 
     // ---------- Memory Analysis Helpers ----------
@@ -433,27 +624,340 @@ impl Strategic {
         }
     }
 
-    /// Get trick progress urgency: higher value means more urgency to win tricks.
-    /// Based on trick number and hand size - later tricks are more urgent.
-    fn trick_urgency(trick_no: u8, hand_size: u8) -> f32 {
-        if hand_size == 0 {
-            return 1.0;
-        }
-        let progress = trick_no as f32 / hand_size as f32;
-        // Early tricks (0.0-0.33): 0.8 urgency
-        // Mid tricks (0.33-0.67): 1.0 urgency
-        // Late tricks (0.67-1.0): 1.2 urgency
-        if progress < 0.33 {
-            0.8
-        } else if progress < 0.67 {
-            1.0
-        } else {
-            1.2
+    /// Determine if a card would win the current trick.
+    /// Returns true if playing this card would beat the current winner (and likely win the trick).
+    /// Note: This is an approximation - when we're not last to play, subsequent players might beat us.
+    fn would_win_trick(
+        card: Card,
+        current_plays: &[(u8, Card)],
+        lead_suit: Option<Suit>,
+        trump: Trump,
+        legal: &[Card],
+    ) -> bool {
+        match lead_suit {
+            None => {
+                // On lead: use heuristic
+                // High trump cards are more likely to win
+                // Simple heuristic: trump cards win, non-trump might win if high
+                if Self::is_trump(&card, trump) {
+                    return true;
+                }
+                // For non-trump on lead, assume high cards might win
+                matches!(card.rank, Rank::Ace | Rank::King | Rank::Queen)
+            }
+            Some(lead) => {
+                // Check if we're void in lead suit
+                let have_lead_suit = legal.iter().any(|c| c.suit == lead);
+
+                if !have_lead_suit {
+                    // Void in lead suit: trump cards can ruff (winning), non-trumps discard (losing)
+                    return Self::is_trump(&card, trump);
+                }
+
+                if current_plays.is_empty() {
+                    // Shouldn't happen if lead_suit is Some
+                    return false;
+                }
+
+                // Following suit: determine current winner from plays so far
+                let mut current_winner = current_plays[0].1;
+                for &(_, c) in &current_plays[1..] {
+                    if Self::wins_over(c, current_winner, lead, trump) {
+                        current_winner = c;
+                    }
+                }
+
+                // Check if our card beats the current winner
+                Self::wins_over(card, current_winner, lead, trump)
+            }
         }
     }
 
-    /// Memory-aware play selection with trick-progressive strategy.
-    fn pick_memory_aware_play(state: &CurrentRoundInfo, cx: &GameContext, urgency: f32) -> Card {
+    /// Score a card based on bid target alignment and heuristics.
+    /// Returns (target_score, heuristic_score) where higher is better.
+    /// target_score: positive for winning cards when we need wins, negative for losing cards when we need to avoid.
+    /// heuristic_score: tie-breaker based on card quality (cheap wins, conserve highs).
+    fn score_card_for_target(card: Card, ctx: &ScoringContext) -> (f32, f32) {
+        // Determine if this card would win
+        let wins =
+            Self::would_win_trick(card, ctx.current_plays, ctx.lead_suit, ctx.trump, ctx.legal);
+
+        // Target alignment score
+        let target_score = if ctx.avoid {
+            // Want to lose - prefer losing cards
+            if wins {
+                -10.0 * ctx.pressure.abs()
+            } else {
+                10.0 * ctx.pressure.abs()
+            }
+        } else if ctx.pressure > 0.0 {
+            // Need wins - prefer winning cards
+            if wins {
+                10.0 * ctx.pressure
+            } else {
+                -10.0 * ctx.pressure
+            }
+        } else {
+            // Neutral pressure - slight preference based on card quality
+            // In endgame with low need, slightly prefer losing to avoid accidental wins
+            if ctx.is_endgame && ctx.need > 0 && ctx.need < 3 {
+                // Low but non-zero need in endgame: slight penalty for winning to avoid overtricks
+                if wins {
+                    -2.0
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            }
+        };
+
+        // Heuristic score (tie-breaker)
+        let mut heuristic_score = 0.0;
+
+        // Prefer cheap wins (low cards when winning)
+        if wins {
+            // Lower rank cards are "cheaper" - give bonus
+            let rank_value = match card.rank {
+                Rank::Ace => 13.0,
+                Rank::King => 12.0,
+                Rank::Queen => 11.0,
+                Rank::Jack => 10.0,
+                Rank::Ten => 9.0,
+                Rank::Nine => 8.0,
+                Rank::Eight => 7.0,
+                Rank::Seven => 6.0,
+                Rank::Six => 5.0,
+                Rank::Five => 4.0,
+                Rank::Four => 3.0,
+                Rank::Three => 2.0,
+                Rank::Two => 1.0,
+            };
+            heuristic_score -= rank_value; // Negative = prefer lower cards
+        } else {
+            // When losing, prefer playing high cards to conserve low ones
+            let rank_value = match card.rank {
+                Rank::Ace => 13.0,
+                Rank::King => 12.0,
+                Rank::Queen => 11.0,
+                Rank::Jack => 10.0,
+                Rank::Ten => 9.0,
+                Rank::Nine => 8.0,
+                Rank::Eight => 7.0,
+                Rank::Seven => 6.0,
+                Rank::Six => 5.0,
+                Rank::Five => 4.0,
+                Rank::Four => 3.0,
+                Rank::Three => 2.0,
+                Rank::Two => 1.0,
+            };
+            heuristic_score += rank_value; // Positive = prefer higher cards when losing
+        }
+
+        // Bonus for conserving high cards when following suit
+        if let Some(lead) = ctx.lead_suit {
+            if card.suit == lead {
+                let remaining_tracked = Self::count_tracked_cards(ctx.memory, lead, ctx.my_hand);
+                if remaining_tracked > 10.0 && Self::is_tracked_rank(card.rank) {
+                    // Many tracked cards remain - prefer conserving this high card
+                    heuristic_score -= 5.0;
+                }
+            }
+        }
+
+        // Penalize leading suits where opponents are void (they'll trump and waste our lead)
+        // Exception: if the suit is trump, opponents being void is GOOD (they can't trump it)
+        if ctx.lead_suit.is_none() {
+            let is_trump_suit = Self::is_trump(&card, ctx.trump);
+            if !is_trump_suit {
+                // We're on lead - avoid leading non-trump suits where opponents are void
+                let void_count = ctx
+                    .opponent_voids
+                    .iter()
+                    .enumerate()
+                    .filter(|(seat, _)| *seat != ctx.my_seat as usize)
+                    .map(|(_, voids)| if voids.contains(&card.suit) { 1 } else { 0 })
+                    .sum::<usize>();
+                if void_count > 0 {
+                    // Penalize based on how many opponents are void (more void = bigger penalty)
+                    heuristic_score -= 10.0 * void_count as f32;
+                }
+            }
+        }
+
+        (target_score, heuristic_score)
+    }
+
+    /// Endgame play selection for final tricks when exact bid conversion is critical.
+    /// Returns a card chosen using strict endgame rules, or None if not in endgame.
+    fn choose_endgame_card(
+        legal: &[Card],
+        current_plays: &[(u8, Card)],
+        lead_suit: Option<Suit>,
+        trump: Trump,
+        need: u8,
+        tricks_remaining: u8,
+    ) -> Option<Card> {
+        if need == 0 {
+            // At or above bid: strongly avoid winning
+            if lead_suit.is_none() {
+                // Leading: prefer lowest card from short/weak suit, avoid trump
+                let mut by_suit: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
+                for &c in legal {
+                    by_suit[Self::suit_index(c.suit)].push(c);
+                }
+
+                // Prefer non-trump suits, sorted by length (shorter = weaker)
+                let mut suit_scores: Vec<(Suit, usize, bool)> = (0..4)
+                    .map(|i| {
+                        let suit = Suit::from_index(i);
+                        let is_trump_suit = Self::trump_suit(trump) == Some(suit);
+                        (suit, by_suit[i].len(), is_trump_suit)
+                    })
+                    .collect();
+
+                // Sort: non-trump first, then by length (shortest first)
+                suit_scores.sort_by(|a, b| {
+                    match (a.2, b.2) {
+                        (false, true) => std::cmp::Ordering::Less, // a (non-trump) < b (trump)
+                        (true, false) => std::cmp::Ordering::Greater,
+                        _ => a.1.cmp(&b.1), // Both same type, sort by length
+                    }
+                });
+
+                // Try to find lowest card from shortest non-trump suit
+                for (suit, _, _is_trump) in suit_scores {
+                    if let Some(cards) = by_suit.get(Self::suit_index(suit)) {
+                        if !cards.is_empty() {
+                            let mut suit_cards = cards.clone();
+                            suit_cards.sort(); // ascending
+                            return Some(suit_cards[0]);
+                        }
+                    }
+                }
+
+                // Fallback: lowest legal card
+                let mut sorted = legal.to_vec();
+                sorted.sort();
+                return Some(sorted[0]);
+            } else if let Some(lead) = lead_suit {
+                // Following: choose lowest legal card that does NOT win
+                let current_winner = if !current_plays.is_empty() {
+                    let mut winner = current_plays[0].1;
+                    for &(_, c) in &current_plays[1..] {
+                        if Self::wins_over(c, winner, lead, trump) {
+                            winner = c;
+                        }
+                    }
+                    Some(winner)
+                } else {
+                    None
+                };
+
+                if let Some(winner) = current_winner {
+                    // Find non-winning cards
+                    let non_winners: Vec<Card> = legal
+                        .iter()
+                        .copied()
+                        .filter(|&c| !Self::wins_over(c, winner, lead, trump))
+                        .collect();
+
+                    if !non_winners.is_empty() {
+                        let mut sorted = non_winners;
+                        sorted.sort();
+                        return Some(sorted[0]);
+                    }
+                }
+
+                // All cards win or no current winner - choose lowest legal
+                let mut sorted = legal.to_vec();
+                sorted.sort();
+                return Some(sorted[0]);
+            } else {
+                // No lead suit - shouldn't happen when following, but fallback
+                let mut sorted = legal.to_vec();
+                sorted.sort();
+                return Some(sorted[0]);
+            }
+        } else if need >= tricks_remaining {
+            // Must win out: strongly prefer winning
+            if lead_suit.is_none() {
+                // Leading: lead strongest likely winner (high trump or Ace)
+                // Prefer high trump cards first
+                let mut trumps: Vec<Card> = legal
+                    .iter()
+                    .copied()
+                    .filter(|&c| Self::is_trump(&c, trump))
+                    .collect();
+
+                if !trumps.is_empty() {
+                    trumps.sort(); // ascending
+                    return Some(trumps[trumps.len() - 1]); // highest trump
+                }
+
+                // No trump, prefer Aces/Kings
+                let mut high_cards: Vec<Card> = legal
+                    .iter()
+                    .copied()
+                    .filter(|&c| matches!(c.rank, Rank::Ace | Rank::King))
+                    .collect();
+
+                if !high_cards.is_empty() {
+                    high_cards.sort();
+                    return Some(high_cards[high_cards.len() - 1]); // highest
+                }
+
+                // Fallback: highest legal card
+                let mut sorted = legal.to_vec();
+                sorted.sort();
+                return Some(sorted[sorted.len() - 1]);
+            } else if let Some(lead) = lead_suit {
+                // Following: choose cheapest winning card if available
+                let current_winner = if !current_plays.is_empty() {
+                    let mut winner = current_plays[0].1;
+                    for &(_, c) in &current_plays[1..] {
+                        if Self::wins_over(c, winner, lead, trump) {
+                            winner = c;
+                        }
+                    }
+                    Some(winner)
+                } else {
+                    None
+                };
+
+                if let Some(winner) = current_winner {
+                    let winners: Vec<Card> = legal
+                        .iter()
+                        .copied()
+                        .filter(|&c| Self::wins_over(c, winner, lead, trump))
+                        .collect();
+
+                    if !winners.is_empty() {
+                        let mut sorted = winners;
+                        sorted.sort(); // ascending = cheapest first
+                        return Some(sorted[0]);
+                    }
+                }
+
+                // No winning cards - choose lowest legal
+                let mut sorted = legal.to_vec();
+                sorted.sort();
+                return Some(sorted[0]);
+            } else {
+                // No lead suit - shouldn't happen when following, but fallback
+                let mut sorted = legal.to_vec();
+                sorted.sort();
+                return Some(sorted[0]);
+            }
+        }
+
+        // Neutral endgame - return None to use regular scoring
+        None
+    }
+
+    /// Bid-target-driven play selection.
+    /// Every play decision considers how many tricks we still NEED to hit our bid exactly.
+    fn decide_card_with_target_policy(state: &CurrentRoundInfo, cx: &GameContext) -> Card {
         let legal = state.legal_plays();
         debug_assert!(!legal.is_empty(), "No legal plays provided to strategic AI");
 
@@ -463,94 +967,74 @@ impl Strategic {
         let memory = cx.round_memory();
         let my_hand = &state.hand;
 
-        let lead_suit = match lead {
-            Some(ls) => ls,
-            None => return Self::lowest(&legal).unwrap_or(legal[0]), // Should not happen when following
+        // Count tricks won so far
+        let tricks_won_so_far = Self::count_tricks_won(memory, state.player_seat, trump);
+
+        // Detect opponent voids to avoid leading suits they can trump
+        let opponent_voids = Self::detect_opponent_voids(memory, state.player_seat);
+
+        // Compute bid target state
+        let (need, avoid, pressure) = Self::bid_target_state(state, tricks_won_so_far);
+
+        // Check if we're in endgame
+        let tricks_remaining = state.hand_size.saturating_sub(state.trick_no - 1);
+        if Self::is_endgame(tricks_remaining, state.hand_size) {
+            // Try endgame-specific rules
+            if let Some(endgame_card) = Self::choose_endgame_card(
+                &legal,
+                current_plays,
+                lead,
+                trump,
+                need,
+                tricks_remaining,
+            ) {
+                return endgame_card;
+            }
+            // If endgame rules returned None (neutral case), fall through to regular scoring
+            // but increase weight of avoiding accidental wins when need is low
+        }
+
+        // Score all legal cards (with endgame awareness for neutral cases)
+        let is_endgame = Self::is_endgame(tricks_remaining, state.hand_size);
+        let scoring_ctx = ScoringContext {
+            legal: &legal,
+            current_plays,
+            lead_suit: lead,
+            trump,
+            pressure,
+            avoid,
+            memory,
+            my_hand,
+            opponent_voids,
+            my_seat: state.player_seat,
+            is_endgame,
+            need,
         };
 
-        // Determine current winner (if any)
-        let cur_winner = if current_plays.is_empty() {
-            None
-        } else {
-            let mut winner = current_plays[0].1;
-            for &(_, c) in &current_plays[1..] {
-                if Self::wins_over(c, winner, lead_suit, trump) {
-                    winner = c;
-                }
-            }
-            Some(winner)
-        };
+        let mut scored: Vec<(Card, f32, f32)> = legal
+            .iter()
+            .map(|&card| {
+                let (target, heuristic) = Self::score_card_for_target(card, &scoring_ctx);
+                (card, target, heuristic)
+            })
+            .collect();
 
-        // Try to beat current winner using the cheapest winning card.
-        // Higher urgency makes us more willing to win.
-        if let Some(w) = cur_winner {
-            let mut winners: Vec<Card> = legal
-                .iter()
-                .copied()
-                .filter(|&c| Self::wins_over(c, w, lead_suit, trump))
-                .collect();
-            if !winners.is_empty() {
-                winners.sort(); // ascending; cheapest winning
+        // Sort by target score (primary), then heuristic (secondary)
+        scored.sort_by(|a, b| {
+            a.1.partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.2.partial_cmp(&b.2).unwrap_or(std::cmp::Ordering::Equal))
+        });
+        scored.reverse(); // Highest scores first
 
-                // If urgency is high (late tricks), be more aggressive about winning
-                // Otherwise, only win if it's cheap (small card)
-                if urgency > 1.1 || winners[0] < w {
-                    return winners[0];
-                }
-                // If urgency is low and winning would be expensive, consider passing
-                // (fall through to play low)
-            }
+        // If all cards have same target score, use heuristic tie-breaker
+        // Otherwise, pick the best target-aligned card
+        if let Some(best) = scored.first() {
+            return best.0;
         }
 
-        // Following suit: use memory to decide if we should conserve or shed
-        if let Some(following) = Self::lowest_in_suit(legal.iter(), lead_suit) {
-            // Use comprehensive card counting (tracks 10-A) to inform decision
-            let remaining_tracked = Self::count_tracked_cards(memory, lead_suit, my_hand);
-            let suit_in_hand: Vec<Card> = legal
-                .iter()
-                .filter(|c| c.suit == lead_suit)
-                .copied()
-                .collect();
-            // Count tracked cards (10-A) we hold in this suit
-            let my_tracked_in_suit = suit_in_hand
-                .iter()
-                .filter(|c| Self::is_tracked_rank(c.rank))
-                .count();
-
-            // Decision logic: if many tracked cards remain (10+) and we have some,
-            // be more conservative (play low) to preserve our high cards
-            // Threshold: >10.0 means more than half of tracked cards (out of 20 total) remain
-            if remaining_tracked > 10.0 && my_tracked_in_suit > 1 {
-                // Many tracked cards still out - play low to conserve
-                return following;
-            } else {
-                // Few tracked cards remain - safe to play higher
-                let mut suit_cards: Vec<Card> = legal
-                    .iter()
-                    .filter(|c| c.suit == lead_suit)
-                    .copied()
-                    .collect();
-                suit_cards.sort();
-                // Play second-lowest if available (keeps lowest as insurance), otherwise lowest
-                if suit_cards.len() > 1 && urgency < 1.0 {
-                    return suit_cards[1];
-                } else {
-                    return following;
-                }
-            }
-        }
-
-        // Void in lead suit: consider ruffing cheaply if it might help
-        if let Some(low_trump) = Self::lowest_trump(legal.iter(), trump) {
-            // Only ruff if not first or early player in trick (avoid wasting trump early).
-            // Higher urgency makes us more willing to ruff.
-            if current_plays.len() >= 2 || urgency > 1.1 {
-                return low_trump;
-            }
-        }
-
-        // Fallback: discard overall lowest legal card.
-        Self::lowest(&legal).unwrap_or(legal[0])
+        // Fallback: should never happen
+        legal[0]
     }
 }
 
@@ -563,6 +1047,11 @@ impl AiPlayer for Strategic {
 
         // Base estimate from hand strength
         let mut est = Self::estimate_tricks(state);
+
+        // Adjust based on exactness difficulty (how hard it is to hit exactly)
+        // Higher difficulty → nudge bid toward safer value (lower)
+        let exactness_factor = Self::compute_exactness_difficulty(state);
+        est *= exactness_factor;
 
         // Adjust based on score position (more aggressive when trailing)
         let score_mult = Self::score_adjustment_multiplier(&state.scores, state.player_seat);
@@ -629,15 +1118,7 @@ impl AiPlayer for Strategic {
 
         let hand = state.hand.clone();
 
-        // If NoTrumps is legal and the hand is balanced with some top cards, consider it.
-        let no_trump_legal = legal.iter().any(|t| matches!(t, Trump::NoTrumps));
-        let want_nt = no_trump_legal && Self::prefer_no_trump(&hand);
-
-        if want_nt {
-            return Ok(Trump::NoTrumps);
-        }
-
-        // Score each legal suit and pick the best, with optional opponent preference adjustment
+        // Score each legal suit and pick the best
         let mut best: Option<(i32, Trump)> = None;
         for &t in &legal {
             let score = match t {
@@ -655,10 +1136,19 @@ impl AiPlayer for Strategic {
             }
         }
 
-        // If only NoTrumps was legal or no suit evaluated, default to first legal.
+        // Get the best suit score (or 0 if no suits were evaluated)
+        let best_suit_score = best.map(|(score, _)| score).unwrap_or(0);
+
+        // Only consider No Trump if the best suit is weak and hand meets strict criteria
+        if Self::prefer_no_trump(&hand, best_suit_score) {
+            return Ok(Trump::NoTrumps);
+        }
+
+        // If we found a best suit, return it
         if let Some((_, t)) = best {
             Ok(t)
         } else {
+            // If only NoTrumps was legal or no suit evaluated, default to first legal.
             Ok(legal[0])
         }
     }
@@ -669,51 +1159,8 @@ impl AiPlayer for Strategic {
             return Err(AiError::InvalidMove("No legal plays".into()));
         }
 
-        let memory = cx.round_memory();
-        let urgency = Self::trick_urgency(state.trick_no, state.hand_size);
-
-        let choice = match state.current_trick_plays.len() {
-            0 => {
-                // On lead: prefer lowest from our longest suit, but avoid leading suits where opponents are void
-                let hand = &state.hand;
-                let opponent_voids = Self::detect_opponent_voids(memory, state.player_seat);
-                let mut by_suit: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
-                for c in hand {
-                    by_suit[Self::suit_index(c.suit)].push(*c);
-                }
-
-                // Score suits: prefer long suits, but penalize suits where opponents are void
-                let mut best_idx = 0usize;
-                let mut best_score = 0i32;
-                for (i, suit_cards) in by_suit.iter().enumerate() {
-                    let suit_len = suit_cards.len() as i32;
-                    let suit = Suit::from_index(i);
-                    // Penalize if we know opponents are void (they'll trump, wasting our lead)
-                    let void_penalty = opponent_voids
-                        .iter()
-                        .map(|voids| if voids.contains(&suit) { 2 } else { 0 })
-                        .sum::<i32>();
-                    let score = suit_len * 10 - void_penalty;
-                    if score > best_score {
-                        best_score = score;
-                        best_idx = i;
-                    }
-                }
-
-                // If our best suit is not available to lead, just pick overall lowest legal card.
-                if let Some(card) = Self::lowest_in_suit(legal.iter(), Suit::from_index(best_idx)) {
-                    card
-                } else {
-                    Self::lowest(&legal).unwrap_or(legal[0])
-                }
-            }
-            _ => {
-                // Following: use memory-aware strategy
-                Self::pick_memory_aware_play(state, cx, urgency)
-            }
-        };
-
-        Ok(choice)
+        // Use bid-target-driven play selection
+        Ok(Self::decide_card_with_target_policy(state, cx))
     }
 }
 
@@ -733,5 +1180,1036 @@ impl SuitIndex for Suit {
             3 => Suit::Spades,
             _ => unreachable!("invalid suit index"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::player_view::{CurrentRoundInfo, GameHistory};
+    use crate::domain::round_memory::{PlayMemory, TrickMemory};
+    use crate::domain::state::Phase;
+
+    fn build_test_state_with_memory(
+        bids: [Option<u8>; 4],
+        trick_no: u8,
+        hand_size: u8,
+        hand: Vec<Card>,
+        current_trick_plays: Vec<(u8, Card)>,
+        tricks_won_memory: Vec<TrickMemory>,
+        trump: Option<Trump>,
+    ) -> (CurrentRoundInfo, GameContext) {
+        let state = CurrentRoundInfo {
+            game_id: 1,
+            player_seat: 0,
+            game_state: Phase::Trick { trick_no },
+            current_round: 1,
+            hand_size,
+            dealer_pos: 0,
+            hand,
+            bids,
+            trump,
+            trick_no,
+            current_trick_plays,
+            scores: [0, 0, 0, 0],
+            trick_leader: Some(0),
+        };
+
+        let memory = RoundMemory::new(crate::ai::memory::MemoryMode::Full, tricks_won_memory);
+
+        let history = GameHistory { rounds: vec![] };
+
+        let context = GameContext::new(1)
+            .with_history(history)
+            .with_round_memory(Some(memory));
+
+        (state, context)
+    }
+
+    #[test]
+    fn test_avoid_winning_when_need_zero() {
+        // Scenario: We bid 2, already won 2 tricks, need 0 more
+        // Should prefer losing cards over winning cards
+        let hand = vec![
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace, // High card that could win
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two, // Low card that would lose
+            },
+        ];
+
+        // Create memory showing we won 2 tricks (player 0 won both)
+        let trick1 = TrickMemory::new(
+            1,
+            vec![
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Ace,
+                    }),
+                ),
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::King,
+                    }),
+                ),
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Queen,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Jack,
+                    }),
+                ),
+            ],
+        );
+        let trick2 = TrickMemory::new(
+            2,
+            vec![
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Two,
+                    }),
+                ),
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Three,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Four,
+                    }),
+                ),
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Ace,
+                    }),
+                ),
+            ],
+        );
+
+        // Following suit - player 3 led Hearts with a low card, now it's our turn (seat 0)
+        let leader_card = Card {
+            suit: Suit::Hearts,
+            rank: Rank::Three,
+        };
+
+        let (mut state, context) = build_test_state_with_memory(
+            [Some(2), Some(1), Some(1), Some(0)], // We (seat 0) bid 2
+            3,                                    // Trick 3
+            5,                                    // Hand size 5
+            hand,
+            vec![(3, leader_card)], // Player 3 led, now it's player 0's turn (0 = (3 + 1) % 4)
+            vec![trick1, trick2],
+            Some(Trump::Spades),
+        );
+
+        // Fix: Ensure trick_leader is set correctly for turn calculation
+        state.trick_leader = Some(3);
+
+        let ai = Strategic::new(None);
+        let chosen = ai
+            .choose_play(&state, &context)
+            .expect("Should choose a card");
+
+        // Should choose the losing card (Two) over the winning card (Ace)
+        // Since we need 0 more tricks, we want to avoid winning
+        assert_eq!(chosen.rank, Rank::Two);
+        assert_eq!(chosen.suit, Suit::Hearts);
+    }
+
+    #[test]
+    fn test_prefer_winning_when_critical_need() {
+        // Scenario: We bid 3, won 0 tricks, on trick 3 of 5, need 3 more tricks
+        // Should strongly prefer winning cards
+        let hand = vec![
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two, // Low card that would lose
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace, // High card that would win
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::King,
+            },
+        ];
+
+        // Player 3 led Hearts with a low card, now it's our turn (seat 0)
+        let leader_card = Card {
+            suit: Suit::Hearts,
+            rank: Rank::Three,
+        };
+
+        let (mut state, context) = build_test_state_with_memory(
+            [Some(3), Some(1), Some(1), Some(0)], // We (seat 0) bid 3
+            3,                                    // Trick 3 of 5
+            5,                                    // Hand size 5
+            hand,
+            vec![(3, leader_card)], // Player 3 led, now it's player 0's turn
+            vec![],                 // No tricks won yet
+            Some(Trump::Spades),
+        );
+
+        state.trick_leader = Some(3);
+
+        let ai = Strategic::new(None);
+        let chosen = ai
+            .choose_play(&state, &context)
+            .expect("Should choose a card");
+
+        // Should choose the winning card (Ace) to get closer to our bid
+        assert_eq!(chosen.rank, Rank::Ace);
+        assert_eq!(chosen.suit, Suit::Hearts);
+    }
+
+    #[test]
+    fn test_avoid_winning_when_over_bid() {
+        // Scenario: We bid 1, already won 2 tricks (over bid)
+        // Should try to lose
+        let hand = vec![
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace, // Would win
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two, // Would lose
+            },
+        ];
+
+        // Memory showing we won 2 tricks
+        let trick1 = TrickMemory::new(
+            1,
+            vec![
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Ace,
+                    }),
+                ),
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::King,
+                    }),
+                ),
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Queen,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Jack,
+                    }),
+                ),
+            ],
+        );
+        let trick2 = TrickMemory::new(
+            2,
+            vec![
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Two,
+                    }),
+                ),
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Three,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Four,
+                    }),
+                ),
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Ace,
+                    }),
+                ),
+            ],
+        );
+
+        let leader_card = Card {
+            suit: Suit::Hearts,
+            rank: Rank::Three,
+        };
+
+        let (mut state, context) = build_test_state_with_memory(
+            [Some(1), Some(1), Some(1), Some(0)], // We (seat 0) bid 1, but won 2
+            3,
+            5,
+            hand,
+            vec![(3, leader_card)], // Player 3 led, now it's player 0's turn
+            vec![trick1, trick2],
+            Some(Trump::Spades),
+        );
+
+        state.trick_leader = Some(3);
+
+        let ai = Strategic::new(None);
+        let chosen = ai
+            .choose_play(&state, &context)
+            .expect("Should choose a card");
+
+        // Should choose the losing card since we're already over bid
+        assert_eq!(chosen.rank, Rank::Two);
+        assert_eq!(chosen.suit, Suit::Hearts);
+    }
+
+    fn build_test_state_for_bidding(
+        hand: Vec<Card>,
+        hand_size: u8,
+        bids: [Option<u8>; 4],
+        player_seat: u8,
+    ) -> (CurrentRoundInfo, GameContext) {
+        // Determine dealer position - if player_seat is 0, dealer is 3 (player_seat bids first)
+        let dealer_pos = if player_seat == 0 { 3 } else { player_seat - 1 };
+
+        let state = CurrentRoundInfo {
+            game_id: 1,
+            player_seat,
+            game_state: Phase::Bidding,
+            current_round: 1,
+            hand_size,
+            dealer_pos,
+            hand,
+            bids,
+            trump: None,
+            trick_no: 0,
+            current_trick_plays: Vec::new(),
+            scores: [0, 0, 0, 0],
+            trick_leader: None,
+        };
+
+        let context = GameContext::new(1).with_history(GameHistory { rounds: vec![] });
+
+        (state, context)
+    }
+
+    #[test]
+    fn test_swingy_hand_produces_conservative_bid() {
+        // Swingy hand: 7 cards in one suit, 2 voids, few A/K
+        // This should produce a more conservative bid due to high exactness difficulty
+        let hand = vec![
+            // 7 Hearts
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Three,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Four,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Five,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Six,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Seven,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Eight,
+            },
+            // 2 Spades, 4 Diamonds
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Nine,
+            },
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ten,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Jack,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Queen,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ace,
+            },
+        ];
+
+        let (state, context) = build_test_state_for_bidding(
+            hand,
+            13,
+            [None, None, None, None],
+            0, // Player seat 0 (bids first after dealer 3)
+        );
+
+        let ai = Strategic::new(None);
+        let bid_swingy = ai
+            .choose_bid(&state, &context)
+            .expect("Should produce a bid");
+
+        // Compare with a balanced hand
+        let balanced_hand = vec![
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Queen,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Jack,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ten,
+            },
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Nine,
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Nine,
+            },
+        ];
+
+        let (balanced_state, balanced_context) = build_test_state_for_bidding(
+            balanced_hand,
+            13,
+            [None, None, None, None],
+            0, // Player seat 0
+        );
+
+        let bid_balanced = ai
+            .choose_bid(&balanced_state, &balanced_context)
+            .expect("Should produce a bid");
+
+        // Swingy hand should bid lower (more conservative) than balanced hand
+        // Note: exact values depend on estimate_tricks, but swingy should be <= balanced
+        assert!(
+            bid_swingy <= bid_balanced,
+            "Swingy hand should produce conservative bid. Swingy: {}, Balanced: {}",
+            bid_swingy,
+            bid_balanced
+        );
+    }
+
+    #[test]
+    fn test_balanced_hand_preserves_bid() {
+        // Balanced hand with good control (multiple A/K, balanced shape)
+        // Should allow closer-to-estimate bids (low difficulty factor)
+        let hand = vec![
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Queen,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Jack,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ten,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Nine,
+            },
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Queen,
+            },
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Eight,
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Seven,
+            },
+        ];
+
+        let (state, context) = build_test_state_for_bidding(
+            hand,
+            13,
+            [None, None, None, None],
+            0, // Player seat 0
+        );
+
+        let ai = Strategic::new(None);
+        let bid = ai
+            .choose_bid(&state, &context)
+            .expect("Should produce a bid");
+
+        // Balanced hand with control should produce a reasonable bid
+        // (4-4-3-2 shape, multiple A/K = low difficulty)
+        assert!(
+            (3..=7).contains(&bid),
+            "Balanced hand should produce reasonable bid: {}",
+            bid
+        );
+    }
+
+    #[test]
+    fn test_void_hand_increases_difficulty() {
+        // Hand with 2 voids (swingy, hard to control exactly)
+        let hand = vec![
+            // Only Hearts and Diamonds, voids in Clubs and Spades
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Queen,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Jack,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ten,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Nine,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Eight,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Queen,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Jack,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ten,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Nine,
+            },
+        ];
+
+        let (state, context) = build_test_state_for_bidding(
+            hand,
+            13,
+            [None, None, None, None],
+            0, // Player seat 0
+        );
+
+        let ai = Strategic::new(None);
+        let bid_voids = ai
+            .choose_bid(&state, &context)
+            .expect("Should produce a bid");
+
+        // Compare with similar hand but no voids (just fewer cards in those suits)
+        let no_void_hand = vec![
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Queen,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Jack,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ten,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Nine,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Eight,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::King,
+            },
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Queen,
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::Two,
+            }, // One card in Clubs
+            Card {
+                suit: Suit::Spades,
+                rank: Rank::Two,
+            }, // One card in Spades
+            Card {
+                suit: Suit::Diamonds,
+                rank: Rank::Jack,
+            },
+        ];
+
+        let (no_void_state, no_void_context) = build_test_state_for_bidding(
+            no_void_hand,
+            13,
+            [None, None, None, None],
+            0, // Player seat 0
+        );
+
+        let bid_no_voids = ai
+            .choose_bid(&no_void_state, &no_void_context)
+            .expect("Should produce a bid");
+
+        // Hand with voids should be more conservative (lower or equal bid)
+        assert!(
+            bid_voids <= bid_no_voids,
+            "Hand with voids should be more conservative. With voids: {}, Without: {}",
+            bid_voids,
+            bid_no_voids
+        );
+    }
+
+    #[test]
+    fn test_endgame_need_zero_chooses_losing_line() {
+        // Scenario: Endgame (3 tricks remaining), bid 3, won 3 tricks (need 0)
+        // Should choose a losing card if available
+        let hand = vec![
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace,
+            }, // Would win
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two,
+            }, // Would lose
+        ];
+
+        // Memory showing we won 3 tricks
+        let trick1 = TrickMemory::new(
+            1,
+            vec![
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Ace,
+                    }),
+                ),
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::King,
+                    }),
+                ),
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Queen,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Jack,
+                    }),
+                ),
+            ],
+        );
+        let trick2 = TrickMemory::new(
+            2,
+            vec![
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Two,
+                    }),
+                ),
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Three,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Four,
+                    }),
+                ),
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Ace,
+                    }),
+                ),
+            ],
+        );
+        let trick3 = TrickMemory::new(
+            3,
+            vec![
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Spades,
+                        rank: Rank::Two,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Spades,
+                        rank: Rank::Three,
+                    }),
+                ),
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Spades,
+                        rank: Rank::Ace,
+                    }),
+                ),
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Spades,
+                        rank: Rank::King,
+                    }),
+                ),
+            ],
+        );
+
+        // Following suit - player 3 led Hearts with a low card, now it's our turn (seat 0)
+        let leader_card = Card {
+            suit: Suit::Hearts,
+            rank: Rank::Three,
+        };
+
+        // 5-card hand, trick 4 of 5 (1 remaining after this trick = endgame)
+        let (mut state, context) = build_test_state_with_memory(
+            [Some(3), Some(1), Some(1), Some(0)], // We (seat 0) bid 3, won 3
+            4,                                    // Trick 4 of 5
+            5,                                    // Hand size 5
+            hand,
+            vec![(3, leader_card)], // Player 3 led
+            vec![trick1, trick2, trick3],
+            Some(Trump::Spades),
+        );
+
+        state.trick_leader = Some(3);
+
+        let ai = Strategic::new(None);
+        let chosen = ai
+            .choose_play(&state, &context)
+            .expect("Should choose a card");
+
+        // Should choose the losing card (Two) since we need 0 more tricks and we're in endgame
+        assert_eq!(chosen.rank, Rank::Two);
+        assert_eq!(chosen.suit, Suit::Hearts);
+    }
+
+    #[test]
+    fn test_endgame_must_win_out_chooses_winning_line() {
+        // Scenario: Endgame (3 tricks remaining), bid 5, won 2 tricks (need 3, must win out)
+        // Should choose a winning card
+        let hand = vec![
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two,
+            }, // Would lose
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace,
+            }, // Would win
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::King,
+            },
+        ];
+
+        // Memory showing we won 2 tricks
+        let trick1 = TrickMemory::new(
+            1,
+            vec![
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Ace,
+                    }),
+                ),
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::King,
+                    }),
+                ),
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Queen,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Clubs,
+                        rank: Rank::Jack,
+                    }),
+                ),
+            ],
+        );
+        let trick2 = TrickMemory::new(
+            2,
+            vec![
+                (
+                    1,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Two,
+                    }),
+                ),
+                (
+                    2,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Three,
+                    }),
+                ),
+                (
+                    3,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Four,
+                    }),
+                ),
+                (
+                    0,
+                    PlayMemory::Exact(Card {
+                        suit: Suit::Diamonds,
+                        rank: Rank::Ace,
+                    }),
+                ),
+            ],
+        );
+
+        // Following suit - player 3 led Hearts with a low card
+        let leader_card = Card {
+            suit: Suit::Hearts,
+            rank: Rank::Three,
+        };
+
+        // 5-card hand, trick 3 of 5 (2 remaining after this trick = endgame)
+        let (mut state, context) = build_test_state_with_memory(
+            [Some(5), Some(0), Some(0), Some(0)], // We (seat 0) bid 5, won 2
+            3,                                    // Trick 3 of 5
+            5,                                    // Hand size 5
+            hand,
+            vec![(3, leader_card)],
+            vec![trick1, trick2],
+            Some(Trump::Spades),
+        );
+
+        state.trick_leader = Some(3);
+
+        let ai = Strategic::new(None);
+        let chosen = ai
+            .choose_play(&state, &context)
+            .expect("Should choose a card");
+
+        // Should choose the winning card (Ace) since we need 3 more tricks and only 2 remain
+        assert_eq!(chosen.rank, Rank::Ace);
+        assert_eq!(chosen.suit, Suit::Hearts);
+    }
+
+    #[test]
+    fn test_non_endgame_behavior_unchanged() {
+        // Scenario: Not endgame (5 tricks remaining), bid 3, won 0 tricks
+        // Should use regular scoring, not endgame rules
+        let hand = vec![
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Ace,
+            },
+            Card {
+                suit: Suit::Hearts,
+                rank: Rank::Two,
+            },
+            Card {
+                suit: Suit::Clubs,
+                rank: Rank::King,
+            },
+        ];
+
+        // Following suit
+        let leader_card = Card {
+            suit: Suit::Hearts,
+            rank: Rank::Three,
+        };
+
+        // 10-card hand, trick 5 of 10 (5 remaining after this trick = not endgame for hand_size < 10)
+        let (mut state, context) = build_test_state_with_memory(
+            [Some(3), Some(2), Some(2), Some(1)], // We (seat 0) bid 3, won 0
+            5,                                    // Trick 5 of 10
+            10,                                   // Hand size 10 (endgame threshold is 4 remaining)
+            hand,
+            vec![(3, leader_card)],
+            vec![], // No tricks won yet
+            Some(Trump::Spades),
+        );
+
+        state.trick_leader = Some(3);
+
+        let ai = Strategic::new(None);
+        let chosen = ai
+            .choose_play(&state, &context)
+            .expect("Should choose a card");
+
+        // Should use regular scoring (will choose based on need and pressure, not strict endgame rules)
+        // This test just ensures it doesn't panic and returns a legal card
+        assert_eq!(chosen.suit, Suit::Hearts); // Must follow suit
+        assert!(state.hand.contains(&chosen)); // Should be from our hand
     }
 }
