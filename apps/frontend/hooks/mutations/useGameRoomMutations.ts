@@ -17,6 +17,7 @@ import {
 } from '@/app/actions/game-room-actions'
 import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
+import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 
 /**
  * Mutation hook to set player ready status.
@@ -75,6 +76,7 @@ export function useLeaveGame() {
 
 /**
  * Mutation hook to submit a bid.
+ * Uses optimistic updates to immediately show the bid in the UI.
  * Invalidates game snapshot cache on success.
  */
 export function useSubmitBid() {
@@ -87,8 +89,77 @@ export function useSubmitBid() {
         throw handleActionResultError(result)
       }
     },
+    onMutate: async (request) => {
+      // Cancel outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.games.snapshot(request.gameId),
+      })
+
+      // Snapshot current value for rollback
+      const previousSnapshot =
+        queryClient.getQueryData<GameRoomSnapshotPayload>(
+          queryKeys.games.snapshot(request.gameId)
+        )
+
+      if (!previousSnapshot) {
+        return { previousSnapshot: undefined }
+      }
+
+      // Skip optimistic update if viewerSeat is null (user shouldn't be able to bid anyway)
+      if (
+        previousSnapshot.viewerSeat === null ||
+        previousSnapshot.snapshot.phase.phase !== 'Bidding'
+      ) {
+        return { previousSnapshot }
+      }
+
+      // Optimistically update bid
+      const updatedSnapshot: GameRoomSnapshotPayload = {
+        ...previousSnapshot,
+        snapshot: {
+          ...previousSnapshot.snapshot,
+          phase: {
+            phase: 'Bidding',
+            data: {
+              ...previousSnapshot.snapshot.phase.data,
+              bids: previousSnapshot.snapshot.phase.data.bids.map((bid, idx) =>
+                idx === previousSnapshot.viewerSeat ? request.bid : bid
+              ) as [number | null, number | null, number | null, number | null],
+              round: {
+                ...previousSnapshot.snapshot.phase.data.round,
+                bids: previousSnapshot.snapshot.phase.data.round.bids.map(
+                  (bid, idx) =>
+                    idx === previousSnapshot.viewerSeat ? request.bid : bid
+                ) as [
+                  number | null,
+                  number | null,
+                  number | null,
+                  number | null,
+                ],
+              },
+            },
+          },
+        },
+      }
+
+      queryClient.setQueryData(
+        queryKeys.games.snapshot(request.gameId),
+        updatedSnapshot
+      )
+
+      return { previousSnapshot }
+    },
+    onError: (err, request, context) => {
+      // Rollback on error
+      if (context?.previousSnapshot) {
+        queryClient.setQueryData(
+          queryKeys.games.snapshot(request.gameId),
+          context.previousSnapshot
+        )
+      }
+    },
     onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state
+      // Invalidate game snapshot so it refreshes with updated state from backend
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
       })
@@ -98,6 +169,7 @@ export function useSubmitBid() {
 
 /**
  * Mutation hook to select trump suit.
+ * Uses optimistic updates to immediately show the trump suit in the UI.
  * Invalidates game snapshot cache on success.
  */
 export function useSelectTrump() {
@@ -110,8 +182,63 @@ export function useSelectTrump() {
         throw handleActionResultError(result)
       }
     },
+    onMutate: async (request) => {
+      // Cancel outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.games.snapshot(request.gameId),
+      })
+
+      // Snapshot current value for rollback
+      const previousSnapshot =
+        queryClient.getQueryData<GameRoomSnapshotPayload>(
+          queryKeys.games.snapshot(request.gameId)
+        )
+
+      if (!previousSnapshot) {
+        return { previousSnapshot: undefined }
+      }
+
+      // Skip optimistic update if not in TrumpSelect phase
+      if (previousSnapshot.snapshot.phase.phase !== 'TrumpSelect') {
+        return { previousSnapshot }
+      }
+
+      // Optimistically update trump suit
+      const updatedSnapshot: GameRoomSnapshotPayload = {
+        ...previousSnapshot,
+        snapshot: {
+          ...previousSnapshot.snapshot,
+          phase: {
+            phase: 'TrumpSelect',
+            data: {
+              ...previousSnapshot.snapshot.phase.data,
+              round: {
+                ...previousSnapshot.snapshot.phase.data.round,
+                trump: request.trump,
+              },
+            },
+          },
+        },
+      }
+
+      queryClient.setQueryData(
+        queryKeys.games.snapshot(request.gameId),
+        updatedSnapshot
+      )
+
+      return { previousSnapshot }
+    },
+    onError: (err, request, context) => {
+      // Rollback on error
+      if (context?.previousSnapshot) {
+        queryClient.setQueryData(
+          queryKeys.games.snapshot(request.gameId),
+          context.previousSnapshot
+        )
+      }
+    },
     onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state
+      // Invalidate game snapshot so it refreshes with updated state from backend
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
       })
@@ -121,6 +248,7 @@ export function useSelectTrump() {
 
 /**
  * Mutation hook to submit a card play.
+ * Uses optimistic updates to immediately show the card in the trick.
  * Invalidates game snapshot cache on success.
  */
 export function useSubmitPlay() {
@@ -133,8 +261,63 @@ export function useSubmitPlay() {
         throw handleActionResultError(result)
       }
     },
+    onMutate: async (request) => {
+      // Cancel outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.games.snapshot(request.gameId),
+      })
+
+      // Snapshot current value for rollback
+      const previousSnapshot =
+        queryClient.getQueryData<GameRoomSnapshotPayload>(
+          queryKeys.games.snapshot(request.gameId)
+        )
+
+      if (!previousSnapshot) {
+        return { previousSnapshot: undefined }
+      }
+
+      // Skip optimistic update if not in Trick phase
+      if (previousSnapshot.snapshot.phase.phase !== 'Trick') {
+        return { previousSnapshot }
+      }
+
+      // Optimistically add card to current_trick
+      const updatedSnapshot: GameRoomSnapshotPayload = {
+        ...previousSnapshot,
+        snapshot: {
+          ...previousSnapshot.snapshot,
+          phase: {
+            phase: 'Trick',
+            data: {
+              ...previousSnapshot.snapshot.phase.data,
+              current_trick: [
+                ...previousSnapshot.snapshot.phase.data.current_trick,
+                [previousSnapshot.snapshot.phase.data.to_act, request.card],
+              ],
+            },
+          },
+        },
+      }
+
+      queryClient.setQueryData(
+        queryKeys.games.snapshot(request.gameId),
+        updatedSnapshot
+      )
+
+      return { previousSnapshot }
+    },
+    onError: (err, request, context) => {
+      // Rollback on error
+      if (context?.previousSnapshot) {
+        queryClient.setQueryData(
+          queryKeys.games.snapshot(request.gameId),
+          context.previousSnapshot
+        )
+      }
+    },
     onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state
+      // Invalidate game snapshot so it refreshes with updated state from backend
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
       })
