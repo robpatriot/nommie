@@ -97,8 +97,31 @@ export function logError(
 
   // In development, log with full details
   if (process.env.NODE_ENV === 'development') {
-    // Log the serialized error details (error has already been serialized)
-    console.error('[Error Logger]', errorDetails)
+    const logMessage = errorDetails.message || 'Unknown error message'
+    const logTimestamp = errorDetails.timestamp || new Date().toISOString()
+    const logError = errorDetails.error
+    const logContext = errorDetails.context
+
+    // Log as formatted string for maximum visibility (avoids console object display issues)
+    const parts = [`[Error Logger] ${logMessage}`, `Timestamp: ${logTimestamp}`]
+
+    if (logError) {
+      try {
+        parts.push(`Error: ${JSON.stringify(logError, null, 2)}`)
+      } catch {
+        parts.push(`Error: [unable to stringify]`)
+      }
+    }
+
+    if (logContext) {
+      try {
+        parts.push(`Context: ${JSON.stringify(logContext, null, 2)}`)
+      } catch {
+        parts.push(`Context: [unable to stringify]`)
+      }
+    }
+
+    console.error(parts.join('\n'))
 
     // Also log traceId if available for easier debugging
     if (context?.traceId) {
@@ -168,6 +191,20 @@ export function logBackendError(
     if (error.stack) {
       errorDetails.stack = error.stack
     }
+  }
+
+  // Debug: Log what we're about to pass to logError
+  if (process.env.NODE_ENV === 'development') {
+    console.error('[logBackendError] Debug:', {
+      message,
+      errorDetails,
+      errorType: error instanceof Error ? 'Error instance' : 'Plain object',
+      errorMessage: error.message,
+      hasTraceId: error.traceId !== undefined,
+      hasStatus: error.status !== undefined,
+      hasCode: error.code !== undefined,
+      additionalContext,
+    })
   }
 
   logError(message, errorDetails, {
