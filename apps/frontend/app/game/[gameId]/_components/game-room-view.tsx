@@ -114,9 +114,6 @@ export function GameRoomView({
   // If viewerSeat is undefined/null, no seat will be marked as "viewer".
   const effectiveViewerSeat = normalizeViewerSeat(viewerSeat)
 
-  // Determine if viewer is a spectator (no seat assigned)
-  const isSpectator = effectiveViewerSeat === null
-
   const tYou = t('you')
   const tStatusWaiting = t('status.waiting')
   const seatDisplayName = useCallback(
@@ -528,12 +525,6 @@ export function GameRoomView({
             }
           />
 
-          {isSpectator ? (
-            <div className="mt-6 rounded-2xl border border-primary/60 bg-primary/10 px-4 py-3 text-sm text-primary-foreground">
-              <p className="font-semibold">{t('spectatorBanner')}</p>
-            </div>
-          ) : null}
-
           <span className="sr-only">{phaseState.phaseName}</span>
 
           {error ? (
@@ -639,11 +630,6 @@ export function GameRoomView({
   return (
     <div className="flex flex-col text-foreground">
       <PageContainer className="pb-16">
-        {isSpectator ? (
-          <div className="mb-6 rounded-2xl border border-primary/60 bg-primary/10 px-4 py-3 text-sm text-primary-foreground">
-            <p className="font-semibold">{t('spectatorBanner')}</p>
-          </div>
-        ) : null}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section
             className={cn(

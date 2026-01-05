@@ -1,7 +1,6 @@
 {
   "gameRoom": {
     "you": "Du",
-    "spectatorBanner": "Du schaust diesem Spiel als Zuschauer zu",
     "orientation": {
       "top": "Oben",
       "left": "Links",

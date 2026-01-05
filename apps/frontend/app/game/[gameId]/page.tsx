@@ -101,7 +101,12 @@ export default async function GamePage({
 
   const t = await getTranslations('common')
   const tLobby = await getTranslations('lobby')
-  const gameName = t('gameName', { gameId: resolvedGameId })
+  const isSpectator =
+    snapshotResult.viewerSeat === null ||
+    snapshotResult.viewerSeat === undefined
+  const gameName = isSpectator
+    ? `${t('gameName', { gameId: resolvedGameId })} (spectating)`
+    : t('gameName', { gameId: resolvedGameId })
 
   return (
     <ErrorBoundaryWithTranslations>
