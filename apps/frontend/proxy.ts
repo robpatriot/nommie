@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { ensureBackendJwtForMiddleware } from '@/lib/auth/refresh-backend-jwt'
 import { BACKEND_JWT_COOKIE_NAME } from '@/lib/auth/backend-jwt-cookie'
 import { LOCALE_COOKIE_NAME, resolveLocale } from '@/i18n/locale'
+import { logError } from '@/lib/logging/error-logger'
 
 /**
  * Proxy to ensure backend JWT is valid and refreshed if needed, and handle locale resolution.
@@ -94,7 +95,7 @@ export async function proxy(request: NextRequest) {
     } catch (error) {
       // Log error but don't block the request
       // The page/route handler will handle auth errors appropriately
-      console.warn('[proxy] JWT refresh error:', error)
+      logError('JWT refresh error in proxy', error, { pathname })
 
       // Check if NextAuth session is expired before clearing cookie
       try {

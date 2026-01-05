@@ -9,6 +9,7 @@ import type {
   GameHistoryApiResponse,
   GameHistoryApiRound,
 } from '@/app/actions/game-actions'
+import { logWarning } from '@/lib/logging/error-logger'
 
 /**
  * Map API response to GameHistorySummary format.
@@ -36,7 +37,7 @@ function ensureSeat(value: number): Seat {
   if (isValidSeat(value)) {
     return value as Seat
   }
-  console.warn(`Invalid seat index from history payload: ${value}`)
+  logWarning('Invalid seat index from history payload', { value })
   return 0
 }
 

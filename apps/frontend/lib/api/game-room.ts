@@ -10,6 +10,7 @@ import type {
   Trump,
 } from '@/lib/game-room/types'
 import { isValidSeat } from '@/utils/seat-validation'
+import { logWarning } from '@/lib/logging/error-logger'
 
 export type GameSnapshotResult =
   | {
@@ -66,9 +67,10 @@ export async function fetchGameSnapshot(
       } else {
         // Log warning for invalid seat values to catch backend bugs
         // Don't clamp - fail hard to surface the issue
-        console.warn(
-          `Invalid seat value from backend: ${viewerSeat} (expected 0-3, got ${viewerSeat})`
-        )
+        logWarning('Invalid seat value from backend', {
+          viewerSeat,
+          expected: '0-3',
+        })
         // Still set to null to indicate invalid seat
         parsedViewerSeat = null
       }

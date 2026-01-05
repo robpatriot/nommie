@@ -20,6 +20,7 @@ import {
 } from '@/lib/server/backend-status'
 import { isBackendConnectionError } from '@/lib/server/connection-errors'
 import { fetchWithAuthWithRetry } from './server/fetch-with-retry'
+import { logError, logWarning } from '@/lib/logging/error-logger'
 
 // Re-export BackendApiError for convenience (it's also available from ./errors)
 export { BackendApiError }
@@ -114,10 +115,12 @@ export async function fetchWithAuth(
 
     // Only log connection errors if we should (outside startup window or runtime failure)
     if (shouldLogError() && isConnectionError) {
-      console.warn('Backend connection error during API request', error)
+      logError('Backend connection error during API request', error, {
+        endpoint,
+      })
     } else if (shouldLogError() && !isConnectionError) {
       // Other errors should be logged if outside startup window
-      console.warn('Network error during API request', error)
+      logError('Network error during API request', error, { endpoint })
     }
 
     throw error
@@ -129,11 +132,11 @@ export async function fetchWithAuth(
       // Rate limit exceeded - parse error response but don't log during startup
       const parsedError = await parseErrorResponse(response)
       if (shouldLogError()) {
-        console.info(
-          'Rate limit exceeded',
-          parsedError.code,
-          parsedError.message
-        )
+        logWarning('Rate limit exceeded', {
+          code: parsedError.code,
+          message: parsedError.message,
+          endpoint,
+        })
       }
       throw new BackendApiError(
         parsedError.message,
@@ -148,7 +151,12 @@ export async function fetchWithAuth(
     // Only log if we should (outside startup window or runtime failure)
     if (shouldLogError() && response.status >= 500) {
       // Server errors should be logged
-      console.warn('Backend API error', response.status, parsedError.message)
+      logError('Backend API error', new Error(parsedError.message), {
+        status: response.status,
+        code: parsedError.code,
+        traceId: parsedError.traceId,
+        endpoint,
+      })
     }
     throw new BackendApiError(
       parsedError.message,

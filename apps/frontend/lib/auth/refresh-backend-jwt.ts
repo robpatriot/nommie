@@ -17,6 +17,7 @@ import { isBackendConnectionError } from '@/lib/server/connection-errors'
 import { parseErrorResponse } from '@/lib/api/error-parsing'
 import * as jose from 'jose'
 import type { NextRequest, NextResponse } from 'next/server'
+import { logError, logWarning } from '@/lib/logging/error-logger'
 
 const REFRESH_THRESHOLD_SECONDS = 300 // 5 minutes - refresh if expiring within this
 
@@ -208,7 +209,10 @@ async function fetchNewBackendJwt(
     }
     // Backend should be up by now - log error
     if (shouldLogError()) {
-      console.warn('Backend not available for JWT refresh')
+      logError(
+        'Backend not available for JWT refresh',
+        new Error('Backend unavailable')
+      )
     }
     return null
   }
@@ -253,13 +257,19 @@ async function fetchNewBackendJwt(
       if (response.status === 429) {
         // Rate limited - log but don't throw
         if (shouldLogError()) {
-          console.warn('Backend JWT refresh rate limited (429)')
+          logWarning('Backend JWT refresh rate limited (429)')
         }
         return null
       }
 
       if (shouldLogError()) {
-        console.warn('Backend JWT refresh failed', response.status)
+        logError(
+          'Backend JWT refresh failed',
+          new Error(`HTTP ${response.status}`),
+          {
+            status: response.status,
+          }
+        )
       }
       return null
     }
@@ -287,9 +297,9 @@ async function fetchNewBackendJwt(
 
     if (shouldLogError()) {
       if (isConnectionError) {
-        console.warn('Backend connection error during JWT refresh', error)
+        logError('Backend connection error during JWT refresh', error)
       } else {
-        console.warn('Error refreshing backend JWT', error)
+        logError('Error refreshing backend JWT', error)
       }
     }
     return null

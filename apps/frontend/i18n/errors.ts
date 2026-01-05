@@ -1,3 +1,5 @@
+import { logWarning } from '@/lib/logging/error-logger'
+
 export const KNOWN_ERROR_CODES = [
   // Auth
   'UNAUTHORIZED',
@@ -82,9 +84,7 @@ export function errorCodeToMessageKey(code: string | undefined | null): string {
   }
 
   if (process.env.NODE_ENV !== 'production') {
-    console.warn(
-      `Unknown error code '${code}', falling back to errors.codes.UNKNOWN_ERROR`
-    )
+    logWarning('Unknown error code, falling back to UNKNOWN_ERROR', { code })
   }
 
   return 'errors.codes.UNKNOWN_ERROR'
