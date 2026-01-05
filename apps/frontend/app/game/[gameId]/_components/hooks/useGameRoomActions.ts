@@ -257,7 +257,12 @@ export function useGameRoomActions({
         gameId,
         version: currentVersion,
       })
+
+      // Show success message
       showToast(t('gameRoom.leftGameSuccess'), 'success')
+
+      // Navigate immediately after successful leave
+      // Using router.push for consistency with lobby navigation fix
       router.push('/lobby')
     } catch (err) {
       // Reconnect since leave failed (they're still in the game)
