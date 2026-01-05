@@ -6,6 +6,5 @@ This document tracks the current work plan for building the Nommie UI on web (Ne
 
 # Next Steps
 
-- pnpm stop doesn't seem to stop standalone prod next server
 - Review all `#[allow(dead_code)]` attributes and other compiler attribute annotations to determine appropriate solutions or removals
 
