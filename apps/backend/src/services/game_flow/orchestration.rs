@@ -17,11 +17,15 @@ impl GameFlowService {
         txn: &DatabaseTransaction,
         game_id: i64,
     ) -> Result<(), AppError> {
-        // Check if all players are ready
+        // Check if all players are ready (exclude spectators)
         let all_memberships = memberships::find_all_by_game(txn, game_id).await?;
-        let all_ready = all_memberships.iter().all(|m| m.is_ready);
+        let player_memberships: Vec<_> = all_memberships
+            .iter()
+            .filter(|m| m.role == crate::repos::memberships::GameRole::Player)
+            .collect();
+        let all_ready = player_memberships.iter().all(|m| m.is_ready);
 
-        if all_ready && all_memberships.len() == 4 {
+        if all_ready && player_memberships.len() == 4 {
             let game = games::require_game(txn, game_id).await?;
 
             // Only auto-start from the lobby; completed games (or other states) should not deal again.
@@ -64,7 +68,10 @@ impl GameFlowService {
             if let Some(action_tuple) = next_action {
                 let player_seat = action_tuple.0;
                 let memberships = memberships::find_all_by_game(txn, game_id).await?;
-                if let Some(player) = memberships.iter().find(|m| m.turn_order == player_seat) {
+                if let Some(player) = memberships
+                    .iter()
+                    .find(|m| m.turn_order == Some(player_seat))
+                {
                     if player.player_kind == crate::entities::game_players::PlayerKind::Human {
                         // Waiting for human input - done processing
                         return Ok(());
@@ -107,6 +114,15 @@ impl GameFlowService {
                     "Player not in game",
                 )
             })?;
+
+        // Only players can mark ready (not spectators)
+        if membership.role != crate::repos::memberships::GameRole::Player {
+            return Err(DomainError::validation(
+                ValidationKind::Other("INSUFFICIENT_ROLE".into()),
+                "Only players can mark ready",
+            )
+            .into());
+        }
 
         // Set ready status
         memberships::set_membership_ready(txn, membership.id, is_ready).await?;

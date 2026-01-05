@@ -43,7 +43,7 @@ async fn echo_membership(
         user_id: current_user.sub,
         game_id: game_id.0,
         membership_id: membership.id,
-        turn_order: membership.turn_order,
+        turn_order: membership.turn_order.unwrap_or(0),
         is_ready: membership.is_ready,
         role: format!("{:?}", membership.role),
     }))
@@ -84,8 +84,9 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
         player_kind: Set(backend::entities::game_players::PlayerKind::Human),
         human_user_id: Set(Some(user_id)),
         ai_profile_id: Set(None),
-        turn_order: Set(1i16),
+        turn_order: Set(Some(1i16)),
         is_ready: Set(false),
+        role: Set(backend::entities::game_players::GameRole::Player),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -299,8 +300,9 @@ async fn test_membership_composition_with_current_user_and_game_id(
         player_kind: Set(backend::entities::game_players::PlayerKind::Human),
         human_user_id: Set(Some(user_id)),
         ai_profile_id: Set(None),
-        turn_order: Set(2i16),
+        turn_order: Set(Some(2i16)),
         is_ready: Set(true),
+        role: Set(backend::entities::game_players::GameRole::Player),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -334,7 +336,7 @@ async fn test_membership_composition_with_current_user_and_game_id(
     assert_eq!(body["user_id"], user_sub); // From CurrentUser
     assert_eq!(body["game_id"], game.id); // From GameId
     assert_eq!(body["membership_id"], membership.id); // From GameMembership
-    assert_eq!(body["turn_order"], 2);
+    assert_eq!(body["turn_order"], serde_json::json!(2));
     assert_eq!(body["is_ready"], true);
     assert_eq!(body["role"], "Player");
 

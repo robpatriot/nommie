@@ -37,8 +37,12 @@ pub async fn create_membership(
         player_kind: Set(dto.player_kind),
         human_user_id: Set(dto.human_user_id),
         ai_profile_id: Set(dto.ai_profile_id),
-        turn_order: Set(dto.turn_order as i16),
+        turn_order: match dto.turn_order {
+            Some(t) => Set(Some(t)),
+            None => NotSet,
+        },
         is_ready: Set(dto.is_ready),
+        role: Set(dto.role),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -56,8 +60,12 @@ pub async fn update_membership(
         player_kind: Set(dto.player_kind),
         human_user_id: Set(dto.human_user_id),
         ai_profile_id: Set(dto.ai_profile_id),
-        turn_order: Set(dto.turn_order as i16),
+        turn_order: match dto.turn_order {
+            Some(t) => Set(Some(t)),
+            None => NotSet,
+        },
         is_ready: Set(dto.is_ready),
+        role: NotSet,
         created_at: NotSet,
         updated_at: Set(time::OffsetDateTime::now_utc()),
     };
@@ -74,6 +82,7 @@ pub async fn set_membership_ready(
         player_kind: NotSet,
         human_user_id: NotSet,
         ai_profile_id: NotSet,
+        role: NotSet,
         turn_order: NotSet,
         is_ready: Set(dto.is_ready),
         created_at: NotSet,

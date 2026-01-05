@@ -147,7 +147,7 @@ pub async fn get_display_name_by_seat<C: ConnectionTrait + Send + Sync>(
     let memberships = memberships::find_all_by_game(conn, game_id).await?;
     let membership = memberships
         .iter()
-        .find(|m| m.turn_order == seat)
+        .find(|m| m.turn_order == Some(seat))
         .ok_or_else(|| {
             DomainError::not_found(
                 NotFoundKind::Player,

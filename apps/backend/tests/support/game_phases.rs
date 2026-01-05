@@ -292,7 +292,7 @@ pub async fn setup_game_at_round(
             txn,
             game_id,
             *user_id,
-            i as u8,
+            Some(i as u8),
             true, // All ready
             memberships::GameRole::Player,
         )

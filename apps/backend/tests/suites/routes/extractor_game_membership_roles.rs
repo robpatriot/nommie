@@ -113,8 +113,9 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
         player_kind: Set(backend::entities::game_players::PlayerKind::Human),
         human_user_id: Set(Some(user_id)),
         ai_profile_id: Set(None),
-        turn_order: Set(1i16),
+        turn_order: Set(Some(1i16)),
         is_ready: Set(false),
+        role: Set(backend::entities::game_players::GameRole::Player),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -192,8 +193,9 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
         player_kind: Set(backend::entities::game_players::PlayerKind::Human),
         human_user_id: Set(Some(user_id)),
         ai_profile_id: Set(None),
-        turn_order: Set(1i16),
+        turn_order: Set(Some(1i16)),
         is_ready: Set(false),
+        role: Set(backend::entities::game_players::GameRole::Player),
         created_at: Set(now),
         updated_at: Set(now),
     };

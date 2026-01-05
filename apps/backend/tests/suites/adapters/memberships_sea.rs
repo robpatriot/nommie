@@ -23,8 +23,9 @@ async fn test_create_membership_sets_both_timestamps() -> Result<(), AppError> {
                 player_kind: backend::entities::game_players::PlayerKind::Human,
                 human_user_id: Some(user_id),
                 ai_profile_id: None,
-                turn_order: 0,
+                turn_order: Some(0),
                 is_ready: false,
+                role: backend::entities::game_players::GameRole::Player,
             };
             let membership =
                 backend::adapters::memberships_sea::create_membership(txn, dto).await?;
@@ -72,8 +73,9 @@ async fn test_set_ready_updates_only_updated_at() -> Result<(), AppError> {
                 player_kind: backend::entities::game_players::PlayerKind::Human,
                 human_user_id: Some(user_id),
                 ai_profile_id: None,
-                turn_order: 0,
+                turn_order: Some(0),
                 is_ready: false,
+                role: backend::entities::game_players::GameRole::Player,
             };
             let membership =
                 backend::adapters::memberships_sea::create_membership(txn, dto).await?;

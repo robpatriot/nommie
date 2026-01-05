@@ -49,7 +49,10 @@ impl GameFlowService {
                 return Ok(false);
             }
 
-            let player = ctx.players.iter().find(|m| m.turn_order == player_seat);
+            let player = ctx
+                .players
+                .iter()
+                .find(|m| m.turn_order == Some(player_seat));
 
             let Some(player) = player else {
                 // Player not found at this seat - stop AI processing
@@ -87,7 +90,10 @@ impl GameFlowService {
         } else {
             // Slow path: Load from database (used for Lobby, Dealing, etc.)
             let memberships = memberships::find_all_by_game(txn, game.id).await?;
-            let Some(player) = memberships.iter().find(|m| m.turn_order == player_seat) else {
+            let Some(player) = memberships
+                .iter()
+                .find(|m| m.turn_order == Some(player_seat))
+            else {
                 debug!(
                     game.id,
                     player_seat, "No player found at seat, stopping AI processing"

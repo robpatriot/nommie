@@ -79,7 +79,7 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
         .into_iter()
         .find(|m| m.player_kind == game_players::PlayerKind::Ai)
         .expect("AI membership exists");
-    assert_eq!(ai_membership.turn_order, 1);
+    assert_eq!(ai_membership.turn_order, Some(1));
     assert!(ai_membership.is_ready);
 
     let profile = ai_profiles::Entity::find_by_id(

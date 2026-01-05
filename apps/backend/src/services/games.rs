@@ -379,8 +379,8 @@ impl GameService {
             txn,
             game.id,
             user_id,
-            0,     // turn_order: 0 for creator
-            false, // is_ready: false
+            Some(0), // turn_order: 0 for creator
+            false,   // is_ready: false
             GameRole::Player,
         )
         .await
@@ -511,7 +511,7 @@ impl GameService {
     ) -> Result<Option<i64>, AppError> {
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
-        // Find all games where user is a member, ordered by updated_at DESC
+        // Find all games where user is a member (player or spectator), ordered by updated_at DESC
         let memberships = game_players::Entity::find()
             .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
             .filter(game_players::Column::HumanUserId.eq(user_id))
@@ -549,7 +549,7 @@ impl GameService {
         memberships: &[memberships::GameMembership],
     ) -> Option<u8> {
         let used_turn_orders: std::collections::HashSet<u8> =
-            memberships.iter().map(|m| m.turn_order).collect();
+            memberships.iter().filter_map(|m| m.turn_order).collect();
 
         (0..4u8).find(|&order| !used_turn_orders.contains(&order))
     }
@@ -653,8 +653,8 @@ impl GameService {
             // Replace the AI with the lowest seat number (turn_order)
             let ai_to_replace = ai_players
                 .iter()
-                .min_by_key(|m| m.turn_order)
-                .cloned()
+                .filter_map(|m| m.turn_order.map(|t| (m.clone(), t)))
+                .min_by_key(|(_, t)| *t)
                 .ok_or_else(|| {
                     AppError::internal(
                         crate::errors::ErrorCode::InternalError,
@@ -663,11 +663,13 @@ impl GameService {
                     )
                 })?;
 
+            let (ai_membership, turn_order) = ai_to_replace;
+
             // Remove any overrides and the AI membership itself
-            ai_overrides::delete_by_game_player_id(txn, ai_to_replace.id)
+            ai_overrides::delete_by_game_player_id(txn, ai_membership.id)
                 .await
                 .map_err(AppError::from)?;
-            memberships::delete_membership(txn, ai_to_replace.id)
+            memberships::delete_membership(txn, ai_membership.id)
                 .await
                 .map_err(AppError::from)?;
 
@@ -676,7 +678,7 @@ impl GameService {
                 txn,
                 game_id,
                 user_id,
-                ai_to_replace.turn_order,
+                Some(turn_order),
                 false,
                 GameRole::Player,
             )
@@ -698,13 +700,84 @@ impl GameService {
                 txn,
                 game_id,
                 user_id,
-                next_turn_order,
+                Some(next_turn_order),
                 false,
                 GameRole::Player,
             )
             .await
             .map_err(AppError::from)?;
         }
+
+        // Fetch updated memberships and reload game
+        let updated_memberships = memberships::find_all_by_game(txn, game_id)
+            .await
+            .map_err(AppError::from)?;
+
+        let game = games_repo::require_game(txn, game_id)
+            .await
+            .map_err(AppError::from)?;
+
+        Ok((game, updated_memberships))
+    }
+
+    /// Join a user to a game as a spectator.
+    ///
+    /// This method handles:
+    /// - Validating game exists
+    /// - Checking game visibility (must be Public)
+    /// - Checking user is not already a member
+    /// - Creating spectator membership (no turn_order)
+    /// - Returning updated game and memberships
+    ///
+    /// All operations are performed within the provided transaction.
+    ///
+    /// # Arguments
+    /// * `txn` - Database transaction
+    /// * `game_id` - ID of the game to spectate
+    /// * `user_id` - ID of the user spectating
+    ///
+    /// # Returns
+    /// Tuple of (game entity model, all memberships)
+    pub async fn join_as_spectator(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        user_id: i64,
+    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
+        // Fetch game and verify it exists
+        let game = games_repo::require_game(txn, game_id).await?;
+
+        // Check game visibility - only public games can be spectated
+        if game.visibility != GameVisibility::Public {
+            return Err(AppError::forbidden_with_code(
+                crate::errors::ErrorCode::Forbidden,
+                "Only public games can be spectated".to_string(),
+            ));
+        }
+
+        // Check if user is already a member
+        let existing_membership = memberships::find_membership(txn, game_id, user_id)
+            .await
+            .map_err(AppError::from)?;
+        if existing_membership.is_some() {
+            return Err(AppError::Conflict {
+                code: crate::errors::ErrorCode::Conflict,
+                detail: format!("User {} is already a member of game {}", user_id, game_id),
+                extensions: None,
+            });
+        }
+
+        // Create spectator membership (no turn_order)
+        memberships::create_membership(
+            txn,
+            game_id,
+            user_id,
+            None,  // turn_order: None for spectators
+            false, // is_ready: false (spectators don't need to be ready)
+            GameRole::Spectator,
+        )
+        .await
+        .map_err(AppError::from)?;
 
         // Fetch updated memberships and reload game
         let updated_memberships = memberships::find_all_by_game(txn, game_id)
@@ -791,11 +864,15 @@ impl GameService {
             if m.id == membership.id {
                 continue; // Skip the membership we're converting
             }
+            let seat = m.turn_order.ok_or_else(|| {
+                AppError::internal(
+                    crate::errors::ErrorCode::Internal,
+                    "Cannot resolve display name for membership without turn_order".to_string(),
+                    std::io::Error::other("Membership without turn_order"),
+                )
+            })?;
             let display_name = resolve_display_name_for_membership(
-                txn,
-                m,
-                m.turn_order,
-                false, // No final fallback needed for uniqueness check
+                txn, m, seat, false, // No final fallback needed for uniqueness check
             )
             .await
             .map_err(AppError::from)?;
@@ -805,7 +882,14 @@ impl GameService {
         // Generate a friendly AI name for this seat
         use rand::random;
         let name_seed = random::<u64>() as i64;
-        let base_name = friendly_ai_name(name_seed, membership.turn_order as usize);
+        let seat = membership.turn_order.ok_or_else(|| {
+            AppError::internal(
+                crate::errors::ErrorCode::InternalError,
+                "AI player must have turn_order".to_string(),
+                std::io::Error::other("AI player without turn_order"),
+            )
+        })?;
+        let base_name = friendly_ai_name(name_seed, seat as usize);
 
         // Ensure uniqueness
         let unique_name = if !existing_display_names.contains(&base_name) {
@@ -866,8 +950,13 @@ impl GameService {
                 )
             })?;
 
-        // If game is in Lobby, delete the membership (existing behavior)
-        if game.state == DbGameState::Lobby {
+        // Spectators can always just be removed (no seat to replace)
+        if membership.role == memberships::GameRole::Spectator {
+            memberships::delete_membership(txn, membership.id)
+                .await
+                .map_err(AppError::from)?;
+        } else if game.state == DbGameState::Lobby {
+            // If game is in Lobby, delete the membership (existing behavior)
             memberships::delete_membership(txn, membership.id)
                 .await
                 .map_err(AppError::from)?;

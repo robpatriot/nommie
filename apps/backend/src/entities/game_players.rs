@@ -16,9 +16,11 @@ pub struct Model {
     #[sea_orm(column_name = "ai_profile_id")]
     pub ai_profile_id: Option<i64>,
     #[sea_orm(column_name = "turn_order", column_type = "SmallInteger")]
-    pub turn_order: i16,
+    pub turn_order: Option<i16>,
     #[sea_orm(column_name = "is_ready")]
     pub is_ready: bool,
+    #[sea_orm(column_name = "role")]
+    pub role: GameRole,
     #[sea_orm(column_name = "created_at")]
     pub created_at: OffsetDateTime,
     #[sea_orm(column_name = "updated_at")]
@@ -74,4 +76,13 @@ pub enum PlayerKind {
     Human,
     #[sea_orm(string_value = "ai")]
     Ai,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(rs_type = "String", db_type = "Text")]
+pub enum GameRole {
+    #[sea_orm(string_value = "player")]
+    Player,
+    #[sea_orm(string_value = "spectator")]
+    Spectator,
 }

@@ -139,7 +139,10 @@ async fn build_shared_snapshot_parts(
     let creator_user_id = game.created_by;
 
     for membership in memberships {
-        let seat_idx = membership.turn_order;
+        let Some(seat_idx) = membership.turn_order else {
+            // Spectators don't have a turn_order, skip them
+            continue;
+        };
         if !(0..4).contains(&seat_idx) {
             continue;
         }
@@ -754,7 +757,17 @@ fn game_to_response(
         .filter(|m| m.role == GameRole::Player)
         .count() as i32;
 
-    let viewer_is_member = is_human_member(viewer_user_id, memberships);
+    // Check if viewer is a member (player or spectator)
+    let viewer_is_member = is_human_member(viewer_user_id, memberships)
+        || viewer_user_id
+            .map(|id| {
+                memberships.iter().any(|m| {
+                    m.user_id == Some(id)
+                        && m.role == GameRole::Spectator
+                        && m.player_kind == crate::entities::game_players::PlayerKind::Human
+                })
+            })
+            .unwrap_or(false);
 
     // Check if viewer is the host (creator of the game)
     let viewer_is_host = viewer_user_id.map(|id| created_by == id).unwrap_or(false);
@@ -843,6 +856,45 @@ async fn join_game(
     .await?;
 
     // Publish snapshot broadcast so other players' UIs update
+    publish_snapshot(&app_state, id).await?;
+
+    let response = game_to_response(&game_model, &memberships, Some(user_id))?;
+
+    Ok(web::Json(JoinGameResponse { game: response }))
+}
+
+/// POST /api/games/{game_id}/spectate
+///
+/// Adds the current user as a spectator of the specified game.
+/// Only public games can be spectated.
+async fn spectate_game(
+    http_req: HttpRequest,
+    game_id: GameId,
+    current_user: CurrentUser,
+    app_state: web::Data<AppState>,
+) -> Result<web::Json<JoinGameResponse>, AppError> {
+    let user_id = current_user.id;
+    let id = game_id.0;
+
+    // Join as spectator using service layer (handles validation, visibility check, membership creation)
+    let (game_model, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            // Fetch game to get initial version
+            let game = games_repo::require_game(txn, id).await?;
+            let initial_version = game.version;
+
+            let service = GameService;
+            let (game, memberships) = service.join_as_spectator(txn, id, user_id).await?;
+
+            // Touch game to trigger WebSocket broadcasts
+            games_repo::touch_game(txn, id, initial_version).await?;
+
+            Ok((game, memberships))
+        })
+    })
+    .await?;
+
+    // Publish snapshot broadcast so other viewers' UIs update
     publish_snapshot(&app_state, id).await?;
 
     let response = game_to_response(&game_model, &memberships, Some(user_id))?;
@@ -1016,8 +1068,17 @@ async fn list_in_progress_games(
 
     for (game_model, memberships) in games {
         let viewer_is_member = is_human_member(Some(viewer_id), &memberships);
+        // Check if viewer is a spectator
+        let viewer_is_spectator = memberships.iter().any(|m| {
+            m.user_id == Some(viewer_id)
+                && m.role == GameRole::Spectator
+                && m.player_kind == crate::entities::game_players::PlayerKind::Human
+        });
 
-        if game_model.visibility == GameVisibility::Public || viewer_is_member {
+        if game_model.visibility == GameVisibility::Public
+            || viewer_is_member
+            || viewer_is_spectator
+        {
             visible_games.push(game_to_response(
                 &game_model,
                 &memberships,
@@ -1069,7 +1130,16 @@ async fn list_overview_games(
 
     for (game_model, memberships) in active_games {
         let viewer_is_member = is_human_member(Some(viewer_id), &memberships);
-        if game_model.visibility == GameVisibility::Public || viewer_is_member {
+        // Check if viewer is a spectator
+        let viewer_is_spectator = memberships.iter().any(|m| {
+            m.user_id == Some(viewer_id)
+                && m.role == GameRole::Spectator
+                && m.player_kind == crate::entities::game_players::PlayerKind::Human
+        });
+        if game_model.visibility == GameVisibility::Public
+            || viewer_is_member
+            || viewer_is_spectator
+        {
             combined_games.push(game_to_response(
                 &game_model,
                 &memberships,
@@ -1266,7 +1336,13 @@ async fn add_ai_seat(
                 .await
                 .map_err(AppError::from)?;
 
-            if existing_memberships.len() >= 4 {
+            // Count only players (exclude spectators)
+            let player_count = existing_memberships
+                .iter()
+                .filter(|m| m.role == GameRole::Player)
+                .count();
+
+            if player_count >= 4 {
                 return Err(AppError::conflict(
                     ErrorCode::SeatTaken,
                     "All seats are already filled",
@@ -1282,7 +1358,7 @@ async fn add_ai_seat(
                 }
                 if existing_memberships
                     .iter()
-                    .any(|m| m.turn_order == seat_val)
+                    .any(|m| m.turn_order == Some(seat_val))
                 {
                     return Err(AppError::conflict(
                         ErrorCode::SeatTaken,
@@ -1292,8 +1368,14 @@ async fn add_ai_seat(
                 seat_val
             } else {
                 let game_service = GameService;
+                // Filter to only players for seat finding
+                let player_memberships: Vec<_> = existing_memberships
+                    .iter()
+                    .filter(|m| m.role == GameRole::Player)
+                    .cloned()
+                    .collect();
                 game_service
-                    .find_next_available_seat(&existing_memberships)
+                    .find_next_available_seat(&player_memberships)
                     .ok_or_else(|| {
                         AppError::conflict(ErrorCode::SeatTaken, "No available seats remaining")
                     })?
@@ -1304,14 +1386,17 @@ async fn add_ai_seat(
 
             // Collect existing display names using consolidated function
             for membership in &existing_memberships {
-                if membership.turn_order == seat_to_fill {
+                if membership.turn_order == Some(seat_to_fill) {
                     continue;
                 }
 
+                // Only process players (they have turn_order)
+                let Some(seat) = membership.turn_order else {
+                    continue;
+                };
+
                 let display_name = resolve_display_name_for_membership(
-                    txn,
-                    membership,
-                    membership.turn_order,
+                    txn, membership, seat,
                     false, // No final fallback needed for uniqueness check
                 )
                 .await
@@ -1381,8 +1466,16 @@ async fn add_ai_seat(
 
             // Check if adding this AI will complete all 4 players and start the game
             // This determines whether we need to touch_game after (game won't start) or not (game will start)
-            let will_complete_players = existing_memberships.len() == 3;
-            let all_existing_ready = existing_memberships.iter().all(|m| m.is_ready);
+            // Count only players (exclude spectators)
+            let player_count = existing_memberships
+                .iter()
+                .filter(|m| m.role == GameRole::Player)
+                .count();
+            let will_complete_players = player_count == 3;
+            let all_existing_ready = existing_memberships
+                .iter()
+                .filter(|m| m.role == GameRole::Player)
+                .all(|m| m.is_ready);
             let game_will_start = will_complete_players && all_existing_ready;
 
             ai_service
@@ -1464,7 +1557,7 @@ async fn remove_ai_seat(
 
                 let membership = existing_memberships
                     .iter()
-                    .find(|m| m.turn_order == seat_val)
+                    .find(|m| m.turn_order == Some(seat_val))
                     .cloned()
                     .ok_or_else(|| {
                         AppError::bad_request(
@@ -1595,7 +1688,7 @@ async fn update_ai_seat(
 
             let membership = existing_memberships
                 .into_iter()
-                .find(|m| m.turn_order == seat_val)
+                .find(|m| m.turn_order == Some(seat_val))
                 .ok_or_else(|| {
                     AppError::bad_request(
                         ErrorCode::ValidationError,
@@ -1697,8 +1790,21 @@ async fn submit_bid(
     body: ValidatedJson<SubmitBidRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
+    // Only players can submit bids
+    if membership.role != GameRole::Player {
+        return Err(AppError::forbidden_with_code(
+            ErrorCode::InsufficientRole,
+            "Only players can submit bids".to_string(),
+        ));
+    }
+
     let id = game_id.0;
-    let seat = membership.turn_order;
+    let seat = membership.turn_order.ok_or_else(|| {
+        AppError::bad_request(
+            crate::errors::ErrorCode::InvalidSeat,
+            "Player must have a seat to perform this action".to_string(),
+        )
+    })?;
     let bid_value = body.bid;
 
     let game = with_txn(Some(&http_req), &app_state, |txn| {
@@ -1728,8 +1834,21 @@ async fn select_trump(
     body: ValidatedJson<SetTrumpRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
+    // Only players can select trump
+    if membership.role != GameRole::Player {
+        return Err(AppError::forbidden_with_code(
+            ErrorCode::InsufficientRole,
+            "Only players can select trump".to_string(),
+        ));
+    }
+
     let id = game_id.0;
-    let seat = membership.turn_order;
+    let seat = membership.turn_order.ok_or_else(|| {
+        AppError::bad_request(
+            crate::errors::ErrorCode::InvalidSeat,
+            "Player must have a seat to perform this action".to_string(),
+        )
+    })?;
     let payload = body.into_inner();
     let normalized = payload.trump.trim().to_uppercase();
 
@@ -1774,8 +1893,21 @@ async fn play_card(
     body: ValidatedJson<PlayCardRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
+    // Only players can play cards
+    if membership.role != GameRole::Player {
+        return Err(AppError::forbidden_with_code(
+            ErrorCode::InsufficientRole,
+            "Only players can play cards".to_string(),
+        ));
+    }
+
     let id = game_id.0;
-    let seat = membership.turn_order;
+    let seat = membership.turn_order.ok_or_else(|| {
+        AppError::bad_request(
+            crate::errors::ErrorCode::InvalidSeat,
+            "Player must have a seat to perform this action".to_string(),
+        )
+    })?;
 
     let payload = body.into_inner();
     let normalized = payload.card.trim().to_uppercase();
@@ -1982,6 +2114,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/in-progress").route(web::get().to(list_in_progress_games)));
     cfg.service(web::resource("/last-active").route(web::get().to(get_last_active_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
+    cfg.service(web::resource("/{game_id}/spectate").route(web::post().to(spectate_game)));
     cfg.service(web::resource("/{game_id}/leave").route(web::delete().to(leave_game)));
     cfg.service(web::resource("/{game_id}/ready").route(web::post().to(mark_ready)));
     cfg.service(web::resource("/ai/registry").route(web::get().to(list_registered_ais)));

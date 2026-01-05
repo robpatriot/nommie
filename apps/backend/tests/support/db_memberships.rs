@@ -48,8 +48,9 @@ pub async fn create_test_game_player_with_ready(
         player_kind: Set(game_players::PlayerKind::Human),
         human_user_id: Set(Some(user_id)),
         ai_profile_id: Set(None),
-        turn_order: Set(turn_order as i16),
+        turn_order: Set(Some(turn_order as i16)),
         is_ready: Set(is_ready),
+        role: Set(game_players::GameRole::Player),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -73,8 +74,9 @@ pub async fn create_test_ai_game_player(
         player_kind: Set(game_players::PlayerKind::Ai),
         human_user_id: Set(None),
         ai_profile_id: Set(Some(ai_profile_id)),
-        turn_order: Set(turn_order as i16),
+        turn_order: Set(Some(turn_order as i16)),
         is_ready: Set(is_ready),
+        role: Set(game_players::GameRole::Player),
         created_at: Set(now),
         updated_at: Set(now),
     };

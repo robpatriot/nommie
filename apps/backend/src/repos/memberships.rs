@@ -3,7 +3,7 @@
 use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::memberships_sea as memberships_adapter;
-use crate::entities::game_players::PlayerKind;
+use crate::entities::game_players::{GameRole as DbGameRole, PlayerKind};
 use crate::errors::domain::DomainError;
 
 /// Game membership domain model
@@ -14,7 +14,7 @@ pub struct GameMembership {
     pub player_kind: PlayerKind,
     pub user_id: Option<i64>,
     pub ai_profile_id: Option<i64>,
-    pub turn_order: u8,
+    pub turn_order: Option<u8>,
     pub is_ready: bool,
     pub role: GameRole,
 }
@@ -24,6 +24,8 @@ pub struct GameMembership {
 pub enum GameRole {
     /// Regular player in the game
     Player,
+    /// Spectator who can view but not participate
+    Spectator,
 }
 
 // Free functions (generic) mirroring the previous trait methods
@@ -41,7 +43,7 @@ pub async fn create_membership(
     txn: &DatabaseTransaction,
     game_id: i64,
     user_id: i64,
-    turn_order: u8,
+    turn_order: Option<u8>,
     is_ready: bool,
     role: GameRole,
 ) -> Result<GameMembership, DomainError> {
@@ -50,8 +52,9 @@ pub async fn create_membership(
         player_kind: PlayerKind::Human,
         human_user_id: Some(user_id),
         ai_profile_id: None,
-        turn_order,
+        turn_order: turn_order.map(|t| t as i16),
         is_ready,
+        role: role.into(),
     };
     let membership = memberships_adapter::create_membership(txn, dto).await?;
 
@@ -61,9 +64,9 @@ pub async fn create_membership(
         player_kind: PlayerKind::Human,
         user_id: membership.human_user_id,
         ai_profile_id: membership.ai_profile_id,
-        turn_order: membership.turn_order as u8,
+        turn_order: membership.turn_order.map(|t| t as u8),
         is_ready: membership.is_ready,
-        role,
+        role: membership.role.into(),
     })
 }
 
@@ -80,8 +83,9 @@ pub async fn create_ai_membership(
         player_kind: PlayerKind::Ai,
         human_user_id: None,
         ai_profile_id: Some(ai_profile_id),
-        turn_order,
+        turn_order: Some(turn_order as i16),
         is_ready,
+        role: role.into(),
     };
     let membership = memberships_adapter::create_membership(txn, dto).await?;
 
@@ -91,9 +95,9 @@ pub async fn create_ai_membership(
         player_kind: PlayerKind::Ai,
         user_id: membership.human_user_id,
         ai_profile_id: membership.ai_profile_id,
-        turn_order: membership.turn_order as u8,
+        turn_order: membership.turn_order.map(|t| t as u8),
         is_ready: membership.is_ready,
-        role,
+        role: membership.role.into(),
     })
 }
 
@@ -107,7 +111,7 @@ pub async fn update_membership(
         player_kind: membership.player_kind.clone(),
         human_user_id: membership.user_id,
         ai_profile_id: membership.ai_profile_id,
-        turn_order: membership.turn_order,
+        turn_order: membership.turn_order.map(|t| t as i16),
         is_ready: membership.is_ready,
     };
     let updated = memberships_adapter::update_membership(txn, dto).await?;
@@ -117,9 +121,9 @@ pub async fn update_membership(
         player_kind: updated.player_kind,
         user_id: updated.human_user_id,
         ai_profile_id: updated.ai_profile_id,
-        turn_order: updated.turn_order as u8,
+        turn_order: updated.turn_order.map(|t| t as u8),
         is_ready: updated.is_ready,
-        role: GameRole::Player, // For now, all members are players
+        role: updated.role.into(),
     })
 }
 
@@ -156,9 +160,9 @@ pub async fn set_membership_ready(
         player_kind: updated.player_kind,
         user_id: updated.human_user_id,
         ai_profile_id: updated.ai_profile_id,
-        turn_order: updated.turn_order as u8,
+        turn_order: updated.turn_order.map(|t| t as u8),
         is_ready: updated.is_ready,
-        role: GameRole::Player, // For now, all members are players
+        role: updated.role.into(),
     })
 }
 
@@ -170,9 +174,27 @@ impl From<crate::entities::game_players::Model> for GameMembership {
             player_kind: model.player_kind,
             user_id: model.human_user_id,
             ai_profile_id: model.ai_profile_id,
-            turn_order: model.turn_order as u8,
+            turn_order: model.turn_order.map(|t| t as u8),
             is_ready: model.is_ready,
-            role: GameRole::Player, // For now, all members are players
+            role: model.role.into(),
+        }
+    }
+}
+
+impl From<DbGameRole> for GameRole {
+    fn from(role: DbGameRole) -> Self {
+        match role {
+            DbGameRole::Player => GameRole::Player,
+            DbGameRole::Spectator => GameRole::Spectator,
+        }
+    }
+}
+
+impl From<GameRole> for DbGameRole {
+    fn from(role: GameRole) -> Self {
+        match role {
+            GameRole::Player => DbGameRole::Player,
+            GameRole::Spectator => DbGameRole::Spectator,
         }
     }
 }
