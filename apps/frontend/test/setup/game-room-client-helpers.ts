@@ -6,6 +6,8 @@ import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { queryKeys } from '@/lib/queries/query-keys'
 import { initSnapshotFixture } from '../mocks/game-snapshot'
 import { MockWebSocket, mockWebSocketInstances } from './mock-websocket'
+import type { Seat } from '@/lib/game-room/types'
+import { isValidSeat } from '@/utils/seat-validation'
 
 /**
  * Creates initial game room snapshot data for tests.
@@ -84,7 +86,13 @@ export function sendWebSocketSnapshot(
   // Transform the snapshot message to GameRoomSnapshotPayload format
   // This simulates what useGameSync.transformSnapshotMessage does
   const version = overrides?.version ?? 1
-  const viewerSeat = overrides?.viewerSeat ?? 0
+  const viewerSeatRaw = overrides?.viewerSeat ?? 0
+  const viewerSeat: Seat | null =
+    viewerSeatRaw !== null &&
+    viewerSeatRaw !== undefined &&
+    isValidSeat(viewerSeatRaw)
+      ? (viewerSeatRaw as Seat)
+      : null
   const viewerHand = overrides?.viewerHand ?? []
   const playerNames: [string, string, string, string] = [
     'Alex',
@@ -96,10 +104,10 @@ export function sendWebSocketSnapshot(
   const payload: GameRoomSnapshotPayload = {
     snapshot,
     playerNames,
-    viewerSeat: viewerSeat as any,
+    viewerSeat,
     viewerHand,
     timestamp: new Date().toISOString(),
-    hostSeat: snapshot.game.host_seat as any,
+    hostSeat: snapshot.game.host_seat,
     bidConstraints: null,
     version,
     etag: `"game-${gameId}-v${version}"`,
