@@ -49,6 +49,7 @@ mod testkit {
             trick_no: 0,
             current_trick_plays: Vec::new(),
             scores: [0, 0, 0, 0],
+            tricks_won: [0, 0, 0, 0],
             trick_leader: None,
         };
 
@@ -90,6 +91,7 @@ mod testkit {
             trick_no: 1,
             current_trick_plays: vec![(1, leader_card)],
             scores: [10, 8, 6, 4],
+            tricks_won: [0, 0, 0, 0],
             trick_leader: Some(1),
         };
 
@@ -126,6 +128,7 @@ mod testkit {
             trick_no: 0,
             current_trick_plays: Vec::new(),
             scores: [12, 9, 7, 5],
+            tricks_won: [0, 0, 0, 0],
             trick_leader: None,
         };
 

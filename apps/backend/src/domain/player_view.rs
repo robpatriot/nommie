@@ -145,6 +145,13 @@ pub struct CurrentRoundInfo {
     /// Part of the public API for AI players. May be read by external AI implementations.
     pub scores: [i16; 4],
 
+    /// Tricks won by each player in this round (indexed by seat 0-3)
+    ///
+    /// Counts only completed tricks (excludes the current trick in progress).
+    ///
+    /// Part of the public API for AI players. May be read by external AI implementations.
+    pub tricks_won: [u8; 4],
+
     /// Player who should lead the current trick
     ///
     /// - `Some(seat)` during TrickPlay phase

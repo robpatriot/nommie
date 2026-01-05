@@ -19,7 +19,7 @@
 //!
 //! Play strategy (bid-target-driven):
 //! - Every play decision is anchored to the bid target (exact tricks for +10 bonus).
-//! - Track tricks won via RoundMemory to compute remaining need.
+//! - Track tricks won via state.tricks_won to compute remaining need.
 //! - Compute target policy: need = bid - tricks_won, avoid = tricks_won >= bid.
 //! - Pressure scaling: need == 0 → strongly prefer losing; need >= tricks_remaining → strongly prefer winning.
 //! - Score cards by target alignment (win vs lose desirability) with heuristics as tie-breakers.
@@ -378,44 +378,6 @@ impl Strategic {
     /// Returns true if tricks_remaining <= 4.
     fn is_endgame(tricks_remaining: u8, _hand_size: u8) -> bool {
         tricks_remaining <= 4
-    }
-
-    /// Count tricks won by this player from completed tricks in RoundMemory.
-    /// Only counts tricks where we have exact card information (can determine winner reliably).
-    fn count_tricks_won(memory: Option<&RoundMemory>, my_seat: u8, trump: Trump) -> u8 {
-        let mut count = 0;
-        if let Some(mem) = memory {
-            for trick in &mem.tricks {
-                // Only count if we have exact cards for all plays (can determine winner)
-                let mut all_exact = true;
-                let mut plays_with_cards = Vec::new();
-                for (seat, play_mem) in &trick.plays {
-                    match play_mem {
-                        PlayMemory::Exact(card) => {
-                            plays_with_cards.push((*seat, *card));
-                        }
-                        _ => {
-                            all_exact = false;
-                            break;
-                        }
-                    }
-                }
-                if all_exact && plays_with_cards.len() == 4 {
-                    // Determine winner: first card is lead
-                    let lead_suit = plays_with_cards[0].1.suit;
-                    let mut winner = plays_with_cards[0];
-                    for &(seat, card) in &plays_with_cards[1..] {
-                        if Self::wins_over(card, winner.1, lead_suit, trump) {
-                            winner = (seat, card);
-                        }
-                    }
-                    if winner.0 == my_seat {
-                        count += 1;
-                    }
-                }
-            }
-        }
-        count
     }
 
     /// Compute bid target state: how many tricks we still need and whether to avoid winning.
@@ -967,8 +929,8 @@ impl Strategic {
         let memory = cx.round_memory();
         let my_hand = &state.hand;
 
-        // Count tricks won so far
-        let tricks_won_so_far = Self::count_tricks_won(memory, state.player_seat, trump);
+        // Get tricks won so far from state (calculated from completed tricks)
+        let tricks_won_so_far = state.tricks_won[state.player_seat as usize];
 
         // Detect opponent voids to avoid leading suits they can trump
         let opponent_voids = Self::detect_opponent_voids(memory, state.player_seat);
@@ -1199,6 +1161,39 @@ mod tests {
         tricks_won_memory: Vec<TrickMemory>,
         trump: Option<Trump>,
     ) -> (CurrentRoundInfo, GameContext) {
+        // Calculate tricks_won from memory (simulating what the backend does)
+        let trump_val = trump.unwrap_or(Trump::NoTrumps);
+        let mut tricks_won = [0u8; 4];
+        for trick in &tricks_won_memory {
+            // Only count if we have exact cards for all plays (can determine winner reliably)
+            let mut all_exact = true;
+            let mut plays_with_cards = Vec::new();
+            for (seat, play_mem) in &trick.plays {
+                match play_mem {
+                    PlayMemory::Exact(card) => {
+                        plays_with_cards.push((*seat, *card));
+                    }
+                    _ => {
+                        all_exact = false;
+                        break;
+                    }
+                }
+            }
+            if all_exact && plays_with_cards.len() == 4 {
+                // Determine winner: first card is lead
+                let lead_suit = plays_with_cards[0].1.suit;
+                let mut winner = plays_with_cards[0];
+                for &(seat, card) in &plays_with_cards[1..] {
+                    if Strategic::wins_over(card, winner.1, lead_suit, trump_val) {
+                        winner = (seat, card);
+                    }
+                }
+                if winner.0 < 4 {
+                    tricks_won[winner.0 as usize] += 1;
+                }
+            }
+        }
+
         let state = CurrentRoundInfo {
             game_id: 1,
             player_seat: 0,
@@ -1212,6 +1207,7 @@ mod tests {
             trick_no,
             current_trick_plays,
             scores: [0, 0, 0, 0],
+            tricks_won,
             trick_leader: Some(0),
         };
 
@@ -1518,6 +1514,7 @@ mod tests {
             trick_no: 0,
             current_trick_plays: Vec::new(),
             scores: [0, 0, 0, 0],
+            tricks_won: [0, 0, 0, 0],
             trick_leader: None,
         };
 

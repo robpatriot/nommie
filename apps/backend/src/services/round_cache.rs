@@ -246,6 +246,25 @@ impl RoundCache {
             None
         };
 
+        // Count tricks won by each player (only completed tricks, exclude current trick in progress)
+        let mut tricks_won = [0u8; 4];
+        for trick in &all_round_tricks {
+            let winner = trick.winner_seat;
+            if !(0..=3).contains(&winner) {
+                continue;
+            }
+
+            // Skip placeholder winners for the in-progress trick (winner is u8::MAX until trick is resolved)
+            if game_state == DbGameState::TrickPlay
+                && trick.trick_no == current_trick_no
+                && winner == u8::MAX
+            {
+                continue;
+            }
+
+            tricks_won[winner as usize] += 1;
+        }
+
         // Build CurrentRoundInfo using cached data + computed remaining hand
         Ok(crate::domain::player_view::CurrentRoundInfo {
             game_id: self.game_id,
@@ -260,6 +279,7 @@ impl RoundCache {
             trick_no: current_trick_no,
             current_trick_plays,
             scores: self.scores,
+            tricks_won,
             trick_leader,
         })
     }

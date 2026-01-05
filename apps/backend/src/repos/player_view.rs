@@ -59,7 +59,7 @@ pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
     let all_round_tricks = tricks::find_all_by_round(conn, round.id).await?;
     let mut played_cards: Vec<Card> = Vec::new();
 
-    for trick in all_round_tricks {
+    for trick in &all_round_tricks {
         let trick_plays = plays::find_all_by_trick(conn, trick.id).await?;
         for play in trick_plays {
             if play.player_seat == player_seat {
@@ -109,6 +109,25 @@ pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
     // Load cumulative scores from completed rounds
     let scores = scores::get_scores_for_completed_rounds(conn, game_id, current_round).await?;
 
+    // Count tricks won by each player (only completed tricks, exclude current trick in progress)
+    let mut tricks_won = [0u8; 4];
+    for trick in &all_round_tricks {
+        let winner = trick.winner_seat;
+        if !(0..=3).contains(&winner) {
+            continue;
+        }
+
+        // Skip placeholder winners for the in-progress trick (winner is u8::MAX until trick is resolved)
+        if db_state == DbGameState::TrickPlay
+            && trick.trick_no == game.current_trick_no
+            && winner == u8::MAX
+        {
+            continue;
+        }
+
+        tricks_won[winner as usize] += 1;
+    }
+
     // Determine trick leader (who should play first)
     let trick_leader = if db_state == DbGameState::TrickPlay {
         let current_trick_no = game.current_trick_no;
@@ -141,6 +160,7 @@ pub async fn load_current_round_info<C: ConnectionTrait + Send + Sync>(
         trick_no: game.current_trick_no,
         current_trick_plays,
         scores,
+        tricks_won,
         trick_leader,
     })
 }

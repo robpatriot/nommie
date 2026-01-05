@@ -16,6 +16,7 @@
 //! - If following suit: try to win cheaply when late and profitable, else conserve (play low).
 //! - If void in lead suit: consider ruffing cheaply if it can win; otherwise discard lowest.
 //! - On lead: prefer long suit; lead low from length to preserve high cards.
+//! - Bid-aware: avoid winning when tricks_won >= bid; prefer winning when behind bid.
 //!
 //! Notes & assumptions:
 //! - Uses only public, common-sense fields (`state.hand`, `state.trump`, `state.current_trick_plays`)
@@ -367,6 +368,12 @@ impl AiPlayer for Heuristic {
         let trump = state.trump.unwrap_or(Trump::NoTrumps);
         let lead = state.current_trick_plays.first().map(|&(_, c)| c.suit);
 
+        // Get tricks won so far and bid to make bid-aware decisions
+        let tricks_won_so_far = state.tricks_won[state.player_seat as usize];
+        let my_bid = state.bids[state.player_seat as usize].unwrap_or(0);
+        let need_more = tricks_won_so_far < my_bid;
+        let should_avoid_winning = tricks_won_so_far >= my_bid;
+
         let choice = match state.current_trick_plays.len() {
             0 => {
                 // On lead: prefer lowest from our longest suit (keeps high cards).
@@ -390,7 +397,54 @@ impl AiPlayer for Heuristic {
                 }
             }
             _ => {
-                Self::pick_smallest_winning_or_low(&legal, &state.current_trick_plays, trump, lead)
+                // When following: use bid-aware logic
+                if should_avoid_winning {
+                    // Already met or exceeded bid: prefer losing (play low)
+                    if let Some(ls) = lead {
+                        if let Some(low) = Self::lowest_in_suit(legal.iter(), ls) {
+                            // Check if this card would win the trick
+                            let mut would_win = false;
+                            if let Some(cur_winner) =
+                                state.current_trick_plays.first().map(|&(_, c)| c)
+                            {
+                                if Self::wins_over(low, cur_winner, ls, trump) {
+                                    // This low card would still win - try even lower if available
+                                    let mut sorted_legal = legal.to_vec();
+                                    sorted_legal.sort();
+                                    // Find the lowest card that wouldn't win
+                                    for card in sorted_legal {
+                                        if !Self::wins_over(card, cur_winner, ls, trump) {
+                                            return Ok(card);
+                                        }
+                                    }
+                                    // All cards would win - play the lowest anyway
+                                    would_win = true;
+                                }
+                            }
+                            if !would_win {
+                                return Ok(low);
+                            }
+                        }
+                    }
+                    // Fall through to lowest overall if no suit match
+                    Self::lowest(&legal).unwrap_or(legal[0])
+                } else if need_more {
+                    // Behind bid: prefer winning if possible
+                    Self::pick_smallest_winning_or_low(
+                        &legal,
+                        &state.current_trick_plays,
+                        trump,
+                        lead,
+                    )
+                } else {
+                    // Neutral (tricks_won == bid but unlikely): use default strategy
+                    Self::pick_smallest_winning_or_low(
+                        &legal,
+                        &state.current_trick_plays,
+                        trump,
+                        lead,
+                    )
+                }
             }
         };
 
