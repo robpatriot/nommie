@@ -15,7 +15,7 @@ import type { BackendApiError } from '@/lib/errors'
 import { toQueryError } from '@/lib/queries/query-error-handler'
 import type { AiSeatSelection } from '../game-room-view'
 
-const DEFAULT_AI_NAME = 'Heuristic'
+const DEFAULT_AI_NAME = 'Strategic'
 
 type AiRegistryEntryState = {
   name: string
