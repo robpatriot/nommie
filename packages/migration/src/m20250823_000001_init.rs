@@ -97,6 +97,7 @@ enum GamePlayers {
     AiProfileId,
     TurnOrder,
     IsReady,
+    Role,
     CreatedAt,
     UpdatedAt,
 }
@@ -665,13 +666,19 @@ impl MigrationTrait for Migration {
                     .col(
                         ColumnDef::new(GamePlayers::TurnOrder)
                             .small_integer()
-                            .not_null(),
+                            .null(),
                     )
                     .col(
                         ColumnDef::new(GamePlayers::IsReady)
                             .boolean()
                             .not_null()
                             .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(GamePlayers::Role)
+                            .string()
+                            .not_null()
+                            .default("player"),
                     )
                     .col(
                         ColumnDef::new(GamePlayers::CreatedAt)
