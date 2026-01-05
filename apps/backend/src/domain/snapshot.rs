@@ -12,6 +12,8 @@ use crate::domain::{Card, Trump};
 pub struct SeatPublic {
     pub seat: Seat,
     pub user_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub original_user_id: Option<i64>,
     pub display_name: Option<String>,
     pub is_ai: bool,
     pub is_ready: bool,
@@ -24,6 +26,7 @@ impl SeatPublic {
         Self {
             seat,
             user_id: None,
+            original_user_id: None,
             display_name: None,
             is_ai: false,
             is_ready: false,

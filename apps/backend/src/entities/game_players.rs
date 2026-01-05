@@ -13,6 +13,8 @@ pub struct Model {
     pub player_kind: PlayerKind,
     #[sea_orm(column_name = "human_user_id")]
     pub human_user_id: Option<i64>,
+    #[sea_orm(column_name = "original_user_id")]
+    pub original_user_id: Option<i64>,
     #[sea_orm(column_name = "ai_profile_id")]
     pub ai_profile_id: Option<i64>,
     #[sea_orm(column_name = "turn_order", column_type = "SmallInteger")]

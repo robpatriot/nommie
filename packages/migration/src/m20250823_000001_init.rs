@@ -94,6 +94,7 @@ enum GamePlayers {
     GameId,
     PlayerKind,
     HumanUserId,
+    OriginalUserId,
     AiProfileId,
     TurnOrder,
     IsReady,
@@ -659,6 +660,11 @@ impl MigrationTrait for Migration {
                             .null(),
                     )
                     .col(
+                        ColumnDef::new(GamePlayers::OriginalUserId)
+                            .big_integer()
+                            .null(),
+                    )
+                    .col(
                         ColumnDef::new(GamePlayers::AiProfileId)
                             .big_integer()
                             .null(),
@@ -710,6 +716,13 @@ impl MigrationTrait for Migration {
                             .from(GamePlayers::Table, GamePlayers::AiProfileId)
                             .to(AiProfiles::Table, AiProfiles::Id)
                             .on_delete(ForeignKeyAction::Cascade),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_game_players_original_user_id")
+                            .from(GamePlayers::Table, GamePlayers::OriginalUserId)
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::SetNull),
                     )
                     .to_owned(),
             )

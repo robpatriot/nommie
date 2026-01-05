@@ -8,6 +8,7 @@ use actix_web::{web, HttpRequest, HttpResponse, Result};
 use rand::random;
 use sea_orm::TransactionTrait;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use time::format_description::well_known::Rfc3339;
 use tracing::{debug, info, warn};
 
@@ -157,6 +158,9 @@ async fn build_shared_snapshot_parts(
             .map_err(AppError::from)?;
 
         seat_public.display_name = Some(display_name);
+
+        // Set original_user_id if present (for rejoin detection)
+        seat_public.original_user_id = membership.original_user_id;
 
         // Build additional SeatPublic fields
         match membership.player_kind {
@@ -682,6 +686,7 @@ struct GameResponse {
     max_players: i32,
     viewer_is_member: bool,
     viewer_is_host: bool,
+    can_rejoin: bool,
 }
 
 /// Helper function to convert GameState enum to frontend string format
@@ -772,6 +777,16 @@ fn game_to_response(
     // Check if viewer is the host (creator of the game)
     let viewer_is_host = viewer_user_id.map(|id| created_by == id).unwrap_or(false);
 
+    // Check if viewer can rejoin (has an AI seat with original_user_id matching viewer)
+    let can_rejoin = viewer_user_id
+        .map(|id| {
+            memberships.iter().any(|m| {
+                m.player_kind == crate::entities::game_players::PlayerKind::Ai
+                    && m.original_user_id == Some(id)
+            })
+        })
+        .unwrap_or(false);
+
     Ok(GameResponse {
         id: game.id,
         name: game
@@ -790,6 +805,7 @@ fn game_to_response(
         max_players: 4,
         viewer_is_member,
         viewer_is_host,
+        can_rejoin,
     })
 }
 
@@ -1239,6 +1255,11 @@ struct PlayCardRequest {
 
 #[derive(serde::Deserialize)]
 struct LeaveGameRequest {
+    version: i32,
+}
+
+#[derive(serde::Deserialize)]
+struct RejoinGameRequest {
     version: i32,
 }
 
@@ -1777,6 +1798,109 @@ async fn update_ai_seat(
         .finish())
 }
 
+/// POST /api/games/{game_id}/rejoin
+///
+/// Rejoin a game by converting an AI player back to the original human player.
+/// Requires version in request body for optimistic locking.
+async fn rejoin_game(
+    http_req: HttpRequest,
+    game_id: GameId,
+    current_user: CurrentUser,
+    body: ValidatedJson<RejoinGameRequest>,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let user_id = current_user.id;
+    let id = game_id.0;
+    let expected_version = body.version;
+
+    // Rejoin game using service layer
+    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameService;
+            let (updated_game, _) = service
+                .rejoin_game(txn, id, user_id, expected_version)
+                .await?;
+            Ok(updated_game.version)
+        })
+    })
+    .await?;
+
+    let etag = game_etag(id, updated_version);
+
+    // Publish snapshot broadcast immediately (includes membership change)
+    publish_snapshot(&app_state, id).await?;
+
+    // Spawn background task to process any pending AI actions
+    // If AI was acting, it will complete, then see player is human and stop
+    let app_state_clone = app_state.clone();
+    tokio::spawn(async move {
+        let db = match crate::db::require_db(&app_state_clone) {
+            Ok(db) => db,
+            Err(err) => {
+                tracing::error!(
+                    game_id = id,
+                    error = %err,
+                    "Failed to get database connection for post-rejoin AI processing"
+                );
+                return;
+            }
+        };
+
+        let txn = match db.begin().await {
+            Ok(txn) => txn,
+            Err(err) => {
+                tracing::error!(
+                    game_id = id,
+                    error = %err,
+                    "Failed to begin transaction for post-rejoin AI processing"
+                );
+                return;
+            }
+        };
+
+        let game_flow_service = crate::services::game_flow::GameFlowService;
+        match game_flow_service.process_game_state(&txn, id).await {
+            Ok(()) => {
+                if let Err(err) = txn.commit().await {
+                    tracing::error!(
+                        game_id = id,
+                        error = %err,
+                        "Failed to commit transaction after post-rejoin AI processing"
+                    );
+                } else {
+                    // Broadcast updated snapshot after AI processing completes
+                    if let Err(err) = publish_snapshot(&app_state_clone, id).await {
+                        tracing::error!(
+                            game_id = id,
+                            error = %err,
+                            "Failed to publish snapshot after post-rejoin AI processing"
+                        );
+                    }
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    game_id = id,
+                    error = %err,
+                    "Post-rejoin AI processing failed (may be expected if no AI actions)"
+                );
+                // Rollback on error
+                if let Err(rollback_err) = txn.rollback().await {
+                    tracing::error!(
+                        game_id = id,
+                        error = %rollback_err,
+                        "Failed to rollback transaction after post-rejoin AI processing error"
+                    );
+                }
+            }
+        }
+    });
+
+    Ok(HttpResponse::Ok()
+        .insert_header((ETAG, etag))
+        .json(json!({ "version": updated_version })))
+}
+
 /// POST /api/games/{game_id}/bid
 ///
 /// Submits a bid for the current player. Bidding order and validation are enforced
@@ -2116,6 +2240,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
     cfg.service(web::resource("/{game_id}/spectate").route(web::post().to(spectate_game)));
     cfg.service(web::resource("/{game_id}/leave").route(web::delete().to(leave_game)));
+    cfg.service(web::resource("/{game_id}/rejoin").route(web::post().to(rejoin_game)));
     cfg.service(web::resource("/{game_id}/ready").route(web::post().to(mark_ready)));
     cfg.service(web::resource("/ai/registry").route(web::get().to(list_registered_ais)));
     cfg.service(web::resource("/{game_id}/ai/add").route(web::post().to(add_ai_seat)));

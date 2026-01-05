@@ -36,6 +36,7 @@ pub async fn create_membership(
         game_id: Set(dto.game_id),
         player_kind: Set(dto.player_kind),
         human_user_id: Set(dto.human_user_id),
+        original_user_id: Set(dto.original_user_id),
         ai_profile_id: Set(dto.ai_profile_id),
         turn_order: match dto.turn_order {
             Some(t) => Set(Some(t)),
@@ -59,6 +60,7 @@ pub async fn update_membership(
         game_id: Set(dto.game_id),
         player_kind: Set(dto.player_kind),
         human_user_id: Set(dto.human_user_id),
+        original_user_id: Set(dto.original_user_id),
         ai_profile_id: Set(dto.ai_profile_id),
         turn_order: match dto.turn_order {
             Some(t) => Set(Some(t)),
@@ -81,6 +83,7 @@ pub async fn set_membership_ready(
         game_id: NotSet,
         player_kind: NotSet,
         human_user_id: NotSet,
+        original_user_id: NotSet,
         ai_profile_id: NotSet,
         role: NotSet,
         turn_order: NotSet,

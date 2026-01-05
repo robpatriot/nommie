@@ -966,6 +966,7 @@ impl GameService {
         // Update membership to AI
         let mut updated_membership = membership.clone();
         updated_membership.player_kind = crate::entities::game_players::PlayerKind::Ai;
+        updated_membership.original_user_id = membership.user_id; // Store original user
         updated_membership.user_id = None;
         updated_membership.ai_profile_id = Some(ai_profile.id);
         // Keep is_ready as is (if game is active, player was ready)
@@ -1030,6 +1031,76 @@ impl GameService {
 
         // Reload game to get latest state
         let updated_game = games_repo::require_game(txn, game_id).await?;
+
+        Ok((updated_game, updated_memberships))
+    }
+
+    /// Rejoin a game by converting an AI player back to the original human player.
+    ///
+    /// Returns the updated game and all memberships.
+    pub async fn rejoin_game(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+        user_id: i64,
+        expected_version: i32,
+    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
+        // Verify game exists
+        let game = games_repo::require_game(txn, game_id).await?;
+
+        // Use optimistic locking
+        if game.version != expected_version {
+            return Err(AppError::conflict(
+                crate::errors::ErrorCode::OptimisticLock,
+                format!(
+                    "Game version mismatch: expected {}, got {}",
+                    expected_version, game.version
+                ),
+            ));
+        }
+
+        // Find AI membership with this user as original_user_id
+        let all_memberships = memberships::find_all_by_game(txn, game_id)
+            .await
+            .map_err(AppError::from)?;
+        let ai_membership = all_memberships
+            .iter()
+            .find(|m| {
+                m.player_kind == crate::entities::game_players::PlayerKind::Ai
+                    && m.original_user_id == Some(user_id)
+            })
+            .ok_or_else(|| {
+                AppError::bad_request(
+                    crate::errors::ErrorCode::ValidationError,
+                    format!("No AI seat found for user {} to rejoin", user_id),
+                )
+            })?;
+
+        // Convert AI back to human immediately
+        // If AI is currently acting, the action will complete, then process_game_state
+        // will see it's now human and stop processing
+        let mut updated_membership = ai_membership.clone();
+        updated_membership.player_kind = crate::entities::game_players::PlayerKind::Human;
+        updated_membership.user_id = Some(user_id);
+        updated_membership.original_user_id = None; // Clear after rejoining
+        updated_membership.ai_profile_id = None;
+
+        // Delete AI override (display name)
+        ai_overrides::delete_by_game_player_id(txn, updated_membership.id)
+            .await
+            .map_err(AppError::from)?;
+
+        let _updated = memberships::update_membership(txn, updated_membership.clone())
+            .await
+            .map_err(AppError::from)?;
+
+        // Touch game to increment version
+        let updated_game = games_repo::touch_game(txn, game_id, expected_version).await?;
+
+        // Fetch updated memberships
+        let updated_memberships = memberships::find_all_by_game(txn, game_id)
+            .await
+            .map_err(AppError::from)?;
 
         Ok((updated_game, updated_memberships))
     }
