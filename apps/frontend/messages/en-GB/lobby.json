@@ -110,7 +110,10 @@
     "deleteFailed": "Failed to delete game",
     "deleteMissingVersion": "Cannot delete game: missing version information. Please try again.",
     "deleteConflict": "Cannot delete game: game was modified. Please refresh and try again.",
-    "deletedSuccess": "Game deleted successfully"
+    "deletedSuccess": "Game deleted successfully",
+    "rejoinedSuccess": "Rejoined game successfully!",
+    "rejoinFailed": "Failed to rejoin game",
+    "rejoinFailedNoVersion": "Failed to rejoin game: could not determine game version"
   },
   "confirmations": {
     "deleteGame": "Are you sure you want to delete this game? This action cannot be undone."

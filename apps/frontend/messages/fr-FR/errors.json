@@ -98,6 +98,8 @@
     "failedToDeleteGameNoSnapshot": "Échec de la suppression de la partie : impossible de charger l'état",
     "failedToLeaveGame": "Échec de la sortie de la partie",
     "failedToLeaveGameNoVersion": "Échec de la sortie de la partie : impossible de déterminer la version",
+    "failedToRejoinGame": "Échec de la réintégration de la partie",
+    "failedToRejoinGameNoVersion": "Échec de la réintégration de la partie : impossible de déterminer la version",
     "failedToRefreshGamesList": "Échec de l'actualisation de la liste des parties",
     "failedToCreateGame": "Échec de la création de la partie",
     "failedToJoinGame": "Échec de la jonction à la partie",

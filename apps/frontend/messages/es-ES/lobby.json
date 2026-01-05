@@ -110,7 +110,10 @@
     "deleteFailed": "No se pudo eliminar la partida",
     "deleteMissingVersion": "No se puede eliminar: falta la información de versión. Inténtalo de nuevo.",
     "deleteConflict": "No se puede eliminar: la partida cambió. Actualiza e inténtalo de nuevo.",
-    "deletedSuccess": "Partida eliminada correctamente"
+    "deletedSuccess": "Partida eliminada correctamente",
+    "rejoinedSuccess": "¡Te has vuelto a unir a la partida!",
+    "rejoinFailed": "Error al volver a unirse a la partida",
+    "rejoinFailedNoVersion": "Error al volver a unirse a la partida: no se pudo determinar la versión"
   },
   "confirmations": {
     "deleteGame": "¿Seguro que quieres eliminar esta partida? Esta acción no se puede deshacer."

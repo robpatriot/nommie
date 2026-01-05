@@ -110,7 +110,10 @@
     "deleteFailed": "Spiel konnte nicht gelöscht werden",
     "deleteMissingVersion": "Löschen nicht möglich: Versionsinformationen fehlen. Bitte erneut versuchen.",
     "deleteConflict": "Löschen nicht möglich: Das Spiel wurde geändert. Bitte aktualisieren und erneut versuchen.",
-    "deletedSuccess": "Spiel erfolgreich gelöscht"
+    "deletedSuccess": "Spiel erfolgreich gelöscht",
+    "rejoinedSuccess": "Spiel erfolgreich wieder beigetreten!",
+    "rejoinFailed": "Spiel konnte nicht wieder beigetreten werden",
+    "rejoinFailedNoVersion": "Spiel konnte nicht wieder beigetreten werden: Spielversion konnte nicht ermittelt werden"
   },
   "confirmations": {
     "deleteGame": "Möchtest du dieses Spiel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."

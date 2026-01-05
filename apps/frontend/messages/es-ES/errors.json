@@ -98,6 +98,8 @@
     "failedToDeleteGameNoSnapshot": "Error al eliminar la partida: no se pudo cargar el estado",
     "failedToLeaveGame": "Error al abandonar la partida",
     "failedToLeaveGameNoVersion": "Error al abandonar la partida: no se pudo determinar la versión",
+    "failedToRejoinGame": "Error al volver a unirse a la partida",
+    "failedToRejoinGameNoVersion": "Error al volver a unirse a la partida: no se pudo determinar la versión",
     "failedToRefreshGamesList": "Error al actualizar la lista de partidas",
     "failedToCreateGame": "Error al crear la partida",
     "failedToJoinGame": "Error al unirse a la partida",

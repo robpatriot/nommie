@@ -98,6 +98,8 @@
     "failedToDeleteGameNoSnapshot": "Spiel konnte nicht gelöscht werden: Spielzustand konnte nicht geladen werden",
     "failedToLeaveGame": "Spiel konnte nicht verlassen werden",
     "failedToLeaveGameNoVersion": "Spiel konnte nicht verlassen werden: Spielversion konnte nicht ermittelt werden",
+    "failedToRejoinGame": "Spiel konnte nicht wieder beigetreten werden",
+    "failedToRejoinGameNoVersion": "Spiel konnte nicht wieder beigetreten werden: Spielversion konnte nicht ermittelt werden",
     "failedToRefreshGamesList": "Spielliste konnte nicht aktualisiert werden",
     "failedToCreateGame": "Spiel konnte nicht erstellt werden",
     "failedToJoinGame": "Spiel konnte nicht beigetreten werden",

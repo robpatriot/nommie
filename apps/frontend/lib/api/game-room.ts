@@ -115,10 +115,35 @@ export async function leaveGame(
   gameId: number,
   version: number
 ): Promise<void> {
-  await fetchWithAuth(`/api/games/${gameId}/leave`, {
+  const response = await fetchWithAuth(`/api/games/${gameId}/leave`, {
     method: 'DELETE',
     body: JSON.stringify({ version: version }),
   })
+  // For 204 No Content responses, we don't need to parse JSON
+  // Just verify the response was successful (fetchWithAuth throws on error)
+  if (!response.ok) {
+    throw new Error(`Leave game failed with status ${response.status}`)
+  }
+}
+
+export async function rejoinGame(
+  gameId: number,
+  version: number
+): Promise<{ version: number }> {
+  const response = await fetchWithAuth(`/api/games/${gameId}/rejoin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ version: version }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Rejoin game failed with status ${response.status}`)
+  }
+
+  const data = (await response.json()) as { version: number }
+  return data
 }
 
 export async function submitBid(

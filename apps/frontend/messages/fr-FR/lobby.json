@@ -110,7 +110,10 @@
     "deleteFailed": "Impossible de supprimer la partie",
     "deleteMissingVersion": "Suppression impossible : informations de version manquantes. Veuillez réessayer.",
     "deleteConflict": "Suppression impossible : la partie a été modifiée. Actualisez puis réessayez.",
-    "deletedSuccess": "Partie supprimée avec succès"
+    "deletedSuccess": "Partie supprimée avec succès",
+    "rejoinedSuccess": "Réintégration de la partie réussie !",
+    "rejoinFailed": "Échec de la réintégration de la partie",
+    "rejoinFailedNoVersion": "Échec de la réintégration de la partie : impossible de déterminer la version"
   },
   "confirmations": {
     "deleteGame": "Voulez-vous vraiment supprimer cette partie ? Cette action est irréversible."

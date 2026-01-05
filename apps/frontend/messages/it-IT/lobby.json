@@ -110,7 +110,10 @@
     "deleteFailed": "Impossibile eliminare la partita",
     "deleteMissingVersion": "Impossibile eliminare: mancano le informazioni di versione. Riprova.",
     "deleteConflict": "Impossibile eliminare: la partita è stata modificata. Aggiorna e riprova.",
-    "deletedSuccess": "Partita eliminata con successo"
+    "deletedSuccess": "Partita eliminata con successo",
+    "rejoinedSuccess": "Rientrato nella partita con successo!",
+    "rejoinFailed": "Impossibile rientrare nella partita",
+    "rejoinFailedNoVersion": "Impossibile rientrare nella partita: impossibile determinare la versione"
   },
   "confirmations": {
     "deleteGame": "Sei sicuro di voler eliminare questa partita? Questa azione non può essere annullata."

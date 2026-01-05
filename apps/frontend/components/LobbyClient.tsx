@@ -17,6 +17,8 @@ import {
   useSpectateGame,
   useDeleteGame,
 } from '@/hooks/mutations/useGameMutations'
+import { useRejoinGame } from '@/hooks/mutations/useGameRoomMutations'
+import { getGameRoomSnapshotAction } from '@/app/actions/game-room-actions'
 import type { Game } from '@/lib/types'
 import { toQueryError } from '@/lib/queries/query-error-handler'
 import { logBackendError } from '@/lib/logging/error-logger'
@@ -66,6 +68,7 @@ export default function LobbyClient({
   const joinGameMutation = useJoinGame()
   const spectateGameMutation = useSpectateGame()
   const deleteGameMutation = useDeleteGame()
+  const rejoinGameMutation = useRejoinGame()
 
   // Split games into joinable and in-progress
   const joinableGames = useMemo(() => {
@@ -122,7 +125,6 @@ export default function LobbyClient({
 
     try {
       const game = await createGameMutation.mutateAsync({ name: gameName })
-      showToast(t('toasts.createdSuccess'), 'success')
       router.push(`/game/${game.id}`)
     } catch (error) {
       const backendError = toQueryError(error, t('toasts.createFailed'))
@@ -137,7 +139,6 @@ export default function LobbyClient({
   const handleJoin = async (gameId: number) => {
     try {
       await joinGameMutation.mutateAsync(gameId)
-      showToast(t('toasts.joinedSuccess'), 'success')
       router.push(`/game/${gameId}`)
     } catch (error) {
       const backendError = toQueryError(error, t('toasts.joinFailed'))
@@ -160,14 +161,40 @@ export default function LobbyClient({
     }
   }
 
-  const handleRejoin = (gameId: number) => {
-    router.push(`/game/${gameId}`)
+  const handleRejoin = async (gameId: number) => {
+    try {
+      // Fetch snapshot to get current version
+      const snapshotResult = await getGameRoomSnapshotAction({ gameId })
+      if (
+        snapshotResult.kind !== 'ok' ||
+        snapshotResult.data.version === undefined
+      ) {
+        showToast(t('toasts.rejoinFailedNoVersion'), 'error')
+        return
+      }
+
+      const version = snapshotResult.data.version
+
+      // Call rejoin API
+      await rejoinGameMutation.mutateAsync({
+        gameId,
+        version,
+      })
+      showToast(t('toasts.rejoinedSuccess'), 'success')
+      // Navigation happens in the mutation's onSuccess callback
+    } catch (error) {
+      const backendError = toQueryError(error, t('toasts.rejoinFailed'))
+      showToast(backendError.message, 'error', backendError)
+      logBackendError('Rejoin game failed', backendError, {
+        action: 'rejoinGame',
+        gameId,
+      })
+    }
   }
 
   const handleSpectate = async (gameId: number) => {
     try {
       await spectateGameMutation.mutateAsync(gameId)
-      showToast(t('toasts.spectatedSuccess'), 'success')
       router.push(`/game/${gameId}`)
     } catch (error) {
       const backendError = toQueryError(error, t('toasts.spectateFailed'))
@@ -310,11 +337,21 @@ export default function LobbyClient({
                 )
               }
 
-              if (game.viewer_is_member) {
+              if (game.can_rejoin) {
                 actions.push(
                   <button
                     key="rejoin"
                     onClick={() => handleRejoin(game.id)}
+                    className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
+                  >
+                    {t('actions.rejoin')}
+                  </button>
+                )
+              } else if (game.viewer_is_member) {
+                actions.push(
+                  <button
+                    key="goToGame"
+                    onClick={() => router.push(`/game/${game.id}`)}
                     className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
                   >
                     {t('actions.goToGame')}
@@ -394,7 +431,7 @@ export default function LobbyClient({
                 )
               }
 
-              if (game.viewer_is_member) {
+              if (game.can_rejoin) {
                 actions.push(
                   <button
                     key="rejoin"
@@ -402,6 +439,16 @@ export default function LobbyClient({
                     className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
                   >
                     {t('actions.rejoin')}
+                  </button>
+                )
+              } else if (game.viewer_is_member) {
+                actions.push(
+                  <button
+                    key="goToGame"
+                    onClick={() => router.push(`/game/${game.id}`)}
+                    className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
+                  >
+                    {t('actions.goToGame')}
                   </button>
                 )
               } else if (game.visibility === 'PUBLIC') {

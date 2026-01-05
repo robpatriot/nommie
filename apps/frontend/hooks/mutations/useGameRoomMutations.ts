@@ -1,9 +1,11 @@
 'use client'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
 import {
   markPlayerReadyAction,
   leaveGameAction,
+  rejoinGameAction,
   submitBidAction,
   selectTrumpAction,
   submitPlayAction,
@@ -69,15 +71,52 @@ export function useLeaveGame() {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
-      })
-      // Invalidate last active game so header button updates
+    onSuccess: () => {
+      // NOTE: Query invalidation removed - navigation happens immediately after mutateAsync
+      // and we're leaving the game room, so no need to refetch game room queries.
+      // The destination page (lobby) will fetch fresh data if needed.
+      // Only invalidate last active game for header button (fire-and-forget, doesn't affect game room)
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.lastActive(),
       })
+    },
+  })
+}
+
+/**
+ * Mutation hook to rejoin a game.
+ * Invalidates game snapshot cache on success and navigates to game room.
+ */
+export function useRejoinGame() {
+  const queryClient = useQueryClient()
+  const router = useRouter()
+
+  return useMutation({
+    mutationFn: async (request: {
+      gameId: number
+      version: number
+    }): Promise<void> => {
+      const result = await rejoinGameAction({
+        gameId: request.gameId,
+        version: request.version,
+      })
+      if (result.kind === 'error') {
+        throw handleActionResultError(result)
+      }
+    },
+    onSuccess: (_, request) => {
+      // NOTE: games.list() invalidation removed - navigation happens immediately after mutateAsync
+      // and we're leaving the lobby, so no need to refetch lobby queries.
+      // The destination page (game room) will fetch fresh data via WebSocket and initial snapshot.
+      // Only invalidate snapshot for the game we're joining (fire-and-forget, doesn't affect lobby)
+      // and last active game for header button.
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.snapshot(request.gameId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
+      })
+      router.push(`/game/${request.gameId}`)
     },
   })
 }

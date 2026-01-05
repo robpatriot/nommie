@@ -98,6 +98,8 @@
     "failedToDeleteGameNoSnapshot": "Impossibile eliminare la partita: impossibile caricare lo stato",
     "failedToLeaveGame": "Impossibile abbandonare la partita",
     "failedToLeaveGameNoVersion": "Impossibile abbandonare la partita: impossibile determinare la versione",
+    "failedToRejoinGame": "Impossibile rientrare nella partita",
+    "failedToRejoinGameNoVersion": "Impossibile rientrare nella partita: impossibile determinare la versione",
     "failedToRefreshGamesList": "Impossibile aggiornare l'elenco delle partite",
     "failedToCreateGame": "Impossibile creare la partita",
     "failedToJoinGame": "Impossibile unirsi alla partita",

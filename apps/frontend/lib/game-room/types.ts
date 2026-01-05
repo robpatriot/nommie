@@ -7,6 +7,7 @@ export type Card = string
 export interface SeatPublic {
   seat: Seat
   user_id: number | null
+  original_user_id?: number | null
   display_name: string | null
   is_ai: boolean
   is_ready: boolean

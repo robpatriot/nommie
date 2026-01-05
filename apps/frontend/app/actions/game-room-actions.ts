@@ -6,6 +6,7 @@ import {
   fetchGameSnapshot,
   markPlayerReady,
   leaveGame,
+  rejoinGame,
   submitBid,
   selectTrump,
   submitPlay,
@@ -141,6 +142,44 @@ export async function leaveGameAction(
   } catch (error) {
     const t = await getTranslations('errors.actions')
     return toErrorResult(error, t('failedToLeaveGame'))
+  }
+}
+
+export interface RejoinGameRequest {
+  gameId: number
+  version?: number
+}
+
+export async function rejoinGameAction(
+  request: RejoinGameRequest
+): Promise<SimpleActionResult> {
+  try {
+    let finalVersion = request.version
+    if (finalVersion === undefined) {
+      const snapshotResult = await getGameRoomSnapshotAction({
+        gameId: request.gameId,
+      })
+      if (
+        snapshotResult.kind === 'ok' &&
+        snapshotResult.data.version !== undefined
+      ) {
+        finalVersion = snapshotResult.data.version
+      }
+    }
+
+    if (finalVersion === undefined) {
+      const t = await getTranslations('errors.actions')
+      return toErrorResult(
+        new Error('Lock version required'),
+        t('failedToRejoinGameNoVersion')
+      )
+    }
+
+    await rejoinGame(request.gameId, finalVersion)
+    return { kind: 'ok' }
+  } catch (error) {
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToRejoinGame'))
   }
 }
 

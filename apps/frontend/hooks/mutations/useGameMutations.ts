@@ -27,10 +27,11 @@ export function useCreateGame() {
       }
       return result.data
     },
+    // NOTE: Query invalidation removed - navigation happens immediately after mutateAsync
+    // and we're leaving the lobby, so no need to refetch lobby queries.
+    // The destination page will fetch fresh data if needed.
     onSuccess: () => {
-      // Invalidate games list so it refreshes with the new game
-      queryClient.invalidateQueries({ queryKey: queryKeys.games.lists() })
-      // Invalidate last active game so header button updates
+      // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.lastActive(),
       })
@@ -53,13 +54,11 @@ export function useJoinGame() {
       }
       return result.data
     },
-    onSuccess: (data, gameId) => {
-      // Invalidate games list and the specific game detail
-      queryClient.invalidateQueries({ queryKey: queryKeys.games.lists() })
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.detail(gameId),
-      })
-      // Invalidate last active game so header button updates
+    // NOTE: Query invalidation removed - navigation happens immediately after mutateAsync
+    // and we're leaving the lobby, so no need to refetch lobby queries.
+    // The destination page will fetch fresh data if needed.
+    onSuccess: (_data, _gameId) => {
+      // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.lastActive(),
       })
@@ -82,13 +81,11 @@ export function useSpectateGame() {
       }
       return result.data
     },
-    onSuccess: (data, gameId) => {
-      // Invalidate games list and the specific game detail
-      queryClient.invalidateQueries({ queryKey: queryKeys.games.lists() })
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.detail(gameId),
-      })
-      // Invalidate last active game so header button updates
+    // NOTE: Query invalidation removed - navigation happens immediately after mutateAsync
+    // and we're leaving the lobby, so no need to refetch lobby queries.
+    // The destination page will fetch fresh data if needed.
+    onSuccess: (_data, _gameId) => {
+      // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.lastActive(),
       })
