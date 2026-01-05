@@ -1,0 +1,87 @@
+{
+  "title": "Guide du Joueur",
+  "description": "Apprenez à jouer à Nommie et comprenez toutes les fonctionnalités de l'interface du jeu.",
+  "breadcrumbs": {
+    "guide": "Guide"
+  },
+  "sections": {
+    "ui": {
+      "kicker": "Interface",
+      "title": "Comprendre l'Interface du Jeu",
+      "description": "La salle de jeu est divisée en plusieurs zones clés qui vous aident à jouer et à suivre le jeu.",
+      "playerHand": {
+        "title": "Votre Main",
+        "description": "En bas de l'écran, vous verrez vos cartes. Cliquez sur une carte pour la sélectionner, puis cliquez sur le bouton jouer pour la jouer. Si la confirmation de carte est désactivée dans les paramètres, les cartes sont jouées immédiatement lors du clic. Les cartes que vous pouvez jouer légalement sont mises en évidence. Votre main se met à jour automatiquement lorsque des cartes sont jouées."
+      },
+      "seatCards": {
+        "title": "Places des Joueurs",
+        "description": "Autour de la table, vous verrez des indicateurs de places représentant la position de chaque joueur. Celles-ci montrent les noms des joueurs, s'ils sont humains ou IA, leur enchère actuelle et leur nombre de plis. Le joueur actif (dont c'est le tour) est mis en évidence."
+      },
+      "trickArea": {
+        "title": "Zone de Plis",
+        "description": "Le centre de la table montre le pli actuel en cours de jeu. Les cartes sont affichées face visible lorsqu'elles sont jouées. Après qu'un pli soit terminé, les cartes sont affichées pendant un court instant (configurable dans les paramètres) afin que vous puissiez voir qui l'a gagné et quelles cartes ont été jouées. Le dernier pli terminé est affiché entre les rondes."
+      },
+      "biddingPanel": {
+        "title": "Panneau d'Enchères",
+        "description": "Pendant la phase d'enchères, vous verrez un panneau où vous pouvez entrer votre enchère. Entrez un nombre de 0 à la taille de la main pour cette ronde. Le panneau affiche toutes les enchères des joueurs au fur et à mesure qu'elles sont soumises. Pendant la sélection de l'atout, si vous avez gagné l'enchère, vous verrez des options pour choisir la couleur de l'atout."
+      },
+      "scoreSidebar": {
+        "title": "Barre Latérale des Scores",
+        "description": "Sur les écrans larges, vous verrez les scores actuels de tous les joueurs sur le côté de l'écran. Sur les écrans étroits, elle apparaît plus bas. Cela se met à jour après chaque ronde. La barre latérale affiche également les enchères de la ronde actuelle et la couleur d'atout sélectionnée. Cliquez sur le bouton historique pour voir un historique détaillé des scores sur toutes les rondes."
+      },
+      "gameInfo": {
+        "title": "Affichage des Informations du Jeu",
+        "description": "Sur les écrans plus étroits, deux éléments compacts apparaissent en haut de la zone de plis pour afficher des informations essentielles du jeu : la couleur d'atout pour la ronde actuelle et le total de toutes les enchères comparé à la taille de la main pour cette ronde. Cela garantit que vous avez toujours accès aux détails clés du jeu quelle que soit la taille de l'écran."
+      }
+    },
+    "rules": {
+      "kicker": "Règles du Jeu",
+      "title": "Comment Jouer à Nommie",
+      "description": "Nommie est un jeu de cartes à plis pour 4 joueurs avec des enchères. Voici les règles principales :",
+      "players": {
+        "title": "Joueurs",
+        "description": "Le jeu se joue toujours avec exactement 4 joueurs dans un ordre fixe dans le sens des aiguilles d'une montre. Les joueurs peuvent être humains ou contrôlés par IA."
+      },
+      "rounds": {
+        "title": "Rondes",
+        "description": "Le jeu se compose de 26 rondes. Les tailles de main varient : 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13. Chaque ronde utilise un jeu frais de 52 cartes. Le donneur tourne dans le sens des aiguilles d'une montre à chaque ronde."
+      },
+      "bidding": {
+        "title": "Enchères",
+        "description": "Chaque joueur doit faire exactement une enchère par ronde, prédisant combien de plis il gagnera. Les enchères valides sont de 0 à la taille de la main. Le donneur enchère toujours en dernier et ne peut pas choisir une enchère qui ferait que la somme des 4 enchères soit égale à la taille de la main. Un joueur peut enchérir 0, mais ne peut pas le faire plus de trois rondes consécutives. Le meilleur enchérisseur gagne le droit de sélectionner les atouts (les égalités vont au premier enchérisseur)."
+      },
+      "trumpSelection": {
+        "title": "Sélection de l'Atout",
+        "description": "Le gagnant de l'enchère choisit la couleur de l'atout pour cette ronde. Les choix valides sont Trèfle (♣), Carreau (♦), Cœur (♥), Pique (♠) ou Sans Atout. Si Sans Atout est choisi, il n'y a pas de cartes atout pour cette ronde et les plis sont gagnés par la carte la plus haute de la couleur d'entrée."
+      },
+      "trickPlay": {
+        "title": "Jeu de Plis",
+        "description": "Le joueur à gauche du donneur mène le premier pli. Les joueurs doivent suivre la couleur s'ils le peuvent ; sinon, ils peuvent jouer n'importe quelle carte. Si la ronde a une couleur atout et que des cartes atout sont jouées, le pli est gagné par l'atout le plus haut. Sinon, le pli est gagné par la carte la plus haute de la couleur d'entrée. Le gagnant du pli mène le pli suivant. Chaque ronde a exactement autant de plis que la taille de la main."
+      },
+      "scoring": {
+        "title": "Score",
+        "description": "Chaque pli gagné vous donne +1 point. Si vous gagnez exactement autant de plis que vous avez enchéri, vous gagnez un bonus de +10 (cela s'applique même à une enchère de 0 si vous ne prenez pas de plis). Manquer votre enchère signifie que vous ne recevez simplement pas le bonus ; vous ne perdez jamais de points. Les scores sont cumulatifs sur les 26 rondes. Le(s) joueur(s) avec le score total le plus élevé à la fin gagne(nt)."
+      }
+    },
+    "features": {
+      "kicker": "Fonctionnalités",
+      "title": "Fonctionnalités du Jeu",
+      "description": "Comprendre comment fonctionnent les fonctionnalités clés dans Nommie :",
+      "leavingGame": {
+        "title": "Quitter un Jeu",
+        "description": "Vous pouvez quitter un jeu à tout moment, mais ce qui se passe dépend de si le jeu a commencé :",
+        "inLobby": "Si le jeu est encore dans le lobby (non démarré), vous serez simplement retiré du jeu.",
+        "activeGame": "Si le jeu a commencé, un joueur IA prendra votre place et continuera à jouer. Vous verrez une boîte de dialogue de confirmation avant que cela ne se produise. Vous pouvez rejoindre le jeu plus tard depuis le lobby et reprendre votre place.",
+        "spectator": "Si vous observez, vous pouvez partir sans confirmation - vous serez simplement retiré."
+      },
+      "nextGameButton": {
+        "title": "Bouton Jeu Suivant",
+        "description": "Le bouton 'Jeu Suivant' dans l'en-tête (affiché comme ▶ sur les petits écrans) vous emmène directement à votre jeu le plus récemment actif. Cela facilite le retour à un jeu que vous jouiez. Le bouton n'apparaît que si vous avez un jeu actif."
+      },
+      "spectators": {
+        "title": "Observer les Jeux",
+        "description": "Vous pouvez regarder des jeux en tant qu'observateur sans rejoindre en tant que joueur. En tant qu'observateur, vous pouvez voir les cartes à mesure qu'elles sont jouées dans les plis et l'état du jeu, mais vous ne pouvez pas voir les cartes dans les mains des joueurs et vous ne pouvez pas participer aux enchères ou jouer. Les observateurs peuvent partir à tout moment sans affecter le jeu."
+      }
+    }
+  }
+}

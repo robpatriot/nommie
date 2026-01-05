@@ -1,0 +1,87 @@
+{
+  "title": "Player Guide",
+  "description": "Learn how to play Nommie and understand all the features of the game interface.",
+  "breadcrumbs": {
+    "guide": "Guide"
+  },
+  "sections": {
+    "ui": {
+      "kicker": "Interface",
+      "title": "Understanding the Game Interface",
+      "description": "The game room is divided into several key areas that help you play and track the game.",
+      "playerHand": {
+        "title": "Your Hand",
+        "description": "At the bottom of the screen, you'll see your cards. Click on a card to select it, then click the play button to play it. If card confirmation is disabled in settings, cards are played immediately when clicked. Cards that you can legally play are highlighted. Your hand updates automatically as cards are played."
+      },
+      "seatCards": {
+        "title": "Player Seats",
+        "description": "Around the table, you'll see seat indicators representing each player's position. These show player names, whether they're human or AI, their current bid, and their trick count. The active player (whose turn it is) is highlighted."
+      },
+      "trickArea": {
+        "title": "Trick Area",
+        "description": "The center of the table shows the current trick being played. Cards are displayed face-up as they're played. After a trick is completed, the cards are shown for a short time (configurable in settings) so you can see who won it and which cards were played. The last completed trick is shown between rounds."
+      },
+      "biddingPanel": {
+        "title": "Bidding Panel",
+        "description": "During the bidding phase, you'll see a panel where you can enter your bid. Enter a number from 0 to the hand size for that round. The panel shows all players' bids as they're submitted. During trump selection, if you won the bid, you'll see options to choose the trump suit."
+      },
+      "scoreSidebar": {
+        "title": "Score Sidebar",
+        "description": "On wide screens, you'll see the current scores for all players on the side of the screen. On narrow screens, it appears lower down. This updates after each round. The sidebar also displays the bids from the current round and the selected trump suit. Click the history button to see a detailed history of scores across all rounds."
+      },
+      "gameInfo": {
+        "title": "Game Information Display",
+        "description": "On narrower screens, two compact elements appear at the top of the trick area to show essential game information: the trump suit for the current round, and the total of all bids compared to the hand size for that round. This ensures you always have access to key game details regardless of screen size."
+      }
+    },
+    "rules": {
+      "kicker": "Game Rules",
+      "title": "How to Play Nommie",
+      "description": "Nommie is a 4-player trick-taking card game with bidding. Here are the core rules:",
+      "players": {
+        "title": "Players",
+        "description": "The game is always played with exactly 4 players in a fixed clockwise order. Players can be human or AI-controlled."
+      },
+      "rounds": {
+        "title": "Rounds",
+        "description": "The game consists of 26 rounds. Hand sizes vary: 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13. Each round uses a fresh 52-card deck. The dealer rotates clockwise each round."
+      },
+      "bidding": {
+        "title": "Bidding",
+        "description": "Each player must make exactly one bid per round, predicting how many tricks they'll win. Valid bids are from 0 to the hand size. The dealer always bids last and cannot choose a bid that would make the total of all 4 bids equal to the hand size. A player may bid 0, but cannot do so more than three rounds in a row. The highest bidder wins the right to select trumps (ties go to the earliest bidder)."
+      },
+      "trumpSelection": {
+        "title": "Trump Selection",
+        "description": "The winning bidder chooses the trump suit for that round. Valid choices are Clubs (♣), Diamonds (♦), Hearts (♥), Spades (♠), or No Trumps. If No Trumps is chosen, there are no trump cards for that round and tricks are won by the highest card of the lead suit."
+      },
+      "trickPlay": {
+        "title": "Trick Play",
+        "description": "The player to the left of the dealer leads the first trick. Players must follow suit if able; otherwise they may play any card. If the round has a trump suit and any trump cards are played, the trick is won by the highest trump. Otherwise, the trick is won by the highest card of the lead suit. The trick winner leads the next trick. Each round has exactly as many tricks as the hand size."
+      },
+      "scoring": {
+        "title": "Scoring",
+        "description": "Each trick won gives you +1 point. If you win exactly as many tricks as you bid, you gain a +10 bonus (this applies even to a bid of 0 if you take no tricks). Missing your bid means you simply don't receive the bonus; you never lose points. Scores are cumulative across all 26 rounds. The player(s) with the highest total score at the end wins."
+      }
+    },
+    "features": {
+      "kicker": "Features",
+      "title": "Game Features",
+      "description": "Understanding how key features work in Nommie:",
+      "leavingGame": {
+        "title": "Leaving a Game",
+        "description": "You can leave a game at any time, but what happens depends on whether the game has started:",
+        "inLobby": "If the game is still in the lobby (not started), you'll simply be removed from the game.",
+        "activeGame": "If the game has started, an AI player will take over your seat and continue playing. You'll see a confirmation dialog before this happens. You can rejoin the game later from the lobby and take back your seat.",
+        "spectator": "If you're spectating, you can leave without any confirmation - you'll simply be removed."
+      },
+      "nextGameButton": {
+        "title": "Next Game Button",
+        "description": "The 'Next Game' button in the header (shown as ▶ on small screens) takes you directly to your most recently active game. This makes it easy to return to a game you were playing. The button only appears if you have an active game."
+      },
+      "spectators": {
+        "title": "Spectating Games",
+        "description": "You can watch games as a spectator without joining as a player. As a spectator, you can see the cards as they are played in tricks and the game state, but you cannot see cards in players' hands and you cannot participate in bidding or playing. Spectators can leave at any time without affecting the game."
+      }
+    }
+  }
+}

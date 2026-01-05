@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
+import { usePathname } from 'next/navigation'
 function getInitials(email?: string | null) {
   if (!email) {
     return '👤'
@@ -39,10 +40,13 @@ type HeaderProps = {
 
 export default function Header({ session }: HeaderProps) {
   const t = useTranslations('nav')
+  const pathname = usePathname()
   const { crumbs } = useHeaderBreadcrumbs()
   const hasBreadcrumbs = session?.user && crumbs.length > 0
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [isBrandMenuOpen, setIsBrandMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement | null>(null)
+  const brandMenuRef = useRef<HTMLDivElement | null>(null)
 
   // Fetch last active game on client side for real-time updates
   // Only fetch if user is logged in
@@ -69,20 +73,104 @@ export default function Header({ session }: HeaderProps) {
     return () => document.removeEventListener('pointerdown', handlePointerDown)
   }, [isUserMenuOpen])
 
+  useEffect(() => {
+    if (!isBrandMenuOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!brandMenuRef.current) {
+        return
+      }
+
+      if (!brandMenuRef.current.contains(event.target as Node)) {
+        setIsBrandMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [isBrandMenuOpen])
+
+  const isOnLobby = pathname === '/lobby'
+  const isOnGuide = pathname === '/guide'
+
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-surface-strong/70 px-3 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-lg">
       <div className="mx-auto flex w-full max-w-6xl flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-3 rounded-full bg-surface px-3 py-2 text-lg font-semibold text-foreground shadow-inner shadow-black/10 transition hover:bg-surface-strong/80"
-            aria-label={t('brand.homeAria')}
-          >
-            <span className="text-2xl" role="img" aria-hidden>
-              🃏
-            </span>
-            <span className="hidden tracking-tight sm:inline">Nommie</span>
-          </Link>
+          {session?.user ? (
+            <div className="relative" ref={brandMenuRef}>
+              <button
+                type="button"
+                onClick={() => setIsBrandMenuOpen((open) => !open)}
+                className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-2 text-lg font-semibold text-foreground shadow-inner shadow-black/10 transition hover:bg-surface-strong/80"
+                aria-haspopup="true"
+                aria-expanded={isBrandMenuOpen}
+                aria-label={t('brand.menuAria')}
+              >
+                <span className="text-2xl" role="img" aria-hidden>
+                  🃏
+                </span>
+                <span className="hidden tracking-tight sm:inline">Nommie</span>
+                <span
+                  className={`text-xs text-muted transition-transform ${
+                    isBrandMenuOpen ? 'rotate-180' : ''
+                  }`}
+                  aria-hidden
+                >
+                  ▼
+                </span>
+              </button>
+              {isBrandMenuOpen ? (
+                <div className="absolute left-0 top-full mt-2 w-48 rounded-2xl border border-border/60 bg-surface p-3 text-sm shadow-lg shadow-black/20">
+                  <Link
+                    href="/lobby"
+                    className={`mb-2 flex w-full items-center justify-between rounded-2xl border border-border/70 bg-surface px-4 py-2 font-semibold transition hover:border-primary/50 ${
+                      isOnLobby
+                        ? 'border-primary/50 text-primary'
+                        : 'text-foreground hover:text-primary'
+                    }`}
+                    onClick={() => setIsBrandMenuOpen(false)}
+                  >
+                    {t('brand.lobby')}
+                    {isOnLobby ? (
+                      <span className="text-xs" aria-hidden>
+                        ●
+                      </span>
+                    ) : null}
+                  </Link>
+                  <Link
+                    href="/guide"
+                    className={`flex w-full items-center justify-between rounded-2xl border border-border/70 bg-surface px-4 py-2 font-semibold transition hover:border-primary/50 ${
+                      isOnGuide
+                        ? 'border-primary/50 text-primary'
+                        : 'text-foreground hover:text-primary'
+                    }`}
+                    onClick={() => setIsBrandMenuOpen(false)}
+                  >
+                    {t('brand.guide')}
+                    {isOnGuide ? (
+                      <span className="text-xs" aria-hidden>
+                        ●
+                      </span>
+                    ) : null}
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Link
+              href="/"
+              className="inline-flex items-center gap-3 rounded-full bg-surface px-3 py-2 text-lg font-semibold text-foreground shadow-inner shadow-black/10 transition hover:bg-surface-strong/80"
+              aria-label={t('brand.homeAria')}
+            >
+              <span className="text-2xl" role="img" aria-hidden>
+                🃏
+              </span>
+              <span className="hidden tracking-tight sm:inline">Nommie</span>
+            </Link>
+          )}
           {hasBreadcrumbs ? (
             <nav
               className="hidden items-center gap-2 text-sm text-muted sm:flex"

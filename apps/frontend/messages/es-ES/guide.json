@@ -1,0 +1,87 @@
+{
+  "title": "Guía del Jugador",
+  "description": "Aprende a jugar Nommie y entiende todas las funciones de la interfaz del juego.",
+  "breadcrumbs": {
+    "guide": "Guía"
+  },
+  "sections": {
+    "ui": {
+      "kicker": "Interfaz",
+      "title": "Entender la Interfaz del Juego",
+      "description": "La sala de juego está dividida en varias áreas clave que te ayudan a jugar y seguir el juego.",
+      "playerHand": {
+        "title": "Tu Mano",
+        "description": "En la parte inferior de la pantalla, verás tus cartas. Haz clic en una carta para seleccionarla, luego haz clic en el botón de jugar para jugarla. Si la confirmación de carta está deshabilitada en los ajustes, las cartas se juegan inmediatamente al hacer clic. Las cartas que puedes jugar legalmente están resaltadas. Tu mano se actualiza automáticamente cuando se juegan cartas."
+      },
+      "seatCards": {
+        "title": "Asientos de Jugadores",
+        "description": "Alrededor de la mesa, verás indicadores de asientos que representan la posición de cada jugador. Estas muestran nombres de jugadores, si son humanos o IA, su oferta actual y su conteo de trucos. El jugador activo (cuyo turno es) está resaltado."
+      },
+      "trickArea": {
+        "title": "Área de Trucos",
+        "description": "El centro de la mesa muestra el truco actual que se está jugando. Las cartas se muestran boca arriba cuando se juegan. Después de completar un truco, las cartas se muestran por un breve tiempo (configurable en los ajustes) para que puedas ver quién lo ganó y qué cartas se jugaron. El último truco completado se muestra entre rondas."
+      },
+      "biddingPanel": {
+        "title": "Panel de Ofertas",
+        "description": "Durante la fase de ofertas, verás un panel donde puedes ingresar tu oferta. Ingresa un número del 0 al tamaño de la mano para esa ronda. El panel muestra las ofertas de todos los jugadores a medida que se envían. Durante la selección de triunfo, si ganaste la oferta, verás opciones para elegir el palo de triunfo."
+      },
+      "scoreSidebar": {
+        "title": "Barra Lateral de Puntuación",
+        "description": "En pantallas anchas, verás las puntuaciones actuales de todos los jugadores en el lado de la pantalla. En pantallas estrechas, aparece más abajo. Esto se actualiza después de cada ronda. La barra lateral también muestra las ofertas de la ronda actual y el palo de triunfo seleccionado. Haz clic en el botón de historial para ver un historial detallado de puntuaciones en todas las rondas."
+      },
+      "gameInfo": {
+        "title": "Visualización de Información del Juego",
+        "description": "En pantallas más estrechas, dos elementos compactos aparecen en la parte superior del área de trucos para mostrar información esencial del juego: el palo de triunfo para la ronda actual y el total de todas las ofertas comparado con el tamaño de la mano para esa ronda. Esto asegura que siempre tengas acceso a detalles clave del juego independientemente del tamaño de la pantalla."
+      }
+    },
+    "rules": {
+      "kicker": "Reglas del Juego",
+      "title": "Cómo Jugar Nommie",
+      "description": "Nommie es un juego de cartas de trucos para 4 jugadores con ofertas. Aquí están las reglas principales:",
+      "players": {
+        "title": "Jugadores",
+        "description": "El juego siempre se juega con exactamente 4 jugadores en un orden fijo en sentido horario. Los jugadores pueden ser humanos o controlados por IA."
+      },
+      "rounds": {
+        "title": "Rondas",
+        "description": "El juego consta de 26 rondas. Los tamaños de mano varían: 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13. Cada ronda usa una baraja fresca de 52 cartas. El repartidor rota en sentido horario cada ronda."
+      },
+      "bidding": {
+        "title": "Ofertas",
+        "description": "Cada jugador debe hacer exactamente una oferta por ronda, prediciendo cuántos trucos ganará. Las ofertas válidas son de 0 al tamaño de la mano. El repartidor siempre ofrece último y no puede elegir una oferta que haría que la suma de las 4 ofertas sea igual al tamaño de la mano. Un jugador puede ofertar 0, pero no puede hacerlo más de tres rondas seguidas. El mejor postor gana el derecho a seleccionar los triunfos (los empates van al primer postor)."
+      },
+      "trumpSelection": {
+        "title": "Selección de Triunfo",
+        "description": "El ganador de la oferta elige el palo de triunfo para esa ronda. Las opciones válidas son Tréboles (♣), Diamantes (♦), Corazones (♥), Picas (♠) o Sin Triunfo. Si se elige Sin Triunfo, no hay cartas de triunfo para esa ronda y los trucos se ganan con la carta más alta del palo de salida."
+      },
+      "trickPlay": {
+        "title": "Juego de Trucos",
+        "description": "El jugador a la izquierda del repartidor lidera el primer truco. Los jugadores deben seguir el palo si pueden; de lo contrario, pueden jugar cualquier carta. Si la ronda tiene un palo de triunfo y se juegan cartas de triunfo, el truco lo gana el triunfo más alto. De lo contrario, el truco lo gana la carta más alta del palo de salida. El ganador del truco lidera el siguiente truco. Cada ronda tiene exactamente tantos trucos como el tamaño de la mano."
+      },
+      "scoring": {
+        "title": "Puntuación",
+        "description": "Cada truco ganado te da +1 punto. Si ganas exactamente tantos trucos como ofertaste, obtienes un bonus de +10 (esto se aplica incluso a una oferta de 0 si no tomas trucos). Perder tu oferta significa que simplemente no recibes el bonus; nunca pierdes puntos. Las puntuaciones son acumulativas en las 26 rondas. El/los jugador(es) con la puntuación total más alta al final gana(n)."
+      }
+    },
+    "features": {
+      "kicker": "Funciones",
+      "title": "Funciones del Juego",
+      "description": "Entender cómo funcionan las funciones clave en Nommie:",
+      "leavingGame": {
+        "title": "Abandonar un Juego",
+        "description": "Puedes abandonar un juego en cualquier momento, pero lo que sucede depende de si el juego ha comenzado:",
+        "inLobby": "Si el juego todavía está en el lobby (no iniciado), simplemente serás eliminado del juego.",
+        "activeGame": "Si el juego ha comenzado, un jugador de IA tomará tu asiento y continuará jugando. Verás un diálogo de confirmación antes de que esto suceda. Puedes volver a unirte al juego más tarde desde el lobby y recuperar tu asiento.",
+        "spectator": "Si estás observando, puedes salir sin ninguna confirmación - simplemente serás eliminado."
+      },
+      "nextGameButton": {
+        "title": "Botón del Siguiente Juego",
+        "description": "El botón 'Siguiente Juego' en el encabezado (mostrado como ▶ en pantallas pequeñas) te lleva directamente a tu juego más recientemente activo. Esto facilita volver a un juego que estabas jugando. El botón solo aparece si tienes un juego activo."
+      },
+      "spectators": {
+        "title": "Observar Juegos",
+        "description": "Puedes ver juegos como espectador sin unirte como jugador. Como espectador, puedes ver las cartas a medida que se juegan en trucos y el estado del juego, pero no puedes ver cartas en las manos de los jugadores y no puedes participar en ofertas o jugar. Los espectadores pueden salir en cualquier momento sin afectar el juego."
+      }
+    }
+  }
+}

@@ -59,6 +59,7 @@ export default getRequestConfig(async () => {
     'toasts',
     'lobby',
     'game',
+    'guide',
   ])
 
   return {

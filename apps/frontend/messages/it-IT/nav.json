@@ -1,6 +1,9 @@
 {
   "brand": {
-    "homeAria": "Home di Nommie"
+    "homeAria": "Home di Nommie",
+    "menuAria": "Menu di navigazione Nommie",
+    "lobby": "Sala",
+    "guide": "Guida"
   },
   "breadcrumbs": {
     "ariaLabel": "Percorso di navigazione"

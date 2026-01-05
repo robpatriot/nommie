@@ -1,6 +1,9 @@
 {
   "brand": {
-    "homeAria": "Accueil Nommie"
+    "homeAria": "Accueil Nommie",
+    "menuAria": "Menu de navigation Nommie",
+    "lobby": "Hall",
+    "guide": "Manuel"
   },
   "breadcrumbs": {
     "ariaLabel": "Fil d’Ariane"

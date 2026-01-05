@@ -8,6 +8,7 @@ export type Namespace =
   | 'toasts'
   | 'lobby'
   | 'game'
+  | 'guide'
 
 export async function loadNamespace(
   locale: SupportedLocale,

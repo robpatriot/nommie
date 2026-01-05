@@ -85,6 +85,7 @@ export default async function RootLayout({
     'errors',
     'toasts',
     'lobby',
+    'guide',
   ])
 
   return (

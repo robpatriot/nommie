@@ -1,0 +1,87 @@
+{
+  "title": "Spielerhandbuch",
+  "description": "Lernen Sie, wie man Nommie spielt und verstehen Sie alle Funktionen der Spieloberfläche.",
+  "breadcrumbs": {
+    "guide": "Handbuch"
+  },
+  "sections": {
+    "ui": {
+      "kicker": "Oberfläche",
+      "title": "Die Spieloberfläche verstehen",
+      "description": "Der Spielraum ist in mehrere wichtige Bereiche unterteilt, die Ihnen beim Spielen und Verfolgen des Spiels helfen.",
+      "playerHand": {
+        "title": "Ihre Hand",
+        "description": "Am unteren Bildschirmrand sehen Sie Ihre Karten. Klicken Sie auf eine Karte, um sie auszuwählen, und klicken Sie dann auf die Schaltfläche Spielen, um sie zu spielen. Wenn die Kartenbestätigung in den Einstellungen deaktiviert ist, werden Karten sofort beim Klicken gespielt. Karten, die Sie legal spielen können, sind hervorgehoben. Ihre Hand wird automatisch aktualisiert, wenn Karten gespielt werden."
+      },
+      "seatCards": {
+        "title": "Spielerplätze",
+        "description": "Um den Tisch herum sehen Sie Platzanzeigen, die die Position jedes Spielers darstellen. Diese zeigen Spielernamen, ob sie menschlich oder KI sind, ihr aktuelles Gebot und ihre Trickanzahl. Der aktive Spieler (der an der Reihe ist) ist hervorgehoben."
+      },
+      "trickArea": {
+        "title": "Trick-Bereich",
+        "description": "Die Mitte des Tisches zeigt den aktuell gespielten Trick. Karten werden offen angezeigt, wenn sie gespielt werden. Nach Abschluss eines Tricks werden die Karten kurz angezeigt (in den Einstellungen konfigurierbar), damit Sie sehen können, wer ihn gewonnen hat und welche Karten gespielt wurden. Der letzte abgeschlossene Trick wird zwischen den Runden angezeigt."
+      },
+      "biddingPanel": {
+        "title": "Biet-Panel",
+        "description": "Während der Bietphase sehen Sie ein Panel, in dem Sie Ihr Gebot eingeben können. Geben Sie eine Zahl von 0 bis zur Handgröße für diese Runde ein. Das Panel zeigt alle Spielergebote an, während sie abgegeben werden. Während der Trumpfauswahl sehen Sie, wenn Sie das Gebot gewonnen haben, Optionen zur Auswahl der Trumpffarbe."
+      },
+      "scoreSidebar": {
+        "title": "Punkte-Seitenleiste",
+        "description": "Auf breiten Bildschirmen sehen Sie die aktuellen Punktzahlen aller Spieler an der Seite des Bildschirms. Auf schmalen Bildschirmen erscheint sie weiter unten. Dies wird nach jeder Runde aktualisiert. Die Seitenleiste zeigt auch die Gebote aus der aktuellen Runde und die ausgewählte Trumpffarbe an. Klicken Sie auf die Schaltfläche Historie, um eine detaillierte Historie der Punktzahlen über alle Runden hinweg zu sehen."
+      },
+      "gameInfo": {
+        "title": "Spielinformationsanzeige",
+        "description": "Auf schmaleren Bildschirmen erscheinen zwei kompakte Elemente oben im Trick-Bereich, um wichtige Spielinformationen anzuzeigen: die Trumpffarbe für die aktuelle Runde und die Summe aller Gebote im Vergleich zur Handgröße für diese Runde. Dies stellt sicher, dass Sie unabhängig von der Bildschirmgröße immer Zugriff auf wichtige Spieldetails haben."
+      }
+    },
+    "rules": {
+      "kicker": "Spielregeln",
+      "title": "Wie man Nommie spielt",
+      "description": "Nommie ist ein Kartenspiel für 4 Spieler mit Bieten. Hier sind die Kernregeln:",
+      "players": {
+        "title": "Spieler",
+        "description": "Das Spiel wird immer mit genau 4 Spielern in einer festen Reihenfolge im Uhrzeigersinn gespielt. Spieler können menschlich oder KI-gesteuert sein."
+      },
+      "rounds": {
+        "title": "Runden",
+        "description": "Das Spiel besteht aus 26 Runden. Die Handgrößen variieren: 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13. Jede Runde verwendet ein frisches 52-Karten-Deck. Der Geber rotiert im Uhrzeigersinn jede Runde."
+      },
+      "bidding": {
+        "title": "Bieten",
+        "description": "Jeder Spieler muss genau ein Gebot pro Runde abgeben und vorhersagen, wie viele Tricks er gewinnen wird. Gültige Gebote sind von 0 bis zur Handgröße. Der Geber bietet immer zuletzt und kann kein Gebot wählen, das die Summe aller 4 Gebote gleich der Handgröße machen würde. Ein Spieler kann 0 bieten, aber nicht mehr als drei Runden hintereinander. Der Höchstbietende gewinnt das Recht, die Trumpfe auszuwählen (bei Gleichstand gewinnt der früheste Bietende)."
+      },
+      "trumpSelection": {
+        "title": "Trumpfauswahl",
+        "description": "Der Gewinner des Gebots wählt die Trumpffarbe für diese Runde. Gültige Wahlmöglichkeiten sind Kreuz (♣), Karo (♦), Herz (♥), Pik (♠) oder Kein Trumpf. Wenn Kein Trumpf gewählt wird, gibt es keine Trumpfkarten für diese Runde und Tricks werden vom höchsten Karte der Leitfarbe gewonnen."
+      },
+      "trickPlay": {
+        "title": "Trick-Spiel",
+        "description": "Der Spieler links vom Geber führt den ersten Trick. Spieler müssen die Farbe bedienen, wenn möglich; andernfalls können sie eine beliebige Karte spielen. Wenn die Runde eine Trumpffarbe hat und Trumpfkarten gespielt werden, wird der Trick vom höchsten Trumpf gewonnen. Andernfalls wird der Trick von der höchsten Karte der Leitfarbe gewonnen. Der Trickgewinner führt den nächsten Trick. Jede Runde hat genau so viele Tricks wie die Handgröße."
+      },
+      "scoring": {
+        "title": "Punktevergabe",
+        "description": "Jeder gewonnene Trick gibt Ihnen +1 Punkt. Wenn Sie genau so viele Tricks gewinnen, wie Sie geboten haben, erhalten Sie einen +10 Bonus (dies gilt auch für ein Gebot von 0, wenn Sie keine Tricks nehmen). Wenn Sie Ihr Gebot verfehlen, erhalten Sie einfach nicht den Bonus; Sie verlieren nie Punkte. Die Punktzahlen sind über alle 26 Runden kumulativ. Der/die Spieler mit der höchsten Gesamtpunktzahl am Ende gewinnt/gewinnen."
+      }
+    },
+    "features": {
+      "kicker": "Funktionen",
+      "title": "Spiel-Funktionen",
+      "description": "Verstehen, wie wichtige Funktionen in Nommie funktionieren:",
+      "leavingGame": {
+        "title": "Ein Spiel verlassen",
+        "description": "Sie können ein Spiel jederzeit verlassen, aber was passiert, hängt davon ab, ob das Spiel gestartet wurde:",
+        "inLobby": "Wenn das Spiel noch in der Lobby ist (nicht gestartet), werden Sie einfach aus dem Spiel entfernt.",
+        "activeGame": "Wenn das Spiel gestartet wurde, übernimmt ein KI-Spieler Ihren Platz und spielt weiter. Sie sehen einen Bestätigungsdialog, bevor dies geschieht. Sie können das Spiel später von der Lobby aus wieder beitreten und Ihren Platz zurücknehmen.",
+        "spectator": "Wenn Sie zuschauen, können Sie ohne Bestätigung verlassen - Sie werden einfach entfernt."
+      },
+      "nextGameButton": {
+        "title": "Nächstes-Spiel-Schaltfläche",
+        "description": "Die Schaltfläche 'Nächstes Spiel' in der Kopfzeile (auf kleinen Bildschirmen als ▶ angezeigt) bringt Sie direkt zu Ihrem zuletzt aktiven Spiel. Dies erleichtert die Rückkehr zu einem Spiel, das Sie gespielt haben. Die Schaltfläche erscheint nur, wenn Sie ein aktives Spiel haben."
+      },
+      "spectators": {
+        "title": "Spiele beobachten",
+        "description": "Sie können Spiele als Zuschauer beobachten, ohne als Spieler beizutreten. Als Zuschauer können Sie die Karten sehen, wie sie in Tricks gespielt werden, und den Spielzustand, aber Sie können keine Karten in den Händen der Spieler sehen und Sie können nicht am Bieten oder Spielen teilnehmen. Zuschauer können jederzeit verlassen, ohne das Spiel zu beeinflussen."
+      }
+    }
+  }
+}

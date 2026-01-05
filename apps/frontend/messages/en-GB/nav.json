@@ -1,6 +1,9 @@
 {
   "brand": {
-    "homeAria": "Nommie home"
+    "homeAria": "Nommie home",
+    "menuAria": "Nommie navigation menu",
+    "lobby": "Lobby",
+    "guide": "Guide"
   },
   "breadcrumbs": {
     "ariaLabel": "Breadcrumb"

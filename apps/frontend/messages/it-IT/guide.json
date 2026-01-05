@@ -1,0 +1,87 @@
+{
+  "title": "Guida del Giocatore",
+  "description": "Impara a giocare a Nommie e comprendi tutte le funzionalità dell'interfaccia di gioco.",
+  "breadcrumbs": {
+    "guide": "Guida"
+  },
+  "sections": {
+    "ui": {
+      "kicker": "Interfaccia",
+      "title": "Comprendere l'Interfaccia di Gioco",
+      "description": "La sala di gioco è divisa in diverse aree chiave che ti aiutano a giocare e seguire il gioco.",
+      "playerHand": {
+        "title": "La Tua Mano",
+        "description": "In basso sullo schermo, vedrai le tue carte. Clicca su una carta per selezionarla, poi clicca sul pulsante gioca per giocarla. Se la conferma della carta è disabilitata nelle impostazioni, le carte vengono giocate immediatamente quando cliccate. Le carte che puoi giocare legalmente sono evidenziate. La tua mano si aggiorna automaticamente quando vengono giocate le carte."
+      },
+      "seatCards": {
+        "title": "Posti dei Giocatori",
+        "description": "Intorno al tavolo, vedrai indicatori di posto che rappresentano la posizione di ogni giocatore. Questi mostrano i nomi dei giocatori, se sono umani o IA, la loro offerta attuale e il loro conteggio di prese. Il giocatore attivo (il cui turno è) è evidenziato."
+      },
+      "trickArea": {
+        "title": "Area delle Prese",
+        "description": "Il centro del tavolo mostra la presa attuale in corso. Le carte vengono mostrate scoperte quando vengono giocate. Dopo che una presa è completata, le carte vengono mostrate per un breve periodo (configurabile nelle impostazioni) in modo che tu possa vedere chi l'ha vinta e quali carte sono state giocate. L'ultima presa completata viene mostrata tra i round."
+      },
+      "biddingPanel": {
+        "title": "Pannello delle Offerte",
+        "description": "Durante la fase delle offerte, vedrai un pannello dove puoi inserire la tua offerta. Inserisci un numero da 0 alla dimensione della mano per quel round. Il pannello mostra tutte le offerte dei giocatori man mano che vengono inviate. Durante la selezione del briscola, se hai vinto l'offerta, vedrai opzioni per scegliere il seme del briscola."
+      },
+      "scoreSidebar": {
+        "title": "Barra Laterale dei Punteggi",
+        "description": "Su schermi larghi, vedrai i punteggi attuali di tutti i giocatori sul lato dello schermo. Su schermi stretti, appare più in basso. Questo si aggiorna dopo ogni round. La barra laterale mostra anche le offerte del round attuale e il seme del briscola selezionato. Clicca sul pulsante cronologia per vedere una cronologia dettagliata dei punteggi su tutti i round."
+      },
+      "gameInfo": {
+        "title": "Visualizzazione delle Informazioni di Gioco",
+        "description": "Su schermi più stretti, due elementi compatti appaiono nella parte superiore dell'area delle prese per mostrare informazioni essenziali del gioco: il seme del briscola per il round attuale e il totale di tutte le offerte confrontato con la dimensione della mano per quel round. Questo assicura che tu abbia sempre accesso ai dettagli chiave del gioco indipendentemente dalla dimensione dello schermo."
+      }
+    },
+    "rules": {
+      "kicker": "Regole del Gioco",
+      "title": "Come Giocare a Nommie",
+      "description": "Nommie è un gioco di carte a prese per 4 giocatori con offerte. Ecco le regole principali:",
+      "players": {
+        "title": "Giocatori",
+        "description": "Il gioco si gioca sempre con esattamente 4 giocatori in un ordine fisso in senso orario. I giocatori possono essere umani o controllati da IA."
+      },
+      "rounds": {
+        "title": "Round",
+        "description": "Il gioco consiste di 26 round. Le dimensioni delle mani variano: 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 2, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13. Ogni round usa un mazzo fresco di 52 carte. Il mazziere ruota in senso orario ogni round."
+      },
+      "bidding": {
+        "title": "Offerte",
+        "description": "Ogni giocatore deve fare esattamente un'offerta per round, prevedendo quante prese vincerà. Le offerte valide sono da 0 alla dimensione della mano. Il mazziere offre sempre per ultimo e non può scegliere un'offerta che farebbe sì che la somma di tutte le 4 offerte sia uguale alla dimensione della mano. Un giocatore può offrire 0, ma non può farlo per più di tre round consecutivi. Il miglior offerente vince il diritto di selezionare i briscola (i pareggi vanno al primo offerente)."
+      },
+      "trumpSelection": {
+        "title": "Selezione del Briscola",
+        "description": "Il vincitore dell'offerta sceglie il seme del briscola per quel round. Le scelte valide sono Fiori (♣), Quadri (♦), Cuori (♥), Picche (♠) o Senza Briscola. Se viene scelto Senza Briscola, non ci sono carte briscola per quel round e le prese vengono vinte dalla carta più alta del seme di uscita."
+      },
+      "trickPlay": {
+        "title": "Gioco delle Prese",
+        "description": "Il giocatore alla sinistra del mazziere conduce la prima presa. I giocatori devono seguire il seme se possibile; altrimenti possono giocare qualsiasi carta. Se il round ha un seme briscola e vengono giocate carte briscola, la presa viene vinta dal briscola più alto. Altrimenti, la presa viene vinta dalla carta più alta del seme di uscita. Il vincitore della presa conduce la presa successiva. Ogni round ha esattamente tante prese quante la dimensione della mano."
+      },
+      "scoring": {
+        "title": "Punteggio",
+        "description": "Ogni presa vinta ti dà +1 punto. Se vinci esattamente tante prese quante hai offerto, ottieni un bonus di +10 (questo si applica anche a un'offerta di 0 se non prendi prese). Mancare la tua offerta significa che semplicemente non ricevi il bonus; non perdi mai punti. I punteggi sono cumulativi su tutti i 26 round. Il/i giocatore/i con il punteggio totale più alto alla fine vince/vincono."
+      }
+    },
+    "features": {
+      "kicker": "Funzionalità",
+      "title": "Funzionalità del Gioco",
+      "description": "Comprendere come funzionano le funzionalità chiave in Nommie:",
+      "leavingGame": {
+        "title": "Lasciare un Gioco",
+        "description": "Puoi lasciare un gioco in qualsiasi momento, ma ciò che accade dipende se il gioco è iniziato:",
+        "inLobby": "Se il gioco è ancora nella lobby (non avviato), verrai semplicemente rimosso dal gioco.",
+        "activeGame": "Se il gioco è iniziato, un giocatore IA prenderà il tuo posto e continuerà a giocare. Vedrai una finestra di dialogo di conferma prima che ciò accada. Puoi riunirti al gioco più tardi dalla lobby e riprendere il tuo posto.",
+        "spectator": "Se stai osservando, puoi uscire senza alcuna conferma - verrai semplicemente rimosso."
+      },
+      "nextGameButton": {
+        "title": "Pulsante Prossimo Gioco",
+        "description": "Il pulsante 'Prossimo Gioco' nell'intestazione (mostrato come ▶ su schermi piccoli) ti porta direttamente al tuo gioco più recentemente attivo. Questo rende facile tornare a un gioco che stavi giocando. Il pulsante appare solo se hai un gioco attivo."
+      },
+      "spectators": {
+        "title": "Osservare i Giochi",
+        "description": "Puoi guardare giochi come spettatore senza unirti come giocatore. Come spettatore, puoi vedere le carte mentre vengono giocate nelle prese e lo stato del gioco, ma non puoi vedere carte nelle mani dei giocatori e non puoi partecipare alle offerte o giocare. Gli spettatori possono uscire in qualsiasi momento senza influenzare il gioco."
+      }
+    }
+  }
+}

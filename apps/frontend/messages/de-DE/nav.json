@@ -1,6 +1,9 @@
 {
   "brand": {
-    "homeAria": "Nommie Startseite"
+    "homeAria": "Nommie Startseite",
+    "menuAria": "Nommie Navigationsmenü",
+    "lobby": "Spielhalle",
+    "guide": "Handbuch"
   },
   "breadcrumbs": {
     "ariaLabel": "Pfadnavigation"
