@@ -26,9 +26,11 @@
 //!
 //! Determinism:
 //! - No randomness used. `seed` is stored for future extensions (e.g., tie-breaking knobs).
+use std::collections::HashMap;
+
 use crate::ai::{AiError, AiPlayer};
 use crate::domain::player_view::CurrentRoundInfo;
-use crate::domain::{Card, GameContext, Suit, Trump};
+use crate::domain::{card_beats, Card, GameContext, Suit, Trump};
 
 #[derive(Clone)]
 pub struct Heuristic {
@@ -44,35 +46,6 @@ impl Heuristic {
     }
 
     // ---------- Utilities (pure, small, deterministic) ----------
-
-    fn suit_index(suit: Suit) -> usize {
-        match suit {
-            Suit::Clubs => 0,
-            Suit::Diamonds => 1,
-            Suit::Hearts => 2,
-            Suit::Spades => 3,
-        }
-    }
-
-    fn is_trump(card: &Card, trump: Trump) -> bool {
-        matches!(
-            (trump, card.suit),
-            (Trump::Clubs, Suit::Clubs)
-                | (Trump::Diamonds, Suit::Diamonds)
-                | (Trump::Hearts, Suit::Hearts)
-                | (Trump::Spades, Suit::Spades)
-        )
-    }
-
-    fn trump_suit(trump: Trump) -> Option<Suit> {
-        match trump {
-            Trump::NoTrumps => None,
-            Trump::Clubs => Some(Suit::Clubs),
-            Trump::Diamonds => Some(Suit::Diamonds),
-            Trump::Hearts => Some(Suit::Hearts),
-            Trump::Spades => Some(Suit::Spades),
-        }
-    }
 
     fn lowest(cards: &[Card]) -> Option<Card> {
         // Assumes `Card: Ord` with ascending order by rank (then suit) if applicable.
@@ -94,7 +67,7 @@ impl Heuristic {
     }
 
     fn lowest_trump<'a>(cards: impl Iterator<Item = &'a Card>, trump: Trump) -> Option<Card> {
-        if let Some(ts) = Self::trump_suit(trump) {
+        if let Ok(ts) = trump.try_into() {
             Self::lowest_in_suit(cards, ts)
         } else {
             None
@@ -128,23 +101,18 @@ impl Heuristic {
         let hand = &state.hand;
         let n = hand.len().max(1);
 
-        // Counts by suit and capture cards per suit
-        let mut by_suit_cards: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
+        // Group cards by suit
+        let mut by_suit_cards: HashMap<Suit, Vec<Card>> = HashMap::new();
         for c in hand.iter() {
-            by_suit_cards[Self::suit_index(c.suit)].push(*c);
+            by_suit_cards.entry(c.suit).or_default().push(*c);
         }
-        let counts = [
-            by_suit_cards[0].len(),
-            by_suit_cards[1].len(),
-            by_suit_cards[2].len(),
-            by_suit_cards[3].len(),
-        ];
 
-        let longest = *counts.iter().max().unwrap_or(&0) as f32;
+        let counts: Vec<usize> = by_suit_cards.values().map(|v| v.len()).collect();
+        let longest = counts.iter().max().copied().unwrap_or(0) as f32;
 
         // High-card control proxy
         let mut hi = 0usize;
-        for v in &mut by_suit_cards {
+        for v in by_suit_cards.values_mut() {
             hi += Self::suit_high_score(v);
         }
         let hi_norm = hi as f32 / 6.0; // max 6 if two cards in each suit considered
@@ -192,11 +160,16 @@ impl Heuristic {
     /// Consider No Trump if available: prefer when hand is balanced and has some top cards.
     fn prefer_no_trump(hand: &[Card]) -> bool {
         // Balanced if no suit has >= 6 and none <= 1
-        let mut counts = [0usize; 4];
+        let mut by_suit_counts: HashMap<Suit, usize> = HashMap::new();
         for c in hand {
-            counts[Self::suit_index(c.suit)] += 1;
+            *by_suit_counts.entry(c.suit).or_insert(0) += 1;
         }
-        let balanced = counts.iter().all(|&c| (2..=5).contains(&c));
+        let balanced = [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
+            .iter()
+            .all(|&suit| {
+                let count = by_suit_counts.get(&suit).copied().unwrap_or(0);
+                (2..=5).contains(&count)
+            });
         if !balanced {
             return false;
         }
@@ -206,43 +179,6 @@ impl Heuristic {
         let k = sorted.len().max(1).div_ceil(4); // ceil(n/4)
                                                  // Require at least some "control": here just check size threshold.
         k >= 3
-    }
-
-    /// Compare trick cards: does `a` beat `b` given (lead, trump)?
-    /// - Any trump beats any non-trump.
-    /// - Within the same suit, higher rank (by `Ord`) wins.
-    /// - Off-suit non-trump cannot beat on-suit non-trump.
-    fn wins_over(a: Card, b: Card, lead: Suit, trump: Trump) -> bool {
-        let a_tr = Self::is_trump(&a, trump);
-        let b_tr = Self::is_trump(&b, trump);
-        if a_tr && !b_tr {
-            return true;
-        }
-        if !a_tr && b_tr {
-            return false;
-        }
-        // Neither or both are trumps -> compare within suit context
-        let trump_suit = Self::trump_suit(trump);
-        let a_s = if a_tr {
-            trump_suit.unwrap_or(a.suit)
-        } else {
-            a.suit
-        };
-        let b_s = if b_tr {
-            trump_suit.unwrap_or(b.suit)
-        } else {
-            b.suit
-        };
-
-        if a_s == b_s {
-            return a > b; // higher rank wins
-        }
-
-        // Different suits, neither is trump: only a that follows lead can beat b.
-        if a_s == lead && b_s != lead {
-            return true;
-        }
-        false
     }
 
     /// Given legal plays and current trick context, pick the smallest winning card if
@@ -262,7 +198,7 @@ impl Heuristic {
             } else {
                 let mut winner = current_plays[0].1;
                 for &(_, c) in &current_plays[1..] {
-                    if Self::wins_over(c, winner, ls, trump) {
+                    if card_beats(c, winner, ls, trump) {
                         winner = c;
                     }
                 }
@@ -277,7 +213,7 @@ impl Heuristic {
             let mut winners: Vec<Card> = legal
                 .iter()
                 .copied()
-                .filter(|&c| Self::wins_over(c, w, ls, trump))
+                .filter(|&c| card_beats(c, w, ls, trump))
                 .collect();
             if !winners.is_empty() {
                 winners.sort(); // ascending; cheapest winning
@@ -378,23 +314,25 @@ impl AiPlayer for Heuristic {
             0 => {
                 // On lead: prefer lowest from our longest suit (keeps high cards).
                 let hand = &state.hand;
-                let mut by_suit: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
+                let mut by_suit: HashMap<Suit, Vec<Card>> = HashMap::new();
                 for c in hand {
-                    by_suit[Self::suit_index(c.suit)].push(*c);
+                    by_suit.entry(c.suit).or_default().push(*c);
                 }
-                let mut best_idx = 0usize;
-                for i in 1..4 {
-                    if by_suit[i].len() > by_suit[best_idx].len() {
-                        best_idx = i;
+
+                // Find the suit with the most cards
+                let best_suit = by_suit
+                    .iter()
+                    .max_by_key(|(_, cards)| cards.len())
+                    .map(|(suit, _)| *suit);
+
+                // If our longest suit is available to lead, use it
+                if let Some(suit) = best_suit {
+                    if let Some(card) = Self::lowest_in_suit(legal.iter(), suit) {
+                        return Ok(card);
                     }
                 }
-                // If our longest suit is not available to lead (e.g., all filtered out by
-                // legality for some edge rule), just pick overall lowest legal card.
-                if let Some(card) = Self::lowest_in_suit(legal.iter(), Suit::from_index(best_idx)) {
-                    card
-                } else {
-                    Self::lowest(&legal).unwrap_or(legal[0])
-                }
+                // Fallback: pick overall lowest legal card
+                Self::lowest(&legal).unwrap_or(legal[0])
             }
             _ => {
                 // When following: use bid-aware logic
@@ -407,13 +345,13 @@ impl AiPlayer for Heuristic {
                             if let Some(cur_winner) =
                                 state.current_trick_plays.first().map(|&(_, c)| c)
                             {
-                                if Self::wins_over(low, cur_winner, ls, trump) {
+                                if card_beats(low, cur_winner, ls, trump) {
                                     // This low card would still win - try even lower if available
                                     let mut sorted_legal = legal.to_vec();
                                     sorted_legal.sort();
                                     // Find the lowest card that wouldn't win
                                     for card in sorted_legal {
-                                        if !Self::wins_over(card, cur_winner, ls, trump) {
+                                        if !card_beats(card, cur_winner, ls, trump) {
                                             return Ok(card);
                                         }
                                     }
@@ -449,24 +387,5 @@ impl AiPlayer for Heuristic {
         };
 
         Ok(choice)
-    }
-}
-
-// Helper to map usize -> Suit when we built suit-indexed arrays.
-// Adjust if your Suit enum does not implement this conversion.
-trait SuitIndex {
-    fn from_index(i: usize) -> Suit;
-}
-impl SuitIndex for Suit {
-    fn from_index(i: usize) -> Suit {
-        // Assumes Suit discriminants/indexes are 0..=3 in a fixed order.
-        // If your enum differs, replace this match accordingly.
-        match i {
-            0 => Suit::Clubs,
-            1 => Suit::Diamonds,
-            2 => Suit::Hearts,
-            3 => Suit::Spades,
-            _ => unreachable!("invalid suit index"),
-        }
     }
 }

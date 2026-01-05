@@ -33,10 +33,12 @@
 //!
 //! Determinism:
 //! - No randomness used. `seed` is stored for future extensions (e.g., tie-breaking knobs).
+use std::collections::HashMap;
+
 use crate::ai::{AiError, AiPlayer};
 use crate::domain::player_view::{CurrentRoundInfo, GameHistory};
 use crate::domain::round_memory::{PlayMemory, RoundMemory};
-use crate::domain::{Card, GameContext, Rank, Suit, Trump};
+use crate::domain::{card_beats, Card, GameContext, Rank, Suit, Trump};
 
 #[derive(Clone)]
 pub struct Strategic {
@@ -69,15 +71,6 @@ impl Strategic {
 
     // ---------- Utilities (pure, small, deterministic) ----------
 
-    fn suit_index(suit: Suit) -> usize {
-        match suit {
-            Suit::Clubs => 0,
-            Suit::Diamonds => 1,
-            Suit::Hearts => 2,
-            Suit::Spades => 3,
-        }
-    }
-
     fn is_trump(card: &Card, trump: Trump) -> bool {
         matches!(
             (trump, card.suit),
@@ -86,16 +79,6 @@ impl Strategic {
                 | (Trump::Hearts, Suit::Hearts)
                 | (Trump::Spades, Suit::Spades)
         )
-    }
-
-    fn trump_suit(trump: Trump) -> Option<Suit> {
-        match trump {
-            Trump::NoTrumps => None,
-            Trump::Clubs => Some(Suit::Clubs),
-            Trump::Diamonds => Some(Suit::Diamonds),
-            Trump::Hearts => Some(Suit::Hearts),
-            Trump::Spades => Some(Suit::Spades),
-        }
     }
 
     /// High-card score of a suit: evaluates top 5 cards (10, J, Q, K, A).
@@ -151,23 +134,18 @@ impl Strategic {
         let hand = &state.hand;
         let n = hand.len().max(1);
 
-        // Counts by suit and capture cards per suit
-        let mut by_suit_cards: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
+        // Group cards by suit
+        let mut by_suit_cards: HashMap<Suit, Vec<Card>> = HashMap::new();
         for c in hand.iter() {
-            by_suit_cards[Self::suit_index(c.suit)].push(*c);
+            by_suit_cards.entry(c.suit).or_default().push(*c);
         }
-        let counts = [
-            by_suit_cards[0].len(),
-            by_suit_cards[1].len(),
-            by_suit_cards[2].len(),
-            by_suit_cards[3].len(),
-        ];
 
-        let longest = *counts.iter().max().unwrap_or(&0) as f32;
+        let counts: Vec<usize> = by_suit_cards.values().map(|v| v.len()).collect();
+        let longest = counts.iter().max().copied().unwrap_or(0) as f32;
 
         // High-card control proxy
         let mut hi = 0usize;
-        for v in &mut by_suit_cards {
+        for v in by_suit_cards.values_mut() {
             hi += Self::suit_high_score(v);
         }
         let hi_norm = hi as f32 / 6.0; // max 6 if two cards in each suit considered
@@ -198,23 +176,20 @@ impl Strategic {
         }
 
         // Count cards by suit
-        let mut by_suit_cards: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
+        let mut by_suit_cards: HashMap<Suit, Vec<Card>> = HashMap::new();
         for c in hand.iter() {
-            by_suit_cards[Self::suit_index(c.suit)].push(*c);
+            by_suit_cards.entry(c.suit).or_default().push(*c);
         }
-        let counts = [
-            by_suit_cards[0].len(),
-            by_suit_cards[1].len(),
-            by_suit_cards[2].len(),
-            by_suit_cards[3].len(),
-        ];
 
         // Factor 1: Void count (more voids → higher swinginess)
-        let void_count = counts.iter().filter(|&&c| c == 0).count() as f32;
+        // There are 4 suits total, so voids = 4 - suits_with_cards
+        let suits_with_cards = by_suit_cards.len();
+        let void_count = (4 - suits_with_cards) as f32;
         let void_difficulty = 1.0 + (void_count * 0.15); // +15% per void
 
         // Factor 2: Longest suit length (very long suits → forced wins late, harder to control)
-        let longest = *counts.iter().max().unwrap_or(&0) as f32;
+        let counts: Vec<usize> = by_suit_cards.values().map(|v| v.len()).collect();
+        let longest = counts.iter().max().copied().unwrap_or(0) as f32;
         let avg_suit_length = hand_size / 4.0;
         let length_difficulty = if longest > avg_suit_length * 1.5 {
             // Very long suit (e.g., 6+ in a 13-card hand) = harder to control
@@ -237,10 +212,12 @@ impl Strategic {
 
         // Factor 4: Suit balance vs extreme shapes
         // Extreme shapes (e.g., 7-3-2-1) are harder to control than balanced (4-3-3-3)
-        let variance = counts
+        // For suits with cards, use their count; for voids, use 0
+        let variance = [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
             .iter()
-            .map(|&c| {
-                let diff = c as f32 - avg_suit_length;
+            .map(|&suit| {
+                let count = by_suit_cards.get(&suit).map(|v| v.len()).unwrap_or(0) as f32;
+                let diff = count - avg_suit_length;
                 diff * diff
             })
             .sum::<f32>()
@@ -293,25 +270,29 @@ impl Strategic {
         }
 
         // Extremely balanced: no suit >= 4 and no suit <= 1 (all suits 2-3)
-        let mut counts = [0usize; 4];
+        let mut by_suit_counts: HashMap<Suit, usize> = HashMap::new();
         let mut total_aces_and_kings = 0;
 
         for c in hand {
-            counts[Self::suit_index(c.suit)] += 1;
+            *by_suit_counts.entry(c.suit).or_insert(0) += 1;
             if matches!(c.rank, Rank::Ace | Rank::King) {
                 total_aces_and_kings += 1;
             }
         }
 
-        let balanced = counts.iter().all(|&c| (2..=3).contains(&c));
+        let balanced = [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades]
+            .iter()
+            .all(|&suit| {
+                let count = by_suit_counts.get(&suit).copied().unwrap_or(0);
+                (2..=3).contains(&count)
+            });
         if !balanced {
             return false;
         }
 
         // Count unique suits with Ace or King
         let mut suits_with_ace_or_king = 0;
-        for suit_idx in 0..4 {
-            let suit = Suit::from_index(suit_idx);
+        for &suit in &[Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
             let has_ace_or_king = hand
                 .iter()
                 .any(|c| c.suit == suit && matches!(c.rank, Rank::Ace | Rank::King));
@@ -333,43 +314,6 @@ impl Strategic {
         }
 
         true
-    }
-
-    /// Compare trick cards: does `a` beat `b` given (lead, trump)?
-    /// - Any trump beats any non-trump.
-    /// - Within the same suit, higher rank (by `Ord`) wins.
-    /// - Off-suit non-trump cannot beat on-suit non-trump.
-    fn wins_over(a: Card, b: Card, lead: Suit, trump: Trump) -> bool {
-        let a_tr = Self::is_trump(&a, trump);
-        let b_tr = Self::is_trump(&b, trump);
-        if a_tr && !b_tr {
-            return true;
-        }
-        if !a_tr && b_tr {
-            return false;
-        }
-        // Neither or both are trumps -> compare within suit context
-        let trump_suit = Self::trump_suit(trump);
-        let a_s = if a_tr {
-            trump_suit.unwrap_or(a.suit)
-        } else {
-            a.suit
-        };
-        let b_s = if b_tr {
-            trump_suit.unwrap_or(b.suit)
-        } else {
-            b.suit
-        };
-
-        if a_s == b_s {
-            return a > b; // higher rank wins
-        }
-
-        // Different suits, neither is trump: only a that follows lead can beat b.
-        if a_s == lead && b_s != lead {
-            return true;
-        }
-        false
     }
 
     // ---------- Bid Target Tracking ----------
@@ -624,13 +568,13 @@ impl Strategic {
                 // Following suit: determine current winner from plays so far
                 let mut current_winner = current_plays[0].1;
                 for &(_, c) in &current_plays[1..] {
-                    if Self::wins_over(c, current_winner, lead, trump) {
+                    if card_beats(c, current_winner, lead, trump) {
                         current_winner = c;
                     }
                 }
 
                 // Check if our card beats the current winner
-                Self::wins_over(card, current_winner, lead, trump)
+                card_beats(card, current_winner, lead, trump)
             }
         }
     }
@@ -764,17 +708,17 @@ impl Strategic {
             // At or above bid: strongly avoid winning
             if lead_suit.is_none() {
                 // Leading: prefer lowest card from short/weak suit, avoid trump
-                let mut by_suit: [Vec<Card>; 4] = [vec![], vec![], vec![], vec![]];
+                let mut by_suit: HashMap<Suit, Vec<Card>> = HashMap::new();
                 for &c in legal {
-                    by_suit[Self::suit_index(c.suit)].push(c);
+                    by_suit.entry(c.suit).or_default().push(c);
                 }
 
                 // Prefer non-trump suits, sorted by length (shorter = weaker)
-                let mut suit_scores: Vec<(Suit, usize, bool)> = (0..4)
-                    .map(|i| {
-                        let suit = Suit::from_index(i);
-                        let is_trump_suit = Self::trump_suit(trump) == Some(suit);
-                        (suit, by_suit[i].len(), is_trump_suit)
+                let mut suit_scores: Vec<(Suit, usize, bool)> = by_suit
+                    .iter()
+                    .map(|(&suit, cards)| {
+                        let is_trump_suit = trump.try_into().ok() == Some(suit);
+                        (suit, cards.len(), is_trump_suit)
                     })
                     .collect();
 
@@ -789,7 +733,7 @@ impl Strategic {
 
                 // Try to find lowest card from shortest non-trump suit
                 for (suit, _, _is_trump) in suit_scores {
-                    if let Some(cards) = by_suit.get(Self::suit_index(suit)) {
+                    if let Some(cards) = by_suit.get(&suit) {
                         if !cards.is_empty() {
                             let mut suit_cards = cards.clone();
                             suit_cards.sort(); // ascending
@@ -807,7 +751,7 @@ impl Strategic {
                 let current_winner = if !current_plays.is_empty() {
                     let mut winner = current_plays[0].1;
                     for &(_, c) in &current_plays[1..] {
-                        if Self::wins_over(c, winner, lead, trump) {
+                        if card_beats(c, winner, lead, trump) {
                             winner = c;
                         }
                     }
@@ -821,7 +765,7 @@ impl Strategic {
                     let non_winners: Vec<Card> = legal
                         .iter()
                         .copied()
-                        .filter(|&c| !Self::wins_over(c, winner, lead, trump))
+                        .filter(|&c| !card_beats(c, winner, lead, trump))
                         .collect();
 
                     if !non_winners.is_empty() {
@@ -878,7 +822,7 @@ impl Strategic {
                 let current_winner = if !current_plays.is_empty() {
                     let mut winner = current_plays[0].1;
                     for &(_, c) in &current_plays[1..] {
-                        if Self::wins_over(c, winner, lead, trump) {
+                        if card_beats(c, winner, lead, trump) {
                             winner = c;
                         }
                     }
@@ -891,7 +835,7 @@ impl Strategic {
                     let winners: Vec<Card> = legal
                         .iter()
                         .copied()
-                        .filter(|&c| Self::wins_over(c, winner, lead, trump))
+                        .filter(|&c| card_beats(c, winner, lead, trump))
                         .collect();
 
                     if !winners.is_empty() {
@@ -1126,25 +1070,6 @@ impl AiPlayer for Strategic {
     }
 }
 
-// Helper to map usize -> Suit when we built suit-indexed arrays.
-// Adjust if your Suit enum does not implement this conversion.
-trait SuitIndex {
-    fn from_index(i: usize) -> Suit;
-}
-impl SuitIndex for Suit {
-    fn from_index(i: usize) -> Suit {
-        // Assumes Suit discriminants/indexes are 0..=3 in a fixed order.
-        // If your enum differs, replace this match accordingly.
-        match i {
-            0 => Suit::Clubs,
-            1 => Suit::Diamonds,
-            2 => Suit::Hearts,
-            3 => Suit::Spades,
-            _ => unreachable!("invalid suit index"),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1184,7 +1109,7 @@ mod tests {
                 let lead_suit = plays_with_cards[0].1.suit;
                 let mut winner = plays_with_cards[0];
                 for &(seat, card) in &plays_with_cards[1..] {
-                    if Strategic::wins_over(card, winner.1, lead_suit, trump_val) {
+                    if card_beats(card, winner.1, lead_suit, trump_val) {
                         winner = (seat, card);
                     }
                 }
