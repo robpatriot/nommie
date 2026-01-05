@@ -9,7 +9,7 @@ import {
   useUpdateAiSeat,
   useRemoveAiSeat,
 } from '@/hooks/mutations/useGameRoomMutations'
-import { queryKeys } from '@/lib/queries/query-keys'
+import { getGameVersionFromCache } from '@/lib/queries/game-snapshot-helpers'
 import type { ToastMessage } from '@/components/Toast'
 import type { BackendApiError } from '@/lib/errors'
 import { toQueryError } from '@/lib/queries/query-error-handler'
@@ -84,10 +84,7 @@ export function useAiSeatManagement({
       }
 
       // Read version directly from cache at request time to avoid stale closures
-      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(gameId)
-      )
-      const currentVersion = cachedSnapshot?.version
+      const currentVersion = getGameVersionFromCache(queryClient, gameId)
 
       if (currentVersion === undefined) {
         showToast(tErrors('versionRequired'), 'error')
@@ -136,10 +133,7 @@ export function useAiSeatManagement({
       }
 
       // Read version directly from cache at request time to avoid stale closures
-      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(gameId)
-      )
-      const currentVersion = cachedSnapshot?.version
+      const currentVersion = getGameVersionFromCache(queryClient, gameId)
 
       if (currentVersion === undefined) {
         showToast(tErrors('versionRequired'), 'error')
@@ -177,10 +171,7 @@ export function useAiSeatManagement({
       }
 
       // Read version directly from cache at request time to avoid stale closures
-      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(gameId)
-      )
-      const currentVersion = cachedSnapshot?.version
+      const currentVersion = getGameVersionFromCache(queryClient, gameId)
 
       if (currentVersion === undefined) {
         showToast(tErrors('versionRequired'), 'error')

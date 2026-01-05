@@ -2,7 +2,6 @@ import { useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import type { PhaseSnapshot, Trump } from '@/lib/game-room/types'
 import type { ToastMessage } from '@/components/Toast'
 import { isActiveGame } from '../game-room/phase-helpers'
@@ -13,8 +12,8 @@ import {
   useSelectTrump,
   useSubmitPlay,
 } from '@/hooks/mutations/useGameRoomMutations'
-import { queryKeys } from '@/lib/queries/query-keys'
 import { toQueryError } from '@/lib/queries/query-error-handler'
+import { getGameVersionFromCache } from '@/lib/queries/game-snapshot-helpers'
 import type { BackendApiError } from '@/lib/errors'
 
 interface UseGameRoomActionsProps {
@@ -102,10 +101,7 @@ export function useGameRoomActions({
       }
 
       // Read version directly from cache at request time to avoid stale closures
-      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(gameId)
-      )
-      const currentVersion = cachedSnapshot?.version
+      const currentVersion = getGameVersionFromCache(queryClient, gameId)
 
       if (currentVersion === undefined) {
         showToast(tErrors('versionRequiredBid'), 'error')
@@ -142,10 +138,7 @@ export function useGameRoomActions({
       }
 
       // Read version directly from cache at request time to avoid stale closures
-      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(gameId)
-      )
-      const currentVersion = cachedSnapshot?.version
+      const currentVersion = getGameVersionFromCache(queryClient, gameId)
 
       if (currentVersion === undefined) {
         showToast(tErrors('versionRequiredTrump'), 'error')
@@ -182,10 +175,7 @@ export function useGameRoomActions({
       }
 
       // Read version directly from cache at request time to avoid stale closures
-      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(gameId)
-      )
-      const currentVersion = cachedSnapshot?.version
+      const currentVersion = getGameVersionFromCache(queryClient, gameId)
 
       if (currentVersion === undefined) {
         showToast(tErrors('versionRequiredCard'), 'error')
@@ -242,10 +232,7 @@ export function useGameRoomActions({
 
     try {
       // Read version directly from cache at request time to avoid stale closures
-      const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(gameId)
-      )
-      const currentVersion = cachedSnapshot?.version
+      const currentVersion = getGameVersionFromCache(queryClient, gameId)
 
       if (currentVersion === undefined) {
         showToast(tErrors('versionRequired'), 'error')
