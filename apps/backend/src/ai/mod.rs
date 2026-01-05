@@ -75,6 +75,7 @@ mod config;
 mod heuristic;
 pub mod memory;
 mod random;
+mod reckoner;
 pub mod registry;
 mod strategic;
 mod trait_def;
@@ -83,6 +84,7 @@ pub use config::AiConfig;
 pub use heuristic::Heuristic;
 pub use memory::MemoryMode;
 pub use random::RandomPlayer;
+pub use reckoner::Reckoner;
 pub use strategic::Strategic;
 pub use trait_def::{AiError, AiPlayer};
 

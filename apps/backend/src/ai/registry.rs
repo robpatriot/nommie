@@ -6,7 +6,7 @@
 //! 4) Determinism: same seed ⇒ same behavior (where applicable).
 //! 5) Include profile metadata (display_name, playstyle, memory_level, etc.) in the factory.
 
-use crate::ai::{AiPlayer, Heuristic, RandomPlayer, Strategic};
+use crate::ai::{AiPlayer, Heuristic, RandomPlayer, Reckoner, Strategic};
 
 /// Factory definition for constructing AI implementations.
 pub struct AiFactory {
@@ -73,6 +73,19 @@ static AI_FACTORIES: &[AiFactory] = &[
             memory_level: Some(90),
         },
     },
+    AiFactory {
+        name: Reckoner::NAME,
+        version: Reckoner::VERSION,
+        make: make_reckoner,
+        profile: AiProfileDefaults {
+            variant: "default",
+            display_name: "Reckoner",
+            playstyle: Some("strategic"),
+            difficulty: None,
+            config: None,
+            memory_level: Some(90),
+        },
+    },
 ];
 
 /// Returns the statically registered AI factories.
@@ -95,6 +108,10 @@ fn make_heuristic(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
 
 fn make_strategic(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
     Box::new(Strategic::new(seed))
+}
+
+fn make_reckoner(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
+    Box::new(Reckoner::new(seed))
 }
 
 #[cfg(test)]
@@ -120,6 +137,10 @@ mod ai_registry_smoke {
             ais.iter().any(|factory| factory.name == Strategic::NAME),
             "Strategic factory should be present"
         );
+        assert!(
+            ais.iter().any(|factory| factory.name == Reckoner::NAME),
+            "Reckoner factory should be present"
+        );
     }
 
     #[test]
@@ -139,6 +160,7 @@ mod ai_registry_smoke {
         assert!(by_name(RandomPlayer::NAME).is_some());
         assert!(by_name(Heuristic::NAME).is_some());
         assert!(by_name(Strategic::NAME).is_some());
+        assert!(by_name(Reckoner::NAME).is_some());
         assert!(by_name("NotARealAI").is_none());
     }
 }
