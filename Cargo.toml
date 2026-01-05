@@ -4,6 +4,7 @@ members = [
     "apps/migration-cli",
     "packages/migration",
     "packages/backend-test-support", "packages/db-infra",
+    "packages/ai-simulator",
 ]
 resolver = "2"
 
