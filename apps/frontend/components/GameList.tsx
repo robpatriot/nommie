@@ -37,6 +37,7 @@ export default function GameList({
   const t = useTranslations('lobby.gameList')
   const tLobby = useTranslations('lobby')
   const [searchQuery, setSearchQuery] = useState('')
+  const [isMounted] = useState(true)
 
   const getStateLabel = (state: Game['state']): string => {
     return t(`gameStates.${state}`)
@@ -110,7 +111,9 @@ export default function GameList({
             const stateClass =
               stateClassNames[game.state] ?? 'bg-surface text-subtle'
             const actions = renderActions?.(game)
-            const relativeUpdated = formatRelativeTime(game.updated_at)
+            const relativeUpdated = isMounted
+              ? formatRelativeTime(game.updated_at)
+              : ''
             const seatsOpen = formatNumber(
               Math.max(game.max_players - game.player_count, 0),
               locale
