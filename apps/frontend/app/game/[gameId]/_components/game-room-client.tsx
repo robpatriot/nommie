@@ -189,14 +189,17 @@ export function GameRoomClient({
         onRefresh={() => void refreshSnapshot()}
         isRefreshing={isRefreshing}
         error={combinedError}
-        readyState={{
-          canReady: canMarkReady,
-          isPending: isReadyPending,
-          hasMarked: hasMarkedReady,
-          onReady: () => {
-            void markReady()
-          },
-        }}
+        readyState={useMemo(
+          () => ({
+            canReady: canMarkReady,
+            isPending: isReadyPending,
+            hasMarked: hasMarkedReady,
+            onReady: () => {
+              void markReady()
+            },
+          }),
+          [canMarkReady, isReadyPending, hasMarkedReady, markReady]
+        )}
         biddingState={biddingControls}
         trumpState={trumpControls}
         playState={playControls}

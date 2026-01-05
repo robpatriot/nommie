@@ -84,10 +84,7 @@ export default function LobbyClient({
   }, [allGames])
 
   const filteredJoinableGames = useMemo(() => {
-    const openGames = joinableGames.filter(
-      (game) => game.state === 'LOBBY' && game.player_count < game.max_players
-    )
-    return openGames.slice().sort(sortByUpdatedAtDesc)
+    return joinableGames.slice().sort(sortByUpdatedAtDesc)
   }, [joinableGames])
 
   const sortedInProgressGames = useMemo(() => {

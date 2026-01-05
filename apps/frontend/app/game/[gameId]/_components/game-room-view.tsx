@@ -166,20 +166,32 @@ export function GameRoomView({
     [setupSeatEntries]
   )
 
+  // Compute derived values from phase (pure functions)
   const trickMap = getCurrentTrickMap(phase)
   const historicalStats = getHistoricalStats(phase)
 
-  const seatSummaries = buildSeatSummaries({
+  const seatSummaries = useMemo(() => {
+    return buildSeatSummaries({
+      playerNames,
+      viewerSeat: effectiveViewerSeat ?? 0, // Use 0 as fallback for orientation calculation only
+      phase,
+      scores: snapshot.game.scores_total,
+      trickMap,
+      round,
+      activeSeat,
+      actualViewerSeat: effectiveViewerSeat, // Pass actual viewer seat separately for isViewer check
+      historicalStats,
+    })
+  }, [
     playerNames,
-    viewerSeat: effectiveViewerSeat ?? 0, // Use 0 as fallback for orientation calculation only
+    effectiveViewerSeat,
     phase,
-    scores: snapshot.game.scores_total,
+    snapshot.game.scores_total,
     trickMap,
     round,
     activeSeat,
-    actualViewerSeat: effectiveViewerSeat, // Pass actual viewer seat separately for isViewer check
     historicalStats,
-  })
+  ])
   const mobileSeatSummaries = useMemo(
     () =>
       seatSummaries
