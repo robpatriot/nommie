@@ -45,8 +45,7 @@
       "footer": "weiter spielen"
     },
     "resumeGame": {
-      "lastGame": "▶ Letztes Spiel",
-      "mostRecentGame": "▶ Neuestes Spiel"
+      "nextGame": "▶ Nächstes Spiel"
     }
   },
   "gameName": "Spiel {gameId}"

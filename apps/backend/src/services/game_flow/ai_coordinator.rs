@@ -11,7 +11,7 @@ use crate::repos::{bids, games, memberships, player_view, plays, rounds, tricks}
 
 /// Type of action needed from a player.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ActionType {
+pub(crate) enum ActionType {
     Bid,
     Trump,
     Play,
@@ -333,7 +333,7 @@ impl GameFlowService {
     ///
     /// Returns None if no action is needed (game complete or waiting).
     /// Returns Some((seat, action_type)) if an action is needed.
-    pub(super) async fn determine_next_action(
+    pub(crate) async fn determine_next_action(
         &self,
         txn: &DatabaseTransaction,
         game: &games::Game,

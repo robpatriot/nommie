@@ -44,6 +44,10 @@ export function useMarkPlayerReady() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(gameId),
       })
+      // Invalidate last active game so header button updates
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
+      })
     },
   })
 }
@@ -69,6 +73,10 @@ export function useLeaveGame() {
       // Invalidate game snapshot so it refreshes with updated state
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
+      })
+      // Invalidate last active game so header button updates
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
       })
     },
   })
@@ -163,6 +171,10 @@ export function useSubmitBid() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
       })
+      // Invalidate last active game so header button updates
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
+      })
     },
   })
 }
@@ -242,6 +254,10 @@ export function useSelectTrump() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
       })
+      // Invalidate last active game so header button updates
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
+      })
     },
   })
 }
@@ -320,6 +336,10 @@ export function useSubmitPlay() {
       // Invalidate game snapshot so it refreshes with updated state from backend
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
+      })
+      // Invalidate last active game so header button updates
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
       })
     },
   })

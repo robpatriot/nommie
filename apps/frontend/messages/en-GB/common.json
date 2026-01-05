@@ -45,8 +45,7 @@
       "footer": "play on"
     },
     "resumeGame": {
-      "lastGame": "▶ Last Game",
-      "mostRecentGame": "▶ Most Recent Game"
+      "nextGame": "▶ Next Game"
     }
   },
   "gameName": "Game {gameId}"

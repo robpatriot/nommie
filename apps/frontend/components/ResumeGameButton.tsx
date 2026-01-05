@@ -30,12 +30,8 @@ export default function ResumeGameButton({
     >
       {/* Arrow only - shown below 275px */}
       <span className="min-[275px]:hidden">▶</span>
-      {/* "Last Game" - shown between 275px and sm (640px) */}
-      <span className="hidden min-[275px]:inline sm:hidden">
-        {t('lastGame')}
-      </span>
-      {/* "Most Recent Game" - shown at sm (640px) and above */}
-      <span className="hidden sm:inline">{t('mostRecentGame')}</span>
+      {/* "Next Game" - shown at 275px and above */}
+      <span className="hidden min-[275px]:inline">{t('nextGame')}</span>
     </button>
   )
 }

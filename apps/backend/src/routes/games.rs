@@ -1157,9 +1157,9 @@ async fn list_overview_games(
 
 /// GET /api/games/last-active
 ///
-/// Returns the game ID of the most recently active game for the current user.
-/// "Most recently active" means the game with the highest updated_at timestamp
-/// among all games where the user is a member.
+/// Returns the game ID of the game that has been waiting for the user to act the longest.
+/// If no games are waiting for the user, returns the most recently active game
+/// (highest updated_at timestamp) where the user is a member.
 async fn get_last_active_game(
     http_req: HttpRequest,
     current_user: CurrentUser,

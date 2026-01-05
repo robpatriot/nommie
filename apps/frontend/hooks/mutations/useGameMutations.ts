@@ -30,6 +30,10 @@ export function useCreateGame() {
     onSuccess: () => {
       // Invalidate games list so it refreshes with the new game
       queryClient.invalidateQueries({ queryKey: queryKeys.games.lists() })
+      // Invalidate last active game so header button updates
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
+      })
     },
   })
 }
@@ -55,6 +59,10 @@ export function useJoinGame() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.detail(gameId),
       })
+      // Invalidate last active game so header button updates
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
+      })
     },
   })
 }
@@ -79,6 +87,10 @@ export function useSpectateGame() {
       queryClient.invalidateQueries({ queryKey: queryKeys.games.lists() })
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.detail(gameId),
+      })
+      // Invalidate last active game so header button updates
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.lastActive(),
       })
     },
   })

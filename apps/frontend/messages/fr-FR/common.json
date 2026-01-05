@@ -45,8 +45,7 @@
       "footer": "à vous de jouer"
     },
     "resumeGame": {
-      "lastGame": "▶ Dernière partie",
-      "mostRecentGame": "▶ Partie la plus récente"
+      "nextGame": "▶ Partie suivante"
     }
   },
   "gameName": "Partie {gameId}"
