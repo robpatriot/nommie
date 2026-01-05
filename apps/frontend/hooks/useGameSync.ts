@@ -6,6 +6,22 @@ import {
 } from '@/lib/config/env-validation'
 import { logError } from '@/lib/logging/error-logger'
 
+// Helper to get readable WebSocket readyState names
+function getReadyStateName(state: number): string {
+  switch (state) {
+    case WebSocket.CONNECTING:
+      return 'CONNECTING'
+    case WebSocket.OPEN:
+      return 'OPEN'
+    case WebSocket.CLOSING:
+      return 'CLOSING'
+    case WebSocket.CLOSED:
+      return 'CLOSED'
+    default:
+      return `UNKNOWN(${state})`
+  }
+}
+
 import {
   getGameRoomSnapshotAction,
   type GameRoomSnapshotPayload,
@@ -88,10 +104,18 @@ function cleanupWebSocket(
     clearTimeout(reconnectTimeout)
   }
   if (ws) {
-    // Close the connection - onclose will fire naturally
-    // The handler will check closeReasonRef to decide if reconnection is needed
-    // We don't null handlers here - that would prevent onclose from firing
-    ws.close(1000, 'Connection closed')
+    // Only close OPEN sockets - don't close CONNECTING sockets to avoid browser errors
+    // CONNECTING sockets will either:
+    // 1. Connect and then onopen handler will see generation mismatch and close it
+    // 2. Fail naturally and onerror/onclose handlers will see generation mismatch and ignore
+    // The generation token ensures stale connections don't affect state
+    if (ws.readyState === WebSocket.OPEN) {
+      // Close the connection - onclose will fire naturally
+      // The handler will check closeReasonRef to decide if reconnection is needed
+      // We don't null handlers here - that would prevent onclose from firing
+      ws.close(1000, 'Connection closed')
+    }
+    // For CONNECTING, CLOSING, or CLOSED states, let handlers clean up via generation checks
   }
 }
 
@@ -113,7 +137,9 @@ export function useGameSync({
   const reconnectAttemptsRef = useRef(0)
   const closeReasonRef = useRef<CloseReason | null>(null)
   const etagRef = useRef<string | undefined>(initialData.etag)
-  const isConnectingRef = useRef(false)
+  // Generation token: increments on each connection attempt and cleanup
+  // Stale handlers from previous effect runs check this and bail early
+  const genRef = useRef(0)
   const gameIdRef = useRef(gameId)
 
   // Message handler ref - updated on every render to always have latest
@@ -379,11 +405,15 @@ export function useGameSync({
   }, [])
 
   const connect = useCallback(async () => {
-    // Atomic check-and-set to prevent race conditions
-    if (isConnectingRef.current) {
+    // Check if we already have an active connection
+    const existingWs = wsRef.current
+    if (
+      existingWs &&
+      (existingWs.readyState === WebSocket.OPEN ||
+        existingWs.readyState === WebSocket.CONNECTING)
+    ) {
       return
     }
-    isConnectingRef.current = true
 
     try {
       // Reset reconnection attempts on manual connect (user-initiated retry)
@@ -398,15 +428,31 @@ export function useGameSync({
         state === 'disconnected' ? 'reconnecting' : 'connecting'
       )
 
-      const token = await fetchWsToken()
-      const wsBase = resolveWsUrl()
       const currentGameId = gameIdRef.current
+
+      const token = await fetchWsToken()
+
+      const wsBase = resolveWsUrl()
       const url = `${wsBase}/ws/games/${currentGameId}?token=${encodeURIComponent(token)}`
+
+      // Increment generation and capture it - this invalidates any previous connection attempts
+      genRef.current++
+      const myGen = genRef.current
+
       const ws = new WebSocket(url)
       wsRef.current = ws
 
       ws.onopen = () => {
-        isConnectingRef.current = false
+        // Generation check: if this handler is from a stale connection, ignore it
+        if (genRef.current !== myGen) {
+          ws.close()
+          // Clear ref if it still points to this stale socket
+          if (wsRef.current === ws) {
+            wsRef.current = null
+          }
+          return
+        }
+
         // Reset reconnection state on successful connection
         reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
         reconnectAttemptsRef.current = 0
@@ -415,18 +461,58 @@ export function useGameSync({
       }
 
       ws.onmessage = (event) => {
+        // Generation check: ignore messages from stale connections
+        if (genRef.current !== myGen) {
+          return
+        }
         handleMessageEventRef.current?.(event)
       }
 
-      ws.onerror = () => {
-        logError(
-          'WebSocket error event',
-          new Error('WebSocket connection error'),
-          {
-            gameId: gameIdRef.current,
-            url: ws.url,
+      ws.onerror = (event) => {
+        // Generation check: ignore errors from stale connections
+        if (genRef.current !== myGen) {
+          return
+        }
+
+        const wsUrl = ws.url?.replace(/token=[^&]+/, 'token=***') || 'unknown'
+        const wsReadyState = ws.readyState
+        const wsReadyStateName = getReadyStateName(wsReadyState)
+
+        // Only log errors if the WebSocket is not already closing/closed
+        // Errors during close are expected and not actionable
+        if (
+          wsReadyState === WebSocket.CLOSING ||
+          wsReadyState === WebSocket.CLOSED
+        ) {
+          return
+        }
+
+        // This is a real connection error - capture details
+        const errorDetails: Record<string, unknown> = {
+          gameId: currentGameId,
+          url: wsUrl,
+          readyState: wsReadyState,
+          readyStateName: wsReadyStateName,
+          eventType: event.type || 'error',
+          timestamp: new Date().toISOString(),
+        }
+
+        // Capture event target details if available
+        if (event.target) {
+          const target = event.target as WebSocket
+          errorDetails.eventTarget = {
+            readyState: target.readyState,
+            readyStateName: getReadyStateName(target.readyState),
+            url: target.url?.replace(/token=[^&]+/, 'token=***') || 'unknown',
+            protocol: target.protocol || 'none',
+            extensions: target.extensions || 'none',
           }
-        )
+        }
+
+        const errorMessage = `WebSocket connection error: gameId=${currentGameId}, readyState=${wsReadyStateName}, url=${wsUrl}`
+
+        logError(errorMessage, new Error(errorMessage), errorDetails)
+
         setSyncError({
           message: 'Websocket connection error',
           traceId: undefined,
@@ -434,8 +520,15 @@ export function useGameSync({
       }
 
       // Thin event handler - just notifies owner, doesn't make policy decisions
-      ws.onclose = () => {
-        isConnectingRef.current = false
+      ws.onclose = (_event) => {
+        // Generation check: ignore close events from stale connections
+        // But still clear the ref if it points to this socket to avoid leaks
+        if (genRef.current !== myGen) {
+          if (wsRef.current === ws) {
+            wsRef.current = null
+          }
+          return
+        }
 
         // If this is still the current connection, clear it
         if (wsRef.current === ws) {
@@ -458,7 +551,7 @@ export function useGameSync({
         }
       }
     } catch (error) {
-      isConnectingRef.current = false
+      const currentGameId = gameIdRef.current
       const normalizedError =
         error instanceof Error
           ? error
@@ -468,7 +561,11 @@ export function useGameSync({
                 : 'Failed to establish realtime connection'
             )
       logError('Failed to establish realtime connection', normalizedError, {
-        gameId: gameIdRef.current,
+        gameId: currentGameId,
+        originalErrorType:
+          error instanceof Error ? error.constructor.name : typeof error,
+        originalErrorMessage:
+          error instanceof Error ? error.message : String(error),
       })
       setSyncError({
         message: normalizedError.message,
@@ -485,13 +582,16 @@ export function useGameSync({
     scheduleReconnect,
     closeExistingConnection,
     shouldReconnect,
+    // Note: connectionState is intentionally NOT in deps - we use it only for logging
+    // and don't want to recreate connect when it changes
   ])
 
   // Store connect function in ref for use in onclose handler
   connectRef.current = connect
 
   const disconnect = useCallback(() => {
-    isConnectingRef.current = false
+    // Increment generation to invalidate any in-flight connection
+    genRef.current++
     // Reset reconnection attempts on manual disconnect
     reconnectAttemptsRef.current = 0
     setReconnectAttempts(0)
@@ -507,30 +607,46 @@ export function useGameSync({
   useEffect(() => {
     // Update ref immediately (synchronous)
     const previousGameId = gameIdRef.current
+    const gameIdChanged = previousGameId !== gameId
     gameIdRef.current = gameId
 
     // Determine close reason based on context
-    const closeReason: CloseReason =
-      previousGameId !== gameId ? 'gameIdChange' : 'unmount'
+    const closeReason: CloseReason = gameIdChanged ? 'gameIdChange' : 'unmount'
 
     // Reset reconnection attempts when gameId changes (new connection)
-    if (previousGameId !== gameId) {
+    if (gameIdChanged) {
       reconnectAttemptsRef.current = 0
       setReconnectAttempts(0)
       reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
+
+      // Close existing connection if gameId changed
+      const existingWs = wsRef.current
+      if (existingWs) {
+        closeReasonRef.current = 'gameIdChange'
+        cleanupWebSocket(existingWs, reconnectTimeoutRef.current)
+      }
     }
 
-    // Create connection for new gameId
+    // Simply call connect() - it will check for existing connections internally
     void connect()
 
     return () => {
-      // Cleanup on unmount or gameId change
-      isConnectingRef.current = false
+      // Increment generation to invalidate any in-flight connection from this effect run
+      // Note: We intentionally mutate genRef.current here - we want to increment it, not copy it
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      genRef.current++
+
       // Set close reason - onclose handler will read and reset it
       closeReasonRef.current = closeReason
+
+      // Close and clear the socket
       const ws = wsRef.current
-      cleanupWebSocket(ws, reconnectTimeoutRef.current)
-      // Let onclose handler clear wsRef.current via its check
+      if (ws) {
+        cleanupWebSocket(ws, reconnectTimeoutRef.current)
+        wsRef.current = null
+      }
+
+      // Clear reconnect timer
       reconnectTimeoutRef.current = null
     }
   }, [gameId, connect])
