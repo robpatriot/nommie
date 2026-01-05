@@ -101,6 +101,7 @@
     "failedToRefreshGamesList": "Impossibile aggiornare l'elenco delle partite",
     "failedToCreateGame": "Impossibile creare la partita",
     "failedToJoinGame": "Impossibile unirsi alla partita",
+    "failedToSpectateGame": "Impossibile guardare la partita",
     "failedToDeleteGame": "Impossibile eliminare la partita",
     "failedToFetchGameHistory": "Impossibile caricare la cronologia della partita",
     "failedToUpdateSettings": "Impossibile aggiornare le impostazioni"

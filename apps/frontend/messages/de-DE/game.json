@@ -1,6 +1,7 @@
 {
   "gameRoom": {
     "you": "Du",
+    "spectatorBanner": "Du schaust diesem Spiel als Zuschauer zu",
     "orientation": {
       "top": "Oben",
       "left": "Links",
@@ -119,8 +120,10 @@
       "subtitle": "Alle Gebote bleiben unten sichtbar.",
       "turn": {
         "yourTurn": "Du bist dran",
-        "waiting": "Warten"
+        "waiting": "Warten",
+        "waitingFor": "Warten auf {name}"
       },
+      "subtitleSpectator": "{name} bietet. Alle Gebote bleiben unten sichtbar.",
       "yourBidLabel": "Dein Gebot",
       "bidValueAria": "Gebotswert",
       "submit": {

@@ -33,7 +33,8 @@
     "delete": "Supprimer",
     "goToGame": "Aller à la partie",
     "join": "Rejoindre",
-    "rejoin": "Rejoindre à nouveau"
+    "rejoin": "Rejoindre à nouveau",
+    "watch": "Regarder"
   },
   "lists": {
     "actionsLabel": "Commandes",
@@ -102,6 +103,10 @@
     "gameFilledUp": "Cette table vient de se remplir. Choisissez-en une autre.",
     "joinedSuccess": "Partie rejointe avec succès !",
     "joinFailed": "Impossible de rejoindre la partie",
+    "spectatedSuccess": "Vous regardez maintenant la partie !",
+    "spectateFailed": "Impossible de regarder la partie",
+    "spectatePrivateGame": "Seules les parties publiques peuvent être regardées",
+    "alreadyMember": "Vous êtes déjà membre de cette partie",
     "deleteFailed": "Impossible de supprimer la partie",
     "deleteMissingVersion": "Suppression impossible : informations de version manquantes. Veuillez réessayer.",
     "deleteConflict": "Suppression impossible : la partie a été modifiée. Actualisez puis réessayez.",

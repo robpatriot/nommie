@@ -33,7 +33,8 @@
     "delete": "Löschen",
     "goToGame": "Zum Spiel",
     "join": "Beitreten",
-    "rejoin": "Wieder beitreten"
+    "rejoin": "Wieder beitreten",
+    "watch": "Zuschauen"
   },
   "lists": {
     "actionsLabel": "Aktionen",
@@ -102,6 +103,10 @@
     "gameFilledUp": "Dieser Tisch wurde gerade voll. Bitte wähle einen anderen.",
     "joinedSuccess": "Spiel erfolgreich beigetreten!",
     "joinFailed": "Beitritt zum Spiel fehlgeschlagen",
+    "spectatedSuccess": "Spiel wird jetzt beobachtet!",
+    "spectateFailed": "Beobachten des Spiels fehlgeschlagen",
+    "spectatePrivateGame": "Nur öffentliche Spiele können beobachtet werden",
+    "alreadyMember": "Du bist bereits Mitglied dieses Spiels",
     "deleteFailed": "Spiel konnte nicht gelöscht werden",
     "deleteMissingVersion": "Löschen nicht möglich: Versionsinformationen fehlen. Bitte erneut versuchen.",
     "deleteConflict": "Löschen nicht möglich: Das Spiel wurde geändert. Bitte aktualisieren und erneut versuchen.",

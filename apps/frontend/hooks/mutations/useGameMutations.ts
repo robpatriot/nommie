@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   createGameAction,
   joinGameAction,
+  spectateGameAction,
   deleteGameAction,
 } from '@/app/actions/game-actions'
 import { handleActionResultError } from '@/lib/queries/query-error-handler'
@@ -43,6 +44,31 @@ export function useJoinGame() {
   return useMutation({
     mutationFn: async (gameId: number): Promise<Game> => {
       const result = await joinGameAction(gameId)
+      if (result.kind === 'error') {
+        throw handleActionResultError(result)
+      }
+      return result.data
+    },
+    onSuccess: (data, gameId) => {
+      // Invalidate games list and the specific game detail
+      queryClient.invalidateQueries({ queryKey: queryKeys.games.lists() })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.detail(gameId),
+      })
+    },
+  })
+}
+
+/**
+ * Mutation hook to spectate a game.
+ * Invalidates games list and specific game detail cache on success.
+ */
+export function useSpectateGame() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (gameId: number): Promise<Game> => {
+      const result = await spectateGameAction(gameId)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }

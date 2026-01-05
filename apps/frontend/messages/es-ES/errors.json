@@ -101,6 +101,7 @@
     "failedToRefreshGamesList": "Error al actualizar la lista de partidas",
     "failedToCreateGame": "Error al crear la partida",
     "failedToJoinGame": "Error al unirse a la partida",
+    "failedToSpectateGame": "Error al ver la partida",
     "failedToDeleteGame": "Error al eliminar la partida",
     "failedToFetchGameHistory": "Error al cargar el historial de la partida",
     "failedToUpdateSettings": "Error al actualizar la configuración"

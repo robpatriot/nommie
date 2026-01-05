@@ -114,6 +114,9 @@ export function GameRoomView({
   // If viewerSeat is undefined/null, no seat will be marked as "viewer".
   const effectiveViewerSeat = normalizeViewerSeat(viewerSeat)
 
+  // Determine if viewer is a spectator (no seat assigned)
+  const isSpectator = effectiveViewerSeat === null
+
   const tYou = t('you')
   const tStatusWaiting = t('status.waiting')
   const seatDisplayName = useCallback(
@@ -334,7 +337,7 @@ export function GameRoomView({
 
   useLayoutEffect(() => {
     const viewport = playerHandViewportRef.current
-    if (!viewport) {
+    if (!viewport || viewerHand.length === 0) {
       return
     }
 
@@ -525,6 +528,12 @@ export function GameRoomView({
             }
           />
 
+          {isSpectator ? (
+            <div className="mt-6 rounded-2xl border border-primary/60 bg-primary/10 px-4 py-3 text-sm text-primary-foreground">
+              <p className="font-semibold">{t('spectatorBanner')}</p>
+            </div>
+          ) : null}
+
           <span className="sr-only">{phaseState.phaseName}</span>
 
           {error ? (
@@ -630,6 +639,11 @@ export function GameRoomView({
   return (
     <div className="flex flex-col text-foreground">
       <PageContainer className="pb-16">
+        {isSpectator ? (
+          <div className="mb-6 rounded-2xl border border-primary/60 bg-primary/10 px-4 py-3 text-sm text-primary-foreground">
+            <p className="font-semibold">{t('spectatorBanner')}</p>
+          </div>
+        ) : null}
         <div className="grid gap-6 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px]">
           <section
             className={cn(
@@ -691,25 +705,27 @@ export function GameRoomView({
                 onPauseStateChange={handlePauseStateChange}
               />
             </div>
-            <PlayerHand
-              viewerHand={viewerHand}
-              phase={phase}
-              playerNames={playerNames}
-              viewerSeat={effectiveViewerSeat ?? 0}
-              playState={effectivePlayState}
-              selectedCard={selectedCard}
-              onSelectCard={setSelectedCard}
-              onPlayCard={handlePlayCard}
-              requireCardConfirmation={requireCardConfirmation}
-              layoutVariant="scaled"
-              viewportRef={playerHandViewportRef}
-            />
+            {effectiveViewerSeat !== null && viewerHand.length > 0 && (
+              <PlayerHand
+                viewerHand={viewerHand}
+                phase={phase}
+                playerNames={playerNames}
+                viewerSeat={effectiveViewerSeat}
+                playState={effectivePlayState}
+                selectedCard={selectedCard}
+                onSelectCard={setSelectedCard}
+                onPlayCard={handlePlayCard}
+                requireCardConfirmation={requireCardConfirmation}
+                layoutVariant="scaled"
+                viewportRef={playerHandViewportRef}
+              />
+            )}
           </section>
 
           <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
             <PlayerActions
               phase={phase}
-              viewerSeat={effectiveViewerSeat ?? 0}
+              viewerSeat={effectiveViewerSeat}
               playerNames={playerNames}
               bidding={biddingState}
               trump={trumpState}

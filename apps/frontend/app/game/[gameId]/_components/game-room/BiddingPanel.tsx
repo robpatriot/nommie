@@ -22,7 +22,7 @@ import type { GameRoomViewProps } from '../game-room-view'
 
 interface BiddingPanelProps {
   phase: BiddingSnapshot
-  viewerSeat: Seat
+  viewerSeat: Seat | null
   layoutSeat: Seat
   playerNames: [string, string, string, string]
   bidding: NonNullable<GameRoomViewProps['biddingState']>
@@ -47,15 +47,18 @@ export function BiddingPanel({
   const minBid = phase.min_bid
   const maxBid = phase.max_bid
   const handSize = phase.round.hand_size
-  const viewerBid = phase.bids[viewerSeat] ?? null
+  const isSpectator = viewerSeat === null
+  const viewerBid =
+    viewerSeat !== null ? (phase.bids[viewerSeat] ?? null) : null
   const zeroBidLocked = bidding.zeroBidLocked ?? false
   const isViewerTurn =
-    isTrumpMode && trumpPhase
+    !isSpectator &&
+    (isTrumpMode && trumpPhase
       ? trumpPhase.to_act === viewerSeat
-      : phase.to_act === viewerSeat
+      : phase.to_act === viewerSeat)
   const activeName = getPlayerDisplayName(
     isTrumpMode && trumpPhase ? trumpPhase.to_act : phase.to_act,
-    viewerSeat,
+    viewerSeat, // Pass null for spectators so it never matches and shows actual player name
     playerNames,
     tYou('you')
   )
@@ -114,7 +117,7 @@ export function BiddingPanel({
     () =>
       ([0, 1, 2, 3] as const).map((seat) => ({
         seat,
-        name: getPlayerDisplayName(seat, viewerSeat, playerNames, tYou('you')),
+        name: getPlayerDisplayName(seat, viewerSeat, playerNames, tYou('you')), // Pass null for spectators
         bid: phase.bids[seat],
         orientation: getOrientation(layoutSeat, seat),
       })),
@@ -125,7 +128,7 @@ export function BiddingPanel({
     const remainingNullBids = phase.bids.filter((bid) => bid === null).length
     const sumOfOtherBids = phase.bids.reduce<number>(
       (total, bid, seatIndex) => {
-        if (seatIndex === viewerSeat) {
+        if (viewerSeat !== null && seatIndex === viewerSeat) {
           return total
         }
         return total + (bid ?? 0)
@@ -293,10 +296,14 @@ export function BiddingPanel({
           </h2>
           <p className={`text-xs ${textColor}/80`}>
             {isTrumpMode
-              ? isViewerTurn
-                ? tTrump('description')
-                : tTrump('waitingForPlayerDescription', { name: activeName })
-              : t('subtitle')}
+              ? isSpectator
+                ? tTrump('waitingForPlayerDescription', { name: activeName })
+                : isViewerTurn
+                  ? tTrump('description')
+                  : tTrump('waitingForPlayerDescription', { name: activeName })
+              : isSpectator
+                ? t('subtitleSpectator', { name: activeName })
+                : t('subtitle')}
           </p>
         </div>
         <div
@@ -313,15 +320,19 @@ export function BiddingPanel({
           <span
             className={`text-[10px] font-semibold uppercase tracking-[0.3em] ${textColor}/80`}
           >
-            {isViewerTurn
+            {isSpectator
               ? isTrumpMode
-                ? tTrump('submit.confirm')
-                : t('turn.yourTurn')
-              : isTrumpMode
                 ? tTrump('submit.waitingFor', { name: activeName })
-                : t('turn.waiting')}
+                : t('turn.waitingFor', { name: activeName })
+              : isViewerTurn
+                ? isTrumpMode
+                  ? tTrump('submit.confirm')
+                  : t('turn.yourTurn')
+                : isTrumpMode
+                  ? tTrump('submit.waitingFor', { name: activeName })
+                  : t('turn.waiting')}
           </span>
-          {!isViewerTurn && !isTrumpMode && (
+          {!isViewerTurn && !isTrumpMode && !isSpectator && (
             <span className={`text-sm font-bold ${textColor}/90`}>
               {activeName}
             </span>
@@ -329,10 +340,10 @@ export function BiddingPanel({
         </div>
       </header>
 
-      {/* Only show form if:
+      {/* Only show form if viewer is a player (not spectator) and:
           - Bidding mode: user hasn't submitted their bid yet (viewerBid === null)
           - Trump mode: it's the viewer's turn to select trump (canSelectTrump) */}
-      {(isTrumpMode ? canSelectTrump : viewerBid === null) && (
+      {!isSpectator && (isTrumpMode ? canSelectTrump : viewerBid === null) && (
         <form
           className={`flex flex-col gap-3 rounded-2xl border bg-surface/85 p-4 shadow-inner ${
             isTrumpMode

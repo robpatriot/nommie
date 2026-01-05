@@ -101,6 +101,7 @@
     "failedToRefreshGamesList": "Échec de l'actualisation de la liste des parties",
     "failedToCreateGame": "Échec de la création de la partie",
     "failedToJoinGame": "Échec de la jonction à la partie",
+    "failedToSpectateGame": "Échec du visionnage de la partie",
     "failedToDeleteGame": "Échec de la suppression de la partie",
     "failedToFetchGameHistory": "Échec du chargement de l’historique de la partie",
     "failedToUpdateSettings": "Échec de la mise à jour des paramètres"

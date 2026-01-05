@@ -1,6 +1,7 @@
 {
   "gameRoom": {
     "you": "You",
+    "spectatorBanner": "You are viewing this game as a spectator",
     "orientation": {
       "top": "Top",
       "left": "Left",
@@ -119,8 +120,10 @@
       "subtitle": "Everyone's bids stay visible below.",
       "turn": {
         "yourTurn": "Your turn",
-        "waiting": "Waiting"
+        "waiting": "Waiting",
+        "waitingFor": "Waiting for {name}"
       },
+      "subtitleSpectator": "{name} is bidding. Everyone's bids stay visible below.",
       "yourBidLabel": "Your bid",
       "bidValueAria": "Bid value",
       "submit": {

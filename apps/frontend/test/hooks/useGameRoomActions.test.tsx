@@ -116,6 +116,7 @@ describe('useGameRoomActions', () => {
             disconnect: mockDisconnect,
             connect: mockConnect,
             phase: { phase: 'Init' },
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -147,6 +148,7 @@ describe('useGameRoomActions', () => {
               phase: 'Bidding',
               data: createBiddingPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -175,6 +177,7 @@ describe('useGameRoomActions', () => {
             disconnect: mockDisconnect,
             connect: mockConnect,
             phase: { phase: 'Init' },
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -209,6 +212,7 @@ describe('useGameRoomActions', () => {
               phase: 'Bidding',
               data: createBiddingPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -244,6 +248,7 @@ describe('useGameRoomActions', () => {
               phase: 'Bidding',
               data: createBiddingPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -279,6 +284,7 @@ describe('useGameRoomActions', () => {
               phase: 'Bidding',
               data: createBiddingPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -313,6 +319,7 @@ describe('useGameRoomActions', () => {
               phase: 'TrumpSelect',
               data: createTrumpPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -349,6 +356,7 @@ describe('useGameRoomActions', () => {
               phase: 'TrumpSelect',
               data: createTrumpPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -383,6 +391,7 @@ describe('useGameRoomActions', () => {
               phase: 'Trick',
               data: createTrickPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -419,6 +428,7 @@ describe('useGameRoomActions', () => {
               phase: 'Trick',
               data: createTrickPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -450,6 +460,7 @@ describe('useGameRoomActions', () => {
             disconnect: mockDisconnect,
             connect: mockConnect,
             phase: { phase: 'Init' },
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -486,6 +497,7 @@ describe('useGameRoomActions', () => {
               phase: 'Bidding',
               data: createBiddingPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -518,6 +530,7 @@ describe('useGameRoomActions', () => {
               phase: 'Bidding',
               data: createBiddingPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -548,6 +561,7 @@ describe('useGameRoomActions', () => {
             disconnect: mockDisconnect,
             connect: mockConnect,
             phase: { phase: 'Init' },
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),
@@ -589,6 +603,7 @@ describe('useGameRoomActions', () => {
               phase: 'Bidding',
               data: createBiddingPhase(),
             } as PhaseSnapshot,
+            viewerSeat: 0,
           }),
         {
           wrapper: createWrapper(queryClient),

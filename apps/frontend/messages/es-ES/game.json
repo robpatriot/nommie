@@ -1,6 +1,7 @@
 {
   "gameRoom": {
     "you": "Tú",
+    "spectatorBanner": "Estás viendo esta partida como espectador",
     "orientation": {
       "top": "Arriba",
       "left": "Izquierda",
@@ -119,8 +120,10 @@
       "subtitle": "Las pujas de todos se muestran abajo.",
       "turn": {
         "yourTurn": "Tu turno",
-        "waiting": "En espera"
+        "waiting": "En espera",
+        "waitingFor": "Esperando a {name}"
       },
+      "subtitleSpectator": "{name} está pujando. Las pujas de todos se muestran abajo.",
       "yourBidLabel": "Tu puja",
       "bidValueAria": "Valor de puja",
       "submit": {

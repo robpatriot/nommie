@@ -14,6 +14,7 @@ import { useAvailableGames } from '@/hooks/queries/useGames'
 import {
   useCreateGame,
   useJoinGame,
+  useSpectateGame,
   useDeleteGame,
 } from '@/hooks/mutations/useGameMutations'
 import type { Game } from '@/lib/types'
@@ -63,6 +64,7 @@ export default function LobbyClient({
   // Mutations
   const createGameMutation = useCreateGame()
   const joinGameMutation = useJoinGame()
+  const spectateGameMutation = useSpectateGame()
   const deleteGameMutation = useDeleteGame()
 
   // Split games into joinable and in-progress
@@ -160,6 +162,33 @@ export default function LobbyClient({
 
   const handleRejoin = (gameId: number) => {
     router.push(`/game/${gameId}`)
+  }
+
+  const handleSpectate = async (gameId: number) => {
+    try {
+      await spectateGameMutation.mutateAsync(gameId)
+      showToast(t('toasts.spectatedSuccess'), 'success')
+      router.push(`/game/${gameId}`)
+    } catch (error) {
+      const backendError = toQueryError(error, t('toasts.spectateFailed'))
+
+      // Customize error message for specific error codes
+      let message = backendError.message
+      if (backendError.status === 403 && backendError.code === 'FORBIDDEN') {
+        message = t('toasts.spectatePrivateGame')
+      } else if (
+        backendError.status === 409 &&
+        backendError.code === 'CONFLICT'
+      ) {
+        message = t('toasts.alreadyMember')
+      }
+
+      showToast(message, 'error', backendError)
+      logBackendError('Spectate game failed', backendError, {
+        action: 'spectateGame',
+        gameId,
+      })
+    }
   }
 
   const handleDelete = async (gameId: number) => {
@@ -304,6 +333,18 @@ export default function LobbyClient({
                     {t('actions.join')}
                   </button>
                 )
+                // Show Watch button for public games
+                if (game.visibility === 'PUBLIC') {
+                  actions.push(
+                    <button
+                      key="watch"
+                      onClick={() => handleSpectate(game.id)}
+                      className="rounded-full border border-primary/60 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                    >
+                      {t('actions.watch')}
+                    </button>
+                  )
+                }
               } else if (game.player_count >= game.max_players) {
                 actions.push(
                   <span
@@ -313,6 +354,18 @@ export default function LobbyClient({
                     {t('labels.fullTable')}
                   </span>
                 )
+                // Show Watch button for public full games
+                if (game.visibility === 'PUBLIC') {
+                  actions.push(
+                    <button
+                      key="watch"
+                      onClick={() => handleSpectate(game.id)}
+                      className="rounded-full border border-primary/60 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                    >
+                      {t('actions.watch')}
+                    </button>
+                  )
+                }
               }
 
               return actions.length > 0 ? (
@@ -349,6 +402,17 @@ export default function LobbyClient({
                     className="rounded-full bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow shadow-primary/30 transition hover:bg-primary"
                   >
                     {t('actions.rejoin')}
+                  </button>
+                )
+              } else if (game.visibility === 'PUBLIC') {
+                // Show Watch button for public games user is not a member of
+                actions.push(
+                  <button
+                    key="watch"
+                    onClick={() => handleSpectate(game.id)}
+                    className="rounded-full border border-primary/60 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                  >
+                    {t('actions.watch')}
                   </button>
                 )
               }

@@ -33,7 +33,8 @@
     "delete": "Delete",
     "goToGame": "Go to game",
     "join": "Join",
-    "rejoin": "Rejoin"
+    "rejoin": "Rejoin",
+    "watch": "Watch"
   },
   "lists": {
     "actionsLabel": "Actions",
@@ -102,6 +103,10 @@
     "gameFilledUp": "That game just filled up. Please choose another one.",
     "joinedSuccess": "Joined game successfully!",
     "joinFailed": "Failed to join game",
+    "spectatedSuccess": "Now spectating game!",
+    "spectateFailed": "Failed to spectate game",
+    "spectatePrivateGame": "Only public games can be spectated",
+    "alreadyMember": "You are already a member of this game",
     "deleteFailed": "Failed to delete game",
     "deleteMissingVersion": "Cannot delete game: missing version information. Please try again.",
     "deleteConflict": "Cannot delete game: game was modified. Please refresh and try again.",

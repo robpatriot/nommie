@@ -101,6 +101,7 @@
     "failedToRefreshGamesList": "Spielliste konnte nicht aktualisiert werden",
     "failedToCreateGame": "Spiel konnte nicht erstellt werden",
     "failedToJoinGame": "Spiel konnte nicht beigetreten werden",
+    "failedToSpectateGame": "Spiel konnte nicht beobachtet werden",
     "failedToDeleteGame": "Spiel konnte nicht gelöscht werden",
     "failedToFetchGameHistory": "Spielverlauf konnte nicht geladen werden",
     "failedToUpdateSettings": "Einstellungen konnten nicht aktualisiert werden"

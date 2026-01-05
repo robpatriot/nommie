@@ -142,6 +142,7 @@ export function GameRoomClient({
     disconnect,
     connect,
     phase,
+    viewerSeat: viewerSeatForInteractions,
   })
 
   // Game room controls

@@ -127,7 +127,8 @@ describe('useGameRoomReadyState', () => {
       )
 
       expect(result.current.hasMarkedReady).toBe(false)
-      expect(result.current.canMarkReady).toBe(true)
+      // Spectators (null viewerSeat) cannot mark ready
+      expect(result.current.canMarkReady).toBe(false)
     })
 
     it('does not sync when not in Init phase', () => {

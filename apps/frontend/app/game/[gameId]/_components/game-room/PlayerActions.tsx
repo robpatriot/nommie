@@ -16,7 +16,7 @@ import {
 
 interface PlayerActionsProps {
   phase: PhaseSnapshot
-  viewerSeat: Seat
+  viewerSeat: Seat | null
   playerNames: [string, string, string, string]
   bidding?: GameRoomViewProps['biddingState']
   trump?: GameRoomViewProps['trumpState']
@@ -25,11 +25,12 @@ interface PlayerActionsProps {
 }
 
 // Create a minimal bidding state fallback for viewing bids when no active bidding state exists
+// For spectators (viewerSeat === null), use seat 0 as a placeholder for layout purposes only
 function createBiddingStateFallback(
-  viewerSeat: Seat
+  viewerSeat: Seat | null
 ): NonNullable<GameRoomViewProps['biddingState']> {
   return {
-    viewerSeat: viewerSeat,
+    viewerSeat: viewerSeat ?? 0, // Use 0 as placeholder for spectators (layout only)
     isPending: false,
     onSubmit: async () => {},
     zeroBidLocked: false,
@@ -54,8 +55,8 @@ export function PlayerActions({
     return (
       <BiddingPanel
         phase={phase.data}
-        viewerSeat={biddingState.viewerSeat}
-        layoutSeat={viewerSeat}
+        viewerSeat={viewerSeat}
+        layoutSeat={viewerSeat ?? 0}
         playerNames={playerNames}
         bidding={biddingState}
       />
@@ -82,8 +83,8 @@ export function PlayerActions({
     return (
       <BiddingPanel
         phase={biddingSnapshot}
-        viewerSeat={biddingState.viewerSeat}
-        layoutSeat={viewerSeat}
+        viewerSeat={viewerSeat}
+        layoutSeat={viewerSeat ?? 0}
         playerNames={playerNames}
         bidding={biddingState}
         trumpPhase={phase.data}
@@ -97,7 +98,7 @@ export function PlayerActions({
       <LastTrick
         lastTrick={lastTrick ?? null}
         getSeatName={seatDisplayName}
-        viewerSeat={viewerSeat}
+        viewerSeat={viewerSeat ?? 0}
       />
     )
   }

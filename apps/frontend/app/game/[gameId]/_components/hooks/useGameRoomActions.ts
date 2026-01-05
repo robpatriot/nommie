@@ -30,6 +30,7 @@ interface UseGameRoomActionsProps {
   disconnect: () => void
   connect: () => Promise<void>
   phase: PhaseSnapshot
+  viewerSeat: number | null
 }
 
 /**
@@ -45,6 +46,7 @@ export function useGameRoomActions({
   disconnect,
   connect,
   phase,
+  viewerSeat,
 }: UseGameRoomActionsProps) {
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -218,11 +220,14 @@ export function useGameRoomActions({
       return
     }
 
+    // Spectators don't need confirmation (no seat to replace)
+    const isSpectator = viewerSeat === null
+
     // Check if game is active (not in Init/Lobby phase)
     const gameIsActive = isActiveGame(phase)
 
-    // If game is active, show confirmation dialog
-    if (gameIsActive) {
+    // If game is active and user is a player (not spectator), show confirmation dialog
+    if (gameIsActive && !isSpectator) {
       const confirmed = window.confirm(
         tErrors('leaveActiveGameConfirmation') ||
           'Are you sure you want to leave? An AI will take over your seat and continue playing.'
@@ -275,6 +280,7 @@ export function useGameRoomActions({
     connect,
     phase,
     queryClient,
+    viewerSeat,
   ])
 
   return {

@@ -101,6 +101,7 @@
     "failedToRefreshGamesList": "Failed to refresh games list",
     "failedToCreateGame": "Failed to create game",
     "failedToJoinGame": "Failed to join game",
+    "failedToSpectateGame": "Failed to spectate game",
     "failedToDeleteGame": "Failed to delete game",
     "failedToFetchGameHistory": "Failed to fetch game history",
     "failedToUpdateSettings": "Failed to update settings"

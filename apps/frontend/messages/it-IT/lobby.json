@@ -33,7 +33,8 @@
     "delete": "Elimina",
     "goToGame": "Vai alla partita",
     "join": "Entra",
-    "rejoin": "Rientra"
+    "rejoin": "Rientra",
+    "watch": "Guarda"
   },
   "lists": {
     "actionsLabel": "Azioni",
@@ -102,6 +103,10 @@
     "gameFilledUp": "Quel tavolo si è appena riempito. Scegline un altro.",
     "joinedSuccess": "Sei entrato nella partita!",
     "joinFailed": "Impossibile entrare nella partita",
+    "spectatedSuccess": "Stai guardando la partita!",
+    "spectateFailed": "Impossibile guardare la partita",
+    "spectatePrivateGame": "Solo le partite pubbliche possono essere guardate",
+    "alreadyMember": "Sei già membro di questa partita",
     "deleteFailed": "Impossibile eliminare la partita",
     "deleteMissingVersion": "Impossibile eliminare: mancano le informazioni di versione. Riprova.",
     "deleteConflict": "Impossibile eliminare: la partita è stata modificata. Aggiorna e riprova.",

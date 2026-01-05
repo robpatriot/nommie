@@ -1,6 +1,7 @@
 {
   "gameRoom": {
     "you": "Vous",
+    "spectatorBanner": "Vous regardez cette partie en tant que spectateur",
     "orientation": {
       "top": "Haut",
       "left": "Gauche",
@@ -119,8 +120,10 @@
       "subtitle": "Les annonces de chacun restent visibles ci-dessous.",
       "turn": {
         "yourTurn": "À vous",
-        "waiting": "En attente"
+        "waiting": "En attente",
+        "waitingFor": "En attente de {name}"
       },
+      "subtitleSpectator": "{name} annonce. Les annonces de chacun restent visibles ci-dessous.",
       "yourBidLabel": "Votre annonce",
       "bidValueAria": "Valeur de l’annonce",
       "submit": {

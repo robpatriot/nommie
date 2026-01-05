@@ -11,7 +11,9 @@ export function useGameRoomReadyState(
   phaseName: string
 ) {
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
-  const canMarkReady = phaseName === 'Init'
+  // Only players (with a seat) can mark ready, not spectators
+  const canMarkReady =
+    phaseName === 'Init' && viewerSeatForInteractions !== null
   // Track the last synced snapshot value to avoid unnecessary updates
   const lastSyncedReadyState = useRef<boolean | null>(null)
 

@@ -66,6 +66,23 @@ export async function joinGameAction(
   }
 }
 
+export async function spectateGameAction(
+  gameId: number
+): Promise<ActionResult<Game>> {
+  try {
+    // Auth is enforced centrally in fetchWithAuth
+
+    const response = await fetchWithAuth(`/api/games/${gameId}/spectate`, {
+      method: 'POST',
+    })
+    const data: { game: Game } = await response.json()
+    return { kind: 'ok', data: data.game }
+  } catch (error) {
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToSpectateGame'))
+  }
+}
+
 export async function deleteGameAction(
   gameId: number,
   version?: number

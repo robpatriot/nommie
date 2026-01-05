@@ -1,6 +1,7 @@
 {
   "gameRoom": {
     "you": "Tu",
+    "spectatorBanner": "Stai guardando questa partita come spettatore",
     "orientation": {
       "top": "Sopra",
       "left": "Sinistra",
@@ -119,8 +120,10 @@
       "subtitle": "Le puntate di tutti restano visibili qui sotto.",
       "turn": {
         "yourTurn": "Tocca a te",
-        "waiting": "In attesa"
+        "waiting": "In attesa",
+        "waitingFor": "In attesa di {name}"
       },
+      "subtitleSpectator": "{name} sta puntando. Le puntate di tutti restano visibili qui sotto.",
       "yourBidLabel": "La tua puntata",
       "bidValueAria": "Valore puntata",
       "submit": {
