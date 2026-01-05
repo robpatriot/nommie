@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use time::format_description::well_known::Rfc3339;
 use tracing::{debug, info, warn};
 
-use crate::ai::{registry, Heuristic, RandomPlayer};
+use crate::ai::{registry, RandomPlayer, Strategic};
 use crate::db::txn::with_txn;
 use crate::domain::bidding::validate_consecutive_zero_bids;
 use crate::domain::snapshot::{GameSnapshot, SeatAiProfilePublic, SeatPublic};
@@ -1322,7 +1322,7 @@ async fn add_ai_seat(
 
             let ai_service = AiService;
             let (factory, registry_version, resolved_seed) =
-                resolve_registry_selection(&request, Some(Heuristic::NAME))?;
+                resolve_registry_selection(&request, Some(Strategic::NAME))?;
 
             let mut seed = resolved_seed;
             if seed.is_none() && factory.name == RandomPlayer::NAME {
@@ -1330,7 +1330,7 @@ async fn add_ai_seat(
             }
 
             // Use the shared default AI lookup when appropriate
-            let ai_profile = if factory.name == Heuristic::NAME {
+            let ai_profile = if factory.name == Strategic::NAME {
                 let game_service = GameService;
                 game_service.find_default_ai_profile(txn).await?
             } else {

@@ -720,17 +720,17 @@ impl GameService {
 
     /// Find the default AI profile.
     ///
-    /// Returns the AI profile for the default AI player (currently Heuristic).
+    /// Returns the AI profile for the default AI player (currently Strategic).
     /// This is used both for player-to-AI conversion and as the default when adding AI seats.
     pub async fn find_default_ai_profile(
         &self,
         txn: &DatabaseTransaction,
     ) -> Result<ai_profiles::AiProfile, AppError> {
-        use crate::ai::Heuristic;
+        use crate::ai::Strategic;
         let profile = ai_profiles::find_by_registry_variant(
             txn,
-            Heuristic::NAME,
-            Heuristic::VERSION,
+            Strategic::NAME,
+            Strategic::VERSION,
             "default",
         )
         .await
@@ -739,9 +739,9 @@ impl GameService {
             AppError::internal(
                 crate::errors::ErrorCode::InternalError,
                 format!(
-                    "Default Heuristic AI profile not found (registry_name: {}, version: {}, variant: default)",
-                    Heuristic::NAME,
-                    Heuristic::VERSION
+                    "Default Strategic AI profile not found (registry_name: {}, version: {}, variant: default)",
+                    Strategic::NAME,
+                    Strategic::VERSION
                 ),
                 std::io::Error::other("AI profile not found"),
             )
@@ -752,7 +752,7 @@ impl GameService {
     /// Convert a human player membership to an AI player.
     ///
     /// This preserves the seat position and all game state, but converts the player
-    /// from human to AI. The AI will use the default Heuristic profile.
+    /// from human to AI. The AI will use the default Strategic profile.
     ///
     /// # Arguments
     /// * `txn` - Database transaction
