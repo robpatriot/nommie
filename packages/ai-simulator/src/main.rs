@@ -53,6 +53,10 @@ struct Args {
     #[arg(short, long)]
     verbose: bool,
 
+    /// Show output summary and file paths
+    #[arg(long)]
+    show_output: bool,
+
     /// Output directory for results
     #[arg(long, default_value = "./simulation-results")]
     output_dir: String,
@@ -94,18 +98,22 @@ impl AiType {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    // Initialize logging
+    // Initialize logging - silent by default, only show warnings/errors
     let filter = if args.verbose {
         "debug"
-    } else {
+    } else if args.show_output {
         "info"
+    } else {
+        "warn" // Only show warnings and errors by default
     };
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .init();
 
-    info!("Starting AI simulator");
-    info!("Configuration: {} games", args.games);
+    if args.show_output {
+        info!("Starting AI simulator");
+        info!("Configuration: {} games", args.games);
+    }
     
     // Determine AI types: use --seats if provided, otherwise use individual seat parameters
     let seat_types = if let Some(seats_ai) = args.seats {
@@ -114,14 +122,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         [args.seat0, args.seat1, args.seat2, args.seat3]
     };
     
-    info!(
-        "AI types: seat0={:?}, seat1={:?}, seat2={:?}, seat3={:?}",
-        seat_types[0], seat_types[1], seat_types[2], seat_types[3]
-    );
+    if args.show_output {
+        info!(
+            "AI types: seat0={:?}, seat1={:?}, seat2={:?}, seat3={:?}",
+            seat_types[0], seat_types[1], seat_types[2], seat_types[3]
+        );
+    }
 
     // Create output writer
     let mut output_writer = OutputWriter::new(&args.output_dir, &args.output_format, args.compress)?;
-    info!("Output directory: {}", args.output_dir);
+    if args.show_output {
+        info!("Output directory: {}", args.output_dir);
+    }
 
     // Create AI players
     let ai_types = [
@@ -193,16 +205,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Finish writing
     output_writer.finish()?;
     
-    // Print output file paths
-    if let Some(path) = jsonl_path_clone {
-        info!("Detailed results written to: {}", path.display());
-    }
-    if let Some(path) = csv_path_clone {
-        info!("Summary CSV written to: {}", path.display());
-    }
+    // Print output file paths and summary only if requested
+    if args.show_output {
+        if let Some(path) = jsonl_path_clone {
+            info!("Detailed results written to: {}", path.display());
+        }
+        if let Some(path) = csv_path_clone {
+            info!("Summary CSV written to: {}", path.display());
+        }
 
-    // Print summary
-    print_summary(&results, errors, elapsed, args.games);
+        // Print summary
+        print_summary(&results, errors, elapsed, args.games);
+    }
 
     Ok(())
 }
