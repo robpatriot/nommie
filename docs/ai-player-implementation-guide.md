@@ -23,9 +23,10 @@ This guide explains how to build AI players for **Nommie** (Nomination Whist). I
 8. [Core Data Types](#core-data-types)
 9. [Error Handling](#error-handling)
 10. [Testing Your AI](#testing-your-ai)
-11. [Best Practices](#best-practices)
-12. [Submission Requirements](#submission-requirements)
-13. [Appendices](#appendices)
+11. [AI Simulator](#ai-simulator)
+12. [Best Practices](#best-practices)
+13. [Submission Requirements](#submission-requirements)
+14. [Appendices](#appendices)
 
 ---
 
@@ -258,6 +259,65 @@ The backend owns a deterministic conformance suite that exercises every AI regis
 - Expectation: all registered AIs pass with no flaky behavior and complete in \< 1 second.
 
 You should run this suite after registering or changing an AI. It is complementary to any custom unit tests in your module.
+
+---
+
+## AI Simulator
+
+The **ai-simulator** runs fast in-memory games without database overhead for rapid iteration on AI strategies.
+
+### Simulator
+
+Located in `packages/ai-simulator/`, the simulator runs games entirely in memory and outputs detailed metrics. Available options include:
+
+**Example usage:**
+
+```bash
+cargo run --bin ai-simulator --manifest-path packages/ai-simulator/Cargo.toml -- \
+  --games 100 \
+  --seats MyNewAI \
+  --output-dir /tmp/simulation-results \
+  && cd packages/ai-simulator && python3 analyze_results.py $(ls -t /tmp/simulation-results/simulation_*.jsonl | head -1)
+```
+
+This runs 100 games with your AI in all seats, then analyzes the latest results file automatically.
+
+- Number of games to simulate
+- AI type per seat (strategic, heuristic, reckoner, random)
+- Fixed game seeds for reproducibility
+- Output directory and format (JSONL, CSV)
+- Compression options
+
+Results are written to timestamped JSONL and CSV files containing:
+- Per-game metrics (final scores, winners, duration)
+- Per-round metrics (bids, tricks won, bid accuracy, trump selection)
+- Per-player metrics (total score, rounds won, bid accuracy statistics)
+
+### Analysis Script
+
+The `analyze_results.py` script processes simulation JSONL output and provides:
+
+**Bid Accuracy Analysis**
+- Overall exact/overbid/underbid percentages
+- Mean error, MAE, RMSE, and error distribution histograms
+- Breakdown by hand size, trump type, and seat position
+
+**Auction Dynamics**
+- Performance comparison when winning the auction (choosing trump) vs not
+- First leader analysis (performance when leading first trick)
+
+**Calibration Tables**
+- Bid value → actual tricks won mapping
+- Breakdown by hand-size buckets
+
+**Score Metrics**
+- Win rate, average score per game, points per hand
+- Bonus hit rate (percentage of exact bid matches)
+
+**Contract Conversion Stats**
+- Round-level success rates for making bids
+
+The analysis script can process a specific JSONL file or automatically find the latest simulation results.
 
 ---
 
