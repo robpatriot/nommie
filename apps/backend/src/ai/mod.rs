@@ -78,6 +78,7 @@ mod random;
 mod reckoner;
 pub mod registry;
 mod strategic;
+mod tactician;
 mod trait_def;
 
 pub use config::AiConfig;
@@ -86,6 +87,7 @@ pub use memory::MemoryMode;
 pub use random::RandomPlayer;
 pub use reckoner::Reckoner;
 pub use strategic::Strategic;
+pub use tactician::Tactician;
 pub use trait_def::{AiError, AiPlayer};
 
 /// Create an AI player from ai_type string and configuration.

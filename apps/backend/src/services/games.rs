@@ -851,17 +851,17 @@ impl GameService {
 
     /// Find the default AI profile.
     ///
-    /// Returns the AI profile for the default AI player (currently Strategic).
+    /// Returns the AI profile for the default AI player (currently Tactician).
     /// This is used both for player-to-AI conversion and as the default when adding AI seats.
     pub async fn find_default_ai_profile(
         &self,
         txn: &DatabaseTransaction,
     ) -> Result<ai_profiles::AiProfile, AppError> {
-        use crate::ai::Strategic;
+        use crate::ai::Tactician;
         let profile = ai_profiles::find_by_registry_variant(
             txn,
-            Strategic::NAME,
-            Strategic::VERSION,
+            Tactician::NAME,
+            Tactician::VERSION,
             "default",
         )
         .await
@@ -870,9 +870,9 @@ impl GameService {
             AppError::internal(
                 crate::errors::ErrorCode::InternalError,
                 format!(
-                    "Default Strategic AI profile not found (registry_name: {}, version: {}, variant: default)",
-                    Strategic::NAME,
-                    Strategic::VERSION
+                    "Default Tactician AI profile not found (registry_name: {}, version: {}, variant: default)",
+                    Tactician::NAME,
+                    Tactician::VERSION
                 ),
                 std::io::Error::other("AI profile not found"),
             )
@@ -883,7 +883,7 @@ impl GameService {
     /// Convert a human player membership to an AI player.
     ///
     /// This preserves the seat position and all game state, but converts the player
-    /// from human to AI. The AI will use the default Strategic profile.
+    /// from human to AI. The AI will use the default Tactician profile.
     ///
     /// # Arguments
     /// * `txn` - Database transaction

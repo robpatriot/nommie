@@ -79,6 +79,7 @@ enum AiType {
     Strategic,
     Heuristic,
     Reckoner,
+    Tactician,
     Random,
 }
 
@@ -90,6 +91,7 @@ impl AiType {
             AiType::Strategic => "Strategic",
             AiType::Heuristic => "Heuristic",
             AiType::Reckoner => "Reckoner",
+            AiType::Tactician => "Tactician",
             AiType::Random => "RandomPlayer", // Actual name in registry
         }
     }
