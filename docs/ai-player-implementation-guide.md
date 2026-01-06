@@ -273,11 +273,9 @@ Located in `packages/ai-simulator/`, the simulator runs games entirely in memory
 **Example usage:**
 
 ```bash
-cargo run --bin ai-simulator --manifest-path packages/ai-simulator/Cargo.toml -- \
-  --games 100 \
-  --seats MyNewAI \
-  --output-dir /tmp/simulation-results \
-  && cd packages/ai-simulator && python3 analyze_results.py $(ls -t /tmp/simulation-results/simulation_*.jsonl | head -1)
+cargo run -p ai-simulator -- --games 100 --seats MyNewAI --output-dir /tmp/sim-results
+
+./packages/ai-simulator/analyze_results.py /tmp/sim-results
 ```
 
 This runs 100 games with your AI in all seats, then analyzes the latest results file automatically.

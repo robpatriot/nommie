@@ -750,7 +750,7 @@ def analyze_jsonl(filepath: Path) -> None:
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        # Find latest JSONL file
+        # Find latest JSONL file in default directory
         results_dir = Path('simulation-results')
         if results_dir.exists():
             jsonl_files = list(results_dir.glob('*.jsonl'))
@@ -761,7 +761,19 @@ if __name__ == '__main__':
                 print("No JSONL files found in simulation-results/", file=sys.stderr)
                 sys.exit(1)
         else:
-            print("Usage: python3 analyze_results.py <path-to-jsonl-file>", file=sys.stderr)
+            print("Usage: python3 analyze_results.py [<path-to-jsonl-file>|<directory>]", file=sys.stderr)
             sys.exit(1)
     else:
-        analyze_jsonl(Path(sys.argv[1]))
+        arg_path = Path(sys.argv[1])
+        if arg_path.is_dir():
+            # Directory provided - find latest JSONL file
+            jsonl_files = list(arg_path.glob('*.jsonl'))
+            if jsonl_files:
+                latest = max(jsonl_files, key=lambda p: p.stat().st_mtime)
+                analyze_jsonl(latest)
+            else:
+                print(f"No JSONL files found in {arg_path}/", file=sys.stderr)
+                sys.exit(1)
+        else:
+            # File path provided
+            analyze_jsonl(arg_path)
