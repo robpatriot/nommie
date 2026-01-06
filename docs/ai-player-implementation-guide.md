@@ -74,12 +74,13 @@ Nommie mixes 1‑based and 0‑based concepts.
 
 | Concept | Range | Used For |
 |---|---|---|
-| **Rounds** | 1–26 | human reference & `round_no` |
-| **Tricks** | 1–hand_size | per‑round memory/tracking |
+| **Rounds (history)** | 1–26 | `RoundHistory.round_no` (1-based) |
+| **Rounds (current)** | 0–25 | `CurrentRoundInfo.current_round` (0-based) |
+| **Tricks** | 1–hand_size | `trick_no` in memory/tracking (1-based) |
 | **Seats** | 0–3 | array indices (`bids[seat]`, `scores[seat]`) |
 
 `round_no=1 → 13 cards • round_no=13 → first 2‑card round • round_no=26 → 13 cards`.  
-Vector indices are always `round_no – 1`.
+For `CurrentRoundInfo.current_round`: value 0 = round 1, value 12 = first 2‑card round, value 25 = round 26.
 
 **Arrays:** All multi-player arrays (`bids`, `scores`) index by seat 0–3.
 
@@ -157,13 +158,14 @@ Your AI implements three methods, each receiving **read‑only** views:
 
 ### `CurrentRoundInfo` (high-level fields)
 - `game_id: i64` — useful for fetching cached `GameHistory`/`RoundMemory`
-- `player_seat: i16` (0–3), `dealer_pos: i16` (0–3)  
-- `current_round: i16` (1–26), `hand_size: u8`, `game_state: GameState`
+- `player_seat: u8` (0–3), `dealer_pos: u8` (0–3)  
+- `current_round: u8` (0–25), `hand_size: u8`, `game_state: Phase`
 - `hand: Vec<Card>` — remaining cards in your hand after removing plays already recorded
 - `bids: [Option<u8>; 4]`, `trump: Option<Trump>`
-- `trick_no: i16` (1..=hand_size)  
-- `current_trick_plays: Vec<(i16, Card)>` — **in play order** (leader first), seats 0–3, empty if no one has played
-- `trick_leader: Option<i16>` → **left of dealer for trick 1; previous trick winner thereafter**  
+- `trick_no: u8` (1..=hand_size)  
+- `current_trick_plays: Vec<(u8, Card)>` — **in play order** (leader first), seats 0–3, empty if no one has played
+- `trick_leader: Option<u8>` → **left of dealer for trick 1; previous trick winner thereafter**  
+- `tricks_won: [u8; 4]` — tricks won by each player this round (completed tricks only)
 - `scores: [i16; 4]` — **cumulative** scores from all completed rounds (current round not included)
 
 ### Helpers (always prefer these)
@@ -219,7 +221,7 @@ Your AI implements three methods, each receiving **read‑only** views:
 - **Suit** `Clubs|Diamonds|Hearts|Spades`
 - **Trump** `Clubs|Diamonds|Hearts|Spades|NoTrumps`
 - **Rank** `Two..Ace`
-- **GameState** `Bidding|TrumpSelection|TrickPlay`
+- **Phase** `Init|Bidding|TrumpSelect|Trick { trick_no }|Scoring|Complete|GameOver`
 - **AiError** `Timeout|Internal(String)|InvalidMove(String)`
 
 ---
@@ -514,17 +516,17 @@ fn choose_play(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<Card
 pub struct GameHistory { pub rounds: Vec<RoundHistory> }
 
 pub struct RoundHistory {
-    pub round_no: i16,                     // 1–26
+    pub round_no: u8,                      // 1–26 (1-based for history)
     pub hand_size: u8,                     // Number of cards each player had this round
-    pub dealer_seat: i16,                  // 0–3
+    pub dealer_seat: u8,                   // 0–3
     pub bids: [Option<u8>; 4],
-    pub trump_selector_seat: Option<i16>,
+    pub trump_selector_seat: Option<u8>,
     pub trump: Option<Trump>,
     pub scores: [RoundScoreDetail; 4],
 }
 
 pub struct RoundScoreDetail {
-    pub round_score: i16,
+    pub round_score: u8,
     pub cumulative_score: i16,
 }
 ```
@@ -534,8 +536,8 @@ pub struct RoundScoreDetail {
 pub struct RoundMemory { pub mode: MemoryMode, pub tricks: Vec<TrickMemory> }
 
 pub struct TrickMemory {
-    pub trick_no: i16, // 1..=hand_size (1-based, matches Indexing Reference)
-    pub plays: Vec<(i16, PlayMemory)> 
+    pub trick_no: u8, // 1..=hand_size (1-based)
+    pub plays: Vec<(u8, PlayMemory)> // (seat, memory)
 }
 
 pub enum PlayMemory {
