@@ -740,6 +740,12 @@ export function GameRoomView({
               roundNo={snapshot.game.round_no}
               dealer={snapshot.game.dealer}
               seatDisplayName={seatDisplayName}
+              aiProfiles={[
+                snapshot.game.seating[0]?.ai_profile ?? null,
+                snapshot.game.seating[1]?.ai_profile ?? null,
+                snapshot.game.seating[2]?.ai_profile ?? null,
+                snapshot.game.seating[3]?.ai_profile ?? null,
+              ]}
               error={error}
               onShowHistory={handleOpenHistory}
               isHistoryLoading={isHistoryLoading}

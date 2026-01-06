@@ -5,6 +5,12 @@ import { StatCard } from '@/components/StatCard'
 import { cn } from '@/lib/cn'
 import { formatNumber } from '@/utils/number-formatting'
 import { getPhaseTranslationKey, isTrickPhase } from './phase-helpers'
+import { formatVersion } from '@/utils/version-formatting'
+
+interface AiProfile {
+  name: string
+  version: string
+}
 
 interface ScoreSidebarProps {
   gameId: number
@@ -16,6 +22,12 @@ interface ScoreSidebarProps {
   roundNo: number
   dealer: Seat
   seatDisplayName: (seat: Seat) => string
+  aiProfiles?: [
+    AiProfile | null,
+    AiProfile | null,
+    AiProfile | null,
+    AiProfile | null,
+  ]
   error?: { message: string; traceId?: string } | null
   onShowHistory?: () => void
   isHistoryLoading?: boolean
@@ -32,6 +44,7 @@ export function ScoreSidebar({
   roundNo,
   dealer,
   seatDisplayName,
+  aiProfiles,
   error,
   onShowHistory,
   isHistoryLoading = false,
@@ -149,19 +162,32 @@ export function ScoreSidebar({
         </summary>
         <div className="px-4 pb-4">
           <ul className="flex flex-col gap-3 text-sm text-muted">
-            {scores.map((score, idx) => (
-              <li
-                key={playerNames[idx]}
-                className="flex items-center justify-between rounded-xl border border-border/40 bg-surface/60 px-3 py-2"
-              >
-                <span className="font-medium text-foreground">
-                  {playerNames[idx]}
-                </span>
-                <span className="text-base font-semibold text-foreground">
-                  {score}
-                </span>
-              </li>
-            ))}
+            {scores.map((score, idx) => {
+              const aiProfile = aiProfiles?.[idx]
+              return (
+                <li
+                  key={playerNames[idx]}
+                  className="flex items-center justify-between rounded-xl border border-border/40 bg-surface/60 px-3 py-2"
+                >
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="font-medium text-foreground">
+                      {playerNames[idx]}
+                    </span>
+                    {aiProfile ? (
+                      <span
+                        className="inline-flex items-center rounded-full bg-black/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground"
+                        title={`AI: ${aiProfile.name} v${formatVersion(aiProfile.version)}`}
+                      >
+                        {aiProfile.name}
+                      </span>
+                    ) : null}
+                  </div>
+                  <span className="text-base font-semibold text-foreground">
+                    {score}
+                  </span>
+                </li>
+              )
+            })}
           </ul>
         </div>
       </details>

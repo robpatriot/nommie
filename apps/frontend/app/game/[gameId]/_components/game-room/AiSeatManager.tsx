@@ -1,5 +1,6 @@
 import { useTranslations } from 'next-intl'
 import type { GameRoomViewProps } from '../game-room-view'
+import { formatVersion } from '@/utils/version-formatting'
 
 interface AiSeatManagerProps {
   aiState?: GameRoomViewProps['aiSeatState']
@@ -139,7 +140,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                       {seat.aiProfile
                         ? t('runningProfile', {
                             name: seat.aiProfile.name,
-                            version: seat.aiProfile.version,
+                            version: formatVersion(seat.aiProfile.version),
                           })
                         : t('selectProfileHint')}
                     </p>
@@ -199,7 +200,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                               <option key={key} value={key}>
                                 {t('profileOption', {
                                   name: entry.name,
-                                  version: entry.version,
+                                  version: formatVersion(entry.version),
                                 })}
                               </option>
                             )
