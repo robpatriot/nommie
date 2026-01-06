@@ -3,8 +3,13 @@
 //! This tool runs games entirely in memory without validation or database overhead,
 //! allowing rapid iteration on AI strategies.
 
+mod metrics;
+mod output;
 mod simulator;
+mod types;
 
+use metrics::build_game_metrics;
+use output::OutputWriter;
 use simulator::{GameResult, Simulator};
 use backend::ai::{create_ai, AiConfig, AiPlayer};
 use clap::{Parser, ValueEnum};
@@ -43,6 +48,22 @@ struct Args {
     /// Enable verbose logging
     #[arg(short, long)]
     verbose: bool,
+
+    /// Output directory for results
+    #[arg(long, default_value = "./simulation-results")]
+    output_dir: String,
+
+    /// Output format
+    #[arg(long, default_value = "jsonl")]
+    output_format: OutputFormat,
+
+    /// Compress output files
+    #[arg(long)]
+    compress: bool,
+
+    /// Metrics detail level
+    #[arg(long, default_value = "detailed")]
+    metrics_level: MetricsLevel,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -53,13 +74,15 @@ enum AiType {
     Random,
 }
 
+use types::{MetricsLevel, OutputFormat};
+
 impl AiType {
     fn name(&self) -> &'static str {
         match self {
             AiType::Strategic => "Strategic",
             AiType::Heuristic => "Heuristic",
             AiType::Reckoner => "Reckoner",
-            AiType::Random => "Random",
+            AiType::Random => "RandomPlayer", // Actual name in registry
         }
     }
 }
@@ -84,7 +107,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.seat0, args.seat1, args.seat2, args.seat3
     );
 
+    // Create output writer
+    let mut output_writer = OutputWriter::new(&args.output_dir, &args.output_format, args.compress)?;
+    info!("Output directory: {}", args.output_dir);
+
     // Create AI players
+    let ai_types = [
+        args.seat0.name().to_string(),
+        args.seat1.name().to_string(),
+        args.seat2.name().to_string(),
+        args.seat3.name().to_string(),
+    ];
     let ais = [
         create_ai_player(args.seat0.name())?,
         create_ai_player(args.seat1.name())?,
@@ -101,6 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::rng();
     
     for game_num in 1..=args.games {
+        let game_start = Instant::now();
         let game_seed = args.seed.map(|s| s as i64).unwrap_or_else(|| {
             // Generate random seed if no seed provided
             rng.random::<i64>()
@@ -108,7 +142,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match run_game(game_num, game_seed, &ais) {
             Ok(result) => {
+                let duration_ms = game_start.elapsed().as_secs_f64() * 1000.0;
                 let scores = result.final_scores;
+                
+                // Build and write metrics
+                let metrics = build_game_metrics(
+                    game_num,
+                    game_seed,
+                    ai_types.clone(),
+                    args.games,
+                    &result,
+                    duration_ms,
+                );
+                
+                if let Err(e) = output_writer.write_game(&metrics) {
+                    warn!("Failed to write metrics for game {}: {}", game_num, e);
+                }
+                
                 results.push(result);
                 if args.verbose {
                     info!("Game {} completed: scores={:?}", game_num, scores);
@@ -122,6 +172,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let elapsed = start.elapsed();
+    
+    // Get output file paths before finishing
+    let (jsonl_path, csv_path) = output_writer.output_paths();
+    let jsonl_path_clone = jsonl_path.cloned();
+    let csv_path_clone = csv_path.cloned();
+    
+    // Finish writing
+    output_writer.finish()?;
+    
+    // Print output file paths
+    if let Some(path) = jsonl_path_clone {
+        info!("Detailed results written to: {}", path.display());
+    }
+    if let Some(path) = csv_path_clone {
+        info!("Summary CSV written to: {}", path.display());
+    }
 
     // Print summary
     print_summary(&results, errors, elapsed, args.games);
