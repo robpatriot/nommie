@@ -211,7 +211,7 @@ During early testing, you can restrict signup and login to a controlled set of e
 
 **Storage (backend only):**
 - Local dev: set in `apps/backend/.env` (or your shell environment)
-- Local-prod Docker: set in `docker/local-prod/backend.env`
+- Prod Docker: set in `docker/prod/backend.env`
 - Do not commit the actual allowlist to the public git repository
 - `/api/private/:path*` - Private API endpoints (requires auth)
 

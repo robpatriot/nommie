@@ -29,9 +29,9 @@ This document shows where SSL certificates are copied/mounted in the Postgres an
 
 | Certificate | Build Location | Runtime Location | Volume Mount | Purpose |
 |------------|----------------|------------------|--------------|---------|
-| `server.key` | `/opt/nommie/ssl/server.key` | `/var/lib/postgresql/ssl/server.key` | `nommie_dev_db_ssl` (dev-db) or inside `nommie_local_prod_db_data` (local-prod) | Postgres SSL server key |
-| `server.crt` | `/opt/nommie/ssl/server.crt` | `/var/lib/postgresql/ssl/server.crt` | `nommie_dev_db_ssl` (dev-db) or inside `nommie_local_prod_db_data` (local-prod) | Postgres SSL server cert |
-| `ca.crt` | `/opt/nommie/ssl/ca.crt` | `/var/lib/postgresql/ssl/ca.crt` | `nommie_dev_db_ssl` (dev-db) or inside `nommie_local_prod_db_data` (local-prod) | CA cert (reference) |
+| `server.key` | `/opt/nommie/ssl/server.key` | `/var/lib/postgresql/ssl/server.key` | `nommie_dev_db_ssl` (dev-db) or inside `nommie_prod_db_data` (prod) | Postgres SSL server key |
+| `server.crt` | `/opt/nommie/ssl/server.crt` | `/var/lib/postgresql/ssl/server.crt` | `nommie_dev_db_ssl` (dev-db) or inside `nommie_prod_db_data` (prod) | Postgres SSL server cert |
+| `ca.crt` | `/opt/nommie/ssl/ca.crt` | `/var/lib/postgresql/ssl/ca.crt` | `nommie_dev_db_ssl` (dev-db) or inside `nommie_prod_db_data` (prod) | CA cert (reference) |
 | `ca.crt` | N/A | `/etc/ssl/certs/nommie-ca.crt` | `../shared/ca.crt` (host) | For local backend connections |
 
 ### Backend Container
@@ -56,13 +56,13 @@ This document shows where SSL certificates are copied/mounted in the Postgres an
 
 **Volume mounts:**
 - **dev-db**: `docker/dev-db/docker-compose.yml` (line 24: separate SSL volume, line 28: CA cert mount)
-- **local-prod**: `docker/local-prod/docker-compose.yml` (line 20: SSL directory created inside data volume, no separate SSL volume)
+- **prod**: `docker/prod/docker-compose.yml` (line 20: SSL directory created inside data volume, no separate SSL volume)
 
 ### Backend Container
 
 **Volume mounts:**
 - **dev-db**: `docker/dev-db/docker-compose.yml` (line 28)
-- **local-prod**: `docker/local-prod/docker-compose.yml` (line 42)
+- **prod**: `docker/prod/docker-compose.yml` (line 42)
 
 ## Verification Commands
 
@@ -73,8 +73,8 @@ This document shows where SSL certificates are copied/mounted in the Postgres an
 # For dev-db
 docker compose -f docker/dev-db/docker-compose.yml exec postgres ls -la /opt/nommie/ssl/
 
-# For local-prod
-docker compose -f docker/local-prod/docker-compose.yml exec postgres ls -la /opt/nommie/ssl/
+# For prod
+docker compose -f docker/prod/docker-compose.yml exec postgres ls -la /opt/nommie/ssl/
 ```
 
 **Expected output:**
@@ -89,8 +89,8 @@ docker compose -f docker/local-prod/docker-compose.yml exec postgres ls -la /opt
 # For dev-db
 docker compose -f docker/dev-db/docker-compose.yml exec postgres ls -la /var/lib/postgresql/ssl/
 
-# For local-prod
-docker compose -f docker/local-prod/docker-compose.yml exec postgres ls -la /var/lib/postgresql/ssl/
+# For prod
+docker compose -f docker/prod/docker-compose.yml exec postgres ls -la /var/lib/postgresql/ssl/
 ```
 
 **Expected output:**
@@ -105,8 +105,8 @@ docker compose -f docker/local-prod/docker-compose.yml exec postgres ls -la /var
 # For dev-db
 docker compose -f docker/dev-db/docker-compose.yml exec postgres ls -la /etc/ssl/certs/nommie-ca.crt
 
-# For local-prod
-docker compose -f docker/local-prod/docker-compose.yml exec postgres ls -la /etc/ssl/certs/nommie-ca.crt
+# For prod
+docker compose -f docker/prod/docker-compose.yml exec postgres ls -la /etc/ssl/certs/nommie-ca.crt
 ```
 
 **Expected output:**
@@ -119,8 +119,8 @@ docker compose -f docker/local-prod/docker-compose.yml exec postgres ls -la /etc
 # For dev-db
 docker compose -f docker/dev-db/docker-compose.yml exec postgres grep -E "^ssl|ssl_cert|ssl_key|ssl_ca" /var/lib/postgresql/data/postgresql.conf
 
-# For local-prod
-docker compose -f docker/local-prod/docker-compose.yml exec postgres grep -E "^ssl|ssl_cert|ssl_key|ssl_ca" /var/lib/postgresql/data/postgresql.conf
+# For prod
+docker compose -f docker/prod/docker-compose.yml exec postgres grep -E "^ssl|ssl_cert|ssl_key|ssl_ca" /var/lib/postgresql/data/postgresql.conf
 ```
 
 **Expected output:**
@@ -135,8 +135,8 @@ ssl_ca_file = '/var/lib/postgresql/ssl/ca.crt'
 
 #### 1. Check mounted CA cert
 ```bash
-# For local-prod
-docker compose -f docker/local-prod/docker-compose.yml exec backend ls -la /etc/ssl/certs/nommie-ca.crt
+# For prod
+docker compose -f docker/prod/docker-compose.yml exec backend ls -la /etc/ssl/certs/nommie-ca.crt
 ```
 
 **Expected output:**
@@ -146,8 +146,8 @@ docker compose -f docker/local-prod/docker-compose.yml exec backend ls -la /etc/
 
 #### 2. Verify backend environment variable
 ```bash
-# For local-prod
-docker compose -f docker/local-prod/docker-compose.yml exec backend env | grep POSTGRES_SSL
+# For prod
+docker compose -f docker/prod/docker-compose.yml exec backend env | grep POSTGRES_SSL
 ```
 
 **Expected output:**
@@ -200,11 +200,11 @@ echo "=== Checking Backend Container Certificates ==="
 echo
 
 echo "4. Mounted CA cert in Backend:"
-docker compose -f docker/local-prod/docker-compose.yml exec backend ls -la /etc/ssl/certs/nommie-ca.crt 2>/dev/null || echo "  Container not running or local-prod not available"
+docker compose -f docker/prod/docker-compose.yml exec backend ls -la /etc/ssl/certs/nommie-ca.crt 2>/dev/null || echo "  Container not running or prod not available"
 echo
 
 echo "5. Backend SSL environment variables:"
-docker compose -f docker/local-prod/docker-compose.yml exec backend env | grep POSTGRES_SSL || echo "  Container not running or local-prod not available"
+docker compose -f docker/prod/docker-compose.yml exec backend env | grep POSTGRES_SSL || echo "  Container not running or prod not available"
 echo
 
 echo "=== Checking Host Certificate File ==="

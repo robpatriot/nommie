@@ -1,6 +1,6 @@
 # Postgres TLS Image
 
-This directory contains a shared Docker image for Postgres with TLS support using a private CA. The same image is used for both `dev-db` and `local-prod` environments.
+This directory contains a shared Docker image for Postgres with TLS support using a private CA. The same image is used for both `dev-db` and `prod` environments.
 
 ## Overview
 
@@ -46,14 +46,14 @@ Before building the image, you must:
 
 ### Option 1: Automatic Build via Docker Compose (Recommended)
 
-The `dev-db` and `local-prod` docker-compose files are configured to automatically build the image when needed. Just run:
+The `dev-db` and `prod` docker-compose files are configured to automatically build the image when needed. Just run:
 
 ```bash
 # For dev-db
 docker compose -f docker/dev-db/docker-compose.yml up --build
 
-# For local-prod
-docker compose -f docker/local-prod/docker-compose.yml up --build
+# For prod
+docker compose -f docker/prod/docker-compose.yml up --build
 ```
 
 The compose files will automatically:
@@ -105,9 +105,9 @@ On first container start:
 - Postgres is configured with SSL in `postgresql.conf`
 - Subsequent starts reuse the certs from the volume
 
-### local-prod
+### prod
 
-The `local-prod/docker-compose.yml` also uses the same image:
+The `prod/docker-compose.yml` also uses the same image:
 
 ```yaml
 postgres:

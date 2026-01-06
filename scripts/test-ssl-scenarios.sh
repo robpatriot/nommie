@@ -566,7 +566,7 @@ show_usage() {
     cat <<EOF
 Usage: $0 [SCENARIO_NUMBER]
 
-Test SSL certificate flow scenarios for dev-db and local-prod containers.
+Test SSL certificate flow scenarios for dev-db and prod containers.
 
 Arguments:
   SCENARIO_NUMBER    Run a specific scenario (1-5). If omitted, runs all scenarios.

@@ -1,4 +1,4 @@
-name: nommie-local-prod
+name: nommie-prod
 
 services:
   postgres:
@@ -17,8 +17,8 @@ services:
     env_file:
       - ./db.env
     volumes:
-      - nommie_local_prod_db_data:/var/lib/postgresql/data
-      - nommie_local_prod_ssl:/var/lib/postgresql/ssl
+      - nommie_prod_db_data:/var/lib/postgresql/data
+      - nommie_prod_ssl:/var/lib/postgresql/ssl
     healthcheck:
       # Use hardcoded defaults to avoid requiring shell env vars for compose file substitution
       # The actual container env vars come from db.env via env_file
@@ -64,7 +64,7 @@ services:
       context: ../shared
       dockerfile: redis.Dockerfile
     image: ${COMPOSE_PROJECT_NAME}-redis:8.2
-    command: ["redis-server", "--save", ""] # disable RDB for local-prod
+    command: ["redis-server", "--save", ""] # disable RDB for prod
     restart: unless-stopped
     expose:
       - "6379"
@@ -81,14 +81,14 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - nommie_local_prod_caddy_data:/data
-      - nommie_local_prod_caddy_config:/config
+      - nommie_prod_caddy_data:/data
+      - nommie_prod_caddy_config:/config
 
 volumes:
-  nommie_local_prod_db_data:
-  nommie_local_prod_ssl:
-  nommie_local_prod_caddy_data:
-  nommie_local_prod_caddy_config:
+  nommie_prod_db_data:
+  nommie_prod_ssl:
+  nommie_prod_caddy_data:
+  nommie_prod_caddy_config:
 
 secrets:
   # CA private key (used only during build, never in final image)

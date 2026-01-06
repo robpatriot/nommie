@@ -8,7 +8,7 @@ This directory contains environment configuration files for different deployment
 
 ## 🔒 Postgres TLS
 
-All Postgres instances (dev-db and local-prod) use TLS encryption by default. See [`postgres-tls/README.md`](postgres-tls/README.md) for:
+All Postgres instances (dev-db and prod) use TLS encryption by default. See [`postgres-tls/README.md`](postgres-tls/README.md) for:
 - How to generate your private CA (one-time setup)
 - How to build the TLS-enabled Postgres image
 - Backend TLS configuration
@@ -25,14 +25,14 @@ All Postgres instances (dev-db and local-prod) use TLS encryption by default. Se
 
 2. Edit `docker/dev-db/db.env` with your local development values.
 
-### For Local Production-like Setup (`local-prod/`)
+### For Production-like Setup (`prod/`)
 
 1. Copy all example files:
    ```bash
-   cp docker/local-prod/backend.env.example docker/local-prod/backend.env
-   cp docker/local-prod/frontend.env.example docker/local-prod/frontend.env
-   cp docker/local-prod/db.env.example docker/local-prod/db.env
-   cp docker/local-prod/caddy.env.example docker/local-prod/caddy.env
+   cp docker/prod/backend.env.example docker/prod/backend.env
+   cp docker/prod/frontend.env.example docker/prod/frontend.env
+   cp docker/prod/db.env.example docker/prod/db.env
+   cp docker/prod/caddy.env.example docker/prod/caddy.env
    ```
 
 2. Edit each `.env` file with your actual values:
@@ -70,7 +70,7 @@ docker/
 ├── dev-db/
 │   ├── db.env.example          # Example for local dev database
 │   └── db.env                  # Your actual dev config (gitignored)
-└── local-prod/
+└── prod/
     ├── backend.env.example      # Example for backend
     ├── backend.env              # Your actual backend config (gitignored)
     ├── frontend.env.example     # Example for frontend
