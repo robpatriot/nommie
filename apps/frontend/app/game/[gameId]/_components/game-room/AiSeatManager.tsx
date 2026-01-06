@@ -198,10 +198,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                             const key = `${entry.name}::${entry.version}`
                             return (
                               <option key={key} value={key}>
-                                {t('profileOption', {
-                                  name: entry.name,
-                                  version: formatVersion(entry.version),
-                                })}
+                                {entry.name}
                               </option>
                             )
                           })}
