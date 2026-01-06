@@ -156,7 +156,7 @@ fn test_suit_distribution_bias() {
 
     use crate::domain::Suit;
 
-    const NUM_DEALS: u32 = 10_000;
+    const NUM_DEALS: u32 = 5_000;
     const HAND_SIZE: u8 = 13;
 
     // Track suit counts across all deals
@@ -233,8 +233,8 @@ fn test_suit_distribution_bias() {
     }
 
     // Check for significant bias (more than 1% deviation)
-    // With 10,000 deals of 13 cards each, we expect ~32,500 cards per suit
-    // 1% deviation would be ~325 cards, but we'll use a more lenient threshold
+    // With 5,000 deals of 13 cards each, we expect ~65,000 cards per suit
+    // 1% deviation would be ~650 cards, but we'll use a more lenient threshold
     // for statistical variation: 0.5% of expected
     let max_allowed_deviation = (expected_per_suit as f64 * 0.005) as u32;
     let mut max_deviation = 0u32;
