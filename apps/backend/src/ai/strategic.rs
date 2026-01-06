@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 
 use crate::ai::{AiError, AiPlayer};
-use crate::domain::player_view::{CurrentRoundInfo, GameHistory};
+use crate::domain::player_view::{CurrentRoundInfo, GameHistory, RoundHistory};
 use crate::domain::round_memory::{PlayMemory, RoundMemory};
 use crate::domain::{card_beats, Card, GameContext, Rank, Suit, Trump};
 
@@ -91,6 +91,27 @@ impl Strategic {
             Rank::Queen => 0.55,
             Rank::Jack => 0.35,
             Rank::Ten => 0.25,
+            _ => 0.0,
+        }
+    }
+
+    /// Rank weight scaled by hand size - lower cards become valuable in small hands.
+    fn rank_weight_for_cash_scaled(rank: Rank, hand_size: u8) -> f32 {
+        let base = Self::rank_weight_for_cash(rank);
+
+        // In small hands, lower cards can win because higher cards may not be in play.
+        // Scale factor: smaller hands = more value for lower cards.
+        // For hand_size 13: no bonus for low cards
+        // For hand_size 2: significant bonus for low cards
+        let scale_factor = (13.0 / hand_size as f32).min(6.5); // Cap at 6.5x for very small hands
+
+        match rank {
+            Rank::Ace | Rank::King | Rank::Queen => base, // Top cards don't need scaling
+            Rank::Jack => base + (0.15 * (scale_factor - 1.0).max(0.0)),
+            Rank::Ten => base + (0.2 * (scale_factor - 1.0).max(0.0)),
+            Rank::Nine => 0.0 + (0.15 * (scale_factor - 1.0).max(0.0)),
+            Rank::Eight => 0.0 + (0.1 * (scale_factor - 1.0).max(0.0)),
+            Rank::Seven => 0.0 + (0.05 * (scale_factor - 1.0).max(0.0)),
             _ => 0.0,
         }
     }
@@ -240,30 +261,47 @@ impl Strategic {
         let longest = suit_lengths.first().copied().unwrap_or(0) as f32;
         let avg = (hand_size as f32) / 4.0;
 
-        // High-card density: count weighted top cards across suits.
+        // High-card value: use scaled weights that account for hand size.
+        // In small hands, lower cards (9, 8, 7) become valuable.
         let mut high = 0f32;
         for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
             for c in hand.iter().filter(|c| c.suit == suit) {
-                high += Self::rank_weight_for_cash(c.rank);
+                high += Self::rank_weight_for_cash_scaled(c.rank, hand_size);
             }
         }
 
-        // Shape bonus: long suit helps, but diminishing returns.
-        let shape = ((longest - avg).max(0.0)) * 0.35;
+        // Shape bonus: long suit helps, scaled by hand size.
+        // The value of a long suit is proportional to hand size.
+        let shape_multiplier = (hand_size as f32 / 13.0).max(0.3); // Scale down for small hands
+        let shape = ((longest - avg).max(0.0)) * 0.35 * shape_multiplier;
 
-        // Ruff potential: void/singleton bonus (very small; swingy, so keep low).
+        // Ruff potential: void/singleton bonus, scaled by hand size.
+        // Voids/singletons are more valuable in larger hands (more ruffing opportunities).
+        let ruff_multiplier = (hand_size as f32 / 13.0).max(0.4);
         let mut short_suits = 0f32;
         for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
             let n = *counts.get(&suit).unwrap_or(&0) as f32;
             if n == 0.0 {
-                short_suits += 0.35;
+                short_suits += 0.35 * ruff_multiplier;
             } else if n == 1.0 {
-                short_suits += 0.2;
+                short_suits += 0.2 * ruff_multiplier;
             }
         }
 
         // Combine into a rough trick expectation.
-        let mut est = (high * 0.85) + shape + short_suits;
+        // High card weight also scales with hand size - smaller hands need higher multiplier.
+        let high_multiplier = 0.85 + (0.15 * (13.0 / hand_size as f32).min(2.0)); // Boost for small hands
+        let mut est = (high * high_multiplier) + shape + short_suits;
+
+        // Account for proportional difficulty: winning 3.5/5 (70%) is much harder than 3.5/13 (27%).
+        // Apply a difficulty factor that makes higher percentages of tricks harder to achieve.
+        let trick_percentage = est / hand_size as f32;
+        if trick_percentage > 0.5 {
+            // Winning >50% of tricks gets progressively harder
+            let excess = trick_percentage - 0.5;
+            let difficulty_penalty = excess * 0.3; // Reduce estimate for very high percentages
+            est *= 1.0 - difficulty_penalty;
+        }
 
         // Hand-size normalization: keep estimates in [0, hand_size].
         let cap = hand_size as f32;
@@ -276,65 +314,9 @@ impl Strategic {
         est
     }
 
-    fn exactness_difficulty(hand: &[Card], hand_size: u8) -> f32 {
-        if hand.is_empty() || hand_size == 0 {
-            return 1.0;
-        }
-        let counts = Self::suit_counts(hand);
-        let avg = (hand_size as f32) / 4.0;
-
-        let mut voids = 0f32;
-        let mut singletons = 0f32;
-        let mut extreme = 0f32;
-
-        for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
-            let n = *counts.get(&suit).unwrap_or(&0) as f32;
-            if n == 0.0 {
-                voids += 1.0;
-            } else if n == 1.0 {
-                singletons += 1.0;
-            }
-            if n > avg * 1.7 || (avg > 0.0 && n < avg * 0.5) {
-                extreme += 1.0;
-            }
-        }
-
-        // Many high cards can create forced wins (overtrick risk).
-        let mut forced = 0f32;
-        for c in hand {
-            if matches!(c.rank, Rank::Ace | Rank::King) {
-                forced += 1.0;
-            }
-        }
-
-        // Scale: small hands are naturally swingier; dampen penalties there.
-        let size_scale = ((hand_size as f32) / 13.0).sqrt().max(0.35);
-
-        let mut diff = 1.0 + (voids * 0.25 + singletons * 0.12 + extreme * 0.08 + forced * 0.02);
-        diff *= size_scale;
-        diff.clamp(0.6, 1.6)
-    }
-
-    fn adjust_for_score_position(est: f32, state: &CurrentRoundInfo, seat: u8) -> f32 {
-        // Keep this very mild; the scoring system rewards exactness, so chasing is dangerous.
-        let scores = &state.scores;
-        let my = scores[seat as usize] as i32;
-        let best = scores.iter().copied().max().unwrap_or(0) as i32;
-        let delta = best - my;
-
-        if delta >= 20 {
-            est * 1.08
-        } else if delta >= 10 {
-            est * 1.04
-        } else if delta <= 0 {
-            est * 0.98
-        } else {
-            est
-        }
-    }
-
     fn adjust_for_opponent_bids(est: f32, state: &CurrentRoundInfo, hand_size: u8) -> f32 {
-        // If table has already bid high, modestly shade down to reduce blowups.
+        // Adjust based on how opponents' bids compare to expected average.
+        // If they bid significantly above/below expected, that's meaningful information.
         let expected_avg = (hand_size as f32) / 4.0;
         let mut seen = 0f32;
         let mut n = 0f32;
@@ -342,42 +324,118 @@ impl Strategic {
             seen += *b as f32;
             n += 1.0;
         }
-        if n > 0.0 && seen / n > expected_avg + 0.75 {
-            est * 0.95
+
+        if n > 0.0 {
+            let opponent_avg = seen / n;
+            let deviation = opponent_avg - expected_avg;
+
+            // Scale adjustment based on deviation magnitude.
+            // Deviation of 1.0 = significant, 2.0 = very significant.
+            // For small hand sizes, deviations are more meaningful.
+            let hand_size_factor = (13.0 / hand_size as f32).min(3.0); // More impact in small hands
+            let adjustment = deviation * 0.08 * hand_size_factor; // Scale with deviation
+
+            // If opponents bid high, reduce estimate (they may have strong hands).
+            // If opponents bid low, increase estimate slightly (they may have weak hands).
+            est * (1.0 - adjustment.clamp(-0.15, 0.15)) // Cap at ±15% adjustment
         } else {
             est
         }
     }
 
     fn adjust_for_history(est: f32, history: &GameHistory, hand_size: u8, my_seat: u8) -> f32 {
-        // Very light opponent modeling: if table historically over/underbids, nudge slightly.
+        // Only use history after enough rounds for statistical significance.
+        // Early game: no data. Mid game: sparse data. Late game: meaningful patterns.
+        const MIN_ROUNDS_FOR_HISTORY: usize = 8;
+        if history.rounds.len() < MIN_ROUNDS_FOR_HISTORY {
+            return est;
+        }
+
+        // Analyze opponent bid achievement patterns, not just bid values.
+        // If opponents overbid and fail → they're giving us tricks → bid higher.
+        // If opponents overbid and succeed → they have strong hands → account for that.
         let expected_avg = (hand_size as f32) / 4.0;
-        let mut bias = 0f32;
-        let mut n = 0f32;
+        let mut total_adjustment = 0f32;
+        let mut opponent_count = 0f32;
+
         for seat in 0..4u8 {
             if seat == my_seat {
                 continue;
             }
-            // Extract recent bids for this seat from history
-            let recent: Vec<u8> = history
+
+            // Look at recent rounds (last 5-8 rounds for better sample size)
+            let recent_rounds: Vec<&RoundHistory> = history
                 .rounds
                 .iter()
                 .rev()
-                .take(3)
-                .filter_map(|round| round.bids[seat as usize])
+                .take(8)
+                .filter(|round| {
+                    round.bids[seat as usize].is_some()
+                        && round.scores[seat as usize].round_score > 0
+                })
                 .collect();
-            if recent.is_empty() {
+
+            if recent_rounds.len() < 3 {
+                // Not enough data for this opponent
                 continue;
             }
-            let avg = recent.iter().map(|b| *b as f32).sum::<f32>() / recent.len() as f32;
-            bias += avg - expected_avg;
-            n += 1.0;
+
+            let mut bid_achievement_bias = 0f32;
+            let mut bid_value_bias = 0f32;
+            let mut count = 0f32;
+
+            for round in &recent_rounds {
+                if let Some(bid) = round.bids[seat as usize] {
+                    let round_score = round.scores[seat as usize].round_score;
+                    // Derive tricks won: if round_score >= 10 and round_score - 10 == bid, then exact
+                    let tricks_won = if round_score >= 10 && round_score - 10 == bid {
+                        bid
+                    } else {
+                        round_score
+                    };
+
+                    // Bid achievement: did they make their bid?
+                    // If they overbid (bid > tricks), they failed and gave us tricks → we should bid higher
+                    // If they underbid (bid < tricks), they succeeded easily → they might have strong hands
+                    let achievement = tricks_won as f32 - bid as f32;
+                    bid_achievement_bias += achievement;
+
+                    // Bid value relative to expected
+                    bid_value_bias += bid as f32 - expected_avg;
+                    count += 1.0;
+                }
+            }
+
+            if count > 0.0 {
+                let avg_achievement = bid_achievement_bias / count;
+                let avg_bid_value = bid_value_bias / count;
+
+                // Calculate effective trick-taking: how many tricks they're actually taking
+                // relative to expected average. This combines bid value and achievement.
+                // If they bid high and achieve → they're taking more tricks → fewer for us → bid lower
+                // If they bid high and fail → they're giving us tricks → bid higher
+                // If they bid low and exceed → they're taking more than expected → bid lower
+                let effective_trick_taking = avg_bid_value + avg_achievement;
+
+                // Scale adjustment: if someone consistently takes 1 more trick than expected,
+                // that's a significant signal. Scale by 0.6-0.8 to make it impactful but not extreme.
+                // The adjustment is inverted: more tricks for them = fewer for us = bid lower
+                let opponent_adjustment = -effective_trick_taking * 0.7;
+
+                total_adjustment += opponent_adjustment;
+                opponent_count += 1.0;
+            }
         }
-        if n == 0.0 {
+
+        if opponent_count == 0.0 {
             return est;
         }
-        let table_bias = (bias / n).clamp(-1.0, 1.0);
-        est - (table_bias * 0.15)
+
+        let avg_adjustment = total_adjustment / opponent_count;
+        // Allow larger adjustments: if opponents consistently take 1+ more/less tricks,
+        // we should adjust by ~0.7-1.0. Clamp to ±1.5 to allow meaningful response
+        // while preventing extreme swings from outliers.
+        est + avg_adjustment.clamp(-1.5, 1.5)
     }
 
     fn choose_bid_from_estimate(legal: &[u8], est: f32) -> u8 {
@@ -394,24 +452,49 @@ impl Strategic {
         best
     }
 
+    fn adjust_for_first_trick_leader(est: f32, state: &CurrentRoundInfo, hand_size: u8) -> f32 {
+        // First trick leader has significant advantage, especially in small hands.
+        // But the advantage depends on hand strength - weak cards = no advantage, strong cards = big advantage.
+        let first_trick_leader = (state.dealer_pos + 1) % 4;
+        let is_leader = state.player_seat == first_trick_leader;
+
+        if is_leader {
+            // Calculate hand strength for leading - high cards that can win the first trick.
+            // If you have Aces/Kings, you can likely win; if you have 2s, you can't.
+            let mut leading_strength = 0f32;
+            for card in &state.hand {
+                // High cards that can win the first trick (especially if you choose trump)
+                let card_value = Self::rank_weight_for_cash_scaled(card.rank, hand_size);
+                leading_strength += card_value;
+            }
+
+            // Normalize by hand size - having 2 Aces in a 2-card hand is huge, in a 13-card hand less so.
+            let avg_hand_strength = leading_strength / hand_size as f32;
+
+            // Advantage scales with:
+            // 1. Hand size (smaller = more impact per trick)
+            // 2. Hand strength (stronger cards = more advantage)
+            let hand_size_factor = (13.0 / hand_size as f32).min(3.0);
+            let strength_factor = (avg_hand_strength / 0.5).min(2.0); // Cap at 2x for very strong hands
+
+            // If you have weak cards (2s, 3s), no advantage. If you have strong cards, significant advantage.
+            let leader_advantage = hand_size_factor * strength_factor * 0.1; // Base 0.1, scales up to ~0.6
+            est + leader_advantage
+        } else {
+            est
+        }
+    }
+
     fn compute_bid(state: &CurrentRoundInfo, cx: &GameContext) -> u8 {
         let legal = state.legal_bids();
         let hand = &state.hand;
         let hand_size = state.hand_size;
 
         let mut est = Self::estimate_tricks(hand, hand_size);
-        est = Self::adjust_for_score_position(est, state, state.player_seat);
         est = Self::adjust_for_opponent_bids(est, state, hand_size);
+        est = Self::adjust_for_first_trick_leader(est, state, hand_size);
         if let Some(history) = cx.game_history() {
             est = Self::adjust_for_history(est, history, hand_size, state.player_seat);
-        }
-
-        // Apply exactness difficulty: swingy hands get slightly more conservative bids.
-        let diff = Self::exactness_difficulty(hand, hand_size);
-        if diff > 1.0 {
-            est *= 1.0 / diff;
-        } else {
-            est *= 1.0 + (1.0 - diff) * 0.03;
         }
 
         est = est.clamp(0.0, hand_size as f32);

@@ -689,44 +689,6 @@ impl Reckoner {
         (high * 0.85 + shape + short).clamp(0.0, hand_size)
     }
 
-    fn exactness_difficulty(state: &CurrentRoundInfo) -> f32 {
-        let hand = &state.hand;
-        if hand.is_empty() || state.hand_size == 0 {
-            return 1.0;
-        }
-
-        let counts = Self::suit_counts(hand);
-        let avg = (state.hand_size as f32) / 4.0;
-
-        let mut voids = 0.0;
-        let mut singles = 0.0;
-        let mut extreme = 0.0;
-
-        for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
-            let n = *counts.get(&suit).unwrap_or(&0) as f32;
-            if n == 0.0 {
-                voids += 1.0;
-            } else if n == 1.0 {
-                singles += 1.0;
-            }
-            if n > avg * 1.7 || (avg > 0.0 && n < avg * 0.5) {
-                extreme += 1.0;
-            }
-        }
-
-        let mut forced = 0.0;
-        for c in hand {
-            if matches!(c.rank, Rank::Ace | Rank::King) {
-                forced += 1.0;
-            }
-        }
-
-        let size_scale = ((state.hand_size as f32) / 13.0).sqrt().max(0.35);
-        let mut diff = 1.0 + (voids * 0.25 + singles * 0.12 + extreme * 0.08 + forced * 0.02);
-        diff *= size_scale;
-        diff.clamp(0.6, 1.6)
-    }
-
     fn choose_bid_from_estimate(legal: &[u8], est: f32) -> u8 {
         let mut best = legal[0];
         let mut best_d = (best as f32 - est).abs();
@@ -774,27 +736,8 @@ impl Reckoner {
         let legal = state.legal_bids();
         let mut est = Self::estimate_tricks_basic(state);
 
-        // Mild score-position adjustment (avoid over-aggression; exactness matters)
-        let my = state.scores[state.player_seat as usize] as i32;
-        let best = state.scores.iter().copied().max().unwrap_or(0) as i32;
-        let delta = best - my;
-        if delta >= 20 {
-            est *= 1.08;
-        } else if delta >= 10 {
-            est *= 1.04;
-        } else if delta <= 0 {
-            est *= 0.98;
-        }
-
         if let Some(history) = cx.game_history() {
             est = Self::adjust_for_history(est, history, state.hand_size, state.player_seat);
-        }
-
-        let diff = Self::exactness_difficulty(state);
-        if diff > 1.0 {
-            est *= 1.0 / diff;
-        } else {
-            est *= 1.0 + (1.0 - diff) * 0.03;
         }
 
         est = est.clamp(0.0, state.hand_size as f32);
