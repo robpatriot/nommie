@@ -25,3 +25,8 @@ docker/dev-db/
 
 # Docker shared files (ca.crt moved to postgres-tls, only redis.Dockerfile remains)
 docker/shared/
+
+# Development tools (not needed in production builds)
+packages/ai-simulator/
+# But we need the Cargo.toml for workspace resolution
+!packages/ai-simulator/Cargo.toml

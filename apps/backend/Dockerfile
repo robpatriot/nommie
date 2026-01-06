@@ -16,6 +16,7 @@ COPY apps/migration-cli/Cargo.toml apps/migration-cli/Cargo.toml
 COPY packages/migration/Cargo.toml packages/migration/Cargo.toml
 COPY packages/backend-test-support/Cargo.toml packages/backend-test-support/Cargo.toml
 COPY packages/db-infra/Cargo.toml packages/db-infra/Cargo.toml
+COPY packages/ai-simulator/Cargo.toml packages/ai-simulator/Cargo.toml
 
 # Copy library package sources (they're dependencies, need real code)
 COPY packages/migration/src packages/migration/src
