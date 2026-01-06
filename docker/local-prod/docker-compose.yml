@@ -51,6 +51,7 @@ services:
         NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL}
     restart: unless-stopped
     env_file:
+      - .env
       - ./frontend.env
     depends_on:
       - backend
