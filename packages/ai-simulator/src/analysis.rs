@@ -90,11 +90,11 @@ impl AnalysisResults {
                         if let Some(exact) = accuracy["exact"].as_u64() {
                             entry.exact += exact as u32;
                         }
-                        if let Some(over) = accuracy["over"].as_u64() {
-                            entry.over += over as u32;
+                        if let Some(underbid) = accuracy["underbid"].as_u64() {
+                            entry.underbid += underbid as u32;
                         }
-                        if let Some(under) = accuracy["under"].as_u64() {
-                            entry.under += under as u32;
+                        if let Some(overbid) = accuracy["overbid"].as_u64() {
+                            entry.overbid += overbid as u32;
                         }
                         entry.total_rounds += 1;
                     }
@@ -104,11 +104,11 @@ impl AnalysisResults {
 
         // Calculate percentages
         for stat in stats.values_mut() {
-            let total = stat.exact + stat.over + stat.under;
+            let total = stat.exact + stat.underbid + stat.overbid;
             if total > 0 {
                 stat.exact_pct = (stat.exact as f64 / total as f64) * 100.0;
-                stat.over_pct = (stat.over as f64 / total as f64) * 100.0;
-                stat.under_pct = (stat.under as f64 / total as f64) * 100.0;
+                stat.underbid_pct = (stat.underbid as f64 / total as f64) * 100.0;
+                stat.overbid_pct = (stat.overbid as f64 / total as f64) * 100.0;
             }
         }
 
@@ -160,12 +160,12 @@ pub struct WinStats {
 #[derive(Default, Debug)]
 pub struct BidAccuracyStats {
     pub exact: u32,
-    pub over: u32,
-    pub under: u32,
+    pub underbid: u32,
+    pub overbid: u32,
     pub total_rounds: u32,
     pub exact_pct: f64,
-    pub over_pct: f64,
-    pub under_pct: f64,
+    pub underbid_pct: f64,
+    pub overbid_pct: f64,
 }
 
 #[derive(Default, Debug)]

@@ -25,6 +25,10 @@ struct Args {
     #[arg(short, long, default_value = "1")]
     games: u32,
 
+    /// AI type for all seats (shortcut to set all 4 seats to the same AI)
+    #[arg(long, conflicts_with_all = ["seat0", "seat1", "seat2", "seat3"])]
+    seats: Option<AiType>,
+
     /// AI type for seat 0
     #[arg(long, default_value = "strategic")]
     seat0: AiType,
@@ -102,9 +106,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting AI simulator");
     info!("Configuration: {} games", args.games);
+    
+    // Determine AI types: use --seats if provided, otherwise use individual seat parameters
+    let seat_types = if let Some(seats_ai) = args.seats {
+        [seats_ai.clone(), seats_ai.clone(), seats_ai.clone(), seats_ai]
+    } else {
+        [args.seat0, args.seat1, args.seat2, args.seat3]
+    };
+    
     info!(
         "AI types: seat0={:?}, seat1={:?}, seat2={:?}, seat3={:?}",
-        args.seat0, args.seat1, args.seat2, args.seat3
+        seat_types[0], seat_types[1], seat_types[2], seat_types[3]
     );
 
     // Create output writer
@@ -113,16 +125,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create AI players
     let ai_types = [
-        args.seat0.name().to_string(),
-        args.seat1.name().to_string(),
-        args.seat2.name().to_string(),
-        args.seat3.name().to_string(),
+        seat_types[0].name().to_string(),
+        seat_types[1].name().to_string(),
+        seat_types[2].name().to_string(),
+        seat_types[3].name().to_string(),
     ];
     let ais = [
-        create_ai_player(args.seat0.name())?,
-        create_ai_player(args.seat1.name())?,
-        create_ai_player(args.seat2.name())?,
-        create_ai_player(args.seat3.name())?,
+        create_ai_player(seat_types[0].name())?,
+        create_ai_player(seat_types[1].name())?,
+        create_ai_player(seat_types[2].name())?,
+        create_ai_player(seat_types[3].name())?,
     ];
 
     // Run simulations

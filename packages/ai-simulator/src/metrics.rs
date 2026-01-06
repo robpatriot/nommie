@@ -50,9 +50,9 @@ pub struct BidAccuracy {
     pub tricks: u8,
     pub exact: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub over: Option<u8>,
+    pub underbid: Option<u8>, // Amount by which tricks exceeded bid (tricks > bid)
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub under: Option<u8>,
+    pub overbid: Option<u8>, // Amount by which bid exceeded tricks (tricks < bid)
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -70,8 +70,8 @@ pub struct PlayerMetrics {
 #[derive(Debug, Clone, Serialize)]
 pub struct BidAccuracyStats {
     pub exact: u32,
-    pub over: u32,
-    pub under: u32,
+    pub underbid: u32, // Count of underbids (tricks > bid)
+    pub overbid: u32, // Count of overbids (tricks < bid)
     pub exact_pct: f64,
 }
 
@@ -142,16 +142,17 @@ fn build_round_metrics(round: &RoundHistory) -> RoundMetrics {
                 round_score
             };
             let exact = tricks == bid;
-            let over = if tricks > bid { Some(tricks - bid) } else { None };
-            let under = if tricks < bid { Some(bid - tricks) } else { None };
+            // Terminology: underbid = bid too low (tricks > bid), overbid = bid too high (tricks < bid)
+            let underbid = if tricks > bid { Some(tricks - bid) } else { None };
+            let overbid = if tricks < bid { Some(bid - tricks) } else { None };
 
             bid_accuracy.push(BidAccuracy {
                 seat: seat as u8,
                 bid,
                 tricks,
                 exact,
-                over,
-                under,
+                underbid,
+                overbid,
             });
         }
     }
@@ -211,23 +212,26 @@ fn build_player_metrics(
         .count() as u32;
 
     // Calculate bid accuracy
+    // Terminology: underbid = bid too low (tricks > bid), overbid = bid too high (tricks < bid)
     let mut exact = 0;
-    let mut over = 0;
-    let mut under = 0;
+    let mut underbid = 0; // tricks > bid
+    let mut overbid = 0; // tricks < bid
 
     for round in rounds {
         if let Some(ba) = round.bid_accuracy.iter().find(|ba| ba.seat == seat) {
             if ba.exact {
                 exact += 1;
-            } else if ba.over.is_some() {
-                over += 1;
-            } else if ba.under.is_some() {
-                under += 1;
+            } else if ba.underbid.is_some() {
+                // underbid = tricks > bid
+                underbid += 1;
+            } else if ba.overbid.is_some() {
+                // overbid = tricks < bid
+                overbid += 1;
             }
         }
     }
 
-    let total_bids = exact + over + under;
+    let total_bids = exact + underbid + overbid;
     let exact_pct = if total_bids > 0 {
         (exact as f64 / total_bids as f64) * 100.0
     } else {
@@ -252,8 +256,8 @@ fn build_player_metrics(
         rounds_won,
         bid_accuracy: BidAccuracyStats {
             exact,
-            over,
-            under,
+            underbid,
+            overbid,
             exact_pct,
         },
         avg_tricks_per_round: avg_tricks,
