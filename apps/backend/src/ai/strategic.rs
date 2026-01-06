@@ -506,6 +506,7 @@ impl Strategic {
 
         let mut best_trump: Option<Trump> = None;
         let mut best_estimate = -1.0f32;
+        let mut tied_trumps: Vec<Trump> = Vec::new();
 
         for &trump in &legal {
             // Create state with this trump suit
@@ -524,8 +525,22 @@ impl Strategic {
             let total = e_trump + e_cash + e_length + e_ruff;
             if total > best_estimate {
                 best_estimate = total;
-                best_trump = Some(trump);
+                tied_trumps.clear();
+                tied_trumps.push(trump);
+            } else if (total - best_estimate).abs() < 0.001 {
+                // Equal scores (within floating point tolerance)
+                tied_trumps.push(trump);
             }
+        }
+
+        // If we have tied trumps, use deterministic tie-breaker based on game state
+        if tied_trumps.len() > 1 {
+            // Use round number + player seat to rotate preference fairly
+            let tie_breaker =
+                (state.current_round as usize + state.player_seat as usize) % tied_trumps.len();
+            best_trump = Some(tied_trumps[tie_breaker]);
+        } else if let Some(trump) = tied_trumps.first() {
+            best_trump = Some(*trump);
         }
 
         // Fallback to original method if bucket estimation didn't select anything
@@ -544,8 +559,8 @@ impl Strategic {
                 }
             }
 
-            let mut best = None;
             let mut best_score = i32::MIN;
+            let mut tied_trumps: Vec<Trump> = Vec::new();
             for &t in &legal {
                 let suit = match t {
                     Trump::Clubs => Some(Suit::Clubs),
@@ -557,11 +572,21 @@ impl Strategic {
                 let score = suit.map(|s| Self::trump_score(hand, s)).unwrap_or(-999);
                 if score > best_score {
                     best_score = score;
-                    best = Some(t);
+                    tied_trumps.clear();
+                    tied_trumps.push(t);
+                } else if score == best_score {
+                    tied_trumps.push(t);
                 }
             }
 
-            best.unwrap_or_else(|| legal[0])
+            // If tied, use deterministic tie-breaker based on game state
+            if tied_trumps.len() > 1 {
+                let tie_breaker =
+                    (state.current_round as usize + state.player_seat as usize) % tied_trumps.len();
+                tied_trumps[tie_breaker]
+            } else {
+                tied_trumps.first().copied().unwrap_or_else(|| legal[0])
+            }
         }
     }
 

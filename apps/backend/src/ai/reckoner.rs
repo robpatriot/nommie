@@ -884,8 +884,8 @@ impl Reckoner {
             }
         }
 
-        let mut best = legal[0];
         let mut best_score = i32::MIN;
+        let mut tied_trumps: Vec<Trump> = Vec::new();
         for &t in &legal {
             let suit = match t {
                 Trump::Clubs => Some(Suit::Clubs),
@@ -897,10 +897,22 @@ impl Reckoner {
             let score = suit.map(|s| Self::trump_score(hand, s)).unwrap_or(-999);
             if score > best_score {
                 best_score = score;
-                best = t;
+                tied_trumps.clear();
+                tied_trumps.push(t);
+            } else if score == best_score {
+                tied_trumps.push(t);
             }
         }
-        best
+
+        // If tied, use deterministic tie-breaker based on game state
+        if tied_trumps.len() > 1 {
+            // Use round number + player seat to rotate preference fairly
+            let tie_breaker =
+                (state.current_round as usize + state.player_seat as usize) % tied_trumps.len();
+            tied_trumps[tie_breaker]
+        } else {
+            tied_trumps.first().copied().unwrap_or_else(|| legal[0])
+        }
     }
 }
 
