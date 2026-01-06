@@ -52,16 +52,16 @@ pub fn determine_trick_leader(
 ///
 /// **Always use these** instead of implementing game rules yourself:
 ///
-/// - [`legal_bids()`](Self::legal_bids) - valid bids you can make (handles dealer restriction)
+/// - [`GameContext::legal_bids()`](crate::domain::GameContext::legal_bids) - valid bids (via context)
 /// - [`legal_plays()`](Self::legal_plays) - valid cards to play (handles follow-suit rule)
 /// - [`legal_trumps()`](Self::legal_trumps) - valid trump choices (all 5 options)
 ///
 /// ## Example
 ///
 /// ```rust,ignore
-/// fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
-///     // Get legal options
-///     let legal_bids = state.legal_bids();
+/// fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
+///     // Get legal options (via context for full rule enforcement)
+///     let legal_bids = context.legal_bids(state);
 ///     
 ///     // Analyze your hand
 ///     let high_cards = state.hand.iter()
@@ -161,61 +161,6 @@ pub struct CurrentRoundInfo {
 }
 
 impl CurrentRoundInfo {
-    /// Get legal bids for this player.
-    ///
-    /// Returns valid bid values (0 to hand_size) that this player can make right now.
-    /// Automatically handles:
-    /// - Dealer restriction (cannot bid value that makes sum equal hand_size)
-    /// - Valid range (0 to hand_size)
-    /// - Turn order (returns empty vec if not your turn)
-    ///
-    /// # Returns
-    ///
-    /// - `Vec<u8>` - List of legal bid values (sorted 0..=hand_size)
-    ///   - Empty if not in Bidding phase or not your turn
-    ///   - Non-empty list during your turn in bidding
-    ///
-    /// # For AI Developers
-    ///
-    /// **Always use this method** instead of implementing bid validation yourself.
-    /// Choose from the returned values to ensure legal moves.
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// let legal_bids = state.legal_bids();
-    /// if legal_bids.is_empty() {
-    ///     return Err(AiError::InvalidMove("Not my turn to bid".into()));
-    /// }
-    /// // Choose from legal_bids
-    /// let bid = legal_bids[0];
-    /// ```
-    pub fn legal_bids(&self) -> Vec<u8> {
-        if self.game_state != Phase::Bidding {
-            return Vec::new();
-        }
-
-        // Check if it's this player's turn
-        let bid_count = self.bids.iter().filter(|b| b.is_some()).count();
-        let expected_seat = (self.dealer_pos + 1 + bid_count as u8) % 4;
-        if self.player_seat != expected_seat {
-            return Vec::new();
-        }
-
-        // Use domain function to get base legal bids
-        use crate::domain::rules::valid_bid_range;
-        let mut legal: Vec<u8> = valid_bid_range(self.hand_size).collect();
-
-        // Dealer restriction: if last to bid, cannot make sum equal hand_size
-        if bid_count == 3 {
-            let existing_sum: u8 = self.bids.iter().filter_map(|&b| b).sum();
-            let forbidden = self.hand_size.saturating_sub(existing_sum);
-            legal.retain(|&b| b != forbidden);
-        }
-
-        legal
-    }
-
     /// Get legal plays for this player.
     ///
     /// Returns valid cards from your hand that you can play right now.

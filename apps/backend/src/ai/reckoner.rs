@@ -1153,8 +1153,8 @@ impl Reckoner {
         est - (table_bias * k)
     }
 
-    fn compute_bid(state: &CurrentRoundInfo, _cx: &GameContext) -> u8 {
-        let legal = state.legal_bids();
+    fn compute_bid(state: &CurrentRoundInfo, cx: &GameContext) -> u8 {
+        let legal = cx.legal_bids(state);
         let hand_size = state.hand_size;
         let hand_size_f = hand_size as f32;
 
@@ -1410,7 +1410,7 @@ impl Reckoner {
 
 impl AiPlayer for Reckoner {
     fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, AiError> {
-        let legal = state.legal_bids();
+        let legal = cx.legal_bids(state);
         if legal.is_empty() {
             return Err(AiError::InvalidMove("No legal bids".into()));
         }

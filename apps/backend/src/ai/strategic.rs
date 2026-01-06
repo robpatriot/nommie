@@ -552,7 +552,7 @@ impl Strategic {
     }
 
     fn compute_bid(state: &CurrentRoundInfo, cx: &GameContext) -> u8 {
-        let legal = state.legal_bids();
+        let legal = cx.legal_bids(state);
         let hand = &state.hand;
         let hand_size = state.hand_size;
 
@@ -1394,7 +1394,7 @@ impl Strategic {
 
 impl AiPlayer for Strategic {
     fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, AiError> {
-        let legal = state.legal_bids();
+        let legal = cx.legal_bids(state);
         if legal.is_empty() {
             return Err(AiError::InvalidMove("No legal bids".into()));
         }

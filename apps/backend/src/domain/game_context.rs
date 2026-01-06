@@ -6,6 +6,7 @@
 
 use super::player_view::{CurrentRoundInfo, GameHistory};
 use super::round_memory::RoundMemory;
+use super::state::Phase;
 use crate::errors::domain::{DomainError, ValidationKind};
 
 /// Complete game context available at any point in a game.
@@ -32,17 +33,19 @@ use crate::errors::domain::{DomainError, ValidationKind};
 ///
 /// ```rust,ignore
 /// fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
-///     // Access game history for strategic decisions
-///     let history = context.game_history().ok_or(...)?;
+///     // Get legal bids (applies all rules including zero-bid streak)
+///     let legal_bids = context.legal_bids(state);
 ///     
-///     // Analyze opponent patterns over recent rounds
-///     let recent_rounds = history.rounds.iter().rev().take(5);
-///     for round in recent_rounds {
-///         // Analyze bidding patterns, trump choices, etc.
+///     // Access game history for strategic decisions
+///     if let Some(history) = context.game_history() {
+///         // Analyze opponent patterns over recent rounds
+///         let recent_rounds = history.rounds.iter().rev().take(5);
+///         for round in recent_rounds {
+///             // Analyze bidding patterns, trump choices, etc.
+///         }
 ///     }
 ///     
 ///     // Make informed bid
-///     let legal_bids = state.legal_bids();
 ///     Ok(legal_bids[0])
 /// }
 /// ```
@@ -202,5 +205,79 @@ impl GameContext {
     /// Part of the public API for AI players.
     pub fn round_memory(&self) -> Option<&RoundMemory> {
         self.round_memory.as_ref()
+    }
+
+    /// Get legal bids for the current player.
+    ///
+    /// Returns valid bid values (0..=hand_size) applying all rules:
+    /// - Valid range for hand size
+    /// - Dealer restriction (sum cannot equal hand_size)
+    /// - Zero-bid streak rule (no 4+ consecutive zeros)
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Current round info for the bidding player
+    ///
+    /// # Returns
+    ///
+    /// Sorted list of legal bid values, or empty if not this player's turn
+    /// or not in bidding phase.
+    ///
+    /// # For AI Developers
+    ///
+    /// **Always use this method** to get valid bid options. It handles all
+    /// bid validation rules automatically.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
+    ///     let legal_bids = context.legal_bids(state);
+    ///     if legal_bids.is_empty() {
+    ///         return Err(AiError::InvalidMove("No legal bids available".into()));
+    ///     }
+    ///     // Choose from legal_bids
+    ///     Ok(legal_bids[0])
+    /// }
+    /// ```
+    pub fn legal_bids(&self, state: &CurrentRoundInfo) -> Vec<u8> {
+        if state.game_state != Phase::Bidding {
+            return Vec::new();
+        }
+
+        // Check if it's this player's turn
+        let bid_count = state.bids.iter().filter(|b| b.is_some()).count();
+        let expected_seat = (state.dealer_pos + 1 + bid_count as u8) % 4;
+        if state.player_seat != expected_seat {
+            return Vec::new();
+        }
+
+        // Base legal bids from valid range
+        use crate::domain::rules::valid_bid_range;
+        let mut legal: Vec<u8> = valid_bid_range(state.hand_size).collect();
+
+        // Dealer restriction: if last to bid, cannot make sum equal hand_size
+        if bid_count == 3 {
+            let existing_sum: u8 = state.bids.iter().filter_map(|&b| b).sum();
+            let forbidden = state.hand_size.saturating_sub(existing_sum);
+            legal.retain(|&b| b != forbidden);
+        }
+
+        // Zero-bid streak rule: cannot bid 0 four times in a row
+        if legal.contains(&0) {
+            if let Some(history) = self.game_history() {
+                if crate::domain::bidding::validate_consecutive_zero_bids(
+                    history,
+                    state.player_seat,
+                    state.current_round,
+                )
+                .is_err()
+                {
+                    legal.retain(|&b| b != 0);
+                }
+            }
+        }
+
+        legal
     }
 }

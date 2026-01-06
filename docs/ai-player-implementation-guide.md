@@ -111,7 +111,7 @@ Use the short template in **Appendix A.1** to get a working AI.
 For a complete, thread‑safe reference with deterministic RNG, see **Appendix A.2 (RandomPlayer)**.
 
 Typical loop:
-1. Call legal helpers in this order: `state.legal_bids()` → `state.legal_trumps()` → `state.legal_plays()`.
+1. Call legal helpers in this order: `context.legal_bids(state)` → `state.legal_trumps()` → `state.legal_plays()`.
 2. Apply your strategy (bidding heuristics, trump selection, then card choice).
 3. Return a **legal** result. Never panic.
 
@@ -137,7 +137,7 @@ Once registered, your AI becomes available via `crate::ai::registry::{registered
 Your AI implements three methods, each receiving **read‑only** views:
 
 - `choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError>`  
-  Called during **Bidding** phase only. Use `state.legal_bids()`; engine enforces dealer restriction and zero‑bid streak rule.
+  Called during **Bidding** phase only. Use `context.legal_bids(state)`; enforces dealer restriction and zero‑bid streak rule.
 
 - `choose_trump(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Trump, AiError>`  
   Called during **TrumpSelection** phase only, and **only for the bid winner**. Use `state.legal_trumps()`; all 5 options are valid.
@@ -167,9 +167,13 @@ Your AI implements three methods, each receiving **read‑only** views:
 - `scores: [i16; 4]` — **cumulative** scores from all completed rounds (current round not included)
 
 ### Helpers (always prefer these)
-- `legal_bids() -> Vec<u8>` — sorted 0..=hand_size; returns empty if not your turn
-- `legal_trumps() -> Vec<Trump>` — all 5 options (Clubs, Diamonds, Hearts, Spades, NoTrumps)
-- `legal_plays() -> Vec<Card>` — arbitrary order; returns empty if not your turn
+
+**On `GameContext`:**
+- `context.legal_bids(state) -> Vec<u8>` — sorted 0..=hand_size; enforces dealer restriction and zero‑bid streak rule
+
+**On `CurrentRoundInfo`:**
+- `state.legal_trumps() -> Vec<Trump>` — all 5 options (Clubs, Diamonds, Hearts, Spades, NoTrumps)
+- `state.legal_plays() -> Vec<Card>` — arbitrary order; returns empty if not your turn
 
 **Note:** The engine calls AIs only when it's their turn, so `legal_*` should never be empty. If needed, advance with `(seat + 1) % 4`.
 
@@ -306,8 +310,8 @@ impl MyAI {
 }
 
 impl AiPlayer for MyAI {
-    fn choose_bid(&self, state: &CurrentRoundInfo, _cx: &GameContext) -> Result<u8, AiError> {
-        let legal = state.legal_bids();
+    fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, AiError> {
+        let legal = cx.legal_bids(state);
         legal.first().copied().ok_or_else(|| AiError::InvalidMove("No legal bids".into()))
     }
 
@@ -344,8 +348,8 @@ impl RandomPlayer {
 }
 
 impl AiPlayer for RandomPlayer {
-    fn choose_bid(&self, state: &CurrentRoundInfo, _cx: &GameContext) -> Result<u8, AiError> {
-        let legal = state.legal_bids();
+    fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, AiError> {
+        let legal = cx.legal_bids(state);
         if legal.is_empty() { return Err(AiError::InvalidMove("No legal bids".into())); }
         let mut rng = self.rng.lock().map_err(|e| AiError::Internal(format!("rng lock: {e}")))?;
         legal.choose(&mut *rng).copied().ok_or_else(|| AiError::Internal("rng choice".into()))
@@ -408,7 +412,7 @@ mod tests {
 #### C.1 — Opponent Analysis using GameHistory
 ```rust
 fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, AiError> {
-    let legal = state.legal_bids();
+    let legal = cx.legal_bids(state);
 
     if let Some(hist) = cx.game_history() {
         let me = state.player_seat as usize;

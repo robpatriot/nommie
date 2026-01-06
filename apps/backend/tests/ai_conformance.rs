@@ -136,8 +136,8 @@ mod testkit {
         Scenario { state, context }
     }
 
-    pub fn assert_bid_legal(bid: u8, state: &CurrentRoundInfo) {
-        let legal = state.legal_bids();
+    pub fn assert_bid_legal(bid: u8, state: &CurrentRoundInfo, context: &GameContext) {
+        let legal = context.legal_bids(state);
         assert!(
             legal.contains(&bid),
             "Bid {bid} must be within legal options: {legal:?}"
@@ -194,7 +194,7 @@ fn run_dealer_restriction(factory: &AiFactory) {
     let bid = ai
         .choose_bid(&scenario.state, &scenario.context)
         .expect("AI should produce a bid");
-    assert_bid_legal(bid, &scenario.state);
+    assert_bid_legal(bid, &scenario.state, &scenario.context);
 }
 
 fn run_must_follow_suit(factory: &AiFactory) {

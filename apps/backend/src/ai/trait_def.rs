@@ -19,7 +19,7 @@
 //! ```rust,ignore
 //! use crate::ai::{AiPlayer, AiError};
 //! use crate::domain::player_view::CurrentRoundInfo;
-//! use crate::domain::{Card, Trump};
+//! use crate::domain::{Card, GameContext, Trump};
 //!
 //! pub struct MyAI {
 //!     // Your AI's state
@@ -27,18 +27,18 @@
 //!
 //! impl AiPlayer for MyAI {
 //!     fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
-//!         let legal_bids = state.legal_bids();
+//!         let legal_bids = context.legal_bids(state);
 //!         // Your bidding logic here
 //!         Ok(legal_bids[0])
 //!     }
 //!
-//!     fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
+//!     fn choose_play(&self, state: &CurrentRoundInfo, _context: &GameContext) -> Result<Card, AiError> {
 //!         let legal_plays = state.legal_plays();
 //!         // Your card selection logic here
 //!         Ok(legal_plays[0])
 //!     }
 //!
-//!     fn choose_trump(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Trump, AiError> {
+//!     fn choose_trump(&self, _state: &CurrentRoundInfo, _context: &GameContext) -> Result<Trump, AiError> {
 //!         // Your trump selection logic here
 //!         Ok(Trump::Spades)
 //!     }
@@ -122,22 +122,22 @@ impl From<AiError> for AppError {
 /// ```rust,ignore
 /// use crate::ai::{AiPlayer, AiError};
 /// use crate::domain::player_view::CurrentRoundInfo;
-/// use crate::domain::{Card, Trump};
+/// use crate::domain::{Card, GameContext, Trump};
 ///
 /// pub struct SimpleAI;
 ///
 /// impl AiPlayer for SimpleAI {
 ///     fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
-///         let legal_bids = state.legal_bids();
+///         let legal_bids = context.legal_bids(state);
 ///         Ok(legal_bids[0])  // Bid the minimum legal value
 ///     }
 ///
-///     fn choose_play(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Card, AiError> {
+///     fn choose_play(&self, state: &CurrentRoundInfo, _context: &GameContext) -> Result<Card, AiError> {
 ///         let legal_plays = state.legal_plays();
 ///         Ok(legal_plays[0])  // Play the first legal card
 ///     }
 ///
-///     fn choose_trump(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<Trump, AiError> {
+///     fn choose_trump(&self, _state: &CurrentRoundInfo, _context: &GameContext) -> Result<Trump, AiError> {
 ///         Ok(Trump::Spades)  // Always choose Spades
 ///     }
 /// }
@@ -153,13 +153,14 @@ pub trait AiPlayer: Send + Sync {
     ///
     /// # Returns
     ///
-    /// * `Ok(u8)` - A legal bid value (query `state.legal_bids()` for valid options)
+    /// * `Ok(u8)` - A legal bid value (query `context.legal_bids(state)` for valid options)
     /// * `Err(AiError)` - Internal error or no legal bids available
     ///
     /// # Important
     ///
-    /// **Always use** `state.legal_bids()` to get valid bid options. This handles:
+    /// **Always use** `context.legal_bids(state)` to get valid bid options. This handles:
     /// - Dealer restriction (sum cannot equal hand_size)
+    /// - Zero-bid streak rule (cannot bid 0 four times in a row)
     /// - Valid range (0 to hand_size)
     /// - Turn order (returns empty vec if not your turn)
     ///
@@ -167,7 +168,7 @@ pub trait AiPlayer: Send + Sync {
     ///
     /// ```rust,ignore
     /// fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
-    ///     let legal_bids = state.legal_bids();
+    ///     let legal_bids = context.legal_bids(state);
     ///     
     ///     if legal_bids.is_empty() {
     ///         return Err(AiError::InvalidMove("No legal bids available".into()));

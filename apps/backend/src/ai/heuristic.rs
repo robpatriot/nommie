@@ -242,8 +242,8 @@ impl Heuristic {
 }
 
 impl AiPlayer for Heuristic {
-    fn choose_bid(&self, state: &CurrentRoundInfo, _cx: &GameContext) -> Result<u8, AiError> {
-        let legal = state.legal_bids();
+    fn choose_bid(&self, state: &CurrentRoundInfo, cx: &GameContext) -> Result<u8, AiError> {
+        let legal = cx.legal_bids(state);
         if legal.is_empty() {
             return Err(AiError::InvalidMove("No legal bids".into()));
         }

@@ -40,22 +40,22 @@
 //! ```rust,ignore
 //! use crate::ai::{AiPlayer, AiError};
 //! use crate::domain::player_view::CurrentRoundInfo;
-//! use crate::domain::{Card, Trump};
+//! use crate::domain::{Card, GameContext, Trump};
 //!
 //! pub struct SimpleAI;
 //!
 //! impl AiPlayer for SimpleAI {
-//!     fn choose_bid(&self, state: &CurrentRoundInfo) -> Result<u8, AiError> {
-//!         let legal_bids = state.legal_bids();
+//!     fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
+//!         let legal_bids = context.legal_bids(state);
 //!         Ok(legal_bids[0])  // Bid minimum
 //!     }
 //!
-//!     fn choose_play(&self, state: &CurrentRoundInfo) -> Result<Card, AiError> {
+//!     fn choose_play(&self, state: &CurrentRoundInfo, _context: &GameContext) -> Result<Card, AiError> {
 //!         let legal_plays = state.legal_plays();
 //!         Ok(legal_plays[0])  // Play first legal card
 //!     }
 //!
-//!     fn choose_trump(&self, _state: &CurrentRoundInfo) -> Result<Trump, AiError> {
+//!     fn choose_trump(&self, _state: &CurrentRoundInfo, _context: &GameContext) -> Result<Trump, AiError> {
 //!         Ok(Trump::Spades)  // Always choose Spades
 //!     }
 //! }

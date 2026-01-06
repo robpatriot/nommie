@@ -46,7 +46,7 @@ use crate::domain::{Card, GameContext, Trump};
 /// When building custom AIs, follow these patterns from `RandomPlayer`:
 ///
 /// 1. **Thread Safety**: Use `Mutex` for mutable state (RNG, statistics, etc.)
-/// 2. **Legal Moves**: Always query `state.legal_bids()` and `state.legal_plays()`
+/// 2. **Legal Moves**: Always query `context.legal_bids(state)` and `state.legal_plays()`
 /// 3. **Error Handling**: Wrap errors, check preconditions, never panic
 /// 4. **Determinism**: Support optional seeding for testing
 ///
@@ -93,10 +93,10 @@ impl RandomPlayer {
 }
 
 impl AiPlayer for RandomPlayer {
-    fn choose_bid(&self, state: &CurrentRoundInfo, _context: &GameContext) -> Result<u8, AiError> {
+    fn choose_bid(&self, state: &CurrentRoundInfo, context: &GameContext) -> Result<u8, AiError> {
         // Pattern 1: Always get legal moves first
-        // This handles dealer restriction and turn order automatically
-        let legal_bids = state.legal_bids();
+        // This handles all bid rules including dealer restriction and zero-bid streak
+        let legal_bids = context.legal_bids(state);
 
         // Pattern 2: Validate preconditions before proceeding
         if legal_bids.is_empty() {
