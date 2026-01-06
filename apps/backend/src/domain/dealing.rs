@@ -31,8 +31,10 @@ fn full_deck() -> Vec<Card> {
     deck
 }
 
-/// Simple LCG (Linear Congruential Generator) for deterministic shuffling.
-/// Uses constants from Numerical Recipes.
+/// Simple deterministic RNG for shuffling.
+///
+/// Uses a SplitMix64-style generator for good statistical properties while
+/// remaining fast and deterministic given a seed.
 struct SimpleLcg {
     state: u64,
 }
@@ -43,16 +45,28 @@ impl SimpleLcg {
     }
 
     fn next(&mut self) -> u64 {
-        // LCG: X(n+1) = (a * X(n) + c) mod m
-        // Using Numerical Recipes constants
-        const A: u64 = 1664525;
-        const C: u64 = 1013904223;
-        self.state = self.state.wrapping_mul(A).wrapping_add(C);
-        self.state
+        // SplitMix64: well-distributed 64-bit generator.
+        self.state = self.state.wrapping_add(0x9E3779B97F4A7C15);
+        let mut z = self.state;
+        z ^= z >> 30;
+        z = z.wrapping_mul(0xBF58476D1CE4E5B9);
+        z ^= z >> 27;
+        z = z.wrapping_mul(0x94D049BB133111EB);
+        z ^ (z >> 31)
     }
 
     fn next_range(&mut self, max: usize) -> usize {
-        (self.next() % max as u64) as usize
+        let m = max as u64;
+        // Compute largest multiple of m that fits in u64 to avoid modulo bias.
+        // Values >= limit are discarded using rejection sampling.
+        let limit = u64::MAX - (u64::MAX % m);
+
+        loop {
+            let x = self.next();
+            if x < limit {
+                return (x % m) as usize;
+            }
+        }
     }
 }
 

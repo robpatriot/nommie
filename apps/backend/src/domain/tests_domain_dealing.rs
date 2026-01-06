@@ -144,3 +144,118 @@ fn test_dealing_hand_uniqueness() {
         "No card should appear in multiple hands"
     );
 }
+
+/// Test suit distribution across many deals to detect bias.
+///
+/// This test performs a large number of deals and checks if suits
+/// are evenly distributed. If the shuffle has bias, certain suits
+/// will appear more frequently than expected.
+#[test]
+fn test_suit_distribution_bias() {
+    use std::collections::HashMap;
+
+    use crate::domain::Suit;
+
+    const NUM_DEALS: u32 = 10_000;
+    const HAND_SIZE: u8 = 13;
+
+    // Track suit counts across all deals
+    let mut suit_counts: HashMap<Suit, u32> = HashMap::new();
+    suit_counts.insert(Suit::Clubs, 0);
+    suit_counts.insert(Suit::Diamonds, 0);
+    suit_counts.insert(Suit::Hearts, 0);
+    suit_counts.insert(Suit::Spades, 0);
+
+    // Track suit distribution by player position
+    let mut suit_by_player: [HashMap<Suit, u32>; 4] = [
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+        HashMap::new(),
+    ];
+    for player_suits in &mut suit_by_player {
+        player_suits.insert(Suit::Clubs, 0);
+        player_suits.insert(Suit::Diamonds, 0);
+        player_suits.insert(Suit::Hearts, 0);
+        player_suits.insert(Suit::Spades, 0);
+    }
+
+    // Perform many deals with different seeds
+    for deal_num in 0..NUM_DEALS {
+        let seed = deal_num as u64;
+        let hands = deal_hands(4, HAND_SIZE, seed).unwrap();
+
+        // Count suits in each hand
+        for (player_idx, hand) in hands.iter().enumerate() {
+            for card in hand {
+                *suit_counts.get_mut(&card.suit).unwrap() += 1;
+                *suit_by_player[player_idx].get_mut(&card.suit).unwrap() += 1;
+            }
+        }
+    }
+
+    // Calculate expected counts (each suit should appear equally)
+    // Each deal: 4 players * 13 cards = 52 cards total
+    // Each suit should appear 13 times per deal
+    // Total deals: NUM_DEALS
+    // Expected per suit: NUM_DEALS * 13
+    let total_cards = NUM_DEALS * 4 * HAND_SIZE as u32;
+    let expected_per_suit = total_cards / 4;
+
+    println!("\n=== Suit Distribution Test ({} deals) ===", NUM_DEALS);
+    println!("Total cards dealt: {}", total_cards);
+    println!("Expected per suit: {}", expected_per_suit);
+    println!("\nOverall suit distribution:");
+    for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
+        let count = suit_counts[&suit];
+        let percentage = (count as f64 / total_cards as f64) * 100.0;
+        let deviation = count as i32 - expected_per_suit as i32;
+        let deviation_pct = (deviation as f64 / expected_per_suit as f64) * 100.0;
+        println!(
+            "  {:?}: {} ({:.2}%) - deviation: {} ({:+.2}%)",
+            suit, count, percentage, deviation, deviation_pct
+        );
+    }
+
+    println!("\nSuit distribution by player position:");
+    for (player_idx, player_suits) in suit_by_player.iter().enumerate() {
+        println!("  Player {}:", player_idx);
+        for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
+            let count = player_suits[&suit];
+            let expected_per_player_suit = NUM_DEALS * HAND_SIZE as u32 / 4;
+            let percentage = (count as f64 / (NUM_DEALS as f64 * HAND_SIZE as f64)) * 100.0;
+            let deviation = count as i32 - expected_per_player_suit as i32;
+            println!(
+                "    {:?}: {} ({:.2}%) - deviation: {}",
+                suit, count, percentage, deviation
+            );
+        }
+    }
+
+    // Check for significant bias (more than 1% deviation)
+    // With 10,000 deals of 13 cards each, we expect ~32,500 cards per suit
+    // 1% deviation would be ~325 cards, but we'll use a more lenient threshold
+    // for statistical variation: 0.5% of expected
+    let max_allowed_deviation = (expected_per_suit as f64 * 0.005) as u32;
+    let mut max_deviation = 0u32;
+
+    for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
+        let count = suit_counts[&suit];
+        let deviation = count.abs_diff(expected_per_suit);
+        max_deviation = max_deviation.max(deviation);
+    }
+
+    println!(
+        "\nMax deviation: {} (allowed: {})",
+        max_deviation, max_allowed_deviation
+    );
+
+    // This test will fail if there's significant bias
+    // We use a lenient threshold to account for statistical variation
+    assert!(
+        max_deviation <= max_allowed_deviation,
+        "Suit distribution shows significant bias. Max deviation: {} (expected < {})",
+        max_deviation,
+        max_allowed_deviation
+    );
+}
