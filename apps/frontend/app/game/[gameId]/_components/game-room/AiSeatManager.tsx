@@ -23,10 +23,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
   const isRegistryLoading = registry?.isLoading ?? false
   const registryError = registry?.error ?? null
   const preferredDefaultName =
-    registry?.defaultName ??
-    registryEntries.find((entry) => entry.name === 'Strategic')?.name ??
-    registryEntries[0]?.name ??
-    'Strategic'
+    registry?.defaultName ?? registryEntries[0]?.name ?? ''
   const addDisabled =
     !aiState.canAdd ||
     aiState.isPending ||

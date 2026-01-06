@@ -851,17 +851,27 @@ impl GameService {
 
     /// Find the default AI profile.
     ///
-    /// Returns the AI profile for the default AI player (currently Tactician).
+    /// Returns the AI profile for the default AI player.
     /// This is used both for player-to-AI conversion and as the default when adding AI seats.
     pub async fn find_default_ai_profile(
         &self,
         txn: &DatabaseTransaction,
     ) -> Result<ai_profiles::AiProfile, AppError> {
-        use crate::ai::Tactician;
+        use crate::ai::registry;
+        let default = registry::default_ai().ok_or_else(|| {
+            AppError::internal(
+                crate::errors::ErrorCode::InternalError,
+                format!(
+                    "DEFAULT_AI_NAME '{}' is not registered",
+                    registry::DEFAULT_AI_NAME
+                ),
+                std::io::Error::other("default AI not registered"),
+            )
+        })?;
         let profile = ai_profiles::find_by_registry_variant(
             txn,
-            Tactician::NAME,
-            Tactician::VERSION,
+            default.name,
+            default.version,
             "default",
         )
         .await
@@ -870,9 +880,9 @@ impl GameService {
             AppError::internal(
                 crate::errors::ErrorCode::InternalError,
                 format!(
-                    "Default Tactician AI profile not found (registry_name: {}, version: {}, variant: default)",
-                    Tactician::NAME,
-                    Tactician::VERSION
+                    "Default AI profile not found (registry_name: {}, version: {}, variant: default)",
+                    default.name,
+                    default.version
                 ),
                 std::io::Error::other("AI profile not found"),
             )
@@ -883,7 +893,7 @@ impl GameService {
     /// Convert a human player membership to an AI player.
     ///
     /// This preserves the seat position and all game state, but converts the player
-    /// from human to AI. The AI will use the default Tactician profile.
+    /// from human to AI. The AI will use the default AI profile.
     ///
     /// # Arguments
     /// * `txn` - Database transaction

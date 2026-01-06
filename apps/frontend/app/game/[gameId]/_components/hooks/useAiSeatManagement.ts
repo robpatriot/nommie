@@ -15,7 +15,7 @@ import type { BackendApiError } from '@/lib/errors'
 import { toQueryError } from '@/lib/queries/query-error-handler'
 import type { AiSeatSelection } from '../game-room-view'
 
-const DEFAULT_AI_NAME = 'Strategic'
+const FALLBACK_AI_NAME = 'Tactician'
 
 type AiRegistryEntryState = {
   name: string
@@ -49,7 +49,7 @@ export function useAiSeatManagement({
 
   // AI registry query - only enabled when AI manager is visible
   const {
-    data: aiRegistryData = [],
+    data: aiRegistryData,
     isLoading: isAiRegistryLoading,
     error: aiRegistryQueryError,
   } = useAiRegistry(canViewAiManager)
@@ -61,8 +61,12 @@ export function useAiSeatManagement({
       : tErrors('failedToLoadAiRegistry')
     : null
 
-  // Convert AI registry data to expected format
-  const aiRegistry: AiRegistryEntryState[] = aiRegistryData
+  // Extract entries and default from registry response
+  const aiRegistry: AiRegistryEntryState[] = useMemo(
+    () => aiRegistryData?.entries ?? [],
+    [aiRegistryData?.entries]
+  )
+  const defaultAiName = aiRegistryData?.defaultName ?? FALLBACK_AI_NAME
 
   // Mutations
   const addAiSeatMutation = useAddAiSeat()
@@ -93,8 +97,8 @@ export function useAiSeatManagement({
 
       const registryName =
         selection?.registryName ??
-        aiRegistry.find((entry) => entry.name === DEFAULT_AI_NAME)?.name ??
-        DEFAULT_AI_NAME
+        aiRegistry.find((entry) => entry.name === defaultAiName)?.name ??
+        defaultAiName
       const registryVersion =
         selection?.registryVersion ??
         aiRegistry.find((entry) => entry.name === registryName)?.version
@@ -116,6 +120,7 @@ export function useAiSeatManagement({
     [
       aiRegistry,
       aiControlsEnabled,
+      defaultAiName,
       gameId,
       isAiPending,
       addAiSeatMutation,
@@ -261,7 +266,7 @@ export function useAiSeatManagement({
         entries: aiRegistry,
         isLoading: isAiRegistryLoading,
         error: aiRegistryError,
-        defaultName: DEFAULT_AI_NAME,
+        defaultName: defaultAiName,
       },
       seats: seatInfo,
     }
@@ -272,6 +277,7 @@ export function useAiSeatManagement({
     availableSeats,
     aiControlsEnabled,
     canViewAiManager,
+    defaultAiName,
     handleAddAi,
     handleRemoveAiSeat,
     handleUpdateAiSeat,

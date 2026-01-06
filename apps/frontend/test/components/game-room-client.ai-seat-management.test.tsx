@@ -171,12 +171,18 @@ describe('GameRoomClient', () => {
       let resolveRegistry: () => void
       const registryPromise = new Promise<{
         kind: 'ok'
-        data: Array<{ name: string; version: string }>
+        data: {
+          entries: Array<{ name: string; version: string }>
+          defaultName: string
+        }
       }>((resolve) => {
         resolveRegistry = () =>
           resolve({
             kind: 'ok',
-            data: [{ name: 'Heuristic', version: '1.0.0' }],
+            data: {
+              entries: [{ name: 'Tactician', version: '1.4.0' }],
+              defaultName: 'Tactician',
+            },
           })
       })
       mockFetchAiRegistryAction.mockReturnValueOnce(registryPromise)

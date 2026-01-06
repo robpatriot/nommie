@@ -264,10 +264,13 @@ export function setupGameRoomClientTest(): void {
   mockRemoveAiSeatAction.mockResolvedValue({ kind: 'ok' })
   mockFetchAiRegistryAction.mockResolvedValue({
     kind: 'ok',
-    data: [
-      { name: 'Heuristic', version: '1.0.0' },
-      { name: 'RandomPlayer', version: '1.0.0' },
-    ],
+    data: {
+      entries: [
+        { name: 'Tactician', version: '1.4.0' },
+        { name: 'RandomPlayer', version: '1.0.0' },
+      ],
+      defaultName: 'Tactician',
+    },
   })
 }
 

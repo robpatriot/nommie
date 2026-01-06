@@ -252,7 +252,12 @@ export interface AiRegistryEntry {
   version: string
 }
 
-export async function listRegisteredAis(): Promise<AiRegistryEntry[]> {
+export interface AiRegistryResponse {
+  entries: AiRegistryEntry[]
+  defaultName: string
+}
+
+export async function listRegisteredAis(): Promise<AiRegistryResponse> {
   const response = await fetchWithAuth('/api/games/ai/registry', {
     method: 'GET',
   })
@@ -266,7 +271,10 @@ export async function listRegisteredAis(): Promise<AiRegistryEntry[]> {
   }
 
   const data = await response.json()
-  return Array.isArray(data.ais) ? data.ais : []
+  return {
+    entries: Array.isArray(data.ais) ? data.ais : [],
+    defaultName: data.default_name ?? 'Tactician',
+  }
 }
 
 function toBidConstraints(

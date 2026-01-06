@@ -14,7 +14,7 @@ import {
   updateAiSeat,
   removeAiSeat,
   listRegisteredAis,
-  type AiRegistryEntry,
+  type AiRegistryResponse,
 } from '@/lib/api/game-room'
 import {
   toErrorResult,
@@ -443,11 +443,11 @@ export async function updateAiSeatAction(
 }
 
 export async function fetchAiRegistryAction(): Promise<
-  ActionResult<AiRegistryEntry[]>
+  ActionResult<AiRegistryResponse>
 > {
   try {
-    const ais = await listRegisteredAis()
-    return { kind: 'ok', data: ais }
+    const registry = await listRegisteredAis()
+    return { kind: 'ok', data: registry }
   } catch (error) {
     const t = await getTranslations('errors.actions')
     return toErrorResult(error, t('failedToFetchAiRegistry'))

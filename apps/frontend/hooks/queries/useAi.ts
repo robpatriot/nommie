@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchAiRegistryAction } from '@/app/actions/game-room-actions'
 import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
-import type { AiRegistryEntry } from '@/lib/api/game-room'
+import type { AiRegistryResponse } from '@/lib/api/game-room'
 
 /**
  * Query hook to fetch AI registry.
@@ -14,7 +14,7 @@ import type { AiRegistryEntry } from '@/lib/api/game-room'
 export function useAiRegistry(enabled: boolean = true) {
   return useQuery({
     queryKey: queryKeys.ai.registry(),
-    queryFn: async (): Promise<AiRegistryEntry[]> => {
+    queryFn: async (): Promise<AiRegistryResponse> => {
       const result = await fetchAiRegistryAction()
       if (result.kind === 'error') {
         throw handleActionResultError(result)

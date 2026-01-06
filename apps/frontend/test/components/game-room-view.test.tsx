@@ -337,11 +337,11 @@ describe('GameRoomView', () => {
           onUpdateSeat,
           registry: {
             entries: [
-              { name: 'Heuristic', version: '1.0.0' },
+              { name: 'Tactician', version: '1.4.0' },
               { name: 'RandomPlayer', version: '1.0.0' },
             ],
             isLoading: false,
-            defaultName: 'Heuristic',
+            defaultName: 'Tactician',
           },
           seats: [
             {
@@ -360,7 +360,7 @@ describe('GameRoomView', () => {
               isOccupied: true,
               isAi: true,
               isReady: true,
-              aiProfile: { name: 'Heuristic', version: '1.0.0' },
+              aiProfile: { name: 'Tactician', version: '1.4.0' },
             },
             {
               seat: 2,
@@ -369,7 +369,7 @@ describe('GameRoomView', () => {
               isOccupied: true,
               isAi: true,
               isReady: false,
-              aiProfile: { name: 'Heuristic', version: '1.0.0' },
+              aiProfile: { name: 'Tactician', version: '1.4.0' },
             },
             {
               seat: 3,
@@ -407,7 +407,7 @@ describe('GameRoomView', () => {
     await userEvent.selectOptions(profileSelect, 'RandomPlayer::1.0.0')
     await userEvent.click(removeSeatButton)
 
-    expect(onAdd).toHaveBeenCalledWith({ registryName: 'Heuristic' })
+    expect(onAdd).toHaveBeenCalledWith({ registryName: 'Tactician' })
     expect(onUpdateSeat).toHaveBeenCalledWith(1, {
       registryName: 'RandomPlayer',
       registryVersion: '1.0.0',
@@ -458,9 +458,9 @@ describe('GameRoomView', () => {
           onRemoveSeat,
           onUpdateSeat,
           registry: {
-            entries: [{ name: 'Heuristic', version: '1.0.0' }],
+            entries: [{ name: 'Tactician', version: '1.4.0' }],
             isLoading: false,
-            defaultName: 'Heuristic',
+            defaultName: 'Tactician',
           },
           seats: [],
         }}

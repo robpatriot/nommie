@@ -8,6 +8,10 @@
 
 use crate::ai::{AiPlayer, Heuristic, RandomPlayer, Reckoner, Strategic, Tactician};
 
+/// The default AI used when adding AI players to games.
+/// This is the single source of truth for the default AI selection.
+pub const DEFAULT_AI_NAME: &str = Tactician::NAME;
+
 /// Factory definition for constructing AI implementations.
 pub struct AiFactory {
     pub name: &'static str,
@@ -109,6 +113,12 @@ pub fn registered_ais() -> &'static [AiFactory] {
 /// Finds a registered AI factory by its name.
 pub fn by_name(name: &str) -> Option<&'static AiFactory> {
     registered_ais().iter().find(|factory| factory.name == name)
+}
+
+/// Returns the default AI factory.
+/// Returns None only if DEFAULT_AI_NAME is misconfigured (should never happen).
+pub fn default_ai() -> Option<&'static AiFactory> {
+    by_name(DEFAULT_AI_NAME)
 }
 
 fn make_random_player(seed: Option<u64>) -> Box<dyn AiPlayer + Send + Sync> {
