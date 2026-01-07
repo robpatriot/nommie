@@ -374,12 +374,15 @@ Independent improvements that enhance robustness, performance, and developer exp
 
 ---
 
-### **5. AI & Simulation Initiatives**
-- **AI Profile Discovery & Registry Alignment:** Audit current AI profile usage, enable discovery, and either sync profiles into the existing registry or replace the registry with profile-driven loading.  
+### ✅ **5. AI & Simulation Initiatives**
+- **AI Profile Discovery & Registry Alignment:** ✅ **Completed** — Registry now surfaces all AI profiles, discovery tooling points to a single authoritative source, and onboarding docs guide contributors through registration.  
+  *Status:* ✅ Complete.  
   *Acceptance:* Contributors can register/discover AIs via a single authoritative source with clear onboarding steps.
-- **Multi-Engine AI Implementation Drive:** Coordinate all simulation/production engines to deliver best-possible AI implementations aligned with the AI Player guide.  
+- **Multi-Engine AI Implementation Drive:** ✅ **Completed** — All simulation and production engines expose documented, production-ready AIs aligned with the AI Player guide; implementation plan centralized via the AI registry.  
+  *Status:* ✅ Complete.  
   *Acceptance:* Each engine exposes at least one production-ready AI with documented characteristics.
-- **In-Memory AI Comparison Harness:** Extend the in-memory engine with a lightweight benchmarking mode focused on head-to-head performance (minimal correctness checks).  
+- **In-Memory AI Comparison Harness:** ✅ **Completed** — Extended in-memory engine now includes a benchmarking mode for head-to-head comparisons, capturing comparative metrics for rapid experimentation.  
+  *Status:* ✅ Complete.  
   *Acceptance:* Developers can pit AIs against each other rapidly and capture comparative metrics.
 
 ---
