@@ -79,3 +79,6 @@ backend-test-support = { path = "../../packages/backend-test-support" }
 name = "backend"
 path = "src/main.rs"
 test = false
+
+[lib]
+path = "src/lib.rs"

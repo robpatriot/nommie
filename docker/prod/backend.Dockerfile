@@ -23,13 +23,14 @@ COPY packages/migration/src packages/migration/src
 COPY packages/backend-test-support/src packages/backend-test-support/src
 COPY packages/db-infra/src packages/db-infra/src
 
-# Create dummy source files only for binaries to cache dependency compilation
+# Create a dummy lib.rs to cache dependency compilation.
+# Important: build only the library here, so we never accidentally ship a dummy backend binary.
 RUN mkdir -p apps/backend/src \
-    && echo "fn main() {}" > apps/backend/src/main.rs \
+    && echo "pub fn _dummy() {}" > apps/backend/src/lib.rs \
     && mkdir -p apps/migration-cli/src \
     && echo "fn main() {}" > apps/migration-cli/src/main.rs
 
-RUN cargo build --release --manifest-path apps/backend/Cargo.toml
+RUN cargo build --release --lib --manifest-path apps/backend/Cargo.toml
 
 # Remove dummy sources before copying the real ones
 RUN rm -rf apps/backend/src \
@@ -39,10 +40,10 @@ RUN rm -rf apps/backend/src \
 COPY . .
 
 # Build the actual backend binary
-RUN cargo build --locked --release --manifest-path apps/backend/Cargo.toml
+RUN cargo build --locked --release --bin backend --manifest-path apps/backend/Cargo.toml
 
 # Build migration-cli binary
-RUN cargo build --locked --release --manifest-path apps/migration-cli/Cargo.toml
+RUN cargo build --locked --release --bin migration --manifest-path apps/migration-cli/Cargo.toml
 
 FROM rust:1.91.1-slim AS runtime
 

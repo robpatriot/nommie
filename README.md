@@ -25,12 +25,12 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
 
 ## Production Containers
 
-We ship standalone Dockerfiles for the backend (`apps/backend/Dockerfile`) and the frontend (`apps/frontend/Dockerfile`). Create dedicated env files (e.g. `.env.backend.prod`, `.env.frontend.prod`) and pass them via `docker run --env-file` to avoid baking secrets into images.
+We ship standalone Dockerfiles for the backend (`docker/prod/backend.Dockerfile`) and the frontend (`docker/prod/frontend.Dockerfile`). Create dedicated env files (e.g. `.env.backend.prod`, `.env.frontend.prod`) and pass them via `docker run --env-file` to avoid baking secrets into images.
 
 ### Backend API
 
 ```bash
-docker build -f apps/backend/Dockerfile -t nommie-backend:prod .
+docker build -f docker/prod/backend.Dockerfile -t nommie-backend:prod .
 docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
 ```
 
@@ -45,7 +45,7 @@ The container listens on port `3001` and logs to stdout/stderr. Run migrations b
 ### Frontend (Next.js)
 
 ```bash
-docker build -f apps/frontend/Dockerfile -t nommie-frontend:prod .
+docker build -f docker/prod/frontend.Dockerfile -t nommie-frontend:prod .
 docker run --env-file .env.frontend.prod -p 3000:3000 nommie-frontend:prod
 ```
 

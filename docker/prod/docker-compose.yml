@@ -31,13 +31,15 @@ services:
   backend:
     build:
       context: ../..
-      dockerfile: apps/backend/Dockerfile
+      dockerfile: docker/prod/backend.Dockerfile
     restart: unless-stopped
     env_file:
       - ./backend.env
       - ./db.env
     depends_on:
       postgres:
+        condition: service_started
+      redis:
         condition: service_started
     # backend must listen on 0.0.0.0:3001 inside the container
     expose:
@@ -46,7 +48,7 @@ services:
   frontend:
     build:
       context: ../..
-      dockerfile: apps/frontend/Dockerfile
+      dockerfile: docker/prod/frontend.Dockerfile
       args:
         NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL}
     restart: unless-stopped
