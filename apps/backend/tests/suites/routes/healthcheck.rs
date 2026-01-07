@@ -21,7 +21,7 @@ async fn test_health_endpoint() -> Result<(), Box<dyn std::error::Error>> {
 
     // Verify required fields are present
     assert_eq!(json["status"], "ok");
-    assert_eq!(json["app_version"], "0.1.0");
+    assert_eq!(json["app_version"], env!("CARGO_PKG_VERSION"));
     assert!(json["db"].is_string());
     assert!(json["migrations"].is_string());
     assert!(json["time"].is_string());
