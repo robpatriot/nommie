@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, act } from '../utils'
+import { render, screen, waitFor, act, fireEvent } from '../utils'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 
@@ -134,32 +134,40 @@ describe('GameRoomClient', () => {
         )
       })
 
+      // Ensure the WebSocket connection finishes opening (it happens on a microtask),
+      // so its connection-state updates are flushed within act().
+      await waitForWebSocketConnection()
+
       const readyButton = screen.getByRole('button', {
         name: /Mark yourself as ready/i,
       })
 
-      // Click multiple times quickly (but with small delays to allow state updates)
-      await userEvent.click(readyButton)
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      await userEvent.click(readyButton)
-      await new Promise((resolve) => setTimeout(resolve, 10))
-      await userEvent.click(readyButton)
+      // Click multiple times quickly - the mutation pending guard should prevent duplicates.
+      act(() => {
+        fireEvent.click(readyButton)
+        fireEvent.click(readyButton)
+        fireEvent.click(readyButton)
+      })
 
-      // Wait for async operations
+      // Wait for async operations (mutation resolves + component state updates)
       await waitFor(
         () => {
-          expect(mockMarkPlayerReadyAction).toHaveBeenCalled()
+          expect(mockMarkPlayerReadyAction).toHaveBeenCalledTimes(1)
         },
         { timeout: 2000 }
       )
 
-      // Should only call once (subsequent clicks should be prevented by isPending)
-      // Note: Due to React 18's automatic batching and test timing, the action
-      // might be called twice, but the important thing is that it's called with correct args
-      // and that subsequent calls are prevented by the pending state
-      const callCount = mockMarkPlayerReadyAction.mock.calls.length
-      expect(callCount).toBeGreaterThanOrEqual(1)
-      expect(callCount).toBeLessThanOrEqual(2) // Allow for React 18 batching
+      // Ensure React had a chance to flush the post-mutation ready-state update.
+      // Our mutation mock's pending flag isn't reactive (no re-render when it flips),
+      // so we wait on the user-visible ready state instead.
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', {
+            name: /(Unmarking as ready|Mark yourself as not ready)/i,
+          })
+        ).toBeInTheDocument()
+      })
+
       expect(mockMarkPlayerReadyAction).toHaveBeenCalledWith(42, true)
     })
 
