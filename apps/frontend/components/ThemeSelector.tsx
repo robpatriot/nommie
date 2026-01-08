@@ -5,6 +5,9 @@ import { useTranslations } from 'next-intl'
 import { updateThemeAction } from '@/app/actions/settings-actions'
 import { useTheme, type ThemeName } from './theme-provider'
 
+// Temporarily disable Oldtime theme option in UI
+const DISABLED_THEMES: ThemeName[] = ['oldtime']
+
 const THEME_OPTIONS: Array<{
   value: ThemeName
   emoji: string
@@ -21,7 +24,7 @@ const THEME_OPTIONS: Array<{
     value: 'oldtime',
     emoji: '🔥',
   },
-]
+].filter((option) => !DISABLED_THEMES.includes(option.value))
 
 export function ThemeSelector({
   preferredTheme,
