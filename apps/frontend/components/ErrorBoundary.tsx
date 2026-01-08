@@ -3,6 +3,7 @@
 import { Component, type ReactNode } from 'react'
 import { logError } from '@/lib/logging/error-logger'
 import { BackendApiError } from '@/lib/errors'
+import { Button } from '@/components/ui/Button'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -106,8 +107,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       // Default fallback UI
       return (
         <div className="flex min-h-screen items-center justify-center bg-background p-4">
-          <div className="max-w-md rounded-lg border border-danger/40 bg-danger/10 p-6 text-center">
-            <h2 className="mb-2 text-lg font-semibold text-danger-foreground">
+          <div className="max-w-md rounded-lg border border-destructive/40 bg-destructive/10 p-6 text-center">
+            <h2 className="mb-2 text-lg font-semibold text-destructive-foreground">
               {t.title}
             </h2>
             <p className="mb-4 text-sm text-muted-foreground">
@@ -116,7 +117,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             {isBackendError && (
               <div className="mb-4">
                 {this.state.expanded && (
-                  <div className="space-y-1 text-xs text-danger/80 text-left">
+                  <div className="space-y-1 text-xs text-destructive/80 text-left">
                     <p>
                       <span className="font-semibold">
                         {t.details?.statusLabel}:
@@ -144,7 +145,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
                 {hasTraceId && (
                   <button
                     onClick={this.handleToggleExpanded}
-                    className="mt-1 text-xs text-danger/90 hover:text-danger underline"
+                    className="mt-1 text-xs text-destructive/90 hover:text-destructive underline"
                   >
                     {this.state.expanded
                       ? `${t.details?.hide} ${t.details?.details}`
@@ -154,25 +155,23 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               </div>
             )}
             <div className="flex gap-2 justify-center">
-              <button
-                onClick={this.handleReset}
-                className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-              >
+              <Button onClick={this.handleReset} variant="primary" size="md">
                 {t.tryAgain}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => window.location.reload()}
-                className="rounded bg-surface px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-strong"
+                variant="outline"
+                size="md"
               >
                 {t.reloadPage}
-              </button>
+              </Button>
             </div>
             {process.env.NODE_ENV === 'development' && (
               <details className="mt-4 text-left">
                 <summary className="cursor-pointer text-xs text-muted-foreground">
                   {t.devDetails}
                 </summary>
-                <pre className="mt-2 overflow-auto rounded bg-surface p-2 text-xs">
+                <pre className="mt-2 overflow-auto rounded bg-card p-2 text-xs">
                   {error.stack}
                 </pre>
               </details>

@@ -96,7 +96,7 @@ export default function Header({ session }: HeaderProps) {
   const isOnGuide = pathname === '/guide'
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-surface-strong/70 px-3 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-lg">
+    <header className="sticky top-0 z-30 border-b border-border/60 bg-muted/70 px-3 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-lg">
       <div className="mx-auto flex w-full max-w-6xl flex-row items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {session?.user ? (
@@ -104,7 +104,7 @@ export default function Header({ session }: HeaderProps) {
               <button
                 type="button"
                 onClick={() => setIsBrandMenuOpen((open) => !open)}
-                className="inline-flex items-center gap-2 rounded-full bg-surface px-3 py-2 text-lg font-semibold text-foreground shadow-inner shadow-black/10 transition hover:bg-surface-strong/80"
+                className="inline-flex items-center gap-2 rounded-full bg-card px-3 py-2 text-lg font-semibold text-foreground shadow-inner shadow-shadow/10 transition hover:bg-muted/80"
                 aria-haspopup="true"
                 aria-expanded={isBrandMenuOpen}
                 aria-label={t('brand.menuAria')}
@@ -114,7 +114,7 @@ export default function Header({ session }: HeaderProps) {
                 </span>
                 <span className="hidden tracking-tight sm:inline">Nommie</span>
                 <span
-                  className={`text-xs text-muted transition-transform ${
+                  className={`text-xs text-muted-foreground transition-transform ${
                     isBrandMenuOpen ? 'rotate-180' : ''
                   }`}
                   aria-hidden
@@ -123,10 +123,10 @@ export default function Header({ session }: HeaderProps) {
                 </span>
               </button>
               {isBrandMenuOpen ? (
-                <div className="absolute left-0 top-full mt-2 w-48 rounded-2xl border border-border/60 bg-surface p-3 text-sm shadow-lg shadow-black/20">
+                <div className="absolute left-0 top-full mt-2 w-48 rounded-2xl border border-border/60 bg-card p-3 text-sm shadow-lg shadow-shadow/20">
                   <Link
                     href="/lobby"
-                    className={`mb-2 flex w-full items-center justify-between rounded-2xl border border-border/70 bg-surface px-4 py-2 font-semibold transition hover:border-primary/50 ${
+                    className={`mb-2 flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-2 font-semibold transition hover:border-primary/50 ${
                       isOnLobby
                         ? 'border-primary/50 text-primary'
                         : 'text-foreground hover:text-primary'
@@ -142,7 +142,7 @@ export default function Header({ session }: HeaderProps) {
                   </Link>
                   <Link
                     href="/guide"
-                    className={`flex w-full items-center justify-between rounded-2xl border border-border/70 bg-surface px-4 py-2 font-semibold transition hover:border-primary/50 ${
+                    className={`flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-2 font-semibold transition hover:border-primary/50 ${
                       isOnGuide
                         ? 'border-primary/50 text-primary'
                         : 'text-foreground hover:text-primary'
@@ -162,7 +162,7 @@ export default function Header({ session }: HeaderProps) {
           ) : (
             <Link
               href="/"
-              className="inline-flex items-center gap-3 rounded-full bg-surface px-3 py-2 text-lg font-semibold text-foreground shadow-inner shadow-black/10 transition hover:bg-surface-strong/80"
+              className="inline-flex items-center gap-3 rounded-full bg-card px-3 py-2 text-lg font-semibold text-foreground shadow-inner shadow-shadow/10 transition hover:bg-muted/80"
               aria-label={t('brand.homeAria')}
             >
               <span className="text-2xl" role="img" aria-hidden>
@@ -173,7 +173,7 @@ export default function Header({ session }: HeaderProps) {
           )}
           {hasBreadcrumbs ? (
             <nav
-              className="hidden items-center gap-2 text-sm text-muted sm:flex"
+              className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex"
               aria-label={t('breadcrumbs.ariaLabel')}
             >
               {crumbs.map((crumb, index) => {
@@ -184,19 +184,19 @@ export default function Header({ session }: HeaderProps) {
                     className="flex items-center gap-2"
                   >
                     {index > 0 ? (
-                      <span aria-hidden className="text-muted">
+                      <span aria-hidden className="text-muted-foreground">
                         /
                       </span>
                     ) : null}
                     {crumb.href && !isLast ? (
                       <Link
                         href={crumb.href}
-                        className="rounded-full px-3 py-1.5 font-medium text-muted transition hover:bg-surface/80 hover:text-foreground"
+                        className="rounded-full px-3 py-1.5 font-medium text-muted-foreground transition hover:bg-card/80 hover:text-foreground"
                       >
                         {crumb.label}
                       </Link>
                     ) : (
-                      <span className="rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-subtle">
+                      <span className="rounded-full bg-card px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {crumb.label}
                       </span>
                     )}
@@ -205,7 +205,9 @@ export default function Header({ session }: HeaderProps) {
               })}
             </nav>
           ) : (
-            <span className="text-sm text-muted">{t('tagline')}</span>
+            <span className="text-sm text-muted-foreground">
+              {t('tagline')}
+            </span>
           )}
         </div>
 
@@ -220,7 +222,7 @@ export default function Header({ session }: HeaderProps) {
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen((open) => !open)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-surface text-sm font-semibold uppercase tracking-wide text-muted transition hover:border-primary/50 hover:text-foreground"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-card text-sm font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
                   aria-haspopup="true"
                   aria-expanded={isUserMenuOpen}
                   aria-label={t('account.menuAria')}
@@ -228,8 +230,8 @@ export default function Header({ session }: HeaderProps) {
                   {getInitials(session.user.email)}
                 </button>
                 {isUserMenuOpen ? (
-                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border/60 bg-surface p-3 text-sm shadow-lg shadow-black/20">
-                    <p className="mb-2 truncate text-xs uppercase tracking-wide text-subtle">
+                  <div className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-border/60 bg-card p-3 text-sm shadow-lg shadow-shadow/20">
+                    <p className="mb-2 truncate text-xs uppercase tracking-wide text-muted-foreground">
                       {t('account.signedInAs')}
                     </p>
                     <p className="mb-3 truncate text-foreground">
@@ -237,7 +239,7 @@ export default function Header({ session }: HeaderProps) {
                     </p>
                     <Link
                       href="/settings"
-                      className="mb-2 flex w-full items-center justify-between rounded-2xl border border-border/70 bg-surface px-4 py-2 font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
+                      className="mb-2 flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-2 font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
                       onClick={() => setIsUserMenuOpen(false)}
                     >
                       {t('account.settings')}
@@ -246,7 +248,7 @@ export default function Header({ session }: HeaderProps) {
                     <form action={signOutAction}>
                       <button
                         type="submit"
-                        className="w-full rounded-2xl border border-border/70 bg-surface px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
+                        className="w-full rounded-2xl border border-border/70 bg-card px-4 py-2 text-sm font-semibold text-foreground transition hover:border-primary/50 hover:text-primary"
                       >
                         {t('account.signOut')}
                       </button>

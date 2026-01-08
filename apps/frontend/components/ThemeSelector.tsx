@@ -8,10 +8,7 @@ import { useTheme, type ThemeName } from './theme-provider'
 // Temporarily disable Oldtime theme option in UI
 const DISABLED_THEMES: ThemeName[] = ['oldtime']
 
-const THEME_OPTIONS: Array<{
-  value: ThemeName
-  emoji: string
-}> = [
+const ALL_THEME_OPTIONS = [
   {
     value: 'standard',
     emoji: '🎲',
@@ -24,7 +21,11 @@ const THEME_OPTIONS: Array<{
     value: 'oldtime',
     emoji: '🔥',
   },
-].filter((option) => !DISABLED_THEMES.includes(option.value))
+] satisfies Array<{ value: ThemeName; emoji: string }>
+
+const THEME_OPTIONS = ALL_THEME_OPTIONS.filter(
+  (option) => !DISABLED_THEMES.includes(option.value)
+)
 
 export function ThemeSelector({
   preferredTheme,
@@ -98,7 +99,7 @@ export function ThemeSelector({
                 ${
                   isActive
                     ? 'border-primary bg-primary/10'
-                    : 'border-border/60 bg-surface/50 hover:border-primary/40 hover:bg-surface/80'
+                    : 'border-border/60 bg-card/50 hover:border-primary/40 hover:bg-card/80'
                 }
                 ${isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary
@@ -115,7 +116,7 @@ export function ThemeSelector({
                 >
                   {t(`theme.options.${option.value}.label`)}
                 </span>
-                <span className="text-xs text-subtle">
+                <span className="text-xs text-muted-foreground">
                   {t(`theme.options.${option.value}.description`)}
                 </span>
               </div>
@@ -132,7 +133,9 @@ export function ThemeSelector({
         })}
       </div>
       {errorMessage && (
-        <div className="min-h-[1.5rem] text-sm text-danger">{errorMessage}</div>
+        <div className="min-h-[1.5rem] text-sm text-destructive">
+          {errorMessage}
+        </div>
       )}
     </div>
   )

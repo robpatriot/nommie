@@ -46,7 +46,7 @@ export function CardConfirmationToggle({
         className={`flex items-center justify-between rounded-2xl border px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
           enabled
             ? 'border-primary/60 bg-primary/10 text-foreground shadow-inner shadow-primary/20'
-            : 'border-border/60 bg-surface/80 text-muted hover:border-primary/40 hover:text-foreground'
+            : 'border-border/60 bg-card/80 text-muted-foreground hover:border-primary/40 hover:text-foreground'
         } ${isPending ? 'opacity-80' : ''}`}
       >
         <div className="flex flex-col text-left">
@@ -57,7 +57,7 @@ export function CardConfirmationToggle({
                 : 'cardConfirmation.toggle.disabled.title'
             )}
           </span>
-          <span className="text-xs text-subtle">
+          <span className="text-xs text-muted-foreground">
             {t(
               enabled
                 ? 'cardConfirmation.toggle.enabled.description'
@@ -81,15 +81,15 @@ export function CardConfirmationToggle({
       </button>
       <div className="min-h-[1.5rem] text-sm">
         {isPending ? (
-          <span className="text-muted">
+          <span className="text-muted-foreground">
             {t('cardConfirmation.status.saving')}
           </span>
         ) : errorMessage ? (
-          <span className="text-danger">
+          <span className="text-destructive">
             {t('cardConfirmation.status.couldNotSave', { error: errorMessage })}
           </span>
         ) : (
-          <span className="text-subtle">
+          <span className="text-muted-foreground">
             {t('cardConfirmation.status.saved')}
           </span>
         )}

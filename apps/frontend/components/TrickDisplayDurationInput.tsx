@@ -82,7 +82,7 @@ export function TrickDisplayDurationInput({
           <span className="text-sm font-semibold text-foreground">
             {t('trickDisplayDuration.label')}
           </span>
-          <span className="text-xs text-subtle">
+          <span className="text-xs text-muted-foreground">
             {t('trickDisplayDuration.description')}
           </span>
           <input
@@ -96,13 +96,13 @@ export function TrickDisplayDurationInput({
             placeholder={DEFAULT_TRICK_DISPLAY_DURATION_SECONDS.toString()}
             className={`rounded-2xl border px-4 py-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
               isPending
-                ? 'border-border/40 bg-surface/40 text-muted opacity-60'
-                : 'border-border/60 bg-surface/80 text-foreground hover:border-primary/40 focus:border-primary/60'
+                ? 'border-border/40 bg-card/40 text-muted-foreground opacity-60'
+                : 'border-border/60 bg-card/80 text-foreground hover:border-primary/40 focus:border-primary/60'
             }`}
             aria-label={t('trickDisplayDuration.label')}
           />
         </label>
-        <div className="text-xs text-subtle">
+        <div className="text-xs text-muted-foreground">
           {t('trickDisplayDuration.help', {
             defaultValue: DEFAULT_TRICK_DISPLAY_DURATION_SECONDS,
           })}
@@ -110,27 +110,27 @@ export function TrickDisplayDurationInput({
       </div>
       <div className="min-h-[1.5rem] text-sm">
         {isPending ? (
-          <span className="text-muted">
+          <span className="text-muted-foreground">
             {t('trickDisplayDuration.status.saving')}
           </span>
         ) : errorMessage ? (
-          <span className="text-danger">
+          <span className="text-destructive">
             {t('trickDisplayDuration.status.couldNotSave', {
               error: errorMessage,
             })}
           </span>
         ) : isUsingDefault ? (
-          <span className="text-subtle">
+          <span className="text-muted-foreground">
             {t('trickDisplayDuration.status.usingDefault', {
               value: displayValue,
             })}
           </span>
         ) : isDisabled ? (
-          <span className="text-subtle">
+          <span className="text-muted-foreground">
             {t('trickDisplayDuration.status.disabled')}
           </span>
         ) : (
-          <span className="text-subtle">
+          <span className="text-muted-foreground">
             {t('trickDisplayDuration.status.usingCustom', {
               value: displayValue,
             })}

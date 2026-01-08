@@ -83,9 +83,9 @@ function ToastItem({
         isExiting ? 'opacity-0' : 'opacity-100'
       } ${
         isError
-          ? 'border-danger/40 bg-danger/10'
+          ? 'border-destructive/40 bg-destructive/10'
           : isWarning
-            ? 'border-orange-500/60 bg-orange-500/20'
+            ? 'border-warning/60 bg-warning/20'
             : 'border-success/40 bg-success/10'
       }`}
     >
@@ -94,10 +94,10 @@ function ToastItem({
           <p
             className={`text-sm font-medium ${
               isError
-                ? 'text-danger'
+                ? 'text-destructive'
                 : isWarning
-                  ? '[color:color-mix(in_srgb,var(--color-warning)_75%,var(--color-warning-contrast)_25%)]'
-                  : '[color:color-mix(in_srgb,var(--color-success)_75%,var(--color-success-contrast)_25%)]'
+                  ? '[color:color-mix(in_srgb,var(--color-warning)_75%,var(--color-warning-foreground)_25%)]'
+                  : '[color:color-mix(in_srgb,var(--color-success)_75%,var(--color-success-foreground)_25%)]'
             }`}
           >
             {toast.message}
@@ -105,7 +105,7 @@ function ToastItem({
           {isError && toast.error && (
             <div className="mt-2">
               {expanded && (
-                <div className="space-y-1 text-xs text-danger/80">
+                <div className="space-y-1 text-xs text-destructive/80">
                   <p>
                     <span className="font-semibold">
                       {t('details.statusLabel')}:
@@ -133,7 +133,7 @@ function ToastItem({
               {hasTraceId && (
                 <button
                   onClick={() => setExpanded(!expanded)}
-                  className="mt-1 text-xs text-danger/90 hover:text-danger underline"
+                  className="mt-1 text-xs text-destructive/90 hover:text-destructive underline"
                 >
                   {expanded ? t('details.hide') : t('details.show')}{' '}
                   {t('details.details')}
@@ -146,10 +146,10 @@ function ToastItem({
           onClick={handleClose}
           className={`ml-4 text-sm font-semibold transition-colors ${
             isError
-              ? 'text-danger hover:text-danger/80'
+              ? 'text-destructive hover:text-destructive/80'
               : isWarning
-                ? '[color:color-mix(in_srgb,var(--color-warning)_75%,var(--color-warning-contrast)_25%)] hover:[color:color-mix(in_srgb,var(--color-warning)_60%,var(--color-warning-contrast)_40%)]'
-                : '[color:color-mix(in_srgb,var(--color-success)_75%,var(--color-success-contrast)_25%)] hover:[color:color-mix(in_srgb,var(--color-success)_60%,var(--color-success-contrast)_40%)]'
+                ? '[color:color-mix(in_srgb,var(--color-warning)_75%,var(--color-warning-foreground)_25%)] hover:[color:color-mix(in_srgb,var(--color-warning)_60%,var(--color-warning-foreground)_40%)]'
+                : '[color:color-mix(in_srgb,var(--color-success)_75%,var(--color-success-foreground)_25%)] hover:[color:color-mix(in_srgb,var(--color-success)_60%,var(--color-success-foreground)_40%)]'
           }`}
           aria-label={t('closeAria')}
         >

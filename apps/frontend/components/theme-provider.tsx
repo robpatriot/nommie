@@ -195,15 +195,22 @@ export function ThemeProvider({
     }
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY) {
+      if (event.key === STORAGE_KEY) {
+        const next = event.newValue
+        if (isThemeMode(next)) {
+          setThemeState(next)
+        } else if (next === null) {
+          setThemeState('system')
+        }
         return
       }
 
-      const next = event.newValue
-      if (isThemeMode(next)) {
-        setThemeState(next)
-      } else if (next === null) {
-        setThemeState('system')
+      if (event.key === THEME_NAME_STORAGE_KEY) {
+        const next = event.newValue
+        if (isThemeName(next)) {
+          setThemeNameState(next)
+        }
+        return
       }
     }
 

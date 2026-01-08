@@ -1023,7 +1023,7 @@ export function PlayerHand({
   return (
     <section
       className={cn(
-        'flex w-full flex-col gap-3 rounded-[28px] border border-white/15 bg-surface/80 p-4 text-foreground shadow-elevated backdrop-blur',
+        'flex w-full flex-col gap-3 rounded-[28px] border border-border/70 bg-card/80 p-4 text-foreground shadow-elevated backdrop-blur',
         className
       )}
     >
@@ -1035,12 +1035,15 @@ export function PlayerHand({
           !requireCardConfirmation) && (
           <div className="flex flex-col gap-1 min-w-0">
             {shouldShowTitle && (
-              <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle break-words">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground break-words">
                 {tHand('title')}
               </span>
             )}
             {shouldShowTitle && handStatus !== readOnlyPreviewText && (
-              <p className="text-xs text-muted break-words" aria-live="polite">
+              <p
+                className="text-xs text-muted-foreground break-words"
+                aria-live="polite"
+              >
                 {handStatus}
               </p>
             )}
@@ -1098,8 +1101,8 @@ export function PlayerHand({
             style={{ minWidth: 'max-content' }}
           >
             {playState.playable.length > 0 && legalCardsDisplay ? (
-              <div className="rounded-full bg-black/20 px-3 py-1">
-                <span className="text-sm font-medium text-muted">
+              <div className="rounded-full bg-overlay/20 px-3 py-1">
+                <span className="text-sm font-medium text-muted-foreground">
                   <span className="sm:hidden">{t('legal.short')}</span>
                   <span className="hidden sm:inline">{t('legal.long')}</span>
                 </span>
@@ -1119,7 +1122,9 @@ export function PlayerHand({
       >
         {viewerHand.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <span className="text-sm text-subtle">{tHand('empty')}</span>
+            <span className="text-sm text-muted-foreground">
+              {tHand('empty')}
+            </span>
           </div>
         ) : (
           <div className="relative w-full h-full">

@@ -17,15 +17,17 @@ interface SetupSeatListProps {
 export function SetupSeatList({ seats }: SetupSeatListProps) {
   const t = useTranslations('game.gameRoom')
   return (
-    <div className="rounded-3xl border border-white/10 bg-surface/80 p-5 shadow-elevated backdrop-blur">
+    <div className="rounded-3xl border border-border/60 bg-card/80 p-5 shadow-elevated backdrop-blur">
       <header className="mb-4 flex flex-col gap-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+        <p className="text-xs font-semibold uppercase tracking-[0.4em] text-muted-foreground">
           {t('setupSeats.kicker')}
         </p>
         <h2 className="text-2xl font-semibold text-foreground">
           {t('setupSeats.title')}
         </h2>
-        <p className="text-sm text-muted">{t('setupSeats.description')}</p>
+        <p className="text-sm text-muted-foreground">
+          {t('setupSeats.description')}
+        </p>
       </header>
 
       <ul className="space-y-3">
@@ -46,12 +48,12 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
               className={`rounded-2xl border px-4 py-3 transition ${
                 seat.isViewer
                   ? 'border-primary/60 bg-primary/5'
-                  : 'border-border/60 bg-surface/70'
+                  : 'border-border/60 bg-card/70'
               }`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground">
                     {t('setupSeats.seatLabel', { seatNumber: seat.seatNumber })}
                   </p>
                   <p className="text-base font-semibold text-foreground">
@@ -61,8 +63,8 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
                     seat.isReady
-                      ? 'bg-success/20 text-success-contrast'
-                      : 'bg-border/20 text-subtle'
+                      ? 'bg-success/20 text-success-foreground'
+                      : 'bg-border/20 text-muted-foreground'
                   }`}
                 >
                   {seat.isReady
@@ -71,7 +73,7 @@ export function SetupSeatList({ seats }: SetupSeatListProps) {
                 </span>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-subtle">
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <span className="rounded-full border border-border/40 px-3 py-1 text-xs">
                   {statusLabel}
                 </span>

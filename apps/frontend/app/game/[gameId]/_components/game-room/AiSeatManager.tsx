@@ -11,7 +11,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
 
   if (!aiState) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-surface/60 p-4 text-sm text-subtle">
+      <div className="rounded-xl border border-dashed border-border bg-card/60 p-4 text-sm text-muted-foreground">
         {t('noAccess')}
       </div>
     )
@@ -36,13 +36,13 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
       : t('waitingSeatLabel.openSeats', { count: waitingSeatCount })
 
   return (
-    <div className="rounded-xl border border-border/60 bg-surface/70 p-4 text-sm shadow-elevated">
+    <div className="rounded-xl border border-border/60 bg-card/70 p-4 text-sm shadow-elevated">
       <header className="mb-4 space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground">
             {t('kicker')}
           </p>
-          <span className="rounded-full border border-border/40 bg-surface/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-subtle">
+          <span className="rounded-full border border-border/40 bg-card/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             {t('summary', {
               bots: aiState.aiSeats,
               filled: aiState.totalSeats - aiState.availableSeats,
@@ -54,7 +54,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
           <h3 className="text-xl font-semibold text-foreground">
             {t('title')}
           </h3>
-          <p className="text-xs text-muted">{t('description')}</p>
+          <p className="text-xs text-muted-foreground">{t('description')}</p>
         </div>
       </header>
 
@@ -103,7 +103,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
               </span>
             ) : null}
           </button>
-          <span className="text-[11px] text-muted">
+          <span className="text-[11px] text-muted-foreground">
             {t('defaultsTo')}&nbsp;
             <span className="font-semibold text-foreground">
               {preferredDefaultName}
@@ -113,7 +113,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
         </div>
 
         {registryError ? (
-          <div className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger-foreground">
+          <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive-foreground">
             {registryError}
           </div>
         ) : null}
@@ -123,17 +123,17 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
             {activeAiSeats.map((seat, index) => (
               <li
                 key={seat.userId ?? `${seat.seat}-${index}`}
-                className="rounded-2xl border border-border/60 bg-surface/70 px-4 py-3"
+                className="rounded-2xl border border-border/60 bg-card/70 px-4 py-3"
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                       {t('seatLabel', { seatNumber: seat.seat + 1 })}
                     </p>
                     <p className="text-base font-semibold text-foreground">
                       {seat.name}
                     </p>
-                    <p className="text-[11px] uppercase tracking-wide text-subtle">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                       {seat.aiProfile
                         ? t('runningProfile', {
                             name: seat.aiProfile.name,
@@ -153,7 +153,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                       aria-label={t('profileSelect.aria', {
                         seatNumber: seat.seat + 1,
                       })}
-                      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:text-muted"
+                      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:cursor-not-allowed disabled:text-muted-foreground"
                       disabled={
                         aiState.isPending ||
                         isRegistryLoading ||
@@ -208,7 +208,7 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
                         aiState.onRemoveSeat?.(seat.seat)
                       }}
                       disabled={aiState.isPending}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border/60 text-foreground transition hover:bg-surface-strong disabled:cursor-not-allowed disabled:text-muted"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border/60 text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground"
                       aria-label={t('remove.aria', {
                         seatNumber: seat.seat + 1,
                       })}
@@ -239,12 +239,12 @@ export function AiSeatManager({ aiState }: AiSeatManagerProps) {
             ))}
           </ul>
         ) : (
-          <div className="rounded-2xl border border-dashed border-border bg-surface/70 px-4 py-3 text-xs text-subtle">
+          <div className="rounded-2xl border border-dashed border-border bg-card/70 px-4 py-3 text-xs text-muted-foreground">
             {t('empty')}
           </div>
         )}
 
-        <p className="text-[11px] uppercase tracking-wide text-subtle">
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
           {waitingSeatLabel}
         </p>
       </div>

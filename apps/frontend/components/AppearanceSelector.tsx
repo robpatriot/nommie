@@ -114,7 +114,7 @@ export function AppearanceSelector({
               className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 isActive
                   ? 'border-primary/60 bg-primary/10 text-foreground shadow-inner shadow-primary/20'
-                  : 'border-border/60 bg-surface/80 text-muted hover:border-primary/40 hover:text-foreground'
+                  : 'border-border/60 bg-card/80 text-muted-foreground hover:border-primary/40 hover:text-foreground'
               } ${isPending ? 'opacity-80' : ''}`}
             >
               <span className="flex items-center gap-3">
@@ -125,7 +125,7 @@ export function AppearanceSelector({
                   <span className="text-sm font-semibold text-foreground">
                     {t(`appearance.options.${option.value}.label`)}
                   </span>
-                  <span className="text-xs text-subtle">
+                  <span className="text-xs text-muted-foreground">
                     {t(`appearance.options.${option.value}.description`)}
                   </span>
                 </span>
@@ -140,7 +140,7 @@ export function AppearanceSelector({
               ) : (
                 <span
                   aria-hidden
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 text-xs text-muted"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 text-xs text-muted-foreground"
                 >
                   ○
                 </span>
@@ -152,7 +152,7 @@ export function AppearanceSelector({
         {/* Visual separator */}
         <div className="my-2 flex items-center gap-3">
           <div className="h-px flex-1 bg-border/30" />
-          <span className="text-xs uppercase tracking-wide text-subtle">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
             {t('appearance.separator')}
           </span>
           <div className="h-px flex-1 bg-border/30" />
@@ -167,7 +167,7 @@ export function AppearanceSelector({
           className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
             active === 'system'
               ? 'border-primary/60 bg-primary/10 text-foreground shadow-inner shadow-primary/20'
-              : 'border-dashed border-muted/40 bg-surface/40 text-muted hover:border-primary/40 hover:bg-surface/60 hover:text-foreground'
+              : 'border-dashed border-muted/40 bg-card/40 text-muted-foreground hover:border-primary/40 hover:bg-card/60 hover:text-foreground'
           } ${isPending ? 'opacity-80' : ''}`}
         >
           <span className="flex items-center gap-3">
@@ -178,7 +178,7 @@ export function AppearanceSelector({
               <span className="text-sm font-semibold text-foreground">
                 {t('appearance.options.system.label')}
               </span>
-              <span className="text-xs text-subtle">
+              <span className="text-xs text-muted-foreground">
                 {t('appearance.options.system.description')}
               </span>
             </span>
@@ -193,7 +193,7 @@ export function AppearanceSelector({
           ) : (
             <span
               aria-hidden
-              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 text-xs text-muted"
+              className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border/60 text-xs text-muted-foreground"
             >
               ○
             </span>
@@ -203,15 +203,17 @@ export function AppearanceSelector({
 
       <div className="min-h-[1.5rem] text-sm">
         {isPending ? (
-          <span className="text-muted">{t('appearance.status.saving')}</span>
+          <span className="text-muted-foreground">
+            {t('appearance.status.saving')}
+          </span>
         ) : errorMessage ? (
-          <span className="text-danger">
+          <span className="text-destructive">
             {t('appearance.status.couldNotSave', {
               error: errorMessage,
             })}
           </span>
         ) : isUsingPreference && active !== 'system' ? (
-          <span className="text-subtle">
+          <span className="text-muted-foreground">
             {t('appearance.status.usingPreference', {
               appearance:
                 active === 'dark'
@@ -220,7 +222,7 @@ export function AppearanceSelector({
             })}
           </span>
         ) : (
-          <span className="text-subtle">
+          <span className="text-muted-foreground">
             {t('appearance.status.usingSystem', {
               appearance: effectiveLabel,
             })}

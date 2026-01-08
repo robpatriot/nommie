@@ -36,7 +36,7 @@ export function TrickAreaHeader({
   )
 
   const trumpElement = (
-    <div className="flex h-7 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/20 px-2">
+    <div className="flex h-7 shrink-0 items-center justify-center rounded-full border border-border/60 bg-card/20 px-2">
       <span
         className={cn(
           'leading-none',
@@ -51,7 +51,7 @@ export function TrickAreaHeader({
 
   const bidsElement = (
     <div className="flex shrink-0">
-      <div className="flex h-7 items-center justify-center rounded-full border border-white/20 bg-white/20 px-3 text-[11px] font-semibold text-foreground">
+      <div className="flex h-7 items-center justify-center rounded-full border border-border/60 bg-card/20 px-3 text-[11px] font-semibold text-foreground">
         {`${totalBids}/${handSize}`}
       </div>
     </div>

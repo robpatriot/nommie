@@ -409,7 +409,7 @@ describe('BiddingPanel', () => {
       // Active player should be highlighted - Bailey is seat 1, which is to_act
       const baileyElements = screen.getAllByText('Bailey')
       const baileyElement = baileyElements[0].closest('div')
-      expect(baileyElement).toHaveClass(/bg-panel-primary/)
+      expect(baileyElement).toHaveClass(/bg-primary\//)
     })
   })
 

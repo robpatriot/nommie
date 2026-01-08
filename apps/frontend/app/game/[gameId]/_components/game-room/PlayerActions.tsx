@@ -104,12 +104,12 @@ export function PlayerActions({
   }
 
   return (
-    <section className="flex w-full flex-col gap-3 rounded-3xl border border-white/10 bg-surface/80 p-5 text-sm text-muted shadow-elevated backdrop-blur">
+    <section className="flex w-full flex-col gap-3 rounded-3xl border border-border/60 bg-card/80 p-5 text-sm text-muted-foreground shadow-elevated backdrop-blur">
       <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-muted-foreground">
           {t('title')}
         </h2>
-        <span className="rounded-full bg-surface px-3 py-1 text-xs text-muted">
+        <span className="rounded-full bg-card px-3 py-1 text-xs text-muted-foreground">
           {t('waitingBadge')}
         </span>
       </header>

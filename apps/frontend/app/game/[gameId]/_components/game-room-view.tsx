@@ -377,13 +377,13 @@ export function GameRoomView({
             intro={
               <div className="flex flex-col gap-4">
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
+                  <p className="text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                     {t('setup.kicker', { gameId })}
                   </p>
                   <h2 className="text-3xl font-semibold text-foreground sm:text-4xl">
                     {t('setup.title')}
                   </h2>
-                  <p className="text-sm text-muted sm:text-base">
+                  <p className="text-sm text-muted-foreground sm:text-base">
                     {t('setup.description')}
                   </p>
                 </div>
@@ -409,10 +409,10 @@ export function GameRoomView({
                     description={t('setup.stats.readyPlayers.description')}
                   />
                 </div>
-                <div className="rounded-2xl border border-border/60 bg-surface/70 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                <div className="rounded-2xl border border-border/60 bg-card/70 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                     <span>{t('setup.quickActions.title')}</span>
-                    <span className="text-[10px] font-normal tracking-[0.2em] text-muted">
+                    <span className="text-[10px] font-normal tracking-[0.2em] text-muted-foreground">
                       {t('setup.quickActions.subtitle')}
                     </span>
                   </div>
@@ -430,7 +430,7 @@ export function GameRoomView({
                         }
                       >
                         <div className="space-y-1">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                             {t('setup.quickActions.manualSync')}
                           </p>
                           <p className="text-base font-semibold text-foreground">
@@ -439,7 +439,7 @@ export function GameRoomView({
                               : t('actions.refreshLabel')}
                           </p>
                         </div>
-                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-card/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
                           <svg
                             aria-hidden="true"
                             className="h-5 w-5"
@@ -466,14 +466,14 @@ export function GameRoomView({
                         aria-label={t('setup.quickActions.copyInviteAria')}
                       >
                         <div className="space-y-1">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                             {t('setup.quickActions.shareLink')}
                           </p>
                           <p className="text-base font-semibold text-foreground">
                             {t('setup.quickActions.copyInvite')}
                           </p>
                         </div>
-                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-card/80 text-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
                           <svg
                             aria-hidden="true"
                             className="h-5 w-5"
@@ -504,7 +504,7 @@ export function GameRoomView({
                         }
                       >
                         <div className="space-y-1">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                             {t('setup.quickActions.leaveGame')}
                           </p>
                           <p className="text-base font-semibold text-foreground">
@@ -513,7 +513,7 @@ export function GameRoomView({
                               : t('setup.quickActions.leaveGameLabel')}
                           </p>
                         </div>
-                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-card/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
                           <svg
                             aria-hidden="true"
                             className="h-5 w-5"
@@ -596,7 +596,7 @@ export function GameRoomView({
                   }
                 >
                   <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                       {t('setup.quickActions.leaveGame')}
                     </p>
                     <p className="text-base font-semibold text-foreground">
@@ -605,7 +605,7 @@ export function GameRoomView({
                         : t('setup.quickActions.leaveGameLabel')}
                     </p>
                   </div>
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-card/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
                     <svg
                       aria-hidden="true"
                       className="h-5 w-5"
@@ -647,11 +647,11 @@ export function GameRoomView({
             className={cn(
               'relative flex flex-col gap-6',
               showCardWrapper &&
-                'card-wrapper rounded-[40px] border border-white/10 px-6 pt-[44px] pb-6 shadow-elevated'
+                'card-wrapper rounded-[40px] border border-border/60 px-6 pt-[44px] pb-6 shadow-elevated'
             )}
           >
             {showPreviousRoundPosition ? (
-              <div className="text-left text-xs font-semibold uppercase tracking-[0.35em] text-subtle">
+              <div className="text-left text-xs font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                 {t('trickArea.lastRoundFinalPosition')}
               </div>
             ) : null}
@@ -763,7 +763,7 @@ export function GameRoomView({
                 }
               >
                 <div className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-subtle">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
                     {t('setup.quickActions.leaveGame')}
                   </p>
                   <p className="text-base font-semibold text-foreground">
@@ -772,7 +772,7 @@ export function GameRoomView({
                       : t('setup.quickActions.leaveGameLabel')}
                   </p>
                 </div>
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-surface/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-card/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
                   <svg
                     aria-hidden="true"
                     className="h-5 w-5"

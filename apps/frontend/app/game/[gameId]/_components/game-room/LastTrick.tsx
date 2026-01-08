@@ -17,21 +17,21 @@ export function LastTrick({
 
   if (!lastTrick || lastTrick.length === 0) {
     return (
-      <section className="flex w-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/80 p-5 text-sm text-muted shadow-elevated backdrop-blur">
+      <section className="flex w-full flex-col gap-4 rounded-3xl border border-border/60 bg-card/80 p-5 text-sm text-muted-foreground shadow-elevated backdrop-blur">
         <header className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-muted-foreground">
             {t('lastTrick.title')}
           </h2>
         </header>
-        <p className="text-xs text-muted">{t('lastTrick.empty')}</p>
+        <p className="text-xs text-muted-foreground">{t('lastTrick.empty')}</p>
       </section>
     )
   }
 
   return (
-    <section className="flex w-full flex-col gap-4 rounded-3xl border border-white/10 bg-surface/80 p-5 text-sm text-muted shadow-elevated backdrop-blur">
+    <section className="flex w-full flex-col gap-4 rounded-3xl border border-border/60 bg-card/80 p-5 text-sm text-muted-foreground shadow-elevated backdrop-blur">
       <header className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-subtle">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.4em] text-muted-foreground">
           {t('lastTrick.title')}
         </h2>
       </header>

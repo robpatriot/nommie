@@ -51,7 +51,7 @@ export function PlayPanel({
           <h2 className="text-sm font-semibold uppercase tracking-[0.4em]">
             {t('title')}
           </h2>
-          <p className="text-xs text-muted">{t('description')}</p>
+          <p className="text-xs text-muted-foreground">{t('description')}</p>
         </div>
         <div className="rounded-full border border-primary/50 bg-primary/25 px-3 py-1 text-xs font-semibold text-foreground">
           {t('waitingOn', { name: activeName })}
@@ -59,11 +59,11 @@ export function PlayPanel({
       </header>
 
       <form
-        className="flex flex-col gap-4 rounded-2xl border border-primary/30 bg-surface/85 p-4 shadow-inner shadow-primary/20"
+        className="flex flex-col gap-4 rounded-2xl border border-primary/30 bg-card/85 p-4 shadow-inner shadow-primary/20"
         onSubmit={handleSubmit}
       >
         <div className="flex flex-col items-start gap-3 text-sm text-foreground">
-          <span className="text-xs uppercase tracking-wide text-muted">
+          <span className="text-xs uppercase tracking-wide text-muted-foreground">
             {t('selectedCardLabel')}
           </span>
           {selectedCard ? (
@@ -101,7 +101,7 @@ export function PlayPanel({
             t('submit.waitingFor', { name: activeName })
           )}
         </button>
-        <p className="text-xs text-muted">
+        <p className="text-xs text-muted-foreground">
           <span className="sm:hidden">{t('legal.short')}</span>
           <span className="hidden sm:inline">{t('legal.long')}</span>{' '}
           {play.playable.length ? play.playable.join(', ') : t('legal.empty')}

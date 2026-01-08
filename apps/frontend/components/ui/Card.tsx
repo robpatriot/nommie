@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn'
 type CardPadding = 'none' | 'sm' | 'md' | 'lg'
 type CardTone = 'default' | 'strong' | 'subtle'
 
-type SurfaceCardProps<T extends ElementType> = PropsWithChildren<{
+type CardProps<T extends ElementType> = PropsWithChildren<{
   as?: T
   padding?: CardPadding
   tone?: CardTone
@@ -24,19 +24,19 @@ const paddingClassMap: Record<CardPadding, string> = {
 }
 
 const toneClassMap: Record<CardTone, string> = {
-  default: 'border-white/10 bg-surface/80',
-  strong: 'border-white/15 bg-surface/85',
-  subtle: 'border-white/5 bg-surface/60',
+  default: 'border-border/60 bg-card/80',
+  strong: 'border-border/70 bg-card/85',
+  subtle: 'border-border/40 bg-card/60',
 }
 
-export function SurfaceCard<T extends ElementType = 'section'>({
+export function Card<T extends ElementType = 'section'>({
   as,
   padding = 'md',
   tone = 'default',
   className,
   children,
   ...rest
-}: SurfaceCardProps<T>) {
+}: CardProps<T>) {
   const Component = as ?? 'section'
 
   return (

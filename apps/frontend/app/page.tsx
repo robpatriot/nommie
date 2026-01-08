@@ -2,7 +2,7 @@ import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
 import { PageContainer } from '@/components/PageContainer'
-import { SurfaceCard } from '@/components/SurfaceCard'
+import { Card } from '@/components/ui/Card'
 import { StatCard } from '@/components/StatCard'
 import { signInWithGoogleAction } from '@/app/actions/auth-actions'
 
@@ -29,29 +29,25 @@ export default async function Home({
     <PageContainer className="flex-1 justify-center gap-0 pb-16 pt-10 sm:pt-16">
       {/* Show access denied message if present */}
       {showAccessDenied && (
-        <SurfaceCard
-          padding="lg"
-          tone="strong"
-          className="mb-6 max-w-4xl mx-auto"
-        >
+        <Card padding="lg" tone="strong" className="mb-6 max-w-4xl mx-auto">
           <h2 className="text-xl font-semibold mb-2">
             {t('home.accessDenied.title')}
           </h2>
-          <p className="text-sm text-muted">
+          <p className="text-sm text-muted-foreground">
             {t('home.accessDenied.description')}
           </p>
-        </SurfaceCard>
+        </Card>
       )}
 
       <div className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <SurfaceCard as="section" padding="lg" tone="strong">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-subtle">
+        <Card as="section" padding="lg" tone="strong">
+          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-muted-foreground">
             {t('home.hero.kicker')}
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
             {t('home.hero.title', { appName })}
           </h1>
-          <p className="mt-4 text-lg text-muted sm:text-xl">
+          <p className="mt-4 text-lg text-muted-foreground sm:text-xl">
             {t('home.hero.description')}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -66,7 +62,7 @@ export default async function Home({
                 {t('home.hero.primaryCta')}
               </button>
             </form>
-            <div className="flex items-center justify-center rounded-2xl border border-border/60 bg-surface px-4 py-3 text-sm font-semibold text-muted shadow-inner shadow-black/10 sm:w-60">
+            <div className="flex items-center justify-center rounded-2xl border border-border/60 bg-card px-4 py-3 text-sm font-semibold text-muted-foreground shadow-inner shadow-shadow/10 sm:w-60">
               {t('home.hero.secondaryCta')}
             </div>
           </div>
@@ -91,15 +87,15 @@ export default async function Home({
               valueClassName="text-sm font-semibold text-foreground"
             />
           </div>
-        </SurfaceCard>
+        </Card>
 
-        <SurfaceCard
+        <Card
           as="section"
           padding="lg"
           tone="subtle"
-          className="relative flex flex-col border-white/20 bg-gradient-to-br from-surface/70 to-surface-strong/40 shadow-elevated"
+          className="relative flex flex-col border-white/20 bg-gradient-to-br from-card/70 to-muted/40 shadow-elevated"
         >
-          <div className="text-sm font-semibold uppercase tracking-[0.4em] text-muted">
+          <div className="text-sm font-semibold uppercase tracking-[0.4em] text-muted-foreground">
             {t('home.aside.kicker')}
           </div>
           <div className="mt-6 flex flex-1 items-center justify-center">
@@ -124,7 +120,7 @@ export default async function Home({
                   <div className="relative w-full aspect-square max-w-[140px] mx-auto">
                     {/* Center card display */}
                     <div className="absolute inset-0 flex items-center justify-center z-20">
-                      <div className="relative rounded-2xl bg-gradient-to-br from-white/25 to-white/10 backdrop-blur-md border-2 border-white/30 p-2.5 min-w-[65px] shadow-lg shadow-black/20 transform hover:scale-105 transition-transform">
+                      <div className="relative rounded-2xl bg-gradient-to-br from-white/25 to-white/10 backdrop-blur-md border-2 border-white/30 p-2.5 min-w-[65px] shadow-lg shadow-shadow/20 transform hover:scale-105 transition-transform">
                         <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-transparent" />
                         <div className="relative text-center">
                           <span
@@ -232,7 +228,7 @@ export default async function Home({
               </div>
             </div>
           </div>
-        </SurfaceCard>
+        </Card>
       </div>
     </PageContainer>
   )

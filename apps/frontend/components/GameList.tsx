@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { formatNumber } from '@/utils/number-formatting'
 import type { Game } from '@/lib/types'
-import { SurfaceCard } from './SurfaceCard'
+import { Card } from '@/components/ui/Card'
 
 interface GameListProps {
   games: Game[]
@@ -15,15 +15,15 @@ interface GameListProps {
 }
 
 const stateClassNames: Record<Game['state'], string> = {
-  LOBBY: 'bg-success/15 text-success-contrast',
-  DEALING: 'bg-accent/15 text-accent-contrast',
-  BIDDING: 'bg-warning/15 text-warning-contrast',
-  TRUMP_SELECTION: 'bg-warning/15 text-warning-contrast',
-  TRICK_PLAY: 'bg-accent/20 text-accent-contrast',
-  SCORING: 'bg-primary/15 text-primary-contrast',
-  BETWEEN_ROUNDS: 'bg-muted/15 text-subtle',
-  COMPLETED: 'bg-muted/15 text-subtle',
-  ABANDONED: 'bg-danger/15 text-danger-foreground',
+  LOBBY: 'bg-success/15 text-success-foreground',
+  DEALING: 'bg-accent/15 text-accent-foreground',
+  BIDDING: 'bg-warning/15 text-warning-foreground',
+  TRUMP_SELECTION: 'bg-warning/15 text-warning-foreground',
+  TRICK_PLAY: 'bg-accent/20 text-accent-foreground',
+  SCORING: 'bg-primary/15 text-primary',
+  BETWEEN_ROUNDS: 'bg-muted/15 text-muted-foreground',
+  COMPLETED: 'bg-muted/15 text-muted-foreground',
+  ABANDONED: 'bg-destructive/15 text-destructive-foreground',
 }
 
 export default function GameList({
@@ -76,11 +76,11 @@ export default function GameList({
   const showActions = typeof renderActions === 'function'
 
   return (
-    <SurfaceCard as="section" padding="md">
+    <Card as="section" padding="md">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-2xl font-semibold text-foreground">{title}</h2>
         {games.length > 0 ? (
-          <label className="flex w-full items-center gap-2 rounded-2xl border border-border/60 bg-surface px-3 py-2 text-sm text-muted shadow-inner shadow-black/10 sm:w-64">
+          <label className="flex w-full items-center gap-2 rounded-2xl border border-border/60 bg-card px-3 py-2 text-sm text-muted-foreground shadow-inner shadow-shadow/10 sm:w-64">
             <span role="img" aria-hidden>
               🔍
             </span>
@@ -90,18 +90,18 @@ export default function GameList({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('search.placeholder')}
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted focus-visible:outline-none"
+              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none"
             />
           </label>
         ) : null}
       </div>
 
       {games.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-border/60 bg-surface px-4 py-8 text-center text-muted">
+        <div className="mt-6 rounded-2xl border border-dashed border-border/60 bg-card px-4 py-8 text-center text-muted-foreground">
           {emptyMessage}
         </div>
       ) : filteredGames.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-border/60 bg-surface px-4 py-8 text-center text-muted">
+        <div className="mt-6 rounded-2xl border border-dashed border-border/60 bg-card px-4 py-8 text-center text-muted-foreground">
           {t('noMatches')}
         </div>
       ) : (
@@ -109,7 +109,7 @@ export default function GameList({
           {filteredGames.map((game) => {
             const stateLabel = getStateLabel(game.state)
             const stateClass =
-              stateClassNames[game.state] ?? 'bg-surface text-subtle'
+              stateClassNames[game.state] ?? 'bg-card text-muted-foreground'
             const actions = renderActions?.(game)
             const relativeUpdated = isMounted
               ? formatRelativeTime(game.updated_at)
@@ -122,11 +122,11 @@ export default function GameList({
             return (
               <article
                 key={game.id}
-                className="group card-hover-shadow rounded-2xl border border-border/60 bg-surface px-4 py-5 transition-transform duration-200 hover:-translate-y-1 hover:border-primary/40"
+                className="group card-hover-shadow rounded-2xl border border-border/60 bg-card px-4 py-5 transition-transform duration-200 hover:-translate-y-1 hover:border-primary/40"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.4em] text-subtle">
+                    <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">
                       Game {game.id}
                     </p>
                     <h3 className="text-xl font-semibold text-foreground">
@@ -140,9 +140,9 @@ export default function GameList({
                   </span>
                 </div>
 
-                <dl className="mt-4 grid gap-3 text-sm text-muted sm:grid-cols-3">
-                  <div className="rounded-2xl bg-surface-strong/70 px-3 py-2">
-                    <dt className="text-xs uppercase tracking-wide text-subtle">
+                <dl className="mt-4 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
+                  <div className="rounded-2xl bg-muted/70 px-3 py-2">
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                       {t('fields.players')}
                     </dt>
                     <dd className="text-base font-semibold text-foreground">
@@ -150,16 +150,16 @@ export default function GameList({
                       {formatNumber(game.max_players, locale)}
                     </dd>
                   </div>
-                  <div className="rounded-2xl bg-surface-strong/70 px-3 py-2">
-                    <dt className="text-xs uppercase tracking-wide text-subtle">
+                  <div className="rounded-2xl bg-muted/70 px-3 py-2">
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                       {t('fields.seatsOpen')}
                     </dt>
                     <dd className="text-base font-semibold text-foreground">
                       {seatsOpen}
                     </dd>
                   </div>
-                  <div className="rounded-2xl bg-surface-strong/70 px-3 py-2">
-                    <dt className="text-xs uppercase tracking-wide text-subtle">
+                  <div className="rounded-2xl bg-muted/70 px-3 py-2">
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                       {t('fields.updated')}
                     </dt>
                     <dd className="text-base font-semibold text-foreground">
@@ -181,6 +181,6 @@ export default function GameList({
           })}
         </div>
       )}
-    </SurfaceCard>
+    </Card>
   )
 }

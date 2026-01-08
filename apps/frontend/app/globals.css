@@ -5,24 +5,22 @@
   --color-ring: #ffb06f;
   --color-background: #e9f2f0;
   --color-foreground: #12231e;
-  --color-muted: #354e46;
-  --color-subtle: #6d847b;
-  --color-surface: #fafcfa;
-  --color-surface-strong: #f4f8f5;
+  --color-card: #fafcfa;
+  --color-card-foreground: #12231e;
+  --color-muted: #f4f8f5;
+  --color-muted-foreground: #6d847b;
   --color-primary: #ef954a;
   --color-primary-foreground: #fffcf8;
-  --color-primary-contrast: #12231e;
   --color-accent: #2fb294;
   --color-accent-foreground: #0c2d25;
-  --color-accent-contrast: #0c2d25;
-  --color-danger: #dc5252;
-  --color-danger-foreground: #fff5f4;
+  --color-destructive: #dc5252;
+  --color-destructive-foreground: #fff5f4;
   --color-success: #47b575;
   --color-success-foreground: #0a3524;
-  --color-success-contrast: #0a3524;
   --color-warning: #f6c14b;
   --color-warning-foreground: #5f3c05;
-  --color-warning-contrast: #5f3c05;
+  --color-overlay: #000000;
+  --color-shadow: #000000;
   --color-felt-highlight: #2a705c;
   --color-felt-base: #0e4335;
   --color-felt-shadow: #051b14;
@@ -31,27 +29,23 @@
 @layer base {
   .dark {
     --color-background: #0a1210;
-    --color-surface: #112620;
-    --color-surface-strong: #0b1a16;
+    --color-card: #112620;
+    --color-card-foreground: #e5f4ed;
+    --color-muted: #0b1a16;
     --color-border: #264439;
     --color-ring: #fbbc62;
     --color-foreground: #e5f4ed;
-    --color-muted: #b7cdc6;
-    --color-subtle: #849c95;
-    --color-primary: #ffb06f;
-    --color-primary-foreground: #2e1a0c;
-    --color-primary-contrast: #fff9f0;
+    --color-muted-foreground: #849c95;
+    --color-primary: #78e5ab;
+    --color-primary-foreground: #092418;
     --color-accent: #62dcbd;
     --color-accent-foreground: #0b1e18;
-    --color-accent-contrast: #ecfcf7;
-    --color-danger: #f87171;
-    --color-danger-foreground: #300808;
+    --color-destructive: #f87171;
+    --color-destructive-foreground: #300808;
     --color-success: #78e5ab;
     --color-success-foreground: #092418;
-    --color-success-contrast: #ecfcf7;
     --color-warning: #fde082;
     --color-warning-foreground: #2e1a0c;
-    --color-warning-contrast: #ffe7bf;
     --color-felt-highlight: #1a4c40;
     --color-felt-base: #06251e;
     --color-felt-shadow: #02100c;
@@ -62,24 +56,20 @@
     --color-ring: #ffd700;
     --color-background: #f5f5dc;
     --color-foreground: #2a0a0a;
-    --color-muted: #5a3a3a;
-    --color-subtle: #8a5a5a;
-    --color-surface: #fffef8;
-    --color-surface-strong: #f8f2e8;
+    --color-card: #fffef8;
+    --color-card-foreground: #2a0a0a;
+    --color-muted: #f8f2e8;
+    --color-muted-foreground: #8a5a5a;
     --color-primary: #c41e3a;
     --color-primary-foreground: #fff5f5;
-    --color-primary-contrast: #2a0a0a;
     --color-accent: #daa520;
     --color-accent-foreground: #2a1a0a;
-    --color-accent-contrast: #2a1a0a;
-    --color-danger: #dc2626;
-    --color-danger-foreground: #fff5f5;
+    --color-destructive: #dc2626;
+    --color-destructive-foreground: #fff5f5;
     --color-success: #16a34a;
     --color-success-foreground: #f0fdf4;
-    --color-success-contrast: #14532d;
     --color-warning: #ea580c;
     --color-warning-foreground: #fff7ed;
-    --color-warning-contrast: #7c2d12;
     --color-felt-highlight: #8b2a3a;
     --color-felt-base: #5a1a2a;
     --color-felt-shadow: #2a0a1a;
@@ -87,27 +77,23 @@
 
   [data-theme='high_roller'].dark {
     --color-background: #1a0a0a;
-    --color-surface: #2a1515;
-    --color-surface-strong: #1f0f0f;
+    --color-card: #2a1515;
+    --color-card-foreground: #fff0e6;
+    --color-muted: #1f0f0f;
     --color-border: #5a3030;
     --color-ring: #ffd700;
     --color-foreground: #fff0e6;
-    --color-muted: #d4a890;
-    --color-subtle: #b08870;
+    --color-muted-foreground: #b08870;
     --color-primary: #ff6b6b;
     --color-primary-foreground: #2a0a0a;
-    --color-primary-contrast: #fff5f5;
     --color-accent: #ffd700;
     --color-accent-foreground: #2a1a0a;
-    --color-accent-contrast: #fffef0;
-    --color-danger: #f87171;
-    --color-danger-foreground: #2a0a0a;
+    --color-destructive: #f87171;
+    --color-destructive-foreground: #2a0a0a;
     --color-success: #4ade80;
     --color-success-foreground: #14532d;
-    --color-success-contrast: #f0fdf4;
     --color-warning: #fb923c;
     --color-warning-foreground: #7c2d12;
-    --color-warning-contrast: #fff7ed;
     --color-felt-highlight: #6a1a2a;
     --color-felt-base: #3a0a1a;
     --color-felt-shadow: #1a0005;
@@ -142,7 +128,7 @@
 
   a,
   button {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/70 focus-visible:ring-offset-surface-strong;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary/70 focus-visible:ring-offset-muted;
   }
 
   button:not(:disabled),
@@ -226,9 +212,9 @@
   .card-wrapper {
     background: linear-gradient(
       to bottom,
-      var(--color-surface-strong),
-      var(--color-surface),
-      var(--color-surface-strong)
+      var(--color-muted),
+      var(--color-card),
+      var(--color-muted)
     );
   }
 
@@ -239,9 +225,9 @@
   .card-wrapper-home {
     background: linear-gradient(
       to bottom,
-      var(--color-surface-strong),
-      var(--color-surface),
-      var(--color-surface-strong)
+      var(--color-muted),
+      var(--color-card),
+      var(--color-muted)
     );
     position: relative;
   }
@@ -276,35 +262,9 @@
 }
 
 @layer utilities {
-  .text-card-cream {
-    --card-cream: #fffcf5;
-    color: var(--card-cream);
-  }
-
-  .dark .text-card-cream {
-    --card-cream: #e5f4ed;
-    color: var(--card-cream);
-  }
-
-  .bg-card-cream {
-    --card-cream: #fffcf5;
-    background-color: var(--card-cream);
-  }
-
-  .dark .bg-card-cream {
-    --card-cream: #191f20;
-  }
-
   .shadow-elevated {
-    --shadow-color: #082016;
     box-shadow: 0 22px 55px -26px
-      color-mix(in srgb, var(--shadow-color) 42%, transparent);
-  }
-
-  .dark .shadow-elevated {
-    --shadow-color: #000000;
-    box-shadow: 0 22px 55px -26px
-      color-mix(in srgb, var(--shadow-color) 52%, transparent);
+      color-mix(in srgb, var(--color-shadow) 46%, transparent);
   }
 
   .card-hover-shadow {
@@ -316,7 +276,8 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 20px 55px
+      color-mix(in srgb, var(--color-shadow) 35%, transparent);
     opacity: 0;
     pointer-events: none;
     transition:
@@ -331,368 +292,22 @@
   }
 
   .table-circle-ring {
-    border: 1px solid rgba(18, 35, 30, 0.25);
+    border: 1px solid
+      color-mix(in srgb, var(--color-foreground) 25%, transparent);
     background: radial-gradient(
       circle,
-      rgba(18, 35, 30, 0.18) 0%,
-      rgba(18, 35, 30, 0.1) 50%,
+      color-mix(in srgb, var(--color-foreground) 18%, transparent) 0%,
+      color-mix(in srgb, var(--color-foreground) 10%, transparent) 50%,
       transparent 70%
     );
   }
 
   .dark .table-circle-ring {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: color-mix(in srgb, var(--color-foreground) 12%, transparent);
     background: radial-gradient(
       circle,
-      rgba(255, 255, 255, 0.05) 0%,
+      color-mix(in srgb, var(--color-foreground) 6%, transparent) 0%,
       transparent 70%
     );
-  }
-
-  /* Panel colors: primary (orange) in light mode, success (green) in dark mode */
-  /* These utilities map to different colors in light vs dark mode */
-  .bg-panel-primary {
-    background-color: color-mix(
-      in srgb,
-      var(--color-primary) 100%,
-      transparent
-    );
-  }
-
-  .dark .bg-panel-primary {
-    background-color: color-mix(
-      in srgb,
-      var(--color-success) 100%,
-      transparent
-    );
-  }
-
-  .bg-panel-primary\/10 {
-    background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
-  }
-
-  .dark .bg-panel-primary\/10 {
-    background-color: color-mix(in srgb, var(--color-success) 10%, transparent);
-  }
-
-  .bg-panel-primary\/15 {
-    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
-  }
-
-  .dark .bg-panel-primary\/15 {
-    background-color: color-mix(in srgb, var(--color-success) 15%, transparent);
-  }
-
-  .bg-panel-primary\/20 {
-    background-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
-  }
-
-  .dark .bg-panel-primary\/20 {
-    background-color: color-mix(in srgb, var(--color-success) 20%, transparent);
-  }
-
-  .bg-panel-primary\/25 {
-    background-color: color-mix(in srgb, var(--color-primary) 25%, transparent);
-  }
-
-  .dark .bg-panel-primary\/25 {
-    background-color: color-mix(in srgb, var(--color-success) 25%, transparent);
-  }
-
-  .bg-panel-primary\/30 {
-    background-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
-  }
-
-  .dark .bg-panel-primary\/30 {
-    background-color: color-mix(in srgb, var(--color-success) 30%, transparent);
-  }
-
-  .bg-panel-primary\/40 {
-    background-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
-  }
-
-  .dark .bg-panel-primary\/40 {
-    background-color: color-mix(in srgb, var(--color-success) 40%, transparent);
-  }
-
-  .bg-panel-primary\/50 {
-    background-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
-  }
-
-  .dark .bg-panel-primary\/50 {
-    background-color: color-mix(in srgb, var(--color-success) 50%, transparent);
-  }
-
-  .bg-panel-primary\/60 {
-    background-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
-  }
-
-  .dark .bg-panel-primary\/60 {
-    background-color: color-mix(in srgb, var(--color-success) 60%, transparent);
-  }
-
-  .bg-panel-primary\/80 {
-    background-color: color-mix(in srgb, var(--color-primary) 80%, transparent);
-  }
-
-  .dark .bg-panel-primary\/80 {
-    background-color: color-mix(in srgb, var(--color-success) 80%, transparent);
-  }
-
-  .border-panel-primary {
-    border-color: color-mix(in srgb, var(--color-primary) 100%, transparent);
-  }
-
-  .dark .border-panel-primary {
-    border-color: color-mix(in srgb, var(--color-success) 100%, transparent);
-  }
-
-  .border-panel-primary\/20 {
-    border-color: color-mix(in srgb, var(--color-primary) 20%, transparent);
-  }
-
-  .dark .border-panel-primary\/20 {
-    border-color: color-mix(in srgb, var(--color-success) 20%, transparent);
-  }
-
-  .border-panel-primary\/30 {
-    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
-  }
-
-  .dark .border-panel-primary\/30 {
-    border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
-  }
-
-  .border-panel-primary\/40 {
-    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
-  }
-
-  .dark .border-panel-primary\/40 {
-    border-color: color-mix(in srgb, var(--color-success) 40%, transparent);
-  }
-
-  .border-panel-primary\/50 {
-    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
-  }
-
-  .dark .border-panel-primary\/50 {
-    border-color: color-mix(in srgb, var(--color-success) 50%, transparent);
-  }
-
-  .border-panel-primary\/60 {
-    border-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
-  }
-
-  .dark .border-panel-primary\/60 {
-    border-color: color-mix(in srgb, var(--color-success) 60%, transparent);
-  }
-
-  .text-panel-primary {
-    color: var(--color-primary-contrast);
-  }
-
-  .dark .text-panel-primary {
-    color: var(--color-success-contrast);
-  }
-
-  .text-panel-primary\/75 {
-    color: color-mix(in srgb, var(--color-primary-contrast) 75%, transparent);
-  }
-
-  .dark .text-panel-primary\/75 {
-    color: color-mix(in srgb, var(--color-success-contrast) 75%, transparent);
-  }
-
-  .text-panel-primary\/80 {
-    color: color-mix(in srgb, var(--color-primary-contrast) 80%, transparent);
-  }
-
-  .dark .text-panel-primary\/80 {
-    color: color-mix(in srgb, var(--color-success-contrast) 80%, transparent);
-  }
-
-  .text-panel-primary\/90 {
-    color: color-mix(in srgb, var(--color-primary-contrast) 90%, transparent);
-  }
-
-  .dark .text-panel-primary\/90 {
-    color: color-mix(in srgb, var(--color-success-contrast) 90%, transparent);
-  }
-
-  .shadow-panel-primary\/20 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-primary) 20%, transparent);
-  }
-
-  .dark .shadow-panel-primary\/20 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-success) 20%, transparent);
-  }
-
-  .shadow-panel-primary\/30 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-primary) 30%, transparent);
-  }
-
-  .dark .shadow-panel-primary\/30 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-success) 30%, transparent);
-  }
-
-  .shadow-panel-primary\/40 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-primary) 40%, transparent);
-  }
-
-  .dark .shadow-panel-primary\/40 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-success) 40%, transparent);
-  }
-
-  .ring-panel-primary {
-    --tw-ring-color: color-mix(in srgb, var(--color-primary) 100%, transparent);
-  }
-
-  .dark .ring-panel-primary {
-    --tw-ring-color: color-mix(in srgb, var(--color-success) 100%, transparent);
-  }
-
-  .ring-panel-primary\/40 {
-    --tw-ring-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
-  }
-
-  .dark .ring-panel-primary\/40 {
-    --tw-ring-color: color-mix(in srgb, var(--color-success) 40%, transparent);
-  }
-
-  /* Panel accent colors: primary (orange) in light mode, accent (teal) in dark mode */
-  .bg-panel-primary-accent {
-    background-color: color-mix(
-      in srgb,
-      var(--color-primary) 100%,
-      transparent
-    );
-  }
-
-  .dark .bg-panel-primary-accent {
-    background-color: color-mix(in srgb, var(--color-accent) 100%, transparent);
-  }
-
-  .bg-panel-primary-accent\/15 {
-    background-color: color-mix(in srgb, var(--color-primary) 15%, transparent);
-  }
-
-  .dark .bg-panel-primary-accent\/15 {
-    background-color: color-mix(in srgb, var(--color-accent) 15%, transparent);
-  }
-
-  .bg-panel-primary-accent\/30 {
-    background-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
-  }
-
-  .dark .bg-panel-primary-accent\/30 {
-    background-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
-  }
-
-  .border-panel-primary-accent {
-    border-color: color-mix(in srgb, var(--color-primary) 100%, transparent);
-  }
-
-  .dark .border-panel-primary-accent {
-    border-color: color-mix(in srgb, var(--color-accent) 100%, transparent);
-  }
-
-  .border-panel-primary-accent\/30 {
-    border-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
-  }
-
-  .dark .border-panel-primary-accent\/30 {
-    border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
-  }
-
-  .border-panel-primary-accent\/40 {
-    border-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
-  }
-
-  .dark .border-panel-primary-accent\/40 {
-    border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
-  }
-
-  .border-panel-primary-accent\/50 {
-    border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
-  }
-
-  .dark .border-panel-primary-accent\/50 {
-    border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
-  }
-
-  .text-panel-primary-accent {
-    color: var(--color-primary-contrast);
-  }
-
-  .dark .text-panel-primary-accent {
-    color: var(--color-accent-contrast);
-  }
-
-  .text-panel-primary-accent\/75 {
-    color: color-mix(in srgb, var(--color-primary-contrast) 75%, transparent);
-  }
-
-  .dark .text-panel-primary-accent\/75 {
-    color: color-mix(in srgb, var(--color-accent-contrast) 75%, transparent);
-  }
-
-  .text-panel-primary-accent\/80 {
-    color: color-mix(in srgb, var(--color-primary-contrast) 80%, transparent);
-  }
-
-  .dark .text-panel-primary-accent\/80 {
-    color: color-mix(in srgb, var(--color-accent-contrast) 80%, transparent);
-  }
-
-  .shadow-panel-primary-accent\/20 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-primary) 20%, transparent);
-  }
-
-  .dark .shadow-panel-primary-accent\/20 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-accent) 20%, transparent);
-  }
-
-  .shadow-panel-primary-accent\/30 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-primary) 30%, transparent);
-  }
-
-  .dark .shadow-panel-primary-accent\/30 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-accent) 30%, transparent);
-  }
-
-  .shadow-panel-primary-accent\/40 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-primary) 40%, transparent);
-  }
-
-  .dark .shadow-panel-primary-accent\/40 {
-    box-shadow: 0 10px 25px -5px
-      color-mix(in srgb, var(--color-accent) 40%, transparent);
-  }
-
-  .ring-panel-primary-accent {
-    --tw-ring-color: color-mix(in srgb, var(--color-primary) 100%, transparent);
-  }
-
-  .dark .ring-panel-primary-accent {
-    --tw-ring-color: color-mix(in srgb, var(--color-accent) 100%, transparent);
-  }
-
-  .ring-panel-primary-accent\/40 {
-    --tw-ring-color: color-mix(in srgb, var(--color-primary) 40%, transparent);
-  }
-
-  .dark .ring-panel-primary-accent\/40 {
-    --tw-ring-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
   }
 }

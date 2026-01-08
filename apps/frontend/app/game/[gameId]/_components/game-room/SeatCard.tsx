@@ -42,10 +42,10 @@ export function SeatCard({
   return (
     <div
       className={cn(
-        'flex w-fit flex-col gap-1.5 rounded-xl border-2 bg-surface/80 px-3 py-2 text-sm text-muted shadow-elevated backdrop-blur transition',
+        'flex w-fit flex-col gap-1.5 rounded-xl border-2 bg-card/80 px-3 py-2 text-sm text-muted-foreground shadow-elevated backdrop-blur transition',
         isActive
           ? 'border-primary/60 bg-primary/10 shadow-inner shadow-primary/20'
-          : 'border-white/10',
+          : 'border-border/60',
         baseClasses,
         variant === 'table' ? positionStyles[orientation] : '',
         className
@@ -53,7 +53,7 @@ export function SeatCard({
     >
       <div className="flex flex-col gap-0.5 text-center sm:text-left">
         {!isViewer ? (
-          <span className="hidden text-[10px] font-semibold uppercase tracking-[0.4em] text-subtle sm:inline">
+          <span className="hidden text-[10px] font-semibold uppercase tracking-[0.4em] text-muted-foreground sm:inline">
             {badge}
           </span>
         ) : null}
@@ -62,19 +62,19 @@ export function SeatCard({
 
       <div className="flex flex-wrap items-center justify-center gap-1 text-[10px] sm:justify-end">
         {typeof bid === 'number' ? (
-          <span className="rounded-full bg-black/20 px-2 py-0.5 font-semibold text-foreground">
+          <span className="rounded-full bg-overlay/20 px-2 py-0.5 font-semibold text-foreground">
             {t('seat.bid', { bid })}
           </span>
         ) : null}
         {typeof tricksWon === 'number' ? (
-          <span className="rounded-full bg-black/20 px-2 py-0.5 font-semibold text-foreground">
+          <span className="rounded-full bg-overlay/20 px-2 py-0.5 font-semibold text-foreground">
             {t('seat.won', { tricksWon })}
           </span>
         ) : null}
       </div>
 
       {isViewer ? (
-        <span className="hidden self-center rounded-full bg-success/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success-contrast sm:inline">
+        <span className="hidden self-center rounded-full bg-success/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success-foreground sm:inline">
           {t('you')}
         </span>
       ) : null}

@@ -547,7 +547,7 @@ export function TrickArea({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-[32px] border border-white/10 bg-black/25 px-4 text-center text-sm text-muted shadow-elevated backdrop-blur',
+        'relative flex items-center justify-center rounded-[32px] border border-border/60 bg-overlay/25 px-4 text-center text-sm text-muted-foreground shadow-elevated backdrop-blur',
         className
       )}
       style={{
@@ -588,11 +588,11 @@ export function TrickArea({
         </div>
       ) : orderedCards.length === 0 ? (
         <div className="flex flex-col items-center gap-2">
-          <span className="text-sm font-medium text-subtle">
+          <span className="text-sm font-medium text-muted-foreground">
             {getWaitingMessage(phase, getSeatName, t)}
           </span>
           {isTrickPhase(phase) ? (
-            <span className="text-xs text-muted">
+            <span className="text-xs text-muted-foreground">
               {t('trickOf', {
                 trickNo: phase.data.trick_no,
                 handSize: round?.hand_size ?? '?',

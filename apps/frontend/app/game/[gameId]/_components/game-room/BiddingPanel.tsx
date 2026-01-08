@@ -261,7 +261,7 @@ export function BiddingPanel({
       case 'SPADES':
         return 'text-slate-900'
       case 'NO_TRUMPS':
-        return 'text-panel-primary-accent'
+        return 'text-primary'
       default:
         return ''
     }
@@ -273,16 +273,10 @@ export function BiddingPanel({
   const suits = allowedTrumps.filter((t) => t !== 'NO_TRUMPS').reverse()
   const hasNoTrump = allowedTrumps.includes('NO_TRUMPS')
 
-  // Use panel-primary-accent colors for trump mode
-  const borderColor = isTrumpMode
-    ? 'border-panel-primary-accent/50'
-    : 'border-panel-primary/50'
-  const bgColor = isTrumpMode
-    ? 'bg-panel-primary-accent/15'
-    : 'bg-panel-primary/10'
-  const textColor = isTrumpMode
-    ? 'text-panel-primary-accent'
-    : 'text-panel-primary'
+  // Use primary for the highlight color (orange in standard light, green in standard dark)
+  const borderColor = isTrumpMode ? 'border-primary/50' : 'border-primary/50'
+  const bgColor = isTrumpMode ? 'bg-primary/15' : 'bg-primary/10'
+  const textColor = isTrumpMode ? 'text-primary' : 'text-primary'
 
   return (
     <section
@@ -310,11 +304,11 @@ export function BiddingPanel({
           className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 border ${
             isViewerTurn
               ? isTrumpMode
-                ? 'bg-panel-primary-accent/25 border-panel-primary-accent/60'
-                : 'bg-panel-primary/25 border-panel-primary/60'
+                ? 'bg-primary/25 border-primary/60'
+                : 'bg-primary/25 border-primary/60'
               : isTrumpMode
-                ? 'bg-panel-primary-accent/15 border-panel-primary-accent/40'
-                : 'bg-panel-primary/15 border-panel-primary/40'
+                ? 'bg-primary/15 border-primary/40'
+                : 'bg-primary/15 border-primary/40'
           }`}
         >
           <span
@@ -345,10 +339,10 @@ export function BiddingPanel({
           - Trump mode: it's the viewer's turn to select trump (canSelectTrump) */}
       {!isSpectator && (isTrumpMode ? canSelectTrump : viewerBid === null) && (
         <form
-          className={`flex flex-col gap-3 rounded-2xl border bg-surface/85 p-4 shadow-inner ${
+          className={`flex flex-col gap-3 rounded-2xl border bg-card/85 p-4 shadow-inner ${
             isTrumpMode
-              ? 'border-panel-primary-accent/30 shadow-panel-primary-accent/20'
-              : 'border-panel-primary/30 shadow-panel-primary/20'
+              ? 'border-primary/30 shadow-primary/20'
+              : 'border-primary/30 shadow-primary/20'
           }`}
           onSubmit={handleSubmit}
         >
@@ -378,10 +372,10 @@ export function BiddingPanel({
                           disabled={disabled}
                           className={`flex items-center justify-center rounded-2xl border px-4 py-3 text-center transition ${
                             isSelected
-                              ? 'border-panel-primary-accent bg-panel-primary-accent/30 text-panel-primary-accent shadow-md shadow-panel-primary-accent/30'
+                              ? 'border-primary bg-primary/30 text-primary shadow-md shadow-primary/30'
                               : canSelectTrump
-                                ? 'border-panel-primary-accent/40 bg-surface text-panel-primary-accent hover:border-panel-primary-accent hover:bg-panel-primary-accent/15'
-                                : 'border-border bg-surface text-muted'
+                                ? 'border-primary/40 bg-card text-primary hover:border-primary hover:bg-primary/15'
+                                : 'border-border bg-card text-muted-foreground'
                           } ${
                             disabled
                               ? 'cursor-not-allowed opacity-60'
@@ -427,10 +421,10 @@ export function BiddingPanel({
                       disabled={!canSelectTrump || isTrumpPending}
                       className={`flex items-center justify-center rounded-2xl border px-4 py-3 text-center transition ${
                         selectedTrump === 'NO_TRUMPS'
-                          ? 'border-panel-primary-accent bg-panel-primary-accent/30 text-panel-primary-accent shadow-md shadow-panel-primary-accent/30'
+                          ? 'border-primary bg-primary/30 text-primary shadow-md shadow-primary/30'
                           : canSelectTrump
-                            ? 'border-panel-primary-accent/40 bg-surface text-panel-primary-accent hover:border-panel-primary-accent hover:bg-panel-primary-accent/15'
-                            : 'border-border bg-surface text-muted'
+                            ? 'border-primary/40 bg-card text-primary hover:border-primary hover:bg-primary/15'
+                            : 'border-border bg-card text-muted-foreground'
                       } ${
                         !canSelectTrump || isTrumpPending
                           ? 'cursor-not-allowed opacity-60'
@@ -447,7 +441,7 @@ export function BiddingPanel({
                       }
                       aria-pressed={selectedTrump === 'NO_TRUMPS'}
                     >
-                      <span className="text-xl font-semibold text-panel-primary-accent">
+                      <span className="text-xl font-semibold text-primary">
                         {tTrumpName('NO_TRUMPS')}
                       </span>
                     </button>
@@ -457,7 +451,7 @@ export function BiddingPanel({
 
               <button
                 type="submit"
-                className="w-full rounded-2xl bg-panel-primary-accent px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-panel-primary-accent/40 transition hover:bg-panel-primary-accent/80 disabled:cursor-not-allowed disabled:bg-panel-primary-accent/40 disabled:text-primary-foreground/70 dark:text-accent-foreground dark:disabled:text-accent-foreground/70"
+                className="w-full rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
                 disabled={!canSelectTrump || isTrumpPending || !selectedTrump}
                 aria-label={
                   isTrumpPending
@@ -502,7 +496,7 @@ export function BiddingPanel({
                   className={`w-24 rounded-xl border bg-background px-3 py-2 text-sm font-semibold text-foreground outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${
                     hasValidationIssue
                       ? 'border-warning/70 focus:border-warning focus:ring focus:ring-warning/30'
-                      : 'border-panel-primary/40 focus:border-panel-primary focus:ring focus:ring-panel-primary/40'
+                      : 'border-primary/40 focus:border-primary focus:ring focus:ring-primary/40'
                   } ${flashValidation && hasValidationIssue ? 'animate-pulse' : ''}`}
                   disabled={isInputDisabled}
                   aria-label={t('bidValueAria')}
@@ -512,7 +506,7 @@ export function BiddingPanel({
                 />
                 <button
                   type="submit"
-                  className="rounded-2xl bg-panel-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-panel-primary/40 transition hover:bg-panel-primary/80 disabled:cursor-not-allowed disabled:bg-panel-primary/40 disabled:text-primary-foreground/70 dark:text-success-foreground dark:disabled:text-success-foreground/70"
+                  className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
                   disabled={isSubmitDisabled}
                   aria-label={
                     bidding.isPending
@@ -537,7 +531,7 @@ export function BiddingPanel({
                     ? t('hint.waitingForPlayer', { name: activeName })
                     : t('hint.submittedWaiting')}
                 {!isViewerTurn && viewerBid === null && (
-                  <span className="block mt-1 text-panel-primary/70">
+                  <span className="block mt-1 text-primary/70">
                     {t('hint.preEntry')}
                   </span>
                 )}
@@ -545,7 +539,7 @@ export function BiddingPanel({
               {warningMessage ? (
                 <p
                   id="bid-validation-warning"
-                  className={`text-xs font-semibold text-warning-contrast ${
+                  className={`text-xs font-semibold text-warning-foreground ${
                     flashValidation ? 'animate-pulse' : ''
                   }`}
                   role="alert"
@@ -559,10 +553,8 @@ export function BiddingPanel({
       )}
 
       <div
-        className={`rounded-2xl border bg-surface/70 p-4 ${
-          isTrumpMode
-            ? 'border-panel-primary-accent/20'
-            : 'border-panel-primary/20'
+        className={`rounded-2xl border bg-card/70 p-4 ${
+          isTrumpMode ? 'border-primary/20' : 'border-primary/20'
         }`}
       >
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide">
@@ -580,14 +572,14 @@ export function BiddingPanel({
                 className={`flex items-center justify-between rounded-2xl px-3 py-2 text-sm ${
                   isActiveInCurrentPhase
                     ? isTrumpMode
-                      ? 'bg-panel-primary-accent/20 text-panel-primary-accent'
-                      : 'bg-panel-primary/20 text-panel-primary'
-                    : 'bg-surface text-muted'
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-primary/20 text-primary'
+                    : 'bg-card text-muted-foreground'
                 }`}
               >
                 <div className="flex flex-col">
                   <span className="font-semibold text-foreground">{name}</span>
-                  <span className="text-[10px] uppercase text-subtle">
+                  <span className="text-[10px] uppercase text-muted-foreground">
                     {orientation}
                   </span>
                 </div>

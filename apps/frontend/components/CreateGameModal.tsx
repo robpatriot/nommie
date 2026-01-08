@@ -3,6 +3,7 @@
 import type { FormEvent } from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
+import { Button } from '@/components/ui/Button'
 
 interface CreateGameModalProps {
   isOpen: boolean
@@ -64,14 +65,14 @@ export default function CreateGameModal({
       aria-labelledby="create-game-title"
     >
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-md"
+        className="absolute inset-0 bg-overlay/50 backdrop-blur-md"
         onClick={handleCancel}
         aria-hidden
       />
-      <div className="relative z-10 w-full max-w-lg rounded-[32px] border border-white/20 bg-surface/90 p-6 shadow-elevated">
+      <div className="relative z-10 w-full max-w-lg rounded-[32px] border border-border/70 bg-card/90 p-6 shadow-elevated">
         <header className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-muted-foreground">
               {t('createModal.kicker')}
             </p>
             <h2
@@ -80,24 +81,28 @@ export default function CreateGameModal({
             >
               {t('createModal.title')}
             </h2>
-            <p className="text-sm text-muted">
+            <p className="text-sm text-muted-foreground">
               {t('createModal.description', { defaultName })}
             </p>
           </div>
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={handleCancel}
-            className="rounded-full border border-border/60 bg-surface px-3 py-1 text-sm font-medium text-subtle transition hover:text-foreground"
+            className="rounded-full px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground"
             aria-label={t('createModal.closeAria')}
           >
             ✕
-          </button>
+          </Button>
         </header>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
             {t('createModal.gameNameLabel')}{' '}
-            <span className="text-muted">({t('createModal.optional')})</span>
+            <span className="text-muted-foreground">
+              ({t('createModal.optional')})
+            </span>
             <input
               type="text"
               id="game-name"
@@ -110,26 +115,32 @@ export default function CreateGameModal({
             />
           </label>
 
-          <p className="text-xs text-subtle">{t('createModal.helper')}</p>
+          <p className="text-xs text-muted-foreground">
+            {t('createModal.helper')}
+          </p>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="lg"
               onClick={handleCancel}
               disabled={isSubmitting}
-              className="rounded-2xl border border-border/70 bg-surface px-4 py-3 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full text-muted-foreground hover:text-foreground"
             >
               {t('createModal.cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant="primary"
+              size="lg"
               disabled={isSubmitting}
-              className="rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="w-full"
             >
               {isSubmitting
                 ? t('createModal.creating')
                 : t('createModal.create')}
-            </button>
+            </Button>
           </div>
         </form>
       </div>

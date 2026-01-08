@@ -23,14 +23,14 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'flex h-full flex-col gap-1 rounded-2xl border border-border/60 bg-surface px-4 py-3 text-muted shadow-inner shadow-black/5',
+        'flex h-full flex-col gap-1 rounded-2xl border border-border/60 bg-card px-4 py-3 text-muted-foreground shadow-inner shadow-shadow/5',
         align === 'center'
           ? 'items-center text-center'
           : 'items-start text-left',
         className
       )}
     >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-subtle">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground">
         {label}
       </p>
       <p
@@ -39,7 +39,12 @@ export function StatCard({
         {value}
       </p>
       {description ? (
-        <p className={cn('text-xs text-muted/90', descriptionClassName)}>
+        <p
+          className={cn(
+            'text-xs text-muted-foreground/90',
+            descriptionClassName
+          )}
+        >
           {description}
         </p>
       ) : null}

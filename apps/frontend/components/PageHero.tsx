@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
-import { SurfaceCard } from './SurfaceCard'
+import { Card } from '@/components/ui/Card'
 
 interface PageHeroProps {
   intro: ReactNode
@@ -24,7 +24,7 @@ export function PageHero({
   footerClassName,
 }: PageHeroProps) {
   return (
-    <SurfaceCard padding="lg" className={className}>
+    <Card padding="lg" className={className}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className={cn('flex flex-col gap-4 lg:flex-1', introClassName)}>
           {intro}
@@ -43,6 +43,6 @@ export function PageHero({
       {footer ? (
         <div className={cn('mt-4', footerClassName)}>{footer}</div>
       ) : null}
-    </SurfaceCard>
+    </Card>
   )
 }

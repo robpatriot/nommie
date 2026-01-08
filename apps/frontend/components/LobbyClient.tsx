@@ -252,17 +252,16 @@ export default function LobbyClient({
     <>
       <PageContainer>
         <PageHero
-          className="border-white/15"
           intro={
             <div className="space-y-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-subtle">
+              <p className="text-xs font-semibold uppercase tracking-[0.4em] text-muted-foreground">
                 {t('hero.kicker')}
               </p>
               <div>
                 <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
                   {t('hero.title')}
                 </h1>
-                <p className="mt-2 text-sm text-muted sm:text-base">
+                <p className="mt-2 text-sm text-muted-foreground sm:text-base">
                   {t('hero.description')}
                 </p>
               </div>
@@ -302,7 +301,7 @@ export default function LobbyClient({
               <button
                 onClick={handleRefresh}
                 disabled={isRefreshing}
-                className="inline-flex w-full items-center justify-center rounded-2xl border border-border/60 bg-surface px-5 py-3 font-semibold text-muted transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex w-full items-center justify-center rounded-2xl border border-border/60 bg-card px-5 py-3 font-semibold text-muted-foreground transition hover:border-primary/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 aria-live="polite"
               >
                 {isRefreshing
@@ -327,7 +326,7 @@ export default function LobbyClient({
                   <button
                     key="delete"
                     onClick={() => handleDelete(game.id)}
-                    className="rounded-full border border-danger/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-danger transition hover:bg-danger hover:text-danger-foreground"
+                    className="rounded-full border border-destructive/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-destructive transition hover:bg-destructive hover:text-destructive-foreground"
                   >
                     {t('actions.delete')}
                   </button>
@@ -373,7 +372,7 @@ export default function LobbyClient({
                     <button
                       key="watch"
                       onClick={() => handleSpectate(game.id)}
-                      className="rounded-full border border-primary/60 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                      className="rounded-full border border-primary/60 bg-card px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
                     >
                       {t('actions.watch')}
                     </button>
@@ -383,7 +382,7 @@ export default function LobbyClient({
                 actions.push(
                   <span
                     key="full"
-                    className="rounded-full bg-surface px-3 py-1 text-xs font-semibold uppercase tracking-wide text-subtle"
+                    className="rounded-full bg-card px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
                   >
                     {t('labels.fullTable')}
                   </span>
@@ -394,7 +393,7 @@ export default function LobbyClient({
                     <button
                       key="watch"
                       onClick={() => handleSpectate(game.id)}
-                      className="rounded-full border border-primary/60 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                      className="rounded-full border border-primary/60 bg-card px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
                     >
                       {t('actions.watch')}
                     </button>
@@ -421,7 +420,7 @@ export default function LobbyClient({
                   <button
                     key="delete"
                     onClick={() => handleDelete(game.id)}
-                    className="rounded-full border border-danger/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-danger transition hover:bg-danger hover:text-danger-foreground"
+                    className="rounded-full border border-destructive/60 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-destructive transition hover:bg-destructive hover:text-destructive-foreground"
                   >
                     {t('actions.delete')}
                   </button>
@@ -454,7 +453,7 @@ export default function LobbyClient({
                   <button
                     key="watch"
                     onClick={() => handleSpectate(game.id)}
-                    className="rounded-full border border-primary/60 bg-surface px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
+                    className="rounded-full border border-primary/60 bg-card px-4 py-2 text-sm font-semibold text-primary transition hover:bg-primary/10"
                   >
                     {t('actions.watch')}
                   </button>

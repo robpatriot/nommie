@@ -55,71 +55,71 @@ export default async function SettingsPage() {
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10">
       <BreadcrumbSetter crumbs={[{ label: t('breadcrumbs.settings') }]} />
-      <section className="rounded-3xl border border-border/50 bg-surface/70 p-8 shadow-elevated">
+      <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
         <div className="mb-6">
-          <p className="text-sm uppercase tracking-wide text-subtle">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">
             {t('sections.display.kicker')}
           </p>
           <h2 className="text-2xl font-semibold text-foreground">
             {t('sections.display.appearance.title')}
           </h2>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted-foreground">
             {t('sections.display.appearance.description')}
           </p>
         </div>
         <AppearanceSelector preferredAppearance={preferredAppearance} />
       </section>
-      <section className="rounded-3xl border border-border/50 bg-surface/70 p-8 shadow-elevated">
+      <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
         <div className="mb-6">
-          <p className="text-sm uppercase tracking-wide text-subtle">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">
             {t('sections.display.kicker')}
           </p>
           <h2 className="text-2xl font-semibold text-foreground">
             {t('sections.display.theme.title')}
           </h2>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted-foreground">
             {t('sections.display.theme.description')}
           </p>
         </div>
         <ThemeSelector preferredTheme={preferredTheme} />
       </section>
-      <section className="rounded-3xl border border-border/50 bg-surface/70 p-8 shadow-elevated">
+      <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
         <div className="mb-6">
-          <p className="text-sm uppercase tracking-wide text-subtle">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">
             {t('sections.language.kicker')}
           </p>
           <h2 className="text-2xl font-semibold text-foreground">
             {t('sections.language.title')}
           </h2>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted-foreground">
             {t('sections.language.description')}
           </p>
         </div>
         <LanguageSelector preferredLocale={preferredLocale} />
       </section>
-      <section className="rounded-3xl border border-border/50 bg-surface/70 p-8 shadow-elevated">
+      <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
         <div className="mb-6">
-          <p className="text-sm uppercase tracking-wide text-subtle">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">
             {t('sections.gameplay.kicker')}
           </p>
           <h2 className="text-2xl font-semibold text-foreground">
             {t('sections.gameplay.cardConfirmation.title')}
           </h2>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted-foreground">
             {t('sections.gameplay.cardConfirmation.description')}
           </p>
         </div>
         <CardConfirmationToggle initialEnabled={requireCardConfirmation} />
       </section>
-      <section className="rounded-3xl border border-border/50 bg-surface/70 p-8 shadow-elevated">
+      <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
         <div className="mb-6">
-          <p className="text-sm uppercase tracking-wide text-subtle">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">
             {t('sections.gameplay.kicker')}
           </p>
           <h2 className="text-2xl font-semibold text-foreground">
             {t('sections.gameplay.trickDisplayDuration.title')}
           </h2>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted-foreground">
             {t('sections.gameplay.trickDisplayDuration.description')}
           </p>
         </div>
