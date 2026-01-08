@@ -8,6 +8,10 @@
       "appearance": {
         "title": "Erscheinungsbild",
         "description": "Wähle, wie Nommie auf all deinen Geräten aussieht. Die Einstellung gilt überall, wo du angemeldet bist."
+      },
+      "theme": {
+        "title": "Thema",
+        "description": "Wähle ein visuelles Thema für den Spieltisch und die Benutzeroberfläche. Jedes Thema hat seine eigene einzigartige Farbpalette und seinen eigenen Stil."
       }
     },
     "language": {
@@ -49,6 +53,23 @@
       "couldNotSave": "Speichern fehlgeschlagen: {error}",
       "usingPreference": "Gespeichertes Erscheinungsbild: {appearance}.",
       "usingSystem": "Systemeinstellung: {appearance}."
+    }
+  },
+  "theme": {
+    "selected": "Ausgewählt",
+    "options": {
+      "standard": {
+        "label": "Klassisch",
+        "description": "Klassischer Casino-Tisch mit grünem Filz und elegantem Stil"
+      },
+      "high_roller": {
+        "label": "Großspieler",
+        "description": "Mutiger Las-Vegas-Stil mit satten Rot-, Gold- und Schwarztönen"
+      },
+      "oldtime": {
+        "label": "Retro",
+        "description": "Art-Déco-inspiriertes Thema mit dramatischem Flair"
+      }
     }
   },
   "language": {

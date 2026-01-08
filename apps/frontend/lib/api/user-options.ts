@@ -1,11 +1,12 @@
 'use server'
 
 import { fetchWithAuth } from '@/lib/api'
-import type { ThemeMode } from '@/components/theme-provider'
+import type { ThemeMode, ThemeName } from '@/components/theme-provider'
 import type { SupportedLocale } from '@/i18n/locale'
 
 export interface UserOptionsResponse {
   appearance_mode: ThemeMode
+  theme: ThemeName
   require_card_confirmation: boolean
   locale: SupportedLocale | null
   trick_display_duration_seconds: number | null

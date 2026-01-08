@@ -23,6 +23,7 @@ pub async fn ensure_default_for_user(
     let active = user_options::ActiveModel {
         user_id: Set(user_id),
         appearance_mode: Set("system".to_string()),
+        theme: Set("standard".to_string()),
         require_card_confirmation: Set(true),
         locale: Set(None),
         trick_display_duration_seconds: Set(None),
@@ -45,6 +46,7 @@ pub async fn update_options(
     txn: &DatabaseTransaction,
     user_id: i64,
     appearance_mode: Option<&str>,
+    theme: Option<&str>,
     require_card_confirmation: Option<bool>,
     // Option<Option<&str>> allows distinguishing:
     // - None = field not provided (don't update)
@@ -60,6 +62,7 @@ pub async fn update_options(
     let existing = ensure_default_for_user(txn, user_id).await?;
 
     if appearance_mode.is_none()
+        && theme.is_none()
         && require_card_confirmation.is_none()
         && locale.is_none()
         && trick_display_duration_seconds.is_none()
@@ -70,6 +73,9 @@ pub async fn update_options(
     let mut active: user_options::ActiveModel = existing.into();
     if let Some(mode) = appearance_mode {
         active.appearance_mode = Set(mode.to_string());
+    }
+    if let Some(theme_str) = theme {
+        active.theme = Set(theme_str.to_string());
     }
     if let Some(require_confirmation) = require_card_confirmation {
         active.require_card_confirmation = Set(require_confirmation);

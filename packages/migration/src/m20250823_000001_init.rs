@@ -36,6 +36,7 @@ enum UserOptions {
     Table,
     UserId,
     AppearanceMode,
+    Theme,
     RequireCardConfirmation,
     Locale,
     TrickDisplayDurationSeconds,
@@ -330,6 +331,12 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null()
                             .default("system"),
+                    )
+                    .col(
+                        ColumnDef::new(UserOptions::Theme)
+                            .string()
+                            .not_null()
+                            .default("standard"),
                     )
                     .col(
                         ColumnDef::new(UserOptions::RequireCardConfirmation)

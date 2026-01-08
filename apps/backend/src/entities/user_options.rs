@@ -9,6 +9,8 @@ pub struct Model {
     pub user_id: i64,
     #[sea_orm(column_name = "appearance_mode")]
     pub appearance_mode: String,
+    #[sea_orm(column_name = "theme")]
+    pub theme: String,
     #[sea_orm(column_name = "require_card_confirmation")]
     pub require_card_confirmation: bool,
     #[sea_orm(column_name = "locale")]

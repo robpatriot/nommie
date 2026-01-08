@@ -7,7 +7,11 @@
       "kicker": "Affichage",
       "appearance": {
         "title": "Apparence",
-        "description": "Choisissez l’apparence de Nommie sur tous vos appareils. Ce réglage s’applique partout où vous êtes connecté."
+        "description": "Choisissez l'apparence de Nommie sur tous vos appareils. Ce réglage s'applique partout où vous êtes connecté."
+      },
+      "theme": {
+        "title": "Thème",
+        "description": "Choisissez un thème visuel pour la table de jeu et l'interface. Chaque thème a sa propre palette de couleurs et son style unique."
       }
     },
     "language": {
@@ -49,6 +53,23 @@
       "couldNotSave": "Impossible d'enregistrer : {error}",
       "usingPreference": "Apparence enregistrée : {appearance}.",
       "usingSystem": "Réglage système : {appearance}."
+    }
+  },
+  "theme": {
+    "selected": "Sélectionné",
+    "options": {
+      "standard": {
+        "label": "Classique",
+        "description": "Table de casino classique avec feutre vert et style sophistiqué"
+      },
+      "high_roller": {
+        "label": "Gros Joueur",
+        "description": "Style audacieux de Las Vegas avec rouges, ors et noirs riches"
+      },
+      "oldtime": {
+        "label": "Rétro",
+        "description": "Thème inspiré de l'Art déco avec un style dramatique"
+      }
     }
   },
   "language": {

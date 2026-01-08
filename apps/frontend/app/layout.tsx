@@ -15,11 +15,13 @@ import {
   ThemeProvider,
   type ThemeMode,
   type ResolvedTheme,
+  type ThemeName,
 } from '@/components/theme-provider'
 import PerformanceMonitorWrapper from '@/components/PerformanceMonitorWrapper'
 import { AppQueryClientProvider } from '@/lib/providers/query-client-provider'
 import { LOCALE_COOKIE_NAME, resolveLocale } from '@/i18n/locale'
 import { loadMessages } from '@/i18n/messages'
+import { getUserOptions } from '@/lib/api/user-options'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -27,13 +29,16 @@ const themeScript = `
 (() => {
   try {
     const storageKey = 'nommie.theme';
+    const themeNameKey = 'nommie.theme_name';
     const stored = localStorage.getItem(storageKey);
+    const storedThemeName = localStorage.getItem(themeNameKey);
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const prefersDark = media.matches;
     const theme = stored === 'light' || stored === 'dark' ? stored : 'system';
     const resolved = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
+    const themeName = storedThemeName === 'standard' || storedThemeName === 'high_roller' || storedThemeName === 'oldtime' ? storedThemeName : 'standard';
     const root = document.documentElement;
-    root.dataset.theme = resolved;
+    root.dataset.theme = themeName;
     root.dataset.userTheme = theme;
     root.classList.toggle('dark', resolved === 'dark');
     root.style.colorScheme = resolved;
@@ -67,6 +72,7 @@ export default async function RootLayout({
 
   let initialTheme: ThemeMode = 'system'
   let initialResolved: ResolvedTheme = 'light'
+  let initialThemeName: ThemeName = 'standard'
 
   if (themeCookie === 'light' || themeCookie === 'dark') {
     initialTheme = themeCookie
@@ -76,6 +82,16 @@ export default async function RootLayout({
     if (suffix === 'dark' || suffix === 'light') {
       initialTheme = 'system'
       initialResolved = suffix
+    }
+  }
+
+  // Fetch theme preference from backend if user is authenticated
+  if (session) {
+    try {
+      const options = await getUserOptions()
+      initialThemeName = options.theme
+    } catch {
+      // Fall back to default theme on error
     }
   }
 
@@ -91,7 +107,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      data-theme={initialResolved}
+      data-theme={initialThemeName}
       data-user-theme={initialTheme}
       suppressHydrationWarning
     >
@@ -103,6 +119,7 @@ export default async function RootLayout({
           <ThemeProvider
             initialTheme={initialTheme}
             initialResolved={initialResolved}
+            initialThemeName={initialThemeName}
           >
             <AppQueryClientProvider>
               <PerformanceMonitorWrapper />

@@ -39,6 +39,38 @@ impl AppearanceMode {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Theme {
+    #[default]
+    Standard,
+    #[serde(rename = "high_roller")]
+    HighRoller,
+    Oldtime,
+}
+
+impl Theme {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Standard => "standard",
+            Self::HighRoller => "high_roller",
+            Self::Oldtime => "oldtime",
+        }
+    }
+
+    pub fn from_db(value: &str, user_id: i64) -> Result<Self, DomainError> {
+        match value {
+            "standard" => Ok(Self::Standard),
+            "high_roller" => Ok(Self::HighRoller),
+            "oldtime" => Ok(Self::Oldtime),
+            other => Err(DomainError::infra(
+                InfraErrorKind::DataCorruption,
+                format!("invalid theme '{other}' stored for user_id={user_id}"),
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UserLocale {
     #[serde(rename = "en-GB")]
@@ -83,6 +115,7 @@ impl UserLocale {
 pub struct UserOptions {
     pub user_id: i64,
     pub appearance_mode: AppearanceMode,
+    pub theme: Theme,
     pub require_card_confirmation: bool,
     pub locale: Option<UserLocale>,
     pub trick_display_duration_seconds: Option<f64>,
@@ -92,6 +125,7 @@ pub struct UserOptions {
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct UpdateUserOptions {
     pub appearance_mode: Option<AppearanceMode>,
+    pub theme: Option<Theme>,
     pub require_card_confirmation: Option<bool>,
     // Option<Option<UserLocale>> allows distinguishing:
     // - None = field not provided (don't update)
@@ -125,6 +159,7 @@ pub async fn update_options(
         txn,
         user_id,
         options.appearance_mode.map(|mode| mode.as_str()),
+        options.theme.map(|t| t.as_str()),
         options.require_card_confirmation,
         locale_for_adapter,
         options.trick_display_duration_seconds,
@@ -138,6 +173,7 @@ impl TryFrom<crate::entities::user_options::Model> for UserOptions {
 
     fn try_from(model: crate::entities::user_options::Model) -> Result<Self, Self::Error> {
         let appearance_mode = AppearanceMode::from_db(&model.appearance_mode, model.user_id)?;
+        let theme = Theme::from_db(&model.theme, model.user_id)?;
         let locale = model
             .locale
             .map(|l| UserLocale::from_db(&l, model.user_id))
@@ -145,6 +181,7 @@ impl TryFrom<crate::entities::user_options::Model> for UserOptions {
         Ok(Self {
             user_id: model.user_id,
             appearance_mode,
+            theme,
             require_card_confirmation: model.require_card_confirmation,
             locale,
             trick_display_duration_seconds: model.trick_display_duration_seconds,

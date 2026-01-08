@@ -8,6 +8,10 @@
       "appearance": {
         "title": "Appearance",
         "description": "Choose how Nommie looks across all devices. The appearance setting applies everywhere you're signed in."
+      },
+      "theme": {
+        "title": "Theme",
+        "description": "Choose a visual theme for the game table and interface. Each theme has its own unique colour palette and style."
       }
     },
     "language": {
@@ -49,6 +53,23 @@
       "couldNotSave": "Could not save: {error}",
       "usingPreference": "Using your saved appearance: {appearance}.",
       "usingSystem": "Using your system default: {appearance}."
+    }
+  },
+  "theme": {
+    "selected": "Selected",
+    "options": {
+      "standard": {
+        "label": "Standard",
+        "description": "Classic green felt casino table with sophisticated styling"
+      },
+      "high_roller": {
+        "label": "High Roller",
+        "description": "Bold Vegas-style with rich reds, golds, and blacks"
+      },
+      "oldtime": {
+        "label": "Oldtime",
+        "description": "Art deco inspired theme with dramatic flair"
+      }
     }
   },
   "language": {

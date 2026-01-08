@@ -12,14 +12,18 @@ import {
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 export type ResolvedTheme = 'light' | 'dark'
+export type ThemeName = 'standard' | 'high_roller' | 'oldtime'
 
 const STORAGE_KEY = 'nommie.theme'
 const COOKIE_KEY = 'nommie_theme'
+const THEME_NAME_STORAGE_KEY = 'nommie.theme_name'
 
 type ThemeContextValue = {
   theme: ThemeMode
   resolvedTheme: ResolvedTheme
   setTheme: (mode: ThemeMode) => void
+  themeName: ThemeName
+  setThemeName: (name: ThemeName) => void
   hydrated: boolean
 }
 
@@ -28,6 +32,10 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 const isThemeMode = (value: unknown): value is ThemeMode =>
   typeof value === 'string' &&
   (value === 'light' || value === 'dark' || value === 'system')
+
+const isThemeName = (value: unknown): value is ThemeName =>
+  typeof value === 'string' &&
+  (value === 'standard' || value === 'high_roller' || value === 'oldtime')
 
 const getDomUserTheme = (): ThemeMode | undefined => {
   if (typeof document === 'undefined') {
@@ -55,6 +63,21 @@ const readStoredTheme = (): ThemeMode => {
   return 'system'
 }
 
+const readStoredThemeName = (): ThemeName => {
+  if (typeof window === 'undefined') {
+    return 'standard'
+  }
+  try {
+    const stored = window.localStorage.getItem(THEME_NAME_STORAGE_KEY)
+    if (isThemeName(stored)) {
+      return stored
+    }
+  } catch {
+    // ignore storage access errors
+  }
+  return 'standard'
+}
+
 const readSystemPreference = (): ResolvedTheme => {
   if (typeof window === 'undefined') {
     return 'light'
@@ -72,18 +95,21 @@ type InitialThemeState = {
   theme: ThemeMode
   systemTheme: ResolvedTheme
   resolvedTheme: ResolvedTheme
+  themeName: ThemeName
 }
 
 type ThemeProviderProps = {
   children: React.ReactNode
   initialTheme?: ThemeMode
   initialResolved?: ResolvedTheme
+  initialThemeName?: ThemeName
 }
 
 export function ThemeProvider({
   children,
   initialTheme = 'system',
   initialResolved = 'light',
+  initialThemeName = 'standard',
 }: ThemeProviderProps) {
   // Compute initial values directly instead of using refs (React 19 doesn't allow ref access during render)
   const systemPreference = readSystemPreference()
@@ -94,6 +120,7 @@ export function ThemeProvider({
       initialTheme === 'system'
         ? (initialResolved ?? systemPreference)
         : (initialTheme as ResolvedTheme),
+    themeName: initialThemeName,
   }
 
   const [theme, setThemeState] = useState<ThemeMode>(initialThemeState.theme)
@@ -103,13 +130,16 @@ export function ThemeProvider({
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(
     initialThemeState.resolvedTheme
   )
+  const [themeName, setThemeNameState] = useState<ThemeName>(
+    initialThemeState.themeName
+  )
   const [hydrated, setHydrated] = useState(false)
 
   const applyTheme = useCallback(
-    (mode: ThemeMode, nextResolved: ResolvedTheme) => {
+    (mode: ThemeMode, nextResolved: ResolvedTheme, name: ThemeName) => {
       if (typeof document === 'undefined') return
       const root = document.documentElement
-      root.dataset.theme = nextResolved
+      root.dataset.theme = name
       root.dataset.userTheme = mode
       root.classList.toggle('dark', nextResolved === 'dark')
       root.style.colorScheme = nextResolved
@@ -125,6 +155,7 @@ export function ThemeProvider({
     const domTheme = getDomUserTheme()
     const stored = readStoredTheme()
     const nextTheme = domTheme ?? stored
+    const storedThemeName = readStoredThemeName()
     const domResolved =
       document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'
 
@@ -134,9 +165,10 @@ export function ThemeProvider({
     startTransition(() => {
       setThemeState(nextTheme)
       setResolvedTheme(nextResolved)
+      setThemeNameState(storedThemeName)
       setHydrated(true)
     })
-    applyTheme(nextTheme, nextResolved)
+    applyTheme(nextTheme, nextResolved, storedThemeName)
   }, [applyTheme])
 
   useEffect(() => {
@@ -185,7 +217,7 @@ export function ThemeProvider({
     startTransition(() => {
       setResolvedTheme(nextResolved)
     })
-    applyTheme(theme, nextResolved)
+    applyTheme(theme, nextResolved, themeName)
 
     if (typeof window !== 'undefined') {
       try {
@@ -197,7 +229,7 @@ export function ThemeProvider({
         // ignore cookie write errors
       }
     }
-  }, [theme, systemTheme, applyTheme])
+  }, [theme, systemTheme, themeName, applyTheme])
 
   const setTheme = useCallback((mode: ThemeMode) => {
     setThemeState(mode)
@@ -215,14 +247,28 @@ export function ThemeProvider({
     }
   }, [])
 
+  const setThemeName = useCallback((name: ThemeName) => {
+    setThemeNameState(name)
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      window.localStorage.setItem(THEME_NAME_STORAGE_KEY, name)
+    } catch {
+      // ignore storage write errors
+    }
+  }, [])
+
   const contextValue = useMemo<ThemeContextValue>(
     () => ({
       theme,
       resolvedTheme,
       setTheme,
+      themeName,
+      setThemeName,
       hydrated,
     }),
-    [theme, resolvedTheme, setTheme, hydrated]
+    [theme, resolvedTheme, setTheme, themeName, setThemeName, hydrated]
   )
 
   return (

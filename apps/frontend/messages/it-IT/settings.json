@@ -7,7 +7,11 @@
       "kicker": "Schermo",
       "appearance": {
         "title": "Aspetto",
-        "description": "Scegli come appare Nommie su tutti i tuoi dispositivi. L’impostazione dell’aspetto si applica ovunque tu abbia effettuato l’accesso."
+        "description": "Scegli come appare Nommie su tutti i tuoi dispositivi. L'impostazione dell'aspetto si applica ovunque tu abbia effettuato l'accesso."
+      },
+      "theme": {
+        "title": "Tema",
+        "description": "Scegli un tema visivo per il tavolo da gioco e l'interfaccia. Ogni tema ha la propria palette di colori e stile unici."
       }
     },
     "language": {
@@ -49,6 +53,23 @@
       "couldNotSave": "Impossibile salvare: {error}",
       "usingPreference": "Aspetto salvato: {appearance}.",
       "usingSystem": "Impostazione del sistema: {appearance}."
+    }
+  },
+  "theme": {
+    "selected": "Selezionato",
+    "options": {
+      "standard": {
+        "label": "Classico",
+        "description": "Tavolo da casinò classico con feltro verde e stile sofisticato"
+      },
+      "high_roller": {
+        "label": "Giocatore d'Alto Livello",
+        "description": "Stile audace di Las Vegas con rossi, ori e neri intensi"
+      },
+      "oldtime": {
+        "label": "Retró",
+        "description": "Tema ispirato all'Art Déco con stile drammatico"
+      }
     }
   },
   "language": {

@@ -5,7 +5,7 @@ import { getTranslations } from 'next-intl/server'
 import { fetchWithAuth } from '@/lib/api'
 import { toErrorResult } from '@/lib/api/action-helpers'
 import type { SimpleActionResult } from '@/lib/api/action-helpers'
-import type { ThemeMode } from '@/components/theme-provider'
+import type { ThemeMode, ThemeName } from '@/components/theme-provider'
 import {
   LOCALE_COOKIE_NAME,
   isSupportedLocale,
@@ -14,6 +14,7 @@ import {
 
 export type UpdateUserOptionsPayload = {
   appearance_mode?: ThemeMode
+  theme?: ThemeName
   require_card_confirmation?: boolean
   locale?: SupportedLocale | null
   trick_display_duration_seconds?: number | null
@@ -25,6 +26,7 @@ export async function updateUserOptionsAction(
   if (
     !payload ||
     (payload.appearance_mode === undefined &&
+      payload.theme === undefined &&
       payload.require_card_confirmation === undefined &&
       payload.locale === undefined &&
       payload.trick_display_duration_seconds === undefined)
@@ -72,6 +74,10 @@ export async function updateUserOptionsAction(
 
 export async function updateAppearanceAction(mode: ThemeMode) {
   return updateUserOptionsAction({ appearance_mode: mode })
+}
+
+export async function updateThemeAction(theme: ThemeName) {
+  return updateUserOptionsAction({ theme })
 }
 
 export async function updateLocaleAction(

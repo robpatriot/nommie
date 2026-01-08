@@ -9,13 +9,14 @@ use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
 use crate::extractors::ValidatedJson;
 use crate::repos::user_options::{
-    self, AppearanceMode, UpdateUserOptions, UserLocale, UserOptions,
+    self, AppearanceMode, Theme, UpdateUserOptions, UserLocale, UserOptions,
 };
 use crate::state::app_state::AppState;
 
 #[derive(Debug, Serialize)]
 pub struct UserOptionsResponse {
     pub appearance_mode: AppearanceMode,
+    pub theme: Theme,
     pub require_card_confirmation: bool,
     pub locale: Option<UserLocale>,
     pub trick_display_duration_seconds: Option<f64>,
@@ -26,6 +27,7 @@ impl From<UserOptions> for UserOptionsResponse {
     fn from(value: UserOptions) -> Self {
         Self {
             appearance_mode: value.appearance_mode,
+            theme: value.theme,
             require_card_confirmation: value.require_card_confirmation,
             locale: value.locale,
             trick_display_duration_seconds: value.trick_display_duration_seconds,
@@ -38,6 +40,8 @@ impl From<UserOptions> for UserOptionsResponse {
 pub struct UpdateUserOptionsRequest {
     #[serde(default)]
     pub appearance_mode: Option<AppearanceMode>,
+    #[serde(default)]
+    pub theme: Option<Theme>,
     #[serde(default)]
     pub require_card_confirmation: Option<bool>,
     // Option<Option<UserLocale>> allows distinguishing:
@@ -94,6 +98,7 @@ async fn update_user_options(
     // Allow request if any field is provided (including locale/trick_duration explicitly set to null)
     // For locale/duration: None = not provided, Some(None) = explicitly set to null, Some(Some(_)) = set to value
     let has_any_option = payload.appearance_mode.is_some()
+        || payload.theme.is_some()
         || payload.require_card_confirmation.is_some()
         || payload.locale.is_some() // is_some() is true for both Some(None) and Some(Some(_))
         || payload.trick_display_duration_seconds.is_some(); // is_some() is true for both Some(None) and Some(Some(_))
@@ -108,6 +113,7 @@ async fn update_user_options(
 
     let update_request = UpdateUserOptions {
         appearance_mode: payload.appearance_mode,
+        theme: payload.theme,
         require_card_confirmation: payload.require_card_confirmation,
         locale: payload.locale,
         trick_display_duration_seconds: payload.trick_display_duration_seconds,
