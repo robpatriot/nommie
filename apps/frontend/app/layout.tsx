@@ -1,6 +1,11 @@
 // apps/frontend/app/layout.tsx
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import {
+  Inter,
+  Righteous,
+  Bebas_Neue,
+  Playfair_Display,
+} from 'next/font/google'
 import { Suspense } from 'react'
 import Script from 'next/script'
 import { cookies, headers } from 'next/headers'
@@ -13,8 +18,8 @@ import { NextIntlClientProvider } from 'next-intl'
 
 import {
   ThemeProvider,
-  type ThemeMode,
-  type ResolvedTheme,
+  type ColourScheme,
+  type ResolvedColourScheme,
   type ThemeName,
 } from '@/components/theme-provider'
 import PerformanceMonitorWrapper from '@/components/PerformanceMonitorWrapper'
@@ -23,23 +28,39 @@ import { LOCALE_COOKIE_NAME, resolveLocale } from '@/i18n/locale'
 import { loadMessages } from '@/i18n/messages'
 import { getUserOptions } from '@/lib/api/user-options'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+const righteous = Righteous({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-oldtime-heading',
+})
+const bebasNeue = Bebas_Neue({
+  weight: '400',
+  subsets: ['latin'],
+  variable: '--font-oldtime-display',
+})
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-oldtime-elegant',
+})
 
 const themeScript = `
 (() => {
   try {
-    const storageKey = 'nommie.theme';
+    const storageKey = 'nommie.colour_scheme';
     const themeNameKey = 'nommie.theme_name';
     const stored = localStorage.getItem(storageKey);
     const storedThemeName = localStorage.getItem(themeNameKey);
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const prefersDark = media.matches;
-    const theme = stored === 'light' || stored === 'dark' ? stored : 'system';
-    const resolved = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
-    const themeName = storedThemeName === 'standard' || storedThemeName === 'high_roller' || storedThemeName === 'oldtime' ? storedThemeName : 'standard';
+    const colourScheme = stored === 'light' || stored === 'dark' ? stored : 'system';
+    const resolved = colourScheme === 'system' ? (prefersDark ? 'dark' : 'light') : colourScheme;
     const root = document.documentElement;
-    root.dataset.theme = themeName;
-    root.dataset.userTheme = theme;
+    const serverThemeName = root.dataset.themeName;
+    const isValidThemeName = (value) => value === 'standard' || value === 'high_roller' || value === 'oldtime';
+    const themeName = isValidThemeName(storedThemeName) ? storedThemeName : (isValidThemeName(serverThemeName) ? serverThemeName : 'standard');
+    root.dataset.themeName = themeName;
+    root.dataset.colourScheme = colourScheme;
     root.classList.toggle('dark', resolved === 'dark');
     root.style.colorScheme = resolved;
   } catch (error) {
@@ -68,19 +89,20 @@ export default async function RootLayout({
     acceptLanguageHeader: headerStore.get('accept-language'),
   })
 
-  const themeCookie = cookieStore.get('nommie_theme')?.value ?? null
+  const colourSchemeCookie =
+    cookieStore.get('nommie_colour_scheme')?.value ?? null
 
-  let initialTheme: ThemeMode = 'system'
-  let initialResolved: ResolvedTheme = 'light'
+  let initialColourScheme: ColourScheme = 'system'
+  let initialResolved: ResolvedColourScheme = 'light'
   let initialThemeName: ThemeName = 'standard'
 
-  if (themeCookie === 'light' || themeCookie === 'dark') {
-    initialTheme = themeCookie
-    initialResolved = themeCookie
-  } else if (themeCookie?.startsWith('system:')) {
-    const [, suffix] = themeCookie.split(':')
+  if (colourSchemeCookie === 'light' || colourSchemeCookie === 'dark') {
+    initialColourScheme = colourSchemeCookie
+    initialResolved = colourSchemeCookie
+  } else if (colourSchemeCookie?.startsWith('system:')) {
+    const [, suffix] = colourSchemeCookie.split(':')
     if (suffix === 'dark' || suffix === 'light') {
-      initialTheme = 'system'
+      initialColourScheme = 'system'
       initialResolved = suffix
     }
   }
@@ -107,17 +129,19 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      data-theme={initialThemeName}
-      data-user-theme={initialTheme}
+      data-theme-name={initialThemeName}
+      data-colour-scheme={initialColourScheme}
       suppressHydrationWarning
     >
-      <body className={`${inter.className} tabletop-shell`}>
+      <body
+        className={`${inter.variable} ${righteous.variable} ${bebasNeue.variable} ${playfair.variable} font-sans tabletop-shell`}
+      >
         <Script id="theme-sync" strategy="beforeInteractive">
           {themeScript}
         </Script>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeProvider
-            initialTheme={initialTheme}
+            initialColourScheme={initialColourScheme}
             initialResolved={initialResolved}
             initialThemeName={initialThemeName}
           >

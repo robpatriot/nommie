@@ -5,4 +5,16 @@ export default {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)'],
+        oldtime: {
+          heading: ['var(--font-oldtime-heading)'],
+          display: ['var(--font-oldtime-display)'],
+          elegant: ['var(--font-oldtime-elegant)'],
+        },
+      },
+    },
+  },
 }

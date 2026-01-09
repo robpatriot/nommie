@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useTranslations } from 'next-intl'
 import { updateAppearanceAction } from '@/app/actions/settings-actions'
-import { useTheme, type ThemeMode } from './theme-provider'
+import { useTheme, type ColourScheme } from './theme-provider'
 
-const STORAGE_KEY = 'nommie.theme'
+const STORAGE_KEY = 'nommie.colour_scheme'
 
 const SPECIFIC_OPTIONS: Array<{
-  value: ThemeMode
+  value: ColourScheme
   emoji: string
 }> = [
   {
@@ -24,10 +24,11 @@ const SPECIFIC_OPTIONS: Array<{
 export function AppearanceSelector({
   preferredAppearance,
 }: {
-  preferredAppearance: ThemeMode | null
+  preferredAppearance: ColourScheme | null
 }) {
   const t = useTranslations('settings')
-  const { theme, setTheme, resolvedTheme, hydrated } = useTheme()
+  const { colourScheme, setColourScheme, resolvedColourScheme, hydrated } =
+    useTheme()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -40,7 +41,7 @@ export function AppearanceSelector({
     }
 
     try {
-      const backendPreference: ThemeMode = preferredAppearance ?? 'system'
+      const backendPreference: ColourScheme = preferredAppearance ?? 'system'
       const stored = window.localStorage.getItem(STORAGE_KEY)
 
       // Only sync if backend preference differs from localStorage
@@ -66,32 +67,32 @@ export function AppearanceSelector({
   const isUsingPreference =
     preferredAppearance !== null && preferredAppearance !== 'system'
 
-  const active = useMemo<ThemeMode>(() => {
+  const active = useMemo<ColourScheme>(() => {
     if (hydrated) {
-      return theme
+      return colourScheme
     }
     return preferredAppearance ?? 'system'
-  }, [hydrated, theme, preferredAppearance])
+  }, [hydrated, colourScheme, preferredAppearance])
 
   const effectiveLabel =
-    resolvedTheme === 'dark'
+    resolvedColourScheme === 'dark'
       ? t('appearance.options.dark.label')
       : t('appearance.options.light.label')
 
-  const handleSelect = (mode: ThemeMode) => {
-    if (hydrated && mode === theme) {
+  const handleSelect = (mode: ColourScheme) => {
+    if (hydrated && mode === colourScheme) {
       return
     }
 
-    const previousTheme = theme
+    const previousTheme = colourScheme
     setErrorMessage(null)
-    setTheme(mode)
+    setColourScheme(mode)
 
     startTransition(async () => {
       const result = await updateAppearanceAction(mode)
       if (result.kind === 'error') {
         setErrorMessage(result.message)
-        setTheme(previousTheme)
+        setColourScheme(previousTheme)
       } else {
         setErrorMessage(null)
       }

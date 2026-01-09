@@ -23,7 +23,7 @@ Next.js frontend and how to extend it responsibly.
   manages the user’s preference. It:
   - reads `localStorage` for a stored choice (`light`, `dark`, or `system`);
   - listens to `prefers-color-scheme`;
-  - applies `data-theme` and `dark` class to the root element;
+  - applies `data-theme-name` and `data-colour-scheme` class to the root element;
   - exposes `useTheme()` so components can react to `theme` / `resolvedTheme`.
 - **Initial render**: `app/layout.tsx` injects a small script before hydration to
   apply the correct theme immediately and wraps the app in `ThemeProvider`.
