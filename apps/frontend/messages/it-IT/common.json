@@ -45,6 +45,7 @@
       "footer": "si gioca"
     },
     "resumeGame": {
+      "next": "▶ Avanti",
       "nextGame": "▶ Prossima partita"
     }
   },

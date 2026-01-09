@@ -45,6 +45,7 @@
       "footer": "a jugar"
     },
     "resumeGame": {
+      "next": "▶ Siguiente",
       "nextGame": "▶ Próxima partida"
     }
   },

@@ -30,8 +30,12 @@ export default function ResumeGameButton({
     >
       {/* Arrow only - shown below 275px */}
       <span className="min-[275px]:hidden">▶</span>
-      {/* "Next Game" - shown at 275px and above */}
-      <span className="hidden min-[275px]:inline">{t('nextGame')}</span>
+      {/* "▶ Next" - shown at 275px to 349px */}
+      <span className="hidden min-[275px]:inline min-[350px]:hidden">
+        {t('next')}
+      </span>
+      {/* "▶ Next Game" - shown at 350px and above */}
+      <span className="hidden min-[350px]:inline">{t('nextGame')}</span>
     </button>
   )
 }

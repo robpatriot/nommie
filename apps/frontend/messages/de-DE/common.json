@@ -45,6 +45,7 @@
       "footer": "weiter spielen"
     },
     "resumeGame": {
+      "next": "▶ Weiter",
       "nextGame": "▶ Nächstes Spiel"
     }
   },

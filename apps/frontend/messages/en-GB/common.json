@@ -45,6 +45,7 @@
       "footer": "play on"
     },
     "resumeGame": {
+      "next": "▶ Next",
       "nextGame": "▶ Next Game"
     }
   },
