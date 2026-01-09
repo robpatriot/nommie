@@ -1,6 +1,5 @@
 import type { Trump } from '@/lib/game-room/types'
 import { cn } from '@/lib/cn'
-import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 const suitMap = {
   CLUBS: { symbol: '♣', color: 'text-slate-900' },
@@ -30,13 +29,18 @@ export function TrickAreaHeader({
         }
     : { text: '—', color: 'text-foreground', isText: true }
 
-  // For 640px-1024px: trump left, bids right. For <640px: bids left, trump right
-  const isMediumViewport = useMediaQuery(
-    '(min-width: 640px) and (max-width: 1023px)'
-  )
+  const isBlackSuit = trump === 'SPADES' || trump === 'CLUBS'
 
   const trumpElement = (
-    <div className="flex h-7 shrink-0 items-center justify-center rounded-full border border-border/60 bg-card/20 px-2">
+    <div
+      className={cn(
+        'flex h-7 shrink-0 items-center justify-center rounded-full border border-border/60 px-2',
+        // base surface
+        'bg-card/20',
+        // subtle lightening only when needed
+        isBlackSuit && 'dark:bg-foreground/18'
+      )}
+    >
       <span
         className={cn(
           'leading-none',
@@ -59,17 +63,10 @@ export function TrickAreaHeader({
 
   return (
     <div className="flex w-full items-center justify-between gap-2 lg:hidden">
-      {isMediumViewport ? (
-        <>
-          {trumpElement}
-          {bidsElement}
-        </>
-      ) : (
-        <>
-          {bidsElement}
-          {trumpElement}
-        </>
-      )}
+      <>
+        {bidsElement}
+        {trumpElement}
+      </>
     </div>
   )
 }
