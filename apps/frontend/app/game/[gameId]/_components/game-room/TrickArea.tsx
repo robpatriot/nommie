@@ -547,7 +547,7 @@ export function TrickArea({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center rounded-[32px] border border-border/60 bg-overlay/25 px-4 text-center text-sm text-muted-foreground shadow-elevated backdrop-blur',
+        'oldtime-trick-bg relative flex items-center justify-center rounded-[32px] border border-border/60 bg-overlay/25 px-4 text-center text-sm text-muted-foreground shadow-elevated backdrop-blur',
         className
       )}
       style={{

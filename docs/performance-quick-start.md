@@ -21,7 +21,7 @@ export default async function RootLayout({
   // ... existing code ...
   
   return (
-    <html lang="en" data-theme={initialResolved} data-user-theme={initialTheme}>
+    <html lang="en" data-theme-name={initialResolved} data-colour-scheme={initialTheme}>
       <body className={`${inter.className} tabletop-shell`}>
         {/* ... existing code ... */}
         {process.env.NODE_ENV === 'development' && <PerformanceMonitor />}
