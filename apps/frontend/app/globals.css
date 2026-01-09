@@ -234,6 +234,53 @@
     color: var(--color-primary);
   }
 
+  /* Oldtime trick area background images - left and right */
+  [data-theme-name='oldtime'] .oldtime-trick-bg {
+    position: relative;
+  }
+
+  /* Left */
+  [data-theme-name='oldtime'] .oldtime-trick-bg::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30%;
+    height: 80%;
+    background-image: url('/images/left.webp');
+    background-size: contain;
+    background-position: left center;
+    background-repeat: no-repeat;
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Right */
+  [data-theme-name='oldtime'] .oldtime-trick-bg::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30%;
+    height: 80%;
+    background-image: url('/images/right.webp');
+    background-size: contain;
+    background-position: right center;
+    background-repeat: no-repeat;
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Ensure trick area content sits above the character images */
+  [data-theme-name='oldtime'] .oldtime-trick-bg > * {
+    position: relative;
+    z-index: 10;
+  }
+
   *,
   *::before,
   *::after {
