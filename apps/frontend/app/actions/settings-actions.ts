@@ -5,7 +5,7 @@ import { getTranslations } from 'next-intl/server'
 import { fetchWithAuth } from '@/lib/api'
 import { toErrorResult } from '@/lib/api/action-helpers'
 import type { SimpleActionResult } from '@/lib/api/action-helpers'
-import type { ThemeMode, ThemeName } from '@/components/theme-provider'
+import type { ColourScheme, ThemeName } from '@/components/theme-provider'
 import {
   LOCALE_COOKIE_NAME,
   isSupportedLocale,
@@ -13,7 +13,7 @@ import {
 } from '@/i18n/locale'
 
 export type UpdateUserOptionsPayload = {
-  appearance_mode?: ThemeMode
+  colour_scheme?: ColourScheme
   theme?: ThemeName
   require_card_confirmation?: boolean
   locale?: SupportedLocale | null
@@ -25,7 +25,7 @@ export async function updateUserOptionsAction(
 ): Promise<SimpleActionResult> {
   if (
     !payload ||
-    (payload.appearance_mode === undefined &&
+    (payload.colour_scheme === undefined &&
       payload.theme === undefined &&
       payload.require_card_confirmation === undefined &&
       payload.locale === undefined &&
@@ -72,8 +72,8 @@ export async function updateUserOptionsAction(
   }
 }
 
-export async function updateAppearanceAction(mode: ThemeMode) {
-  return updateUserOptionsAction({ appearance_mode: mode })
+export async function updateColourScheme(mode: ColourScheme) {
+  return updateUserOptionsAction({ colour_scheme: mode })
 }
 
 export async function updateThemeAction(theme: ThemeName) {

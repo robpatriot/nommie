@@ -1,11 +1,11 @@
 'use server'
 
 import { fetchWithAuth } from '@/lib/api'
-import type { ThemeMode, ThemeName } from '@/components/theme-provider'
+import type { ColourScheme, ThemeName } from '@/components/theme-provider'
 import type { SupportedLocale } from '@/i18n/locale'
 
 export interface UserOptionsResponse {
-  appearance_mode: ThemeMode
+  colour_scheme: ColourScheme
   theme: ThemeName
   require_card_confirmation: boolean
   locale: SupportedLocale | null

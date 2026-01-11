@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useTranslations } from 'next-intl'
-import { updateAppearanceAction } from '@/app/actions/settings-actions'
+import { updateColourScheme } from '@/app/actions/settings-actions'
 import { useTheme, type ColourScheme } from './theme-provider'
 
 const STORAGE_KEY = 'nommie.colour_scheme'
@@ -21,10 +21,10 @@ const SPECIFIC_OPTIONS: Array<{
   },
 ]
 
-export function AppearanceSelector({
-  preferredAppearance,
+export function ColourSchemeSelector({
+  preferredColourScheme,
 }: {
-  preferredAppearance: ColourScheme | null
+  preferredColourScheme: ColourScheme | null
 }) {
   const t = useTranslations('settings')
   const { colourScheme, setColourScheme, resolvedColourScheme, hydrated } =
@@ -41,7 +41,7 @@ export function AppearanceSelector({
     }
 
     try {
-      const backendPreference: ColourScheme = preferredAppearance ?? 'system'
+      const backendPreference: ColourScheme = preferredColourScheme ?? 'system'
       const stored = window.localStorage.getItem(STORAGE_KEY)
 
       // Only sync if backend preference differs from localStorage
@@ -59,25 +59,25 @@ export function AppearanceSelector({
     } catch {
       // Ignore storage access errors (e.g., in private browsing)
     }
-  }, [preferredAppearance])
+  }, [preferredColourScheme])
 
   // null means no explicit preference (use system default)
   // 'system' means explicitly set to system
   // 'light'/'dark' means explicitly set to that mode
   const isUsingPreference =
-    preferredAppearance !== null && preferredAppearance !== 'system'
+    preferredColourScheme !== null && preferredColourScheme !== 'system'
 
   const active = useMemo<ColourScheme>(() => {
     if (hydrated) {
       return colourScheme
     }
-    return preferredAppearance ?? 'system'
-  }, [hydrated, colourScheme, preferredAppearance])
+    return preferredColourScheme ?? 'system'
+  }, [hydrated, colourScheme, preferredColourScheme])
 
   const effectiveLabel =
     resolvedColourScheme === 'dark'
-      ? t('appearance.options.dark.label')
-      : t('appearance.options.light.label')
+      ? t('colour_scheme.options.dark.label')
+      : t('colour_scheme.options.light.label')
 
   const handleSelect = (mode: ColourScheme) => {
     if (hydrated && mode === colourScheme) {
@@ -89,7 +89,7 @@ export function AppearanceSelector({
     setColourScheme(mode)
 
     startTransition(async () => {
-      const result = await updateAppearanceAction(mode)
+      const result = await updateColourScheme(mode)
       if (result.kind === 'error') {
         setErrorMessage(result.message)
         setColourScheme(previousTheme)
@@ -102,7 +102,7 @@ export function AppearanceSelector({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-2">
-        {/* Specific appearance options */}
+        {/* Specific colour_scheme options */}
         {SPECIFIC_OPTIONS.map((option) => {
           const isActive = active === option.value
           return (
@@ -124,10 +124,10 @@ export function AppearanceSelector({
                 </span>
                 <span className="flex flex-col">
                   <span className="text-sm font-semibold text-foreground">
-                    {t(`appearance.options.${option.value}.label`)}
+                    {t(`colour_scheme.options.${option.value}.label`)}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {t(`appearance.options.${option.value}.description`)}
+                    {t(`colour_scheme.options.${option.value}.description`)}
                   </span>
                 </span>
               </span>
@@ -154,7 +154,7 @@ export function AppearanceSelector({
         <div className="my-2 flex items-center gap-3">
           <div className="h-px flex-1 bg-border/30" />
           <span className="text-xs uppercase tracking-wide text-muted-foreground">
-            {t('appearance.separator')}
+            {t('colour_scheme.separator')}
           </span>
           <div className="h-px flex-1 bg-border/30" />
         </div>
@@ -177,10 +177,10 @@ export function AppearanceSelector({
             </span>
             <span className="flex flex-col">
               <span className="text-sm font-semibold text-foreground">
-                {t('appearance.options.system.label')}
+                {t('colour_scheme.options.system.label')}
               </span>
               <span className="text-xs text-muted-foreground">
-                {t('appearance.options.system.description')}
+                {t('colour_scheme.options.system.description')}
               </span>
             </span>
           </span>
@@ -205,27 +205,27 @@ export function AppearanceSelector({
       <div className="min-h-[1.5rem] text-sm">
         {isPending ? (
           <span className="text-muted-foreground">
-            {t('appearance.status.saving')}
+            {t('colour_scheme.status.saving')}
           </span>
         ) : errorMessage ? (
           <span className="text-destructive">
-            {t('appearance.status.couldNotSave', {
+            {t('colour_scheme.status.couldNotSave', {
               error: errorMessage,
             })}
           </span>
         ) : isUsingPreference && active !== 'system' ? (
           <span className="text-muted-foreground">
-            {t('appearance.status.usingPreference', {
-              appearance:
+            {t('colour_scheme.status.usingPreference', {
+              colour_scheme:
                 active === 'dark'
-                  ? t('appearance.options.dark.label')
-                  : t('appearance.options.light.label'),
+                  ? t('colour_scheme.options.dark.label')
+                  : t('colour_scheme.options.light.label'),
             })}
           </span>
         ) : (
           <span className="text-muted-foreground">
-            {t('appearance.status.usingSystem', {
-              appearance: effectiveLabel,
+            {t('colour_scheme.status.usingSystem', {
+              colour_scheme: effectiveLabel,
             })}
           </span>
         )}

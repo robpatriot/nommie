@@ -11,13 +11,13 @@ pub const DEFAULT_TRICK_DISPLAY_DURATION_SECONDS: f64 = 2.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
-pub enum AppearanceMode {
+pub enum ColourScheme {
     System,
     Light,
     Dark,
 }
 
-impl AppearanceMode {
+impl ColourScheme {
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::System => "system",
@@ -33,7 +33,7 @@ impl AppearanceMode {
             "dark" => Ok(Self::Dark),
             other => Err(DomainError::infra(
                 InfraErrorKind::DataCorruption,
-                format!("invalid appearance_mode '{other}' stored for user_id={user_id}"),
+                format!("invalid colour_scheme '{other}' stored for user_id={user_id}"),
             )),
         }
     }
@@ -114,7 +114,7 @@ impl UserLocale {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserOptions {
     pub user_id: i64,
-    pub appearance_mode: AppearanceMode,
+    pub colour_scheme: ColourScheme,
     pub theme: Theme,
     pub require_card_confirmation: bool,
     pub locale: Option<UserLocale>,
@@ -124,7 +124,7 @@ pub struct UserOptions {
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct UpdateUserOptions {
-    pub appearance_mode: Option<AppearanceMode>,
+    pub colour_scheme: Option<ColourScheme>,
     pub theme: Option<Theme>,
     pub require_card_confirmation: Option<bool>,
     // Option<Option<UserLocale>> allows distinguishing:
@@ -158,7 +158,7 @@ pub async fn update_options(
     let model = adapter::update_options(
         txn,
         user_id,
-        options.appearance_mode.map(|mode| mode.as_str()),
+        options.colour_scheme.map(|mode| mode.as_str()),
         options.theme.map(|t| t.as_str()),
         options.require_card_confirmation,
         locale_for_adapter,
@@ -172,7 +172,7 @@ impl TryFrom<crate::entities::user_options::Model> for UserOptions {
     type Error = DomainError;
 
     fn try_from(model: crate::entities::user_options::Model) -> Result<Self, Self::Error> {
-        let appearance_mode = AppearanceMode::from_db(&model.appearance_mode, model.user_id)?;
+        let colour_scheme = ColourScheme::from_db(&model.colour_scheme, model.user_id)?;
         let theme = Theme::from_db(&model.theme, model.user_id)?;
         let locale = model
             .locale
@@ -180,7 +180,7 @@ impl TryFrom<crate::entities::user_options::Model> for UserOptions {
             .transpose()?;
         Ok(Self {
             user_id: model.user_id,
-            appearance_mode,
+            colour_scheme,
             theme,
             require_card_confirmation: model.require_card_confirmation,
             locale,

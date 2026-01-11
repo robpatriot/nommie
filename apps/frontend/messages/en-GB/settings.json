@@ -5,9 +5,9 @@
   "sections": {
     "display": {
       "kicker": "Display",
-      "appearance": {
-        "title": "Appearance",
-        "description": "Choose how Nommie looks across all devices. The appearance setting applies everywhere you're signed in."
+      "colour_scheme": {
+        "title": "Colour Scheme",
+        "description": "Choose how Nommie looks across all devices. The colour scheme setting applies everywhere you're signed in."
       },
       "theme": {
         "title": "Theme",
@@ -31,8 +31,8 @@
       }
     }
   },
-  "appearance": {
-    "ariaLabel": "Appearance",
+  "colour_scheme": {
+    "ariaLabel": "Colour Scheme",
     "separator": "or",
     "options": {
       "system": {
@@ -49,10 +49,10 @@
       }
     },
     "status": {
-      "saving": "Saving appearance…",
+      "saving": "Saving colour scheme…",
       "couldNotSave": "Could not save: {error}",
-      "usingPreference": "Using your saved appearance: {appearance}.",
-      "usingSystem": "Using your system default: {appearance}."
+      "usingPreference": "Using your saved colour scheme: {colour_scheme}.",
+      "usingSystem": "Using your system default: {colour_scheme}."
     }
   },
   "theme": {

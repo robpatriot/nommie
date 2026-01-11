@@ -5,9 +5,9 @@
   "sections": {
     "display": {
       "kicker": "Schermo",
-      "appearance": {
-        "title": "Aspetto",
-        "description": "Scegli come appare Nommie su tutti i tuoi dispositivi. L'impostazione dell'aspetto si applica ovunque tu abbia effettuato l'accesso."
+      "colour_scheme": {
+        "title": "Schema colori",
+        "description": "Scegli come appare Nommie su tutti i tuoi dispositivi. L’impostazione dello schema colori si applica ovunque tu abbia effettuato l’accesso."
       },
       "theme": {
         "title": "Tema",
@@ -31,8 +31,8 @@
       }
     }
   },
-  "appearance": {
-    "ariaLabel": "Aspetto",
+  "colour_scheme": {
+    "ariaLabel": "Schema colori",
     "separator": "o",
     "options": {
       "system": {
@@ -49,10 +49,10 @@
       }
     },
     "status": {
-      "saving": "Salvataggio dell'aspetto…",
+      "saving": "Salvataggio dello schema colori…",
       "couldNotSave": "Impossibile salvare: {error}",
-      "usingPreference": "Aspetto salvato: {appearance}.",
-      "usingSystem": "Impostazione del sistema: {appearance}."
+      "usingPreference": "Schema colori salvato: {colour_scheme}.",
+      "usingSystem": "Impostazione del sistema: {colour_scheme}."
     }
   },
   "theme": {

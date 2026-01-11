@@ -22,7 +22,7 @@ pub async fn ensure_default_for_user(
 
     let active = user_options::ActiveModel {
         user_id: Set(user_id),
-        appearance_mode: Set("system".to_string()),
+        colour_scheme: Set("system".to_string()),
         theme: Set("standard".to_string()),
         require_card_confirmation: Set(true),
         locale: Set(None),
@@ -45,7 +45,7 @@ pub async fn ensure_default_for_user(
 pub async fn update_options(
     txn: &DatabaseTransaction,
     user_id: i64,
-    appearance_mode: Option<&str>,
+    colour_scheme: Option<&str>,
     theme: Option<&str>,
     require_card_confirmation: Option<bool>,
     // Option<Option<&str>> allows distinguishing:
@@ -61,7 +61,7 @@ pub async fn update_options(
 ) -> Result<user_options::Model, sea_orm::DbErr> {
     let existing = ensure_default_for_user(txn, user_id).await?;
 
-    if appearance_mode.is_none()
+    if colour_scheme.is_none()
         && theme.is_none()
         && require_card_confirmation.is_none()
         && locale.is_none()
@@ -71,8 +71,8 @@ pub async fn update_options(
     }
 
     let mut active: user_options::ActiveModel = existing.into();
-    if let Some(mode) = appearance_mode {
-        active.appearance_mode = Set(mode.to_string());
+    if let Some(mode) = colour_scheme {
+        active.colour_scheme = Set(mode.to_string());
     }
     if let Some(theme_str) = theme {
         active.theme = Set(theme_str.to_string());

@@ -5,8 +5,8 @@
   "sections": {
     "display": {
       "kicker": "Affichage",
-      "appearance": {
-        "title": "Apparence",
+      "colour_scheme": {
+        "title": "Schéma de couleurs",
         "description": "Choisissez l'apparence de Nommie sur tous vos appareils. Ce réglage s'applique partout où vous êtes connecté."
       },
       "theme": {
@@ -31,8 +31,8 @@
       }
     }
   },
-  "appearance": {
-    "ariaLabel": "Apparence",
+  "colour_scheme": {
+    "ariaLabel": "Schéma de couleurs",
     "separator": "ou",
     "options": {
       "system": {
@@ -49,10 +49,10 @@
       }
     },
     "status": {
-      "saving": "Enregistrement de l'apparence…",
+      "saving": "Enregistrement du schéma de couleurs…",
       "couldNotSave": "Impossible d'enregistrer : {error}",
-      "usingPreference": "Apparence enregistrée : {appearance}.",
-      "usingSystem": "Réglage système : {appearance}."
+      "usingPreference": "Schéma de couleurs enregistré : {colour_scheme}.",
+      "usingSystem": "Réglage système : {colour_scheme}."
     }
   },
   "theme": {

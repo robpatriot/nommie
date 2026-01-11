@@ -19,7 +19,7 @@ const NAMESPACES = [
 const SOURCE_DIRS = ['app', 'components', 'hooks', 'lib', 'utils', 'test']
 
 const DYNAMIC_PREFIXES = [
-  'settings.appearance.options.',
+  'settings.colour_scheme.options.',
   'settings.language.options.',
   'errors.codes.',
   'game.gameRoom.phase.',

@@ -10,6 +10,7 @@ import { Suspense } from 'react'
 import Script from 'next/script'
 import { cookies, headers } from 'next/headers'
 import './globals.css'
+
 import Header from '@/components/Header'
 import { HeaderBreadcrumbProvider } from '@/components/header-breadcrumbs'
 import { auth } from '@/auth'
@@ -29,16 +30,19 @@ import { loadMessages } from '@/i18n/messages'
 import { getUserOptions } from '@/lib/api/user-options'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
+
 const righteous = Righteous({
   weight: '400',
   subsets: ['latin'],
   variable: '--font-oldtime-heading',
 })
+
 const bebasNeue = Bebas_Neue({
   weight: '400',
   subsets: ['latin'],
   variable: '--font-oldtime-display',
 })
+
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-oldtime-elegant',
@@ -47,23 +51,46 @@ const playfair = Playfair_Display({
 const themeScript = `
 (() => {
   try {
-    const storageKey = 'nommie.colour_scheme';
-    const themeNameKey = 'nommie.theme_name';
-    const stored = localStorage.getItem(storageKey);
-    const storedThemeName = localStorage.getItem(themeNameKey);
+    const COLOUR_SCHEME_STORAGE_KEY = 'nommie.colour_scheme';
+    const THEME_NAME_STORAGE_KEY = 'nommie.theme_name';
+
+    const storedColourScheme = localStorage.getItem(COLOUR_SCHEME_STORAGE_KEY);
+    const storedThemeName = localStorage.getItem(THEME_NAME_STORAGE_KEY);
+
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const prefersDark = media.matches;
-    const colourScheme = stored === 'light' || stored === 'dark' ? stored : 'system';
-    const resolved = colourScheme === 'system' ? (prefersDark ? 'dark' : 'light') : colourScheme;
+
     const root = document.documentElement;
+
+    const isValidThemeName = (value) =>
+      value === 'standard' || value === 'high_roller' || value === 'oldtime';
+
+    // Backend / server is authoritative
     const serverThemeName = root.dataset.themeName;
-    const isValidThemeName = (value) => value === 'standard' || value === 'high_roller' || value === 'oldtime';
-    const themeName = isValidThemeName(storedThemeName) ? storedThemeName : (isValidThemeName(serverThemeName) ? serverThemeName : 'standard');
+    const themeName = isValidThemeName(serverThemeName)
+      ? serverThemeName
+      : (isValidThemeName(storedThemeName) ? storedThemeName : 'standard');
+
     root.dataset.themeName = themeName;
+
+    const isValidScheme = (value) =>
+      value === 'light' || value === 'dark' || value === 'system';
+
+    const serverColourScheme = root.dataset.colourScheme;
+    const colourScheme = isValidScheme(serverColourScheme)
+      ? serverColourScheme
+      : (isValidScheme(storedColourScheme) ? storedColourScheme : 'system');
+
     root.dataset.colourScheme = colourScheme;
+
+    const resolved =
+      colourScheme === 'system'
+        ? (prefersDark ? 'dark' : 'light')
+        : colourScheme;
+
     root.classList.toggle('dark', resolved === 'dark');
     root.style.colorScheme = resolved;
-  } catch (error) {
+  } catch {
     // no-op
   }
 })();
@@ -89,31 +116,24 @@ export default async function RootLayout({
     acceptLanguageHeader: headerStore.get('accept-language'),
   })
 
-  const colourSchemeCookie =
-    cookieStore.get('nommie_colour_scheme')?.value ?? null
-
   let initialColourScheme: ColourScheme = 'system'
   let initialResolved: ResolvedColourScheme = 'light'
   let initialThemeName: ThemeName = 'standard'
-
-  if (colourSchemeCookie === 'light' || colourSchemeCookie === 'dark') {
-    initialColourScheme = colourSchemeCookie
-    initialResolved = colourSchemeCookie
-  } else if (colourSchemeCookie?.startsWith('system:')) {
-    const [, suffix] = colourSchemeCookie.split(':')
-    if (suffix === 'dark' || suffix === 'light') {
-      initialColourScheme = 'system'
-      initialResolved = suffix
-    }
-  }
 
   // Fetch theme preference from backend if user is authenticated
   if (session) {
     try {
       const options = await getUserOptions()
       initialThemeName = options.theme
+      initialColourScheme = options.colour_scheme
+      initialResolved =
+        initialColourScheme === 'dark'
+          ? 'dark'
+          : initialColourScheme === 'light'
+            ? 'light'
+            : 'light'
     } catch {
-      // Fall back to default theme on error
+      // Fall back to defaults on error
     }
   }
 
@@ -126,19 +146,35 @@ export default async function RootLayout({
     'guide',
   ])
 
+  const serverResolved =
+    initialColourScheme === 'dark'
+      ? 'dark'
+      : initialColourScheme === 'light'
+        ? 'light'
+        : null
+
   return (
     <html
       lang={locale}
       data-theme-name={initialThemeName}
       data-colour-scheme={initialColourScheme}
+      className={serverResolved === 'dark' ? 'dark' : undefined}
+      style={
+        serverResolved
+          ? ({ colorScheme: serverResolved } as React.CSSProperties)
+          : undefined
+      }
       suppressHydrationWarning
     >
-      <body
-        className={`${inter.variable} ${righteous.variable} ${bebasNeue.variable} ${playfair.variable} font-sans tabletop-shell`}
-      >
+      <head>
         <Script id="theme-sync" strategy="beforeInteractive">
           {themeScript}
         </Script>
+      </head>
+
+      <body
+        className={`${inter.variable} ${righteous.variable} ${bebasNeue.variable} ${playfair.variable} font-sans tabletop-shell`}
+      >
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeProvider
             initialColourScheme={initialColourScheme}
@@ -147,11 +183,13 @@ export default async function RootLayout({
           >
             <AppQueryClientProvider>
               <PerformanceMonitorWrapper />
+
               <HeaderBreadcrumbProvider>
                 <div className="tabletop-content">
                   <Suspense fallback={null}>
                     <Header session={session} />
                   </Suspense>
+
                   {children}
                 </div>
               </HeaderBreadcrumbProvider>

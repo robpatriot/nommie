@@ -35,7 +35,7 @@ enum UserCredentials {
 enum UserOptions {
     Table,
     UserId,
-    AppearanceMode,
+    ColourScheme,
     Theme,
     RequireCardConfirmation,
     Locale,
@@ -327,7 +327,7 @@ impl MigrationTrait for Migration {
                             .primary_key(),
                     )
                     .col(
-                        ColumnDef::new(UserOptions::AppearanceMode)
+                        ColumnDef::new(UserOptions::ColourScheme)
                             .string()
                             .not_null()
                             .default("system"),

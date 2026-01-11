@@ -1,18 +1,35 @@
+// apps/frontend/components/PerformanceMonitorWrapper.tsx
 'use client'
 
-import dynamic from 'next/dynamic'
+import { useEffect, useState } from 'react'
 
-// Dynamically import PerformanceMonitor (only used in development)
-// This wrapper is needed because dynamic imports with ssr: false
-// cannot be used directly in Server Components in Next.js 16
-const PerformanceMonitor = dynamic(
-  () =>
-    import('@/components/PerformanceMonitor').then((mod) => ({
-      default: mod.PerformanceMonitor,
-    })),
-  { ssr: false }
-)
-
+// Dev-only wrapper that avoids next/dynamic (which can trigger SSR bailout markers).
 export default function PerformanceMonitorWrapper() {
-  return <PerformanceMonitor />
+  const [Monitor, setMonitor] = useState<null | React.ComponentType>(null)
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return
+
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const mod = await import('@/components/PerformanceMonitor')
+        if (!cancelled) {
+          setMonitor(() => mod.PerformanceMonitor)
+        }
+      } catch {
+        // no-op: monitor is optional in dev
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (process.env.NODE_ENV !== 'development') return null
+  if (!Monitor) return null
+
+  return <Monitor />
 }

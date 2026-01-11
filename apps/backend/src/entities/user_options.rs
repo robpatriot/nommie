@@ -7,8 +7,8 @@ use time::OffsetDateTime;
 pub struct Model {
     #[sea_orm(primary_key)]
     pub user_id: i64,
-    #[sea_orm(column_name = "appearance_mode")]
-    pub appearance_mode: String,
+    #[sea_orm(column_name = "colour_scheme")]
+    pub colour_scheme: String,
     #[sea_orm(column_name = "theme")]
     pub theme: String,
     #[sea_orm(column_name = "require_card_confirmation")]

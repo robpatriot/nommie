@@ -17,7 +17,7 @@ export type ThemeName = 'standard' | 'high_roller' | 'oldtime'
 const COLOUR_SCHEME_STORAGE_KEY = 'nommie.colour_scheme'
 const THEME_NAME_STORAGE_KEY = 'nommie.theme_name'
 
-const COLOUR_SCHEME_COOKIE_KEY = 'nommie_colour_scheme'
+//const COLOUR_SCHEME_COOKIE_KEY = 'nommie_colour_scheme'
 
 type ThemeContextValue = {
   colourScheme: ColourScheme
@@ -137,22 +137,20 @@ export function ThemeProvider({
   useEffect(() => {
     if (typeof document === 'undefined') return
 
+    // DOM is authoritative on first hydration (boot script has already run)
     const domMode = getDomUserColourScheme()
-    const storedMode = readStoredColourScheme()
-    const nextMode = domMode ?? storedMode ?? initialColourScheme
-
     const domName = getDomThemeName()
+
+    const storedMode = readStoredColourScheme()
     const storedName = readStoredThemeName()
 
-    // If server provided a non-default themeName, prefer it.
-    const shouldPreferServerThemeName = initialThemeName !== 'standard'
-    const nextName = shouldPreferServerThemeName
-      ? initialThemeName
-      : (domName ?? storedName ?? 'standard')
+    const nextMode: ColourScheme =
+      domMode ?? storedMode ?? initialColourScheme ?? 'system'
 
-    // Determine resolved scheme:
-    // - If the boot script already toggled 'dark', trust DOM (avoids mismatch)
-    // - Otherwise fall back to the computed system preference
+    const nextName: ThemeName =
+      domName ?? storedName ?? initialThemeName ?? 'standard'
+
+    // Trust DOM's current dark class to avoid mismatch
     const domResolved: ResolvedColourScheme =
       document.documentElement.classList.contains('dark') ? 'dark' : 'light'
 
@@ -166,21 +164,9 @@ export function ThemeProvider({
       setHydrated(true)
     })
 
-    applyTheme(nextMode, nextResolved, nextName)
-
-    // If server has a preferred theme name, persist it for future loads
-    if (typeof window !== 'undefined') {
-      try {
-        const storedRaw = window.localStorage.getItem(THEME_NAME_STORAGE_KEY)
-        if (
-          shouldPreferServerThemeName &&
-          (storedRaw === null || storedRaw !== initialThemeName)
-        ) {
-          window.localStorage.setItem(THEME_NAME_STORAGE_KEY, initialThemeName)
-        }
-      } catch {
-        // ignore storage write errors
-      }
+    // Only apply to DOM if the boot script didn't already set it
+    if (domMode == null || domName == null) {
+      applyTheme(nextMode, nextResolved, nextName)
     }
   }, [applyTheme, initialColourScheme, initialThemeName])
 
@@ -240,7 +226,7 @@ export function ThemeProvider({
     })
 
     applyTheme(colourScheme, nextResolved, themeName)
-
+    /*
     if (typeof window !== 'undefined') {
       try {
         const cookieValue =
@@ -251,6 +237,7 @@ export function ThemeProvider({
         // ignore cookie write errors
       }
     }
+*/
   }, [colourScheme, systemColourScheme, themeName, applyTheme])
 
   const setColourScheme = useCallback((mode: ColourScheme) => {
