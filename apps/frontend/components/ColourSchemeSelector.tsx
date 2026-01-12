@@ -39,11 +39,6 @@ export function ColourSchemeSelector({
     return preferredColourScheme ?? 'system'
   }, [hydrated, colourScheme, preferredColourScheme])
 
-  // Matches your previous UX logic:
-  // "Using preference" = backend had explicit light/dark (not null, not system)
-  const isUsingPreference =
-    preferredColourScheme !== null && preferredColourScheme !== 'system'
-
   const effectiveLabel =
     resolvedColourScheme === 'dark'
       ? t('colour_scheme.options.dark.label')
@@ -169,7 +164,7 @@ export function ColourSchemeSelector({
               error: errorMessage,
             })}
           </span>
-        ) : isUsingPreference && active !== 'system' ? (
+        ) : active !== 'system' ? (
           <span className="text-muted-foreground">
             {t('colour_scheme.status.usingPreference', {
               colour_scheme:
