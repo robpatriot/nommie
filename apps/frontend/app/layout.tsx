@@ -7,7 +7,6 @@ import {
   Playfair_Display,
 } from 'next/font/google'
 import { Suspense } from 'react'
-import Script from 'next/script'
 import { cookies, headers } from 'next/headers'
 import './globals.css'
 
@@ -168,9 +167,10 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <Script id="theme-sync" strategy="beforeInteractive">
-          {themeScript}
-        </Script>
+        <script
+          id="theme-sync"
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+        />
       </head>
 
       <body
