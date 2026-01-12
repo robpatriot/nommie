@@ -1,3 +1,4 @@
+// apps/frontend/components/theme-provider.tsx
 'use client'
 
 import {
@@ -9,67 +10,64 @@ import {
   useMemo,
   useState,
 } from 'react'
+import type { SimpleActionResult } from '@/lib/api/action-helpers'
+import { updateUserOptionsAction } from '@/app/actions/settings-actions'
 
 export type ColourScheme = 'light' | 'dark' | 'system'
 export type ResolvedColourScheme = 'light' | 'dark'
 export type ThemeName = 'standard' | 'high_roller' | 'oldtime'
 
-const COLOUR_SCHEME_STORAGE_KEY = 'nommie.colour_scheme'
-const THEME_NAME_STORAGE_KEY = 'nommie.theme_name'
+export const COLOUR_SCHEME_STORAGE_KEY = 'nommie.colour_scheme'
+export const THEME_NAME_STORAGE_KEY = 'nommie.theme_name'
 
-//const COLOUR_SCHEME_COOKIE_KEY = 'nommie_colour_scheme'
+export const COLOUR_SCHEMES = [
+  'light',
+  'dark',
+  'system',
+] as const satisfies readonly ColourScheme[]
+export const THEME_NAMES = [
+  'standard',
+  'high_roller',
+  'oldtime',
+] as const satisfies readonly ThemeName[]
+
+const isOneOf = <T extends readonly string[]>(
+  values: T,
+  value: unknown
+): value is T[number] =>
+  typeof value === 'string' && (values as readonly string[]).includes(value)
+
+export const isValidColourScheme = (value: unknown): value is ColourScheme =>
+  isOneOf(COLOUR_SCHEMES, value)
+
+export const isValidThemeName = (value: unknown): value is ThemeName =>
+  isOneOf(THEME_NAMES, value)
 
 type ThemeContextValue = {
   colourScheme: ColourScheme
   resolvedColourScheme: ResolvedColourScheme
-  setColourScheme: (mode: ColourScheme) => void
+  setColourScheme: (mode: ColourScheme) => Promise<SimpleActionResult>
   themeName: ThemeName
-  setThemeName: (name: ThemeName) => void
+  setThemeName: (name: ThemeName) => Promise<SimpleActionResult>
   hydrated: boolean
+
+  isSaving: boolean
+  errorMessage: string | null
+  clearError: () => void
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
-const isColourScheme = (value: unknown): value is ColourScheme =>
-  typeof value === 'string' &&
-  (value === 'light' || value === 'dark' || value === 'system')
-
-const isThemeName = (value: unknown): value is ThemeName =>
-  typeof value === 'string' &&
-  (value === 'standard' || value === 'high_roller' || value === 'oldtime')
-
-const getDomUserColourScheme = (): ColourScheme | undefined => {
+const getDomColourScheme = (): ColourScheme | undefined => {
   if (typeof document === 'undefined') return undefined
   const attr = document.documentElement.dataset.colourScheme
-  return isColourScheme(attr) ? attr : undefined
+  return isValidColourScheme(attr) ? attr : undefined
 }
 
 const getDomThemeName = (): ThemeName | undefined => {
   if (typeof document === 'undefined') return undefined
   const attr = document.documentElement.dataset.themeName
-  return isThemeName(attr) ? attr : undefined
-}
-
-const readStoredColourScheme = (): ColourScheme => {
-  if (typeof window === 'undefined') return 'system'
-  try {
-    const stored = window.localStorage.getItem(COLOUR_SCHEME_STORAGE_KEY)
-    if (isColourScheme(stored)) return stored
-  } catch {
-    // ignore storage access errors
-  }
-  return 'system'
-}
-
-const readStoredThemeName = (): ThemeName => {
-  if (typeof window === 'undefined') return 'standard'
-  try {
-    const stored = window.localStorage.getItem(THEME_NAME_STORAGE_KEY)
-    if (isThemeName(stored)) return stored
-  } catch {
-    // ignore storage access errors
-  }
-  return 'standard'
+  return isValidThemeName(attr) ? attr : undefined
 }
 
 const readSystemPreference = (): ResolvedColourScheme => {
@@ -83,6 +81,19 @@ const readSystemPreference = (): ResolvedColourScheme => {
   }
 }
 
+const safeWriteLocalStorage = (key: string, value: string | null) => {
+  if (typeof window === 'undefined') return
+  try {
+    if (value === null) {
+      window.localStorage.removeItem(key)
+    } else {
+      window.localStorage.setItem(key, value)
+    }
+  } catch {
+    // ignore storage write errors
+  }
+}
+
 type ThemeProviderProps = {
   children: React.ReactNode
   initialColourScheme?: ColourScheme
@@ -90,13 +101,14 @@ type ThemeProviderProps = {
   initialThemeName?: ThemeName
 }
 
+type ApplySource = 'hydrate' | 'user' | 'storage' | 'system'
+
 export function ThemeProvider({
   children,
   initialColourScheme = 'system',
   initialResolved = 'light',
   initialThemeName = 'standard',
 }: ThemeProviderProps) {
-  // Compute initial values directly instead of using refs (React 19 doesn't allow ref access during render)
   const systemPreference = readSystemPreference()
 
   const [colourScheme, setColourSchemeState] =
@@ -112,43 +124,97 @@ export function ThemeProvider({
   const [themeName, setThemeNameState] = useState<ThemeName>(initialThemeName)
   const [hydrated, setHydrated] = useState(false)
 
-  const applyTheme = useCallback(
-    (
-      mode: ColourScheme,
-      nextResolved: ResolvedColourScheme,
-      name: ThemeName
-    ) => {
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [saveCount, setSaveCount] = useState(0)
+  const isSaving = saveCount > 0
+
+  const clearError = useCallback(() => setErrorMessage(null), [])
+
+  const computeResolved = useCallback(
+    (mode: ColourScheme, sys: ResolvedColourScheme): ResolvedColourScheme =>
+      mode === 'system' ? sys : (mode as ResolvedColourScheme),
+    []
+  )
+
+  const applyToDom = useCallback(
+    (mode: ColourScheme, resolved: ResolvedColourScheme, name: ThemeName) => {
       if (typeof document === 'undefined') return
       const root = document.documentElement
 
-      // New DOM contract: keep everything as "colourScheme" + "themeName"
       root.dataset.colourScheme = mode
       root.dataset.themeName = name
 
-      root.classList.toggle('dark', nextResolved === 'dark')
-      root.style.colorScheme = nextResolved
+      root.classList.toggle('dark', resolved === 'dark')
+      root.style.colorScheme = resolved
+    },
+    []
+  )
+
+  const applyLocal = useCallback(
+    (
+      next: { colourScheme?: ColourScheme; themeName?: ThemeName },
+      source: ApplySource
+    ) => {
+      const nextMode =
+        next.colourScheme != null && isValidColourScheme(next.colourScheme)
+          ? next.colourScheme
+          : colourScheme
+
+      const nextName =
+        next.themeName != null && isValidThemeName(next.themeName)
+          ? next.themeName
+          : themeName
+
+      const nextResolved = computeResolved(nextMode, systemColourScheme)
+
+      startTransition(() => {
+        setColourSchemeState(nextMode)
+        setThemeNameState(nextName)
+        setResolvedColourScheme(nextResolved)
+      })
+
+      applyToDom(nextMode, nextResolved, nextName)
+
+      // Write-through cache + cross-tab propagation:
+      // Persist preference values (including "system"), not resolved.
+      safeWriteLocalStorage(COLOUR_SCHEME_STORAGE_KEY, nextMode)
+      safeWriteLocalStorage(THEME_NAME_STORAGE_KEY, nextName)
+
+      void source
+      return { nextMode, nextName, nextResolved }
+    },
+    [applyToDom, colourScheme, computeResolved, systemColourScheme, themeName]
+  )
+
+  const persistToBackend = useCallback(
+    async (payload: { colour_scheme?: ColourScheme; theme?: ThemeName }) => {
+      setSaveCount((n) => n + 1)
+      try {
+        const result = await updateUserOptionsAction(payload)
+        if (result.kind === 'error') {
+          setErrorMessage(result.message)
+        } else {
+          setErrorMessage(null)
+        }
+        return result
+      } finally {
+        setSaveCount((n) => Math.max(0, n - 1))
+      }
     },
     []
   )
 
   // Initial hydration alignment:
-  // Prefer DOM (set by the inline boot script) if present, else fall back to localStorage,
-  // else use server-provided initial props.
+  // DOM is authoritative (server + boot script already set attrs/class/style).
+  // Adopt DOM values and seed localStorage from them.
   useEffect(() => {
     if (typeof document === 'undefined') return
 
-    // DOM is authoritative on first hydration (boot script has already run)
-    const domMode = getDomUserColourScheme()
+    const domMode = getDomColourScheme()
     const domName = getDomThemeName()
 
-    const storedMode = readStoredColourScheme()
-    const storedName = readStoredThemeName()
-
-    const nextMode: ColourScheme =
-      domMode ?? storedMode ?? initialColourScheme ?? 'system'
-
-    const nextName: ThemeName =
-      domName ?? storedName ?? initialThemeName ?? 'standard'
+    const nextMode: ColourScheme = domMode ?? initialColourScheme ?? 'system'
+    const nextName: ThemeName = domName ?? initialThemeName ?? 'standard'
 
     // Trust DOM's current dark class to avoid mismatch
     const domResolved: ResolvedColourScheme =
@@ -159,112 +225,96 @@ export function ThemeProvider({
 
     startTransition(() => {
       setColourSchemeState(nextMode)
-      setResolvedColourScheme(nextResolved)
       setThemeNameState(nextName)
+      setResolvedColourScheme(nextResolved)
       setHydrated(true)
     })
 
-    // Only apply to DOM if the boot script didn't already set it
-    if (domMode == null || domName == null) {
-      applyTheme(nextMode, nextResolved, nextName)
-    }
-  }, [applyTheme, initialColourScheme, initialThemeName])
+    applyToDom(nextMode, nextResolved, nextName)
 
-  // Track system scheme changes
+    // Seed localStorage cache (baseline for cross-tab)
+    safeWriteLocalStorage(COLOUR_SCHEME_STORAGE_KEY, nextMode)
+    safeWriteLocalStorage(THEME_NAME_STORAGE_KEY, nextName)
+  }, [applyToDom, initialColourScheme, initialThemeName])
+
+  // Track OS scheme changes: if user preference is "system", update resolved + DOM.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = (event: MediaQueryListEvent) => {
-      setSystemColourScheme(event.matches ? 'dark' : 'light')
+
+    const updateFromMedia = (matches: boolean) => {
+      const nextSys: ResolvedColourScheme = matches ? 'dark' : 'light'
+
+      startTransition(() => {
+        setSystemColourScheme(nextSys)
+      })
+
+      // Only adjust visuals if user preference is system
+      if (getDomColourScheme() === 'system') {
+        const nextResolved = nextSys
+        startTransition(() => {
+          setResolvedColourScheme(nextResolved)
+        })
+        applyToDom('system', nextResolved, getDomThemeName() ?? themeName)
+      }
     }
 
-    startTransition(() => {
-      setSystemColourScheme(media.matches ? 'dark' : 'light')
-    })
+    updateFromMedia(media.matches)
+
+    const handleChange = (event: MediaQueryListEvent) => {
+      updateFromMedia(event.matches)
+    }
 
     media.addEventListener('change', handleChange)
     return () => media.removeEventListener('change', handleChange)
-  }, [])
+  }, [applyToDom, themeName])
 
-  // Cross-tab sync
+  // Cross-tab sync: react to localStorage changes from other tabs.
+  // Apply locally, but do NOT persist to backend (to avoid storms).
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const handleStorage = (event: StorageEvent) => {
+      if (event.storageArea !== window.localStorage) return
+
       if (event.key === COLOUR_SCHEME_STORAGE_KEY) {
         const next = event.newValue
-        if (isColourScheme(next)) {
-          setColourSchemeState(next)
-        } else if (next === null) {
-          setColourSchemeState('system')
-        }
+        const nextMode: ColourScheme =
+          next == null ? 'system' : isValidColourScheme(next) ? next : 'system'
+        applyLocal({ colourScheme: nextMode }, 'storage')
         return
       }
 
       if (event.key === THEME_NAME_STORAGE_KEY) {
         const next = event.newValue
-        if (isThemeName(next)) {
-          setThemeNameState(next)
+        if (next != null && isValidThemeName(next)) {
+          applyLocal({ themeName: next }, 'storage')
         }
       }
     }
 
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
-  }, [])
+  }, [applyLocal])
 
-  // Apply any changes to DOM + cookie (cookie is Step 3, but keeping current behaviour)
-  useEffect(() => {
-    const nextResolved: ResolvedColourScheme =
-      colourScheme === 'system'
-        ? systemColourScheme
-        : (colourScheme as ResolvedColourScheme)
+  const setColourScheme = useCallback(
+    async (mode: ColourScheme) => {
+      clearError()
+      applyLocal({ colourScheme: mode }, 'user')
+      return persistToBackend({ colour_scheme: mode })
+    },
+    [applyLocal, clearError, persistToBackend]
+  )
 
-    startTransition(() => {
-      setResolvedColourScheme(nextResolved)
-    })
-
-    applyTheme(colourScheme, nextResolved, themeName)
-    /*
-    if (typeof window !== 'undefined') {
-      try {
-        const cookieValue =
-          colourScheme === 'system' ? `system:${nextResolved}` : colourScheme
-        const maxAge = 60 * 60 * 24 * 365 // 1 year
-        document.cookie = `${COLOUR_SCHEME_COOKIE_KEY}=${cookieValue}; path=/; max-age=${maxAge}; samesite=lax`
-      } catch {
-        // ignore cookie write errors
-      }
-    }
-*/
-  }, [colourScheme, systemColourScheme, themeName, applyTheme])
-
-  const setColourScheme = useCallback((mode: ColourScheme) => {
-    setColourSchemeState(mode)
-    if (typeof window === 'undefined') return
-
-    try {
-      if (mode === 'system') {
-        window.localStorage.removeItem(COLOUR_SCHEME_STORAGE_KEY)
-      } else {
-        window.localStorage.setItem(COLOUR_SCHEME_STORAGE_KEY, mode)
-      }
-    } catch {
-      // ignore storage write errors
-    }
-  }, [])
-
-  const setThemeName = useCallback((name: ThemeName) => {
-    setThemeNameState(name)
-    if (typeof window === 'undefined') return
-
-    try {
-      window.localStorage.setItem(THEME_NAME_STORAGE_KEY, name)
-    } catch {
-      // ignore storage write errors
-    }
-  }, [])
+  const setThemeName = useCallback(
+    async (name: ThemeName) => {
+      clearError()
+      applyLocal({ themeName: name }, 'user')
+      return persistToBackend({ theme: name })
+    },
+    [applyLocal, clearError, persistToBackend]
+  )
 
   const contextValue = useMemo<ThemeContextValue>(
     () => ({
@@ -274,6 +324,9 @@ export function ThemeProvider({
       themeName,
       setThemeName,
       hydrated,
+      isSaving,
+      errorMessage,
+      clearError,
     }),
     [
       colourScheme,
@@ -282,6 +335,9 @@ export function ThemeProvider({
       themeName,
       setThemeName,
       hydrated,
+      isSaving,
+      errorMessage,
+      clearError,
     ]
   )
 

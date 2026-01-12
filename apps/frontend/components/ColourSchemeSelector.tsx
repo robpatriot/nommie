@@ -1,25 +1,19 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
-import { updateColourScheme } from '@/app/actions/settings-actions'
-import { useTheme, type ColourScheme } from './theme-provider'
-
-const STORAGE_KEY = 'nommie.colour_scheme'
+import { COLOUR_SCHEMES, useTheme, type ColourScheme } from './theme-provider'
 
 const SPECIFIC_OPTIONS: Array<{
-  value: ColourScheme
+  value: Extract<ColourScheme, 'light' | 'dark'>
   emoji: string
 }> = [
-  {
-    value: 'light',
-    emoji: '🌞',
-  },
-  {
-    value: 'dark',
-    emoji: '🌙',
-  },
+  { value: 'light', emoji: '🌞' },
+  { value: 'dark', emoji: '🌙' },
 ]
+
+// Optional sanity: ensure the provider’s list still contains what this UI expects
+void COLOUR_SCHEMES
 
 export function ColourSchemeSelector({
   preferredColourScheme,
@@ -27,52 +21,28 @@ export function ColourSchemeSelector({
   preferredColourScheme: ColourScheme | null
 }) {
   const t = useTranslations('settings')
-  const { colourScheme, setColourScheme, resolvedColourScheme, hydrated } =
-    useTheme()
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
 
-  // Sync backend preference to localStorage on mount
-  // This ensures cross-device sync: if user changes preference on one device,
-  // it will sync to localStorage on other devices when they visit settings
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return
-    }
+  const {
+    colourScheme,
+    setColourScheme,
+    resolvedColourScheme,
+    hydrated,
+    isSaving,
+    errorMessage,
+    clearError,
+  } = useTheme()
 
-    try {
-      const backendPreference: ColourScheme = preferredColourScheme ?? 'system'
-      const stored = window.localStorage.getItem(STORAGE_KEY)
-
-      // Only sync if backend preference differs from localStorage
-      if (backendPreference === 'system') {
-        // Backend says system, but localStorage might have a value
-        if (stored !== null && stored !== 'system') {
-          window.localStorage.removeItem(STORAGE_KEY)
-        }
-      } else {
-        // Backend has explicit preference
-        if (stored !== backendPreference) {
-          window.localStorage.setItem(STORAGE_KEY, backendPreference)
-        }
-      }
-    } catch {
-      // Ignore storage access errors (e.g., in private browsing)
-    }
-  }, [preferredColourScheme])
-
-  // null means no explicit preference (use system default)
-  // 'system' means explicitly set to system
-  // 'light'/'dark' means explicitly set to that mode
-  const isUsingPreference =
-    preferredColourScheme !== null && preferredColourScheme !== 'system'
-
+  // Before hydration, show backend preference (server-provided).
+  // After hydration, ThemeProvider is authoritative.
   const active = useMemo<ColourScheme>(() => {
-    if (hydrated) {
-      return colourScheme
-    }
+    if (hydrated) return colourScheme
     return preferredColourScheme ?? 'system'
   }, [hydrated, colourScheme, preferredColourScheme])
+
+  // Matches your previous UX logic:
+  // "Using preference" = backend had explicit light/dark (not null, not system)
+  const isUsingPreference =
+    preferredColourScheme !== null && preferredColourScheme !== 'system'
 
   const effectiveLabel =
     resolvedColourScheme === 'dark'
@@ -80,23 +50,9 @@ export function ColourSchemeSelector({
       : t('colour_scheme.options.light.label')
 
   const handleSelect = (mode: ColourScheme) => {
-    if (hydrated && mode === colourScheme) {
-      return
-    }
-
-    const previousTheme = colourScheme
-    setErrorMessage(null)
-    setColourScheme(mode)
-
-    startTransition(async () => {
-      const result = await updateColourScheme(mode)
-      if (result.kind === 'error') {
-        setErrorMessage(result.message)
-        setColourScheme(previousTheme)
-      } else {
-        setErrorMessage(null)
-      }
-    })
+    if (hydrated && mode === colourScheme) return
+    clearError()
+    void setColourScheme(mode)
   }
 
   return (
@@ -110,13 +66,13 @@ export function ColourSchemeSelector({
               key={option.value}
               type="button"
               onClick={() => handleSelect(option.value)}
-              disabled={isPending}
+              disabled={isSaving}
               aria-pressed={isActive}
               className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                 isActive
                   ? 'border-primary/60 bg-primary/10 text-foreground shadow-inner shadow-primary/20'
                   : 'border-border/60 bg-card/80 text-muted-foreground hover:border-primary/40 hover:text-foreground'
-              } ${isPending ? 'opacity-80' : ''}`}
+              } ${isSaving ? 'opacity-80' : ''}`}
             >
               <span className="flex items-center gap-3">
                 <span aria-hidden className="text-xl">
@@ -163,13 +119,13 @@ export function ColourSchemeSelector({
         <button
           type="button"
           onClick={() => handleSelect('system')}
-          disabled={isPending}
+          disabled={isSaving}
           aria-pressed={active === 'system'}
           className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
             active === 'system'
               ? 'border-primary/60 bg-primary/10 text-foreground shadow-inner shadow-primary/20'
               : 'border-dashed border-muted/40 bg-card/40 text-muted-foreground hover:border-primary/40 hover:bg-card/60 hover:text-foreground'
-          } ${isPending ? 'opacity-80' : ''}`}
+          } ${isSaving ? 'opacity-80' : ''}`}
         >
           <span className="flex items-center gap-3">
             <span aria-hidden className="text-xl">
@@ -203,7 +159,7 @@ export function ColourSchemeSelector({
       </div>
 
       <div className="min-h-[1.5rem] text-sm">
-        {isPending ? (
+        {isSaving ? (
           <span className="text-muted-foreground">
             {t('colour_scheme.status.saving')}
           </span>

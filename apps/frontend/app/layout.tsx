@@ -48,45 +48,48 @@ const playfair = Playfair_Display({
   variable: '--font-oldtime-elegant',
 })
 
+// Boot script: server DOM is authoritative, localStorage is only fallback.
+// Resolves "system" for first paint by toggling <html class="dark"> + color-scheme.
 const themeScript = `
 (() => {
   try {
     const COLOUR_SCHEME_STORAGE_KEY = 'nommie.colour_scheme';
     const THEME_NAME_STORAGE_KEY = 'nommie.theme_name';
 
-    const storedColourScheme = localStorage.getItem(COLOUR_SCHEME_STORAGE_KEY);
-    const storedThemeName = localStorage.getItem(THEME_NAME_STORAGE_KEY);
+    const VALID_THEME_NAMES = ['standard', 'high_roller', 'oldtime'];
+    const VALID_COLOUR_SCHEMES = ['light', 'dark', 'system'];
 
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const prefersDark = media.matches;
+    const isValidThemeName = (value) =>
+      typeof value === 'string' && VALID_THEME_NAMES.includes(value);
+
+    const isValidColourScheme = (value) =>
+      typeof value === 'string' && VALID_COLOUR_SCHEMES.includes(value);
 
     const root = document.documentElement;
 
-    const isValidThemeName = (value) =>
-      value === 'standard' || value === 'high_roller' || value === 'oldtime';
-
-    // Backend / server is authoritative
+    // Theme name: prefer server; fall back to storage; then default.
     const serverThemeName = root.dataset.themeName;
+    const storedThemeName = localStorage.getItem(THEME_NAME_STORAGE_KEY);
     const themeName = isValidThemeName(serverThemeName)
       ? serverThemeName
       : (isValidThemeName(storedThemeName) ? storedThemeName : 'standard');
 
     root.dataset.themeName = themeName;
 
-    const isValidScheme = (value) =>
-      value === 'light' || value === 'dark' || value === 'system';
-
+    // Colour scheme preference: prefer server; fall back to storage; then default.
     const serverColourScheme = root.dataset.colourScheme;
-    const colourScheme = isValidScheme(serverColourScheme)
+    const storedColourScheme = localStorage.getItem(COLOUR_SCHEME_STORAGE_KEY);
+    const colourScheme = isValidColourScheme(serverColourScheme)
       ? serverColourScheme
-      : (isValidScheme(storedColourScheme) ? storedColourScheme : 'system');
+      : (isValidColourScheme(storedColourScheme) ? storedColourScheme : 'system');
 
     root.dataset.colourScheme = colourScheme;
 
-    const resolved =
-      colourScheme === 'system'
-        ? (prefersDark ? 'dark' : 'light')
-        : colourScheme;
+    // Resolve system for first paint visuals.
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const resolved = colourScheme === 'system'
+      ? (prefersDark ? 'dark' : 'light')
+      : colourScheme;
 
     root.classList.toggle('dark', resolved === 'dark');
     root.style.colorScheme = resolved;
@@ -120,7 +123,7 @@ export default async function RootLayout({
   let initialResolved: ResolvedColourScheme = 'light'
   let initialThemeName: ThemeName = 'standard'
 
-  // Fetch theme preference from backend if user is authenticated
+  // Backend is authoritative for logged-in users
   if (session) {
     try {
       const options = await getUserOptions()
@@ -146,7 +149,9 @@ export default async function RootLayout({
     'guide',
   ])
 
-  const serverResolved =
+  // Only set server-side "dark" class (and color-scheme) when user explicitly chose
+  // light/dark. For "system", we let the boot script resolve on the client.
+  const serverResolved: ResolvedColourScheme | null =
     initialColourScheme === 'dark'
       ? 'dark'
       : initialColourScheme === 'light'
@@ -159,11 +164,7 @@ export default async function RootLayout({
       data-theme-name={initialThemeName}
       data-colour-scheme={initialColourScheme}
       className={serverResolved === 'dark' ? 'dark' : undefined}
-      style={
-        serverResolved
-          ? ({ colorScheme: serverResolved } as React.CSSProperties)
-          : undefined
-      }
+      style={serverResolved ? { colorScheme: serverResolved } : undefined}
       suppressHydrationWarning
     >
       <head>

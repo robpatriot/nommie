@@ -72,14 +72,6 @@ export async function updateUserOptionsAction(
   }
 }
 
-export async function updateColourScheme(mode: ColourScheme) {
-  return updateUserOptionsAction({ colour_scheme: mode })
-}
-
-export async function updateThemeAction(theme: ThemeName) {
-  return updateUserOptionsAction({ theme })
-}
-
 export async function updateLocaleAction(
   locale: SupportedLocale | null
 ): Promise<SimpleActionResult> {
