@@ -84,13 +84,14 @@ const readSystemPreference = (): ResolvedColourScheme => {
 const safeWriteLocalStorage = (key: string, value: string | null) => {
   if (typeof window === 'undefined') return
   try {
+    const current = window.localStorage.getItem(key)
     if (value === null) {
-      window.localStorage.removeItem(key)
-    } else {
-      window.localStorage.setItem(key, value)
+      if (current !== null) window.localStorage.removeItem(key)
+      return
     }
+    if (current !== value) window.localStorage.setItem(key, value)
   } catch {
-    // ignore storage write errors
+    // ignore
   }
 }
 
@@ -101,7 +102,10 @@ type ThemeProviderProps = {
   initialThemeName?: ThemeName
 }
 
-type ApplySource = 'hydrate' | 'user' | 'storage' | 'system'
+type ApplySource = 'hydrate' | 'user' | 'storage'
+
+const shouldPersistToStorage = (source: ApplySource) =>
+  source === 'user' || source === 'hydrate'
 
 export function ThemeProvider({
   children,
@@ -136,54 +140,77 @@ export function ThemeProvider({
     []
   )
 
-  const applyToDom = useCallback(
-    (mode: ColourScheme, resolved: ResolvedColourScheme, name: ThemeName) => {
+  const applyThemeNameToDom = useCallback((name: ThemeName) => {
+    if (typeof document === 'undefined') return
+    const root = document.documentElement
+    if (root.dataset.themeName !== name) {
+      root.dataset.themeName = name
+    }
+  }, [])
+
+  const applyColourSchemeToDom = useCallback(
+    (mode: ColourScheme, resolved: ResolvedColourScheme) => {
       if (typeof document === 'undefined') return
       const root = document.documentElement
 
-      root.dataset.colourScheme = mode
-      root.dataset.themeName = name
+      if (root.dataset.colourScheme !== mode) {
+        root.dataset.colourScheme = mode
+      }
 
-      root.classList.toggle('dark', resolved === 'dark')
-      root.style.colorScheme = resolved
+      const shouldBeDark = resolved === 'dark'
+      if (root.classList.contains('dark') !== shouldBeDark) {
+        root.classList.toggle('dark', shouldBeDark)
+      }
+
+      if (root.style.colorScheme !== resolved) {
+        root.style.colorScheme = resolved
+      }
     },
     []
   )
 
-  const applyLocal = useCallback(
-    (
-      next: { colourScheme?: ColourScheme; themeName?: ThemeName },
-      source: ApplySource
-    ) => {
-      const nextMode =
-        next.colourScheme != null && isValidColourScheme(next.colourScheme)
-          ? next.colourScheme
-          : colourScheme
-
-      const nextName =
-        next.themeName != null && isValidThemeName(next.themeName)
-          ? next.themeName
-          : themeName
-
-      const nextResolved = computeResolved(nextMode, systemColourScheme)
+  const applyThemeNameLocal = useCallback(
+    (name: ThemeName, source: ApplySource) => {
+      if (!isValidThemeName(name)) return
 
       startTransition(() => {
-        setColourSchemeState(nextMode)
-        setThemeNameState(nextName)
+        setThemeNameState(name)
+      })
+
+      applyThemeNameToDom(name)
+
+      if (shouldPersistToStorage(source)) {
+        safeWriteLocalStorage(THEME_NAME_STORAGE_KEY, name)
+      }
+    },
+    [applyThemeNameToDom]
+  )
+
+  const applyColourSchemeLocal = useCallback(
+    (
+      mode: ColourScheme,
+      source: ApplySource,
+      resolvedOverride?: ResolvedColourScheme
+    ) => {
+      if (!isValidColourScheme(mode)) return
+
+      const nextResolved =
+        mode === 'system' && resolvedOverride != null
+          ? resolvedOverride
+          : computeResolved(mode, systemColourScheme)
+
+      startTransition(() => {
+        setColourSchemeState(mode)
         setResolvedColourScheme(nextResolved)
       })
 
-      applyToDom(nextMode, nextResolved, nextName)
+      applyColourSchemeToDom(mode, nextResolved)
 
-      // Write-through cache + cross-tab propagation:
-      // Persist preference values (including "system"), not resolved.
-      safeWriteLocalStorage(COLOUR_SCHEME_STORAGE_KEY, nextMode)
-      safeWriteLocalStorage(THEME_NAME_STORAGE_KEY, nextName)
-
-      void source
-      return { nextMode, nextName, nextResolved }
+      if (shouldPersistToStorage(source)) {
+        safeWriteLocalStorage(COLOUR_SCHEME_STORAGE_KEY, mode)
+      }
     },
-    [applyToDom, colourScheme, computeResolved, systemColourScheme, themeName]
+    [applyColourSchemeToDom, computeResolved, systemColourScheme]
   )
 
   const persistToBackend = useCallback(
@@ -206,7 +233,7 @@ export function ThemeProvider({
 
   // Initial hydration alignment:
   // DOM is authoritative (server + boot script already set attrs/class/style).
-  // Adopt DOM values and seed localStorage from them.
+  // Adopt DOM values and seed localStorage baseline from them via apply*Local(..., 'hydrate').
   useEffect(() => {
     if (typeof document === 'undefined') return
 
@@ -216,28 +243,26 @@ export function ThemeProvider({
     const nextMode: ColourScheme = domMode ?? initialColourScheme ?? 'system'
     const nextName: ThemeName = domName ?? initialThemeName ?? 'standard'
 
-    // Trust DOM's current dark class to avoid mismatch
+    // Trust DOM's current dark class for "system" resolution.
     const domResolved: ResolvedColourScheme =
       document.documentElement.classList.contains('dark') ? 'dark' : 'light'
 
-    const nextResolved: ResolvedColourScheme =
-      nextMode === 'system' ? domResolved : (nextMode as ResolvedColourScheme)
-
+    // Align our notion of system preference to what the DOM is currently showing.
     startTransition(() => {
-      setColourSchemeState(nextMode)
-      setThemeNameState(nextName)
-      setResolvedColourScheme(nextResolved)
+      setSystemColourScheme(domResolved)
       setHydrated(true)
     })
 
-    applyToDom(nextMode, nextResolved, nextName)
+    applyColourSchemeLocal(nextMode, 'hydrate', domResolved)
+    applyThemeNameLocal(nextName, 'hydrate')
+  }, [
+    applyColourSchemeLocal,
+    applyThemeNameLocal,
+    initialColourScheme,
+    initialThemeName,
+  ])
 
-    // Seed localStorage cache (baseline for cross-tab)
-    safeWriteLocalStorage(COLOUR_SCHEME_STORAGE_KEY, nextMode)
-    safeWriteLocalStorage(THEME_NAME_STORAGE_KEY, nextName)
-  }, [applyToDom, initialColourScheme, initialThemeName])
-
-  // Track OS scheme changes: if user preference is "system", update resolved + DOM.
+  // Track OS scheme changes: if user preference is "system", update resolved + DOM visuals.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -250,13 +275,12 @@ export function ThemeProvider({
         setSystemColourScheme(nextSys)
       })
 
-      // Only adjust visuals if user preference is system
+      // Only adjust visuals if the current preference is system.
       if (getDomColourScheme() === 'system') {
-        const nextResolved = nextSys
         startTransition(() => {
-          setResolvedColourScheme(nextResolved)
+          setResolvedColourScheme(nextSys)
         })
-        applyToDom('system', nextResolved, getDomThemeName() ?? themeName)
+        applyColourSchemeToDom('system', nextSys)
       }
     }
 
@@ -268,10 +292,10 @@ export function ThemeProvider({
 
     media.addEventListener('change', handleChange)
     return () => media.removeEventListener('change', handleChange)
-  }, [applyToDom, themeName])
+  }, [applyColourSchemeToDom])
 
   // Cross-tab sync: react to localStorage changes from other tabs.
-  // Apply locally, but do NOT persist to backend (to avoid storms).
+  // Apply locally, and do NOT echo writes back to storage or persist to backend.
   useEffect(() => {
     if (typeof window === 'undefined') return
 
@@ -282,38 +306,38 @@ export function ThemeProvider({
         const next = event.newValue
         const nextMode: ColourScheme =
           next == null ? 'system' : isValidColourScheme(next) ? next : 'system'
-        applyLocal({ colourScheme: nextMode }, 'storage')
+        applyColourSchemeLocal(nextMode, 'storage')
         return
       }
 
       if (event.key === THEME_NAME_STORAGE_KEY) {
         const next = event.newValue
         if (next != null && isValidThemeName(next)) {
-          applyLocal({ themeName: next }, 'storage')
+          applyThemeNameLocal(next, 'storage')
         }
       }
     }
 
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
-  }, [applyLocal])
+  }, [applyColourSchemeLocal, applyThemeNameLocal])
 
   const setColourScheme = useCallback(
     async (mode: ColourScheme) => {
       clearError()
-      applyLocal({ colourScheme: mode }, 'user')
+      applyColourSchemeLocal(mode, 'user')
       return persistToBackend({ colour_scheme: mode })
     },
-    [applyLocal, clearError, persistToBackend]
+    [applyColourSchemeLocal, clearError, persistToBackend]
   )
 
   const setThemeName = useCallback(
     async (name: ThemeName) => {
       clearError()
-      applyLocal({ themeName: name }, 'user')
+      applyThemeNameLocal(name, 'user')
       return persistToBackend({ theme: name })
     },
-    [applyLocal, clearError, persistToBackend]
+    [applyThemeNameLocal, clearError, persistToBackend]
   )
 
   const contextValue = useMemo<ThemeContextValue>(
