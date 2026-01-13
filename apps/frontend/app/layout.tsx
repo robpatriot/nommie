@@ -73,7 +73,7 @@ const themeScript = `
       ? serverThemeName
       : (isValidThemeName(storedThemeName) ? storedThemeName : 'standard');
 
-    root.dataset.themeName = themeName;
+    if (root.dataset.themeName !== themeName) root.dataset.themeName = themeName;
 
     // Colour scheme preference: prefer server; fall back to storage; then default.
     const serverColourScheme = root.dataset.colourScheme;
@@ -82,7 +82,7 @@ const themeScript = `
       ? serverColourScheme
       : (isValidColourScheme(storedColourScheme) ? storedColourScheme : 'system');
 
-    root.dataset.colourScheme = colourScheme;
+    if (root.dataset.colourScheme !== colourScheme) root.dataset.colourScheme = colourScheme;
 
     // Resolve system for first paint visuals.
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -90,8 +90,9 @@ const themeScript = `
       ? (prefersDark ? 'dark' : 'light')
       : colourScheme;
 
-    root.classList.toggle('dark', resolved === 'dark');
-    root.style.colorScheme = resolved;
+    const shouldBeDark = resolved === 'dark';
+    if (root.classList.contains('dark') !== shouldBeDark) root.classList.toggle('dark', shouldBeDark);
+    if (root.style.colorScheme !== resolved) root.style.colorScheme = resolved;
   } catch {
     // no-op
   }
@@ -119,7 +120,6 @@ export default async function RootLayout({
   })
 
   let initialColourScheme: ColourScheme = 'system'
-  let initialResolved: ResolvedColourScheme = 'light'
   let initialThemeName: ThemeName = 'standard'
 
   // Backend is authoritative for logged-in users
@@ -128,12 +128,6 @@ export default async function RootLayout({
       const options = await getUserOptions()
       initialThemeName = options.theme
       initialColourScheme = options.colour_scheme
-      initialResolved =
-        initialColourScheme === 'dark'
-          ? 'dark'
-          : initialColourScheme === 'light'
-            ? 'light'
-            : 'light'
     } catch {
       // Fall back to defaults on error
     }
@@ -179,8 +173,8 @@ export default async function RootLayout({
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeProvider
             initialColourScheme={initialColourScheme}
-            initialResolved={initialResolved}
             initialThemeName={initialThemeName}
+            isAuthenticated={!!session}
           >
             <AppQueryClientProvider>
               <PerformanceMonitorWrapper />

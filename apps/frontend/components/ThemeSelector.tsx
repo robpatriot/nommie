@@ -25,7 +25,7 @@ export function ThemeSelector({
 
   const {
     themeName,
-    setThemeName,
+    applyPreferences,
     hydrated,
     isSaving,
     errorMessage,
@@ -39,7 +39,10 @@ export function ThemeSelector({
   const handleSelect = (nextTheme: ThemeName) => {
     if (hydrated && nextTheme === themeName) return
     clearError()
-    void setThemeName(nextTheme)
+    void applyPreferences(
+      { themeName: nextTheme },
+      { persistBackend: true, persistStorage: true }
+    )
   }
 
   return (

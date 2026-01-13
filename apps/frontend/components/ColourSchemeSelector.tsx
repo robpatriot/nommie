@@ -24,7 +24,7 @@ export function ColourSchemeSelector({
 
   const {
     colourScheme,
-    setColourScheme,
+    applyPreferences,
     resolvedColourScheme,
     hydrated,
     isSaving,
@@ -47,7 +47,10 @@ export function ColourSchemeSelector({
   const handleSelect = (mode: ColourScheme) => {
     if (hydrated && mode === colourScheme) return
     clearError()
-    void setColourScheme(mode)
+    void applyPreferences(
+      { colourScheme: mode },
+      { persistBackend: true, persistStorage: true }
+    )
   }
 
   return (

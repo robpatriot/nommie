@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { usePathname } from 'next/navigation'
+
 function getInitials(email?: string | null) {
   if (!email) {
     return '👤'
