@@ -2,9 +2,6 @@
 //!
 //! This is the main entry point for the backend server. It uses the backend library
 //! to configure and run the HTTP server.
-//!
-//! In a binary+lib setup, `lib.rs` owns the modules and `main.rs` is a thin wrapper
-//! that calls into the library. This avoids duplicating tests across targets.
 
 use std::sync::Arc;
 use std::time::Duration;
