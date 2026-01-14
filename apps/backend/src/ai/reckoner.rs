@@ -1180,10 +1180,9 @@ impl Reckoner {
 
         // Find required_to_win
         let current_highest = state.bids.iter().flatten().max().copied().unwrap_or(0);
-        let required_to_win = current_highest + 1;
 
         // Choose mode and finalize bid
-        let (mode, provisional_bid) = Self::choose_mode_and_finalize_bid(
+        let (_mode, provisional_bid) = Self::choose_mode_and_finalize_bid(
             pick_bid_raw,
             follow_bid_raw,
             adjusted_pick_est, // Use adjusted pick_est for mode selection
@@ -1253,14 +1252,6 @@ impl Reckoner {
                 chosen_bid = Self::choose_bid_from_estimate(&legal, chosen_bid as f32);
             }
 
-            // Optional debug output
-            if std::env::var("RECKONER_BID_DEBUG").as_deref() == Ok("1") {
-                eprintln!(
-                    "Reckoner bid: hand_size={} pick_est={:.2} follow_est={:.2} pick_bid={} follow_bid={} required_to_win={} mode=PICK(forced) final_bid={}",
-                    hand_size, adjusted_pick_est, follow_est, pick_bid_raw, follow_bid_raw, required_to_win, chosen_bid
-                );
-            }
-
             return chosen_bid;
         }
 
@@ -1276,18 +1267,6 @@ impl Reckoner {
         if !legal.contains(&chosen_bid) {
             // Fallback: choose closest legal bid
             chosen_bid = Self::choose_bid_from_estimate(&legal, chosen_bid as f32);
-        }
-
-        // Optional debug output (only when RECKONER_BID_DEBUG=1)
-        if std::env::var("RECKONER_BID_DEBUG").as_deref() == Ok("1") {
-            let mode_str = match mode {
-                BidMode::Pick => "PICK",
-                BidMode::Follow => "FOLLOW",
-            };
-            eprintln!(
-                "Reckoner bid: hand_size={} pick_est={:.2} follow_est={:.2} pick_bid={} follow_bid={} required_to_win={} mode={} final_bid={}",
-                hand_size, pick_est, follow_est, pick_bid_raw, follow_bid_raw, required_to_win, mode_str, chosen_bid
-            );
         }
 
         chosen_bid
