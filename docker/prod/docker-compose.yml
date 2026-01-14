@@ -49,11 +49,9 @@ services:
     build:
       context: ../..
       dockerfile: docker/prod/frontend.Dockerfile
-      args:
-        NEXT_PUBLIC_BACKEND_BASE_URL: ${NEXT_PUBLIC_BACKEND_BASE_URL}
     restart: unless-stopped
     env_file:
-      - .env
+      - ./backend_base_url.env
       - ./frontend.env
     depends_on:
       - backend

@@ -4,9 +4,6 @@ FROM node:20-bookworm AS builder
 
 WORKDIR /app
 
-ARG NEXT_PUBLIC_BACKEND_BASE_URL
-ENV NEXT_PUBLIC_BACKEND_BASE_URL=$NEXT_PUBLIC_BACKEND_BASE_URL
-
 ENV PNPM_HOME="/pnpm" \
     PATH="/pnpm:$PATH" \
     NEXT_TELEMETRY_DISABLED=1
@@ -17,10 +14,20 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps apps
 COPY packages packages
 
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @nommie/frontend exec next build
+# Copy the build-time env file into the image
+COPY docker/prod/backend_base_url.env /tmp/backend_base_url.env
 
-FROM node:20-bookworm-slim AS runner
+RUN pnpm install --frozen-lockfile
+
+RUN set -a && . /tmp/backend_base_url.env && set +a && \
+    if [ -z "${NEXT_PUBLIC_BACKEND_BASE_URL:-}" ]; then \
+      echo >&2 "❌ FRONTEND BUILD CONFIG ERROR"; \
+      echo >&2 "   Missing NEXT_PUBLIC_BACKEND_BASE_URL Expected in: docker/prod/backend_base_url.env"; \
+      exit 2; \
+    fi && \
+    pnpm --filter @nommie/frontend exec next build
+
+    FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
