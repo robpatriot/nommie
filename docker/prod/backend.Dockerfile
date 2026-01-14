@@ -1,73 +1,57 @@
 # syntax=docker/dockerfile:1.6
 
-FROM rust:1.91.1 AS builder
+FROM rust:1.91.1 AS chef
 
 WORKDIR /app
 
-# Install dependencies required for building OpenSSL-dependent crates
+# Build deps (OpenSSL, pkg-config) + cargo-chef tool
 RUN apt-get update \
     && apt-get install -y --no-install-recommends pkg-config libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && cargo install cargo-chef
 
-# Copy manifest files first to maximize build caching
-COPY Cargo.toml Cargo.lock ./
-COPY apps/backend/Cargo.toml apps/backend/Cargo.toml
-COPY apps/migration-cli/Cargo.toml apps/migration-cli/Cargo.toml
-COPY packages/migration/Cargo.toml packages/migration/Cargo.toml
-COPY packages/backend-test-support/Cargo.toml packages/backend-test-support/Cargo.toml
-COPY packages/db-infra/Cargo.toml packages/db-infra/Cargo.toml
-COPY packages/ai-simulator/Cargo.toml packages/ai-simulator/Cargo.toml
+# ---- planner: compute dependency recipe (fast) ----
+FROM chef AS planner
+WORKDIR /app
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-# Copy library package sources (they're dependencies, need real code)
-COPY packages/migration/src packages/migration/src
-COPY packages/backend-test-support/src packages/backend-test-support/src
-COPY packages/db-infra/src packages/db-infra/src
+# ---- builder: cook deps from recipe, then build real bins ----
+FROM chef AS builder
+WORKDIR /app
 
-# Create a dummy lib.rs to cache dependency compilation.
-# Important: build only the library here, so we never accidentally ship a dummy backend binary.
-RUN mkdir -p apps/backend/src \
-    && echo "pub fn _dummy() {}" > apps/backend/src/lib.rs \
-    && mkdir -p apps/migration-cli/src \
-    && echo "fn main() {}" > apps/migration-cli/src/main.rs
+# Cook dependencies (cached by recipe.json content)
+COPY --from=planner /app/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo chef cook --release --recipe-path recipe.json
 
-RUN cargo build --release --lib --manifest-path apps/backend/Cargo.toml
-
-# Remove dummy sources before copying the real ones
-RUN rm -rf apps/backend/src \
-    && rm -rf apps/migration-cli/src
-
-# Copy the full workspace
+# Copy full source and build actual binaries
 COPY . .
 
-# Build the actual backend binary
-RUN cargo build --locked --release --bin backend --manifest-path apps/backend/Cargo.toml
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo build --locked --release --bin backend --manifest-path apps/backend/Cargo.toml
 
-# Build migration-cli binary
-RUN cargo build --locked --release --bin migration --manifest-path apps/migration-cli/Cargo.toml
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    cargo build --locked --release --bin migration --manifest-path apps/migration-cli/Cargo.toml
 
+# ---- runtime: unchanged payload ----
 FROM rust:1.91.1-slim AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/* \
-    # Create non-root runtime user and set up app directory
     && useradd -m -u 1000 appuser \
     && mkdir -p /app \
     && chown -R appuser:appuser /app
 
-# Copy CA certificate for Postgres TLS verification before switching users
-# The CA cert is public and safe to include in the image
-# /etc/ssl/certs/ exists in the base image (ca-certificates package creates it)
 COPY docker/postgres-tls/ca.crt /etc/ssl/certs/nommie-ca.crt
 RUN chmod 644 /etc/ssl/certs/nommie-ca.crt
 
 USER appuser
-
 WORKDIR /app
-
-# EXPOSE documents the default port (3001) for documentation purposes only
-# The actual runtime port is controlled by BACKEND_PORT environment variable
-# If BACKEND_PORT differs from 3001, use that value for docker run -p mappings
 EXPOSE 3001
 
 COPY --from=builder /app/target/release/backend /usr/local/bin/backend
