@@ -58,7 +58,7 @@ impl WebSocketClient {
 
     /// Send a text message
     pub async fn send(&mut self, text: &str) -> Result<(), Box<dyn std::error::Error>> {
-        self.stream.send(Message::Text(text.to_string())).await?;
+        self.stream.send(Message::Text(text.into())).await?;
         Ok(())
     }
 
