@@ -37,7 +37,7 @@
     "db:svc:ready": "docker compose -f docker/dev-db/docker-compose.yml exec postgres pg_isready -U \"${POSTGRES_USER}\" -d \"${POSTGRES_DB}\""
   },
   "devDependencies": {
-    "baseline-browser-mapping": "^2.9.6",
+    "baseline-browser-mapping": "^2.9.14",
     "typescript": "^5.9.3"
   }
 }
