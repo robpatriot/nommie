@@ -11,8 +11,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use backend::config::db::{DbKind, RuntimeEnv};
-use backend::infra::db::build_admin_pool;
 use backend::infra::db::locking::{BootstrapLock, PgAdvisoryLock, SqliteFileLock};
+use db_infra::infra::db::build_admin_pool;
 use migration::{migrate, MigrationCommand};
 use tokio::sync::Barrier;
 

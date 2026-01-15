@@ -1,5 +1,6 @@
 use backend::config::db::RuntimeEnv;
-use backend::infra::db::{bootstrap_db, build_admin_pool};
+use backend::infra::db::core::bootstrap_db;
+use db_infra::infra::db::build_admin_pool;
 use futures::future::join_all;
 use migration::{Migrator, MigratorTrait};
 use sea_orm::{ConnectionTrait, DatabaseBackend};

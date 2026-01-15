@@ -1,21 +1,18 @@
 // Standard library imports
-use std::future::Future;
 use std::process;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use db_infra::config::db::build_session_statements;
 use db_infra::error::DbInfraError;
-// Local / external db-infra module imports
 use db_infra::infra::db::diagnostics::{migration_counters, sqlite_diagnostics};
 use db_infra::infra::db::locking::{BootstrapLock, InMemoryLock, PgAdvisoryLock, SqliteFileLock};
 use db_infra::sanitize_db_url;
 // External crate imports
 use migration::MigrationCommand;
 use rand::Rng;
-use sea_orm::{
-    ConnectOptions, Database, DatabaseConnection, SqlxPostgresConnector, SqlxSqliteConnector,
-};
+use sea_orm::{DatabaseConnection, SqlxPostgresConnector, SqlxSqliteConnector};
 use sqlx::postgres::PgPoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use tracing::{info, trace, warn};
@@ -26,107 +23,6 @@ use super::{DbKind, DbOwner, RuntimeEnv};
 use crate::config::db::{make_conn_spec, validate_db_config, ConnectionSettings, DbSettings};
 use crate::db::shared_pool_cache::get_or_create_shared_pool;
 use crate::error::AppError;
-
-/// Get database engine name for logging
-fn get_db_engine(db_kind: DbKind) -> &'static str {
-    match db_kind {
-        DbKind::Postgres => "postgresql",
-        DbKind::SqliteFile | DbKind::SqliteMemory => "sqlite",
-    }
-}
-
-/// Get database path description for logging
-fn get_db_path(db_kind: DbKind) -> String {
-    match db_kind {
-        DbKind::Postgres => "postgresql://...".to_string(),
-        DbKind::SqliteFile => "sqlite file".to_string(),
-        DbKind::SqliteMemory => "sqlite::memory:".to_string(),
-    }
-}
-
-/// Retry a connection attempt with fixed interval delays
-/// Returns the result of the last attempt after all retries are exhausted
-async fn retry_connection<T, F, Fut>(
-    mut connect_fn: F,
-    max_attempts: u32,
-    interval_ms: u64,
-) -> Result<T, AppError>
-where
-    F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, AppError>>,
-{
-    let mut last_error = None;
-
-    for attempt in 1..=max_attempts {
-        match connect_fn().await {
-            Ok(result) => {
-                if attempt > 1 {
-                    info!(
-                        "connection_retry=success attempts={} interval_ms={}",
-                        attempt, interval_ms
-                    );
-                }
-                return Ok(result);
-            }
-            Err(e) => {
-                last_error = Some(e);
-                if attempt < max_attempts {
-                    warn!(
-                        "connection_retry=failed attempt={} max_attempts={} interval_ms={}",
-                        attempt, max_attempts, interval_ms
-                    );
-                    tokio::time::sleep(Duration::from_millis(interval_ms)).await;
-                }
-            }
-        }
-    }
-
-    let final_error = last_error.unwrap_or_else(|| {
-        AppError::config_msg(
-            "connection retry failed",
-            "no error recorded after max attempts (this should not happen)",
-        )
-    });
-    Err(final_error)
-}
-
-/// Build ordered session-level SQL statements for the given database kind and settings.
-/// Note: SQLite file prerequisites (journal_mode, synchronous) are handled separately and not included here.
-fn build_session_statements(db_kind: DbKind, settings: &DbSettings) -> Vec<String> {
-    match (db_kind, settings) {
-        (DbKind::SqliteFile | DbKind::SqliteMemory, DbSettings::Sqlite { busy_timeout_ms }) => {
-            vec![
-                "PRAGMA foreign_keys = ON;".to_string(),
-                format!("PRAGMA busy_timeout = {};", busy_timeout_ms),
-            ]
-        }
-        (
-            DbKind::Postgres,
-            DbSettings::Postgres {
-                app_name,
-                statement_timeout,
-                idle_in_transaction_timeout,
-                lock_timeout,
-            },
-        ) => {
-            let mut stmts = vec![
-                // application_name is safe to single-quote; minimal escaping
-                format!("SET application_name = '{}';", app_name.replace('\'', "''")),
-                "SET timezone = 'UTC';".to_string(),
-                format!("SET statement_timeout = '{}';", statement_timeout),
-                format!(
-                    "SET idle_in_transaction_session_timeout = '{}';",
-                    idle_in_transaction_timeout
-                ),
-            ];
-            if let Some(lock_timeout) = lock_timeout {
-                stmts.push(format!("SET lock_timeout = '{}';", lock_timeout));
-            }
-            stmts
-        }
-        _ => Vec::new(),
-    }
-}
 
 /// Apply SQLite-specific per-connection settings
 /// Extracts Sqlite variant from DbSettings and applies foreign_keys + busy_timeout
@@ -358,14 +254,12 @@ pub async fn bootstrap_db(
     // Validate configuration first
     validate_db_config(env, db_kind)?;
 
-    let engine = get_db_engine(db_kind);
-    let path = get_db_path(db_kind);
     let pid = process::id();
 
     //  Bootstrap start marker - BEFORE any work
     info!(
-        "bootstrap=start env={:?} db_kind={:?} engine={} path={} pid={}",
-        env, db_kind, engine, path, pid
+        "bootstrap=start env={:?} db_kind={:?} pid={}",
+        env, db_kind, pid
     );
 
     // Build migration pool (shared for SqliteMemory, admin for others)
@@ -411,45 +305,6 @@ pub async fn bootstrap_db(
 
     // Return the shared pool (same connection that was migrated for InMemory, new pool for others)
     Ok((*shared_pool).clone())
-}
-
-/// Build admin pool for migrations - single connection only
-/// This function is public for test utilities that need to query migration state
-/// with admin-level access (e.g., counting applied migrations accurately).
-pub async fn build_admin_pool(
-    env: RuntimeEnv,
-    db_kind: DbKind,
-) -> Result<DatabaseConnection, AppError> {
-    let url = make_conn_spec(env, db_kind, DbOwner::Owner)?;
-
-    let mut opt = ConnectOptions::new(&url);
-    opt.min_connections(1)
-        .max_connections(1) // Admin pool uses exactly 1 connection
-        .acquire_timeout(Duration::from_secs(2))
-        .sqlx_logging(true);
-
-    // Retry connection on startup for Postgres only (max 5 tries, 0.5s interval)
-    // SQLite connections don't need retry since they're local
-    let pool = if matches!(db_kind, DbKind::Postgres) {
-        retry_connection(
-            || {
-                let opt_clone = opt.clone();
-                async move {
-                    Database::connect(opt_clone).await.map_err(|e| {
-                        AppError::config("failed to connect to Postgres (admin pool)", e)
-                    })
-                }
-            },
-            5,
-            500,
-        )
-        .await?
-    } else {
-        Database::connect(opt)
-            .await
-            .map_err(|e| AppError::config("failed to connect to database (admin pool)", e))?
-    };
-    Ok(pool)
 }
 
 pub async fn build_pool(
