@@ -16,7 +16,6 @@ import {
 import { isBackendConnectionError } from '@/lib/server/connection-errors'
 import { parseErrorResponse } from '@/lib/api/error-parsing'
 import * as jose from 'jose'
-import type { NextRequest, NextResponse } from 'next/server'
 import { logError, logWarning } from '@/lib/logging/error-logger'
 
 const REFRESH_THRESHOLD_SECONDS = 300 // 5 minutes - refresh if expiring within this
@@ -354,50 +353,6 @@ export async function ensureBackendJwtForServerAction(): Promise<string> {
   }
 
   return result.token
-}
-
-/**
- * Ensure we have a valid backend JWT for proxy.
- * Refreshes if needed and sets cookie on response if refreshed.
- * Use this in proxy (where cookies can be modified via NextResponse).
- *
- * @param request - Next.js request object
- * @param response - Next.js response object (will be modified if refresh needed)
- * @returns The backend JWT token, or null if not available
- */
-export async function ensureBackendJwtForMiddleware(
-  request: NextRequest,
-  response: NextResponse
-): Promise<string | null> {
-  const getCookie = async (name: string) => {
-    return request.cookies.get(name)?.value
-  }
-
-  // Get cookie header for fetchNewBackendJwt (proxy can't use cookies() from next/headers)
-  const cookieHeader = request.headers.get('cookie') || undefined
-
-  try {
-    const result = await refreshBackendJwtIfNeeded(getCookie, cookieHeader)
-
-    if (!result) {
-      return null
-    }
-
-    // If refreshed, set the cookie on the response
-    if (result.refreshed) {
-      response.cookies.set(
-        BACKEND_JWT_COOKIE_NAME,
-        result.token,
-        getBackendJwtCookieOptions()
-      )
-    }
-
-    return result.token
-  } catch {
-    // In proxy, we don't throw - just return null
-    // The page/route handler will handle auth errors
-    return null
-  }
 }
 
 /**

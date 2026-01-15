@@ -1,10 +1,8 @@
 import type {
   BiddingSnapshot,
   Card,
-  CompleteSnapshot,
   PhaseSnapshot,
   Seat,
-  ScoringSnapshot,
   TrumpSelectSnapshot,
   TrickSnapshot,
 } from '@/lib/game-room/types'
@@ -42,59 +40,11 @@ export function isTrickPhase(
   return phase.phase === 'Trick'
 }
 
-export function isScoringPhase(
-  phase: PhaseSnapshot
-): phase is { phase: 'Scoring'; data: ScoringSnapshot } {
-  return phase.phase === 'Scoring'
-}
-
-export function isCompletePhase(
-  phase: PhaseSnapshot
-): phase is { phase: 'Complete'; data: CompleteSnapshot } {
-  return phase.phase === 'Complete'
-}
-
-/**
- * Check if the game is in pre-game (Init) phase
- */
-export function isPreGame(phase: PhaseSnapshot): boolean {
-  return isInitPhase(phase)
-}
-
-/**
- * Check if the game is over
- */
-export function isGameOver(phase: PhaseSnapshot): boolean {
-  return isGameOverPhase(phase)
-}
-
 /**
  * Check if the game is active (not Init or GameOver)
  */
 export function isActiveGame(phase: PhaseSnapshot): boolean {
   return !isInitPhase(phase) && !isGameOverPhase(phase)
-}
-
-/**
- * Check if phase has round data (Bidding, TrumpSelect, Trick, Scoring, Complete)
- */
-export function hasRoundData(phase: PhaseSnapshot): boolean {
-  return (
-    isBiddingPhase(phase) ||
-    isTrumpSelectPhase(phase) ||
-    isTrickPhase(phase) ||
-    isScoringPhase(phase) ||
-    isCompletePhase(phase)
-  )
-}
-
-/**
- * Check if phase has last trick data (Bidding, TrumpSelect, Trick)
- */
-export function hasLastTrickData(phase: PhaseSnapshot): boolean {
-  return (
-    isBiddingPhase(phase) || isTrumpSelectPhase(phase) || isTrickPhase(phase)
-  )
 }
 
 /**

@@ -45,21 +45,3 @@ export function validateSeat(
 
   return null
 }
-
-/**
- * Validates a seat number and throws an error if invalid.
- * Useful for server actions that need to validate before processing.
- *
- * @param seat - Seat number to validate
- * @param required - Whether the seat is required (default: false)
- * @throws Error if seat is invalid
- */
-export function requireValidSeat(
-  seat: number | undefined,
-  required: boolean = false
-): void {
-  const error = validateSeat(seat, required)
-  if (error) {
-    throw new Error(error)
-  }
-}

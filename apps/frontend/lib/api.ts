@@ -25,9 +25,6 @@ import { logError, logWarning } from '@/lib/logging/error-logger'
 // Re-export BackendApiError for convenience (it's also available from ./errors)
 export { BackendApiError }
 
-// Re-export ProblemDetails interface for convenience
-export type { ProblemDetails } from './api/error-parsing'
-
 async function getLocalizedErrorMessageForCode(
   code: string,
   fallback: string

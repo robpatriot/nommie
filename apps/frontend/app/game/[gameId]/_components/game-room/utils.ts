@@ -31,14 +31,6 @@ export const ORIENTATION_ORDER_MOBILE: SeatSummary['orientation'][] = [
 ]
 
 /**
- * Order for sorting cards in trick area by orientation.
- * Left, top, right, bottom (play order around the table).
- */
-export const ORIENTATION_ORDER_TRICK: Array<
-  'bottom' | 'right' | 'top' | 'left'
-> = ['left', 'top', 'right', 'bottom']
-
-/**
  * Normalize viewer seat value to Seat | null.
  * Validates that the seat is a valid number between 0-3.
  *

@@ -41,7 +41,7 @@ export default getRequestConfig(async () => {
   if (backendLocale) {
     locale = backendLocale
     // If cookie doesn't match backend preference, we'll need to update it
-    // but we can't set cookies in getRequestConfig, so we'll handle this in proxy.ts
+    // but we can't set cookies in getRequestConfig
   } else {
     // Fall back to cookie/header resolution
     const resolved = resolveLocale({
