@@ -16,13 +16,6 @@
     "signOut": "Se déconnecter"
   },
   "auth": {
-    "signInWithGoogle": "Se connecter avec Google",
-    "signIn": "Se connecter",
-    "signOut": "Se déconnecter",
-    "loading": "Chargement…",
-    "statusAria": "État de l'authentification",
-    "signInAria": "Se connecter",
-    "signOutAria": "Se déconnecter",
-    "loadingAria": "Chargement de l'authentification"
+    "signInWithGoogle": "Se connecter avec Google"
   }
 }
