@@ -104,6 +104,7 @@ export function GameRoomView({
     onLeaveGame,
     isLeavePending = false,
   } = props
+
   const phase = snapshot.phase
   const round = getRound(phase)
   const phaseState = useGamePhaseState(phase)
@@ -192,6 +193,7 @@ export function GameRoomView({
     activeSeat,
     historicalStats,
   ])
+
   const mobileSeatSummaries = useMemo(
     () =>
       seatSummaries
@@ -206,9 +208,12 @@ export function GameRoomView({
 
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+
+  // Pause state lifted from TrickArea so other components can behave consistently
   const [isTrickPaused, setIsTrickPaused] = useState(false)
   const [isViewerLeaderDuringPause, setIsViewerLeaderDuringPause] =
     useState(false)
+
   const showCardWrapper = useMediaQuery('(min-width: 640px)')
 
   // Use query hook directly
@@ -268,16 +273,16 @@ export function GameRoomView({
   )
 
   // Modify playState to prevent playing during pause if viewer is not leader
+  // (safety net; PlayerHand also gates interaction using the same pause signals)
   const effectivePlayState = useMemo(() => {
     if (!playState) {
       return undefined
     }
 
-    // If paused and viewer is not leader, disable playing
     if (isTrickPaused && !isViewerLeaderDuringPause) {
       return {
         ...playState,
-        playable: [], // Empty playable array prevents card selection
+        playable: [],
       }
     }
 
@@ -367,6 +372,37 @@ export function GameRoomView({
       resizeObserver.disconnect()
     }
   }, [viewerHand.length])
+
+  // DRY TrickArea props across desktop + mobile layouts
+  const renderTrickArea = useCallback(
+    (className?: string) => (
+      <TrickArea
+        trickMap={trickMap}
+        getSeatName={seatDisplayName}
+        round={round}
+        phase={phase}
+        viewerSeat={effectiveViewerSeat ?? 0}
+        lastTrick={lastTrick}
+        showPreviousRoundPosition={showPreviousRoundPosition}
+        className={className}
+        cardScale={cardScale}
+        trickDisplayDurationSeconds={trickDisplayDurationSeconds}
+        onPauseStateChange={handlePauseStateChange}
+      />
+    ),
+    [
+      trickMap,
+      seatDisplayName,
+      round,
+      phase,
+      effectiveViewerSeat,
+      lastTrick,
+      showPreviousRoundPosition,
+      cardScale,
+      trickDisplayDurationSeconds,
+      handlePauseStateChange,
+    ]
+  )
 
   if (isPreGame) {
     return (
@@ -655,6 +691,7 @@ export function GameRoomView({
                 {t('trickArea.lastRoundFinalPosition')}
               </div>
             ) : null}
+
             <div
               className="hidden gap-3 sm:grid"
               style={{
@@ -666,19 +703,9 @@ export function GameRoomView({
               {seatSummaries.map((summary) => (
                 <SeatCard key={summary.seat} summary={summary} />
               ))}
-              <TrickArea
-                trickMap={trickMap}
-                getSeatName={seatDisplayName}
-                round={round}
-                phase={phase}
-                viewerSeat={effectiveViewerSeat ?? 0}
-                lastTrick={lastTrick}
-                showPreviousRoundPosition={showPreviousRoundPosition}
-                className="col-start-2 row-start-2 w-full"
-                cardScale={cardScale}
-                trickDisplayDurationSeconds={trickDisplayDurationSeconds}
-              />
+              {renderTrickArea('col-start-2 row-start-2 w-full')}
             </div>
+
             <div className="flex flex-col gap-3 sm:hidden">
               <div className="grid grid-cols-2 gap-3">
                 {mobileSeatSummaries.map((summary) => (
@@ -690,19 +717,9 @@ export function GameRoomView({
                   />
                 ))}
               </div>
-              <TrickArea
-                trickMap={trickMap}
-                getSeatName={seatDisplayName}
-                round={round}
-                phase={phase}
-                viewerSeat={effectiveViewerSeat ?? 0}
-                lastTrick={lastTrick}
-                showPreviousRoundPosition={showPreviousRoundPosition}
-                cardScale={cardScale}
-                trickDisplayDurationSeconds={trickDisplayDurationSeconds}
-                onPauseStateChange={handlePauseStateChange}
-              />
+              {renderTrickArea()}
             </div>
+
             {effectiveViewerSeat !== null && viewerHand.length > 0 && (
               <PlayerHand
                 viewerHand={viewerHand}
@@ -716,6 +733,8 @@ export function GameRoomView({
                 requireCardConfirmation={requireCardConfirmation}
                 layoutVariant="scaled"
                 viewportRef={playerHandViewportRef}
+                isTrickPaused={isTrickPaused}
+                isViewerLeaderDuringPause={isViewerLeaderDuringPause}
               />
             )}
           </section>

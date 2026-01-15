@@ -31,6 +31,10 @@ interface PlayerHandProps {
   requireCardConfirmation?: boolean
   layoutVariant?: LayoutVariant
   viewportRef?: React.RefObject<HTMLDivElement | null>
+
+  // Pause signals lifted from TrickArea via GameRoomView
+  isTrickPaused?: boolean
+  isViewerLeaderDuringPause?: boolean
 }
 
 const CARD_WIDTH = CARD_DIMENSIONS.md.width
@@ -843,19 +847,43 @@ export function PlayerHand({
   requireCardConfirmation = true,
   layoutVariant = 'default',
   viewportRef: externalViewportRef,
+  isTrickPaused = false,
+  isViewerLeaderDuringPause = false,
 }: PlayerHandProps) {
   const t = useTranslations('game.gameRoom.play')
   const tHand = useTranslations('game.gameRoom.hand')
   const tSuitAbbrev = useTranslations('game.gameRoom.hand.suitAbbrev')
+
   const isTrickPhase = checkIsTrickPhase(phase) && !!playState
+
+  // "Turn" comes from the backend phase snapshot.
   const viewerTurn =
     isTrickPhase && playState
       ? phase.data.to_act === playState.viewerSeat
       : false
+
+  // Pause-aware ability to act: if paused, only the leader is allowed to play through.
+  const canActNow = isTrickPhase
+    ? viewerTurn && (!isTrickPaused || isViewerLeaderDuringPause)
+    : false
+
+  type HandMode = 'preview' | 'waiting' | 'acting_confirm' | 'acting_immediate'
+
+  const handMode: HandMode = useMemo(() => {
+    if (!isTrickPhase || !playState) {
+      return 'preview'
+    }
+    if (!canActNow) {
+      return 'waiting'
+    }
+    return requireCardConfirmation ? 'acting_confirm' : 'acting_immediate'
+  }, [isTrickPhase, playState, canActNow, requireCardConfirmation])
+
   const playableCards = useMemo(
     () => new Set(playState?.playable ?? []),
     [playState]
   )
+
   const waitingOnSeat = isTrickPhase ? phase.data.to_act : null
   const waitingOnName =
     waitingOnSeat === null
@@ -865,60 +893,80 @@ export function PlayerHand({
         : playerNames[waitingOnSeat]
 
   const readOnlyPreviewText = tHand('status.readOnlyPreview')
-  let handStatus = readOnlyPreviewText
 
-  if (!viewerHand.length) {
-    handStatus = t('status.handWillAppear')
-  } else if (isTrickPhase && !viewerTurn && !requireCardConfirmation) {
-    // Show waiting message when confirmation is disabled and not viewer's turn
-    handStatus = waitingOnName
-      ? t('status.waitingFor', { name: waitingOnName })
-      : t('status.waitingForNext')
-  } else if (viewerTurn && !requireCardConfirmation) {
-    handStatus = t('status.tapToPlayImmediate')
-  }
-
-  // Responsive visibility: hide title below 400px, legal plays below 320px
-  // Exception: always show title when it's not the player's turn (for waiting message)
-  const showTitle = useMediaQuery('(min-width: 400px)')
-  const showLegalPlays = useMediaQuery('(min-width: 320px)')
-  const isNotViewerTurn = isTrickPhase && playState && !viewerTurn
-  const shouldShowTitle = isNotViewerTurn || showTitle
-
-  // Memoize legal cards display calculation
-  const legalCardsDisplay = useMemo(() => {
-    if (!isTrickPhase || !playState || !viewerTurn) {
-      return null
+  const handStatus = useMemo(() => {
+    if (!viewerHand.length) {
+      return t('status.handWillAppear')
     }
 
-    if (!playState.playable.length) {
+    if (handMode === 'acting_immediate') {
+      return t('status.tapToPlayImmediate')
+    }
+
+    if (handMode === 'waiting' && !requireCardConfirmation) {
+      return waitingOnName
+        ? t('status.waitingFor', { name: waitingOnName })
+        : t('status.waitingForNext')
+    }
+
+    return readOnlyPreviewText
+  }, [
+    viewerHand.length,
+    handMode,
+    requireCardConfirmation,
+    waitingOnName,
+    t,
+    readOnlyPreviewText,
+  ])
+
+  // Title should only be hidden due to viewport size (per agreement).
+  const shouldShowTitle = useMediaQuery('(min-width: 400px)')
+  const showLegalPlays = useMediaQuery('(min-width: 320px)')
+
+  // Legal value display rules:
+  // Show legal value when:
+  //   - paused AND viewer is allowed to play through pause (leader), OR
+  //   - not paused AND the leader has played (current_trick has cards)
+  const leaderPlayed = isTrickPhase && phase.data.current_trick.length > 0
+  const shouldShowLegalValue =
+    (isViewerLeaderDuringPause && viewerTurn) ||
+    (!isTrickPaused && leaderPlayed)
+
+  const legalValue = useMemo(() => {
+    if (!isTrickPhase || !playState) {
       return '—'
     }
 
-    // Get lead card if trick has started
-    const leadCard =
-      phase.data.current_trick.length > 0
-        ? phase.data.current_trick[0][1]
-        : null
-
-    if (leadCard) {
-      // Rule 2: If player has cards matching lead suit, only that suit is legal
-      const leadSuit = leadCard.slice(-1).toUpperCase()
-      const hasLeadSuit = viewerHand.some(
-        (card) => card.slice(-1).toUpperCase() === leadSuit
-      )
-
-      if (hasLeadSuit) {
-        // Only one suit is legal (the lead suit) - translate the suit abbreviation
-        return tSuitAbbrev(leadSuit as 'S' | 'C' | 'H' | 'D')
-      }
+    if (!shouldShowLegalValue) {
+      return '—'
     }
 
-    // Rule 3: No lead card or player doesn't have lead suit - all cards are legal
+    // During pause, if viewer is allowed to act (leader), show "all" (don’t reveal suit).
+    if (isViewerLeaderDuringPause && viewerTurn) {
+      return tHand('legal.all')
+    }
+
+    // Not paused; leader has played -> compute suit/all from visible lead.
+    const leadCard = phase.data.current_trick[0]?.[1] ?? null
+    if (!leadCard) {
+      return tHand('legal.all')
+    }
+
+    const leadSuit = leadCard.slice(-1).toUpperCase()
+    const hasLeadSuit = viewerHand.some(
+      (card) => card.slice(-1).toUpperCase() === leadSuit
+    )
+
+    if (hasLeadSuit) {
+      return tSuitAbbrev(leadSuit as 'S' | 'C' | 'H' | 'D')
+    }
+
     return tHand('legal.all')
   }, [
     isTrickPhase,
     playState,
+    shouldShowLegalValue,
+    isViewerLeaderDuringPause,
     viewerTurn,
     phase,
     viewerHand,
@@ -951,22 +999,18 @@ export function PlayerHand({
     const updateLayout = () => {
       const width = viewport.clientWidth
 
-      // Compute layout using previous signature
       const newLayout = strategy.computeLayout(
         width,
         viewerHand,
         layoutSignatureRef.current
       )
 
-      // Update signature after computing layout (for next render)
-      // Reuse the split from layout result if available (avoids recomputation)
       if (newLayout.mode === 'twoRow' && newLayout.twoRowSplit) {
         layoutSignatureRef.current = createSignature(
           viewerHand,
           newLayout.twoRowSplit
         )
       } else {
-        // Reset signature for single-row layouts
         layoutSignatureRef.current = null
       }
 
@@ -983,8 +1027,6 @@ export function PlayerHand({
     return () => {
       resizeObserver.disconnect()
     }
-    // viewportRef is stable (refs don't change identity), but included so effect re-runs
-    // if a different external ref is passed. ResizeObserver handles size changes.
   }, [viewerHand, layoutVariant, viewportRef])
 
   const handleCardClick = useCallback(
@@ -994,11 +1036,11 @@ export function PlayerHand({
       }
 
       const isPlayable = playableCards.has(card)
-      if (!viewerTurn || !isPlayable || playState.isPending) {
+      if (!canActNow || !isPlayable || playState.isPending) {
         return
       }
 
-      if (!requireCardConfirmation) {
+      if (handMode === 'acting_immediate') {
         onSelectCard(null)
         if (onPlayCard) {
           void onPlayCard(card)
@@ -1012,8 +1054,8 @@ export function PlayerHand({
       isTrickPhase,
       playState,
       playableCards,
-      viewerTurn,
-      requireCardConfirmation,
+      canActNow,
+      handMode,
       onSelectCard,
       onPlayCard,
       selectedCard,
@@ -1028,40 +1070,38 @@ export function PlayerHand({
       )}
     >
       <header className="flex items-center gap-3">
-        {/* Title and subtitle: only show when not waiting (or when requireCardConfirmation is false and waiting) */}
-        {(!isTrickPhase ||
-          !playState ||
-          viewerTurn ||
-          !requireCardConfirmation) && (
-          <div className="flex flex-col gap-1 min-w-0">
-            {shouldShowTitle && (
-              <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground break-words">
-                {tHand('title')}
-              </span>
-            )}
-            {shouldShowTitle && handStatus !== readOnlyPreviewText && (
-              <p
-                className="text-xs text-muted-foreground break-words"
-                aria-live="polite"
-              >
-                {handStatus}
-              </p>
-            )}
-          </div>
-        )}
-        {isTrickPhase && playState && requireCardConfirmation ? (
+        {/* Title container always exists; viewport alone decides visibility */}
+        <div className="flex flex-col gap-1 min-w-0">
+          {shouldShowTitle && (
+            <span className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted-foreground break-words">
+              {tHand('title')}
+            </span>
+          )}
+
+          {shouldShowTitle && handStatus !== readOnlyPreviewText && (
+            <p
+              className="text-xs text-muted-foreground break-words"
+              aria-live="polite"
+            >
+              {handStatus}
+            </p>
+          )}
+        </div>
+
+        {/* Confirmation-mode play button */}
+        {isTrickPhase && playState && handMode === 'acting_confirm' ? (
           <div className="flex justify-center flex-1 min-w-0">
             <button
               type="button"
               data-selected-card-exempt
               onClick={async () => {
-                if (onPlayCard && selectedCard && viewerTurn) {
+                if (onPlayCard && selectedCard && canActNow) {
                   await onPlayCard(selectedCard)
                   onSelectCard(null)
                 }
               }}
               disabled={
-                !viewerTurn ||
+                !canActNow ||
                 playState.isPending ||
                 !selectedCard ||
                 !playState.playable.includes(selectedCard)
@@ -1077,7 +1117,7 @@ export function PlayerHand({
             >
               {playState.isPending ? (
                 t('button.playing')
-              ) : viewerTurn ? (
+              ) : canActNow ? (
                 <>
                   <span className="sm:hidden">{t('button.playCard')}</span>
                   <span className="hidden sm:inline">
@@ -1092,25 +1132,23 @@ export function PlayerHand({
             </button>
           </div>
         ) : null}
+
         {isTrickPhase &&
         playState &&
-        viewerTurn &&
-        (showLegalPlays || !requireCardConfirmation) ? (
+        (showLegalPlays || handMode === 'acting_immediate') ? (
           <div
             className="ml-auto flex items-center justify-end gap-2 flex-shrink-0"
             style={{ minWidth: 'max-content' }}
           >
-            {playState.playable.length > 0 && legalCardsDisplay ? (
-              <div className="rounded-full bg-overlay/20 px-3 py-1">
-                <span className="text-sm font-medium text-muted-foreground">
-                  <span className="sm:hidden">{t('legal.short')}</span>
-                  <span className="hidden sm:inline">{t('legal.long')}</span>
-                </span>
-                <span className="ml-1.5 text-sm font-medium text-foreground">
-                  {legalCardsDisplay}
-                </span>
-              </div>
-            ) : null}
+            <div className="rounded-full bg-overlay/20 px-3 py-1">
+              <span className="text-sm font-medium text-muted-foreground">
+                <span className="sm:hidden">{t('legal.short')}</span>
+                <span className="hidden sm:inline">{t('legal.long')}</span>
+              </span>
+              <span className="ml-1.5 text-sm font-medium text-foreground">
+                {legalValue}
+              </span>
+            </div>
           </div>
         ) : null}
       </header>
@@ -1135,7 +1173,7 @@ export function PlayerHand({
                 !isTrickPhase ||
                 !playState ||
                 !isPlayable ||
-                !viewerTurn ||
+                !canActNow ||
                 playState.isPending
 
               const cardLabel = isPlayable
