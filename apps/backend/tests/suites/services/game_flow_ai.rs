@@ -2,8 +2,8 @@ use backend::ai::RandomPlayer;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::GameState;
-use backend::AppError;
 use backend::services::ai::{AiInstanceOverrides, AiService};
+use backend::AppError;
 use serde_json::json;
 use tracing::info;
 

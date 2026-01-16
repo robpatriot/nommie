@@ -179,7 +179,8 @@ pub fn build_connection_settings(
         }
         (RuntimeEnv::Prod, DbKind::SqliteMemory) => {
             return Err(DbInfraError::Config {
-                message: "SQLite in-memory database is not allowed in production environment".to_string(),
+                message: "SQLite in-memory database is not allowed in production environment"
+                    .to_string(),
             });
         }
     };
@@ -247,7 +248,8 @@ pub fn build_session_statements(db_kind: DbKind, settings: &DbSettings) -> Vec<S
 pub fn validate_db_config(env: RuntimeEnv, db_kind: DbKind) -> Result<(), DbInfraError> {
     match (env, db_kind) {
         (RuntimeEnv::Prod, DbKind::SqliteMemory) => Err(DbInfraError::Config {
-            message: "SQLite in-memory database is not allowed in production environment".to_string(),
+            message: "SQLite in-memory database is not allowed in production environment"
+                .to_string(),
         }),
         _ => Ok(()),
     }

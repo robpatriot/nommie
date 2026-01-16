@@ -8,12 +8,12 @@ mod output;
 mod simulator;
 mod types;
 
-use metrics::build_game_metrics;
-use output::OutputWriter;
-use simulator::{GameResult, Simulator};
 use backend::ai::{create_ai, AiConfig, AiPlayer};
 use clap::{Parser, ValueEnum};
+use metrics::build_game_metrics;
+use output::OutputWriter;
 use rand::Rng;
+use simulator::{GameResult, Simulator};
 use std::time::Instant;
 use tracing::{info, warn};
 
@@ -108,22 +108,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         "warn" // Only show warnings and errors by default
     };
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .init();
+    tracing_subscriber::fmt().with_env_filter(filter).init();
 
     if args.show_output {
         info!("Starting AI simulator");
         info!("Configuration: {} games", args.games);
     }
-    
+
     // Determine AI types: use --seats if provided, otherwise use individual seat parameters
     let seat_types = if let Some(seats_ai) = args.seats {
-        [seats_ai.clone(), seats_ai.clone(), seats_ai.clone(), seats_ai]
+        [
+            seats_ai.clone(),
+            seats_ai.clone(),
+            seats_ai.clone(),
+            seats_ai,
+        ]
     } else {
         [args.seat0, args.seat1, args.seat2, args.seat3]
     };
-    
+
     if args.show_output {
         info!(
             "AI types: seat0={:?}, seat1={:?}, seat2={:?}, seat3={:?}",
@@ -132,7 +135,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Create output writer
-    let mut output_writer = OutputWriter::new(&args.output_dir, &args.output_format, args.compress)?;
+    let mut output_writer =
+        OutputWriter::new(&args.output_dir, &args.output_format, args.compress)?;
     if args.show_output {
         info!("Output directory: {}", args.output_dir);
     }
@@ -158,7 +162,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize RNG for random seeds if not provided
     let mut rng = rand::rng();
-    
+
     for game_num in 1..=args.games {
         let game_start = Instant::now();
         let game_seed = args.seed.map(|s| s as i64).unwrap_or_else(|| {
@@ -166,11 +170,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             rng.random::<i64>()
         });
 
-        match run_game(game_num, game_seed, &ais) {
+        let game_res = run_game(game_num, game_seed, &ais);
+
+        match game_res {
             Ok(result) => {
                 let duration_ms = game_start.elapsed().as_secs_f64() * 1000.0;
                 let scores = result.final_scores;
-                
+
                 // Build and write metrics
                 let metrics = build_game_metrics(
                     game_num,
@@ -180,11 +186,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     &result,
                     duration_ms,
                 );
-                
+
                 if let Err(e) = output_writer.write_game(&metrics) {
                     warn!("Failed to write metrics for game {}: {}", game_num, e);
                 }
-                
+
                 results.push(result);
                 if args.verbose {
                     info!("Game {} completed: scores={:?}", game_num, scores);
@@ -198,15 +204,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let elapsed = start.elapsed();
-    
+
     // Get output file paths before finishing
     let (jsonl_path, csv_path) = output_writer.output_paths();
     let jsonl_path_clone = jsonl_path.cloned();
     let csv_path_clone = csv_path.cloned();
-    
+
     // Finish writing
     output_writer.finish()?;
-    
+
     // Print output file paths and summary only if requested
     if args.show_output {
         if let Some(path) = jsonl_path_clone {
@@ -223,17 +229,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn create_ai_player(
-    ai_type: &str,
-) -> Result<Box<dyn AiPlayer>, Box<dyn std::error::Error>> {
+fn create_ai_player(ai_type: &str) -> Result<Box<dyn AiPlayer>, Box<dyn std::error::Error>> {
     // Use random seed for each AI to get varied behavior
     let mut rng = rand::rng();
     let config = AiConfig::from_json(Some(&serde_json::json!({
         "seed": rng.random::<u64>()
     })));
 
-    create_ai(ai_type, config)
-        .ok_or_else(|| format!("Unknown AI type: {}", ai_type).into())
+    create_ai(ai_type, config).ok_or_else(|| format!("Unknown AI type: {}", ai_type).into())
 }
 
 fn run_game(
@@ -253,7 +256,10 @@ fn print_summary(results: &[GameResult], errors: u32, elapsed: std::time::Durati
     }
     println!("Total time: {:?}", elapsed);
     if !results.is_empty() {
-        println!("Average time per game: {:?}", elapsed / results.len() as u32);
+        println!(
+            "Average time per game: {:?}",
+            elapsed / results.len() as u32
+        );
     }
 
     if results.is_empty() {
@@ -292,4 +298,3 @@ fn print_summary(results: &[GameResult], errors: u32, elapsed: std::time::Durati
         );
     }
 }
-

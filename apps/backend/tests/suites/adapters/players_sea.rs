@@ -1,7 +1,7 @@
 use backend::db::txn::with_txn;
-use backend::AppError;
 use backend::errors::domain::DomainError;
 use backend::repos::{ai_profiles, players};
+use backend::AppError;
 
 use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player;

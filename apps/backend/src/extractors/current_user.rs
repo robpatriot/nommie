@@ -47,13 +47,16 @@ impl FromRequest for CurrentUser {
             })?;
 
             // Look up user by sub in database
-            let user = if let Some(shared_txn) = SharedTxn::from_req(&req) {
-                // Use shared transaction if present
-                users::find_user_by_sub(shared_txn.transaction(), &claims.sub).await?
-            } else {
-                // Fall back to pooled connection
-                let db = require_db(app_state)?;
-                users::find_user_by_sub(db, &claims.sub).await?
+            let user = match SharedTxn::from_req(&req) {
+                Some(shared_txn) => {
+                    // Use shared transaction if present
+                    users::find_user_by_sub(shared_txn.transaction(), &claims.sub).await?
+                }
+                _ => {
+                    // Fall back to pooled connection
+                    let db = require_db(app_state)?;
+                    users::find_user_by_sub(db, &claims.sub).await?
+                }
             };
 
             let user = user.ok_or(AppError::forbidden_user_not_found())?;

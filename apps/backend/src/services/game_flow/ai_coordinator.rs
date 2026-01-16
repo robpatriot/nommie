@@ -275,22 +275,24 @@ impl GameFlowService {
             let result = match action_type {
                 ActionType::Bid => {
                     let bid = ai.choose_bid(&state, &game_context)?;
-                    // Use internal version to avoid recursion (loop handles processing)
-                    // Service loads its own validation data (trust boundary)
-                    self.submit_bid_internal(txn, game.id, player_seat, bid, game.version)
-                        .await
+                    let res = self
+                        .submit_bid_internal(txn, game.id, player_seat, bid, game.version)
+                        .await;
+                    res
                 }
                 ActionType::Trump => {
                     let trump_choice = ai.choose_trump(&state, &game_context)?;
-                    // Use internal version to avoid recursion (loop handles processing)
-                    self.set_trump_internal(txn, game.id, player_seat, trump_choice, game.version)
-                        .await
+                    let res = self
+                        .set_trump_internal(txn, game.id, player_seat, trump_choice, game.version)
+                        .await;
+                    res
                 }
                 ActionType::Play => {
                     let card = ai.choose_play(&state, &game_context)?;
-                    // Use internal version to avoid recursion (loop handles processing)
-                    self.play_card_internal(txn, game.id, player_seat, card, game.version)
-                        .await
+                    let res = self
+                        .play_card_internal(txn, game.id, player_seat, card, game.version)
+                        .await;
+                    res
                 }
             };
 

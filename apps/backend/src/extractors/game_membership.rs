@@ -66,11 +66,12 @@ async fn resolve_membership(req: HttpRequest) -> Result<GameMembership, AppError
         )
     })?;
 
-    let user = if let Some(shared_txn) = SharedTxn::from_req(&req) {
-        users::find_user_by_sub(shared_txn.transaction(), &claims.sub).await?
-    } else {
-        let db = require_db(app_state)?;
-        users::find_user_by_sub(db, &claims.sub).await?
+    let user = match SharedTxn::from_req(&req) {
+        Some(shared_txn) => users::find_user_by_sub(shared_txn.transaction(), &claims.sub).await?,
+        _ => {
+            let db = require_db(app_state)?;
+            users::find_user_by_sub(db, &claims.sub).await?
+        }
     };
 
     let user = user.ok_or_else(|| {
@@ -81,13 +82,16 @@ async fn resolve_membership(req: HttpRequest) -> Result<GameMembership, AppError
     })?;
 
     let service = MembershipService;
-    let membership = if let Some(shared_txn) = SharedTxn::from_req(&req) {
-        service
-            .find_membership(shared_txn.transaction(), game_id_value, user.id)
-            .await?
-    } else {
-        let db = require_db(app_state)?;
-        service.find_membership(db, game_id_value, user.id).await?
+    let membership = match SharedTxn::from_req(&req) {
+        Some(shared_txn) => {
+            service
+                .find_membership(shared_txn.transaction(), game_id_value, user.id)
+                .await?
+        }
+        _ => {
+            let db = require_db(app_state)?;
+            service.find_membership(db, game_id_value, user.id).await?
+        }
     };
 
     let membership = membership.ok_or_else(|| {

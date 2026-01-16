@@ -122,9 +122,11 @@ impl Guard {
 
         match result {
             Ok(Some(row)) => {
-                let unlocked: bool = row.try_get("", "unlocked").map_err(|e| DbInfraError::Config {
-                    message: format!("failed to read unlock result: {e}"),
-                })?;
+                let unlocked: bool =
+                    row.try_get("", "unlocked")
+                        .map_err(|e| DbInfraError::Config {
+                            message: format!("failed to read unlock result: {e}"),
+                        })?;
 
                 if !unlocked {
                     warn!(
@@ -198,18 +200,20 @@ impl BootstrapLock for PgAdvisoryLock {
             vec![self.lock_key.into()],
         );
 
-        let result = self
-            .admin_pool
-            .query_one(lock_stmt)
-            .await
-            .map_err(|e| DbInfraError::Config {
-                message: format!("failed to acquire advisory lock: {e}"),
-            })?;
+        let result =
+            self.admin_pool
+                .query_one(lock_stmt)
+                .await
+                .map_err(|e| DbInfraError::Config {
+                    message: format!("failed to acquire advisory lock: {e}"),
+                })?;
 
         let locked: bool = match result {
-            Some(row) => row.try_get("", "locked").map_err(|e| DbInfraError::Config {
-                message: format!("failed to read lock result: {e}"),
-            })?,
+            Some(row) => row
+                .try_get("", "locked")
+                .map_err(|e| DbInfraError::Config {
+                    message: format!("failed to read lock result: {e}"),
+                })?,
             None => {
                 return Err(DbInfraError::Config {
                     message: "pg_try_advisory_lock returned no row".to_string(),

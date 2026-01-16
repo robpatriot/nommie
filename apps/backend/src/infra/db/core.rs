@@ -153,7 +153,8 @@ async fn ensure_ai_profiles_with_lock(
                 let sanitized_url = sanitize_db_url(&url);
                 let key = format!("nommie:ai_profiles_init:{:?}:{}", db_kind, sanitized_url);
                 let mut lock = PgAdvisoryLock::new(pool.clone(), &key);
-                lock.try_acquire().await.map_err(AppError::from)?
+                let res = lock.try_acquire().await.map_err(AppError::from)?;
+                res
             }
             DbKind::SqliteMemory => {
                 let mut lock = InMemoryLock;

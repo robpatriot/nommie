@@ -47,4 +47,3 @@ pub fn unique_str(prefix: &str) -> String {
 pub fn unique_email(prefix: &str) -> String {
     format!("{}-{}@example.test", prefix, Ulid::new())
 }
-

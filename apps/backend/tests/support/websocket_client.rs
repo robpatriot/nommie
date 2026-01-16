@@ -26,8 +26,11 @@ impl WebSocketClient {
         timeout: Duration,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let start = tokio::time::Instant::now();
+
         loop {
-            match connect_async(url).await {
+            let connect_res = connect_async(url).await;
+
+            match connect_res {
                 Ok((stream, _)) => return Ok(Self { stream }),
                 Err(err) => {
                     if start.elapsed() >= timeout {

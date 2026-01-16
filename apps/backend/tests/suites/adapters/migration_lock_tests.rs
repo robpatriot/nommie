@@ -344,7 +344,8 @@ async fn acquire_timeout_distinct() {
     }
 
     // Set very short acquire timeout for this test
-    std::env::set_var("NOMMIE_MIGRATE_TIMEOUT_MS", "200");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("NOMMIE_MIGRATE_TIMEOUT_MS", "200") };
 
     let barrier = Arc::new(Barrier::new(2));
     let a_holding = Arc::new(AtomicBool::new(false));
@@ -414,7 +415,8 @@ async fn acquire_timeout_distinct() {
     );
 
     // Clean up env var
-    std::env::remove_var("NOMMIE_MIGRATE_TIMEOUT_MS");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("NOMMIE_MIGRATE_TIMEOUT_MS") };
 }
 
 #[tokio::test]
@@ -581,7 +583,8 @@ async fn body_timeout_aborts_and_unlocks() {
     // Note: Only truly applies to Postgres with actual migration; SQLite simulates the behavior
 
     // Set short body timeout for this test
-    std::env::set_var("NOMMIE_MIGRATE_BODY_TIMEOUT_MS", "200");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("NOMMIE_MIGRATE_BODY_TIMEOUT_MS", "200") };
 
     let db_kind = match skip_if_sqlite_memory("body_timeout_aborts_and_unlocks") {
         None => return,
@@ -695,5 +698,6 @@ async fn body_timeout_aborts_and_unlocks() {
     );
 
     // Clean up env var
-    std::env::remove_var("NOMMIE_MIGRATE_BODY_TIMEOUT_MS");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("NOMMIE_MIGRATE_BODY_TIMEOUT_MS") };
 }

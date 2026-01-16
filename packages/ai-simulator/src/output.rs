@@ -65,8 +65,17 @@ impl OutputWriter {
             .open(&csv_path)?;
         let mut csv_writer = csv::Writer::from_writer(BufWriter::new(csv_file));
         csv_writer.write_record(&[
-            "game_id", "seed", "winner", "seat0_score", "seat1_score", "seat2_score",
-            "seat3_score", "seat0_ai", "seat1_ai", "seat2_ai", "seat3_ai",
+            "game_id",
+            "seed",
+            "winner",
+            "seat0_score",
+            "seat1_score",
+            "seat2_score",
+            "seat3_score",
+            "seat0_ai",
+            "seat1_ai",
+            "seat2_ai",
+            "seat3_ai",
         ])?;
 
         Ok(Self {
@@ -109,4 +118,3 @@ impl OutputWriter {
         (self.jsonl_path.as_ref(), self.csv_path.as_ref())
     }
 }
-

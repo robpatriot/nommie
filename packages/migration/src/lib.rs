@@ -85,10 +85,9 @@ async fn get_db_diagnostics(db: &DatabaseConnection) -> Result<DbDiagnostics, se
                 db.get_database_backend(),
                 String::from("select current_database() as name"),
             );
-            if let Some(row) = db.query_one(stmt).await? {
-                row.try_get("", "name")?
-            } else {
-                "<unknown>".to_string()
+            match db.query_one(stmt).await? {
+                Some(row) => row.try_get("", "name")?,
+                _ => "<unknown>".to_string(),
             }
         }
         sea_orm::DatabaseBackend::Sqlite => {
@@ -96,18 +95,18 @@ async fn get_db_diagnostics(db: &DatabaseConnection) -> Result<DbDiagnostics, se
                 db.get_database_backend(),
                 String::from("SELECT file FROM pragma_database_list WHERE name = 'main'"),
             );
-            if let Some(row) = db.query_one(stmt).await? {
-                if let Ok(file) = row.try_get::<String>("", "file") {
-                    if file.is_empty() {
-                        ":memory:".to_string()
-                    } else {
-                        file
+            match db.query_one(stmt).await? {
+                Some(row) => match row.try_get::<String>("", "file") {
+                    Ok(file) => {
+                        if file.is_empty() {
+                            ":memory:".to_string()
+                        } else {
+                            file
+                        }
                     }
-                } else {
-                    "<unknown>".to_string()
-                }
-            } else {
-                "<unknown>".to_string()
+                    _ => "<unknown>".to_string(),
+                },
+                _ => "<unknown>".to_string(),
             }
         }
         _ => "<unsupported>".to_string(),
@@ -138,8 +137,8 @@ pub async fn count_applied_migrations(db: &DatabaseConnection) -> Result<usize, 
 
     match db.query_one(stmt).await {
         Ok(Some(row)) => row.try_get::<i64>("", "cnt").map(|c| c as usize),
-        Ok(None) => Ok(0),              // Table exists but empty
-        Err(DbErr::Exec(_)) => Ok(0),   // Table doesn't exist yet
+        Ok(None) => Ok(0),            // Table exists but empty
+        Err(DbErr::Exec(_)) => Ok(0), // Table doesn't exist yet
         Err(e) => Err(e),
     }
 }
@@ -153,15 +152,13 @@ pub async fn get_latest_migration_version(
 ) -> Result<Option<String>, DbErr> {
     let stmt = Statement::from_string(
         db.get_database_backend(),
-        String::from(
-            "SELECT version FROM seaql_migrations ORDER BY applied_at DESC LIMIT 1",
-        ),
+        String::from("SELECT version FROM seaql_migrations ORDER BY applied_at DESC LIMIT 1"),
     );
 
     match db.query_one(stmt).await {
         Ok(Some(row)) => row.try_get::<String>("", "version").map(Some),
-        Ok(None) => Ok(None),           // Table exists but no rows
-        Err(DbErr::Exec(_)) => Ok(None),// Table doesn't exist yet
+        Ok(None) => Ok(None),            // Table exists but no rows
+        Err(DbErr::Exec(_)) => Ok(None), // Table doesn't exist yet
         Err(e) => Err(e),
     }
 }

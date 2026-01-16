@@ -13,7 +13,9 @@ use crate::config::db::{
 };
 use crate::error::DbInfraError;
 use crate::infra::db::diagnostics::migration_counters;
-use crate::infra::db::locking::{BootstrapLock, Guard, InMemoryLock, PgAdvisoryLock, SqliteFileLock};
+use crate::infra::db::locking::{
+    BootstrapLock, Guard, InMemoryLock, PgAdvisoryLock, SqliteFileLock,
+};
 
 fn get_db_engine(db_kind: DbKind) -> &'static str {
     match db_kind {
@@ -42,7 +44,9 @@ where
     let mut last_error = None;
 
     for attempt in 1..=max_attempts {
-        match connect_fn().await {
+        let connect_result = connect_fn().await;
+
+        match connect_result {
             Ok(result) => {
                 if attempt > 1 {
                     info!(
@@ -91,10 +95,7 @@ pub async fn build_admin_pool(
                     Database::connect(opt_clone)
                         .await
                         .map_err(|e| DbInfraError::Config {
-                            message: format!(
-                                "failed to connect to Postgres (admin pool): {}",
-                                e
-                            ),
+                            message: format!("failed to connect to Postgres (admin pool): {}", e),
                         })
                 }
             },
@@ -206,7 +207,8 @@ pub async fn orchestrate_migration(
 
     let admin_pool = build_admin_pool(env, db_kind).await?;
 
-    orchestrate_migration_internal(&admin_pool, env, db_kind, command).await
+    let res = orchestrate_migration_internal(&admin_pool, env, db_kind, command).await;
+    res
 }
 
 pub async fn orchestrate_migration_internal(
@@ -535,10 +537,7 @@ async fn migrate_with_guard_controlled(
                     "Migration verification failed: reset should leave 0 migrations applied, but {} were found (env={:?}, db_kind={:?})",
                     applied_count, env, db_kind
                 );
-                return Err((
-                    guard,
-                    DbInfraError::Config { message: detail },
-                ));
+                return Err((guard, DbInfraError::Config { message: detail }));
             }
         }
         MigrationCommand::Down => {
@@ -555,10 +554,7 @@ async fn migrate_with_guard_controlled(
                     "Migration verification failed: expected {} migrations, but {} were applied (env={:?}, db_kind={:?})",
                     expected_count, applied_count, env, db_kind
                 );
-                return Err((
-                    guard,
-                    DbInfraError::Config { message: detail },
-                ));
+                return Err((guard, DbInfraError::Config { message: detail }));
             }
         }
         MigrationCommand::Status => {}
@@ -607,4 +603,3 @@ async fn setup_sqlite_file_prerequisites(pool: &DatabaseConnection) -> Result<()
 
     Ok(())
 }
-

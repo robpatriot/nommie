@@ -9,10 +9,10 @@ use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::AppError;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games;
 use backend::state::app_state::AppState;
+use backend::AppError;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;

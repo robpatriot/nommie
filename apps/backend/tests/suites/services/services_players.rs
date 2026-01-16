@@ -1,9 +1,8 @@
 use backend::ai::RandomPlayer;
 use backend::db::txn::with_txn;
-use backend::AppError;
-use backend::ErrorCode;
 use backend::repos::ai_profiles;
 use backend::services::players::PlayerService;
+use backend::{AppError, ErrorCode};
 
 use crate::support::build_test_state;
 use crate::support::db_memberships::{create_test_ai_game_player, create_test_game_player};

@@ -13,4 +13,3 @@ pub enum MetricsLevel {
     Basic,
     Detailed,
 }
-

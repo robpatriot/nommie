@@ -5,5 +5,3 @@ pub enum DbInfraError {
     #[error("Configuration error: {message}")]
     Config { message: String },
 }
-
-

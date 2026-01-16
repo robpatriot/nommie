@@ -71,7 +71,7 @@ pub struct PlayerMetrics {
 pub struct BidAccuracyStats {
     pub exact: u32,
     pub underbid: u32, // Count of underbids (tricks > bid)
-    pub overbid: u32, // Count of overbids (tricks < bid)
+    pub overbid: u32,  // Count of overbids (tricks < bid)
     pub exact_pct: f64,
 }
 
@@ -106,7 +106,7 @@ pub fn build_game_metrics(
         .final_scores
         .iter()
         .enumerate()
-        .max_by_key(|(_, &score)| score)
+        .max_by_key(|&(_, &score)| score)
         .map(|(idx, _)| idx as u8)
         .unwrap_or(0);
 
@@ -143,8 +143,16 @@ fn build_round_metrics(round: &RoundHistory) -> RoundMetrics {
             };
             let exact = tricks == bid;
             // Terminology: underbid = bid too low (tricks > bid), overbid = bid too high (tricks < bid)
-            let underbid = if tricks > bid { Some(tricks - bid) } else { None };
-            let overbid = if tricks < bid { Some(bid - tricks) } else { None };
+            let underbid = if tricks > bid {
+                Some(tricks - bid)
+            } else {
+                None
+            };
+            let overbid = if tricks < bid {
+                Some(bid - tricks)
+            } else {
+                None
+            };
 
             bid_accuracy.push(BidAccuracy {
                 seat: seat as u8,
@@ -298,4 +306,3 @@ impl From<&GameMetrics> for CsvSummaryRow {
         }
     }
 }
-

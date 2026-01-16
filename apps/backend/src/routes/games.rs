@@ -989,32 +989,37 @@ async fn leave_game(
 
             // Process game state - AIs may act, each incrementing version
             let game_flow_service = crate::services::game_flow::GameFlowService;
-            match game_flow_service
+            let res = game_flow_service
                 .process_game_state(&txn, game_id_for_task)
-                .await
-            {
+                .await;
+
+            match res {
                 Ok(()) => {
                     // Commit the transaction
-                    if let Err(err) = txn.commit().await {
-                        tracing::error!(
-                            game_id = game_id_for_task,
-                            error = %err,
-                            "Failed to commit transaction after background AI processing"
-                        );
-                    } else {
-                        tracing::debug!(
-                            game_id = game_id_for_task,
-                            "Background AI processing completed successfully"
-                        );
-
-                        // Publish snapshot broadcast so clients receive the AI action updates
-                        if let Err(err) = publish_snapshot(&app_state_clone, game_id_for_task).await
-                        {
+                    match txn.commit().await {
+                        Err(err) => {
                             tracing::error!(
                                 game_id = game_id_for_task,
                                 error = %err,
-                                "Failed to publish snapshot after background AI processing"
+                                "Failed to commit transaction after background AI processing"
                             );
+                        }
+                        _ => {
+                            tracing::debug!(
+                                game_id = game_id_for_task,
+                                "Background AI processing completed successfully"
+                            );
+
+                            // Publish snapshot broadcast so clients receive the AI action updates
+                            if let Err(err) =
+                                publish_snapshot(&app_state_clone, game_id_for_task).await
+                            {
+                                tracing::error!(
+                                    game_id = game_id_for_task,
+                                    error = %err,
+                                    "Failed to publish snapshot after background AI processing"
+                                );
+                            }
                         }
                     }
                 }
@@ -1863,22 +1868,26 @@ async fn rejoin_game(
         };
 
         let game_flow_service = crate::services::game_flow::GameFlowService;
-        match game_flow_service.process_game_state(&txn, id).await {
+        let process_res = game_flow_service.process_game_state(&txn, id).await;
+        match process_res {
             Ok(()) => {
-                if let Err(err) = txn.commit().await {
-                    tracing::error!(
-                        game_id = id,
-                        error = %err,
-                        "Failed to commit transaction after post-rejoin AI processing"
-                    );
-                } else {
-                    // Broadcast updated snapshot after AI processing completes
-                    if let Err(err) = publish_snapshot(&app_state_clone, id).await {
+                match txn.commit().await {
+                    Err(err) => {
                         tracing::error!(
                             game_id = id,
                             error = %err,
-                            "Failed to publish snapshot after post-rejoin AI processing"
+                            "Failed to commit transaction after post-rejoin AI processing"
                         );
+                    }
+                    _ => {
+                        // Broadcast updated snapshot after AI processing completes
+                        if let Err(err) = publish_snapshot(&app_state_clone, id).await {
+                            tracing::error!(
+                                game_id = id,
+                                error = %err,
+                                "Failed to publish snapshot after post-rejoin AI processing"
+                            );
+                        }
                     }
                 }
             }

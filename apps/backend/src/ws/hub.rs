@@ -66,14 +66,15 @@ impl GameSessionRegistry {
     pub fn unregister(&self, game_id: i64, token: Uuid) {
         let active_before = self.active_connections.load(Ordering::Relaxed);
 
-        let (was_present, now_empty) = if let Some(entry) = self.sessions.get_mut(&game_id) {
-            // Acquire mutable guard - allows mutation of inner map
-            let was_present = entry.remove(&token).is_some();
-            let now_empty = entry.is_empty();
-            // Guard is dropped here when entry goes out of scope
-            (was_present, now_empty)
-        } else {
-            (false, false)
+        let (was_present, now_empty) = match self.sessions.get_mut(&game_id) {
+            Some(entry) => {
+                // Acquire mutable guard - allows mutation of inner map
+                let was_present = entry.remove(&token).is_some();
+                let now_empty = entry.is_empty();
+                // Guard is dropped here when entry goes out of scope
+                (was_present, now_empty)
+            }
+            _ => (false, false),
         };
 
         // Now that the guard is dropped, we can safely remove the outer map entry if needed
@@ -188,11 +189,14 @@ impl RealtimeBroker {
         loop {
             attempt += 1;
 
-            let mut publisher = self.publisher.lock().await;
-            match publisher
-                .publish::<_, _, ()>(channel.clone(), encoded.clone())
-                .await
-            {
+            let publish_res = {
+                let mut publisher = self.publisher.lock().await;
+                let res = publisher
+                    .publish::<_, _, ()>(channel.clone(), encoded.clone())
+                    .await;
+                res
+            };
+            match publish_res {
                 Ok(_) => return Ok(()),
                 Err(err) => {
                     let app_err = AppError::Internal {
@@ -220,8 +224,6 @@ impl RealtimeBroker {
                         "Redis publish failed, retrying"
                     );
 
-                    // Drop the lock before sleeping
-                    drop(publisher);
                     sleep(delay).await;
                 }
             }
@@ -330,7 +332,9 @@ async fn run_subscription_loop_with_retry(redis_url: &str, registry: Arc<GameSes
     loop {
         attempt += 1;
 
-        match run_subscription_loop(redis_url, registry.clone()).await {
+        let loop_res = run_subscription_loop(redis_url, registry.clone()).await;
+
+        match loop_res {
             Ok(()) => {
                 // Normal completion (shouldn't happen in production, but handle gracefully)
                 info!("Redis subscription loop completed normally");
@@ -372,7 +376,6 @@ async fn run_subscription_loop_with_retry(redis_url: &str, registry: Arc<GameSes
         }
     }
 }
-
 /// Inner function that performs a single connection attempt and message processing
 async fn run_subscription_loop(
     redis_url: &str,
@@ -438,23 +441,32 @@ async fn run_subscription_loop(
     info!("Redis subscription established, processing messages");
 
     let mut stream = pubsub.into_on_message();
-    while let Some(msg) = stream.next().await {
-        let channel_result = msg.get_channel::<String>();
-        let payload_result = msg.get_payload::<String>();
-        if let (Ok(channel), Ok(payload)) = (channel_result, payload_result) {
-            if let Some(game_id) = parse_channel(channel.as_str()) {
-                match serde_json::from_str::<RedisEnvelope>(payload.as_str()) {
-                    Ok(envelope) => {
-                        registry.broadcast(
-                            game_id,
-                            SnapshotBroadcast {
-                                version: envelope.version,
-                            },
-                        );
-                    }
-                    Err(err) => {
-                        error!(error = %err, "Failed to decode Redis snapshot payload");
-                    }
+
+    loop {
+        let next_msg = stream.next().await;
+        let Some(msg) = next_msg else {
+            break;
+        };
+
+        let Ok(channel) = msg.get_channel::<String>() else {
+            continue;
+        };
+        let Ok(payload) = msg.get_payload::<String>() else {
+            continue;
+        };
+
+        if let Some(game_id) = parse_channel(channel.as_str()) {
+            match serde_json::from_str::<RedisEnvelope>(payload.as_str()) {
+                Ok(envelope) => {
+                    registry.broadcast(
+                        game_id,
+                        SnapshotBroadcast {
+                            version: envelope.version,
+                        },
+                    );
+                }
+                Err(err) => {
+                    error!(error = %err, "Failed to decode Redis snapshot payload");
                 }
             }
         }

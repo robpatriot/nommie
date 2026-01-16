@@ -55,13 +55,16 @@ impl FromRequest for GameId {
             })?;
 
             // Check if game exists in database
-            let exists = if let Some(shared_txn) = SharedTxn::from_req(&req) {
-                // Use shared transaction if present
-                games::exists(shared_txn.transaction(), game_id).await?
-            } else {
-                // Fall back to pooled connection
-                let db = require_db(app_state)?;
-                games::exists(db, game_id).await?
+            let exists = match SharedTxn::from_req(&req) {
+                Some(shared_txn) => {
+                    // Use shared transaction if present
+                    games::exists(shared_txn.transaction(), game_id).await?
+                }
+                _ => {
+                    // Fall back to pooled connection
+                    let db = require_db(app_state)?;
+                    games::exists(db, game_id).await?
+                }
             };
 
             if !exists {

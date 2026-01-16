@@ -6,6 +6,7 @@
 use backend::ai::{AiError, AiPlayer};
 use backend::domain::bidding::{place_bid, set_trump, Bid};
 use backend::domain::cards_types::Card;
+use backend::domain::deal_hands;
 use backend::domain::game_context::GameContext;
 use backend::domain::player_view::{CurrentRoundInfo, GameHistory, RoundHistory, RoundScoreDetail};
 use backend::domain::round_memory::{PlayMemory, RoundMemory, TrickMemory};
@@ -14,7 +15,6 @@ use backend::domain::scoring::apply_round_scoring;
 use backend::domain::seed_derivation::derive_dealing_seed;
 use backend::domain::state::{GameState, Phase, RoundState};
 use backend::domain::tricks::play_card;
-use backend::domain::deal_hands;
 
 /// Result of simulating a complete game.
 #[derive(Debug, Clone)]
@@ -94,8 +94,8 @@ impl Simulator {
 
     /// Deal a new round.
     fn deal_round(&mut self, round_no: u8) -> Result<(), SimulatorError> {
-        let hand_size = hand_size_for_round(round_no)
-            .ok_or_else(|| SimulatorError::InvalidRound(round_no))?;
+        let hand_size =
+            hand_size_for_round(round_no).ok_or_else(|| SimulatorError::InvalidRound(round_no))?;
 
         // Derive dealing seed from game seed
         let dealing_seed = derive_dealing_seed(self.game_seed, round_no);
@@ -256,7 +256,10 @@ impl Simulator {
     }
 
     /// Build CurrentRoundInfo for a specific player.
-    fn build_current_round_info(&self, player_seat: u8) -> Result<CurrentRoundInfo, SimulatorError> {
+    fn build_current_round_info(
+        &self,
+        player_seat: u8,
+    ) -> Result<CurrentRoundInfo, SimulatorError> {
         if player_seat >= 4 {
             return Err(SimulatorError::InvalidState(format!(
                 "Invalid player seat: {player_seat}"
@@ -264,13 +267,8 @@ impl Simulator {
         }
 
         // Build current trick plays
-        let current_trick_plays: Vec<(u8, Card)> = self
-            .state
-            .round
-            .trick_plays
-            .iter()
-            .copied()
-            .collect();
+        let current_trick_plays: Vec<(u8, Card)> =
+            self.state.round.trick_plays.iter().copied().collect();
 
         // Determine trick leader
         // For first trick: leader is player to left of dealer
@@ -365,10 +363,12 @@ impl Simulator {
                 })
                 .collect::<Vec<_>>()
                 .try_into()
-                .unwrap_or([RoundScoreDetail {
-                    round_score: 0,
-                    cumulative_score: 0,
-                }; 4]),
+                .unwrap_or(
+                    [RoundScoreDetail {
+                        round_score: 0,
+                        cumulative_score: 0,
+                    }; 4],
+                ),
         };
 
         self.history.rounds.push(round_history);
@@ -414,4 +414,3 @@ impl std::fmt::Display for SimulatorError {
 }
 
 impl std::error::Error for SimulatorError {}
-

@@ -37,17 +37,16 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
                 ..Default::default()
             };
 
-            let inserted = games::Entity::insert(game).exec(txn).await.map_err(|e| {
-                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-            })?;
+            let inserted = games::Entity::insert(game)
+                .exec(txn)
+                .await
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
 
             // Confirm the row exists from within with_txn
             let found = games::Entity::find_by_id(inserted.last_insert_id)
                 .one(txn)
                 .await
-                .map_err(|e| {
-                    backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-                })?;
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
             assert!(found.is_some(), "insert should be visible within with_txn");
 
             Ok::<_, backend::AppError>(inserted.last_insert_id)
@@ -60,9 +59,10 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
     with_txn(Some(&req), &state, |txn| {
         let id = inserted_id;
         Box::pin(async move {
-            let found = games::Entity::find_by_id(id).one(txn).await.map_err(|e| {
-                backend::AppError::from(backend::infra::db_errors::map_db_err(e))
-            })?;
+            let found = games::Entity::find_by_id(id)
+                .one(txn)
+                .await
+                .map_err(|e| backend::AppError::from(backend::infra::db_errors::map_db_err(e)))?;
             assert!(
                 found.is_some(),
                 "insert should persist within SharedTxn after with_txn returns"

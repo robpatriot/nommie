@@ -53,17 +53,21 @@ where
         Box::pin(async move {
             // Collect the request body into BytesMut
             let mut body = BytesMut::new();
-            while let Some(chunk) = payload.next().await {
+
+            loop {
+                let next_chunk = payload.next().await;
+                let Some(chunk) = next_chunk else {
+                    break;
+                };
+
                 let chunk = chunk.map_err(|e| {
-                    warn!(
-                        error = %e,
-                        "Failed to read request body chunk"
-                    );
+                    warn!(error = %e, "Failed to read request body chunk");
                     AppError::bad_request(
                         ErrorCode::BadRequest,
                         "Failed to read request body".to_string(),
                     )
                 })?;
+
                 body.extend_from_slice(&chunk);
             }
 
