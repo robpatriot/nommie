@@ -257,7 +257,7 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
     assert_eq!(resp.status().as_u16(), 401);
 
     // Validate error structure
-    assert_problem_details_structure(resp, 401, "FORBIDDEN_USER_NOT_FOUND", "Access denied").await;
+    assert_problem_details_structure(resp, 401, "UNAUTHORIZED", "Authentication required").await;
 
     shared.rollback().await?;
 

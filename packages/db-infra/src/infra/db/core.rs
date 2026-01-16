@@ -24,10 +24,15 @@ fn get_db_engine(db_kind: DbKind) -> &'static str {
     }
 }
 
-fn get_db_path(db_kind: DbKind) -> String {
+fn get_db_path(db_kind: DbKind, env: RuntimeEnv) -> String {
     match db_kind {
-        DbKind::Postgres => "postgresql://...".to_string(),
-        DbKind::SqliteFile => "sqlite file".to_string(),
+        DbKind::Postgres => {
+            let spec = make_conn_spec(env, db_kind, DbOwner::Owner).unwrap_or_else(|_| "postgres-unknown".to_string());
+            sanitize_db_url(&spec)
+        }
+        DbKind::SqliteFile => {
+            crate::config::db::sqlite_file_spec(db_kind, env).unwrap_or_else(|_| "sqlite-file-unknown".to_string())
+        }
         DbKind::SqliteMemory => "sqlite::memory:".to_string(),
     }
 }
@@ -219,7 +224,7 @@ pub async fn orchestrate_migration_internal(
 ) -> Result<(), DbInfraError> {
     let cancellation_token = CancellationToken::new();
     let engine = get_db_engine(db_kind);
-    let path = get_db_path(db_kind);
+    let path = get_db_path(db_kind, env);
 
     info!(
         "migrate=start env={:?} db_kind={:?} engine={} path={}",
