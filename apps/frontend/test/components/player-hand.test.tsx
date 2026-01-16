@@ -148,7 +148,7 @@ describe('PlayerHand', () => {
         viewerSeat={0}
         selectedCard={null}
         onSelectCard={() => {}}
-        requireCardConfirmation={true} // Default, but explicit for clarity
+        requireCardConfirmation={true}
         playState={{
           viewerSeat: 0,
           playable: ['2H', '3H', '5S', '7C'],
@@ -158,10 +158,10 @@ describe('PlayerHand', () => {
       />
     )
 
-    // PlayerHand button shows waiting message when not viewer's turn and confirmation is required
-    // The button text shows "Waiting for Bailey" but aria-label is different, so query by text
-    const playButton = screen.getByText(/Waiting for Bailey/)
-    expect(playButton).toBeInTheDocument()
-    expect(playButton.closest('button')).toBeDisabled()
+    const playButton = screen.getByRole('button', {
+      name: /waiting for bailey/i,
+    })
+    expect(playButton).toBeDisabled()
+    expect(playButton).toHaveTextContent(/waiting for bailey/i)
   })
 })

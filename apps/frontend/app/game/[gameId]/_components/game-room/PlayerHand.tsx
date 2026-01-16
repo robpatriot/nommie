@@ -855,6 +855,8 @@ export function PlayerHand({
   const tSuitAbbrev = useTranslations('game.gameRoom.hand.suitAbbrev')
 
   const isTrickPhase = checkIsTrickPhase(phase) && !!playState
+  const isPreview = !isTrickPhase || !playState
+  const isImmediatePlay = !requireCardConfirmation
 
   // "Turn" comes from the backend phase snapshot.
   const viewerTurn =
@@ -866,18 +868,6 @@ export function PlayerHand({
   const canActNow = isTrickPhase
     ? viewerTurn && (!isTrickPaused || isViewerLeaderDuringPause)
     : false
-
-  type HandMode = 'preview' | 'waiting' | 'acting_confirm' | 'acting_immediate'
-
-  const handMode: HandMode = useMemo(() => {
-    if (!isTrickPhase || !playState) {
-      return 'preview'
-    }
-    if (!canActNow) {
-      return 'waiting'
-    }
-    return requireCardConfirmation ? 'acting_confirm' : 'acting_immediate'
-  }, [isTrickPhase, playState, canActNow, requireCardConfirmation])
 
   const playableCards = useMemo(
     () => new Set(playState?.playable ?? []),
@@ -899,21 +889,23 @@ export function PlayerHand({
       return t('status.handWillAppear')
     }
 
-    if (handMode === 'acting_immediate') {
-      return t('status.tapToPlayImmediate')
-    }
-
-    if (handMode === 'waiting' && !requireCardConfirmation) {
+    // Immediate-play mode gets a special status (and a waiting message when it's not your turn).
+    if (!isPreview && isImmediatePlay) {
+      if (canActNow) {
+        return t('status.tapToPlayImmediate')
+      }
       return waitingOnName
         ? t('status.waitingFor', { name: waitingOnName })
         : t('status.waitingForNext')
     }
 
+    // Confirm mode + preview mode both default to read-only preview status text.
     return readOnlyPreviewText
   }, [
     viewerHand.length,
-    handMode,
-    requireCardConfirmation,
+    isPreview,
+    isImmediatePlay,
+    canActNow,
     waitingOnName,
     t,
     readOnlyPreviewText,
@@ -1040,7 +1032,7 @@ export function PlayerHand({
         return
       }
 
-      if (handMode === 'acting_immediate') {
+      if (isImmediatePlay) {
         onSelectCard(null)
         if (onPlayCard) {
           void onPlayCard(card)
@@ -1055,7 +1047,7 @@ export function PlayerHand({
       playState,
       playableCards,
       canActNow,
-      handMode,
+      isImmediatePlay,
       onSelectCard,
       onPlayCard,
       selectedCard,
@@ -1089,7 +1081,7 @@ export function PlayerHand({
         </div>
 
         {/* Confirmation-mode play button */}
-        {isTrickPhase && playState && handMode === 'acting_confirm' ? (
+        {isTrickPhase && playState && requireCardConfirmation ? (
           <div className="flex justify-center flex-1 min-w-0">
             <button
               type="button"
@@ -1110,9 +1102,13 @@ export function PlayerHand({
               aria-label={
                 playState.isPending
                   ? t('button.aria.playing')
-                  : selectedCard
-                    ? t('button.aria.playSelected', { card: selectedCard })
-                    : t('button.aria.selectCard')
+                  : !canActNow
+                    ? waitingOnName
+                      ? t('button.waitingFor', { name: waitingOnName })
+                      : t('button.waitingForNext')
+                    : selectedCard
+                      ? t('button.aria.playSelected', { card: selectedCard })
+                      : t('button.aria.selectCard')
               }
             >
               {playState.isPending ? (
@@ -1133,9 +1129,7 @@ export function PlayerHand({
           </div>
         ) : null}
 
-        {isTrickPhase &&
-        playState &&
-        (showLegalPlays || handMode === 'acting_immediate') ? (
+        {isTrickPhase && playState && (showLegalPlays || isImmediatePlay) ? (
           <div
             className="ml-auto flex items-center justify-end gap-2 flex-shrink-0"
             style={{ minWidth: 'max-content' }}
