@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 
 import { getBackendBaseUrlOrThrow } from '@/auth'
-import { ensureBackendJwtForServerAction } from '@/lib/auth/refresh-backend-jwt'
+import {
+  ensureBackendJwtForServerAction,
+  BackendJwtError,
+} from '@/lib/auth/refresh-backend-jwt'
 import {
   shouldLogError,
   isInStartupWindow,
@@ -49,6 +52,14 @@ export async function GET() {
     const payload = await response.json()
     return NextResponse.json(payload, { status: 200 })
   } catch (error) {
+    if (error instanceof BackendJwtError) {
+      // Return 401 for auth errors so client can redirect
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
     // Check if this is a backend startup error
     const isStartupError = isBackendStartupError(error, isInStartupWindow)
 

@@ -353,6 +353,13 @@ export function useGameSync({
       clearTimeout(timeoutId)
 
       if (!response.ok) {
+        if (response.status === 401) {
+          // Session is invalid - hard redirect to home/login
+          // This breaks the retry loop effectively
+          window.location.href = '/'
+          await new Promise((resolve) => setTimeout(resolve, 10000)) // Stall while redirecting
+          throw new Error('Authentication required')
+        }
         throw new Error(
           `Unable to fetch realtime token: ${response.status} ${response.statusText}`
         )

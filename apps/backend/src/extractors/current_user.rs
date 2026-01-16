@@ -59,7 +59,7 @@ impl FromRequest for CurrentUser {
                 }
             };
 
-            let user = user.ok_or(AppError::forbidden_user_not_found())?;
+            let user = user.ok_or(AppError::unauthorized())?;
 
             // Use sub and email from JWT claims (already validated) rather than from database
             // We still need user.id from the database lookup
