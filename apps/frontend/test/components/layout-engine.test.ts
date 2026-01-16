@@ -212,33 +212,21 @@ describe('Layout Engine (Deterministic Decision Tree)', () => {
       // Bad order: H D C (R R B). Violations: 1.
       // Function arrangeRowGroups logic test.
 
-      // Create a scenario where splitting happens and 3 suits land together.
-      // S=6. H=2, C=2, D=2. (12 total).
-      // Split S(6) -> 3, 3.
-      // Option: {S_A, H, C, D} (9) vs {S_B} (3). Bad balance.
-      // Option: Move H,C,D ?
-      // Need 6 vs 6.
-      // {S_A} (3) vs {S_B, H, C, D} (9)? No.
-      // We construct options.
-      // Split S->3.
-      // S_A=3. S_B=3.
-      // Try combining:
-      // S_A + H + C = 7. S_B + D = 5. Diff 2. Valid Balance!
-      // Row1: {S, H, C}. S(B), H(R), C(B).
-      // Optimal order: S H C (B R B). Or C H S.
-
-      const hand = mkHand('2S 3S 4S 5S 6S 7S 2H 3H 2C 3C 2D 3D')
+      // Scenario: S=9, H=1, C=1, D=3. Total=14.
+      // Fails Step 1, 2, 3 due to balance constraints.
+      // Forces Step 4 split of S.
+      // One row will contain S(frag), H, C, D.
+      const hand = mkHand('2S 3S 4S 5S 6S 7S 8S 9S XS 2H 2C 2D 3D 4D')
       const res = getLayout(hand, NARROW_VIEWPORT)
 
-      // We expect S H C (B R B) pattern to minimize violations.
-      // S and C are Black. H is Red. H should be in the middle of S and C.
-      // Expect either S..H..C or C..H..S
-      // Note: Simplistic check assuming groups are kept somewhat together or at least distinct colors separated.
-      const hasAlternating = /S.*H.*C/.test(res.top) || /C.*H.*S/.test(res.top)
-      expect(hasAlternating).toBe(true)
-      // "2S ... 7S" is taking up space.
-      // Just check that we have Alternating property if possible.
-      // Or check specific output order.
+      // We expect S H C (B R B) pattern in one of the rows.
+      // res.top should be 7 cards, res.bot 7 cards.
+      const eitherHasAlternating =
+        /S.*H.*C/.test(res.top) ||
+        /C.*H.*S/.test(res.top) ||
+        /S.*H.*C/.test(res.bot) ||
+        /C.*H.*S/.test(res.bot)
+      expect(eitherHasAlternating).toBe(true)
     })
   })
 })
