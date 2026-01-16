@@ -1083,49 +1083,80 @@ export function PlayerHand({
         {/* Confirmation-mode play button */}
         {isTrickPhase && playState && requireCardConfirmation ? (
           <div className="flex justify-center flex-1 min-w-0">
-            <button
-              type="button"
-              data-selected-card-exempt
-              onClick={async () => {
-                if (onPlayCard && selectedCard && canActNow) {
-                  await onPlayCard(selectedCard)
-                  onSelectCard(null)
-                }
-              }}
-              disabled={
-                !canActNow ||
-                playState.isPending ||
-                !selectedCard ||
-                !playState.playable.includes(selectedCard)
-              }
-              className="rounded-2xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
-              aria-label={
+            {(() => {
+              const state: 'pending' | 'canAct' | 'waitingFor' | 'waitingNext' =
                 playState.isPending
-                  ? t('button.aria.playing')
-                  : !canActNow
-                    ? waitingOnName
-                      ? t('button.waitingFor', { name: waitingOnName })
-                      : t('button.waitingForNext')
-                    : selectedCard
-                      ? t('button.aria.playSelected', { card: selectedCard })
-                      : t('button.aria.selectCard')
+                  ? 'pending'
+                  : canActNow
+                    ? 'canAct'
+                    : waitingOnName
+                      ? 'waitingFor'
+                      : 'waitingNext'
+
+              let ariaLabel: string
+              let content: React.ReactNode
+
+              switch (state) {
+                case 'pending': {
+                  ariaLabel = t('button.aria.playing')
+                  content = t('button.playing')
+                  break
+                }
+
+                case 'canAct': {
+                  ariaLabel = selectedCard
+                    ? t('button.aria.playSelected', { card: selectedCard })
+                    : t('button.aria.selectCard')
+
+                  content = (
+                    <>
+                      <span className="sm:hidden">{t('button.playCard')}</span>
+                      <span className="hidden sm:inline">
+                        {t('button.playSelectedCard')}
+                      </span>
+                    </>
+                  )
+                  break
+                }
+
+                case 'waitingFor': {
+                  // Runtime + TS safety: this should never be null here, but guard anyway.
+                  const name = waitingOnName ?? tHand('you')
+                  ariaLabel = t('button.waitingFor', { name })
+                  content = t('button.waitingFor', { name })
+                  break
+                }
+
+                case 'waitingNext': {
+                  ariaLabel = t('button.waitingForNext')
+                  content = t('button.waitingForNext')
+                  break
+                }
               }
-            >
-              {playState.isPending ? (
-                t('button.playing')
-              ) : canActNow ? (
-                <>
-                  <span className="sm:hidden">{t('button.playCard')}</span>
-                  <span className="hidden sm:inline">
-                    {t('button.playSelectedCard')}
-                  </span>
-                </>
-              ) : waitingOnName ? (
-                t('button.waitingFor', { name: waitingOnName })
-              ) : (
-                t('button.waitingForNext')
-              )}
-            </button>
+
+              return (
+                <button
+                  type="button"
+                  data-selected-card-exempt
+                  onClick={async () => {
+                    if (onPlayCard && selectedCard && canActNow) {
+                      await onPlayCard(selectedCard)
+                      onSelectCard(null)
+                    }
+                  }}
+                  disabled={
+                    !canActNow ||
+                    playState.isPending ||
+                    !selectedCard ||
+                    !playState.playable.includes(selectedCard)
+                  }
+                  className="rounded-2xl bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/40 transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/40 disabled:text-primary-foreground/70"
+                  aria-label={ariaLabel}
+                >
+                  {content}
+                </button>
+              )
+            })()}
           </div>
         ) : null}
 
