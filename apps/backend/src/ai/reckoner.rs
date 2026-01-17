@@ -975,79 +975,6 @@ impl Reckoner {
         (mode, final_bid)
     }
 
-    #[allow(dead_code)]
-    fn estimate_tricks_basic(state: &CurrentRoundInfo) -> f32 {
-        let hand = &state.hand;
-        let hand_size = state.hand_size;
-        let hand_size_f = hand_size as f32;
-
-        // Baseline: average tricks per player
-        let baseline = hand_size_f / 4.0;
-
-        let counts = Self::suit_counts(hand);
-        let mut lens: Vec<usize> = counts.values().copied().collect();
-        lens.sort_by(|a, b| b.cmp(a));
-        let longest = lens.first().copied().unwrap_or(0) as f32;
-        let avg = hand_size_f / 4.0;
-
-        // High-card value: use hand-size aware weights
-        let mut high = 0.0;
-        for c in hand {
-            high += Self::rank_cash_weight_scaled(c.rank, hand_size);
-        }
-
-        // Shape multiplier increases as hands get smaller:
-        // shape_mult = 0.35 * min(2.0, 13.0 / hand_size)
-        let shape_mult = 0.35 * (2.0f32).min(13.0 / hand_size_f);
-        let shape = ((longest - avg).max(0.0)) * shape_mult;
-
-        // Short-suit bonus (void/singleton) scales with hand size:
-        // short_mult = 0.20 * min(2.0, 13.0 / hand_size)
-        let short_mult = 0.20 * (2.0f32).min(13.0 / hand_size_f);
-        let mut short = 0.0;
-        for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
-            let n = *counts.get(&suit).unwrap_or(&0) as f32;
-            if n == 0.0 {
-                short += 0.35 * short_mult / 0.20; // Apply scaling: 0.35 * min(2.0, 13.0/hand_size)
-            } else if n == 1.0 {
-                short += 0.2 * short_mult / 0.20; // Apply scaling: 0.2 * min(2.0, 13.0/hand_size)
-            }
-        }
-
-        // Compute raw feature estimate (treat as signal, not absolute)
-        let raw_est = high * 0.85 + shape + short;
-
-        // Convert to delta from baseline
-        let delta = raw_est - baseline;
-
-        // Shrink delta by hand-size factor (heavily damps small hands)
-        let r = (hand_size_f / 13.0).clamp(0.15, 1.0);
-        let shrink = r.powf(1.6);
-        let mut est = baseline + delta * shrink;
-
-        // Trump potential bonus: if we win bid, we choose trump
-        // Compute best-suit strength across all four suits
-        let mut best_suit_strength = 0.0f32;
-        for suit in [Suit::Clubs, Suit::Diamonds, Suit::Hearts, Suit::Spades] {
-            let suit_len = *counts.get(&suit).unwrap_or(&0) as f32;
-            let mut suit_rank_sum = 0.0f32;
-            for c in hand.iter().filter(|c| c.suit == suit) {
-                suit_rank_sum += Self::rank_cash_weight_scaled(c.rank, hand_size);
-            }
-            let suit_strength = suit_len + suit_rank_sum;
-            best_suit_strength = best_suit_strength.max(suit_strength);
-        }
-
-        // Gate trump potential bonus: only apply if hand is strong enough
-        // (best_suit_strength - baseline >= 1.25)
-        if best_suit_strength >= baseline + 1.25 {
-            let trump_potential_bonus = (best_suit_strength - baseline).max(0.0) * 0.15;
-            est += trump_potential_bonus * shrink;
-        }
-
-        est.clamp(0.0, hand_size_f)
-    }
-
     fn choose_bid_from_estimate(legal: &[u8], est: f32) -> u8 {
         let mut best = legal[0];
         let mut best_d = (best as f32 - est).abs();
@@ -1061,7 +988,6 @@ impl Reckoner {
         best
     }
 
-    #[allow(dead_code)]
     fn compute_auction_strength(state: &CurrentRoundInfo) -> f32 {
         let hand = &state.hand;
         let hand_size = state.hand_size;
@@ -1092,7 +1018,6 @@ impl Reckoner {
         best_suit.max(nt_strength)
     }
 
-    #[allow(dead_code)]
     fn adjust_for_auction_strength(
         est: f32,
         auction_strength: f32,
@@ -1110,7 +1035,6 @@ impl Reckoner {
         }
     }
 
-    #[allow(dead_code)]
     fn adjust_for_history(est: f32, history: &GameHistory, hand_size: u8, my_seat: u8) -> f32 {
         // If history.rounds.len() < 8, return est unchanged (avoid sparse data)
         if history.rounds.len() < 8 {
@@ -1162,11 +1086,29 @@ impl Reckoner {
         let (pick_est, follow_est, is_nt_best) = Self::compute_estimates(state);
 
         // D) No-trumps guardrail: subtract 0.25 from pick_est if NT is best
-        let adjusted_pick_est = if is_nt_best {
+        let mut adjusted_pick_est = if is_nt_best {
             pick_est - 0.25
         } else {
             pick_est
         };
+
+        // E) Auction strength adjustment
+        let auction_strength = Self::compute_auction_strength(state);
+        let baseline = (hand_size / 4) as f32;
+        let r = (hand_size_f / 13.0).clamp(0.15, 1.0);
+        let shrink = r.powf(1.6);
+        adjusted_pick_est = Self::adjust_for_auction_strength(
+            adjusted_pick_est,
+            auction_strength,
+            baseline,
+            shrink,
+        );
+
+        // F) Table history / bias adjustment
+        if let Some(history) = cx.game_history() {
+            adjusted_pick_est =
+                Self::adjust_for_history(adjusted_pick_est, history, hand_size, state.player_seat);
+        }
 
         // Convert estimates to bids
         // B) Apply FOLLOW penalty for hand_size >= 6 before converting to bid
@@ -1416,34 +1358,6 @@ impl AiPlayer for Reckoner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::player_view::CurrentRoundInfo;
-    use crate::domain::state::Phase;
-
-    #[allow(dead_code)]
-    fn build_test_state_for_bidding(
-        hand: Vec<Card>,
-        hand_size: u8,
-        bids: [Option<u8>; 4],
-        player_seat: u8,
-    ) -> CurrentRoundInfo {
-        let dealer_pos = if player_seat == 0 { 3 } else { player_seat - 1 };
-        CurrentRoundInfo {
-            game_id: 1,
-            player_seat,
-            game_state: Phase::Bidding,
-            current_round: 1,
-            hand_size,
-            dealer_pos,
-            hand,
-            bids,
-            trump: None,
-            trick_no: 0,
-            current_trick_plays: Vec::new(),
-            scores: [0, 0, 0, 0],
-            tricks_won: [0, 0, 0, 0],
-            trick_leader: None,
-        }
-    }
 
     #[test]
     fn test_follow_mid_bids_reduce_by_one() {
