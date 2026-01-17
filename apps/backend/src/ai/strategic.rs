@@ -32,8 +32,6 @@ enum WinCertainty {
 
 /// Context for scoring cards in bid-target-driven selection.
 struct ScoringContext<'a> {
-    #[allow(dead_code)]
-    legal: &'a [Card],
     current_plays: &'a [(u8, Card)],
     lead_suit: Option<Suit>,
     trump: Trump,
@@ -41,8 +39,6 @@ struct ScoringContext<'a> {
     pressure: f32,
     avoid: bool,
     need: u8,
-    #[allow(dead_code)]
-    tricks_remaining: u8,
 
     memory: Option<&'a RoundMemory>,
     my_hand: &'a [Card],
@@ -113,19 +109,6 @@ impl Strategic {
             Rank::Eight => 0.0 + (0.1 * (scale_factor - 1.0).max(0.0)),
             Rank::Seven => 0.0 + (0.05 * (scale_factor - 1.0).max(0.0)),
             _ => 0.0,
-        }
-    }
-
-    #[allow(dead_code)]
-    fn rank_weight_for_trump(rank: Rank) -> f32 {
-        match rank {
-            Rank::Ace => 1.0,
-            Rank::King => 0.9,
-            Rank::Queen => 0.7,
-            Rank::Jack => 0.55,
-            Rank::Ten => 0.45,
-            Rank::Nine => 0.3,
-            _ => 0.15,
         }
     }
 
@@ -1362,7 +1345,6 @@ impl Strategic {
         );
 
         let ctx = ScoringContext {
-            legal: &legal,
             current_plays: &state.current_trick_plays,
             lead_suit,
             trump,
@@ -1370,7 +1352,6 @@ impl Strategic {
             pressure,
             avoid,
             need,
-            tricks_remaining,
 
             memory,
             my_hand,
