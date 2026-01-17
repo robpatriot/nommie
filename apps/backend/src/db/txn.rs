@@ -27,7 +27,6 @@ impl SharedTxn {
     /// # Test-only utility
     /// This method is primarily used in integration tests. It cannot be marked `#[cfg(test)]`
     /// because integration tests are in a separate crate.
-    #[allow(dead_code)]
     pub async fn open(conn: &DatabaseConnection) -> Result<Self, sea_orm::DbErr> {
         let txn = conn.begin().await?;
         Ok(SharedTxn(Arc::new(txn)))
@@ -45,7 +44,6 @@ impl SharedTxn {
     /// # Test-only utility
     /// This method is primarily used in integration tests. It cannot be marked `#[cfg(test)]`
     /// because integration tests are in a separate crate.
-    #[allow(dead_code)]
     pub fn inject(&self, req: &mut HttpRequest) {
         req.extensions_mut().insert(self.clone());
     }
@@ -65,7 +63,6 @@ impl SharedTxn {
     /// # Test-only utility
     /// This method is primarily used in integration tests. It cannot be marked `#[cfg(test)]`
     /// because integration tests are in a separate crate.
-    #[allow(dead_code)]
     pub async fn rollback(self) -> Result<(), sea_orm::DbErr> {
         let txn = Arc::try_unwrap(self.0).map_err(|_| {
             sea_orm::DbErr::Custom("Cannot rollback: transaction is still shared".to_string())
@@ -81,7 +78,6 @@ impl SharedTxn {
     /// # Test-only utility
     /// This method is primarily used in integration tests. It cannot be marked `#[cfg(test)]`
     /// because integration tests are in a separate crate.
-    #[allow(dead_code)]
     pub fn strong_count(&self) -> usize {
         Arc::strong_count(&self.0)
     }

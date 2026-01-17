@@ -81,7 +81,6 @@ pub struct CurrentRoundInfo {
     /// Game ID (for loading additional data like [`crate::domain::player_view::GameHistory`])
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub game_id: i64,
 
     /// Your seat position (0-3), determines turn order
@@ -93,7 +92,6 @@ pub struct CurrentRoundInfo {
     /// Current round number (0-25, there are 26 rounds total)
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub current_round: u8,
 
     /// Number of cards each player has this round (varies: 13→2→2→2→3→13)
@@ -369,7 +367,6 @@ pub struct RoundScoreDetail {
     /// Points earned this round (+1 per trick, +10 bonus for exact bid)
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub round_score: u8,
 
     /// Total score after this round (cumulative)

@@ -16,7 +16,6 @@ pub struct RoundMemory {
     /// The memory mode that produced this data
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub mode: MemoryMode,
     /// Completed tricks with potentially degraded card information
     ///
@@ -37,7 +36,6 @@ pub struct TrickMemory {
     /// Trick number (1 to hand_size)
     ///
     /// Part of the public API for AI players. May be read by external AI implementations.
-    #[allow(dead_code)]
     pub trick_no: u8,
     /// What the AI remembers about each play (seat, card memory)
     ///
@@ -80,7 +78,6 @@ impl PlayMemory {
     /// Check if this memory is exact (not degraded).
     ///
     /// Part of the public API for AI players.
-    #[allow(dead_code)]
     pub fn is_exact(&self) -> bool {
         matches!(self, PlayMemory::Exact(_))
     }
@@ -88,7 +85,6 @@ impl PlayMemory {
     /// Check if this play is completely forgotten.
     ///
     /// Part of the public API for AI players.
-    #[allow(dead_code)]
     pub fn is_forgotten(&self) -> bool {
         matches!(self, PlayMemory::Forgotten)
     }
@@ -96,7 +92,6 @@ impl PlayMemory {
     /// Get the exact card if memory is perfect, None otherwise.
     ///
     /// Part of the public API for AI players.
-    #[allow(dead_code)]
     pub fn exact_card(&self) -> Option<Card> {
         match self {
             PlayMemory::Exact(card) => Some(*card),
