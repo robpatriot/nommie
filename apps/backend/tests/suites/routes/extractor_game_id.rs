@@ -27,6 +27,7 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
 
     // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
+    use crate::support::test_seed;
     let shared = SharedTxn::open(db).await?;
 
     // Create a test game in the database using the shared txn
@@ -38,6 +39,7 @@ async fn happy_path_returns_id() -> Result<(), Box<dyn std::error::Error>> {
         version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
+        rng_seed: Set(test_seed("extractor_game_id").to_vec()),
         ..Default::default()
     };
     let game = game.insert(shared.transaction()).await?;

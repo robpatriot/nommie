@@ -126,7 +126,7 @@ pub async fn create_fresh_lobby_game(
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),
         rules_version: Set("1.0".to_string()),
-        rng_seed: Set(Some(rng_seed)),
+        rng_seed: Set(rng_seed.to_vec()),
         current_round: Set(None),
         starting_dealer_pos: Set(None),
         current_trick_no: Set(0i16),

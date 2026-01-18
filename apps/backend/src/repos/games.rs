@@ -25,7 +25,7 @@ pub struct Game {
     pub ended_at: Option<time::OffsetDateTime>,
     pub name: Option<String>,
     pub rules_version: String,
-    pub rng_seed: Option<i64>,
+    pub rng_seed: Vec<u8>,
     pub current_round: Option<u8>,
     pub starting_dealer_pos: Option<u8>,
     pub current_trick_no: u8,

@@ -21,3 +21,4 @@ pub mod websocket;
 pub mod websocket_client;
 
 pub use test_state::{build_test_state, resolve_test_db_kind, test_state_builder};
+pub use test_utils::test_seed;

@@ -42,14 +42,8 @@ impl GameFlowService {
 
         // Derive deterministic dealing seed from game seed
         // Game seed is generated from entropy at creation, then all randomness flows from it
-        let game_seed = game.rng_seed.ok_or_else(|| {
-            AppError::internal(
-                crate::errors::ErrorCode::InternalError,
-                "game missing RNG seed",
-                std::io::Error::other(format!("Game {game_id} missing rng_seed field")),
-            )
-        })?;
-        let dealing_seed = crate::domain::derive_dealing_seed(game_seed, next_round);
+        let game_seed = crate::domain::require_seed_32(&game.rng_seed)?;
+        let dealing_seed = crate::domain::derive_dealing_seed(&game_seed, next_round)?;
 
         // Deal hands using domain logic
         let dealt_hands = deal_hands(4, hand_size, dealing_seed)?;

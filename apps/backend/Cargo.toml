@@ -51,7 +51,9 @@ regex = "1"
 unicode-normalization = "0.1"
 
 # Concurrency and hashing
-rand = "0.9"
+rand = { version = "0.9", features = ["os_rng"] }
+rand_chacha = "0.9"
+blake3 = "1"
 dashmap = "6"
 moka = { version = "0.12", features = ["future"] }
 xxhash-rust = { version = "0.8", features = ["xxh3"] }

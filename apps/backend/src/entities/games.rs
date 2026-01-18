@@ -54,8 +54,8 @@ pub struct Model {
     pub name: Option<String>,
     #[sea_orm(column_name = "rules_version")]
     pub rules_version: String,
-    #[sea_orm(column_name = "rng_seed")]
-    pub rng_seed: Option<i64>,
+    #[sea_orm(column_name = "rng_seed", column_type = "VarBinary(StringLen::None)")]
+    pub rng_seed: Vec<u8>,
     #[sea_orm(column_name = "current_round", column_type = "SmallInteger")]
     pub current_round: Option<i16>,
     #[sea_orm(column_name = "starting_dealer_pos", column_type = "SmallInteger")]

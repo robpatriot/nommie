@@ -61,4 +61,4 @@ pub use dealing::deal_hands;
 pub use game_context::GameContext;
 pub use round_memory::RoundMemory;
 pub use rules::hand_size_for_round;
-pub use seed_derivation::{derive_dealing_seed, derive_memory_seed};
+pub use seed_derivation::{derive_dealing_seed, derive_memory_seed, require_seed_32};

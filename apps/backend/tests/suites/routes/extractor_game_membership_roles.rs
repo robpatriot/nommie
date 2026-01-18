@@ -21,7 +21,7 @@ use time::OffsetDateTime;
 use crate::support::app_builder::create_test_app;
 use crate::support::auth::mint_test_token;
 use crate::support::factory::create_test_user;
-use crate::support::test_state_builder;
+use crate::support::{test_seed, test_state_builder};
 
 /// Test-only handler that requires Player role
 async fn player_only_action(
@@ -102,6 +102,7 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
         version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
+        rng_seed: Set(test_seed("extractor_roles").to_vec()),
         ..Default::default()
     };
     let game = game.insert(shared.transaction()).await?;
@@ -183,6 +184,7 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
         version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
+        rng_seed: Set(test_seed("extractor_roles").to_vec()),
         ..Default::default()
     };
     let game = game.insert(shared.transaction()).await?;

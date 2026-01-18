@@ -6,10 +6,18 @@ use std::collections::HashSet;
 use crate::domain::dealing::deal_hands;
 use crate::domain::Card;
 
+fn mix32(master_seed: u64, deal_index: u64) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"nommie/test/mix32");
+    hasher.update(&master_seed.to_le_bytes());
+    hasher.update(&deal_index.to_le_bytes());
+    *hasher.finalize().as_bytes()
+}
+
 /// Deterministic dealing test with known seed
 #[test]
 fn test_deterministic_dealing_with_known_seed() {
-    let seed: u64 = 42;
+    let seed = mix32(42, 0);
     let hand_size: u8 = 5;
 
     let hands1 = deal_hands(4, hand_size, seed).unwrap();
@@ -27,7 +35,7 @@ fn test_deterministic_dealing_with_known_seed() {
     let hands3 = deal_hands(4, hand_size, seed).unwrap();
     assert_eq!(
         hands3[0][0], first_card,
-        "First card for player 0 must be deterministic for seed={seed}"
+        "First card for player 0 must be deterministic"
     );
 }
 
@@ -36,8 +44,8 @@ fn test_deterministic_dealing_with_known_seed() {
 fn test_different_seeds_produce_different_hands() {
     let hand_size: u8 = 13;
 
-    let hands1 = deal_hands(4, hand_size, 111).unwrap();
-    let hands2 = deal_hands(4, hand_size, 222).unwrap();
+    let hands1 = deal_hands(4, hand_size, mix32(111, 0)).unwrap();
+    let hands2 = deal_hands(4, hand_size, mix32(222, 0)).unwrap();
 
     // Different seeds should produce different hands (with extremely high probability)
     assert_ne!(
@@ -49,10 +57,10 @@ fn test_different_seeds_produce_different_hands() {
 /// Test validation errors for invalid inputs
 #[test]
 fn test_dealing_validates_player_count() {
-    let result = deal_hands(3, 5, 12345);
+    let result = deal_hands(3, 5, [0u8; 32]);
     assert!(result.is_err(), "Should reject player_count != 4");
 
-    let result = deal_hands(5, 5, 12345);
+    let result = deal_hands(5, 5, [0u8; 32]);
     assert!(result.is_err(), "Should reject player_count != 4");
 }
 
@@ -60,30 +68,30 @@ fn test_dealing_validates_player_count() {
 fn test_dealing_validates_hand_size() {
     // Too small
     assert!(
-        deal_hands(4, 1, 12345).is_err(),
+        deal_hands(4, 1, [0u8; 32]).is_err(),
         "Should reject hand_size < 2"
     );
 
     // Too large
     assert!(
-        deal_hands(4, 14, 12345).is_err(),
+        deal_hands(4, 14, [0u8; 32]).is_err(),
         "Should reject hand_size > 13"
     );
 
     // Valid boundary cases
     assert!(
-        deal_hands(4, 2, 12345).is_ok(),
+        deal_hands(4, 2, [0u8; 32]).is_ok(),
         "Should accept hand_size = 2"
     );
     assert!(
-        deal_hands(4, 13, 12345).is_ok(),
+        deal_hands(4, 13, [0u8; 32]).is_ok(),
         "Should accept hand_size = 13"
     );
 }
 
 #[test]
 fn test_hands_are_sorted() {
-    let hands = deal_hands(4, 10, 99999).unwrap();
+    let hands = deal_hands(4, 10, mix32(99999, 0)).unwrap();
 
     for (i, hand) in hands.iter().enumerate() {
         let mut sorted = hand.clone();
@@ -94,7 +102,7 @@ fn test_hands_are_sorted() {
 
 #[test]
 fn test_no_duplicate_cards_across_hands() {
-    let hands = deal_hands(4, 13, 42).unwrap();
+    let hands = deal_hands(4, 13, mix32(42, 0)).unwrap();
 
     let mut all_cards: Vec<Card> = Vec::new();
     for hand in &hands {
@@ -115,7 +123,7 @@ fn test_no_duplicate_cards_across_hands() {
 
 #[test]
 fn test_dealing_produces_correct_hand_sizes() {
-    let hands = deal_hands(4, 5, 12345).unwrap();
+    let hands = deal_hands(4, 5, mix32(12345, 0)).unwrap();
 
     // Verify each hand has the correct size
     for hand in &hands {
@@ -129,7 +137,7 @@ fn test_dealing_produces_correct_hand_sizes() {
 
 #[test]
 fn test_dealing_hand_uniqueness() {
-    let hands = deal_hands(4, 3, 999).unwrap();
+    let hands = deal_hands(4, 3, mix32(999, 0)).unwrap();
 
     // Verify no card appears in multiple hands
     let mut all_cards: Vec<Card> = Vec::new();
@@ -167,14 +175,6 @@ fn test_suit_distribution_bias() {
     // df=9 (4x4), alpha=0.001
     const CHI2_CRIT_DF9_ALPHA_0_001: f64 = 27.877;
 
-    fn mix64(mut x: u64) -> u64 {
-        x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = x;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-
     fn chi_square_gof(observed: &[u32], expected: f64) -> f64 {
         observed
             .iter()
@@ -210,7 +210,7 @@ fn test_suit_distribution_bias() {
 
     for batch in 0..NUM_BATCHES {
         // Clippy-friendly grouping (4-hex-digit groups)
-        let master_seed = mix64(0x000D_1EAD_BA5E_5EED_u64 ^ (batch as u64));
+        let master_seed = 0x000D_1EAD_BA5E_5EED_u64 ^ (batch as u64);
 
         // Overall suit counts in this batch
         let mut suit_counts: HashMap<Suit, u32> = HashMap::new();
@@ -238,7 +238,7 @@ fn test_suit_distribution_bias() {
 
         for i in 0..DEALS_PER_BATCH {
             let deal_index = batch * DEALS_PER_BATCH + i;
-            let seed = mix64(master_seed ^ (deal_index as u64));
+            let seed = mix32(master_seed, deal_index as u64);
             let hands = deal_hands(4, HAND_SIZE, seed).unwrap();
 
             for (player_idx, hand) in hands.iter().enumerate() {
@@ -349,14 +349,6 @@ fn test_rank_distribution_bias() {
     // Variance estimate is noisy; keep this lenient.
     const MAX_ALLOWED_VARIANCE_REL_SPREAD: f64 = 0.30; // (max-min)/min
 
-    fn mix64(mut x: u64) -> u64 {
-        x = x.wrapping_add(0x9E37_79B9_7F4A_7C15);
-        let mut z = x;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-        z ^ (z >> 31)
-    }
-
     fn chi_square_gof(observed: &[u32], expected: f64) -> f64 {
         observed
             .iter()
@@ -423,7 +415,7 @@ fn test_rank_distribution_bias() {
     }
 
     for batch in 0..NUM_BATCHES {
-        let master_seed = mix64(0x52A1_8A53_EEED_BA5E_u64 ^ (batch as u64));
+        let master_seed = 0x52A1_8A53_EEED_BA5E_u64 ^ (batch as u64);
 
         let mut rank_by_player = [[0u32; 13]; 4];
         let mut total_hand_sum_by_player = [0u64; 4];
@@ -438,7 +430,7 @@ fn test_rank_distribution_bias() {
 
         for i in 0..DEALS_PER_BATCH {
             let deal_index = batch * DEALS_PER_BATCH + i;
-            let seed = mix64(master_seed ^ (deal_index as u64));
+            let seed = mix32(master_seed, deal_index as u64);
             let hands = deal_hands(4, HAND_SIZE, seed).unwrap();
 
             for (player_idx, hand) in hands.iter().enumerate() {

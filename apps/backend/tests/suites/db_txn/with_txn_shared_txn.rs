@@ -27,6 +27,7 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
     // Write via with_txn using the shared transaction and confirm existence inside txn
     let inserted_id = with_txn(Some(&req), &state, |txn| {
         Box::pin(async move {
+            use crate::support::test_seed;
             let now = time::OffsetDateTime::now_utc();
             let game = games::ActiveModel {
                 visibility: Set(GameVisibility::Private),
@@ -34,6 +35,7 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
                 rules_version: Set("nommie-1.0.0".to_string()),
                 created_at: Set(now),
                 updated_at: Set(now),
+                rng_seed: Set(test_seed("with_txn_shared_txn").to_vec()),
                 ..Default::default()
             };
 

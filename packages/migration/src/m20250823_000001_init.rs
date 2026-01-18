@@ -516,7 +516,7 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("nommie-1.0.0"),
                     )
-                    .col(ColumnDef::new(Games::RngSeed).big_integer().null())
+                    .col(ColumnDef::new(Games::RngSeed).binary().not_null())
                     .col(ColumnDef::new(Games::CurrentRound).small_integer().null())
                     .col(
                         ColumnDef::new(Games::StartingDealerPos)
@@ -577,6 +577,20 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
+
+        // Add CHECK constraint for rng_seed length (Postgres only)
+        if matches!(
+            manager.get_database_backend(),
+            sea_orm::DatabaseBackend::Postgres
+        ) {
+            manager
+                .get_connection()
+                .execute(Statement::from_string(
+                    sea_orm::DatabaseBackend::Postgres,
+                    "ALTER TABLE games ADD CONSTRAINT ck_games_rng_seed_length CHECK (octet_length(rng_seed) = 32)".to_string(),
+                ))
+                .await?;
+        }
 
         // ai_profiles catalog
         manager

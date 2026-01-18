@@ -85,7 +85,7 @@ pub async fn setup_game_with_players_ex<C: ConnectionTrait>(
         let user = users::ActiveModel {
             id: NotSet,
             sub: Set(user_sub),
-            username: Set(Some(format!("player{i}_{rng_seed}"))),
+            username: Set(Some(format!("player{i}"))),
             is_ai: Set(false),
             created_at: Set(now),
             updated_at: Set(now),
@@ -101,7 +101,7 @@ pub async fn setup_game_with_players_ex<C: ConnectionTrait>(
         rules_version: Set("nommie-1.0.0".to_string()),
         created_at: Set(now),
         updated_at: Set(now),
-        rng_seed: Set(Some(rng_seed)),
+        rng_seed: Set(rng_seed.to_vec()),
         version: Set(1),
         ..Default::default()
     };

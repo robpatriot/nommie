@@ -1,9 +1,6 @@
 // General test utilities
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-
-/// Generate a deterministic seed for a test based on its name.
+/// Generate a deterministic 32-byte seed for a test based on its name.
 ///
 /// Creates a unique, deterministic seed for each test that remains consistent
 /// across test runs but differs between tests to avoid data conflicts.
@@ -12,30 +9,17 @@ use std::hash::{Hash, Hasher};
 /// * `test_name` - Name of the test (e.g., "test_full_game_with_ai_players")
 ///
 /// # Returns
-/// A seed in the range 10000-1009999
+/// A 32-byte seed derived from the test name hash
 ///
 /// # Example
 /// ```
 /// let seed = test_seed("test_full_game_with_ai_players");
-/// assert!(seed >= 10000 && seed < 1010000);
+/// assert_eq!(seed.len(), 32);
 /// ```
-pub fn test_seed(test_name: &str) -> i64 {
-    let mut hasher = DefaultHasher::new();
-    test_name.hash(&mut hasher);
-    (hasher.finish() % 1_000_000) as i64 + 10000 // Range: 10000-1009999
-}
-
-/// Generate a deterministic seed as u64 for functions that require u64 seeds.
-///
-/// This is a convenience function for cases where u64 is required instead of i64.
-///
-/// # Arguments
-/// * `test_name` - Name of the test (e.g., "test_full_game_with_ai_players")
-///
-/// # Returns
-/// A seed in the range 10000-1009999 as u64
-pub fn test_seed_u64(test_name: &str) -> u64 {
-    test_seed(test_name) as u64
+pub fn test_seed(test_name: &str) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(test_name.as_bytes());
+    *hasher.finalize().as_bytes()
 }
 
 /// Generate a unique user sub for a test based on its name.

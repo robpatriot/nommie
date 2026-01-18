@@ -26,7 +26,7 @@ fn create_mock_game(game_id: i64, version: i32) -> Game {
         ended_at: None,
         name: None,
         rules_version: "nommie-1.0.0".to_string(),
-        rng_seed: None,
+        rng_seed: vec![0u8; 32],
         current_round: None,
         starting_dealer_pos: None,
         current_trick_no: 0,

@@ -45,7 +45,7 @@ struct Args {
     #[arg(long, default_value = "strategic")]
     seat3: AiType,
 
-    /// Game seed (for deterministic games)
+    /// Game seed (for deterministic games) - if provided, fills first 8 bytes of 32-byte seed
     #[arg(long)]
     seed: Option<u64>,
 
@@ -160,15 +160,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut results = Vec::new();
     let mut errors = 0;
 
-    // Initialize RNG for random seeds if not provided
-    let mut rng = rand::rng();
-
     for game_num in 1..=args.games {
         let game_start = Instant::now();
-        let game_seed = args.seed.map(|s| s as i64).unwrap_or_else(|| {
-            // Generate random seed if no seed provided
-            rng.random::<i64>()
-        });
+        let game_seed: [u8; 32] = if let Some(s) = args.seed {
+            // If seed is provided, use it to fill first 8 bytes, rest zeros
+            let mut seed = [0u8; 32];
+            seed[..8].copy_from_slice(&s.to_le_bytes());
+            seed
+        } else {
+            // Generate random 32-byte seed
+            rand::random()
+        };
 
         let game_res = run_game(game_num, game_seed, &ais);
 
@@ -180,7 +182,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Build and write metrics
                 let metrics = build_game_metrics(
                     game_num,
-                    game_seed,
+                    &game_seed,
                     ai_types.clone(),
                     args.games,
                     &result,
@@ -241,7 +243,7 @@ fn create_ai_player(ai_type: &str) -> Result<Box<dyn AiPlayer>, Box<dyn std::err
 
 fn run_game(
     game_num: u32,
-    game_seed: i64,
+    game_seed: [u8; 32],
     ais: &[Box<dyn AiPlayer>; 4],
 ) -> Result<GameResult, Box<dyn std::error::Error>> {
     let simulator = Simulator::new(game_seed, game_num as i64);

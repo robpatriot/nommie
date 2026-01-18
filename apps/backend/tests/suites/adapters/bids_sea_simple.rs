@@ -6,7 +6,7 @@ use backend::entities::{game_rounds, round_bids};
 use backend::AppError;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
-use crate::support::build_test_state;
+use crate::support::{build_test_state, test_seed};
 
 /// Minimal test: insert and read a bid directly using SeaORM entities
 #[tokio::test]
@@ -23,6 +23,7 @@ async fn test_bid_entity_direct() -> Result<(), AppError> {
                 rules_version: Set("1.0".to_string()),
                 created_at: Set(now),
                 updated_at: Set(now),
+                rng_seed: Set(test_seed("bids_sea_simple").to_vec()),
                 current_trick_no: Set(0i16),
                 version: Set(1),
                 ..Default::default()

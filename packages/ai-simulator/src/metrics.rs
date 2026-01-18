@@ -9,7 +9,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize)]
 pub struct GameMetrics {
     pub game_id: u32,
-    pub seed: i64,
+    pub seed: String, // Hex-encoded 32-byte seed
     pub timestamp: String,
     pub config: GameConfig,
     pub result: GameResultMetrics,
@@ -78,7 +78,7 @@ pub struct BidAccuracyStats {
 /// Build metrics from game result and history.
 pub fn build_game_metrics(
     game_id: u32,
-    seed: i64,
+    seed: &[u8; 32],
     ai_types: [String; 4],
     total_games: u32,
     result: &super::simulator::GameResult,
@@ -112,7 +112,7 @@ pub fn build_game_metrics(
 
     GameMetrics {
         game_id,
-        seed,
+        seed: hex::encode(seed),
         timestamp,
         config: GameConfig {
             ai_types,
@@ -277,7 +277,7 @@ fn build_player_metrics(
 #[derive(Debug, Serialize)]
 pub struct CsvSummaryRow {
     pub game_id: u32,
-    pub seed: i64,
+    pub seed: String, // Hex-encoded
     pub winner: u8,
     pub seat0_score: i16,
     pub seat1_score: i16,
@@ -293,7 +293,7 @@ impl From<&GameMetrics> for CsvSummaryRow {
     fn from(metrics: &GameMetrics) -> Self {
         CsvSummaryRow {
             game_id: metrics.game_id,
-            seed: metrics.seed,
+            seed: metrics.seed.clone(),
             winner: metrics.result.winner,
             seat0_score: metrics.result.final_scores[0],
             seat1_score: metrics.result.final_scores[1],

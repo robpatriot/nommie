@@ -1,5 +1,9 @@
 //! Deterministic card dealing logic.
 
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
+use rand_chacha::ChaCha20Rng;
+
 use crate::domain::{Card, Rank, Suit};
 use crate::errors::domain::{DomainError, ValidationKind};
 
@@ -31,52 +35,10 @@ fn full_deck() -> Vec<Card> {
     deck
 }
 
-/// Simple deterministic RNG for shuffling.
-///
-/// Uses a SplitMix64-style generator for good statistical properties while
-/// remaining fast and deterministic given a seed.
-struct SimpleLcg {
-    state: u64,
-}
-
-impl SimpleLcg {
-    fn new(seed: u64) -> Self {
-        Self { state: seed }
-    }
-
-    fn next(&mut self) -> u64 {
-        // SplitMix64: well-distributed 64-bit generator.
-        self.state = self.state.wrapping_add(0x9E3779B97F4A7C15);
-        let mut z = self.state;
-        z ^= z >> 30;
-        z = z.wrapping_mul(0xBF58476D1CE4E5B9);
-        z ^= z >> 27;
-        z = z.wrapping_mul(0x94D049BB133111EB);
-        z ^ (z >> 31)
-    }
-
-    fn next_range(&mut self, max: usize) -> usize {
-        let m = max as u64;
-        // Compute largest multiple of m that fits in u64 to avoid modulo bias.
-        // Values >= limit are discarded using rejection sampling.
-        let limit = u64::MAX - (u64::MAX % m);
-
-        loop {
-            let x = self.next();
-            if x < limit {
-                return (x % m) as usize;
-            }
-        }
-    }
-}
-
-/// Fisher-Yates shuffle using deterministic RNG.
-fn shuffle_with_seed(deck: &mut [Card], seed: u64) {
-    let mut rng = SimpleLcg::new(seed);
-    for i in (1..deck.len()).rev() {
-        let j = rng.next_range(i + 1);
-        deck.swap(i, j);
-    }
+/// Shuffle deck using ChaCha20 RNG seeded with 32 bytes.
+fn shuffle_with_seed(deck: &mut [Card], seed: [u8; 32]) {
+    let mut rng = ChaCha20Rng::from_seed(seed);
+    deck.shuffle(&mut rng);
 }
 
 /// Deal hands deterministically given player count, hand size, and RNG seed.
@@ -87,11 +49,11 @@ fn shuffle_with_seed(deck: &mut [Card], seed: u64) {
 /// # Arguments
 /// * `player_count` - Number of players (must be 4 for now)
 /// * `hand_size` - Cards per player (must be 2..=13)
-/// * `seed` - RNG seed for deterministic shuffling
+/// * `seed` - 32-byte RNG seed for deterministic shuffling
 pub fn deal_hands(
     player_count: usize,
     hand_size: u8,
-    seed: u64,
+    seed: [u8; 32],
 ) -> Result<[Vec<Card>; 4], DomainError> {
     if player_count != 4 {
         return Err(DomainError::validation(
@@ -134,37 +96,44 @@ pub fn deal_hands(
 mod tests {
     use super::*;
 
+    fn test_seed(n: u8) -> [u8; 32] {
+        let mut seed = [0u8; 32];
+        seed[0] = n;
+        seed
+    }
+
     #[test]
     fn deal_hands_is_deterministic() {
-        let h1 = deal_hands(4, 5, 12345).unwrap();
-        let h2 = deal_hands(4, 5, 12345).unwrap();
+        let seed = test_seed(42);
+        let h1 = deal_hands(4, 5, seed).unwrap();
+        let h2 = deal_hands(4, 5, seed).unwrap();
         assert_eq!(h1, h2);
     }
 
     #[test]
     fn deal_hands_different_seeds_differ() {
-        let h1 = deal_hands(4, 5, 12345).unwrap();
-        let h2 = deal_hands(4, 5, 54321).unwrap();
+        let h1 = deal_hands(4, 5, test_seed(12)).unwrap();
+        let h2 = deal_hands(4, 5, test_seed(54)).unwrap();
         assert_ne!(h1, h2);
     }
 
     #[test]
     fn deal_hands_validates_player_count() {
-        let result = deal_hands(3, 5, 12345);
+        let result = deal_hands(3, 5, test_seed(1));
         assert!(result.is_err());
     }
 
     #[test]
     fn deal_hands_validates_hand_size() {
-        assert!(deal_hands(4, 1, 12345).is_err());
-        assert!(deal_hands(4, 14, 12345).is_err());
-        assert!(deal_hands(4, 2, 12345).is_ok());
-        assert!(deal_hands(4, 13, 12345).is_ok());
+        assert!(deal_hands(4, 1, test_seed(1)).is_err());
+        assert!(deal_hands(4, 14, test_seed(1)).is_err());
+        assert!(deal_hands(4, 2, test_seed(1)).is_ok());
+        assert!(deal_hands(4, 13, test_seed(1)).is_ok());
     }
 
     #[test]
     fn deal_hands_are_sorted() {
-        let hands = deal_hands(4, 13, 99999).unwrap();
+        let hands = deal_hands(4, 13, test_seed(99)).unwrap();
         for hand in &hands {
             let mut sorted = hand.clone();
             sorted.sort();
@@ -174,7 +143,7 @@ mod tests {
 
     #[test]
     fn deal_hands_no_duplicates() {
-        let hands = deal_hands(4, 10, 42).unwrap();
+        let hands = deal_hands(4, 10, test_seed(42)).unwrap();
         let mut all_cards: Vec<&Card> = Vec::new();
         for hand in &hands {
             all_cards.extend(hand.iter());

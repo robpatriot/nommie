@@ -234,15 +234,15 @@ impl GameFlowService {
 
                 // Derive deterministic memory seed from game seed (not AI config seed)
                 // This ensures memory is stable within a round and unique per player
-                let memory_seed = game.rng_seed.map(|game_seed| {
-                    crate::domain::derive_memory_seed(game_seed, current_round_no, player_seat)
-                });
+                let game_seed = crate::domain::require_seed_32(&game.rng_seed)?;
+                let memory_seed =
+                    crate::domain::derive_memory_seed(&game_seed, current_round_no, player_seat)?;
 
                 let degraded_tricks = crate::ai::memory::get_round_card_plays(
                     txn,
                     round.id,
                     memory_mode,
-                    memory_seed,
+                    Some(memory_seed),
                     use_memory_recency,
                 )
                 .await?;

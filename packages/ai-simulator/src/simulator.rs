@@ -43,14 +43,14 @@ pub struct Simulator {
     /// Completed tricks in current round (for building round memory)
     completed_tricks: Vec<Vec<(u8, Card)>>,
     /// Game seed (for deterministic dealing)
-    game_seed: i64,
+    game_seed: [u8; 32],
     /// Game ID (for context, can be arbitrary)
     game_id: i64,
 }
 
 impl Simulator {
     /// Create a new simulator with initial game state.
-    pub fn new(game_seed: i64, game_id: i64) -> Self {
+    pub fn new(game_seed: [u8; 32], game_id: i64) -> Self {
         Self {
             state: GameState {
                 phase: Phase::Init,
@@ -98,7 +98,8 @@ impl Simulator {
             hand_size_for_round(round_no).ok_or_else(|| SimulatorError::InvalidRound(round_no))?;
 
         // Derive dealing seed from game seed
-        let dealing_seed = derive_dealing_seed(self.game_seed, round_no);
+        let dealing_seed = derive_dealing_seed(&self.game_seed, round_no)
+            .map_err(|e| SimulatorError::DomainError(format!("Seed derivation failed: {e}")))?;
 
         // Deal hands
         let hands = deal_hands(4, hand_size, dealing_seed)

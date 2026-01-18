@@ -86,6 +86,7 @@ pub async fn create_snapshot_game(
         created_at: Set(now),
         updated_at: Set(now),
         version: Set(options.version),
+        rng_seed: Set(vec![0u8; 32]),
         ..Default::default()
     };
 

@@ -6,7 +6,13 @@ use backend::db::txn::SharedTxn;
 use backend::AppError;
 
 use crate::support::build_test_state;
-use crate::support::test_utils::{test_seed, test_seed_u64};
+use crate::support::test_utils::test_seed;
+
+/// Convert test seed to u64 for memory functions that require u64
+fn test_seed_u64(name: &str) -> u64 {
+    let seed = test_seed(name);
+    u64::from_le_bytes(seed[..8].try_into().unwrap())
+}
 
 #[actix_web::test]
 async fn test_memory_degradation_determinism() -> Result<(), AppError> {
@@ -213,7 +219,7 @@ async fn create_test_round_with_plays(
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),
         rules_version: Set("1".to_string()),
-        rng_seed: Set(Some(test_seed("helper_round_plays"))),
+        rng_seed: Set(test_seed("helper_round_plays").to_vec()),
         current_round: Set(Some(1i16)),
         starting_dealer_pos: Set(Some(0i16)),
         current_trick_no: Set(1i16),

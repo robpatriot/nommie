@@ -21,7 +21,7 @@ pub async fn insert_minimal_game_for_test<C: ConnectionTrait>(
         ended_at: Set(None),
         name: Set(Some(name.to_string())),
         rules_version: Set("nommie-1.0.0".to_string()),
-        rng_seed: Set(None),
+        rng_seed: Set(vec![0u8; 32]),
         current_round: Set(None),
         starting_dealer_pos: Set(None),
         current_trick_no: Set(0i16),

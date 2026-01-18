@@ -16,7 +16,7 @@ use time::OffsetDateTime;
 
 use crate::support::auth::bearer_header;
 use crate::support::factory::seed_user_with_sub;
-use crate::support::{build_test_state, test_state_builder};
+use crate::support::{build_test_state, test_seed, test_state_builder};
 
 /// Insert a minimal game, return its id
 async fn insert_test_game(
@@ -30,6 +30,7 @@ async fn insert_test_game(
         version: Set(1),
         created_at: Set(now),
         updated_at: Set(now),
+        rng_seed: Set(test_seed("shared_txn_test").to_vec()),
         ..Default::default()
     };
     let game = game.insert(db).await?;
