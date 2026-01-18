@@ -2,6 +2,9 @@ const createNextIntlPlugin = require('next-intl/plugin')
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
+const canonicalBackendBase =
+  process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // App Router is stable in Next.js 15, no need for experimental flag
@@ -20,12 +23,12 @@ const nextConfig = {
   },
   
   env: {
-    NEXT_PUBLIC_BACKEND_BASE_URL: process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL,
+    NEXT_PUBLIC_BACKEND_BASE_URL: canonicalBackendBase,
     NEXT_PUBLIC_BACKEND_WS_URL:
       process.env.BACKEND_WS_URL ||
       process.env.NEXT_PUBLIC_BACKEND_WS_URL ||
-      (process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
-        ? (process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL).replace(/^http/, 'ws')
+      (canonicalBackendBase
+        ? canonicalBackendBase.replace(/^http/, 'ws')
         : undefined),
   },
   output: 'standalone',
@@ -35,15 +38,15 @@ const nextConfig = {
     // while restricting external sources to only what's needed
     
     // Get backend URLs for CSP connect-src directive
-    const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
-    const backendWsUrl = process.env.NEXT_PUBLIC_BACKEND_WS_URL
-    
+  const backendBaseUrl = process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+  const backendWsUrl = process.env.BACKEND_WS_URL || process.env.NEXT_PUBLIC_BACKEND_WS_URL
+      
     // Build connect-src directive with backend URLs
     const connectSrc = [
       "'self'",
       'https://accounts.google.com', // Google OAuth
     ]
-    
+
     if (backendBaseUrl) {
       // Add HTTP/HTTPS backend URL
       try {

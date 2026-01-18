@@ -20,9 +20,9 @@ COPY docker/prod/backend_base_url.env /tmp/backend_base_url.env
 RUN pnpm install --frozen-lockfile
 
 RUN set -a && . /tmp/backend_base_url.env && set +a && \
-    if [ -z "${NEXT_PUBLIC_BACKEND_BASE_URL:-}" ]; then \
+    if [ -z "${BACKEND_BASE_URL:-}" ]; then \
       echo >&2 "❌ FRONTEND BUILD CONFIG ERROR"; \
-      echo >&2 "   Missing NEXT_PUBLIC_BACKEND_BASE_URL Expected in: docker/prod/backend_base_url.env"; \
+      echo >&2 "   Missing BACKEND_BASE_URL Expected in: docker/prod/backend_base_url.env"; \
       exit 2; \
     fi && \
     pnpm --filter @nommie/frontend exec next build
