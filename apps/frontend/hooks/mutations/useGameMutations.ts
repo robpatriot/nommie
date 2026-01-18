@@ -115,6 +115,9 @@ export function useDeleteGame() {
     },
     onSuccess: (_, { gameId }) => {
       // Invalidate games list and remove the specific game from cache
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.waitingLongest(),
+      })
       queryClient.invalidateQueries({ queryKey: queryKeys.games.listRoot() })
       queryClient.removeQueries({ queryKey: queryKeys.games.detail(gameId) })
     },
