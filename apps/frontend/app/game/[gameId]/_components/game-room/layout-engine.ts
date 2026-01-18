@@ -216,10 +216,12 @@ export function computeLayout(
 ): LayoutStructure {
   // Step 0: One row check
   if (fitsInOneRow(cards.length, viewportWidth)) {
-    // Return single row in canonical order S, H, C, D
-    const groups = getSuitGroups(cards) // Already S,H,C,D
+    // Return single row, optimized for color alternation if suits are missing
+    const allGroups = getSuitGroups(cards)
+    const activeGroups = allGroups.filter((g) => g.count > 0)
+    const orderedGroups = arrangeRowGroups(activeGroups)
     return {
-      topRow: flattenGroups(groups),
+      topRow: flattenGroups(orderedGroups),
       bottomRow: [],
     }
   }

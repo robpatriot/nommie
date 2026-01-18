@@ -24,7 +24,7 @@ const WIDE_VIEWPORT = 2000
 
 describe('Layout Engine (Deterministic Decision Tree)', () => {
   describe('Step 0: Fit One Row', () => {
-    it('returns single row in canonical order S,H,C,D when fitting', () => {
+    it('returns single row in canonical order S,H,C,D when fitting all suits', () => {
       // Input is mixed up
       const hand = mkHand('2C 2H 2S 2D')
       // Wide viewport
@@ -32,6 +32,22 @@ describe('Layout Engine (Deterministic Decision Tree)', () => {
       // Expect sorted S, H, C, D
       expect(res.top).toBe('2S 2H 2C 2D')
       expect(res.bot).toBe('')
+    })
+
+    it('rearranges suits to alternate colors when void in one suit', () => {
+      // Void Hearts: S, C, D. S(B), C(B), D(R).
+      // Canonical: S C D (B B R) -> 1 violation.
+      // Better: S D C (B R B) -> 0 violations.
+      const handH = mkHand('2D 2C 2S')
+      const resH = getLayout(handH, WIDE_VIEWPORT)
+      expect(resH.top).toBe('2S 2D 2C') // S(0)<C(2), so S is checked first for first position
+
+      // Void Clubs: S, H, D. S(B), H(R), D(R).
+      // Canonical: S H D (B R R) -> 1 violation.
+      // Better: H S D (R B R) -> 0 violations.
+      const handC = mkHand('2D 2H 2S')
+      const resC = getLayout(handC, WIDE_VIEWPORT)
+      expect(resC.top).toBe('2H 2S 2D')
     })
   })
 
