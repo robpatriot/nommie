@@ -186,8 +186,11 @@ export async function getAvailableGames(): Promise<Game[]> {
   return data.games
 }
 
-export async function getLastActiveGame(): Promise<number | null> {
-  const response = await fetchWithAuth('/api/games/last-active')
+export async function getWaitingLongestGame(
+  excludeGameId?: number
+): Promise<number | null> {
+  const query = excludeGameId ? `?exclude_game_id=${excludeGameId}` : ''
+  const response = await fetchWithAuth(`/api/games/waiting-longest${query}`)
   const data: LastActiveGameResponse = await response.json()
   return data.game_id ?? null
 }

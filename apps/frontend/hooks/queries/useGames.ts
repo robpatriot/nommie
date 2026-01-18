@@ -5,7 +5,7 @@ import {
   refreshGamesListAction,
   getGameHistoryAction,
 } from '@/app/actions/game-actions'
-import { getLastActiveGame } from '@/lib/api'
+import { getWaitingLongestGame } from '@/lib/api'
 import {
   handleActionResultError,
   toQueryError,
@@ -21,7 +21,7 @@ import type { GameHistoryApiResponse } from '@/app/actions/game-actions'
  */
 export function useAvailableGames(initialData?: Game[]) {
   return useQuery({
-    queryKey: queryKeys.games.lists(),
+    queryKey: queryKeys.games.listRoot(),
     queryFn: async () => {
       const result = await refreshGamesListAction()
       if (result.kind === 'error') {
@@ -36,24 +36,25 @@ export function useAvailableGames(initialData?: Game[]) {
 }
 
 /**
- * Query hook to fetch the last active game ID.
- * Uses the getLastActiveGame server function.
- * Errors are handled consistently through toQueryError.
+ * Query hook to fetch the game ID that has been waiting the longest.
+ * Uses the getWaitingLongestGame server function.
+ * @param options.excludeGameId - Optional ID of a game to exclude from the result
  */
-export function useLastActiveGame(options?: { enabled?: boolean }) {
+export function useWaitingLongestGame(options?: {
+  excludeGameId?: number
+  enabled?: boolean
+}) {
   return useQuery({
-    queryKey: queryKeys.games.lastActive(),
+    queryKey: queryKeys.games.waitingLongest(options?.excludeGameId),
     queryFn: async () => {
       try {
-        return await getLastActiveGame()
+        return await getWaitingLongestGame(options?.excludeGameId)
       } catch (error) {
-        // Ensure consistent error handling - fetchWithAuth throws BackendApiError,
-        // but wrap in toQueryError for consistency with other queries
-        throw toQueryError(error, 'Failed to fetch last active game')
+        throw toQueryError(error, 'Failed to fetch waiting game')
       }
     },
-    // 60 seconds - changes infrequently (only when user joins/leaves games)
-    staleTime: 60 * 1000,
+    // 10 seconds - more responsive than the old 60s
+    staleTime: 10 * 1000,
     enabled: options?.enabled ?? true,
   })
 }

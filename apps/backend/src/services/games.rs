@@ -496,9 +496,9 @@ impl GameService {
 
     /// Find the game that has been waiting for the user to act the longest.
     ///
-    /// Returns the game ID of the game where:
+    /// Prioritizes games where:
     /// - The user is a player (not spectator)
-    /// - It is currently the user's turn to act
+    /// - It is currently the user's turn (Bidding, TrumpSelection, or TrickPlay)
     /// - The game has been waiting the longest (oldest updated_at)
     ///
     /// If no games are waiting for the user, falls back to the most recently active game
@@ -507,24 +507,29 @@ impl GameService {
     /// # Arguments
     /// * `txn` - Database transaction
     /// * `user_id` - ID of the user
+    /// * `exclude_game_id` - Optional ID of a game to exclude
     ///
     /// # Returns
     /// Option<i64> - Game ID if found, None if user has no games
-    pub async fn find_last_active_game(
+    pub async fn game_waiting_longest(
         &self,
         txn: &DatabaseTransaction,
         user_id: i64,
+        exclude_game_id: Option<i64>,
     ) -> Result<Option<i64>, AppError> {
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
         // Find all games where user is a player (not spectator)
-        let memberships = game_players::Entity::find()
+        let mut query = game_players::Entity::find()
             .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
             .filter(game_players::Column::HumanUserId.eq(user_id))
-            .filter(game_players::Column::Role.eq(game_players::GameRole::Player))
-            .all(txn)
-            .await
-            .map_err(AppError::from)?;
+            .filter(game_players::Column::Role.eq(game_players::GameRole::Player));
+
+        if let Some(exclude_id) = exclude_game_id {
+            query = query.filter(game_players::Column::GameId.ne(exclude_id));
+        }
+
+        let memberships = query.all(txn).await.map_err(AppError::from)?;
 
         if memberships.is_empty() {
             return Ok(None);
@@ -535,7 +540,6 @@ impl GameService {
             std::collections::HashMap::new();
         for membership in &memberships {
             if let Some(turn_order) = membership.turn_order {
-                // Convert i16 to u8 (turn_order is 0-3, so this is safe)
                 if let Ok(turn_order_u8) = u8::try_from(turn_order) {
                     game_id_to_turn_order.insert(membership.game_id, turn_order_u8);
                 }
@@ -543,7 +547,7 @@ impl GameService {
         }
 
         // Get all games where user is a member, filtered to actionable states only
-        // (Bidding, TrumpSelection, TrickPlay - skip Lobby, Completed, etc.)
+        // (Bidding, TrumpSelection, TrickPlay - skip Lobby, BetweenRounds, etc.)
         let actionable_states = [
             DbGameState::Bidding,
             DbGameState::TrumpSelection,
@@ -553,7 +557,7 @@ impl GameService {
         let actionable_games = games::Entity::find()
             .filter(games::Column::Id.is_in(game_ids.clone()))
             .filter(games::Column::State.is_in(actionable_states))
-            .order_by_asc(games::Column::UpdatedAt)
+            .order_by_asc(games::Column::UpdatedAt) // Waiting longest first
             .all(txn)
             .await
             .map_err(AppError::from)?;
@@ -564,29 +568,22 @@ impl GameService {
             let game = games_repo::Game::from(game_model.clone());
             let user_turn_order = match game_id_to_turn_order.get(&game.id) {
                 Some(&order) => order,
-                None => continue, // User not a player in this game
+                None => continue,
             };
 
-            // Check if it's currently the user's turn
             match game_flow_service.determine_next_action(txn, &game).await {
                 Ok(Some((seat, _))) if seat == user_turn_order => {
-                    // Found a game waiting for the user - return it (oldest first)
                     return Ok(Some(game.id));
                 }
-                Ok(_) => {
-                    // Not user's turn, continue
-                    continue;
-                }
-                Err(_) => {
-                    // Error determining action, skip this game
-                    continue;
-                }
+                _ => continue,
             }
         }
 
         // No games waiting for the user - fall back to most recently active game
         let last_active_game = games::Entity::find()
             .filter(games::Column::Id.is_in(game_ids))
+            .filter(games::Column::State.ne(DbGameState::Completed))
+            .filter(games::Column::State.ne(DbGameState::Abandoned))
             .order_by_desc(games::Column::UpdatedAt)
             .one(txn)
             .await

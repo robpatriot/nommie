@@ -48,7 +48,7 @@ export function useMarkPlayerReady() {
       })
       // Invalidate last active game so header button updates
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
     },
   })
@@ -77,7 +77,7 @@ export function useLeaveGame() {
       // The destination page (lobby) will fetch fresh data if needed.
       // Only invalidate last active game for header button (fire-and-forget, doesn't affect game room)
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
     },
   })
@@ -114,7 +114,7 @@ export function useRejoinGame() {
         queryKey: queryKeys.games.snapshot(request.gameId),
       })
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
       router.push(`/game/${request.gameId}`)
     },
@@ -212,7 +212,7 @@ export function useSubmitBid() {
       })
       // Invalidate last active game so header button updates
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
     },
   })
@@ -295,7 +295,7 @@ export function useSelectTrump() {
       })
       // Invalidate last active game so header button updates
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
     },
   })
@@ -378,7 +378,7 @@ export function useSubmitPlay() {
       })
       // Invalidate last active game so header button updates
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
     },
   })

@@ -33,7 +33,7 @@ import {
   signOutAction,
 } from '@/app/actions/auth-actions'
 import { useHeaderBreadcrumbs } from './header-breadcrumbs'
-import { useLastActiveGame } from '@/hooks/queries/useGames'
+import { useWaitingLongestGame } from '@/hooks/queries/useGames'
 
 type HeaderProps = {
   session: { user?: { email?: string | null } } | null
@@ -49,10 +49,16 @@ export default function Header({ session }: HeaderProps) {
   const userMenuRef = useRef<HTMLDivElement | null>(null)
   const brandMenuRef = useRef<HTMLDivElement | null>(null)
 
-  // Fetch last active game on client side for real-time updates
-  // Only fetch if user is logged in
-  const { data: activeGameId } = useLastActiveGame({
+  // Detect current game ID for exclusion from "Resume Game" logic
+  const gamePathMatch = pathname.match(/^\/game\/(\d+)/)
+  const currentGameId = gamePathMatch
+    ? parseInt(gamePathMatch[1], 10)
+    : undefined
+
+  // Fetch the game ID that has been waiting the longest for the user's attention.
+  const { data: waitingGameId } = useWaitingLongestGame({
     enabled: !!session?.user,
+    excludeGameId: currentGameId,
   })
 
   useEffect(() => {
@@ -216,7 +222,7 @@ export default function Header({ session }: HeaderProps) {
           {session?.user ? (
             <>
               <ResumeGameButton
-                lastActiveGameId={activeGameId ?? null}
+                waitingGameId={waitingGameId ?? null}
                 className="bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary"
               />
               <div className="relative" ref={userMenuRef}>

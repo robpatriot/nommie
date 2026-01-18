@@ -33,7 +33,7 @@ export function useCreateGame() {
     onSuccess: () => {
       // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
     },
   })
@@ -60,7 +60,7 @@ export function useJoinGame() {
     onSuccess: (_data, _gameId) => {
       // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
     },
   })
@@ -87,7 +87,7 @@ export function useSpectateGame() {
     onSuccess: (_data, _gameId) => {
       // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.lastActive(),
+        queryKey: queryKeys.games.waitingLongest(),
       })
     },
   })
@@ -115,7 +115,7 @@ export function useDeleteGame() {
     },
     onSuccess: (_, { gameId }) => {
       // Invalidate games list and remove the specific game from cache
-      queryClient.invalidateQueries({ queryKey: queryKeys.games.lists() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.games.listRoot() })
       queryClient.removeQueries({ queryKey: queryKeys.games.detail(gameId) })
     },
   })

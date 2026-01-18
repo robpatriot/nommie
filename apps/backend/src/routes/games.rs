@@ -1180,22 +1180,31 @@ async fn list_overview_games(
     }))
 }
 
-/// GET /api/games/last-active
+/// GET /api/games/waiting-longest
 ///
 /// Returns the game ID of the game that has been waiting for the user to act the longest.
 /// If no games are waiting for the user, returns the most recently active game
 /// (highest updated_at timestamp) where the user is a member.
-async fn get_last_active_game(
+#[derive(serde::Deserialize)]
+struct WaitingLongestQuery {
+    exclude_game_id: Option<i64>,
+}
+
+async fn get_waiting_longest_game(
     http_req: HttpRequest,
     current_user: CurrentUser,
     app_state: web::Data<AppState>,
+    query: web::Query<WaitingLongestQuery>,
 ) -> Result<web::Json<LastActiveGameResponse>, AppError> {
     let user_id = current_user.id;
+    let exclude_game_id = query.exclude_game_id;
 
     let game_id = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameService;
-            service.find_last_active_game(txn, user_id).await
+            service
+                .game_waiting_longest(txn, user_id, exclude_game_id)
+                .await
         })
     })
     .await?;
@@ -2249,7 +2258,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/joinable").route(web::get().to(list_joinable_games)));
     cfg.service(web::resource("/overview").route(web::get().to(list_overview_games)));
     cfg.service(web::resource("/in-progress").route(web::get().to(list_in_progress_games)));
-    cfg.service(web::resource("/last-active").route(web::get().to(get_last_active_game)));
+    cfg.service(web::resource("/waiting-longest").route(web::get().to(get_waiting_longest_game)));
     cfg.service(web::resource("/{game_id}/join").route(web::post().to(join_game)));
     cfg.service(web::resource("/{game_id}/spectate").route(web::post().to(spectate_game)));
     cfg.service(web::resource("/{game_id}/leave").route(web::delete().to(leave_game)));

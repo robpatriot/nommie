@@ -6,23 +6,23 @@ import { cn } from '@/lib/cn'
 
 interface ResumeGameButtonProps {
   className?: string
-  lastActiveGameId: number | null
+  waitingGameId: number | null
 }
 
 export default function ResumeGameButton({
   className,
-  lastActiveGameId,
+  waitingGameId,
 }: ResumeGameButtonProps) {
   const router = useRouter()
   const t = useTranslations('common.home.resumeGame')
 
-  if (!lastActiveGameId) {
+  if (!waitingGameId) {
     return null
   }
 
   return (
     <button
-      onClick={() => router.push(`/game/${lastActiveGameId}`)}
+      onClick={() => router.push(`/game/${waitingGameId}`)}
       className={cn(
         'rounded bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90',
         className
