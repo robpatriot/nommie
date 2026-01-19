@@ -1,6 +1,8 @@
 //! Game state loading and construction services.
 
-use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{
+    ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
+};
 
 use crate::adapters::games_sea::GameCreate;
 use crate::domain::cards_parsing::from_stored_format;
@@ -517,8 +519,6 @@ impl GameService {
         user_id: i64,
         exclude_game_id: Option<i64>,
     ) -> Result<Option<i64>, AppError> {
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
-
         // Find all games where user is a player (not spectator)
         let mut query = game_players::Entity::find()
             .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
@@ -554,17 +554,56 @@ impl GameService {
             DbGameState::TrickPlay,
         ];
         let game_ids: Vec<i64> = memberships.iter().map(|m| m.game_id).collect();
-        let actionable_games = games::Entity::find()
-            .filter(games::Column::Id.is_in(game_ids.clone()))
-            .filter(games::Column::State.is_in(actionable_states))
-            .order_by_asc(games::Column::UpdatedAt) // Waiting longest first
+
+        // Find which of these games contain other human players (non-spectator)
+        // "Other human" means: Human player, role=Player, human_user_id != current user.
+        // We only care about games the current user is already a member of (game_ids).
+        let game_ids_with_other_humans: Vec<i64> = game_players::Entity::find()
+            .select_only()
+            .column(game_players::Column::GameId)
+            .filter(game_players::Column::GameId.is_in(game_ids.clone()))
+            .filter(game_players::Column::Role.eq(game_players::GameRole::Player))
+            .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
+            .filter(game_players::Column::HumanUserId.ne(user_id))
+            .distinct()
+            .into_tuple::<i64>()
             .all(txn)
             .await
             .map_err(AppError::from)?;
 
+        let actionable_games_with_humans = if game_ids_with_other_humans.is_empty() {
+            Vec::new()
+        } else {
+            games::Entity::find()
+                .filter(games::Column::Id.is_in(game_ids_with_other_humans.clone()))
+                .filter(games::Column::State.is_in(actionable_states.clone()))
+                .order_by_asc(games::Column::UpdatedAt)
+                .all(txn)
+                .await
+                .map_err(AppError::from)?
+        };
+
+        let actionable_games_ai_only = {
+            let mut q = games::Entity::find()
+                .filter(games::Column::Id.is_in(game_ids.clone()))
+                .filter(games::Column::State.is_in(actionable_states.clone()))
+                .order_by_asc(games::Column::UpdatedAt);
+
+            if !game_ids_with_other_humans.is_empty() {
+                q = q.filter(games::Column::Id.is_not_in(game_ids_with_other_humans));
+            }
+
+            q.all(txn).await.map_err(AppError::from)?
+        };
+
         // Check each actionable game (oldest first) to see if it's the user's turn
+        // Prefer games with other humans first.
         let game_flow_service = GameFlowService;
-        for game_model in &actionable_games {
+
+        for game_model in actionable_games_with_humans
+            .iter()
+            .chain(actionable_games_ai_only.iter())
+        {
             let game = games_repo::Game::from(game_model.clone());
             let user_turn_order = match game_id_to_turn_order.get(&game.id) {
                 Some(&order) => order,
