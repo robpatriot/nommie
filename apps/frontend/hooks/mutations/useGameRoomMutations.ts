@@ -41,11 +41,7 @@ export function useMarkPlayerReady() {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: (_, { gameId }) => {
-      // Invalidate game snapshot so it refreshes with updated state
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(gameId),
-      })
+    onSuccess: () => {
       // Invalidate last active game so header button updates
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.waitingLongest(),
@@ -72,9 +68,6 @@ export function useLeaveGame() {
       }
     },
     onSuccess: () => {
-      // NOTE: Query invalidation removed - navigation happens immediately after mutateAsync
-      // and we're leaving the game room, so no need to refetch game room queries.
-      // The destination page (lobby) will fetch fresh data if needed.
       // Only invalidate last active game for header button (fire-and-forget, doesn't affect game room)
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.waitingLongest(),
@@ -105,9 +98,6 @@ export function useRejoinGame() {
       }
     },
     onSuccess: (_, request) => {
-      // NOTE: games.list() invalidation removed - navigation happens immediately after mutateAsync
-      // and we're leaving the lobby, so no need to refetch lobby queries.
-      // The destination page (game room) will fetch fresh data via WebSocket and initial snapshot.
       // Only invalidate snapshot for the game we're joining (fire-and-forget, doesn't affect lobby)
       // and last active game for header button.
       queryClient.invalidateQueries({
@@ -205,11 +195,7 @@ export function useSubmitBid() {
         )
       }
     },
-    onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state from backend
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
-      })
+    onSuccess: () => {
       // Invalidate last active game so header button updates
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.waitingLongest(),
@@ -288,11 +274,7 @@ export function useSelectTrump() {
         )
       }
     },
-    onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state from backend
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
-      })
+    onSuccess: () => {
       // Invalidate last active game so header button updates
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.waitingLongest(),
@@ -371,11 +353,7 @@ export function useSubmitPlay() {
         )
       }
     },
-    onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state from backend
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
-      })
+    onSuccess: () => {
       // Invalidate last active game so header button updates
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.waitingLongest(),
@@ -398,11 +376,7 @@ export function useAddAiSeat() {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
-      })
+    onSuccess: () => {
       // Invalidate AI registry since seat assignments changed
       queryClient.invalidateQueries({
         queryKey: queryKeys.ai.registry(),
@@ -425,11 +399,7 @@ export function useUpdateAiSeat() {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
-      })
+    onSuccess: () => {
       // Invalidate AI registry since seat assignments changed
       queryClient.invalidateQueries({
         queryKey: queryKeys.ai.registry(),
@@ -452,11 +422,7 @@ export function useRemoveAiSeat() {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: (_, request) => {
-      // Invalidate game snapshot so it refreshes with updated state
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
-      })
+    onSuccess: () => {
       // Invalidate AI registry since seat assignments changed
       queryClient.invalidateQueries({
         queryKey: queryKeys.ai.registry(),
