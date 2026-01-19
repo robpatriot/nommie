@@ -53,8 +53,7 @@ export function useWaitingLongestGame(options?: {
         throw toQueryError(error, 'Failed to fetch waiting game')
       }
     },
-    // 10 seconds - more responsive than the old 60s
-    staleTime: 10 * 1000,
+    staleTime: Infinity,
     enabled: options?.enabled ?? true,
   })
 }
