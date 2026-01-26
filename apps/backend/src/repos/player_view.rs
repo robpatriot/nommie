@@ -4,6 +4,7 @@ use sea_orm::ConnectionTrait;
 
 use crate::domain::cards_parsing::from_stored_format;
 use crate::domain::player_view::{CurrentRoundInfo, GameHistory, RoundHistory, RoundScoreDetail};
+use crate::domain::state::{dealer_for_round, nth_from, round_start_seat};
 use crate::domain::Card;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
@@ -202,7 +203,7 @@ pub async fn load_game_history<C: ConnectionTrait + Send + Sync>(
                     format!("Invalid round number: {}", round.round_no),
                 )
             })?;
-        let dealer_pos = (starting_dealer_pos + (round.round_no - 1)) % 4;
+        let dealer_pos = dealer_for_round(starting_dealer_pos, round.round_no);
 
         // Load bids for this round
         let bid_records = bids::find_all_by_round(conn, round.id).await?;
@@ -265,10 +266,10 @@ fn calculate_winning_bidder(bids: &[Option<u8>; 4], dealer_pos: u8) -> Option<u8
     let mut winner: Option<u8> = None;
 
     // Start from dealer+1 and go clockwise
-    let start = (dealer_pos + 1) % 4;
+    let start = round_start_seat(dealer_pos);
 
     for i in 0..4 {
-        let seat = (start + i) % 4;
+        let seat = nth_from(start, i);
         if let Some(bid_value) = bids[seat as usize] {
             match best_bid {
                 None => {

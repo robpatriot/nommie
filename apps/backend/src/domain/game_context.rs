@@ -6,7 +6,7 @@
 
 use super::player_view::{CurrentRoundInfo, GameHistory};
 use super::round_memory::RoundMemory;
-use super::state::Phase;
+use super::state::{expected_bidder, Phase};
 use crate::errors::domain::{DomainError, ValidationKind};
 
 /// Complete game context available at any point in a game.
@@ -241,7 +241,7 @@ impl GameContext {
 
         // Check if it's this player's turn
         let bid_count = state.bids.iter().filter(|b| b.is_some()).count();
-        let expected_seat = (state.dealer_pos + 1 + bid_count as u8) % 4;
+        let expected_seat = expected_bidder(state.dealer_pos, bid_count as u8);
         if state.player_seat != expected_seat {
             return Vec::new();
         }

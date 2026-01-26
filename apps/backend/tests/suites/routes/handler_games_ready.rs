@@ -44,10 +44,15 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
         .build()
         .await?;
 
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ready"))
         .insert_header(("Authorization", format!("Bearer {token}")))
-        .set_json(serde_json::json!({ "is_ready": true }))
+        .set_json(serde_json::json!({ "is_ready": true, "version": game.version }))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -104,10 +109,15 @@ async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
         .build()
         .await?;
 
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ready"))
         .insert_header(("Authorization", format!("Bearer {token}")))
-        .set_json(serde_json::json!({ "is_ready": true }))
+        .set_json(serde_json::json!({ "is_ready": true, "version": game.version }))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 

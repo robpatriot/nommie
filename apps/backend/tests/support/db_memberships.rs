@@ -2,7 +2,10 @@
 
 use backend::entities::game_players;
 use backend::AppError;
-use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
+    Set,
+};
 
 /// Create a test game_player (membership) record
 ///
@@ -85,4 +88,28 @@ pub async fn create_test_ai_game_player(
 
     let inserted = game_player.insert(conn).await?;
     Ok(inserted.id)
+}
+
+/// Attach a human user to a specific seat in a game.
+///
+/// Test helper: mutates game_players to bind `human_user_id`
+/// to the membership identified by (game_id, turn_order).
+pub async fn attach_human_to_seat(
+    txn: &DatabaseTransaction,
+    game_id: i64,
+    seat: u8,
+    user_id: i64,
+) -> Result<(), sea_orm::DbErr> {
+    let membership = game_players::Entity::find()
+        .filter(game_players::Column::GameId.eq(game_id))
+        .filter(game_players::Column::TurnOrder.eq(seat))
+        .one(txn)
+        .await?
+        .expect("membership should exist");
+
+    let mut membership: game_players::ActiveModel = membership.into();
+    membership.human_user_id = sea_orm::Set(Some(user_id));
+    membership.update(txn).await?;
+
+    Ok(())
 }

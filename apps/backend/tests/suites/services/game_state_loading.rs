@@ -27,8 +27,8 @@ async fn test_load_state_after_deal() -> Result<(), AppError> {
             let loaded_state = game_service.load_game_state(txn, setup.game_id).await?;
 
             assert_eq!(loaded_state.phase, Phase::Bidding);
-            assert_eq!(loaded_state.round_no, 1);
-            assert_eq!(loaded_state.hand_size, 13); // Round 1 has 13 cards
+            assert_eq!(loaded_state.round_no, Some(1));
+            assert_eq!(loaded_state.hand_size, Some(13)); // Round 1 has 13 cards
             assert_eq!(loaded_state.scores_total, [0, 0, 0, 0]);
 
             assert_eq!(loaded_state.hands[0].len(), 13);
@@ -106,7 +106,7 @@ async fn test_load_state_after_trump() -> Result<(), AppError> {
                 Some(backend::domain::Trump::Hearts)
             );
 
-            assert_eq!(loaded_state.trick_no, 1);
+            assert_eq!(loaded_state.trick_no, Some(1));
             assert_eq!(loaded_state.round.trick_plays.len(), 0);
             assert_eq!(loaded_state.round.trick_lead, None);
 
@@ -250,11 +250,13 @@ async fn test_load_state_second_trick_turn_advances() -> Result<(), AppError> {
             assert_eq!(loaded_state.round.trick_plays.len(), 1);
             assert_eq!(loaded_state.round.trick_plays[0].0, 3);
             assert_eq!(
-                loaded_state.leader, 3,
+                loaded_state.leader,
+                Some(3),
                 "Second trick leader should be seat 3"
             );
             assert_eq!(
-                loaded_state.turn, 0,
+                loaded_state.turn,
+                Some(0),
                 "Turn should advance to seat 0 immediately after seat 3 plays"
             );
 
@@ -284,7 +286,9 @@ async fn test_load_state_removes_played_cards_from_hands() -> Result<(), AppErro
             let flow_service = GameFlowService;
 
             let initial_state = game_service.load_game_state(txn, setup.game_id).await?;
-            let acting_seat = initial_state.turn;
+            let acting_seat = initial_state
+                .turn
+                .expect("Expected Some(turn) in Trick phase setup");
             let card_to_play = initial_state.hands[acting_seat as usize][0];
 
             flow_service
@@ -422,8 +426,8 @@ async fn test_load_state_lobby() -> Result<(), AppError> {
 
             // Should return empty initial state (no rounds exist yet)
             assert_eq!(loaded_state.phase, Phase::Init);
-            assert_eq!(loaded_state.round_no, 0);
-            assert_eq!(loaded_state.hand_size, 0);
+            assert_eq!(loaded_state.round_no, None);
+            assert_eq!(loaded_state.hand_size, None);
             assert_eq!(loaded_state.hands[0].len(), 0);
 
             Ok::<_, AppError>(())

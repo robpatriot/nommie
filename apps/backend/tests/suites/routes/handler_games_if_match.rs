@@ -20,12 +20,12 @@ use backend::http::etag::game_etag;
 use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games as games_routes;
 use backend::AppError;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, EntityTrait};
 
 use crate::support::app_builder::create_test_app;
 use crate::support::auth::mint_test_token;
 use crate::support::build_test_state;
-use crate::support::db_memberships::create_test_game_player_with_ready;
+use crate::support::db_memberships::{attach_human_to_seat, create_test_game_player_with_ready};
 use crate::support::factory::{create_fresh_lobby_game, create_test_user};
 use crate::support::game_phases::{
     setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
@@ -53,18 +53,7 @@ async fn setup_bidding_test(test_name: &str) -> Result<IfMatchTestContext, AppEr
     let user_email = format!("{test_name}@example.com");
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
-    // Update membership to use our test user
-    use backend::entities::game_players;
-    let membership = game_players::Entity::find()
-        .filter(game_players::Column::GameId.eq(setup.game_id))
-        .filter(game_players::Column::TurnOrder.eq(actor_seat))
-        .one(shared.transaction())
-        .await?
-        .expect("membership should exist");
-
-    let mut membership: game_players::ActiveModel = membership.into();
-    membership.human_user_id = sea_orm::Set(Some(user_id));
-    ActiveModelTrait::update(membership, shared.transaction()).await?;
+    attach_human_to_seat(shared.transaction(), setup.game_id, actor_seat, user_id).await?;
 
     let token = mint_test_token(&user_sub, &user_email, &security);
 
@@ -92,18 +81,7 @@ async fn setup_trump_test(test_name: &str) -> Result<IfMatchTestContext, AppErro
     let user_email = format!("{test_name}@example.com");
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
-    // Update membership to use our test user
-    use backend::entities::game_players;
-    let membership = game_players::Entity::find()
-        .filter(game_players::Column::GameId.eq(setup.game_id))
-        .filter(game_players::Column::TurnOrder.eq(winning_bidder))
-        .one(shared.transaction())
-        .await?
-        .expect("membership should exist");
-
-    let mut membership: game_players::ActiveModel = membership.into();
-    membership.human_user_id = sea_orm::Set(Some(user_id));
-    ActiveModelTrait::update(membership, shared.transaction()).await?;
+    attach_human_to_seat(shared.transaction(), setup.game_id, winning_bidder, user_id).await?;
 
     let token = mint_test_token(&user_sub, &user_email, &security);
 
@@ -139,24 +117,15 @@ async fn setup_play_test(
             .load_game_state(shared.transaction(), setup.game_id)
             .await?
     };
-    let current_player = game_state.turn as i32;
+    let current_player = game_state
+        .turn
+        .expect("expected Some(turn): test requires an actionable phase");
 
     let user_sub = format!("{test_name}_user");
     let user_email = format!("{test_name}@example.com");
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
-    // Update membership to use our test user
-    use backend::entities::game_players;
-    let membership = game_players::Entity::find()
-        .filter(game_players::Column::GameId.eq(setup.game_id))
-        .filter(game_players::Column::TurnOrder.eq(current_player))
-        .one(shared.transaction())
-        .await?
-        .expect("membership should exist");
-
-    let mut membership: game_players::ActiveModel = membership.into();
-    membership.human_user_id = sea_orm::Set(Some(user_id));
-    ActiveModelTrait::update(membership, shared.transaction()).await?;
+    attach_human_to_seat(shared.transaction(), setup.game_id, current_player, user_id).await?;
 
     // Get a card from the player's hand directly
     use backend::repos::hands;
@@ -171,7 +140,7 @@ async fn setup_play_test(
     )
     .await?
     .expect("round should exist");
-    let hand = hands::find_by_round_and_seat(shared.transaction(), round.id, current_player as u8)
+    let hand = hands::find_by_round_and_seat(shared.transaction(), round.id, current_player)
         .await?
         .expect("player should have a hand");
     let first_card = backend::domain::cards_parsing::from_stored_format(

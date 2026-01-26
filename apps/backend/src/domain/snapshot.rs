@@ -44,8 +44,8 @@ pub struct SeatAiProfilePublic {
 /// Game-level header present in all snapshots.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GameHeader {
-    pub round_no: u8,
-    pub dealer: Seat,
+    pub round_no: Option<u8>,
+    pub dealer: Option<Seat>,
     pub seating: [SeatPublic; 4],
     pub scores_total: [i16; 4],
     pub host_seat: Seat,
@@ -74,8 +74,8 @@ pub enum PhaseSnapshot {
 /// Shared public round facts (no private hands).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RoundPublic {
-    pub hand_size: u8,
-    pub leader: Seat,
+    pub hand_size: Option<u8>,
+    pub leader: Option<Seat>,
     pub bid_winner: Option<Seat>,
     pub trump: Option<Trump>,
     pub tricks_won: [u8; 4],
@@ -95,7 +95,7 @@ pub struct RoundResult {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BiddingSnapshot {
     pub round: RoundPublic,
-    pub to_act: Seat,
+    pub to_act: Option<Seat>,
     pub bids: [Option<u8>; 4],
     pub min_bid: u8,
     pub max_bid: u8,
@@ -110,7 +110,7 @@ pub struct BiddingSnapshot {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TrumpSelectSnapshot {
     pub round: RoundPublic,
-    pub to_act: Seat,
+    pub to_act: Option<Seat>,
     pub allowed_trumps: Vec<Trump>,
     /// Last completed trick from previous round (4 cards) for display purposes.
     pub last_trick: Option<Vec<(Seat, Card)>>,
@@ -121,9 +121,9 @@ pub struct TrumpSelectSnapshot {
 pub struct TrickSnapshot {
     pub round: RoundPublic,
     pub trick_no: u8,
-    pub leader: Seat,
+    pub leader: Option<Seat>,
     pub current_trick: Vec<(Seat, Card)>,
-    pub to_act: Seat,
+    pub to_act: Option<Seat>,
     pub playable: Vec<Card>,
     /// Last completed trick (4 cards) for display purposes.
     pub last_trick: Option<Vec<(Seat, Card)>>,
@@ -147,7 +147,7 @@ pub struct CompleteSnapshot {
 pub fn snapshot(state: &GameState) -> GameSnapshot {
     let game = GameHeader {
         round_no: state.round_no,
-        dealer: compute_dealer(state),
+        dealer: state.dealer,
         seating: [
             SeatPublic::empty(0),
             SeatPublic::empty(1),
@@ -171,14 +171,6 @@ pub fn snapshot(state: &GameState) -> GameSnapshot {
     GameSnapshot { game, phase }
 }
 
-fn compute_dealer(state: &GameState) -> Seat {
-    // Dealer rotates: round 1 -> seat 0, round 2 -> seat 1, etc.
-    if state.round_no == 0 {
-        return 0;
-    }
-    ((state.round_no - 1) % PLAYERS as u8) as Seat
-}
-
 fn build_round_public(state: &GameState) -> RoundPublic {
     RoundPublic {
         hand_size: state.hand_size,
@@ -194,9 +186,15 @@ fn snapshot_bidding(state: &GameState) -> PhaseSnapshot {
     let round = build_round_public(state);
     let to_act = state.turn;
     let bids = state.round.bids;
-    let range = valid_bid_range(state.hand_size);
-    let min_bid = *range.start();
-    let max_bid = *range.end();
+
+    let (min_bid, max_bid) = match state.hand_size {
+        Some(hand_size) => {
+            let range = valid_bid_range(hand_size);
+            (*range.start(), *range.end())
+        }
+        None => (0, 0),
+    };
+
     let previous_round = state.round.previous_round.as_ref().map(|prev| RoundResult {
         round_no: prev.round_no,
         hand_size: prev.hand_size,
@@ -217,8 +215,8 @@ fn snapshot_bidding(state: &GameState) -> PhaseSnapshot {
 
 fn snapshot_trump_select(state: &GameState) -> PhaseSnapshot {
     let round = build_round_public(state);
-    let to_act = state.round.winning_bidder.unwrap_or(0);
-    // All trump options including NO_TRUMPS are allowed
+    let to_act = state.turn;
+
     let allowed_trumps = vec![
         Trump::Clubs,
         Trump::Diamonds,
@@ -239,13 +237,12 @@ fn snapshot_trick(state: &GameState, trick_no: u8) -> PhaseSnapshot {
     let round = build_round_public(state);
     let leader = state.leader;
     let current_trick: Vec<(Seat, Card)> = state.round.trick_plays.clone();
-    let plays_count = current_trick.len() as u8;
-    let to_act = if plays_count >= PLAYERS as u8 {
-        leader
-    } else {
-        (leader + plays_count) % PLAYERS as u8
+    let to_act = state.turn;
+
+    let playable = match to_act {
+        Some(seat) => legal_moves(state, seat),
+        None => Vec::new(),
     };
-    let playable = legal_moves(state, to_act);
 
     PhaseSnapshot::Trick(TrickSnapshot {
         round,

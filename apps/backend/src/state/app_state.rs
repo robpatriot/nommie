@@ -5,7 +5,7 @@ use sea_orm::DatabaseConnection;
 use super::security_config::SecurityConfig;
 use crate::config::email_allowlist::EmailAllowlist;
 use crate::routes::snapshot_cache::SnapshotCache;
-use crate::ws::hub::{GameSessionRegistry, RealtimeBroker};
+use crate::ws::hub::{RealtimeBroker, WsRegistry};
 
 /// Application state containing shared resources
 pub struct AppState {
@@ -21,7 +21,7 @@ pub struct AppState {
     ///
     /// In production this is sourced from `realtime` (and is backed by Redis pub/sub fan-out).
     /// In tests it can be set directly to an in-memory registry to avoid Redis.
-    pub(crate) websocket_registry: Option<Arc<GameSessionRegistry>>,
+    pub(crate) websocket_registry: Option<Arc<WsRegistry>>,
     /// Snapshot cache for optimizing WebSocket broadcasts.
     ///
     /// Caches shared snapshot parts (game state, seating) to avoid redundant
@@ -80,13 +80,13 @@ impl AppState {
     /// Attach a WebSocket session registry.
     ///
     /// Provides an in-memory registry without requiring Redis.
-    pub fn with_websocket_registry(mut self, registry: Arc<GameSessionRegistry>) -> Self {
+    pub fn with_websocket_registry(mut self, registry: Arc<WsRegistry>) -> Self {
         self.websocket_registry = Some(registry);
         self
     }
 
     /// Get the WebSocket session registry, if configured.
-    pub fn websocket_registry(&self) -> Option<Arc<GameSessionRegistry>> {
+    pub fn websocket_registry(&self) -> Option<Arc<WsRegistry>> {
         self.websocket_registry.clone()
     }
 

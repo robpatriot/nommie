@@ -1,10 +1,10 @@
 // Test that verifies the player to the left of the dealer leads the first trick.
 //
-// Verifies that turn_start is correctly set to (dealer_pos + 1) % 4, ensuring
+// Verifies that next_player is correctly set to (dealer_pos + 1) % 4, ensuring
 // the first trick leader rotates clockwise with the dealer position.
 
 use backend::db::txn::with_txn;
-use backend::domain::state::Phase;
+use backend::domain::state::{next_player, Phase};
 use backend::domain::Trump;
 use backend::services::game_flow::GameFlowService;
 use backend::services::games::GameService;
@@ -12,7 +12,6 @@ use backend::AppError;
 
 use crate::support::build_test_state;
 use crate::support::game_phases::{score_round, setup_game_in_trick_play_phase};
-use crate::support::state_helpers::init_round;
 use crate::support::trick_helpers::create_tricks_by_winner_counts;
 
 /// Test: Verify the first trick leader rotates with dealer position across rounds.
@@ -50,15 +49,18 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
             assert_eq!(setup.dealer_pos, 0, "Round 1 should have dealer at seat 0");
             assert_eq!(loaded_state.phase, Phase::Trick { trick_no: 1 });
             assert_eq!(
-                loaded_state.turn_start, 1,
-                "Round 1: dealer=0, turn_start should be 1 (dealer+1)"
+                loaded_state.dealer.map(next_player),
+                Some(1),
+                "Round 1: dealer=0, next player should be 1 (dealer+1)"
             );
             assert_eq!(
-                loaded_state.leader, 1,
+                loaded_state.leader,
+                Some(1),
                 "Round 1: dealer=0, leader should be 1 (dealer+1)"
             );
             assert_eq!(
-                loaded_state.turn, 1,
+                loaded_state.turn,
+                Some(1),
                 "Round 1: dealer=0, turn should be 1 (dealer+1)"
             );
 
@@ -146,15 +148,18 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
             );
             assert_eq!(loaded_state2.phase, Phase::Trick { trick_no: 1 });
             assert_eq!(
-                loaded_state2.turn_start, 2,
-                "Round 2: dealer=1, turn_start should be 2 (dealer+1)"
+                loaded_state2.dealer.map(next_player),
+                Some(2),
+                "Round 2: dealer=1, next player should be 2 (dealer+1)"
             );
             assert_eq!(
-                loaded_state2.leader, 2,
+                loaded_state2.leader,
+                Some(2),
                 "Round 2: dealer=1, leader should be 2 (dealer+1)"
             );
             assert_eq!(
-                loaded_state2.turn, 2,
+                loaded_state2.turn,
+                Some(2),
                 "Round 2: dealer=1, turn should be 2 (dealer+1)"
             );
 
@@ -166,14 +171,14 @@ async fn test_first_trick_leader_is_left_of_dealer() -> Result<(), AppError> {
     Ok(())
 }
 
-/// Test: Verify turn_start consistency between domain init and DB loading
+/// Test: Verify round-start seat consistency between domain init and DB loading
 #[tokio::test]
-async fn test_turn_start_consistency_domain_vs_db() -> Result<(), AppError> {
+async fn test_next_player_consistency_domain_vs_db() -> Result<(), AppError> {
     let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
-            // Create game via DB
+            // Create game via DB and advance it to TrickPlay
             let setup = setup_game_in_trick_play_phase(
                 txn,
                 "first_trick_leader2",
@@ -185,24 +190,64 @@ async fn test_turn_start_consistency_domain_vs_db() -> Result<(), AppError> {
             let game_service = GameService;
             let loaded_from_db = game_service.load_game_state(txn, setup.game_id).await?;
 
-            // Create equivalent state via domain init
+            // Create equivalent state via domain/test helper construction
+            use crate::support::state_helpers::{make_game_state, MakeGameStateArgs};
+
             let hands = [vec![], vec![], vec![], vec![]]; // Empty hands for this test
-            let domain_state = init_round(1, 13, hands, 0, [0, 0, 0, 0]);
-
-            // CRITICAL: Both should have same turn_start calculation
-            assert_eq!(
-                loaded_from_db.turn_start, domain_state.turn_start,
-                "DB loading and domain init should produce same turn_start"
+            let domain_state = make_game_state(
+                hands,
+                MakeGameStateArgs {
+                    // We want to mirror "first trick has started" semantics.
+                    phase: backend::domain::state::Phase::Trick { trick_no: 1 },
+                    round_no: Some(1),
+                    hand_size: Some(13),
+                    dealer: Some(0),
+                    scores_total: [0, 0, 0, 0],
+                    ..Default::default()
+                },
             );
 
-            // Both should be dealer + 1
+            // New canonical assertions:
+            // - dealer matches
+            // - round-start seat (= left of dealer) matches when derived
+            // - in first trick, leader should be round-start seat
+            let db_dealer = loaded_from_db
+                .dealer
+                .expect("DB-loaded state should have dealer in Trick phase");
+            let domain_dealer = domain_state
+                .dealer
+                .expect("Domain state should have dealer in Trick phase");
+
             assert_eq!(
-                domain_state.turn_start, 1,
-                "Domain init should set turn_start to dealer+1"
+                db_dealer, domain_dealer,
+                "DB loading and domain init should produce same dealer"
+            );
+
+            let db_round_start = backend::domain::state::next_player(db_dealer);
+            let domain_round_start = backend::domain::state::next_player(domain_dealer);
+
+            assert_eq!(
+                db_round_start, domain_round_start,
+                "DB and domain should derive the same round-start seat (left of dealer)"
+            );
+
+            // Both should be dealer + 1. With dealer=0, round-start should be 1.
+            assert_eq!(
+                domain_round_start, 1,
+                "Domain init should derive round-start seat as dealer+1"
             );
             assert_eq!(
-                loaded_from_db.turn_start, 1,
-                "DB loading should set turn_start to dealer+1"
+                db_round_start, 1,
+                "DB loading should derive round-start seat as dealer+1"
+            );
+
+            // First trick leader should be left of dealer
+            let db_leader = loaded_from_db
+                .leader
+                .expect("DB-loaded state should have leader in Trick phase");
+            assert_eq!(
+                db_leader, db_round_start,
+                "First trick leader should be left of dealer"
             );
 
             Ok::<_, AppError>(())

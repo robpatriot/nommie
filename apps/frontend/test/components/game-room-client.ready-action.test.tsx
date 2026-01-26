@@ -7,7 +7,7 @@ import { GameRoomClient } from '@/app/game/[gameId]/_components/game-room-client
 import { biddingSnapshotFixture } from '../mocks/game-snapshot'
 import { mockMarkPlayerReadyAction } from '../../setupGameRoomActionsMock'
 import {
-  createInitialData,
+  createInitialDataWithVersion,
   waitForWebSocketConnection,
   sendWebSocketSnapshot,
 } from '../setup/game-room-client-helpers'
@@ -94,7 +94,7 @@ describe('GameRoomClient', () => {
 
   describe('Ready action', () => {
     it('marks player ready', async () => {
-      const initialData = createInitialData()
+      const initialData = createInitialDataWithVersion(42, 1)
 
       await act(async () => {
         const { queryClient: _ } = render(
@@ -121,7 +121,7 @@ describe('GameRoomClient', () => {
     })
 
     it('prevents duplicate ready calls', async () => {
-      const initialData = createInitialData()
+      const initialData = createInitialDataWithVersion(42, 1)
 
       // Reset pending state before test
       if (markPlayerReadyState) {
@@ -172,7 +172,7 @@ describe('GameRoomClient', () => {
     })
 
     it('handles ready action errors', async () => {
-      const initialData = createInitialData()
+      const initialData = createInitialDataWithVersion(42, 1)
 
       mockMarkPlayerReadyAction.mockResolvedValue({
         kind: 'error',
@@ -208,7 +208,7 @@ describe('GameRoomClient', () => {
     })
 
     it('resets hasMarkedReady when phase changes', async () => {
-      const initialData = createInitialData()
+      const initialData = createInitialDataWithVersion(42, 1)
 
       const { queryClient } = await act(async () => {
         return render(<GameRoomClient initialData={initialData} gameId={42} />)
@@ -232,7 +232,7 @@ describe('GameRoomClient', () => {
       const ws = await waitForWebSocketConnection()
       sendWebSocketSnapshot(ws, biddingSnapshotFixture, 42, queryClient, {
         viewerSeat: 0,
-        version: 1,
+        version: 2,
       })
 
       // Wait for phase change (may appear multiple times - in panel and sidebar)

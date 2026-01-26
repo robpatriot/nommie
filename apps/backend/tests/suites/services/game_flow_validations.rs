@@ -419,8 +419,9 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     let service = GameFlowService;
 
     for user_id in &setup.user_ids {
+        let game = backend::repos::games::require_game(txn, game_id).await?;
         service
-            .set_ready_status(txn, game_id, *user_id, true)
+            .mark_ready(txn, game_id, *user_id, true, game.version)
             .await?;
     }
 
@@ -440,6 +441,7 @@ async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
         service.load_game_state(txn, game_id).await?
     };
     let leader = game_state.turn;
+    let leader = leader.expect("expected Some(leader) in Trick phase setup");
 
     let hand = backend::repos::hands::find_by_round_and_seat(txn, round.id, leader)
         .await?

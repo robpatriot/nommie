@@ -3,7 +3,7 @@
 use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::games_sea as games_adapter;
-use crate::domain::state::Phase;
+use crate::domain::state::{dealer_for_round, Phase};
 use crate::entities::games;
 use crate::entities::games::GameState as DbGameState;
 use crate::errors::domain::DomainError;
@@ -55,7 +55,7 @@ impl Game {
 
         // Dealer rotates each round: (starting_dealer + round_no - 1) % 4
         // Subtract 1 because round_no starts at 1, not 0
-        Some((starting + (round - 1)) % 4)
+        Some(dealer_for_round(starting, round))
     }
 }
 

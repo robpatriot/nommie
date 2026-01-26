@@ -1,6 +1,7 @@
 use crate::domain::bidding::{place_bid, set_trump, Bid};
 use crate::domain::scoring::apply_round_scoring;
-use crate::domain::state::{GameState, Phase, PlayerId, RoundState};
+use crate::domain::state::{Phase, PlayerId};
+use crate::domain::test_state_helpers::{make_game_state, MakeGameStateArgs};
 use crate::domain::tricks::play_card;
 use crate::domain::{Card, Rank, Suit, Trump};
 
@@ -10,22 +11,6 @@ fn parse_cards(tokens: &[&str]) -> Vec<Card> {
         .map(|t| t.parse::<Card>().expect("hardcoded valid card token"))
         .collect()
 }
-
-fn make_state_with_hands(hands: [Vec<Card>; 4], hand_size: u8, turn_start: PlayerId) -> GameState {
-    GameState {
-        phase: Phase::Bidding,
-        round_no: 1,
-        hand_size,
-        hands,
-        turn_start,
-        turn: turn_start,
-        leader: turn_start,
-        trick_no: 0,
-        scores_total: [0; 4],
-        round: RoundState::empty(),
-    }
-}
-
 #[test]
 fn happy_path_round_small() {
     // Hand size 3; deterministic hands
@@ -33,7 +18,33 @@ fn happy_path_round_small() {
     let h1 = parse_cards(&["TS", "3H", "4C"]);
     let h2 = parse_cards(&["QS", "5D", "6C"]);
     let h3 = parse_cards(&["9S", "7H", "8C"]);
-    let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
+
+    let hand_size = 3;
+    let turn_start: PlayerId = 0;
+
+    // New model: dealer anchors the round; round-start seat is derived as next_player(dealer).
+    let dealer: PlayerId = ((turn_start + 3) % 4) as PlayerId;
+
+    let mut state = make_game_state(
+        [h0, h1, h2, h3],
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(hand_size),
+            dealer: Some(dealer),
+
+            // In Bidding, "turn" is who must act (place a bid).
+            turn: Some(turn_start),
+
+            // Bidding usually doesn't need leader; set if your domain expects it.
+            leader: None,
+
+            // If your tests care about this being 0, keep it; otherwise None is fine for Bidding.
+            trick_no: Some(0),
+
+            ..Default::default()
+        },
+    );
     // Bidding: p1 wins with 2 against ties by order
     place_bid(&mut state, 0, Bid(1)).unwrap();
     place_bid(&mut state, 1, Bid(2)).unwrap();
@@ -78,7 +89,7 @@ fn happy_path_round_small() {
         },
     )
     .unwrap();
-    assert_eq!(state.leader, 0);
+    assert_eq!(state.leader, Some(0));
     // Trick 2: lead 0
     play_card(
         &mut state,
@@ -116,7 +127,7 @@ fn happy_path_round_small() {
         },
     )
     .unwrap();
-    assert_eq!(state.leader, 0);
+    assert_eq!(state.leader, Some(0));
     // Trick 3: lead 0
     play_card(
         &mut state,

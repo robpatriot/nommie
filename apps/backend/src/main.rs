@@ -139,14 +139,15 @@ async fn main() -> std::io::Result<()> {
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .configure(backend::routes::health::configure_routes),
             )
-            // WebSocket upgrade endpoint for real-time game updates
+            // WebSocket upgrade endpoint (generic, authenticated transport)
             .service(
                 actix_web::web::scope("/ws")
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
                     .service(
-                        actix_web::web::resource("/games/{game_id}")
-                            .route(actix_web::web::get().to(backend::ws::game::upgrade))
-                            .name("websocket_game_upgrade"),
+                        // GET /ws
+                        actix_web::web::resource("")
+                            .route(actix_web::web::get().to(backend::ws::session::upgrade))
+                            .name("websocket_upgrade"),
                     ),
             )
             // Root route - security headers (but no Cache-Control: no-store)
@@ -209,7 +210,7 @@ fn create_json_config(max_size: usize) -> actix_web::web::JsonConfig {
 /// Spawn a task to handle graceful shutdown signals
 fn spawn_shutdown_handler(
     server_handle: actix_web::dev::ServerHandle,
-    registry: Option<Arc<backend::ws::hub::GameSessionRegistry>>,
+    registry: Option<Arc<backend::ws::hub::WsRegistry>>,
     timeout_secs: u64,
 ) {
     tokio::spawn(async move {

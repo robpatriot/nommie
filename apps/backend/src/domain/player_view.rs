@@ -7,7 +7,7 @@
 //! To load these types from the database, use [`crate::repos::player_view::load_current_round_info`]
 //! and [`crate::repos::player_view::load_game_history`].
 
-use crate::domain::state::Phase;
+use crate::domain::state::{expected_actor, round_start_seat, Phase};
 use crate::domain::{Card, Trump};
 
 /// Helper function to determine who should lead a trick.
@@ -21,7 +21,7 @@ pub fn determine_trick_leader(
 ) -> Option<u8> {
     if trick_no == 0 {
         // First trick - leader is player to left of dealer
-        Some((dealer_pos + 1) % 4)
+        Some(round_start_seat(dealer_pos))
     } else {
         // Not first trick - leader is winner of previous trick
         prev_trick_winner
@@ -208,7 +208,7 @@ impl CurrentRoundInfo {
         } else {
             // Not first play - follow turn order from first player
             let first_player = self.current_trick_plays[0].0;
-            (first_player + play_count as u8) % 4
+            expected_actor(first_player, play_count as u8)
         };
 
         if self.player_seat != leader_seat && play_count > 0 {

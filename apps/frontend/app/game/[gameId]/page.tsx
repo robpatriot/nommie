@@ -7,15 +7,14 @@ import { GameJoinErrorClient } from './_components/GameJoinErrorClient'
 import ErrorBoundaryWithTranslations from '@/components/ErrorBoundaryWithTranslations'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
-import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
 import { extractPlayerNames } from '@/utils/player-names'
-import { normalizeViewerSeat } from './_components/game-room/utils'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { getUserOptions } from '@/lib/api/user-options'
 import { BackendApiError } from '@/lib/api'
 import { isInStartupWindow } from '@/lib/server/backend-status'
 import { isBackendStartupError } from '@/lib/server/connection-errors'
 import { handleStaleSessionError } from '@/lib/auth/allowlist'
+import { gameStateMsgToSnapshotPayload } from '@/lib/game-room/protocol/transform'
 
 export default async function GamePage({
   params,
@@ -67,25 +66,26 @@ export default async function GamePage({
     throw new Error(t('failedToLoadGameSnapshot'))
   }
 
-  const seating = snapshotResult.snapshot.game.seating
+  const payload = gameStateMsgToSnapshotPayload(snapshotResult.msg, {
+    etag: snapshotResult.etag,
+    timestamp: new Date().toISOString(),
+  })
+
+  const seating = payload.snapshot.game.seating
   const playerNames = extractPlayerNames(seating)
 
-  const hostSeat = (snapshotResult.snapshot.game.host_seat ??
-    DEFAULT_VIEWER_SEAT) as typeof DEFAULT_VIEWER_SEAT
-  const viewerSeat =
-    normalizeViewerSeat(snapshotResult.viewerSeat, DEFAULT_VIEWER_SEAT) ??
-    DEFAULT_VIEWER_SEAT
+  const { hostSeat, viewerSeat } = payload
 
   const initialPayload: GameRoomSnapshotPayload = {
-    snapshot: snapshotResult.snapshot,
+    snapshot: payload.snapshot,
     etag: snapshotResult.etag,
-    version: snapshotResult.version,
+    version: payload.version,
     playerNames,
     viewerSeat,
-    viewerHand: snapshotResult.viewerHand ?? [],
+    viewerHand: payload.viewerHand,
     timestamp: new Date().toISOString(),
     hostSeat,
-    bidConstraints: snapshotResult.bidConstraints ?? null,
+    bidConstraints: payload.bidConstraints,
   }
 
   let requireCardConfirmation = true
@@ -101,9 +101,7 @@ export default async function GamePage({
 
   const t = await getTranslations('common')
   const tLobby = await getTranslations('lobby')
-  const isSpectator =
-    snapshotResult.viewerSeat === null ||
-    snapshotResult.viewerSeat === undefined
+  const isSpectator = payload.viewerSeat === null
   const gameName = isSpectator
     ? `${t('gameName', { gameId: resolvedGameId })} (spectating)`
     : t('gameName', { gameId: resolvedGameId })

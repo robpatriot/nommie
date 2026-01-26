@@ -288,7 +288,66 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ---
 
-### 🟨 **24. Documentation Maintenance (Ongoing)**
+### 🚀 **24. WebSocket Architecture Refactor & Realtime Foundations**
+**Dependencies:** 10, 18, 23  
+- **Generic WebSocket Sessions:** ✅ **Completed** — Single `WsSession` decoupled from games and URLs.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Connections no longer tied to `{game_id}` routes.
+- **Explicit Subscription Model:** ✅ **Completed** — Clients explicitly `subscribe` / `unsubscribe` to topics via JSON protocol.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Connections may dynamically change subscriptions.
+- **User-Based Registration:** ✅ **Completed** — Connections registered under authenticated `user_id` for user-scoped delivery.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Backend can broadcast to all active connections for a user.
+- **Topic-Based Routing:** ✅ **Completed** — Game events routed only to explicitly subscribed connections.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ No implicit routing via URLs.
+- **Registry & Responsibility Split:** ✅ **Completed** — Clear separation between session lifecycle, routing registries, and game-specific realtime logic.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ No game logic in generic session or hub layers.
+- **Explicit JSON Protocol:** ✅ **Completed** — Typed client commands and server events with documented semantics.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ All WS communication conforms to the defined protocol.
+- **User-Scoped Events:** ✅ **Completed** — User-targeted events (e.g. `your_turn`) delivered independently of game subscriptions.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Backend can notify users across games.
+- **Your-Turn Suppression:** ✅ **Completed** — Suppress `your_turn` for connections already subscribed to the relevant game; other connections still receive it.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ No redundant `your_turn` for in-game connections; client-side dedupe remains a defensive fallback.
+- **WS Token Strategy:** ✅ **Completed** — Short-lived WS tokens minted via `/api/ws/token` and presented on upgrade.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ WS connections authenticate using short-lived tokens.
+- **Subscription Authorisation:** ✅ **Completed** — Server-side validation ensures users may only subscribe to authorised games.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Invalid subscriptions rejected with explicit errors and no data leakage.
+- **Broker Generalisation:** ✅ **Completed** — Redis Pub/Sub supports both game-scoped and user-scoped realtime events.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Cross-instance realtime delivery supports multiple event types.
+- **Authoritative Game State Delivery:** ✅ **Completed** — State delivered only for subscribed games with monotonic versioning.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Clients receive only authoritative, versioned game state.
+- **Version Source Guarantee:** ✅ **Completed** — `game_state.version` sourced from `games.version` with explicit increment semantics.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Backend guarantees monotonic versions; client dedupe semantics are correct.
+- **Client Version Reset Semantics:** ✅ **Completed** — `wsVersionRef` behaviour explicit and resilient to UI refactors.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Safe resets on game change; reconnect behaviour defined.
+- **WebSocket Test Suite Update:** ✅ **Completed** — Tests updated for generic connections and subscriptions (one flaky FE lifecycle assertion tracked).  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Lifecycle, routing, protocol, and reconnect behaviour covered.
+- **Explicit Behavioural Guarantees:** ✅ **Completed** — Tests assert behaviour, not timing or incidental ordering.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ No data before subscribe; ordering guarantees asserted.
+- **Acknowledgement Semantics:** ⬜ **Planned** — Make acks unambiguously machine-correlatable and future-proof.  
+  *Status:* ⬜ Planned.  
+  *Acceptance:* ⬜ Ack messages clearly identify the command being acknowledged; tests assert semantics.
+- **Dedicated WS Token Type:** ⬜ **Planned / Deferred** — Enforce WS-only token type distinct from access tokens.  
+  *Status:* ⬜ Planned / Deferred.  
+  *Acceptance:* ⬜ `/ws` rejects non-WS tokens; tests prove access tokens cannot open WS connections.
+
+---
+
+### 🟨 **25. Documentation Maintenance (Ongoing)**
 **Dependencies:** 11  
 **Status:** Long-standing milestone — documentation is continuously maintained and updated as the project evolves.
 

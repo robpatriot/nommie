@@ -16,6 +16,7 @@ import {
   createInitialData,
   waitForWebSocketConnection,
   sendWebSocketSnapshot,
+  createInitialDataWithVersion,
 } from '../setup/game-room-client-helpers'
 import {
   createMockMutationHooks,
@@ -104,7 +105,7 @@ describe('GameRoomClient', () => {
       // Send WebSocket message with updated snapshot
       sendWebSocketSnapshot(ws, biddingSnapshotFixture, 42, queryClient, {
         viewerSeat: 0,
-        version: 1,
+        version: 2,
       })
 
       // Verify snapshot updated (may appear multiple times - in panel and sidebar)
@@ -118,7 +119,7 @@ describe('GameRoomClient', () => {
     })
 
     it('updates snapshot after action completes via WebSocket', async () => {
-      const initialData = createInitialData()
+      const initialData = createInitialDataWithVersion(42, 1)
 
       const { queryClient } = await act(async () => {
         return render(<GameRoomClient initialData={initialData} gameId={42} />)
@@ -144,7 +145,7 @@ describe('GameRoomClient', () => {
       // Simulate WebSocket message after action completes
       sendWebSocketSnapshot(ws, biddingSnapshotFixture, 42, queryClient, {
         viewerSeat: 0,
-        version: 1,
+        version: 2,
       })
 
       // Verify snapshot updated via WebSocket (no manual refresh needed)

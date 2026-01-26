@@ -1,9 +1,9 @@
 //! Snapshot API tests covering all game phases.
 
 use crate::domain::bidding::{place_bid, set_trump, Bid};
-use crate::domain::rules::PLAYERS;
 use crate::domain::snapshot::{snapshot, PhaseSnapshot, SeatPublic};
-use crate::domain::state::{GameState, Phase, RoundState};
+use crate::domain::state::{Phase, PlayerId};
+use crate::domain::test_state_helpers::{make_game_state, MakeGameStateArgs};
 use crate::domain::tricks::play_card;
 use crate::domain::{Card, Rank, Suit, Trump};
 
@@ -14,53 +14,16 @@ fn parse_cards(tokens: &[&str]) -> Vec<Card> {
         .collect()
 }
 
-/// Build a minimal GameState in Init phase.
-fn build_init_state() -> GameState {
-    GameState {
-        phase: Phase::Init,
-        round_no: 0,
-        hand_size: 0,
-        hands: [vec![], vec![], vec![], vec![]],
-        turn_start: 0,
-        turn: 0,
-        leader: 0,
-        trick_no: 0,
-        scores_total: [0, 0, 0, 0],
-        round: RoundState::empty(),
-    }
-}
-
-/// Start a round with a given round number and initial hands.
-fn start_round(round_no: u8, hands: [Vec<Card>; 4]) -> GameState {
-    let hand_size = hands[0].len() as u8;
-    let dealer = if round_no == 0 {
-        0
-    } else {
-        (round_no - 1) % PLAYERS as u8
-    };
-    let turn_start = ((dealer as usize + 1) % PLAYERS) as u8; // left-of-dealer
-
-    GameState {
-        phase: Phase::Bidding,
-        round_no,
-        hand_size,
-        hands,
-        turn_start,
-        turn: turn_start,
-        leader: turn_start,
-        trick_no: 0,
-        scores_total: [0, 0, 0, 0],
-        round: RoundState::empty(),
-    }
-}
-
 #[test]
 fn init_snapshot_smoke() {
-    let state = build_init_state();
+    let state = make_game_state(
+        [vec![], vec![], vec![], vec![]],
+        MakeGameStateArgs::default(),
+    );
     let snap = snapshot(&state);
 
-    assert_eq!(snap.game.round_no, 0);
-    assert_eq!(snap.game.dealer, 0);
+    assert_eq!(snap.game.round_no, None);
+    assert_eq!(snap.game.dealer, None);
     assert_eq!(
         snap.game.seating,
         [
@@ -95,16 +58,34 @@ fn bidding_snapshot_legals() {
             "AS", "2S", "3S", "4S", "5S", "6S", "7S", "8S", "9S", "TS", "JS", "QS", "KS",
         ]),
     ];
-    let state = start_round(1, hands);
+    let hand_size = hands[0].len() as u8;
+
+    // For round 1, dealer = (round_no - 1) % 4 = 0
+    let dealer: PlayerId = 0;
+
+    let state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(hand_size),
+            dealer: Some(dealer),
+
+            // Round-start seat is next_player(dealer)
+            turn: Some((dealer + 1) % 4),
+
+            ..Default::default()
+        },
+    );
     let snap = snapshot(&state);
 
     match snap.phase {
         PhaseSnapshot::Bidding(b) => {
-            assert_eq!(b.to_act, 1); // left-of-dealer
+            assert_eq!(b.to_act, Some(1)); // left-of-dealer
             assert_eq!(b.bids, [None, None, None, None]);
             assert_eq!(b.min_bid, 0);
             assert_eq!(b.max_bid, 13);
-            assert_eq!(b.round.hand_size, 13);
+            assert_eq!(b.round.hand_size, Some(13));
         }
         _ => panic!("Expected Bidding phase"),
     }
@@ -119,7 +100,25 @@ fn trump_select_snapshot() {
         parse_cards(&["AH", "2H", "3H"]),
         parse_cards(&["AS", "2S", "3S"]),
     ];
-    let mut state = start_round(1, hands);
+    let hand_size = hands[0].len() as u8;
+
+    // For round 1, dealer = (round_no - 1) % 4 = 0
+    let dealer: PlayerId = 0;
+
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(hand_size),
+            dealer: Some(dealer),
+
+            // Round-start seat is next_player(dealer)
+            turn: Some((dealer + 1) % 4),
+
+            ..Default::default()
+        },
+    );
 
     // Place bids: player 1 bids 0, player 2 bids 1, player 3 bids 0, player 0 bids 0
     // Player 2 should win with bid of 1
@@ -134,7 +133,7 @@ fn trump_select_snapshot() {
 
     match snap.phase {
         PhaseSnapshot::TrumpSelect(t) => {
-            assert_eq!(t.to_act, 2); // bid winner
+            assert_eq!(t.to_act, Some(2)); // bid winner
             assert_eq!(t.round.bid_winner, Some(2));
             assert!(t.allowed_trumps.contains(&Trump::Clubs));
             assert!(t.allowed_trumps.contains(&Trump::Diamonds));
@@ -155,7 +154,25 @@ fn trick_snapshot_legals() {
         parse_cards(&["AH", "2H", "3H"]),
         parse_cards(&["AS", "2S", "3S"]),
     ];
-    let mut state = start_round(1, hands);
+    let hand_size = hands[0].len() as u8;
+
+    // For round 1, dealer = (round_no - 1) % 4 = 0
+    let dealer: PlayerId = 0;
+
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(hand_size),
+            dealer: Some(dealer),
+
+            // Round-start seat is next_player(dealer)
+            turn: Some((dealer + 1) % 4),
+
+            ..Default::default()
+        },
+    );
 
     // Complete bidding: player 2 wins with bid of 2
     place_bid(&mut state, 1, Bid(0)).unwrap();
@@ -174,8 +191,8 @@ fn trick_snapshot_legals() {
     match snap.phase {
         PhaseSnapshot::Trick(t) => {
             assert_eq!(t.trick_no, 1);
-            assert_eq!(t.leader, 1); // player to left of dealer (dealer=0, so 1) leads
-            assert_eq!(t.to_act, 1);
+            assert_eq!(t.leader, Some(1)); // player to left of dealer (dealer=0, so 1) leads
+            assert_eq!(t.to_act, Some(1));
             assert_eq!(t.current_trick.len(), 0);
             // Playable should be all cards in player 1's hand (no lead yet)
             assert_eq!(t.playable.len(), 3);
@@ -197,7 +214,7 @@ fn trick_snapshot_legals() {
     let snap = snapshot(&state);
     match snap.phase {
         PhaseSnapshot::Trick(t) => {
-            assert_eq!(t.to_act, 2); // next player after 1
+            assert_eq!(t.to_act, Some(2)); // next player after 1
             assert_eq!(t.current_trick.len(), 1);
             // Player 2 has only Hearts, so is void in Diamonds and can play any card
             assert_eq!(t.playable.len(), 3);
@@ -221,7 +238,7 @@ fn trick_snapshot_legals() {
     let snap = snapshot(&state);
     match snap.phase {
         PhaseSnapshot::Trick(t) => {
-            assert_eq!(t.to_act, 3);
+            assert_eq!(t.to_act, Some(3));
             // Player 3 is void in diamonds, can play any card
             assert_eq!(t.playable.len(), 3);
         }
@@ -239,7 +256,25 @@ fn trick_snapshot_second_trick_turn_rotation() {
         parse_cards(&["AS", "7C"]),
     ];
 
-    let mut state = start_round(1, hands);
+    let hand_size = hands[0].len() as u8;
+
+    // For round 1, dealer = (round_no - 1) % 4 = 0
+    let dealer: PlayerId = 0;
+
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(hand_size),
+            dealer: Some(dealer),
+
+            // Round-start seat is next_player(dealer)
+            turn: Some((dealer + 1) % 4),
+
+            ..Default::default()
+        },
+    );
 
     // Bidding: player 1 wins and selects Spades as trump
     place_bid(&mut state, 1, Bid(2)).unwrap();
@@ -292,8 +327,8 @@ fn trick_snapshot_second_trick_turn_rotation() {
     match snap.phase {
         PhaseSnapshot::Trick(t) => {
             assert_eq!(t.current_trick.len(), 0);
-            assert_eq!(t.leader, 3);
-            assert_eq!(t.to_act, 3);
+            assert_eq!(t.leader, Some(3));
+            assert_eq!(t.to_act, Some(3));
         }
         _ => panic!("Expected Trick phase after first trick resolution"),
     }
@@ -313,8 +348,8 @@ fn trick_snapshot_second_trick_turn_rotation() {
     match snap.phase {
         PhaseSnapshot::Trick(t) => {
             assert_eq!(t.current_trick.len(), 1);
-            assert_eq!(t.leader, 3);
-            assert_eq!(t.to_act, 0);
+            assert_eq!(t.leader, Some(3));
+            assert_eq!(t.to_act, Some(0));
         }
         _ => panic!("Expected Trick phase during second trick"),
     }
@@ -329,7 +364,25 @@ fn scoring_snapshot() {
         parse_cards(&["AH", "2H"]),
         parse_cards(&["AS", "2S"]),
     ];
-    let mut state = start_round(1, hands);
+    let hand_size = hands[0].len() as u8;
+
+    // For round 1, dealer = (round_no - 1) % 4 = 0
+    let dealer: PlayerId = 0;
+
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(hand_size),
+            dealer: Some(dealer),
+
+            // Round-start seat is next_player(dealer)
+            turn: Some((dealer + 1) % 4),
+
+            ..Default::default()
+        },
+    );
 
     // Bidding: player 1 bids 1, others bid 0
     place_bid(&mut state, 1, Bid(1)).unwrap();
@@ -445,7 +498,25 @@ fn complete_and_gameover_snapshots() {
         parse_cards(&["AH"]),
         parse_cards(&["AS"]),
     ];
-    let mut state = start_round(1, hands);
+    let hand_size = hands[0].len() as u8;
+
+    // For round 1, dealer = (round_no - 1) % 4 = 0
+    let dealer: PlayerId = 0;
+
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(hand_size),
+            dealer: Some(dealer),
+
+            // Round-start seat is next_player(dealer)
+            turn: Some((dealer + 1) % 4),
+
+            ..Default::default()
+        },
+    );
 
     // Complete bidding, trump, and single trick
     place_bid(&mut state, 1, Bid(0)).unwrap();
@@ -512,7 +583,7 @@ fn complete_and_gameover_snapshots() {
 
     // Move to GameOver by setting phase directly (simulating end of game)
     state.phase = Phase::GameOver;
-    state.round_no = 26;
+    state.round_no = Some(26);
 
     let snap = snapshot(&state);
     match snap.phase {

@@ -14,12 +14,12 @@ use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games;
 use backend::state::app_state::AppState;
 use backend::AppError;
-use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
 use crate::support::auth::bearer_header;
 use crate::support::build_test_state;
 use crate::support::factory::create_test_user;
+use crate::support::game_state::{assert_game_snapshot_shape, parse_game_state_envelope};
 use crate::support::snapshot_helpers::{create_snapshot_game, SnapshotGameOptions};
 use crate::support::test_utils::test_user_sub;
 
@@ -92,7 +92,7 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
         .to_string();
 
     // Consume response body to fully release the response
-    let _body = test::read_body(resp).await;
+    let body = test::read_body(resp).await;
 
     // Verify ETag format: "game-{id}-v{version}"
     let expected_etag = format!(r#""game-{}-v{}""#, game.game_id, game.version);
@@ -101,17 +101,8 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
         "ETag should be in format \"game-{{id}}-v{{version}}\""
     );
 
-    // Verify version is present in JSON response body
-    let json: Value = serde_json::from_slice(&_body).expect("Body should be valid JSON");
-    let response_version = json
-        .get("version")
-        .expect("Response should include version field")
-        .as_i64()
-        .expect("version should be an integer") as i32;
-    assert_eq!(
-        response_version, game.version,
-        "version in JSON response should match game version"
-    );
+    let env = parse_game_state_envelope(&body);
+    assert_game_snapshot_shape(env.game());
 
     shared.rollback().await?;
     Ok(())
@@ -264,13 +255,8 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
         "200 response should have body with snapshot data"
     );
 
-    // Verify body is valid JSON with expected structure
-    let json: Value = serde_json::from_slice(&body).expect("Body should be valid JSON");
-    let snapshot = json
-        .get("snapshot")
-        .expect("response should include snapshot payload");
-    assert!(snapshot.get("game").is_some(), "Should have game field");
-    assert!(snapshot.get("phase").is_some(), "Should have phase field");
+    let env = parse_game_state_envelope(&body);
+    assert_game_snapshot_shape(env.game());
 
     shared.rollback().await?;
     Ok(())
@@ -461,13 +447,8 @@ async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(
         "200 response should have body with snapshot data"
     );
 
-    // Verify body is valid JSON with expected structure
-    let json: Value = serde_json::from_slice(&body).expect("Body should be valid JSON");
-    let snapshot = json
-        .get("snapshot")
-        .expect("response should include snapshot payload");
-    assert!(snapshot.get("game").is_some(), "Should have game field");
-    assert!(snapshot.get("phase").is_some(), "Should have phase field");
+    let env = parse_game_state_envelope(&body);
+    assert_game_snapshot_shape(env.game());
 
     shared.rollback().await?;
     Ok(())

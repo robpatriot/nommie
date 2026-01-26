@@ -1,394 +1,74 @@
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-
-use actix::prelude::*;
-use actix_web::{web, Error, HttpRequest, HttpResponse};
-use actix_web_actors::ws;
-use serde::Serialize;
-use serde_json::to_string;
-use tracing::{info, warn};
-use uuid::Uuid;
+use actix_web::web;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::db::txn::SharedTxn;
-use crate::domain::state::Seat;
+use crate::domain::snapshot::GameSnapshot;
 use crate::error::AppError;
+use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
-use crate::extractors::game_id::GameId;
-use crate::extractors::game_membership::GameMembership;
-use crate::routes::games::{
-    build_snapshot_response, build_snapshot_response_in_txn, GameSnapshotResponse,
-};
+use crate::protocol::game_state::ViewerState;
+use crate::routes::games::{build_snapshot_response, build_snapshot_response_in_txn};
 use crate::state::app_state::AppState;
-use crate::trace_ctx;
-use crate::ws::hub::{GameSessionRegistry, SnapshotBroadcast};
 
-const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(20);
-const CLIENT_TIMEOUT: Duration = Duration::from_secs(40);
+/// Authorize a user's subscription to a game topic.
+///
+/// IMPORTANT: when `txn` is Some, we must query using that transaction so websocket
+/// tests can see uncommitted rows created inside the per-test transaction.
+pub async fn authorize_game_subscription(
+    txn: Option<&SharedTxn>,
+    app_state: &web::Data<AppState>,
+    game_id: i64,
+    user: &CurrentUser,
+) -> Result<(), AppError> {
+    use crate::entities::game_players;
 
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct Shutdown;
-
-#[derive(Clone, Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-#[allow(clippy::large_enum_variant)]
-enum OutgoingMessage {
-    Snapshot {
-        data: GameSnapshotResponse,
-        viewer_seat: Option<Seat>,
-    },
-    Ack {
-        message: &'static str,
-    },
-    Error {
-        message: String,
-        code: Option<String>,
-    },
-}
-
-pub async fn upgrade(
-    req: HttpRequest,
-    stream: web::Payload,
-    game_id: GameId,
-    current_user: CurrentUser,
-    _membership: GameMembership,
-    app_state: web::Data<AppState>,
-) -> Result<HttpResponse, Error> {
-    let (snapshot_response, viewer_seat) =
-        build_snapshot_response(Some(&req), &app_state, game_id.0, &current_user)
-            .await
-            .map_err(Error::from)?;
-
-    let registry = app_state.websocket_registry();
-    let initial_version = snapshot_response.version;
-    let shared_txn = SharedTxn::from_req(&req);
-
-    // Generate session_id early so we can log it with trace_id while still in span context
-    let session_id = Uuid::new_v4();
-    let trace_id = trace_ctx::trace_id();
-    info!(
-        session_id = %session_id,
-        game_id = game_id.0,
-        user_id = current_user.id,
-        trace_id = %trace_id,
-        "Websocket upgrade initiating session"
-    );
-
-    let config = GameWsSessionConfig {
-        app_state: app_state.clone(),
-        registry,
-        game_id: game_id.0,
-        current_user,
-        shared_txn,
-        pending_messages: vec![
-            OutgoingMessage::Ack {
-                message: "connected",
-            },
-            OutgoingMessage::Snapshot {
-                data: snapshot_response,
-                viewer_seat,
-            },
-        ],
-        initial_version,
+    let membership = if let Some(shared) = txn {
+        game_players::Entity::find()
+            .filter(game_players::Column::GameId.eq(game_id))
+            .filter(game_players::Column::HumanUserId.eq(Some(user.id)))
+            .one(shared.transaction())
+            .await?
+    } else {
+        let db = crate::db::require_db(app_state.as_ref())?;
+        game_players::Entity::find()
+            .filter(game_players::Column::GameId.eq(game_id))
+            .filter(game_players::Column::HumanUserId.eq(Some(user.id)))
+            .one(db)
+            .await?
     };
 
-    let session = GameWsSession::new_with_id(session_id, config);
-
-    ws::start(session, &req, stream)
-}
-
-pub struct GameWsSession {
-    session_id: Uuid,
-    game_id: i64,
-    user_id: i64,
-    current_user: CurrentUser,
-    app_state: web::Data<AppState>,
-    shared_txn: Option<SharedTxn>,
-    last_heartbeat: Instant,
-    pending_messages: Vec<OutgoingMessage>,
-    registry: Option<Arc<GameSessionRegistry>>,
-    registry_token: Option<Uuid>,
-    last_version: i32,
-    heartbeat_handle: Option<actix::SpawnHandle>,
-}
-
-struct GameWsSessionConfig {
-    app_state: web::Data<AppState>,
-    registry: Option<Arc<GameSessionRegistry>>,
-    game_id: i64,
-    current_user: CurrentUser,
-    shared_txn: Option<SharedTxn>,
-    pending_messages: Vec<OutgoingMessage>,
-    initial_version: i32,
-}
-
-impl GameWsSession {
-    fn new_with_id(session_id: Uuid, config: GameWsSessionConfig) -> Self {
-        Self {
-            session_id,
-            game_id: config.game_id,
-            user_id: config.current_user.id,
-            current_user: config.current_user,
-            app_state: config.app_state,
-            shared_txn: config.shared_txn,
-            last_heartbeat: Instant::now(),
-            pending_messages: config.pending_messages,
-            registry: config.registry,
-            registry_token: None,
-            last_version: config.initial_version,
-            heartbeat_handle: None,
-        }
-    }
-
-    fn start_heartbeat(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        let handle = ctx.run_interval(HEARTBEAT_INTERVAL, |actor, ctx| {
-            if Instant::now().duration_since(actor.last_heartbeat) > CLIENT_TIMEOUT {
-                warn!(
-                    session_id = %actor.session_id,
-                    game_id = actor.game_id,
-                    user_id = actor.user_id,
-                    "Websocket client heartbeat timed out"
-                );
-                ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Normal)));
-                ctx.stop();
-                return;
-            }
-
-            ctx.ping(b"keepalive");
+    if membership.is_none() {
+        return Err(AppError::Forbidden {
+            code: ErrorCode::Forbidden,
+            detail: "Not a member of this game".to_string(),
         });
-        self.heartbeat_handle = Some(handle);
     }
 
-    fn flush_pending(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
-        for message in self.pending_messages.drain(..) {
-            match to_string(&message) {
-                Ok(payload) => ctx.text(payload),
-                Err(err) => warn!(
-                    session_id = %self.session_id,
-                    error = %err,
-                    "Failed to serialize websocket message"
-                ),
-            }
-        }
-    }
+    Ok(())
 }
 
-impl Actor for GameWsSession {
-    type Context = ws::WebsocketContext<Self>;
+/// Build the game state payload for the websocket protocol.
+///
+/// Returns:
+/// - version: i32
+/// - game: GameSnapshot (pure domain snapshot)
+/// - viewer: ViewerState (viewer-relative context: seat/hand/constraints)
+pub async fn build_game_state(
+    txn: Option<&SharedTxn>,
+    app_state: &web::Data<AppState>,
+    game_id: i64,
+    user: &CurrentUser,
+) -> Result<(i32, GameSnapshot, ViewerState), AppError> {
+    let (snapshot_response, _viewer_seat) = if let Some(shared) = txn {
+        build_snapshot_response_in_txn(shared.transaction(), app_state, game_id, user.id).await?
+    } else {
+        // Inside websocket actors we do not have a request; passing None is fine.
+        build_snapshot_response(None, app_state, game_id, user).await?
+    };
 
-    fn started(&mut self, ctx: &mut Self::Context) {
-        info!(
-            session_id = %self.session_id,
-            game_id = self.game_id,
-            user_id = self.user_id,
-            "Websocket session started"
-        );
+    let version = snapshot_response.version;
+    let game = snapshot_response.snapshot;
+    let viewer = snapshot_response.viewer;
 
-        if let Some(registry) = &self.registry {
-            let recipient = ctx.address().recipient();
-            let addr = ctx.address();
-            let token = registry.register(self.game_id, recipient, addr);
-            self.registry_token = Some(token);
-        }
-
-        self.start_heartbeat(ctx);
-        self.flush_pending(ctx);
-    }
-
-    fn stopped(&mut self, _ctx: &mut Self::Context) {
-        let stopped_start = std::time::Instant::now();
-        if let (Some(registry), Some(token)) = (&self.registry, self.registry_token) {
-            let before = registry.active_connections_count();
-            registry.unregister(self.game_id, token);
-            let after = registry.active_connections_count();
-            info!(
-                session_id = %self.session_id,
-                game_id = self.game_id,
-                user_id = self.user_id,
-                before_count = before,
-                after_count = after,
-                "[WS SESSION] Actor stopped() - unregistered (fallback, token was still set)"
-            );
-        } else {
-            info!(
-                session_id = %self.session_id,
-                game_id = self.game_id,
-                user_id = self.user_id,
-                duration_ms = stopped_start.elapsed().as_millis(),
-                "[WS SESSION] Actor stopped() - already unregistered"
-            );
-        }
-
-        info!(
-            session_id = %self.session_id,
-            game_id = self.game_id,
-            user_id = self.user_id,
-            duration_ms = stopped_start.elapsed().as_millis(),
-            "[WS SESSION] Websocket session fully stopped"
-        );
-    }
-}
-
-impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for GameWsSession {
-    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-        match msg {
-            Ok(ws::Message::Ping(payload)) => {
-                self.last_heartbeat = Instant::now();
-                ctx.pong(&payload);
-            }
-            Ok(ws::Message::Pong(_)) => {
-                self.last_heartbeat = Instant::now();
-            }
-            Ok(ws::Message::Text(_)) => {
-                // Any received message confirms the connection is alive
-                self.last_heartbeat = Instant::now();
-                // Frontend doesn't send text messages, so this is unexpected but harmless
-                // Silently ignore
-            }
-            Ok(ws::Message::Binary(_)) => {
-                // Any received message confirms the connection is alive
-                self.last_heartbeat = Instant::now();
-            }
-            Ok(ws::Message::Close(reason)) => {
-                // Don't update heartbeat on close - connection is terminating
-                ctx.close(reason);
-                ctx.stop();
-            }
-            Ok(ws::Message::Continuation(_)) => {
-                // Any received message confirms the connection is alive
-                self.last_heartbeat = Instant::now();
-            }
-            Ok(ws::Message::Nop) => {
-                // Any received message confirms the connection is alive
-                self.last_heartbeat = Instant::now();
-            }
-            Err(err) => {
-                // Don't update heartbeat on protocol errors
-                warn!(
-                    session_id = %self.session_id,
-                    game_id = self.game_id,
-                    user_id = self.user_id,
-                    error = %err,
-                    "Websocket protocol error"
-                );
-                ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Error)));
-                ctx.stop();
-            }
-        }
-    }
-}
-
-impl Handler<SnapshotBroadcast> for GameWsSession {
-    type Result = ();
-
-    fn handle(&mut self, msg: SnapshotBroadcast, ctx: &mut Self::Context) -> Self::Result {
-        if msg.version <= self.last_version {
-            return;
-        }
-
-        let app_state = self.app_state.clone();
-        let current_user = self.current_user.clone();
-        let game_id = self.game_id;
-        let shared_txn = self.shared_txn.clone();
-
-        ctx.spawn(
-            async move {
-                if let Some(shared) = shared_txn.as_ref() {
-                    build_snapshot_response_in_txn(
-                        shared.transaction(),
-                        &app_state,
-                        game_id,
-                        current_user.id,
-                    )
-                    .await
-                } else {
-                    build_snapshot_response(None, &app_state, game_id, &current_user).await
-                }
-            }
-            .into_actor(self)
-            .map(|result, actor, ctx| match result {
-                Ok((snapshot, viewer_seat)) => {
-                    // Use max() to ensure last_version always moves forward monotonically,
-                    // preventing race conditions when concurrent snapshot builds complete out of order
-                    actor.last_version = actor.last_version.max(snapshot.version);
-                    let outgoing = OutgoingMessage::Snapshot {
-                        data: snapshot,
-                        viewer_seat,
-                    };
-                    match to_string(&outgoing) {
-                        Ok(serialized) => ctx.text(serialized),
-                        Err(err) => warn!(
-                            session_id = %actor.session_id,
-                            game_id = actor.game_id,
-                            error = %err,
-                            "Failed to serialize broadcast snapshot"
-                        ),
-                    }
-                }
-                Err(err) => {
-                    warn!(
-                        session_id = %actor.session_id,
-                        game_id = actor.game_id,
-                        error = %err,
-                        "Failed to build snapshot for websocket client"
-                    );
-
-                    // Send error message to client so it can retry via HTTP
-                    let error_code = match &err {
-                        AppError::Internal { code, .. }
-                        | AppError::Validation { code, .. }
-                        | AppError::NotFound { code, .. }
-                        | AppError::Forbidden { code, .. }
-                        | AppError::BadRequest { code, .. }
-                        | AppError::Conflict { code, .. }
-                        | AppError::Timeout { code, .. } => Some(code.as_str().to_string()),
-                        AppError::Db { .. }
-                        | AppError::DbUnavailable { .. }
-                        | AppError::Config { .. } => Some(err.code().as_str().to_string()),
-                        AppError::Unauthorized
-                        | AppError::UnauthorizedMissingBearer
-                        | AppError::UnauthorizedInvalidJwt
-                        | AppError::UnauthorizedExpiredJwt
-                        | AppError::ForbiddenUserNotFound => Some(err.code().as_str().to_string()),
-                    };
-
-                    let outgoing = OutgoingMessage::Error {
-                        message: format!("Failed to build snapshot: {err}"),
-                        code: error_code,
-                    };
-                    match to_string(&outgoing) {
-                        Ok(serialized) => ctx.text(serialized),
-                        Err(ser_err) => warn!(
-                            session_id = %actor.session_id,
-                            game_id = actor.game_id,
-                            error = %ser_err,
-                            "Failed to serialize error message"
-                        ),
-                    }
-                }
-            }),
-        );
-    }
-}
-
-impl Handler<Shutdown> for GameWsSession {
-    type Result = ();
-
-    fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) -> Self::Result {
-        // Immediately unregister from registry (the stopped() method will also try, but this ensures it happens)
-        if let (Some(registry), Some(token)) = (&self.registry, self.registry_token.take()) {
-            registry.unregister(self.game_id, token);
-        }
-
-        // Cancel heartbeat interval to prevent any further pings
-        if let Some(handle) = self.heartbeat_handle.take() {
-            ctx.cancel_future(handle);
-        }
-
-        // Stop the actor immediately - this will close the connection forcefully
-        // without waiting for client acknowledgment. We don't call ctx.close() first
-        // because that would send a graceful close frame and wait for acknowledgment,
-        // which can cause a 1-second delay during shutdown.
-        ctx.stop();
-    }
+    Ok((version, game, viewer))
 }

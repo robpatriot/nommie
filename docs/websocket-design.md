@@ -49,7 +49,7 @@ Tokens are minted with a short TTL (currently ~90 seconds) and are intended only
 
 ### Fan-out & Broadcast
 Realtime fan-out is implemented with two layers:
-- **In-process registry**: a map of `game_id -> sessions` held by `GameSessionRegistry`.
+- **In-process registry**: a map of `game_id -> sessions` held by `WsRegistry`.
 - **Redis pub/sub**: a cross-process signal bus so any instance can notify all other instances of updates.
 
 The broadcast contract is intentionally minimal:
@@ -102,7 +102,7 @@ Backend integration tests cover:
 - **Shutdown tests**: Registry cleanup and connection count management
 
 **Test Implementation Details:**
-- Tests use **in-memory `GameSessionRegistry`** (not Redis) for concurrency safety and deterministic test execution
+- Tests use **in-memory `WsRegistry`** (not Redis) for concurrency safety and deterministic test execution
 - Each test uses **transaction-per-test isolation** via `SharedTxn` injection into request extensions
 - Tests run against a **real HTTP server** (not `test::init_service()`) to support WebSocket upgrade
 - Test infrastructure includes `TestTxnInjector` middleware, `WebSocketClient` wrapper, and connection count polling helpers

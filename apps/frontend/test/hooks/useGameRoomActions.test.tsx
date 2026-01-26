@@ -130,6 +130,7 @@ describe('useGameRoomActions', () => {
       expect(mockMutateAsync).toHaveBeenCalledWith({
         gameId: 42,
         isReady: true,
+        version: 1,
       })
     })
 

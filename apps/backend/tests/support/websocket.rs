@@ -1,4 +1,5 @@
-// WebSocket test utilities
+// apps/backend/tests/support/websocket.rs
+// WebSocket test utilities (updated for GET /ws + protocol handshake)
 
 use std::net::TcpListener;
 use std::sync::Arc;
@@ -11,35 +12,28 @@ use backend::middleware::request_trace::RequestTrace;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
 use backend::state::app_state::AppState;
-use backend::ws::game::upgrade;
-use backend::ws::hub::{GameSessionRegistry, SnapshotBroadcast};
+use backend::ws::hub::WsRegistry;
 
 use crate::support::test_middleware::TestTxnInjector;
 
-/// Create a test registry and attach it to AppState
+/// Create a test registry and attach it to AppState.
 ///
 /// Returns both the updated state and the registry so tests can:
-/// 1. Use the state for WebSocket connections
-/// 2. Call registry.broadcast() directly to simulate game mutations
-///
-/// This is safe for concurrent test execution since each test gets
-/// its own isolated registry instance.
-pub fn attach_test_registry(state: AppState) -> (AppState, Arc<GameSessionRegistry>) {
-    let registry = Arc::new(GameSessionRegistry::new());
+/// 1) Use the state for WebSocket connections
+/// 2) Call registry.broadcast_* directly to simulate realtime events
+pub fn attach_test_registry(state: AppState) -> (AppState, Arc<WsRegistry>) {
+    let registry = Arc::new(WsRegistry::new());
     let state = state.with_websocket_registry(registry.clone());
     (state, registry)
 }
 
-/// Helper to broadcast a snapshot update (simulates game mutation triggering broadcast)
-///
-/// In production, game mutations call publish_snapshot which uses Redis pub/sub.
-/// In tests, we call this directly to trigger broadcasts to connected WebSocket clients.
-pub fn broadcast_snapshot(registry: &GameSessionRegistry, game_id: i64, version: i32) {
-    registry.broadcast(game_id, SnapshotBroadcast { version });
+/// Helper to broadcast a snapshot update (simulates game mutation triggering broadcast).
+pub fn broadcast_snapshot(registry: &WsRegistry, game_id: i64, version: i32) {
+    registry.broadcast_game_state_available(game_id, version);
 }
 
 pub async fn wait_for_connections(
-    registry: &GameSessionRegistry,
+    registry: &WsRegistry,
     expected: usize,
     timeout: Duration,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -60,18 +54,9 @@ pub async fn wait_for_connections(
     }
 }
 
-/// Start a test HTTP server with WebSocket routes
+/// Start a test HTTP server with WebSocket routes.
 ///
-/// This function creates a real HTTP server bound to a random port, allowing tests
-/// to connect via real WebSocket clients (e.g., tokio-tungstenite). The server
-/// includes test middleware to inject SharedTxn into request extensions for
-/// transaction-per-test isolation.
-///
-/// # Returns
-/// Returns a tuple of (server_handle, socket_addr, join_handle) where:
-/// - `server_handle` can be used to gracefully stop the server
-/// - `socket_addr` is the address the server is listening on
-/// - `join_handle` can be awaited to wait for server shutdown and check for errors
+/// Exposes GET /ws with JwtExtract (supports ?token=...).
 pub async fn start_test_server(
     state: AppState,
     shared_txn: SharedTxn,
@@ -94,17 +79,16 @@ pub async fn start_test_server(
             .wrap(StructuredLogger)
             .wrap(TraceSpan)
             .wrap(RequestTrace)
-            .wrap(txn_injector.clone()) // Inject SharedTxn into request extensions
+            .wrap(txn_injector.clone())
             .service(
                 web::scope("/ws")
                     .wrap(JwtExtract)
-                    .service(web::resource("/games/{game_id}").route(web::get().to(upgrade))),
+                    .service(web::resource("").route(web::get().to(backend::ws::session::upgrade))),
             )
     })
     .listen(listener)?
     .run();
 
-    // Start server in background and return handle + join
     let server_handle = server.handle();
     let join = tokio::spawn(server);
 

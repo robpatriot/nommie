@@ -9,6 +9,7 @@ use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::games::Game;
 use crate::repos::{bids, games, player_view, plays, rounds, tricks};
+use crate::services::game_flow::GameFlowMutationResult;
 
 impl GameFlowService {
     /// Submit a bid for a player in the current round.
@@ -27,13 +28,16 @@ impl GameFlowService {
         player_seat: u8,
         bid_value: u8,
         expected_version: i32,
-    ) -> Result<Game, AppError> {
-        self.submit_bid_internal(txn, game_id, player_seat, bid_value, expected_version)
-            .await?;
-        self.process_game_state(txn, game_id).await?;
-        // Reload game after state processing to get final version
-        let final_game = games::require_game(txn, game_id).await?;
-        Ok(final_game)
+    ) -> Result<GameFlowMutationResult, AppError> {
+        self.run_mutation(txn, game_id, expected_version, |svc, txn| {
+            Box::pin(async move {
+                svc.submit_bid_mutation(txn, game_id, player_seat, bid_value, expected_version)
+                    .await?;
+                svc.process_game_state(txn, game_id).await?;
+                Ok(())
+            })
+        })
+        .await
     }
 
     /// Internal bid submission - just records the bid without processing.
@@ -45,7 +49,7 @@ impl GameFlowService {
     /// This method loads its own validation data from the database rather than
     /// accepting pre-built context. Services are trust boundaries and must not
     /// rely on caller-provided data for security checks.
-    pub(super) async fn submit_bid_internal(
+    pub(super) async fn submit_bid_mutation(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
@@ -162,19 +166,22 @@ impl GameFlowService {
         player_seat: u8,
         trump: crate::domain::Trump,
         expected_version: i32,
-    ) -> Result<Game, AppError> {
-        self.set_trump_internal(txn, game_id, player_seat, trump, expected_version)
-            .await?;
-        self.process_game_state(txn, game_id).await?;
-        // Reload game after state processing to get final version
-        let final_game = games::require_game(txn, game_id).await?;
-        Ok(final_game)
+    ) -> Result<GameFlowMutationResult, AppError> {
+        self.run_mutation(txn, game_id, expected_version, |svc, txn| {
+            Box::pin(async move {
+                svc.set_trump_mutation(txn, game_id, player_seat, trump, expected_version)
+                    .await?;
+                svc.process_game_state(txn, game_id).await?;
+                Ok(())
+            })
+        })
+        .await
     }
 
     /// Internal trump setting - just sets trump without processing.
     ///
     /// Used by AI loop to avoid recursion. Handlers should use set_trump() instead.
-    pub(super) async fn set_trump_internal(
+    pub(super) async fn set_trump_mutation(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
@@ -195,7 +202,7 @@ impl GameFlowService {
         let result = crate::domain::bidding::set_trump(&mut state, player_seat, trump)?;
 
         // Get current round for persistence
-        let current_round_no = state.round_no;
+        let current_round_no = crate::domain::state::require_round_no(&state, "player_actions")?;
         let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {
@@ -246,19 +253,22 @@ impl GameFlowService {
         player_seat: u8,
         card: Card,
         expected_version: i32,
-    ) -> Result<Game, AppError> {
-        self.play_card_internal(txn, game_id, player_seat, card, expected_version)
-            .await?;
-        self.process_game_state(txn, game_id).await?;
-        // Reload game after state processing to get final version
-        let final_game = games::require_game(txn, game_id).await?;
-        Ok(final_game)
+    ) -> Result<GameFlowMutationResult, AppError> {
+        self.run_mutation(txn, game_id, expected_version, |svc, txn| {
+            Box::pin(async move {
+                svc.play_card_mutation(txn, game_id, player_seat, card, expected_version)
+                    .await?;
+                svc.process_game_state(txn, game_id).await?;
+                Ok(())
+            })
+        })
+        .await
     }
 
     /// Internal card play - just records the play without processing.
     ///
     /// Used by AI loop to avoid recursion. Handlers should use play_card() instead.
-    pub(super) async fn play_card_internal(
+    pub(super) async fn play_card_mutation(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
@@ -276,7 +286,7 @@ impl GameFlowService {
         };
 
         // Get current round for persistence
-        let current_round_no = state.round_no;
+        let current_round_no = crate::domain::state::require_round_no(&state, "player_actions")?;
         let round = rounds::find_by_game_and_round(txn, game_id, current_round_no)
             .await?
             .ok_or_else(|| {

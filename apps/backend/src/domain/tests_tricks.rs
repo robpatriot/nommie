@@ -1,5 +1,6 @@
 use crate::domain::bidding::{place_bid, set_trump, Bid};
-use crate::domain::state::{GameState, Phase, PlayerId, RoundState};
+use crate::domain::state::{Phase, RoundState};
+use crate::domain::test_state_helpers::{make_game_state, MakeGameStateArgs};
 use crate::domain::tricks::{legal_moves, play_card, resolve_current_trick};
 use crate::domain::{Card, Rank, Suit, Trump};
 use crate::errors::domain::{DomainError, ValidationKind};
@@ -11,21 +12,6 @@ fn parse_cards(tokens: &[&str]) -> Vec<Card> {
         .collect()
 }
 
-fn make_state_with_hands(hands: [Vec<Card>; 4], hand_size: u8, turn_start: PlayerId) -> GameState {
-    GameState {
-        phase: Phase::Bidding,
-        round_no: 1,
-        hand_size,
-        hands,
-        turn_start,
-        turn: turn_start,
-        leader: turn_start,
-        trick_no: 0,
-        scores_total: [0; 4],
-        round: RoundState::empty(),
-    }
-}
-
 #[test]
 fn legal_moves_follow_lead() {
     // Hands for a small test
@@ -33,14 +19,32 @@ fn legal_moves_follow_lead() {
     let h1 = parse_cards(&["TS", "3H", "4C"]);
     let h2 = parse_cards(&["QS", "5D", "6C"]);
     let h3 = parse_cards(&["9S", "7H", "8C"]);
-    let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
+
+    // Old: turn_start = 0. New: round start seat is next_player(dealer),
+    // so dealer must be 3 to preserve next_player(3) == 0.
+    let mut state = make_game_state(
+        [h0, h1, h2, h3],
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(3),
+            dealer: Some(3),
+            turn: Some(0),
+            leader: None,
+            trick_no: Some(0),
+            scores_total: [0; 4],
+        },
+    );
+
     for p in 0..4 {
         assert!(place_bid(&mut state, p, Bid(0)).is_ok());
     }
     set_trump(&mut state, 0, Trump::Hearts).unwrap();
+
     // First to play can play any
     let lm0 = legal_moves(&state, 0);
     assert_eq!(lm0.len(), 3);
+
     // Play AS -> lead Spades
     play_card(
         &mut state,
@@ -51,6 +55,7 @@ fn legal_moves_follow_lead() {
         },
     )
     .unwrap();
+
     // Player 1 must follow spades if possible
     let lm1 = legal_moves(&state, 1);
     assert!(lm1.iter().all(|c| c.suit == Suit::Spades) && !lm1.is_empty());
@@ -62,11 +67,27 @@ fn play_card_errors_and_trick_resolution() {
     let h1 = parse_cards(&["TS", "3H", "4C"]);
     let h2 = parse_cards(&["QS", "5D", "6C"]);
     let h3 = parse_cards(&["9S", "7H", "8C"]);
-    let mut state = make_state_with_hands([h0, h1, h2, h3], 3, 0);
+
+    // Old: turn_start = 0 -> dealer = 3 so next_player(dealer) == 0.
+    let mut state = make_game_state(
+        [h0, h1, h2, h3],
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(3),
+            dealer: Some(3),
+            turn: Some(0),
+            leader: None,
+            trick_no: Some(0),
+            scores_total: [0; 4],
+        },
+    );
+
     for p in 0..4 {
         place_bid(&mut state, p, Bid(0)).unwrap();
     }
     set_trump(&mut state, 0, Trump::Hearts).unwrap();
+
     // Out of turn
     assert_eq!(
         play_card(
@@ -80,6 +101,7 @@ fn play_card_errors_and_trick_resolution() {
         .unwrap_err(),
         DomainError::validation(ValidationKind::OutOfTurn, "Out of turn")
     );
+
     // Not in hand
     assert_eq!(
         play_card(
@@ -93,6 +115,7 @@ fn play_card_errors_and_trick_resolution() {
         .unwrap_err(),
         DomainError::validation(ValidationKind::CardNotInHand, "Card not in hand")
     );
+
     // Play trick fully
     play_card(
         &mut state,
@@ -130,9 +153,10 @@ fn play_card_errors_and_trick_resolution() {
         },
     )
     .unwrap();
+
     // Highest trump is none in trick; lead spades so Ace wins -> player 0 leads next
-    assert_eq!(state.leader, 0);
-    assert_eq!(state.turn, 0);
+    assert_eq!(state.leader, Some(0));
+    assert_eq!(state.turn, Some(0));
     assert_eq!(state.round.tricks_won[0], 1);
 }
 

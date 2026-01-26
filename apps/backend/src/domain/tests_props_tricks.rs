@@ -10,6 +10,7 @@
 use proptest::prelude::*;
 
 use crate::domain::state::Phase;
+use crate::domain::test_state_helpers::{make_game_state, MakeGameStateArgs};
 use crate::domain::tricks::{legal_moves, play_card};
 use crate::domain::{test_prelude, Card, Rank, Suit, Trump};
 use crate::errors::domain::{DomainError, ValidationKind};
@@ -22,12 +23,29 @@ proptest! {
     fn prop_first_card_establishes_lead(
         card in crate::domain::test_gens::card(),
     ) {
-        use crate::domain::test_state_helpers::init_round;
         let hands = [vec![card], vec![], vec![], vec![]];
-        let mut state = init_round(1, 5, hands, 0, [0; 4]);
-        state.phase = Phase::Trick { trick_no: 1 };
-        state.turn = 0;
-        state.leader = 0;
+        let mut state = make_game_state(
+            hands,
+            MakeGameStateArgs {
+                phase: Phase::Trick { trick_no: 1 },
+                round_no: Some(1),
+                hand_size: Some(5),
+
+                // round 1 canonical anchor
+                dealer: Some(0),
+
+                // explicit actionable player
+                turn: Some(0),
+
+                // explicit trick leader
+                leader: Some(0),
+                trick_no: Some(1),
+
+                ..Default::default()
+            },
+        );
+
+        // trump explicitly set for the round
         state.round.trump = Some(Trump::NoTrumps);
 
         // Play the first card
@@ -59,16 +77,31 @@ proptest! {
         ),
     ) {
         // off_suit_card is guaranteed to be off-suit by construction
-
-        use crate::domain::test_state_helpers::init_round;
-
         // Player 0 has a card of the led suit AND an off-suit card
         let lead_card = Card { suit: lead_suit, rank: lead_rank };
         let hands = [vec![lead_card, off_suit_card], vec![], vec![], vec![]];
-        let mut state = init_round(1, 5, hands, 0, [0; 4]);
-        state.phase = Phase::Trick { trick_no: 1 };
-        state.turn = 0;
-        state.leader = 0;
+        let mut state = make_game_state(
+            hands,
+            MakeGameStateArgs {
+                phase: Phase::Trick { trick_no: 1 },
+                round_no: Some(1),
+                hand_size: Some(5),
+
+                // round 1 canonical anchor
+                dealer: Some(0),
+
+                // explicit actionable player
+                turn: Some(0),
+
+                    // explicit trick leader
+                leader: Some(0),
+                trick_no: Some(1),
+
+                ..Default::default()
+            },
+        );
+
+        // trump explicitly set for the round
         state.round.trump = Some(Trump::NoTrumps);
 
         // Set up trick_lead as if someone already played
@@ -106,15 +139,30 @@ proptest! {
         ),
     ) {
         // player_card is guaranteed to NOT be of the led suit by construction
-
-        use crate::domain::test_state_helpers::init_round;
-
         // Player 0 has only cards NOT of the led suit
         let hands = [vec![player_card], vec![], vec![], vec![]];
-        let mut state = init_round(1, 5, hands, 0, [0; 4]);
-        state.phase = Phase::Trick { trick_no: 1 };
-        state.turn = 0;
-        state.leader = 0;
+        let mut state = make_game_state(
+            hands,
+            MakeGameStateArgs {
+                phase: Phase::Trick { trick_no: 1 },
+                round_no: Some(1),
+                hand_size: Some(5),
+
+                // round 1 canonical anchor
+                dealer: Some(0),
+
+                // explicit actionable player
+                turn: Some(0),
+
+                // explicit trick leader
+                leader: Some(0),
+                trick_no: Some(1),
+
+                ..Default::default()
+            },
+        );
+
+        // trump explicitly set for the round
         state.round.trump = Some(Trump::NoTrumps);
 
         // Set up trick_lead as if someone already played
@@ -132,8 +180,6 @@ proptest! {
 /// Test: Legal moves when holding lead suit
 #[test]
 fn test_legal_moves_with_lead_suit() {
-    use crate::domain::test_state_helpers::init_round;
-
     // Player has: 2H, 5H, 7C
     // Lead suit is Hearts
     let hands = [
@@ -155,9 +201,28 @@ fn test_legal_moves_with_lead_suit() {
         vec![],
         vec![],
     ];
-    let mut state = init_round(1, 5, hands, 0, [0; 4]);
-    state.phase = Phase::Trick { trick_no: 1 };
-    state.turn = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Trick { trick_no: 1 },
+            round_no: Some(1),
+            hand_size: Some(5),
+
+            // round 1 → dealer = 0
+            dealer: Some(0),
+
+            // explicit actionable player
+            turn: Some(0),
+
+            // trick-specific fields
+            leader: Some(0),
+            trick_no: Some(1),
+
+            ..Default::default()
+        },
+    );
+
+    // lead suit for the current trick
     state.round.trick_lead = Some(Suit::Hearts);
 
     let legal = legal_moves(&state, 0);
@@ -181,8 +246,6 @@ fn test_legal_moves_with_lead_suit() {
 /// Test: Legal moves when void in lead suit
 #[test]
 fn test_legal_moves_when_void() {
-    use crate::domain::test_state_helpers::init_round;
-
     // Player has: 7C, KD, AS
     // Lead suit is Hearts (player is void)
     let hands = [
@@ -204,9 +267,28 @@ fn test_legal_moves_when_void() {
         vec![],
         vec![],
     ];
-    let mut state = init_round(1, 5, hands, 0, [0; 4]);
-    state.phase = Phase::Trick { trick_no: 1 };
-    state.turn = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Trick { trick_no: 1 },
+            round_no: Some(1),
+            hand_size: Some(5),
+
+            // round 1 → dealer = 0
+            dealer: Some(0),
+
+            // explicit actionable player
+            turn: Some(0),
+
+            // trick-specific fields
+            leader: Some(0),
+            trick_no: Some(1),
+
+            ..Default::default()
+        },
+    );
+
+    // lead suit for the current trick
     state.round.trick_lead = Some(Suit::Hearts);
 
     let legal = legal_moves(&state, 0);
@@ -230,8 +312,6 @@ fn test_legal_moves_when_void() {
 /// Test: Legal moves on first play of trick
 #[test]
 fn test_legal_moves_first_play() {
-    use crate::domain::test_state_helpers::init_round;
-
     // Player has: 2H, 5H, 7C
     // No lead suit yet (first to play)
     let hands = [
@@ -253,10 +333,28 @@ fn test_legal_moves_first_play() {
         vec![],
         vec![],
     ];
-    let mut state = init_round(1, 5, hands, 0, [0; 4]);
-    state.phase = Phase::Trick { trick_no: 1 };
-    state.turn = 0;
-    state.leader = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Trick { trick_no: 1 },
+            round_no: Some(1),
+            hand_size: Some(5),
+
+            // round 1 canonical anchor
+            dealer: Some(0),
+
+            // explicit actionable player
+            turn: Some(0),
+
+            // explicit trick leader
+            leader: Some(0),
+            trick_no: Some(1),
+
+            ..Default::default()
+        },
+    );
+
+    // no lead suit yet
     state.round.trick_lead = None;
 
     let legal = legal_moves(&state, 0);
@@ -268,8 +366,6 @@ fn test_legal_moves_first_play() {
 /// Test: Cannot play card not in hand
 #[test]
 fn test_cannot_play_card_not_in_hand() {
-    use crate::domain::test_state_helpers::init_round;
-
     // Player has: 2H
     let hands = [
         vec![Card {
@@ -280,10 +376,28 @@ fn test_cannot_play_card_not_in_hand() {
         vec![],
         vec![],
     ];
-    let mut state = init_round(1, 5, hands, 0, [0; 4]);
-    state.phase = Phase::Trick { trick_no: 1 };
-    state.turn = 0;
-    state.leader = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Trick { trick_no: 1 },
+            round_no: Some(1),
+            hand_size: Some(5),
+
+            // round 1 canonical anchor
+            dealer: Some(0),
+
+            // explicit actionable player
+            turn: Some(0),
+
+            // explicit trick leader
+            leader: Some(0),
+            trick_no: Some(1),
+
+            ..Default::default()
+        },
+    );
+
+    // trump explicitly set for the round
     state.round.trump = Some(Trump::NoTrumps);
 
     // Try to play a card not in hand
@@ -306,8 +420,6 @@ fn test_cannot_play_card_not_in_hand() {
 /// Test: Cannot play out of turn
 #[test]
 fn test_cannot_play_out_of_turn() {
-    use crate::domain::test_state_helpers::init_round;
-
     // Player 1 has a card
     let hands = [
         vec![],
@@ -318,10 +430,28 @@ fn test_cannot_play_out_of_turn() {
         vec![],
         vec![],
     ];
-    let mut state = init_round(1, 5, hands, 0, [0; 4]);
-    state.phase = Phase::Trick { trick_no: 1 };
-    state.turn = 0; // Player 0's turn
-    state.leader = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Trick { trick_no: 1 },
+            round_no: Some(1),
+            hand_size: Some(5),
+
+            // round 1 canonical anchor
+            dealer: Some(0),
+
+            // explicit actionable player
+            turn: Some(0),
+
+            // explicit trick leader
+            leader: Some(0),
+            trick_no: Some(1),
+
+            ..Default::default()
+        },
+    );
+
+    // trump explicitly set for the round
     state.round.trump = Some(Trump::NoTrumps);
 
     // Player 1 tries to play when it's player 0's turn
@@ -347,8 +477,6 @@ fn test_cannot_play_out_of_turn() {
 /// Test: Cannot play in wrong phase
 #[test]
 fn test_cannot_play_in_wrong_phase() {
-    use crate::domain::test_state_helpers::init_round;
-
     let hands = [
         vec![Card {
             suit: Suit::Hearts,
@@ -358,9 +486,17 @@ fn test_cannot_play_in_wrong_phase() {
         vec![],
         vec![],
     ];
-    let mut state = init_round(1, 5, hands, 0, [0; 4]);
-    state.phase = Phase::Bidding; // Wrong phase
-    state.turn = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Bidding,
+            round_no: Some(1),
+            hand_size: Some(5),
+            dealer: Some(0),
+            turn: Some(0),
+            ..Default::default()
+        },
+    );
 
     let result = play_card(
         &mut state,
@@ -384,8 +520,6 @@ fn test_cannot_play_in_wrong_phase() {
 /// Test: Trick winner with no trump (highest card of led suit wins)
 #[test]
 fn test_trick_winner_no_trump() {
-    use crate::domain::test_state_helpers::init_round;
-
     // Set up 4 players with one card each
     let hands = [
         vec![Card {
@@ -405,10 +539,28 @@ fn test_trick_winner_no_trump() {
             rank: Rank::King,
         }], // Off-suit
     ];
-    let mut state = init_round(1, 4, hands, 0, [0; 4]);
-    state.phase = Phase::Trick { trick_no: 1 };
-    state.turn = 0;
-    state.leader = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Trick { trick_no: 1 },
+            round_no: Some(1),
+            hand_size: Some(4),
+
+            // round 1 canonical anchor
+            dealer: Some(0),
+
+            // explicit actionable player
+            turn: Some(0),
+
+            // explicit trick leader
+            leader: Some(0),
+            trick_no: Some(1),
+
+            ..Default::default()
+        },
+    );
+
+    // trump explicitly set for the round
     state.round.trump = Some(Trump::NoTrumps);
 
     // Play all 4 cards
@@ -456,14 +608,12 @@ fn test_trick_winner_no_trump() {
     );
 
     // Next leader should be player 1
-    assert_eq!(state.leader, 1, "Player 1 should be next leader");
+    assert_eq!(state.leader, Some(1), "Player 1 should be next leader");
 }
 
 /// Test: Trick winner with trump (highest trump wins)
 #[test]
 fn test_trick_winner_with_trump() {
-    use crate::domain::test_state_helpers::init_round;
-
     // Set up 4 players with one card each
     let hands = [
         vec![Card {
@@ -483,10 +633,28 @@ fn test_trick_winner_with_trump() {
             rank: Rank::Five,
         }], // Trump! (higher)
     ];
-    let mut state = init_round(1, 4, hands, 0, [0; 4]);
-    state.phase = Phase::Trick { trick_no: 1 };
-    state.turn = 0;
-    state.leader = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Trick { trick_no: 1 },
+            round_no: Some(1),
+            hand_size: Some(4),
+
+            // round 1 canonical anchor
+            dealer: Some(0),
+
+            // explicit actionable player
+            turn: Some(0),
+
+            // explicit trick leader
+            leader: Some(0),
+            trick_no: Some(1),
+
+            ..Default::default()
+        },
+    );
+
+    // trump explicitly set for the round
     state.round.trump = Some(Trump::Spades); // Spades is trump
 
     // Play all 4 cards
@@ -534,14 +702,12 @@ fn test_trick_winner_with_trump() {
     );
 
     // Next leader should be player 3
-    assert_eq!(state.leader, 3, "Player 3 should be next leader");
+    assert_eq!(state.leader, Some(3), "Player 3 should be next leader");
 }
 
 /// Test: Complete trick advances to next trick or scoring
 #[test]
 fn test_complete_trick_advances_phase() {
-    use crate::domain::test_state_helpers::init_round;
-
     // Test case 1: Not last trick
     // All players have 2 cards
     let hands = [
@@ -586,11 +752,28 @@ fn test_complete_trick_advances_phase() {
             },
         ],
     ];
-    let mut state = init_round(1, 2, hands, 0, [0; 4]);
-    state.phase = Phase::Trick { trick_no: 1 };
-    state.trick_no = 1;
-    state.turn = 0;
-    state.leader = 0;
+    let mut state = make_game_state(
+        hands,
+        MakeGameStateArgs {
+            phase: Phase::Trick { trick_no: 1 },
+            round_no: Some(1),
+            hand_size: Some(2),
+
+            // round 1 canonical anchor
+            dealer: Some(0),
+
+            // explicit actionable player
+            turn: Some(0),
+
+            // explicit trick leader
+            leader: Some(0),
+            trick_no: Some(1),
+
+            ..Default::default()
+        },
+    );
+
+    // trump explicitly set for the round
     state.round.trump = Some(Trump::NoTrumps);
 
     // Play first trick (all Hearts)
@@ -632,16 +815,16 @@ fn test_complete_trick_advances_phase() {
     .is_ok());
 
     // Should advance to trick 2
-    assert_eq!(state.trick_no, 2, "Should be on trick 2");
+    assert_eq!(state.trick_no, Some(2), "Should be on trick 2");
     assert_eq!(
         state.phase,
         Phase::Trick { trick_no: 2 },
         "Should be in Trick phase for trick 2"
     );
 
-    // Test case 2: Last trick
-    // Play second trick (all Clubs)
-    let winner = state.leader;
+    let winner = state
+        .leader
+        .expect("expected Some(leader) after first trick");
     assert!(play_card(
         &mut state,
         winner,

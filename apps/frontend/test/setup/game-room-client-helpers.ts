@@ -3,7 +3,6 @@ import { act } from '@testing-library/react'
 import { waitFor } from '@testing-library/react'
 import { expect } from 'vitest'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
-import { queryKeys } from '@/lib/queries/query-keys'
 import { initSnapshotFixture } from '../mocks/game-snapshot'
 import { MockWebSocket, mockWebSocketInstances } from './mock-websocket'
 import type { Seat } from '@/lib/game-room/types'
@@ -83,8 +82,8 @@ export function sendWebSocketSnapshot(
     viewerHand?: string[]
   }
 ): void {
-  // Transform the snapshot message to GameRoomSnapshotPayload format
-  // This simulates what useGameSync.transformSnapshotMessage does
+  // Transform the game_state message to GameRoomSnapshotPayload format
+  // This simulates what useGameSync.transformGameStateMessage does
   const version = overrides?.version ?? 1
   const viewerSeatRaw = overrides?.viewerSeat ?? 0
   const viewerSeat: Seat | null =
@@ -94,38 +93,19 @@ export function sendWebSocketSnapshot(
       ? (viewerSeatRaw as Seat)
       : null
   const viewerHand = overrides?.viewerHand ?? []
-  const playerNames: [string, string, string, string] = [
-    'Alex',
-    'Bailey',
-    'Casey',
-    'Dakota',
-  ]
-
-  const payload: GameRoomSnapshotPayload = {
-    snapshot,
-    playerNames,
-    viewerSeat,
-    viewerHand,
-    timestamp: new Date().toISOString(),
-    hostSeat: snapshot.game.host_seat,
-    bidConstraints: null,
-    version,
-    etag: `"game-${gameId}-v${version}"`,
-  }
-
-  // Update the real query cache (simulating what useGameSync does)
-  queryClient.setQueryData(queryKeys.games.snapshot(gameId), payload)
 
   const message = {
-    type: 'snapshot',
-    data: {
-      snapshot,
-      version: version,
-      viewer_hand: viewerHand,
-      bid_constraints: null,
+    type: 'game_state',
+    topic: { kind: 'game', id: gameId },
+    version,
+    game: snapshot,
+    viewer: {
+      seat: viewerSeat,
+      hand: viewerHand,
+      bidConstraints: null,
     },
-    viewer_seat: viewerSeat,
   }
+
   act(() => {
     ws.onmessage?.(
       new MessageEvent('message', {

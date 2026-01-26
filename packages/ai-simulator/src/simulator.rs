@@ -13,8 +13,75 @@ use backend::domain::round_memory::{PlayMemory, RoundMemory, TrickMemory};
 use backend::domain::rules::hand_size_for_round;
 use backend::domain::scoring::apply_round_scoring;
 use backend::domain::seed_derivation::derive_dealing_seed;
-use backend::domain::state::{GameState, Phase, RoundState};
+use backend::domain::state::{GameState, Phase, PlayerId, RoundState};
 use backend::domain::tricks::play_card;
+
+const PLAYERS: usize = 4;
+
+// -----------------------------------------------------------------------------
+// Local helper (file-scoped)
+//
+// We intentionally keep this copy local because:
+// - this crate cannot access backend's unit-test helpers
+// - we don't want backend to expose test-only helpers or use feature flags
+// -----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy)]
+struct MakeGameStateArgs {
+    phase: Phase,
+
+    round_no: Option<u8>,
+    hand_size: Option<u8>,
+    dealer: Option<PlayerId>,
+
+    turn: Option<PlayerId>,
+    leader: Option<PlayerId>,
+    trick_no: Option<u8>,
+
+    scores_total: [i16; PLAYERS],
+}
+
+impl Default for MakeGameStateArgs {
+    fn default() -> Self {
+        Self {
+            phase: Phase::Init,
+            round_no: None,
+            hand_size: None,
+            dealer: None,
+            turn: None,
+            leader: None,
+            trick_no: None,
+            scores_total: [0; PLAYERS],
+        }
+    }
+}
+
+/// Build a GameState with Option-honest semantics.
+///
+/// Notes:
+/// - `turn: Option<PlayerId>` is the sole "someone must act" signal.
+/// - Round-start seat is derived as `dealer.map(next_player)`; we do not store `turn_start`.
+fn make_game_state(hands: [Vec<Card>; 4], args: MakeGameStateArgs) -> GameState {
+    GameState {
+        phase: args.phase,
+
+        round_no: args.round_no,
+        hand_size: args.hand_size,
+        dealer: args.dealer,
+
+        turn: args.turn,
+        leader: args.leader,
+        trick_no: args.trick_no,
+
+        hands,
+        scores_total: args.scores_total,
+        round: RoundState::empty(),
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Simulator
+// -----------------------------------------------------------------------------
 
 /// Result of simulating a complete game.
 #[derive(Debug, Clone)]
@@ -52,18 +119,10 @@ impl Simulator {
     /// Create a new simulator with initial game state.
     pub fn new(game_seed: [u8; 32], game_id: i64) -> Self {
         Self {
-            state: GameState {
-                phase: Phase::Init,
-                round_no: 0,
-                hand_size: 0,
-                hands: [vec![], vec![], vec![], vec![]],
-                turn_start: 0,
-                turn: 0,
-                leader: 0,
-                trick_no: 0,
-                scores_total: [0; 4],
-                round: RoundState::empty(),
-            },
+            state: make_game_state(
+                [vec![], vec![], vec![], vec![]],
+                MakeGameStateArgs::default(),
+            ),
             history: GameHistory { rounds: vec![] },
             round_memories: [None, None, None, None],
             completed_tricks: vec![],
@@ -79,7 +138,7 @@ impl Simulator {
         mut self,
         ais: &[Box<dyn AiPlayer>; 4],
     ) -> Result<GameResult, SimulatorError> {
-        // Play all 26 rounds
+        // 26 rounds total (13 down to 2, four 2-card rounds, then back up to 13)
         for round_no in 1..=26 {
             self.deal_round(round_no)?;
             self.play_round(ais)?;
@@ -102,22 +161,37 @@ impl Simulator {
             .map_err(|e| SimulatorError::DomainError(format!("Seed derivation failed: {e}")))?;
 
         // Deal hands
-        let hands = deal_hands(4, hand_size, dealing_seed)
+        let hands = deal_hands(PLAYERS, hand_size, dealing_seed)
             .map_err(|e| SimulatorError::DomainError(format!("Deal failed: {e}")))?;
 
         // Determine dealer (rotates each round)
-        let dealer_pos = ((round_no - 1) % 4) as u8;
+        let dealer: PlayerId = ((round_no - 1) % 4) as PlayerId;
 
-        // Initialize round state
-        self.state.round_no = round_no;
-        self.state.hand_size = hand_size;
-        self.state.hands = hands;
-        self.state.turn_start = dealer_pos;
-        self.state.turn = (dealer_pos + 1) % 4; // First bidder is to left of dealer
-        self.state.leader = (dealer_pos + 1) % 4;
-        self.state.trick_no = 0;
-        self.state.phase = Phase::Bidding;
-        self.state.round = RoundState::empty();
+        // Preserve cumulative score across rounds
+        let scores_total = self.state.scores_total;
+
+        // Rebuild state for the new round (Option-honest)
+        self.state = make_game_state(
+            hands,
+            MakeGameStateArgs {
+                phase: Phase::Bidding,
+                round_no: Some(round_no),
+                hand_size: Some(hand_size),
+                dealer: Some(dealer),
+
+                // First bidder is to left of dealer
+                turn: Some((dealer + 1) % 4),
+
+                // Leader is not meaningful during bidding; it will be set for trick play.
+                leader: None,
+
+                // Track current trick number as a convenience for AI context/history.
+                trick_no: Some(0),
+
+                scores_total,
+            },
+        );
+
         self.completed_tricks.clear();
         self.round_memories = [None, None, None, None];
 
@@ -147,7 +221,11 @@ impl Simulator {
     /// Play the bidding phase.
     fn play_bidding_phase(&mut self, ais: &[Box<dyn AiPlayer>; 4]) -> Result<(), SimulatorError> {
         while self.state.phase == Phase::Bidding {
-            let player_seat = self.state.turn;
+            let player_seat = self
+                .state
+                .turn
+                .expect("simulator: expected Some(turn) in Bidding phase");
+
             let current_info = self.build_current_round_info(player_seat)?;
             let game_context = self.build_game_context(player_seat)?;
 
@@ -162,7 +240,6 @@ impl Simulator {
 
             // Check if phase transitioned
             if let Some(Phase::TrumpSelect) = result.phase_transitioned {
-                // Phase transitioned to TrumpSelect
                 break;
             }
         }
@@ -194,10 +271,16 @@ impl Simulator {
         set_trump(&mut self.state, winning_bidder, trump)
             .map_err(|e| SimulatorError::DomainError(format!("Set trump failed: {e}")))?;
 
-        // Fix leader and turn: first trick is led by player to left of dealer
-        // (set_trump sets both to turn_start/dealer, but leader should be dealer+1)
-        self.state.leader = (self.state.turn_start + 1) % 4;
-        self.state.turn = self.state.leader;
+        // Ensure first trick leader/turn is left-of-dealer.
+        // (Domain logic may set a placeholder; simulator enforces canonical round-start seat.)
+        let dealer = self
+            .state
+            .dealer
+            .expect("simulator: expected Some(dealer) after dealing round");
+        let first = (dealer + 1) % 4;
+        self.state.leader = Some(first);
+        self.state.turn = Some(first);
+        self.state.trick_no = Some(1);
 
         Ok(())
     }
@@ -209,7 +292,11 @@ impl Simulator {
             while self.state.round.trick_plays.len() < 4
                 && matches!(self.state.phase, Phase::Trick { .. })
             {
-                let player_seat = self.state.turn;
+                let player_seat = self
+                    .state
+                    .turn
+                    .expect("simulator: expected Some(turn) in Trick phase");
+
                 let current_info = self.build_current_round_info(player_seat)?;
                 let game_context = self.build_game_context(player_seat)?;
 
@@ -239,6 +326,9 @@ impl Simulator {
                         // Update round memories for all players
                         self.update_round_memories(&trick_plays);
                     }
+
+                    // Keep `trick_no` in sync for AI context/history convenience
+                    self.state.trick_no = Some(self.completed_tricks.len() as u8);
                 }
             }
         }
@@ -267,19 +357,34 @@ impl Simulator {
             )));
         }
 
+        let current_round = self
+            .state
+            .round_no
+            .expect("simulator: expected Some(round_no) outside Init");
+        let hand_size = self
+            .state
+            .hand_size
+            .expect("simulator: expected Some(hand_size) outside Init");
+        let dealer_pos = self
+            .state
+            .dealer
+            .expect("simulator: expected Some(dealer) outside Init");
+        let trick_no = self
+            .state
+            .trick_no
+            .expect("simulator: expected Some(trick_no) during round");
+
         // Build current trick plays
         let current_trick_plays: Vec<(u8, Card)> =
             self.state.round.trick_plays.iter().copied().collect();
 
         // Determine trick leader
-        // For first trick: leader is player to left of dealer
-        // For subsequent tricks: leader is winner of previous trick (stored in state.leader)
+        // For first play of a trick: use state.leader (set by domain/simulator)
+        // For trick in progress: leader is first player in trick_plays
         let trick_leader = if matches!(self.state.phase, Phase::Trick { .. }) {
             if current_trick_plays.is_empty() {
-                // First play of trick - use state.leader (set correctly by domain logic)
-                Some(self.state.leader)
+                self.state.leader
             } else {
-                // Trick in progress - leader is first player
                 Some(self.state.round.trick_plays[0].0)
             }
         } else {
@@ -290,13 +395,13 @@ impl Simulator {
             game_id: self.game_id,
             player_seat,
             game_state: self.state.phase,
-            current_round: self.state.round_no,
-            hand_size: self.state.hand_size,
-            dealer_pos: self.state.turn_start,
+            current_round,
+            hand_size,
+            dealer_pos,
             hand: self.state.hands[player_seat as usize].clone(),
             bids: self.state.round.bids,
             trump: self.state.round.trump,
-            trick_no: self.state.trick_no,
+            trick_no,
             current_trick_plays,
             scores: self.state.scores_total,
             tricks_won: self.state.round.tricks_won,
@@ -347,11 +452,24 @@ impl Simulator {
 
     /// Add the completed round to game history.
     fn add_round_to_history(&mut self) {
+        let round_no = self
+            .state
+            .round_no
+            .expect("simulator: expected Some(round_no) when adding history");
+        let hand_size = self
+            .state
+            .hand_size
+            .expect("simulator: expected Some(hand_size) when adding history");
+        let dealer_seat = self
+            .state
+            .dealer
+            .expect("simulator: expected Some(dealer) when adding history");
+
         let round_score_deltas = self.calculate_round_scores();
         let round_history = RoundHistory {
-            round_no: self.state.round_no,
-            hand_size: self.state.hand_size,
-            dealer_seat: self.state.turn_start,
+            round_no,
+            hand_size,
+            dealer_seat,
             bids: self.state.round.bids,
             trump_selector_seat: self.state.round.winning_bidder,
             trump: self.state.round.trump,

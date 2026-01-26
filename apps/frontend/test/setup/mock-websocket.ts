@@ -15,6 +15,8 @@ export class MockWebSocket {
   onclose: ((event: CloseEvent) => void) | null = null
   onmessage: ((event: MessageEvent) => void) | null = null
 
+  sent: string[] = []
+
   // Event listeners for MSW compatibility
   private listeners: Map<string, Set<EventListener>> = new Map()
 
@@ -38,8 +40,8 @@ export class MockWebSocket {
     })
   }
 
-  send(_data: string) {
-    // Mock send - do nothing
+  send(data: string) {
+    this.sent.push(data)
   }
 
   close(code = 1000, reason = 'Connection closed') {

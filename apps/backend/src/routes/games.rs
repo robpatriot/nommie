@@ -1,21 +1,17 @@
-//! Game-related HTTP routes.
-
-use std::collections::HashSet;
-
 use actix_web::http::header::{ETAG, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
-use rand::random;
-use sea_orm::TransactionTrait;
+use sea_orm::{ConnectionTrait, TransactionTrait};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use time::format_description::well_known::Rfc3339;
 use tracing::{debug, info, warn};
 
-use crate::ai::{registry, RandomPlayer};
+use crate::ai::registry;
 use crate::db::txn::with_txn;
 use crate::domain::bidding::validate_consecutive_zero_bids;
-use crate::domain::snapshot::{GameSnapshot, SeatAiProfilePublic, SeatPublic};
+use crate::domain::game_transition::GameTransition;
+use crate::domain::snapshot::{SeatAiProfilePublic, SeatPublic};
 use crate::domain::state::Seat;
 use crate::domain::{Card, Rank, Suit, Trump};
 use crate::entities::games::{GameState, GameVisibility};
@@ -26,85 +22,17 @@ use crate::extractors::game_id::GameId;
 use crate::extractors::game_membership::GameMembership;
 use crate::extractors::ValidatedJson;
 use crate::http::etag::game_etag;
-use crate::repos::memberships::{self, GameRole};
-use crate::repos::players::{friendly_ai_name, resolve_display_name_for_membership};
-use crate::repos::{ai_overrides, ai_profiles, games as games_repo, player_view, users};
+use crate::protocol::game_state::{BidConstraintsResponse, GameSnapshotResponse, ViewerState};
+use crate::repos::memberships::GameRole;
+use crate::repos::players::resolve_display_name_for_membership;
+use crate::repos::{ai_profiles, games as games_repo, memberships, player_view, users};
 use crate::routes::snapshot_cache::SharedSnapshotParts;
-use crate::services::ai::{AiInstanceOverrides, AiService};
+use crate::services::game_flow::seats::ManageAiSeatParams;
 use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
 use crate::services::players::PlayerService;
 use crate::state::app_state::AppState;
-
-#[derive(Clone, Serialize)]
-pub(crate) struct GameSnapshotResponse {
-    snapshot: GameSnapshot,
-    viewer_hand: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    bid_constraints: Option<BidConstraintsResponse>,
-    pub(crate) version: i32,
-}
-
-#[derive(Clone, Serialize)]
-pub(crate) struct BidConstraintsResponse {
-    zero_bid_locked: bool,
-}
-
-/// Join a user to a game and touch the game to trigger WebSocket broadcasts.
-///
-/// This helper encapsulates the common pattern of joining a user to a game
-/// and incrementing the game's version so that WebSocket clients receive
-/// updates about the new player.
-///
-/// Returns the updated game and all memberships.
-async fn join_game_and_touch(
-    txn: &sea_orm::DatabaseTransaction,
-    game_id: i64,
-    user_id: i64,
-    initial_version: i32,
-) -> Result<(games_repo::Game, Vec<memberships::GameMembership>), AppError> {
-    let service = GameService;
-    let (_game, memberships) = service.join_game(txn, game_id, user_id).await?;
-
-    // Touch game to increment version so WebSocket clients receive the update
-    let final_game = games_repo::touch_game(txn, game_id, initial_version).await?;
-
-    Ok((final_game, memberships))
-}
-
-/// Helper that leaves a game and touches it to increment version.
-///
-/// This helper encapsulates the common pattern of removing a user from a game
-/// and incrementing the game's version so that WebSocket clients receive
-/// updates about the player leaving.
-///
-/// For active games, converts the human to AI, touches the game (incrementing version),
-/// then processes game state (AIs may act, each incrementing version further).
-async fn leave_game_and_touch(
-    txn: &sea_orm::DatabaseTransaction,
-    game_id: i64,
-    user_id: i64,
-    initial_version: i32,
-) -> Result<i32, AppError> {
-    // Check game state before leaving to determine if we need AI processing
-    let game_before = games_repo::require_game(txn, game_id).await?;
-    let was_active = game_before.state != crate::entities::games::GameState::Lobby;
-
-    let service = GameService;
-    service.leave_game(txn, game_id, user_id).await?;
-
-    // If game was active, the human was converted to AI
-    if was_active {
-        // Touch game to increment version for the conversion (unit of work)
-        let updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
-        // Note: AI processing is handled in a background task after transaction commits
-        Ok(updated_game.version)
-    } else {
-        // Game was in Lobby - just touch to increment version
-        let updated_game = games_repo::touch_game(txn, game_id, initial_version).await?;
-        Ok(updated_game.version)
-    }
-}
+use crate::ws::protocol::{ServerMsg, Topic};
 
 /// Build shared snapshot parts (cacheable by game_id + version).
 ///
@@ -225,14 +153,7 @@ async fn build_user_specific_parts(
     game_id: i64,
     current_user_id: i64,
     shared: &SharedSnapshotParts,
-) -> Result<
-    (
-        Option<Seat>,
-        Option<Vec<String>>,
-        Option<BidConstraintsResponse>,
-    ),
-    AppError,
-> {
+) -> Result<(Option<Seat>, ViewerState), AppError> {
     // Determine viewer_seat from memberships (check if current_user_id matches any seat)
     let mut viewer_seat: Option<Seat> = None;
     for (seat_idx, seat_public) in shared.seating.iter().enumerate() {
@@ -279,7 +200,14 @@ async fn build_user_specific_parts(
         }
     }
 
-    Ok((viewer_seat, viewer_hand, bid_constraints))
+    let viewer = ViewerState {
+        seat: viewer_seat,
+        hand: viewer_hand,
+        bid_constraints,
+    };
+
+    // Return seat separately for any callers that still want it as a convenience.
+    Ok((viewer.seat, viewer))
 }
 
 pub(crate) async fn build_snapshot_response(
@@ -318,7 +246,7 @@ pub(crate) async fn build_snapshot_response(
     let shared_clone = shared.clone();
 
     // Build user-specific parts
-    let (viewer_seat, viewer_hand, bid_constraints) = with_txn(http_req, app_state, |txn| {
+    let (viewer_seat, viewer) = with_txn(http_req, app_state, |txn| {
         Box::pin(async move {
             build_user_specific_parts(txn, game_id, current_user_id, &shared_clone).await
         })
@@ -327,8 +255,7 @@ pub(crate) async fn build_snapshot_response(
 
     let response = GameSnapshotResponse {
         snapshot: shared.snapshot.clone(),
-        viewer_hand,
-        bid_constraints,
+        viewer,
         version: shared.version,
     };
 
@@ -359,7 +286,7 @@ pub(crate) async fn build_snapshot_response_in_txn(
     };
 
     // Build user-specific parts
-    let (viewer_seat, viewer_hand, bid_constraints) =
+    let (viewer_seat, viewer) =
         build_user_specific_parts(txn, game_id, current_user_id, &shared).await?;
 
     // Note: We don't publish broadcasts here since we're inside a transaction.
@@ -367,8 +294,7 @@ pub(crate) async fn build_snapshot_response_in_txn(
 
     let response = GameSnapshotResponse {
         snapshot: shared.snapshot.clone(),
-        viewer_hand,
-        bid_constraints,
+        viewer,
         version: shared.version,
     };
 
@@ -435,7 +361,7 @@ async fn get_snapshot(
     let id = game_id.0;
 
     // Load game state and produce snapshot within a transaction
-    let (snapshot_response, viewer_seat) =
+    let (snapshot_response, _viewer_seat) =
         build_snapshot_response(Some(&http_req), &app_state, id, &current_user).await?;
 
     // Generate ETag from game ID and lock version
@@ -459,9 +385,6 @@ async fn get_snapshot(
                 // Resource hasn't changed, return 304 Not Modified
                 let mut not_modified = HttpResponse::build(StatusCode::NOT_MODIFIED);
                 not_modified.insert_header((ETAG, etag_value));
-                if let Some(seat) = viewer_seat {
-                    not_modified.insert_header(("x-viewer-seat", seat.to_string()));
-                }
                 return Ok(not_modified.finish());
             } else {
                 debug!(game_id = id, "ETag mismatch, returning full response");
@@ -474,13 +397,16 @@ async fn get_snapshot(
         }
     }
 
+    let msg = ServerMsg::GameState {
+        topic: Topic::Game { id },
+        version: snapshot_response.version,
+        game: snapshot_response.snapshot,
+        viewer: snapshot_response.viewer,
+    };
     // Resource is new or modified, return full response
     let mut response = HttpResponse::Ok();
     response.insert_header((ETAG, etag_value));
-    if let Some(seat) = viewer_seat {
-        response.insert_header(("x-viewer-seat", seat.to_string()));
-    }
-    Ok(response.json(snapshot_response))
+    Ok(response.json(msg))
 }
 
 /// GET /api/games/{game_id}/history
@@ -863,23 +789,26 @@ async fn join_game(
     let user_id = current_user.id;
     let id = game_id.0;
 
-    // Join game using service layer (handles validation, seat assignment, membership creation)
-    let (game_model, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
+    // Join game using flow service (handles mutation + optimistic locking)
+    let (res, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            // Fetch game to get initial version
-            let game = games_repo::require_game(txn, id).await?;
-            let initial_version = game.version;
-
-            join_game_and_touch(txn, id, user_id, initial_version).await
+            let service = GameFlowService;
+            service.join_game(txn, id, user_id).await
         })
     })
     .await?;
 
-    // Publish snapshot broadcast so other players' UIs update
-    publish_snapshot(&app_state, id).await?;
+    // Post-commit publish (no domain transitions expected here, but version bumped)
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        res.final_game.version,
+        res.old_version,
+        &res.transitions,
+    )
+    .await?;
 
-    let response = game_to_response(&game_model, &memberships, Some(user_id))?;
-
+    let response = game_to_response(&res.final_game, &memberships, Some(user_id))?;
     Ok(web::Json(JoinGameResponse { game: response }))
 }
 
@@ -887,6 +816,7 @@ async fn join_game(
 ///
 /// Adds the current user as a spectator of the specified game.
 /// Only public games can be spectated.
+/// POST /api/games/{game_id}/spectate
 async fn spectate_game(
     http_req: HttpRequest,
     game_id: GameId,
@@ -896,30 +826,104 @@ async fn spectate_game(
     let user_id = current_user.id;
     let id = game_id.0;
 
-    // Join as spectator using service layer (handles validation, visibility check, membership creation)
-    let (game_model, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
+    let (res, memberships) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            // Fetch game to get initial version
-            let game = games_repo::require_game(txn, id).await?;
-            let initial_version = game.version;
-
-            let service = GameService;
-            let (game, memberships) = service.join_as_spectator(txn, id, user_id).await?;
-
-            // Touch game to trigger WebSocket broadcasts
-            games_repo::touch_game(txn, id, initial_version).await?;
-
-            Ok((game, memberships))
+            let service = GameFlowService;
+            service.join_as_spectator(txn, id, user_id).await
         })
     })
     .await?;
 
-    // Publish snapshot broadcast so other viewers' UIs update
-    publish_snapshot(&app_state, id).await?;
+    // Post-commit publish (no domain transitions expected here, but version bumped)
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        res.final_game.version,
+        res.old_version,
+        &res.transitions,
+    )
+    .await?;
 
-    let response = game_to_response(&game_model, &memberships, Some(user_id))?;
-
+    let response = game_to_response(&res.final_game, &memberships, Some(user_id))?;
     Ok(web::Json(JoinGameResponse { game: response }))
+}
+
+/// Spawn a background task that drains automatic game flow (AI loop) and publishes
+/// mutation effects if the game advanced.
+///
+/// This is intentionally **not** tied to an HttpRequest (Send-safe for tokio::spawn).
+fn spawn_bg_game_flow_drain_and_publish(app_state: web::Data<AppState>, game_id: i64) {
+    tokio::spawn(async move {
+        // Use a fresh database connection for the background task
+        let db = match crate::db::require_db(&app_state) {
+            Ok(db) => db,
+            Err(err) => {
+                tracing::error!(
+                    game_id,
+                    error = %err,
+                    "Failed to get database connection for background game flow"
+                );
+                return;
+            }
+        };
+
+        // Begin a new transaction for background processing
+        let txn = match db.begin().await {
+            Ok(txn) => txn,
+            Err(err) => {
+                tracing::error!(
+                    game_id,
+                    error = %err,
+                    "Failed to begin transaction for background game flow"
+                );
+                return;
+            }
+        };
+
+        let game_flow_service = crate::services::game_flow::GameFlowService;
+        let flow_res = game_flow_service.run_game_flow(&txn, game_id).await;
+
+        match flow_res {
+            Ok(flow_opt) => {
+                if let Err(err) = txn.commit().await {
+                    tracing::error!(
+                        game_id,
+                        error = %err,
+                        "Failed to commit transaction after background game flow"
+                    );
+                    return;
+                }
+
+                // Only publish if the game actually changed (i.e., version advanced).
+                if let Some(res) = flow_opt {
+                    if let Err(err) = publish_game_mutation_effects(
+                        &app_state,
+                        game_id,
+                        res.final_game.version,
+                        res.old_version,
+                        &res.transitions,
+                    )
+                    .await
+                    {
+                        tracing::error!(
+                            game_id,
+                            error = %err,
+                            "Failed to publish mutation effects after background game flow"
+                        );
+                    }
+                }
+            }
+            Err(err) => {
+                tracing::error!(
+                    game_id,
+                    error = %err,
+                    "Background game flow failed"
+                );
+                // Best-effort rollback
+                let _ = txn.rollback().await;
+            }
+        }
+    });
 }
 
 /// DELETE /api/games/{gameId}/leave
@@ -938,102 +942,31 @@ async fn leave_game(
     let id = game_id.0;
     let expected_version = body.version;
 
-    // Check if game is active before leaving (needed to determine if background task is needed)
-    let db = crate::db::require_db(&app_state)?;
-    let game_before = games_repo::require_game(db, id).await?;
-    let was_active = game_before.state != crate::entities::games::GameState::Lobby;
-
-    // Leave game using service layer
-    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
-        Box::pin(async move { leave_game_and_touch(txn, id, user_id, expected_version).await })
+    // Leave game using service layer (bumps version)
+    let (res, _memberships, was_active) = with_txn(Some(&http_req), &app_state, |txn| {
+        Box::pin(async move {
+            let service = GameFlowService;
+            service.leave_game(txn, id, user_id, expected_version).await
+        })
     })
     .await?;
 
-    let etag = game_etag(id, updated_version);
+    let etag = game_etag(id, res.final_game.version);
 
-    // Publish snapshot broadcast so other players' UIs update
-    publish_snapshot(&app_state, id).await?;
-
-    // If game was active, spawn background task to process AI actions
     if was_active {
-        // Clone AppState for background task (web::Data is Arc internally)
-        let app_state_clone = app_state.clone();
-        let game_id_for_task = id;
-
-        tokio::spawn(async move {
-            // Use a fresh database connection for the background task
-            let db = match crate::db::require_db(&app_state_clone) {
-                Ok(db) => db,
-                Err(err) => {
-                    tracing::error!(
-                        game_id = game_id_for_task,
-                        error = %err,
-                        "Failed to get database connection for background AI processing"
-                    );
-                    return;
-                }
-            };
-
-            // Begin a new transaction for AI processing
-            let txn = match db.begin().await {
-                Ok(txn) => txn,
-                Err(err) => {
-                    tracing::error!(
-                        game_id = game_id_for_task,
-                        error = %err,
-                        "Failed to begin transaction for background AI processing"
-                    );
-                    return;
-                }
-            };
-
-            // Process game state - AIs may act, each incrementing version
-            let game_flow_service = crate::services::game_flow::GameFlowService;
-            let res = game_flow_service
-                .process_game_state(&txn, game_id_for_task)
-                .await;
-
-            match res {
-                Ok(()) => {
-                    // Commit the transaction
-                    match txn.commit().await {
-                        Err(err) => {
-                            tracing::error!(
-                                game_id = game_id_for_task,
-                                error = %err,
-                                "Failed to commit transaction after background AI processing"
-                            );
-                        }
-                        _ => {
-                            tracing::debug!(
-                                game_id = game_id_for_task,
-                                "Background AI processing completed successfully"
-                            );
-
-                            // Publish snapshot broadcast so clients receive the AI action updates
-                            if let Err(err) =
-                                publish_snapshot(&app_state_clone, game_id_for_task).await
-                            {
-                                tracing::error!(
-                                    game_id = game_id_for_task,
-                                    error = %err,
-                                    "Failed to publish snapshot after background AI processing"
-                                );
-                            }
-                        }
-                    }
-                }
-                Err(err) => {
-                    tracing::error!(
-                        game_id = game_id_for_task,
-                        error = %err,
-                        "Background AI processing failed"
-                    );
-                    // Best-effort rollback
-                    let _ = txn.rollback().await;
-                }
-            }
-        });
+        // If game was active, spawn background task to process automatic actions (AI flow).
+        // This task will handle its own publishing.
+        spawn_bg_game_flow_drain_and_publish(app_state.clone(), id);
+    } else {
+        // If game was in Lobby, we publish immediately so other players see the departure.
+        publish_game_mutation_effects(
+            &app_state,
+            id,
+            res.final_game.version,
+            res.old_version,
+            &res.transitions,
+        )
+        .await?;
     }
 
     Ok(HttpResponse::NoContent()
@@ -1215,12 +1148,13 @@ async fn get_waiting_longest_game(
 #[derive(serde::Deserialize)]
 struct MarkReadyRequest {
     is_ready: bool,
+    version: i32,
 }
 
 /// POST /api/games/{game_id}/ready
 ///
 /// Sets the ready status of the current player. When all four seats are ready, the game
-/// automatically transitions into the first round.
+/// automatically transitions into the first round (and may drain AI actions until stable).
 async fn mark_ready(
     http_req: HttpRequest,
     game_id: GameId,
@@ -1230,23 +1164,31 @@ async fn mark_ready(
 ) -> Result<HttpResponse, AppError> {
     let id = game_id.0;
     let user_id = current_user.id;
-    let is_ready = body.is_ready;
 
-    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
+    let is_ready = body.is_ready;
+    let expected_version = body.version;
+
+    let result = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
-            service.set_ready_status(txn, id, user_id, is_ready).await?;
-            // Fetch game to get updated version for ETag
-            let game = games_repo::require_game(txn, id).await?;
-            Ok(game.version)
+            service
+                .mark_ready(txn, id, user_id, is_ready, expected_version)
+                .await
         })
     })
     .await?;
 
-    let etag = game_etag(id, updated_version);
+    let final_version = result.final_game.version;
+    let etag = game_etag(id, final_version);
 
-    // Publish snapshot broadcast so other players' UIs update
-    publish_snapshot(&app_state, id).await?;
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        final_version,
+        result.old_version,
+        &result.transitions,
+    )
+    .await?;
 
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
@@ -1286,55 +1228,13 @@ struct DeleteGameRequest {
     version: i32,
 }
 
-#[derive(Debug, Deserialize)]
-struct ManageAiSeatRequest {
-    seat: Option<u8>,
-    registry_name: Option<String>,
-    registry_version: Option<String>,
-    seed: Option<u64>,
-    version: i32,
-}
-
-fn resolve_registry_selection(
-    request: &ManageAiSeatRequest,
-    default_name: Option<&'static str>,
-) -> Result<(&'static crate::ai::registry::AiFactory, String, Option<u64>), AppError> {
-    let name = match (request.registry_name.as_deref(), default_name) {
-        (Some(name), _) => name,
-        (None, Some(default)) => default,
-        (None, None) => {
-            return Err(AppError::bad_request(
-                ErrorCode::ValidationError,
-                "registry_name is required".to_string(),
-            ));
-        }
-    };
-
-    let factory = registry::by_name(name).ok_or_else(|| {
-        AppError::bad_request(
-            ErrorCode::ValidationError,
-            format!("Unknown AI registry entry '{name}'"),
-        )
-    })?;
-
-    if let Some(provided_version) = request.registry_version.as_deref() {
-        if provided_version != factory.version {
-            return Err(AppError::bad_request(
-                ErrorCode::ValidationError,
-                format!(
-                    "Registry version '{}' does not match server version '{}' for '{}'",
-                    provided_version, factory.version, factory.name
-                ),
-            ));
-        }
-    }
-
-    let version = request
-        .registry_version
-        .clone()
-        .unwrap_or_else(|| factory.version.to_string());
-
-    Ok((factory, version, request.seed))
+#[derive(Deserialize)]
+pub struct ManageAiSeatRequest {
+    pub seat: Option<u8>,
+    pub registry_name: Option<String>,
+    pub version: i32,
+    pub version_info: Option<String>,
+    pub config_seed: Option<u64>,
 }
 
 async fn add_ai_seat(
@@ -1348,202 +1248,36 @@ async fn add_ai_seat(
     let request = body.into_inner();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
-    // Note: version from request is not used - we fetch current game state
-    // after add_ai_to_game which may have started the game and updated version
-    let _version = request.version;
+    let expected_version = request.version;
 
-    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
+    let (res, _memberships) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_repo::require_game(txn, id).await?;
-
-            let game_service = GameService;
-            if !game_service.is_host(&game, host_user_id) {
-                return Err(AppError::forbidden_with_code(
-                    ErrorCode::Forbidden,
-                    "Only the host can manage AI seats",
-                ));
-            }
-
-            if game.state != GameState::Lobby {
-                return Err(AppError::bad_request(
-                    ErrorCode::PhaseMismatch,
-                    "AI seats can only be managed before the game starts",
-                ));
-            }
-
-            let existing_memberships = memberships::find_all_by_game(txn, id)
-                .await
-                .map_err(AppError::from)?;
-
-            // Count only players (exclude spectators)
-            let player_count = existing_memberships
-                .iter()
-                .filter(|m| m.role == GameRole::Player)
-                .count();
-
-            if player_count >= 4 {
-                return Err(AppError::conflict(
-                    ErrorCode::SeatTaken,
-                    "All seats are already filled",
-                ));
-            }
-
-            let seat_to_fill = if let Some(seat_val) = requested_seat {
-                if seat_val > 3 {
-                    return Err(AppError::bad_request(
-                        ErrorCode::InvalidSeat,
-                        format!("Seat {seat_val} is out of range (0-3)"),
-                    ));
-                }
-                if existing_memberships
-                    .iter()
-                    .any(|m| m.turn_order == Some(seat_val))
-                {
-                    return Err(AppError::conflict(
-                        ErrorCode::SeatTaken,
-                        format!("Seat {seat_val} is already taken"),
-                    ));
-                }
-                seat_val
-            } else {
-                let game_service = GameService;
-                // Filter to only players for seat finding
-                let player_memberships: Vec<_> = existing_memberships
-                    .iter()
-                    .filter(|m| m.role == GameRole::Player)
-                    .cloned()
-                    .collect();
-                game_service
-                    .find_next_available_seat(&player_memberships)
-                    .ok_or_else(|| {
-                        AppError::conflict(ErrorCode::SeatTaken, "No available seats remaining")
-                    })?
+            let service = GameFlowService;
+            let params = ManageAiSeatParams {
+                game_id: id,
+                user_id: host_user_id.unwrap_or(0),
+                seat: requested_seat,
+                registry_name: request.registry_name.clone(),
+                registry_version: request.version_info.clone(),
+                config_seed: request.config_seed,
+                expected_version,
             };
-
-            let seat_index = seat_to_fill;
-            let mut existing_display_names: HashSet<String> = HashSet::new();
-
-            // Collect existing display names using consolidated function
-            for membership in &existing_memberships {
-                if membership.turn_order == Some(seat_to_fill) {
-                    continue;
-                }
-
-                // Only process players (they have turn_order)
-                let Some(seat) = membership.turn_order else {
-                    continue;
-                };
-
-                let display_name = resolve_display_name_for_membership(
-                    txn, membership, seat,
-                    false, // No final fallback needed for uniqueness check
-                )
-                .await
-                .map_err(AppError::from)?;
-
-                existing_display_names.insert(display_name);
-            }
-
-            let ai_service = AiService;
-            let (factory, registry_version, resolved_seed) =
-                resolve_registry_selection(&request, Some(registry::DEFAULT_AI_NAME))?;
-
-            let mut seed = resolved_seed;
-            if seed.is_none() && factory.name == RandomPlayer::NAME {
-                seed = Some(random::<u64>());
-            }
-
-            // Use the shared default AI lookup when appropriate
-            let ai_profile = if factory.name == registry::DEFAULT_AI_NAME {
-                let game_service = GameService;
-                game_service.find_default_ai_profile(txn).await?
-            } else {
-                // For other AI types, use the standard lookup
-                ai_profiles::find_by_registry_variant(
-                    txn,
-                    factory.name,
-                    &registry_version,
-                    "default",
-                )
-                .await
-                .map_err(AppError::from)?
-                .ok_or_else(|| {
-                    AppError::bad_request(
-                        ErrorCode::ValidationError,
-                        format!(
-                            "AI profile for {} v{} not found",
-                            factory.name, registry_version
-                        ),
-                    )
-                })?
-            };
-
-            // Generate a random seed for name generation to ensure names vary between games
-            let name_seed = random::<u64>() as i64;
-            let base_name = friendly_ai_name(name_seed, seat_index as usize);
-            let unique_name = unique_ai_display_name(&existing_display_names, &base_name);
-            existing_display_names.insert(unique_name.clone());
-
-            let mut override_config = serde_json::Map::new();
-            if let Some(seed_value) = seed {
-                override_config.insert(
-                    "seed".to_string(),
-                    serde_json::Value::Number(seed_value.into()),
-                );
-            }
-            let override_config = if override_config.is_empty() {
-                None
-            } else {
-                Some(serde_json::Value::Object(override_config))
-            };
-
-            let overrides = AiInstanceOverrides {
-                name: Some(unique_name),
-                memory_level: None,
-                config: override_config,
-            };
-
-            // Check if adding this AI will complete all 4 players and start the game
-            // This determines whether we need to touch_game after (game won't start) or not (game will start)
-            // Count only players (exclude spectators)
-            let player_count = existing_memberships
-                .iter()
-                .filter(|m| m.role == GameRole::Player)
-                .count();
-            let will_complete_players = player_count == 3;
-            let all_existing_ready = existing_memberships
-                .iter()
-                .filter(|m| m.role == GameRole::Player)
-                .all(|m| m.is_ready);
-            let game_will_start = will_complete_players && all_existing_ready;
-
-            ai_service
-                .add_ai_to_game(txn, id, ai_profile.id, seat_to_fill, Some(overrides))
-                .await
-                .map_err(AppError::from)?;
-
-            // Only touch game if it didn't start (not all 4 players ready, or not all existing were ready)
-            // If game started, version was already updated by deal_round/process_game_state
-            if !game_will_start {
-                // Use version from request (consistent with leave_game pattern)
-                // The game state hasn't changed (still in Lobby), so version is still valid
-                let updated_game = games_repo::touch_game(txn, id, _version)
-                    .await
-                    .map_err(AppError::from)?;
-                Ok(updated_game.version)
-            } else {
-                // Game started - fetch to get the updated version from deal_round/process_game_state
-                let game = games_repo::require_game(txn, id).await?;
-                Ok(game.version)
-            }
+            service.add_ai_seat(txn, params).await
         })
     })
     .await?;
 
-    let etag = game_etag(id, updated_version);
+    let etag = game_etag(id, res.final_version());
 
-    // Publish snapshot broadcast so other players' UIs update
-    publish_snapshot(&app_state, id).await?;
+    // Post-commit publish: gated GameStateAvailable + any derived transitions (may be empty).
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        res.final_version(),
+        res.old_version,
+        &res.transitions,
+    )
+    .await?;
 
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
@@ -1561,113 +1295,35 @@ async fn remove_ai_seat(
     let request = body.into_inner();
     let requested_seat = request.seat;
     let host_user_id = membership.user_id;
-    let version = request.version;
+    let expected_version = request.version;
 
-    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
+    let (res, _memberships) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_repo::require_game(txn, id).await?;
-
-            let game_service = GameService;
-            if !game_service.is_host(&game, host_user_id) {
-                return Err(AppError::forbidden_with_code(
-                    ErrorCode::Forbidden,
-                    "Only the host can manage AI seats",
-                ));
-            }
-
-            if game.state != GameState::Lobby {
-                return Err(AppError::bad_request(
-                    ErrorCode::PhaseMismatch,
-                    "AI seats can only be managed before the game starts",
-                ));
-            }
-
-            let existing_memberships = memberships::find_all_by_game(txn, id)
+            let service = GameFlowService;
+            service
+                .remove_ai_seat(
+                    txn,
+                    id,
+                    host_user_id.unwrap_or(0),
+                    requested_seat,
+                    expected_version,
+                )
                 .await
-                .map_err(AppError::from)?;
-
-            let candidate = if let Some(seat_val) = requested_seat {
-                if seat_val > 3 {
-                    return Err(AppError::bad_request(
-                        ErrorCode::InvalidSeat,
-                        format!("Seat {seat_val} is out of range (0-3)"),
-                    ));
-                }
-
-                let membership = existing_memberships
-                    .iter()
-                    .find(|m| m.turn_order == Some(seat_val))
-                    .cloned()
-                    .ok_or_else(|| {
-                        AppError::bad_request(
-                            ErrorCode::ValidationError,
-                            format!("No player assigned to seat {seat_val}"),
-                        )
-                    })?;
-
-                if membership.player_kind != crate::entities::game_players::PlayerKind::Ai {
-                    return Err(AppError::bad_request(
-                        ErrorCode::ValidationError,
-                        "Specified seat is not occupied by an AI player",
-                    ));
-                }
-
-                membership
-            } else {
-                let mut ai_memberships = Vec::new();
-
-                for member in &existing_memberships {
-                    if member.player_kind == crate::entities::game_players::PlayerKind::Ai {
-                        ai_memberships.push(member.clone());
-                    }
-                }
-
-                if ai_memberships.is_empty() {
-                    return Err(AppError::bad_request(
-                        ErrorCode::ValidationError,
-                        "There are no AI seats to remove",
-                    ));
-                }
-
-                ai_memberships
-                    .into_iter()
-                    .max_by_key(|m| m.turn_order)
-                    .ok_or_else(|| {
-                        AppError::internal(
-                            ErrorCode::InternalError,
-                            "Failed to select AI membership for removal",
-                            std::io::Error::other("No AI membership found"),
-                        )
-                    })?
-            };
-
-            if candidate.player_kind != crate::entities::game_players::PlayerKind::Ai {
-                return Err(AppError::bad_request(
-                    ErrorCode::ValidationError,
-                    "Specified seat is not occupied by an AI player",
-                ));
-            }
-
-            ai_overrides::delete_by_game_player_id(txn, candidate.id)
-                .await
-                .map_err(AppError::from)?;
-            memberships::delete_membership(txn, candidate.id)
-                .await
-                .map_err(AppError::from)?;
-
-            // Touch game to increment version so websocket clients receive the update
-            let updated_game = games_repo::touch_game(txn, id, version)
-                .await
-                .map_err(AppError::from)?;
-            Ok(updated_game.version)
         })
     })
     .await?;
 
-    let etag = game_etag(id, updated_version);
+    let etag = game_etag(id, res.final_game.version);
 
-    // Publish snapshot broadcast so other players' UIs update
-    publish_snapshot(&app_state, id).await?;
+    // Post-commit publish: gated GameStateAvailable + any derived transitions (may be empty).
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        res.final_game.version,
+        res.old_version,
+        &res.transitions,
+    )
+    .await?;
 
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
@@ -1698,118 +1354,37 @@ async fn update_ai_seat(
         ));
     }
 
-    let version = request.version;
+    let host_user_id = membership.user_id;
+    let expected_version = request.version;
 
-    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
+    let (res, _memberships) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let game = games_repo::require_game(txn, id).await?;
-
-            let host_user_id = membership.user_id;
-
-            let game_service = GameService;
-            if !game_service.is_host(&game, host_user_id) {
-                return Err(AppError::forbidden_with_code(
-                    ErrorCode::Forbidden,
-                    "Only the host can manage AI seats",
-                ));
-            }
-
-            if game.state != GameState::Lobby {
-                return Err(AppError::bad_request(
-                    ErrorCode::PhaseMismatch,
-                    "AI seats can only be managed before the game starts",
-                ));
-            }
-
-            let existing_memberships = memberships::find_all_by_game(txn, id)
-                .await
-                .map_err(AppError::from)?;
-
-            let membership = existing_memberships
-                .into_iter()
-                .find(|m| m.turn_order == Some(seat_val))
-                .ok_or_else(|| {
-                    AppError::bad_request(
-                        ErrorCode::ValidationError,
-                        format!("No player assigned to seat {seat_val}"),
-                    )
-                })?;
-
-            if membership.player_kind != crate::entities::game_players::PlayerKind::Ai {
-                return Err(AppError::bad_request(
-                    ErrorCode::ValidationError,
-                    "Cannot update AI profile for a human player",
-                ));
-            }
-
-            let (factory, registry_version, resolved_seed) =
-                resolve_registry_selection(&request, None)?;
-
-            let mut seed = resolved_seed;
-            if seed.is_none() && factory.name == RandomPlayer::NAME {
-                seed = Some(random::<u64>());
-            }
-
-            let new_profile = ai_profiles::find_by_registry_variant(
-                txn,
-                factory.name,
-                &registry_version,
-                "default",
-            )
-            .await
-            .map_err(AppError::from)?
-            .ok_or_else(|| {
-                AppError::bad_request(
-                    ErrorCode::ValidationError,
-                    format!(
-                        "AI profile for {} v{} not found",
-                        factory.name, registry_version
-                    ),
-                )
-            })?;
-
-            let mut updated_membership = membership.clone();
-            updated_membership.ai_profile_id = Some(new_profile.id);
-            memberships::update_membership(txn, updated_membership)
-                .await
-                .map_err(AppError::from)?;
-
-            if let Some(seed_value) = seed {
-                let mut cfg = serde_json::Map::new();
-                cfg.insert(
-                    "seed".to_string(),
-                    serde_json::Value::Number(seed_value.into()),
-                );
-                let cfg_value = serde_json::Value::Object(cfg);
-                if let Some(mut existing_override) =
-                    ai_overrides::find_by_game_player_id(txn, membership.id)
-                        .await
-                        .map_err(AppError::from)?
-                {
-                    existing_override.config = Some(cfg_value);
-                    ai_overrides::update_override(txn, existing_override)
-                        .await
-                        .map_err(AppError::from)?;
-                } else {
-                    ai_overrides::create_override(txn, membership.id, None, None, Some(cfg_value))
-                        .await
-                        .map_err(AppError::from)?;
-                }
-            }
-
-            // Touch game to increment version so websocket clients receive the update
-            let updated_game = games_repo::touch_game(txn, id, version)
-                .await
-                .map_err(AppError::from)?;
-            Ok(updated_game.version)
+            let service = GameFlowService;
+            let params = ManageAiSeatParams {
+                game_id: id,
+                user_id: host_user_id.unwrap_or(0),
+                seat: Some(seat_val),
+                registry_name: request.registry_name.clone(),
+                registry_version: request.version_info.clone(),
+                config_seed: request.config_seed,
+                expected_version,
+            };
+            service.update_ai_seat(txn, params).await
         })
     })
     .await?;
 
-    let etag = game_etag(id, updated_version);
+    let etag = game_etag(id, res.final_version());
 
-    // Publish snapshot broadcast so other players' UIs update
-    publish_snapshot(&app_state, id).await?;
+    // Post-commit publish (no domain transitions expected here, but version bumped)
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        res.final_version(),
+        res.old_version,
+        &res.transitions,
+    )
+    .await?;
 
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
@@ -1820,6 +1395,8 @@ async fn update_ai_seat(
 ///
 /// Rejoin a game by converting an AI player back to the original human player.
 /// Requires version in request body for optimistic locking.
+///
+/// No AI drain here: this is a membership/seat mutation only.
 async fn rejoin_game(
     http_req: HttpRequest,
     game_id: GameId,
@@ -1831,96 +1408,32 @@ async fn rejoin_game(
     let id = game_id.0;
     let expected_version = body.version;
 
-    // Rejoin game using service layer
-    let updated_version = with_txn(Some(&http_req), &app_state, |txn| {
+    // Mutation in-txn (service enforces optimistic lock and touches the game)
+    let (res, _memberships) = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
-            let service = GameService;
-            let (updated_game, _) = service
+            let service = GameFlowService;
+            service
                 .rejoin_game(txn, id, user_id, expected_version)
-                .await?;
-            Ok(updated_game.version)
+                .await
         })
     })
     .await?;
 
-    let etag = game_etag(id, updated_version);
+    let etag = game_etag(id, res.final_game.version);
 
-    // Publish snapshot broadcast immediately (includes membership change)
-    publish_snapshot(&app_state, id).await?;
-
-    // Spawn background task to process any pending AI actions
-    // If AI was acting, it will complete, then see player is human and stop
-    let app_state_clone = app_state.clone();
-    tokio::spawn(async move {
-        let db = match crate::db::require_db(&app_state_clone) {
-            Ok(db) => db,
-            Err(err) => {
-                tracing::error!(
-                    game_id = id,
-                    error = %err,
-                    "Failed to get database connection for post-rejoin AI processing"
-                );
-                return;
-            }
-        };
-
-        let txn = match db.begin().await {
-            Ok(txn) => txn,
-            Err(err) => {
-                tracing::error!(
-                    game_id = id,
-                    error = %err,
-                    "Failed to begin transaction for post-rejoin AI processing"
-                );
-                return;
-            }
-        };
-
-        let game_flow_service = crate::services::game_flow::GameFlowService;
-        let process_res = game_flow_service.process_game_state(&txn, id).await;
-        match process_res {
-            Ok(()) => {
-                match txn.commit().await {
-                    Err(err) => {
-                        tracing::error!(
-                            game_id = id,
-                            error = %err,
-                            "Failed to commit transaction after post-rejoin AI processing"
-                        );
-                    }
-                    _ => {
-                        // Broadcast updated snapshot after AI processing completes
-                        if let Err(err) = publish_snapshot(&app_state_clone, id).await {
-                            tracing::error!(
-                                game_id = id,
-                                error = %err,
-                                "Failed to publish snapshot after post-rejoin AI processing"
-                            );
-                        }
-                    }
-                }
-            }
-            Err(err) => {
-                tracing::warn!(
-                    game_id = id,
-                    error = %err,
-                    "Post-rejoin AI processing failed (may be expected if no AI actions)"
-                );
-                // Rollback on error
-                if let Err(rollback_err) = txn.rollback().await {
-                    tracing::error!(
-                        game_id = id,
-                        error = %rollback_err,
-                        "Failed to rollback transaction after post-rejoin AI processing error"
-                    );
-                }
-            }
-        }
-    });
+    // Post-commit publish (membership mutation; no domain transitions expected here)
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        res.final_game.version,
+        res.old_version,
+        &res.transitions,
+    )
+    .await?;
 
     Ok(HttpResponse::Ok()
         .insert_header((ETAG, etag))
-        .json(json!({ "version": updated_version })))
+        .json(json!({ "version": res.final_game.version })))
 }
 
 /// POST /api/games/{game_id}/bid
@@ -1953,7 +1466,7 @@ async fn submit_bid(
     })?;
     let bid_value = body.bid;
 
-    let game = with_txn(Some(&http_req), &app_state, |txn| {
+    let result = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
             service
@@ -1963,8 +1476,17 @@ async fn submit_bid(
     })
     .await?;
 
-    let etag = game_etag(game.id, game.version);
-    publish_snapshot_with_lock(&app_state, id, game.version).await?;
+    let etag = game_etag(result.final_game.id, result.final_game.version);
+
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        result.final_game.version,
+        result.old_version,
+        &result.transitions,
+    )
+    .await?;
+
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -1995,8 +1517,7 @@ async fn select_trump(
             "Player must have a seat to perform this action".to_string(),
         )
     })?;
-    let payload = body.into_inner();
-    let normalized = payload.trump.trim().to_uppercase();
+    let normalized = body.trump.trim().to_uppercase();
 
     let trump = match normalized.as_str() {
         "CLUBS" => crate::domain::Trump::Clubs,
@@ -2007,23 +1528,30 @@ async fn select_trump(
         _ => {
             return Err(AppError::bad_request(
                 ErrorCode::ValidationError,
-                format!("Invalid trump value: {}", payload.trump),
+                format!("Invalid trump value: {}", body.trump),
             ))
         }
     };
 
-    let game = with_txn(Some(&http_req), &app_state, |txn| {
+    let result = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
-            service
-                .set_trump(txn, id, seat, trump, payload.version)
-                .await
+            service.set_trump(txn, id, seat, trump, body.version).await
         })
     })
     .await?;
 
-    let etag = game_etag(game.id, game.version);
-    publish_snapshot_with_lock(&app_state, id, game.version).await?;
+    let etag = game_etag(result.final_game.id, result.final_game.version);
+
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        result.final_game.version,
+        result.old_version,
+        &result.transitions,
+    )
+    .await?;
+
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -2055,8 +1583,7 @@ async fn play_card(
         )
     })?;
 
-    let payload = body.into_inner();
-    let normalized = payload.card.trim().to_uppercase();
+    let normalized = body.card.trim().to_uppercase();
 
     if normalized.is_empty() {
         return Err(AppError::bad_request(
@@ -2067,18 +1594,25 @@ async fn play_card(
 
     let card = normalized.parse::<Card>().map_err(AppError::from)?;
 
-    let game = with_txn(Some(&http_req), &app_state, |txn| {
+    let result = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameFlowService;
-            service
-                .play_card(txn, id, seat, card, payload.version)
-                .await
+            service.play_card(txn, id, seat, card, body.version).await
         })
     })
     .await?;
 
-    let etag = game_etag(game.id, game.version);
-    publish_snapshot_with_lock(&app_state, id, game.version).await?;
+    let etag = game_etag(result.final_game.id, result.final_game.version);
+
+    publish_game_mutation_effects(
+        &app_state,
+        id,
+        result.final_game.version,
+        result.old_version,
+        &result.transitions,
+    )
+    .await?;
+
     Ok(HttpResponse::NoContent()
         .insert_header((ETAG, etag))
         .finish())
@@ -2128,21 +1662,6 @@ async fn delete_game(
     // DELETE responses should not include ETag headers per HTTP/REST best practices
     // since the resource no longer exists after deletion
     Ok(HttpResponse::NoContent().finish())
-}
-
-fn unique_ai_display_name(existing: &HashSet<String>, base: &str) -> String {
-    if !existing.contains(base) {
-        return base.to_string();
-    }
-
-    let mut counter = 2;
-    loop {
-        let candidate = format!("{base} {counter}");
-        if !existing.contains(&candidate) {
-            return candidate;
-        }
-        counter += 1;
-    }
 }
 
 fn format_card(card: Card) -> String {
@@ -2208,49 +1727,96 @@ async fn publish_snapshot_with_lock(
     }
 
     if let Some(realtime) = &app_state.realtime {
-        if let Err(err) = realtime.publish_snapshot(game_id, version).await {
+        if let Err(err) = realtime.publish_game_state(game_id, version).await {
             tracing::error!(
                 game_id,
                 version,
                 error = %err,
-                "Failed to publish snapshot broadcast (Redis may be unavailable). Mutation succeeded, but clients may not receive real-time updates until Redis recovers."
+                "Failed to publish game state broadcast (Redis may be unavailable). Mutation succeeded, but clients may not receive real-time updates until Redis recovers."
             );
         }
     }
     Ok(())
 }
 
-/// Publish a snapshot broadcast by fetching the game's current version.
-///
-/// This is a convenience wrapper that fetches the game from the database
-/// to get the current version, then calls `publish_snapshot_with_lock`.
-///
-/// In tests with SharedTxn, the game may not be visible to pooled connections,
-/// so prefer `publish_snapshot_with_lock` when you already have the version.
-async fn publish_snapshot(app_state: &web::Data<AppState>, game_id: i64) -> Result<(), AppError> {
-    // Fetch game to get current version for broadcast
-    let db = match crate::db::require_db(app_state) {
-        Ok(db) => db,
-        Err(_) => {
-            // Database not available (e.g., in some test scenarios)
-            return Ok(());
-        }
+async fn resolve_human_user_id_for_seat<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+    seat: u8,
+) -> Result<Option<i64>, AppError> {
+    let all = memberships::find_all_by_game(conn, game_id).await?;
+
+    // We only care about real players (not spectators) with a concrete user_id.
+    // AI seats will have user_id == None (and/or player_kind != Human).
+    let user_id = all
+        .into_iter()
+        .find(|m| {
+            m.role == memberships::GameRole::Player
+                && m.turn_order == Some(seat)
+                && m.user_id.is_some()
+        })
+        .and_then(|m| m.user_id);
+
+    Ok(user_id)
+}
+
+async fn publish_game_mutation_effects(
+    app_state: &web::Data<AppState>,
+    game_id: i64,
+    final_version: i32,
+    old_version: i32,
+    transitions: &[GameTransition],
+) -> Result<(), AppError> {
+    // Publish GameStateAvailable only if the version actually bumped.
+    if final_version != old_version {
+        publish_snapshot_with_lock(app_state, game_id, final_version).await?;
+    }
+
+    // Publish YourTurn transitions (best-effort; do not fail the mutation response)
+    let Some(realtime) = &app_state.realtime else {
+        return Ok(());
     };
 
-    // Try to fetch the game, but don't fail if it doesn't exist (e.g., in tests with SharedTxn)
-    let game = match games_repo::find_by_id(db, game_id).await {
-        Ok(Some(game)) => game,
-        Ok(None) => {
-            // Game not found - likely in a test with uncommitted SharedTxn
-            return Ok(());
-        }
-        Err(e) => {
-            // Other error - propagate it
-            return Err(AppError::from(e));
-        }
-    };
+    // Post-commit: do lookup using a plain DB connection (Send-safe; ok in tokio::spawn).
+    let db = crate::db::require_db(app_state)?;
 
-    publish_snapshot_with_lock(app_state, game_id, game.version).await
+    for t in transitions {
+        let GameTransition::TurnBecame { player_id } = *t;
+
+        let seat = player_id;
+        let user_id_res = resolve_human_user_id_for_seat(db, game_id, seat).await;
+
+        match user_id_res {
+            Ok(Some(user_id)) => {
+                if let Err(err) = realtime
+                    .publish_your_turn(user_id, game_id, final_version)
+                    .await
+                {
+                    tracing::error!(
+                        game_id,
+                        final_version,
+                        user_id,
+                        error = %err,
+                        "Failed to publish your_turn event (Redis may be unavailable). Mutation succeeded, but clients may miss your_turn until Redis recovers."
+                    );
+                }
+            }
+            Ok(None) => {
+                // AI / no human at that seat — ignore.
+            }
+            Err(err) => {
+                tracing::error!(
+                    game_id,
+                    final_version,
+                    seat,
+                    error = %err,
+                    "Failed to resolve user_id for TurnBecame; your_turn not published"
+                );
+            }
+        }
+    }
+
+    Ok(())
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
@@ -2278,22 +1844,4 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             .route(web::get().to(get_player_display_name)),
     );
     cfg.service(web::resource("/{game_id}").route(web::delete().to(delete_game)));
-}
-
-#[cfg(test)]
-mod display_name_tests {
-    use std::collections::HashSet;
-
-    use super::unique_ai_display_name;
-
-    #[test]
-    fn unique_ai_names_append_suffixes() {
-        let mut existing = HashSet::new();
-        existing.insert("Atlas Bot".to_string());
-        let second = unique_ai_display_name(&existing, "Atlas Bot");
-        assert_eq!(second, "Atlas Bot 2");
-        existing.insert(second.clone());
-        let third = unique_ai_display_name(&existing, "Atlas Bot");
-        assert_eq!(third, "Atlas Bot 3");
-    }
 }

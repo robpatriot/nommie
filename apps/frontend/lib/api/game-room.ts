@@ -2,25 +2,15 @@
 
 import { fetchWithAuth, BackendApiError } from '@/lib/api'
 import { fetchWithAuthWithRetry } from '@/lib/server/fetch-with-retry'
-import type {
-  BidConstraints,
-  Card,
-  GameSnapshot,
-  Seat,
-  Trump,
-} from '@/lib/game-room/types'
-import { isValidSeat } from '@/utils/seat-validation'
-import { logWarning } from '@/lib/logging/error-logger'
+import type { Card, GameSnapshot, Trump } from '@/lib/game-room/types'
+import { isGameStateMsg, isWireMsg } from '@/lib/game-room/protocol/types'
+import type { GameStateMsg } from '@/lib/game-room/protocol/types'
 
 export type GameSnapshotResult =
   | {
       kind: 'ok'
-      snapshot: GameSnapshot
+      msg: GameStateMsg
       etag?: string
-      version?: number
-      viewerSeat?: Seat | null
-      viewerHand: Card[]
-      bidConstraints?: BidConstraints | null
     }
   | { kind: 'not_modified' }
 
@@ -51,47 +41,21 @@ export async function fetchGameSnapshot(
       }
     )
 
-    const body = (await response.json()) as SnapshotEnvelope
+    const raw = (await response.json()) as unknown
     const etag = response.headers.get('etag') ?? undefined
-    const viewerSeatHeader = response.headers.get('x-viewer-seat')
-    const viewerSeat =
-      viewerSeatHeader !== null && viewerSeatHeader.trim() !== ''
-        ? Number.parseInt(viewerSeatHeader, 10)
-        : null
 
-    // Validate seat value before using it. Invalid values indicate backend bugs.
-    let parsedViewerSeat: Seat | null = null
-    if (viewerSeat !== null) {
-      if (isValidSeat(viewerSeat)) {
-        parsedViewerSeat = viewerSeat
-      } else {
-        // Log warning for invalid seat values to catch backend bugs
-        // Don't clamp - fail hard to surface the issue
-        logWarning('Invalid seat value from backend', {
-          viewerSeat,
-          expected: '0-3',
-        })
-        // Still set to null to indicate invalid seat
-        parsedViewerSeat = null
-      }
+    if (!isWireMsg(raw)) {
+      throw new Error('Invalid snapshot response: not a wire message')
     }
-    const viewerHand =
-      Array.isArray(body.viewer_hand) &&
-      body.viewer_hand.every((card) => typeof card === 'string')
-        ? (body.viewer_hand as Card[])
-        : []
-    const bidConstraints = toBidConstraints(body.bid_constraints) ?? null
-    const version = typeof body.version === 'number' ? body.version : undefined
+    if (!isGameStateMsg(raw)) {
+      throw new Error(
+        `Invalid snapshot response: expected game_state, got ${String(
+          (raw as { type?: unknown }).type
+        )}`
+      )
+    }
 
-    return {
-      kind: 'ok',
-      snapshot: body.snapshot,
-      etag,
-      version,
-      viewerSeat: parsedViewerSeat,
-      viewerHand,
-      bidConstraints,
-    }
+    return { kind: 'ok', msg: raw, etag }
   } catch (error) {
     if (error instanceof BackendApiError && error.status === 304) {
       return { kind: 'not_modified' }
@@ -102,14 +66,15 @@ export async function fetchGameSnapshot(
 
 export async function markPlayerReady(
   gameId: number,
-  isReady: boolean
+  isReady: boolean,
+  version: number
 ): Promise<void> {
   await fetchWithAuth(`/api/games/${gameId}/ready`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ is_ready: isReady }),
+    body: JSON.stringify({ is_ready: isReady, version: version }),
   })
 }
 
@@ -274,21 +239,5 @@ export async function listRegisteredAis(): Promise<AiRegistryResponse> {
   return {
     entries: Array.isArray(data.ais) ? data.ais : [],
     defaultName: data.default_name ?? 'Tactician',
-  }
-}
-
-function toBidConstraints(
-  payload?: SnapshotEnvelope['bid_constraints']
-): BidConstraints | undefined {
-  if (!payload) {
-    return undefined
-  }
-
-  if (typeof payload.zero_bid_locked !== 'boolean') {
-    return undefined
-  }
-
-  return {
-    zeroBidLocked: payload.zero_bid_locked,
   }
 }

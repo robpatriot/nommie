@@ -95,11 +95,8 @@ export async function deleteGameAction(
     if (finalVersion === undefined) {
       try {
         const snapshotResult = await fetchGameSnapshot(gameId)
-        if (
-          snapshotResult.kind === 'ok' &&
-          snapshotResult.version !== undefined
-        ) {
-          finalVersion = snapshotResult.version
+        if (snapshotResult.kind === 'ok') {
+          finalVersion = snapshotResult.msg.version
         } else {
           const t = await getTranslations('errors.actions')
           return toErrorResult(

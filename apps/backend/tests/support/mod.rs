@@ -9,6 +9,7 @@ pub mod db_memberships;
 pub mod factory;
 pub mod game_phases;
 pub mod game_setup;
+pub mod game_state;
 pub mod games_sea_helpers;
 pub mod snapshot_helpers;
 pub mod state_helpers;

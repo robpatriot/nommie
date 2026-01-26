@@ -29,6 +29,24 @@ export function useGameSnapshot(
 ) {
   const queryClient = useQueryClient()
 
+  // Reconcile server-provided initialData into the TanStack cache (upgrade-only).
+  // This prevents stale cache from winning on SPA navigation.
+  const incoming = options?.initialData
+  if (incoming?.version !== undefined) {
+    const key = queryKeys.games.snapshot(gameId)
+    const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(key)
+
+    const cachedVersion = cached?.version
+    const shouldUpgrade =
+      cached == null ||
+      cachedVersion === undefined ||
+      incoming.version > cachedVersion
+
+    if (shouldUpgrade) {
+      queryClient.setQueryData(key, incoming)
+    }
+  }
+
   return useQuery({
     queryKey: queryKeys.games.snapshot(gameId),
     queryFn: async (): Promise<GameRoomSnapshotPayload> => {

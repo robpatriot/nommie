@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+
 import {
   resolveWebSocketUrl,
   validateWebSocketConfig,
 } from '@/lib/config/env-validation'
 import { logError } from '@/lib/logging/error-logger'
+
+import {
+  getGameRoomSnapshotAction,
+  type GameRoomSnapshotPayload,
+} from '@/app/actions/game-room-actions'
+import type { GameRoomError } from '@/app/game/[gameId]/_components/game-room-view.types'
+import type {
+  GameStateMsg,
+  HelloMsg,
+  SubscribeMsg,
+  WireMsg,
+} from '@/lib/game-room/protocol/types'
+import { isGameStateMsg, isWireMsg } from '@/lib/game-room/protocol/types'
+import { queryKeys } from '@/lib/queries/query-keys'
+import { gameStateMsgToSnapshotPayload } from '@/lib/game-room/protocol/transform'
 
 // Helper to get readable WebSocket readyState names
 function getReadyStateName(state: number): string {
@@ -22,43 +38,11 @@ function getReadyStateName(state: number): string {
   }
 }
 
-import {
-  getGameRoomSnapshotAction,
-  type GameRoomSnapshotPayload,
-} from '@/app/actions/game-room-actions'
-import type { GameRoomError } from '@/app/game/[gameId]/_components/game-room-view.types'
-import type { BidConstraints, GameSnapshot, Seat } from '@/lib/game-room/types'
-import { extractPlayerNames } from '@/utils/player-names'
-import { queryKeys } from '@/lib/queries/query-keys'
-
 type ConnectionState =
   | 'connecting'
   | 'connected'
   | 'reconnecting'
   | 'disconnected'
-
-interface SnapshotEnvelopeFromWs {
-  snapshot: GameSnapshot
-  viewer_hand?: string[] | null
-  bid_constraints?: {
-    zero_bid_locked?: boolean
-  } | null
-  version: number
-}
-
-interface SnapshotMessage {
-  type: 'snapshot'
-  data: SnapshotEnvelopeFromWs
-  viewer_seat?: number | null
-}
-
-interface ErrorMessage {
-  type: 'error'
-  code?: string
-  message: string
-}
-
-type WsMessage = SnapshotMessage | ErrorMessage | Record<string, unknown>
 
 export interface UseGameSyncResult {
   refreshSnapshot: () => Promise<void>
@@ -80,6 +64,13 @@ const MAX_RECONNECT_DELAY_MS = 30_000
 const INITIAL_RECONNECT_DELAY_MS = 1000
 const WS_TOKEN_FETCH_TIMEOUT_MS = 10_000
 const MAX_RECONNECT_ATTEMPTS = 10
+
+// Backend-locked transport protocol version for hello/ack (not the game_state version)
+const PROTOCOL_VERSION = 1 as const
+
+// Handshake stall guard. Long enough for prod variance; keeps tests from hanging forever.
+// (If you want per-env tuning later, make this configurable.)
+const HANDSHAKE_TIMEOUT_MS = 10_000
 
 /**
  * Reasons for closing a connection - used to determine reconnection policy
@@ -137,10 +128,19 @@ export function useGameSync({
   const reconnectAttemptsRef = useRef(0)
   const closeReasonRef = useRef<CloseReason | null>(null)
   const etagRef = useRef<string | undefined>(initialData.etag)
+
   // Generation token: increments on each connection attempt and cleanup
   // Stale handlers from previous effect runs check this and bail early
   const genRef = useRef(0)
   const gameIdRef = useRef(gameId)
+
+  // WS transport-level monotonic version
+  const lastWsVersionSeenRef = useRef<number | undefined>(undefined)
+
+  // Handshake state (per active socket connection attempt)
+  const helloAckedRef = useRef(false)
+  const subscribedRef = useRef(false)
+  const handshakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Message handler ref - updated on every render to always have latest
   const handleMessageEventRef = useRef<
@@ -166,7 +166,7 @@ export function useGameSync({
         current &&
         current.version !== undefined &&
         payload.version !== undefined &&
-        current.version > payload.version
+        current.version >= payload.version
       ) {
         return
       }
@@ -174,6 +174,11 @@ export function useGameSync({
       etagRef.current = payload.etag ?? buildEtag(payload.version)
       setSyncError(null)
       queryClient.setQueryData(queryKeys.games.snapshot(currentGameId), payload)
+
+      // Keep "waitingLongest" fresh when any snapshot arrives (required)
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.games.waitingLongest(),
+      })
     },
     [buildEtag, queryClient]
   )
@@ -219,61 +224,133 @@ export function useGameSync({
     }
   }, [applySnapshot, queryClient])
 
-  const transformSnapshotMessage = useCallback(
-    (message: SnapshotMessage): GameRoomSnapshotPayload => {
-      const { data, viewer_seat } = message
-      const version = data.version
-      const viewerSeat =
-        typeof viewer_seat === 'number' && viewer_seat >= 0 && viewer_seat <= 3
-          ? (viewer_seat as Seat)
-          : null
-
-      const bidConstraints: BidConstraints | null = data.bid_constraints
-        ? {
-            zeroBidLocked: Boolean(data.bid_constraints.zero_bid_locked),
-          }
-        : null
-
-      const normalizedViewerHand = Array.isArray(data.viewer_hand)
-        ? data.viewer_hand
-        : []
-
-      const playerNames = extractPlayerNames(data.snapshot.game.seating)
-
-      return {
-        snapshot: data.snapshot,
-        playerNames,
-        viewerSeat,
-        viewerHand: normalizedViewerHand,
-        timestamp: new Date().toISOString(),
-        hostSeat: data.snapshot.game.host_seat as Seat,
-        bidConstraints,
-        version,
-        etag: buildEtag(version),
+  const handleGameStateMessage = useCallback(
+    (message: GameStateMsg) => {
+      // Only apply updates for the currently viewed game.
+      if (
+        message.topic?.kind !== 'game' ||
+        message.topic.id !== gameIdRef.current
+      ) {
+        return
       }
-    },
-    [buildEtag]
-  )
 
-  const handleSnapshotMessage = useCallback(
-    (message: SnapshotMessage) => {
-      const payload = transformSnapshotMessage(message)
+      // Debug/observability only: record last WS version seen for this game.
+      lastWsVersionSeenRef.current = message.version
+
+      const payload = gameStateMsgToSnapshotPayload(message)
       applySnapshot(payload)
     },
-    [applySnapshot, transformSnapshotMessage]
+    [applySnapshot]
   )
 
+  const sendJson = useCallback((msg: unknown) => {
+    const ws = wsRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    try {
+      ws.send(JSON.stringify(msg))
+    } catch (error) {
+      logError('Failed to send websocket message', error, {
+        gameId: gameIdRef.current,
+      })
+    }
+  }, [])
+
+  const clearHandshakeTimeout = useCallback(() => {
+    if (handshakeTimeoutRef.current) {
+      clearTimeout(handshakeTimeoutRef.current)
+      handshakeTimeoutRef.current = null
+    }
+  }, [])
+
+  const armHandshakeTimeout = useCallback(
+    (ws: WebSocket, myGen: number) => {
+      clearHandshakeTimeout()
+      handshakeTimeoutRef.current = setTimeout(() => {
+        // Ignore if stale
+        if (genRef.current !== myGen) return
+        // If still not subscribed, treat as error and let reconnect policy handle it
+        if (!subscribedRef.current) {
+          closeReasonRef.current = 'error'
+          try {
+            ws.close(1000, 'Handshake timed out')
+          } catch {
+            // ignore
+          }
+          setSyncError({
+            message: 'Realtime handshake timed out',
+            traceId: undefined,
+          })
+        }
+      }, HANDSHAKE_TIMEOUT_MS)
+    },
+    [clearHandshakeTimeout]
+  )
+
+  // Handle incoming WS messages (game_state + handshake envelopes + keep other message types safe)
   const handleMessageEvent = useCallback(
     (event: MessageEvent<string>) => {
       try {
-        const parsed = JSON.parse(event.data) as WsMessage
-        if (parsed.type === 'snapshot' && 'data' in parsed) {
-          handleSnapshotMessage(parsed as SnapshotMessage)
-          return
-        }
+        const parsed = JSON.parse(event.data) as unknown
 
-        if (parsed.type === 'error' && 'message' in parsed) {
-          void refreshSnapshot()
+        if (!isWireMsg(parsed)) return
+
+        switch ((parsed as { type: unknown }).type) {
+          case 'hello_ack': {
+            // Handshake step: hello_ack -> subscribe(current game)
+            helloAckedRef.current = true
+            subscribedRef.current = false
+            sendJson({
+              type: 'subscribe',
+              topic: { kind: 'game', id: gameIdRef.current },
+            } satisfies SubscribeMsg)
+            return
+          }
+
+          case 'ack': {
+            // Any ack after hello_ack is treated as successful subscription.
+            if (!subscribedRef.current && helloAckedRef.current) {
+              subscribedRef.current = true
+              clearHandshakeTimeout()
+
+              // Reset reconnection state on successful handshake (not merely onopen)
+              reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
+              reconnectAttemptsRef.current = 0
+              setReconnectAttempts(0)
+
+              setConnectionState('connected')
+              setSyncError(null)
+            }
+            return
+          }
+
+          case 'game_state': {
+            if (isGameStateMsg(parsed)) {
+              handleGameStateMessage(parsed)
+            }
+            return
+          }
+
+          default: {
+            // Must not break other message types.
+            // yourturn: keep waitingLongest fresh.
+            if (
+              (parsed as WireMsg).type === 'yourturn' ||
+              (parsed as WireMsg).type === 'your_turn'
+            ) {
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.games.waitingLongest(),
+              })
+              return
+            }
+
+            // error: preserve original behavior (HTTP refresh fallback)
+            if ((parsed as WireMsg).type === 'error') {
+              void refreshSnapshot()
+              return
+            }
+
+            return
+          }
         }
       } catch (error) {
         logError('Failed to parse websocket payload', error, {
@@ -281,10 +358,16 @@ export function useGameSync({
         })
       }
     },
-    [handleSnapshotMessage, refreshSnapshot]
+    [
+      clearHandshakeTimeout,
+      handleGameStateMessage,
+      queryClient,
+      refreshSnapshot,
+      sendJson,
+    ]
   )
 
-  // Keep ref in sync with latest handler
+  // Keep ref in sync with latest handler (preserve original behavior)
   handleMessageEventRef.current = handleMessageEvent
 
   /**
@@ -397,19 +480,23 @@ export function useGameSync({
    * The reason determines whether reconnection will be attempted
    * Note: The reason is set before close() and will be read by onclose handler
    */
-  const closeExistingConnection = useCallback((reason: CloseReason) => {
-    if (wsRef.current) {
-      const existingWs = wsRef.current
-      // Set close reason before closing - onclose handler will read and reset it
-      closeReasonRef.current = reason
-      cleanupWebSocket(existingWs, null)
-      // Let onclose handler clear wsRef.current via its check
-    }
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = null
-    }
-  }, [])
+  const closeExistingConnection = useCallback(
+    (reason: CloseReason) => {
+      if (wsRef.current) {
+        const existingWs = wsRef.current
+        // Set close reason before closing - onclose handler will read and reset it
+        closeReasonRef.current = reason
+        cleanupWebSocket(existingWs, null)
+        // Let onclose handler clear wsRef.current via its check
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
+      }
+      clearHandshakeTimeout()
+    },
+    [clearHandshakeTimeout]
+  )
 
   const connect = useCallback(async () => {
     // Check if we already have an active connection
@@ -435,16 +522,19 @@ export function useGameSync({
         state === 'disconnected' ? 'reconnecting' : 'connecting'
       )
 
-      const currentGameId = gameIdRef.current
-
       const token = await fetchWsToken()
 
       const wsBase = resolveWsUrl()
-      const url = `${wsBase}/ws/games/${currentGameId}?token=${encodeURIComponent(token)}`
+      // Locked by you: token from /api/ws-token AND new URL shape /ws?token=...
+      const url = `${wsBase}/ws?token=${encodeURIComponent(token)}`
 
       // Increment generation and capture it - this invalidates any previous connection attempts
       genRef.current++
       const myGen = genRef.current
+
+      // Reset handshake state for this connection attempt
+      helloAckedRef.current = false
+      subscribedRef.current = false
 
       const ws = new WebSocket(url)
       wsRef.current = ws
@@ -460,11 +550,17 @@ export function useGameSync({
           return
         }
 
-        // Reset reconnection state on successful connection
-        reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
-        reconnectAttemptsRef.current = 0
-        setConnectionState('connected')
-        setSyncError(null) // Clear any previous connection errors
+        setConnectionState('connecting')
+        setSyncError(null)
+
+        // Start handshake timeout guard
+        armHandshakeTimeout(ws, myGen)
+
+        // Handshake: say hello
+        sendJson({
+          type: 'hello',
+          protocol: PROTOCOL_VERSION,
+        } satisfies HelloMsg)
       }
 
       ws.onmessage = (event) => {
@@ -486,7 +582,6 @@ export function useGameSync({
         const wsReadyStateName = getReadyStateName(wsReadyState)
 
         // Only log errors if the WebSocket is not already closing/closed
-        // Errors during close are expected and not actionable
         if (
           wsReadyState === WebSocket.CLOSING ||
           wsReadyState === WebSocket.CLOSED
@@ -494,9 +589,8 @@ export function useGameSync({
           return
         }
 
-        // This is a real connection error - capture details
         const errorDetails: Record<string, unknown> = {
-          gameId: currentGameId,
+          gameId: gameIdRef.current,
           url: wsUrl,
           readyState: wsReadyState,
           readyStateName: wsReadyStateName,
@@ -504,7 +598,6 @@ export function useGameSync({
           timestamp: new Date().toISOString(),
         }
 
-        // Capture event target details if available
         if (event.target) {
           const target = event.target as WebSocket
           errorDetails.eventTarget = {
@@ -516,8 +609,7 @@ export function useGameSync({
           }
         }
 
-        const errorMessage = `WebSocket connection error: gameId=${currentGameId}, readyState=${wsReadyStateName}, url=${wsUrl}`
-
+        const errorMessage = `WebSocket connection error: gameId=${gameIdRef.current}, readyState=${wsReadyStateName}, url=${wsUrl}`
         logError(errorMessage, new Error(errorMessage), errorDetails)
 
         setSyncError({
@@ -528,6 +620,9 @@ export function useGameSync({
 
       // Thin event handler - just notifies owner, doesn't make policy decisions
       ws.onclose = (_event) => {
+        // Clear handshake timeout regardless
+        clearHandshakeTimeout()
+
         // Generation check: ignore close events from stale connections
         // But still clear the ref if it points to this socket to avoid leaks
         if (genRef.current !== myGen) {
@@ -543,9 +638,12 @@ export function useGameSync({
         }
 
         // Get the close reason (set by closeExistingConnection or default to error)
-        // Read and reset atomically
         const reason = closeReasonRef.current ?? 'error'
         closeReasonRef.current = null
+
+        // Reset handshake state
+        helloAckedRef.current = false
+        subscribedRef.current = false
 
         // Owner makes policy decision based on context
         if (shouldReconnect(reason)) {
@@ -564,7 +662,7 @@ export function useGameSync({
           ? error
           : new Error(
               typeof error === 'object' && error !== null && 'message' in error
-                ? String(error.message)
+                ? String((error as { message?: unknown }).message)
                 : 'Failed to establish realtime connection'
             )
       logError('Failed to establish realtime connection', normalizedError, {
@@ -584,13 +682,14 @@ export function useGameSync({
       }
     }
   }, [
+    armHandshakeTimeout,
+    clearHandshakeTimeout,
+    closeExistingConnection,
     fetchWsToken,
     resolveWsUrl,
     scheduleReconnect,
-    closeExistingConnection,
+    sendJson,
     shouldReconnect,
-    // Note: connectionState is intentionally NOT in deps - we use it only for logging
-    // and don't want to recreate connect when it changes
   ])
 
   // Store connect function in ref for use in onclose handler
@@ -604,59 +703,68 @@ export function useGameSync({
     setReconnectAttempts(0)
     // Set close reason to 'manual' - onclose handler will read and reset it
     closeReasonRef.current = 'manual'
+    clearHandshakeTimeout()
     const ws = wsRef.current
     cleanupWebSocket(ws, reconnectTimeoutRef.current)
     // Let onclose handler clear wsRef.current via its check
     reconnectTimeoutRef.current = null
-  }, [])
+  }, [clearHandshakeTimeout])
 
-  // Main effect: manage connection lifecycle based on gameId
+  const beginNewConnectionEpoch = useCallback(() => {
+    // Invalidate any in-flight handlers or connection attempts
+    genRef.current += 1
+
+    // Reset handshake gates for the new subscription epoch
+    helloAckedRef.current = false
+    subscribedRef.current = false
+
+    // Reset reconnection/backoff state
+    reconnectAttemptsRef.current = 0
+    setReconnectAttempts(0)
+    reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
+
+    // Clear any previous error so the new game starts clean
+    setSyncError(null)
+
+    // Intentionally close the existing socket; must NOT trigger reconnect
+    closeExistingConnection('gameIdChange')
+  }, [closeExistingConnection])
+
+  // Main effect: manage connection lifecycle based on gameId.
+  // A change in gameId defines a new *connection epoch*.
   useEffect(() => {
-    // Update ref immediately (synchronous)
     const previousGameId = gameIdRef.current
     const gameIdChanged = previousGameId !== gameId
     gameIdRef.current = gameId
 
-    // Determine close reason based on context
     const closeReason: CloseReason = gameIdChanged ? 'gameIdChange' : 'unmount'
 
-    // Reset reconnection attempts when gameId changes (new connection)
     if (gameIdChanged) {
-      reconnectAttemptsRef.current = 0
-      setReconnectAttempts(0)
-      reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
-
-      // Close existing connection if gameId changed
-      const existingWs = wsRef.current
-      if (existingWs) {
-        closeReasonRef.current = 'gameIdChange'
-        cleanupWebSocket(existingWs, reconnectTimeoutRef.current)
-      }
+      beginNewConnectionEpoch()
+      void connect()
+      return
     }
 
-    // Simply call connect() - it will check for existing connections internally
     void connect()
 
     return () => {
-      // Increment generation to invalidate any in-flight connection from this effect run
-      // Note: We intentionally mutate genRef.current here - we want to increment it, not copy it
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      genRef.current++
-
-      // Set close reason - onclose handler will read and reset it
+      genRef.current += 1
       closeReasonRef.current = closeReason
 
-      // Close and clear the socket
       const ws = wsRef.current
       if (ws) {
         cleanupWebSocket(ws, reconnectTimeoutRef.current)
         wsRef.current = null
       }
 
-      // Clear reconnect timer
       reconnectTimeoutRef.current = null
+      clearHandshakeTimeout()
     }
-  }, [gameId, connect])
+  }, [gameId, beginNewConnectionEpoch, clearHandshakeTimeout, connect])
+
+  useEffect(() => {
+    etagRef.current = initialData.etag
+  }, [initialData.etag])
 
   return {
     refreshSnapshot,

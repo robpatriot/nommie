@@ -22,8 +22,6 @@ import {
   type SimpleActionResult,
   type SnapshotActionResult,
 } from '@/lib/api/action-helpers'
-import { DEFAULT_VIEWER_SEAT } from '@/lib/game-room/constants'
-import { extractPlayerNames } from '@/utils/player-names'
 import { validateSeat } from '@/utils/seat-validation'
 import type {
   BidConstraints,
@@ -32,6 +30,7 @@ import type {
   Seat,
   Trump,
 } from '@/lib/game-room/types'
+import { gameStateMsgToSnapshotPayload } from '@/lib/game-room/protocol/transform'
 
 export interface GameRoomSnapshotRequest {
   gameId: number
@@ -65,29 +64,14 @@ export async function getGameRoomSnapshotAction(
       return { kind: 'not_modified' }
     }
 
-    const seating = snapshotResult.snapshot.game.seating
-    const playerNames = extractPlayerNames(seating)
-
-    const hostSeat = (snapshotResult.snapshot.game.host_seat ??
-      DEFAULT_VIEWER_SEAT) as Seat
-    const viewerSeat: Seat | null =
-      typeof snapshotResult.viewerSeat === 'number'
-        ? (snapshotResult.viewerSeat as Seat)
-        : null
+    const payload = gameStateMsgToSnapshotPayload(snapshotResult.msg, {
+      etag: snapshotResult.etag,
+      timestamp: new Date().toISOString(),
+    })
 
     return {
       kind: 'ok',
-      data: {
-        snapshot: snapshotResult.snapshot,
-        etag: snapshotResult.etag,
-        version: snapshotResult.version,
-        playerNames,
-        viewerSeat,
-        viewerHand: snapshotResult.viewerHand ?? [],
-        timestamp: new Date().toISOString(),
-        hostSeat,
-        bidConstraints: snapshotResult.bidConstraints ?? null,
-      },
+      data: payload,
     }
   } catch (error) {
     // Handle not_modified case (304 status)
@@ -101,10 +85,11 @@ export async function getGameRoomSnapshotAction(
 
 export async function markPlayerReadyAction(
   gameId: number,
-  isReady: boolean
+  isReady: boolean,
+  version: number
 ): Promise<SimpleActionResult> {
   try {
-    await markPlayerReady(gameId, isReady)
+    await markPlayerReady(gameId, isReady, version)
     return { kind: 'ok' }
   } catch (error) {
     const t = await getTranslations('errors.actions')
@@ -313,11 +298,8 @@ export async function addAiSeatAction(
   if (finalVersion === undefined) {
     try {
       const snapshotResult = await fetchGameSnapshot(request.gameId)
-      if (
-        snapshotResult.kind === 'ok' &&
-        snapshotResult.version !== undefined
-      ) {
-        finalVersion = snapshotResult.version
+      if (snapshotResult.kind === 'ok') {
+        finalVersion = snapshotResult.msg.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(
@@ -363,11 +345,8 @@ export async function removeAiSeatAction(
   if (finalVersion === undefined) {
     try {
       const snapshotResult = await fetchGameSnapshot(request.gameId)
-      if (
-        snapshotResult.kind === 'ok' &&
-        snapshotResult.version !== undefined
-      ) {
-        finalVersion = snapshotResult.version
+      if (snapshotResult.kind === 'ok') {
+        finalVersion = snapshotResult.msg.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(
@@ -410,11 +389,8 @@ export async function updateAiSeatAction(
   if (finalVersion === undefined) {
     try {
       const snapshotResult = await fetchGameSnapshot(request.gameId)
-      if (
-        snapshotResult.kind === 'ok' &&
-        snapshotResult.version !== undefined
-      ) {
-        finalVersion = snapshotResult.version
+      if (snapshotResult.kind === 'ok') {
+        finalVersion = snapshotResult.msg.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(

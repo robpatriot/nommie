@@ -13,12 +13,14 @@ use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games;
 use backend::state::app_state::AppState;
 use backend::AppError;
-use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
 use crate::support::auth::bearer_header;
 use crate::support::build_test_state;
 use crate::support::factory::create_test_user;
+use crate::support::game_state::{
+    assert_error_type_url, parse_error_json, parse_game_state_envelope,
+};
 use crate::support::snapshot_helpers::{create_snapshot_game, SnapshotGameOptions};
 use crate::support::test_utils::test_user_sub;
 
@@ -81,12 +83,9 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
 
     // Parse response body and assert JSON structure
     let body = test::read_body(resp).await;
-    let json: Value = serde_json::from_slice(&body).expect("Valid JSON response");
+    let env = parse_game_state_envelope(&body);
+    let snapshot_obj = env.game();
 
-    // Verify top-level structure
-    let snapshot_obj = json
-        .get("snapshot")
-        .expect("response should include snapshot payload");
     assert!(
         snapshot_obj.get("game").is_some(),
         "snapshot should have 'game' field"
@@ -155,13 +154,8 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
 
     // Parse response body and verify error structure
     let body = test::read_body(resp).await;
-    let json: Value = serde_json::from_slice(&body).expect("Valid JSON response");
-
-    assert_eq!(
-        json.get("code").and_then(|v| v.as_str()),
-        Some("INVALID_GAME_ID")
-    );
-    assert!(json.get("trace_id").is_some(), "error should have trace_id");
+    let json = parse_error_json(&body);
+    assert_error_type_url(&json, "INVALID_GAME_ID");
 
     shared.rollback().await?;
 
@@ -200,15 +194,7 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 
     let body = test::read_body(resp).await;
-    if !body.is_empty() {
-        let json: Value = serde_json::from_slice(&body).expect("Valid JSON response");
-        assert_eq!(
-            json.get("code").and_then(|v| v.as_str()),
-            Some("GAME_NOT_FOUND")
-        );
-        assert!(json.get("trace_id").is_some(), "error should have trace_id");
-        assert_eq!(json.get("status").and_then(|v| v.as_u64()), Some(404));
-    }
+    assert_error_type_url(&parse_error_json(&body), "GAME_NOT_FOUND");
 
     shared.rollback().await?;
 
@@ -247,10 +233,8 @@ async fn test_snapshot_phase_structure() -> Result<(), AppError> {
     assert_eq!(resp.status(), StatusCode::OK);
 
     let body = test::read_body(resp).await;
-    let json: Value = serde_json::from_slice(&body).expect("Valid JSON response");
-    let snapshot = json
-        .get("snapshot")
-        .expect("response should include snapshot payload");
+    let env = parse_game_state_envelope(&body);
+    let snapshot = env.game();
 
     // Verify phase is Bidding and contains expected fields
     let phase_obj = snapshot.get("phase").unwrap();

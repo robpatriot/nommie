@@ -3,6 +3,7 @@ use tracing::{debug, info};
 
 use super::GameFlowService;
 use crate::ai::{create_ai, AiConfig};
+use crate::domain::state::{expected_actor, expected_bidder, round_start_seat};
 use crate::entities::ai_profiles;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
@@ -276,21 +277,21 @@ impl GameFlowService {
                 ActionType::Bid => {
                     let bid = ai.choose_bid(&state, &game_context)?;
                     let res = self
-                        .submit_bid_internal(txn, game.id, player_seat, bid, game.version)
+                        .submit_bid_mutation(txn, game.id, player_seat, bid, game.version)
                         .await;
                     res
                 }
                 ActionType::Trump => {
                     let trump_choice = ai.choose_trump(&state, &game_context)?;
                     let res = self
-                        .set_trump_internal(txn, game.id, player_seat, trump_choice, game.version)
+                        .set_trump_mutation(txn, game.id, player_seat, trump_choice, game.version)
                         .await;
                     res
                 }
                 ActionType::Play => {
                     let card = ai.choose_play(&state, &game_context)?;
                     let res = self
-                        .play_card_internal(txn, game.id, player_seat, card, game.version)
+                        .play_card_mutation(txn, game.id, player_seat, card, game.version)
                         .await;
                     res
                 }
@@ -368,7 +369,7 @@ impl GameFlowService {
                     Ok(None)
                 } else {
                     let dealer_pos = game.dealer_pos().unwrap_or(0);
-                    let next_seat = (dealer_pos + 1 + bid_count as u8) % 4;
+                    let next_seat = expected_bidder(dealer_pos, bid_count as u8);
                     Ok(Some((next_seat, ActionType::Bid)))
                 }
             }
@@ -428,7 +429,7 @@ impl GameFlowService {
                     let play_count = plays::count_plays_by_trick(txn, trick.id).await?;
                     let all_plays = plays::find_all_by_trick(txn, trick.id).await?;
                     let first_player = all_plays.first().map(|p| p.player_seat).unwrap_or(0);
-                    let next_seat = (first_player + play_count as u8) % 4;
+                    let next_seat = expected_actor(first_player, play_count as u8);
                     Ok(Some((next_seat, ActionType::Play)))
                 } else {
                     // First play of trick - need to determine leader
@@ -440,7 +441,7 @@ impl GameFlowService {
                                 "Dealer position not set",
                             )
                         })?;
-                        (dealer_pos + 1) % 4
+                        round_start_seat(dealer_pos)
                     } else {
                         // Subsequent tricks: previous trick winner leads
                         let prev_trick =

@@ -45,8 +45,8 @@ fn create_mock_shared_parts(game_id: i64, version: i32) -> SharedSnapshotParts {
     ];
     let snapshot = GameSnapshot {
         game: backend::domain::snapshot::GameHeader {
-            round_no: 1,
-            dealer: 0, // North
+            round_no: Some(1),
+            dealer: Some(0), // North
             seating: seating.clone(),
             scores_total: [0, 0, 0, 0],
             host_seat: 0, // North

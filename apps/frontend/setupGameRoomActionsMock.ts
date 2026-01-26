@@ -52,8 +52,8 @@ export {
 vi.mock('@/app/actions/game-room-actions', () => ({
   getGameRoomSnapshotAction: (request: unknown) =>
     mockGetGameRoomSnapshotAction(request),
-  markPlayerReadyAction: (gameId: number, isReady: boolean) =>
-    mockMarkPlayerReadyAction(gameId, isReady),
+  markPlayerReadyAction: (gameId: number, isReady: boolean, version: number) =>
+    mockMarkPlayerReadyAction(gameId, isReady, version),
   submitBidAction: (request: unknown) => mockSubmitBidAction(request),
   selectTrumpAction: (request: unknown) => mockSelectTrumpAction(request),
   submitPlayAction: (request: unknown) => mockSubmitPlayAction(request),

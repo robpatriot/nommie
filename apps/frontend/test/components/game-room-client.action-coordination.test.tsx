@@ -8,7 +8,7 @@ import {
   mockGetGameRoomSnapshotAction,
   mockMarkPlayerReadyAction,
 } from '../../setupGameRoomActionsMock'
-import { createInitialData } from '../setup/game-room-client-helpers'
+import { createInitialDataWithVersion } from '../setup/game-room-client-helpers'
 import {
   createMockMutationHooks,
   setupFetchMock,
@@ -89,7 +89,7 @@ describe('GameRoomClient', () => {
 
   describe('Action coordination', () => {
     it('prevents actions when another action is in progress', async () => {
-      const initialData = createInitialData()
+      const initialData = createInitialDataWithVersion(42, 1)
 
       // Make ready action slow
       let resolveReady: () => void
@@ -124,7 +124,7 @@ describe('GameRoomClient', () => {
     })
 
     it('allows manual refresh independently of actions', async () => {
-      const initialData = createInitialData()
+      const initialData = createInitialDataWithVersion(42, 1)
 
       // Make ready action slow
       let resolveReady: () => void

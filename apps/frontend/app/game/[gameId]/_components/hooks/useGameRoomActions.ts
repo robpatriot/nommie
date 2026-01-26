@@ -72,11 +72,18 @@ export function useGameRoomActions({
     }
 
     const newReadyState = !hasMarkedReady
+    const version = getGameVersionFromCache(queryClient, gameId)
+
+    if (version === undefined) {
+      showToast(tErrors('versionRequired'), 'error')
+      return
+    }
 
     try {
       await markPlayerReadyMutation.mutateAsync({
         gameId,
         isReady: newReadyState,
+        version,
       })
       setHasMarkedReady(newReadyState)
     } catch (err) {
@@ -89,6 +96,7 @@ export function useGameRoomActions({
     hasMarkedReady,
     isReadyPending,
     markPlayerReadyMutation,
+    queryClient,
     setHasMarkedReady,
     showToast,
     tErrors,

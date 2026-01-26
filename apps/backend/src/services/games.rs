@@ -6,7 +6,9 @@ use sea_orm::{
 
 use crate::adapters::games_sea::GameCreate;
 use crate::domain::cards_parsing::from_stored_format;
-use crate::domain::state::{GameState, Phase, PreviousRound, RoundState};
+use crate::domain::state::{
+    expected_actor, nth_from, round_start_seat, GameState, Phase, PreviousRound, RoundState,
+};
 use crate::domain::Card;
 use crate::entities::game_players;
 use crate::entities::games::{self, GameState as DbGameState, GameVisibility};
@@ -15,8 +17,7 @@ use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::games::Game;
 use crate::repos::memberships::GameRole;
 use crate::repos::{
-    ai_overrides, ai_profiles, bids, games as games_repo, hands, memberships, plays, rounds,
-    scores, tricks,
+    ai_profiles, bids, games as games_repo, hands, memberships, plays, rounds, scores, tricks,
 };
 use crate::services::game_flow::GameFlowService;
 
@@ -45,13 +46,13 @@ impl GameService {
 
                 return Ok(GameState {
                     phase,
-                    round_no: 0,
-                    hand_size: 0,
+                    round_no: None,
+                    hand_size: None,
                     hands: [Vec::new(), Vec::new(), Vec::new(), Vec::new()],
-                    turn_start: 0,
-                    turn: 0,
-                    leader: 0,
-                    trick_no: 0,
+                    dealer: None,
+                    turn: None,
+                    leader: None,
+                    trick_no: None,
                     scores_total: [0, 0, 0, 0],
                     round: RoundState::empty(),
                 });
@@ -281,9 +282,8 @@ impl GameService {
         // 11. Convert DB phase to domain Phase
         let phase = games_repo::db_game_state_to_phase(&game.state, current_trick_no);
 
-        // 12. Determine turn_start, turn, leader
-        let dealer_pos = game.dealer_pos().unwrap_or(0);
-        let turn_start = (dealer_pos + 1) % 4;
+        // 12. Determine dealer, leader, turn, and optional round fields (honest; no sentinels)
+        let dealer: Option<u8> = game.dealer_pos();
 
         let last_completed_trick_winner: Option<u8> = all_tricks
             .iter()
@@ -291,41 +291,76 @@ impl GameService {
             .find(|t| (0..=3).contains(&t.winner_seat))
             .map(|t| t.winner_seat);
 
-        let leader = match phase {
-            Phase::Trick { .. } => {
-                if let Some((seat, _)) = trick_plays.first() {
-                    *seat
-                } else if let Some(winner) = last_completed_trick_winner {
-                    winner
-                } else {
-                    turn_start
-                }
-            }
-            _ => last_completed_trick_winner.unwrap_or(turn_start),
-        };
+        let (round_no_opt, hand_size_opt, trick_no_opt, leader_opt, turn_opt) = match phase {
+            Phase::Init => (None, None, None, None, None),
 
-        let turn = match phase {
             Phase::Bidding => {
+                let round_no = Some(current_round_no);
+                let hand_size = Some(hand_size);
+
+                let dealer_seat = dealer.ok_or_else(|| {
+                    DomainError::validation_other(
+                        "Invariant violated: dealer must be set during Bidding",
+                    )
+                })?;
+                let round_start = round_start_seat(dealer_seat);
+
                 let bid_count = all_bids.len() as u8;
-                (turn_start + bid_count) % 4
+                let to_act = nth_from(round_start, bid_count);
+
+                (round_no, hand_size, None, None, Some(to_act))
             }
-            Phase::TrumpSelect => winning_bidder.unwrap_or(turn_start),
-            Phase::Trick { .. } => {
-                let plays_count = trick_plays.len() as u8;
-                (leader + plays_count) % 4
+
+            Phase::TrumpSelect => {
+                let round_no = Some(current_round_no);
+                let hand_size = Some(hand_size);
+
+                // TrumpSelect is actionable only for the winning bidder; if missing, no turn.
+                let to_act = winning_bidder;
+
+                (round_no, hand_size, None, None, to_act)
             }
-            _ => turn_start,
+
+            Phase::Trick { trick_no } => {
+                let round_no = Some(current_round_no);
+                let hand_size = Some(hand_size);
+
+                let leader = if let Some((seat, _)) = trick_plays.first() {
+                    Some(*seat)
+                } else if let Some(winner) = last_completed_trick_winner {
+                    Some(winner)
+                } else {
+                    // First trick, no plays yet: leader is left of dealer
+                    let dealer_seat = dealer.ok_or_else(|| {
+                        DomainError::validation_other(
+                            "Invariant violated: dealer must be set during Trick",
+                        )
+                    })?;
+                    Some(round_start_seat(dealer_seat))
+                };
+
+                let to_act = leader.map(|l| {
+                    let plays_count = trick_plays.len() as u8;
+                    expected_actor(l, plays_count)
+                });
+
+                (round_no, hand_size, Some(trick_no), leader, to_act)
+            }
+
+            Phase::Scoring => (Some(current_round_no), Some(hand_size), None, None, None),
+            Phase::Complete => (Some(current_round_no), Some(hand_size), None, None, None),
+            Phase::GameOver => (Some(current_round_no), None, None, None, None),
         };
 
         Ok(GameState {
             phase,
-            round_no: current_round_no,
-            hand_size,
+            round_no: round_no_opt,
+            hand_size: hand_size_opt,
             hands: hands_array,
-            turn_start,
-            turn,
-            leader,
-            trick_no: current_trick_no,
+            dealer,
+            turn: turn_opt,
+            leader: leader_opt,
+            trick_no: trick_no_opt,
             scores_total,
             round: RoundState {
                 trick_plays,
@@ -666,225 +701,6 @@ impl GameService {
         }
     }
 
-    /// Join a user to a game.
-    ///
-    /// This method handles:
-    /// - Validating game exists and is in LOBBY state
-    /// - Checking user is not already a member
-    /// - Checking capacity, replacing lowest-seat AI if needed
-    /// - Finding next available turn_order (when seats are free)
-    /// - Creating membership
-    /// - Returning updated game and memberships
-    ///
-    /// All operations are performed within the provided transaction.
-    ///
-    /// # Arguments
-    /// * `txn` - Database transaction
-    /// * `game_id` - ID of the game to join
-    /// * `user_id` - ID of the user joining
-    ///
-    /// # Returns
-    /// Tuple of (game entity model, all memberships)
-    pub async fn join_game(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-        user_id: i64,
-    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
-        // Fetch game and verify it exists
-        let game = games_repo::require_game(txn, game_id).await?;
-
-        // Verify game is in LOBBY state
-        if game.state != DbGameState::Lobby {
-            return Err(AppError::bad_request(
-                crate::errors::ErrorCode::PhaseMismatch,
-                format!(
-                    "Game is not in LOBBY state (current state: {:?})",
-                    game.state
-                ),
-            ));
-        }
-
-        // Check if user is already a member
-        let existing_membership = memberships::find_membership(txn, game_id, user_id)
-            .await
-            .map_err(AppError::from)?;
-        if existing_membership.is_some() {
-            return Err(AppError::Conflict {
-                code: crate::errors::ErrorCode::Conflict,
-                detail: format!("User {} is already a member of game {}", user_id, game_id),
-                extensions: None,
-            });
-        }
-
-        // Get all current memberships to check capacity and find next seat
-        let all_memberships = memberships::find_all_by_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-
-        let player_memberships: Vec<memberships::GameMembership> = all_memberships
-            .into_iter()
-            .filter(|m| m.role == GameRole::Player)
-            .collect();
-
-        let ai_players: Vec<memberships::GameMembership> = player_memberships
-            .iter()
-            .filter(|m| m.player_kind == crate::entities::game_players::PlayerKind::Ai)
-            .cloned()
-            .collect();
-
-        let total_players = player_memberships.len();
-
-        if total_players >= 4 {
-            if ai_players.is_empty() {
-                // Game is full with human players only
-                return Err(AppError::bad_request(
-                    crate::errors::ErrorCode::ValidationError,
-                    "Game is full (maximum 4 human players)".to_string(),
-                ));
-            }
-
-            // Replace the AI with the lowest seat number (turn_order)
-            let ai_to_replace = ai_players
-                .iter()
-                .filter_map(|m| m.turn_order.map(|t| (m.clone(), t)))
-                .min_by_key(|(_, t)| *t)
-                .ok_or_else(|| {
-                    AppError::internal(
-                        crate::errors::ErrorCode::InternalError,
-                        "Failed to select AI seat for replacement".to_string(),
-                        std::io::Error::other("no AI seat found despite non-empty list"),
-                    )
-                })?;
-
-            let (ai_membership, turn_order) = ai_to_replace;
-
-            // Remove any overrides and the AI membership itself
-            ai_overrides::delete_by_game_player_id(txn, ai_membership.id)
-                .await
-                .map_err(AppError::from)?;
-            memberships::delete_membership(txn, ai_membership.id)
-                .await
-                .map_err(AppError::from)?;
-
-            // Create human membership in the freed seat
-            memberships::create_membership(
-                txn,
-                game_id,
-                user_id,
-                Some(turn_order),
-                false,
-                GameRole::Player,
-            )
-            .await
-            .map_err(AppError::from)?;
-        } else {
-            // Seats available: find next free seat and join there
-            let next_turn_order = self
-                .find_next_available_seat(&player_memberships)
-                .ok_or_else(|| {
-                    AppError::internal(
-                        crate::errors::ErrorCode::InternalError,
-                        "No available turn order found".to_string(),
-                        std::io::Error::other("turn order calculation failed"),
-                    )
-                })?;
-
-            memberships::create_membership(
-                txn,
-                game_id,
-                user_id,
-                Some(next_turn_order),
-                false,
-                GameRole::Player,
-            )
-            .await
-            .map_err(AppError::from)?;
-        }
-
-        // Fetch updated memberships and reload game
-        let updated_memberships = memberships::find_all_by_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-
-        let game = games_repo::require_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-
-        Ok((game, updated_memberships))
-    }
-
-    /// Join a user to a game as a spectator.
-    ///
-    /// This method handles:
-    /// - Validating game exists
-    /// - Checking game visibility (must be Public)
-    /// - Checking user is not already a member
-    /// - Creating spectator membership (no turn_order)
-    /// - Returning updated game and memberships
-    ///
-    /// All operations are performed within the provided transaction.
-    ///
-    /// # Arguments
-    /// * `txn` - Database transaction
-    /// * `game_id` - ID of the game to spectate
-    /// * `user_id` - ID of the user spectating
-    ///
-    /// # Returns
-    /// Tuple of (game entity model, all memberships)
-    pub async fn join_as_spectator(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-        user_id: i64,
-    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
-        // Fetch game and verify it exists
-        let game = games_repo::require_game(txn, game_id).await?;
-
-        // Check game visibility - only public games can be spectated
-        if game.visibility != GameVisibility::Public {
-            return Err(AppError::forbidden_with_code(
-                crate::errors::ErrorCode::Forbidden,
-                "Only public games can be spectated".to_string(),
-            ));
-        }
-
-        // Check if user is already a member
-        let existing_membership = memberships::find_membership(txn, game_id, user_id)
-            .await
-            .map_err(AppError::from)?;
-        if existing_membership.is_some() {
-            return Err(AppError::Conflict {
-                code: crate::errors::ErrorCode::Conflict,
-                detail: format!("User {} is already a member of game {}", user_id, game_id),
-                extensions: None,
-            });
-        }
-
-        // Create spectator membership (no turn_order)
-        memberships::create_membership(
-            txn,
-            game_id,
-            user_id,
-            None,  // turn_order: None for spectators
-            false, // is_ready: false (spectators don't need to be ready)
-            GameRole::Spectator,
-        )
-        .await
-        .map_err(AppError::from)?;
-
-        // Fetch updated memberships and reload game
-        let updated_memberships = memberships::find_all_by_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-
-        let game = games_repo::require_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-
-        Ok((game, updated_memberships))
-    }
-
     /// Find the default AI profile.
     ///
     /// Returns the AI profile for the default AI player.
@@ -924,230 +740,5 @@ impl GameService {
             )
         })?;
         Ok(profile)
-    }
-
-    /// Convert a human player membership to an AI player.
-    ///
-    /// This preserves the seat position and all game state, but converts the player
-    /// from human to AI. The AI will use the default AI profile.
-    ///
-    /// # Arguments
-    /// * `txn` - Database transaction
-    /// * `membership` - The human membership to convert
-    ///
-    /// # Returns
-    /// The updated membership (now AI)
-    async fn convert_human_to_ai(
-        &self,
-        txn: &DatabaseTransaction,
-        membership: memberships::GameMembership,
-    ) -> Result<memberships::GameMembership, AppError> {
-        // Verify this is a human membership
-        if membership.player_kind != crate::entities::game_players::PlayerKind::Human {
-            return Err(AppError::bad_request(
-                crate::errors::ErrorCode::ValidationError,
-                format!(
-                    "Cannot convert: membership {} is not a human player",
-                    membership.id
-                ),
-            ));
-        }
-
-        // Find the default AI profile
-        let ai_profile = self.find_default_ai_profile(txn).await?;
-
-        // Collect existing display names to ensure uniqueness
-        use crate::repos::players::{friendly_ai_name, resolve_display_name_for_membership};
-        let all_memberships = memberships::find_all_by_game(txn, membership.game_id)
-            .await
-            .map_err(AppError::from)?;
-        let mut existing_display_names: std::collections::HashSet<String> =
-            std::collections::HashSet::new();
-
-        for m in &all_memberships {
-            if m.id == membership.id {
-                continue; // Skip the membership we're converting
-            }
-            let seat = m.turn_order.ok_or_else(|| {
-                AppError::internal(
-                    crate::errors::ErrorCode::Internal,
-                    "Cannot resolve display name for membership without turn_order".to_string(),
-                    std::io::Error::other("Membership without turn_order"),
-                )
-            })?;
-            let display_name = resolve_display_name_for_membership(
-                txn, m, seat, false, // No final fallback needed for uniqueness check
-            )
-            .await
-            .map_err(AppError::from)?;
-            existing_display_names.insert(display_name);
-        }
-
-        // Generate a friendly AI name for this seat
-        use rand::random;
-        let name_seed = random::<u64>() as i64;
-        let seat = membership.turn_order.ok_or_else(|| {
-            AppError::internal(
-                crate::errors::ErrorCode::InternalError,
-                "AI player must have turn_order".to_string(),
-                std::io::Error::other("AI player without turn_order"),
-            )
-        })?;
-        let base_name = friendly_ai_name(name_seed, seat as usize);
-
-        // Ensure uniqueness
-        let unique_name = if !existing_display_names.contains(&base_name) {
-            base_name.clone()
-        } else {
-            let mut counter = 2;
-            loop {
-                let candidate = format!("{base_name} {counter}");
-                if !existing_display_names.contains(&candidate) {
-                    break candidate;
-                }
-                counter += 1;
-            }
-        };
-
-        // Update membership to AI
-        let mut updated_membership = membership.clone();
-        updated_membership.player_kind = crate::entities::game_players::PlayerKind::Ai;
-        updated_membership.original_user_id = membership.user_id; // Store original user
-        updated_membership.user_id = None;
-        updated_membership.ai_profile_id = Some(ai_profile.id);
-        // Keep is_ready as is (if game is active, player was ready)
-
-        let updated = memberships::update_membership(txn, updated_membership.clone())
-            .await
-            .map_err(AppError::from)?;
-
-        // Create AI override for the display name
-        ai_overrides::create_override(txn, updated.id, Some(unique_name), None, None)
-            .await
-            .map_err(AppError::from)?;
-
-        Ok(updated)
-    }
-
-    /// Remove a user from a game.
-    ///
-    /// If the game is in Lobby state, deletes the membership.
-    /// If the game is active, converts the human player to an AI player.
-    ///
-    /// Returns the updated game and remaining memberships.
-    pub async fn leave_game(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-        user_id: i64,
-    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
-        // Fetch game and verify it exists
-        let game = games_repo::require_game(txn, game_id).await?;
-
-        // Find the user's membership
-        let membership = memberships::find_membership(txn, game_id, user_id)
-            .await
-            .map_err(AppError::from)?
-            .ok_or_else(|| {
-                AppError::bad_request(
-                    crate::errors::ErrorCode::ValidationError,
-                    format!("User {} is not a member of game {}", user_id, game_id),
-                )
-            })?;
-
-        // Spectators can always just be removed (no seat to replace)
-        if membership.role == memberships::GameRole::Spectator {
-            memberships::delete_membership(txn, membership.id)
-                .await
-                .map_err(AppError::from)?;
-        } else if game.state == DbGameState::Lobby {
-            // If game is in Lobby, delete the membership (existing behavior)
-            memberships::delete_membership(txn, membership.id)
-                .await
-                .map_err(AppError::from)?;
-        } else {
-            // Game is active: convert human to AI
-            self.convert_human_to_ai(txn, membership).await?;
-        }
-
-        // Fetch updated memberships
-        let updated_memberships = memberships::find_all_by_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-
-        // Reload game to get latest state
-        let updated_game = games_repo::require_game(txn, game_id).await?;
-
-        Ok((updated_game, updated_memberships))
-    }
-
-    /// Rejoin a game by converting an AI player back to the original human player.
-    ///
-    /// Returns the updated game and all memberships.
-    pub async fn rejoin_game(
-        &self,
-        txn: &DatabaseTransaction,
-        game_id: i64,
-        user_id: i64,
-        expected_version: i32,
-    ) -> Result<(Game, Vec<memberships::GameMembership>), AppError> {
-        // Verify game exists
-        let game = games_repo::require_game(txn, game_id).await?;
-
-        // Use optimistic locking
-        if game.version != expected_version {
-            return Err(AppError::conflict(
-                crate::errors::ErrorCode::OptimisticLock,
-                format!(
-                    "Game version mismatch: expected {}, got {}",
-                    expected_version, game.version
-                ),
-            ));
-        }
-
-        // Find AI membership with this user as original_user_id
-        let all_memberships = memberships::find_all_by_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-        let ai_membership = all_memberships
-            .iter()
-            .find(|m| {
-                m.player_kind == crate::entities::game_players::PlayerKind::Ai
-                    && m.original_user_id == Some(user_id)
-            })
-            .ok_or_else(|| {
-                AppError::bad_request(
-                    crate::errors::ErrorCode::ValidationError,
-                    format!("No AI seat found for user {} to rejoin", user_id),
-                )
-            })?;
-
-        // Convert AI back to human immediately
-        // If AI is currently acting, the action will complete, then process_game_state
-        // will see it's now human and stop processing
-        let mut updated_membership = ai_membership.clone();
-        updated_membership.player_kind = crate::entities::game_players::PlayerKind::Human;
-        updated_membership.user_id = Some(user_id);
-        updated_membership.original_user_id = None; // Clear after rejoining
-        updated_membership.ai_profile_id = None;
-
-        // Delete AI override (display name)
-        ai_overrides::delete_by_game_player_id(txn, updated_membership.id)
-            .await
-            .map_err(AppError::from)?;
-
-        let _updated = memberships::update_membership(txn, updated_membership.clone())
-            .await
-            .map_err(AppError::from)?;
-
-        // Touch game to increment version
-        let updated_game = games_repo::touch_game(txn, game_id, expected_version).await?;
-
-        // Fetch updated memberships
-        let updated_memberships = memberships::find_all_by_game(txn, game_id)
-            .await
-            .map_err(AppError::from)?;
-
-        Ok((updated_game, updated_memberships))
     }
 }

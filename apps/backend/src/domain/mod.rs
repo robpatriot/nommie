@@ -10,6 +10,7 @@ pub mod game_context;
 pub mod player_view;
 pub mod round_memory;
 
+pub mod game_transition;
 pub mod rules;
 pub mod scoring;
 pub mod seed_derivation;

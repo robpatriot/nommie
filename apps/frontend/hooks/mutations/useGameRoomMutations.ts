@@ -32,11 +32,13 @@ export function useMarkPlayerReady() {
     mutationFn: async ({
       gameId,
       isReady,
+      version,
     }: {
       gameId: number
       isReady: boolean
+      version: number
     }): Promise<void> => {
-      const result = await markPlayerReadyAction(gameId, isReady)
+      const result = await markPlayerReadyAction(gameId, isReady, version)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }

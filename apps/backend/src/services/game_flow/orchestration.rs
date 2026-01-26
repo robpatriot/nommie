@@ -2,99 +2,66 @@ use sea_orm::DatabaseTransaction;
 use tracing::{debug, info};
 
 use super::GameFlowService;
+use crate::domain::game_transition::derive_game_transitions;
+use crate::domain::state::PlayerId;
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
 use crate::repos::{games, memberships, player_view};
+use crate::services::game_flow::GameFlowMutationResult;
+use crate::services::games::GameService;
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct TurnView {
+    pub(crate) version: i32,
+    pub(crate) turn: Option<PlayerId>,
+}
+
+pub(crate) async fn load_turn_view(
+    txn: &DatabaseTransaction,
+    game_id: i64,
+) -> Result<TurnView, AppError> {
+    let game = games::require_game(txn, game_id).await?;
+    let state = GameService.load_game_state(txn, game_id).await?;
+    Ok(TurnView {
+        version: game.version,
+        turn: state.turn,
+    })
+}
 
 impl GameFlowService {
-    /// Check if all players are ready and start the game if conditions are met.
-    ///
-    /// This is called after a player marks themselves ready or after an AI player is added.
-    /// If all 4 players are ready, automatically deals the first round.
-    pub async fn check_and_start_game_if_ready(
+    pub async fn mark_ready(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-    ) -> Result<(), AppError> {
-        // Check if all players are ready (exclude spectators)
-        let all_memberships = memberships::find_all_by_game(txn, game_id).await?;
-        let player_memberships: Vec<_> = all_memberships
-            .iter()
-            .filter(|m| m.role == crate::repos::memberships::GameRole::Player)
-            .collect();
-        let all_ready = player_memberships.iter().all(|m| m.is_ready);
+        user_id: i64,
+        is_ready: bool,
+        expected_version: i32,
+    ) -> Result<GameFlowMutationResult, AppError> {
+        self.run_mutation(txn, game_id, expected_version, |svc, txn| {
+            Box::pin(async move {
+                svc.set_ready_status(txn, game_id, user_id, is_ready, expected_version)
+                    .await?;
 
-        if all_ready && player_memberships.len() == 4 {
-            let game = games::require_game(txn, game_id).await?;
-
-            // Only auto-start from the lobby; completed games (or other states) should not deal again.
-            if game.state == DbGameState::Completed {
-                info!(
-                    game_id,
-                    "All players ready but game already completed; skipping auto-start"
-                );
-                return Ok(());
-            }
-
-            if game.state != DbGameState::Lobby {
-                info!(
-                    game_id,
-                    state = ?game.state,
-                    "All players ready in non-lobby state; skipping auto-start"
-                );
-                return Ok(());
-            }
-
-            info!(game_id, "All players ready, starting game");
-            // Deal first round
-            self.deal_round(txn, game_id).await?;
-
-            // Process game state - it loops internally until no AI actions or transitions are possible
-            // It will exit early if game completes or is abandoned
-            self.process_game_state(txn, game_id).await?;
-
-            // Reload game to check final state after processing
-            let game = games::require_game(txn, game_id).await?;
-
-            // Early exit if game completed or abandoned (all AI players finished the game)
-            if game.state == DbGameState::Completed || game.state == DbGameState::Abandoned {
-                return Ok(());
-            }
-
-            // Check if next player to act is human (if process_game_state returned normally
-            // and game isn't completed/abandoned, it means we're waiting for human input)
-            let next_action = self.determine_next_action(txn, &game).await?;
-            if let Some(action_tuple) = next_action {
-                let player_seat = action_tuple.0;
-                let memberships = memberships::find_all_by_game(txn, game_id).await?;
-                if let Some(player) = memberships
-                    .iter()
-                    .find(|m| m.turn_order == Some(player_seat))
-                {
-                    if player.player_kind == crate::entities::game_players::PlayerKind::Human {
-                        // Waiting for human input - done processing
-                        return Ok(());
-                    }
+                if is_ready {
+                    svc.check_and_start_game_if_ready(txn, game_id).await?;
                 }
-            }
-        }
 
-        Ok(())
+                svc.process_game_state(txn, game_id).await?;
+                Ok(())
+            })
+        })
+        .await
     }
 
-    /// Set the ready status of a player and check if game should start.
-    ///
-    /// If all players are ready after setting ready to true, automatically deals the first round.
-    /// Ready status can only be changed when the game is in Lobby state.
     pub async fn set_ready_status(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         user_id: i64,
         is_ready: bool,
+        expected_version: i32,
     ) -> Result<(), AppError> {
-        // Validate game is in Lobby state
         let game = games::require_game(txn, game_id).await?;
 
         if game.state != DbGameState::Lobby {
@@ -105,7 +72,6 @@ impl GameFlowService {
             .into());
         }
 
-        // Find membership
         let membership = memberships::find_membership(txn, game_id, user_id)
             .await?
             .ok_or_else(|| {
@@ -115,7 +81,6 @@ impl GameFlowService {
                 )
             })?;
 
-        // Only players can mark ready (not spectators)
         if membership.role != crate::repos::memberships::GameRole::Player {
             return Err(DomainError::validation(
                 ValidationKind::Other("INSUFFICIENT_ROLE".into()),
@@ -124,18 +89,87 @@ impl GameFlowService {
             .into());
         }
 
-        // Set ready status
         memberships::set_membership_ready(txn, membership.id, is_ready).await?;
 
-        // Touch game to increment version so WebSocket clients receive the update
-        games::touch_game(txn, game_id, game.version).await?;
-
-        if is_ready {
-            // Check if all players are ready and start game if so
-            self.check_and_start_game_if_ready(txn, game_id).await?;
-        }
+        games::touch_game(txn, game_id, expected_version).await?;
 
         Ok(())
+    }
+
+    pub async fn check_and_start_game_if_ready(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+    ) -> Result<(), AppError> {
+        let all_memberships = memberships::find_all_by_game(txn, game_id).await?;
+        let player_memberships: Vec<_> = all_memberships
+            .iter()
+            .filter(|m| m.role == crate::repos::memberships::GameRole::Player)
+            .collect();
+
+        let all_ready = player_memberships.iter().all(|m| m.is_ready);
+
+        if !(all_ready && player_memberships.len() == 4) {
+            return Ok(());
+        }
+
+        let game = games::require_game(txn, game_id).await?;
+
+        if game.state == DbGameState::Completed {
+            info!(
+                game_id,
+                "All players ready but game already completed; skipping auto-start"
+            );
+            return Ok(());
+        }
+
+        if game.state != DbGameState::Lobby {
+            info!(
+                game_id,
+                state = ?game.state,
+                "All players ready in non-lobby state; skipping auto-start"
+            );
+            return Ok(());
+        }
+
+        info!(game_id, "All players ready, starting game");
+
+        self.deal_round(txn, game_id).await?;
+
+        Ok(())
+    }
+
+    pub async fn run_game_flow(
+        &self,
+        txn: &DatabaseTransaction,
+        game_id: i64,
+    ) -> Result<Option<GameFlowMutationResult>, AppError> {
+        // Capture entry point (version + whose turn / phase) so we can derive effects.
+        let before = load_turn_view(txn, game_id).await?;
+        let old_version = before.version;
+
+        // Drive the game forward automatically (AI loop) until nothing else can happen.
+        self.process_game_state(txn, game_id).await?;
+
+        // Capture exit point.
+        let after = load_turn_view(txn, game_id).await?;
+
+        // If nothing changed, there are no effects to publish.
+        if after.version == old_version {
+            return Ok(None);
+        }
+
+        // Derive transitions across the entire auto-run window.
+        let transitions = derive_game_transitions(before.turn, after.turn);
+
+        // Load final game model (authoritative version, state, etc.)
+        let final_game = games::require_game(txn, game_id).await?;
+
+        Ok(Some(GameFlowMutationResult {
+            final_game,
+            old_version,
+            transitions,
+        }))
     }
 
     /// Process game state after any action or transition.
@@ -256,8 +290,7 @@ impl GameFlowService {
                 game = games::require_game(txn, game_id).await?;
                 // Loop again (cache remains valid for next iteration!)
                 // Note: Game can't be Completed here - completion only happens through
-                // transition checks on the next iteration, which will be caught at line 138.
-                // Similarly, Abandoned state will be caught at line 138 on next iteration.
+                // transition checks on the next iteration.
                 continue;
             }
 
