@@ -243,6 +243,12 @@ export function PlayerHand({
       if (canActNow) {
         return t('status.tapToPlayImmediate')
       }
+
+      // If it's our turn but we can't act, it must be due to a pause (and not being the leader).
+      if (viewerTurn) {
+        return tHand('status.pausing')
+      }
+
       return waitingOnName
         ? t('status.waitingFor', { name: waitingOnName })
         : t('status.waitingForNext')
@@ -257,10 +263,12 @@ export function PlayerHand({
     canActNow,
     waitingOnName,
     t,
+    tHand,
+    viewerTurn,
     readOnlyPreviewText,
   ])
 
-  // Title should only be hidden due to viewport size (per agreement).
+  // Title should only be hidden due to viewport size.
   const shouldShowTitle = useMediaQuery('(min-width: 400px)')
   const showLegalPlays = useMediaQuery('(min-width: 320px)')
 
@@ -420,11 +428,17 @@ export function PlayerHand({
         {isTrickPhase && playState && requireCardConfirmation ? (
           <div className="flex justify-center flex-1 min-w-0">
             {(() => {
-              const state: 'pending' | 'canAct' | 'waitingFor' | 'waitingNext' =
-                playState.isPending
-                  ? 'pending'
-                  : canActNow
-                    ? 'canAct'
+              const state:
+                | 'pending'
+                | 'canAct'
+                | 'pausing'
+                | 'waitingFor'
+                | 'waitingNext' = playState.isPending
+                ? 'pending'
+                : canActNow
+                  ? 'canAct'
+                  : viewerTurn
+                    ? 'pausing'
                     : waitingOnName
                       ? 'waitingFor'
                       : 'waitingNext'
@@ -452,6 +466,12 @@ export function PlayerHand({
                       </span>
                     </>
                   )
+                  break
+                }
+
+                case 'pausing': {
+                  ariaLabel = tHand('status.pausing')
+                  content = tHand('status.pausing')
                   break
                 }
 

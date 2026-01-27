@@ -238,6 +238,7 @@
         "readOnlyPreview": "Aperçu en lecture seule",
         "handWillAppear": "La main apparaîtra une fois la partie commencée.",
         "waitingFor": "En attente de {name}",
+        "pausing": "Pause...",
         "nextPlayer": "le prochain joueur",
         "tapLegalCardToPlay": "Touchez une carte autorisée pour jouer immédiatement."
       },

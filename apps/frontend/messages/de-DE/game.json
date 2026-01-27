@@ -238,6 +238,7 @@
         "readOnlyPreview": "Nur Vorschau",
         "handWillAppear": "Die Hand erscheint, sobald das Spiel beginnt.",
         "waitingFor": "Warten auf {name}",
+        "pausing": "Pausieren...",
         "nextPlayer": "nächsten Spieler",
         "tapLegalCardToPlay": "Tippe eine erlaubte Karte an, um sofort zu spielen."
       },

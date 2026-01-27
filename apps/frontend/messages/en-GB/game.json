@@ -238,6 +238,7 @@
         "readOnlyPreview": "Read-only preview",
         "handWillAppear": "Hand will appear once the game starts.",
         "waitingFor": "Waiting for {name}",
+        "pausing": "Pausing...",
         "nextPlayer": "next player",
         "tapLegalCardToPlay": "Tap a legal card to play immediately."
       },

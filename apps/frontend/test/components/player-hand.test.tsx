@@ -164,4 +164,56 @@ describe('PlayerHand', () => {
     expect(playButton).toBeDisabled()
     expect(playButton).toHaveTextContent(/waiting for bailey/i)
   })
+
+  it('shows "Pausing..." in header when it is viewer turn but trick is paused (immediate play)', () => {
+    render(
+      <PlayerHand
+        viewerHand={['2H', '3H', '5S', '7C']}
+        phase={createTrickPhase(0)} // Viewer's turn
+        playerNames={playerNames}
+        viewerSeat={0}
+        selectedCard={null}
+        onSelectCard={() => {}}
+        requireCardConfirmation={false}
+        isTrickPaused={true}
+        isViewerLeaderDuringPause={false}
+        playState={{
+          viewerSeat: 0,
+          playable: ['2H', '3H', '5S', '7C'],
+          isPending: false,
+          onPlay: async () => {},
+        }}
+      />
+    )
+
+    expect(screen.getByText(/Pausing.../i)).toBeInTheDocument()
+  })
+
+  it('shows "Pausing..." in button when it is viewer turn but trick is paused (confirm mode)', () => {
+    render(
+      <PlayerHand
+        viewerHand={['2H', '3H', '5S', '7C']}
+        phase={createTrickPhase(0)} // Viewer's turn
+        playerNames={playerNames}
+        viewerSeat={0}
+        selectedCard={null}
+        onSelectCard={() => {}}
+        requireCardConfirmation={true}
+        isTrickPaused={true}
+        isViewerLeaderDuringPause={false}
+        playState={{
+          viewerSeat: 0,
+          playable: ['2H', '3H', '5S', '7C'],
+          isPending: false,
+          onPlay: async () => {},
+        }}
+      />
+    )
+
+    const playButton = screen.getByRole('button', {
+      name: /pausing.../i,
+    })
+    expect(playButton).toBeDisabled()
+    expect(playButton).toHaveTextContent(/pausing.../i)
+  })
 })
