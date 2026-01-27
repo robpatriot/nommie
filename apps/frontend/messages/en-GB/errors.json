@@ -11,7 +11,6 @@
     "BACKEND_STARTING": "The server is starting up. Please try again shortly.",
     "NOT_A_MEMBER": "You are not a member of this game.",
     "INSUFFICIENT_ROLE": "You don't have permission to do that.",
-
     "INVALID_GAME_ID": "That game link is invalid.",
     "INVALID_EMAIL": "Please enter a valid email address.",
     "INVALID_GOOGLE_SUB": "Sign-in failed. Please try again.",
@@ -27,18 +26,15 @@
     "BAD_REQUEST": "That request isn't valid.",
     "INVALID_HEADER": "Your request is missing required information.",
     "PRECONDITION_REQUIRED": "Please refresh and try again.",
-
     "GAME_NOT_FOUND": "That game could not be found.",
     "USER_NOT_FOUND": "Your account could not be found.",
     "PLAYER_NOT_FOUND": "That player could not be found.",
     "NOT_FOUND": "We couldn't find what you were looking for.",
-
     "GOOGLE_SUB_MISMATCH": "This email is linked to a different Google account.",
     "SEAT_TAKEN": "That seat is already taken.",
     "UNIQUE_EMAIL": "That email is already in use.",
     "OPTIMISTIC_LOCK": "This game changed. Please refresh and try again.",
     "CONFLICT": "That couldn't be completed because something changed.",
-
     "DB_ERROR": "Something went wrong. Please try again.",
     "DB_UNAVAILABLE": "The server is temporarily unavailable. Please try again.",
     "DB_POOL_EXHAUSTED": "The server is busy. Please try again.",
@@ -57,7 +53,6 @@
     "INTERNAL_ERROR": "Something went wrong. Please try again.",
     "CONFIG_ERROR": "The server is misconfigured. Please contact support.",
     "DATA_CORRUPTION": "Something went wrong. Please contact support.",
-
     "UNKNOWN_ERROR": "Something went wrong. Please try again."
   },
   "toast": {
@@ -106,7 +101,8 @@
     "failedToSpectateGame": "Failed to spectate game",
     "failedToDeleteGame": "Failed to delete game",
     "failedToFetchGameHistory": "Failed to fetch game history",
-    "failedToUpdateSettings": "Failed to update settings"
+    "failedToUpdateSettings": "Failed to update settings",
+    "failedToFetchWaitingGame": "Failed to fetch waiting game"
   },
   "validation": {
     "invalidBidValue": "Invalid bid value",

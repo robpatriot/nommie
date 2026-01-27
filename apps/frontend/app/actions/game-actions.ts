@@ -1,7 +1,12 @@
 'use server'
 
 import { getTranslations } from 'next-intl/server'
-import { deleteGame, fetchWithAuth, getAvailableGames } from '@/lib/api'
+import {
+  deleteGame,
+  fetchWithAuth,
+  getAvailableGames,
+  getWaitingLongestGame,
+} from '@/lib/api'
 import { fetchGameSnapshot } from '@/lib/api/game-room'
 import { toErrorResult } from '@/lib/api/action-helpers'
 import type { ActionResult, SimpleActionResult } from '@/lib/api/action-helpers'
@@ -143,5 +148,21 @@ export async function getGameHistoryAction(
   } catch (error) {
     const t = await getTranslations('errors.actions')
     return toErrorResult(error, t('failedToFetchGameHistory'))
+  }
+}
+
+/**
+ * Server Action to fetch the game ID that has been waiting the longest.
+ * Wraps getWaitingLongestGame to return an ActionResult, ensuring errors are preserved.
+ */
+export async function getWaitingLongestGameAction(
+  excludeGameId?: number
+): Promise<ActionResult<number | null>> {
+  try {
+    const gameId = await getWaitingLongestGame(excludeGameId)
+    return { kind: 'ok', data: gameId }
+  } catch (error) {
+    const t = await getTranslations('errors.actions')
+    return toErrorResult(error, t('failedToFetchWaitingGame'))
   }
 }

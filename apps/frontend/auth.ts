@@ -68,14 +68,13 @@ const nextAuthResult = NextAuth({
             if (checkResponse.status === 403) {
               return '/?accessDenied=true'
             }
+
             // Other errors: log and redirect
             const { logError } = await import('@/lib/logging/error-logger')
             logError(
               'Failed to check allowlist',
               new Error(`HTTP ${checkResponse.status}`),
-              {
-                action: 'checkAllowlist',
-              }
+              { action: 'checkAllowlist' }
             )
             return '/?accessDenied=true'
           }
@@ -92,6 +91,7 @@ const nextAuthResult = NextAuth({
       // Allow sign-in to proceed
       return true
     },
+
     async jwt({ token, account, profile, trigger }) {
       // Store user info in token for refreshing backend JWT
       if (account?.provider === 'google' && profile) {
@@ -101,6 +101,7 @@ const nextAuthResult = NextAuth({
         if (!profile.sub) {
           throw new Error('Google profile missing sub')
         }
+
         token.email = profile.email
         token.googleSub = profile.sub
         token.name = profile.name || token.name
@@ -125,8 +126,9 @@ const nextAuthResult = NextAuth({
               // Store in token and cookie
               token.backendJwt = data.token
 
+              // IMPORTANT: cookie helpers are server-only now
               const { setBackendJwtInCookie } =
-                await import('@/lib/auth/backend-jwt-cookie')
+                await import('@/lib/auth/backend-jwt-cookie.server')
               await setBackendJwtInCookie(data.token)
             }
           }

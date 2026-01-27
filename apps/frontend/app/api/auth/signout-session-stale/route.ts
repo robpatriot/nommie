@@ -1,12 +1,9 @@
 import { signOut } from '@/auth'
+import { deleteBackendJwtCookie } from '@/lib/auth/backend-jwt-cookie.server'
 
-/**
- * Route handler that signs out the user when their session is stale
- * (backend JWT is invalid but NextAuth session still exists).
- * Signs out and redirects to home page.
- */
 export async function GET() {
-  return signOut({
-    redirectTo: '/',
-  })
+  // Clear backend JWT cookie server-side
+  await deleteBackendJwtCookie()
+
+  return signOut({ redirectTo: '/' })
 }

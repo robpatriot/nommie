@@ -27,6 +27,7 @@ import { AppQueryClientProvider } from '@/lib/providers/query-client-provider'
 import { LOCALE_COOKIE_NAME, resolveLocale } from '@/i18n/locale'
 import { loadMessages } from '@/i18n/messages'
 import { getUserOptions } from '@/lib/api/user-options'
+import { BACKEND_JWT_COOKIE_NAME } from '@/lib/auth/backend-jwt-cookie'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -113,6 +114,7 @@ export default async function RootLayout({
 
   const cookieStore = await cookies()
   const headerStore = await headers()
+  const backendJwt = cookieStore.get(BACKEND_JWT_COOKIE_NAME)?.value ?? null
 
   const { locale } = resolveLocale({
     cookieLocale: cookieStore.get(LOCALE_COOKIE_NAME)?.value ?? null,
@@ -123,7 +125,7 @@ export default async function RootLayout({
   let initialThemeName: ThemeName = 'standard'
 
   // Backend is authoritative for logged-in users
-  if (session) {
+  if (session && backendJwt) {
     try {
       const options = await getUserOptions()
       initialThemeName = options.theme

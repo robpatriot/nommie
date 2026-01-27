@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { BackendApiError } from '@/lib/api'
+import { BackendApiError, isStaleSessionError } from '@/lib/errors'
 
 /**
  * Handle an email-allowlist failure in a server component.
@@ -32,11 +32,7 @@ export async function handleAllowlistError(error: unknown) {
  * to a Route Handler that can modify cookies.
  */
 export async function handleStaleSessionError(error: unknown) {
-  if (
-    error instanceof BackendApiError &&
-    error.status === 401 &&
-    error.code === 'FORBIDDEN_USER_NOT_FOUND'
-  ) {
+  if (isStaleSessionError(error)) {
     // Redirect to route handler that signs out and redirects to home
     redirect('/api/auth/signout-session-stale')
   }

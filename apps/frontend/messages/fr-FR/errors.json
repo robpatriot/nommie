@@ -11,7 +11,6 @@
     "BACKEND_STARTING": "Le serveur démarre. Veuillez réessayer dans un instant.",
     "NOT_A_MEMBER": "Vous ne faites pas partie de cette partie.",
     "INSUFFICIENT_ROLE": "Vous n’avez pas les droits nécessaires.",
-
     "INVALID_GAME_ID": "Ce lien de partie est invalide.",
     "INVALID_EMAIL": "Veuillez saisir une adresse e-mail valide.",
     "INVALID_GOOGLE_SUB": "Échec de la connexion. Veuillez réessayer.",
@@ -27,18 +26,15 @@
     "BAD_REQUEST": "Cette requête n’est pas valide.",
     "INVALID_HEADER": "Votre requête ne contient pas les informations requises.",
     "PRECONDITION_REQUIRED": "Veuillez actualiser et réessayer.",
-
     "GAME_NOT_FOUND": "Cette partie est introuvable.",
     "USER_NOT_FOUND": "Votre compte est introuvable.",
     "PLAYER_NOT_FOUND": "Ce joueur est introuvable.",
     "NOT_FOUND": "Élément introuvable.",
-
     "GOOGLE_SUB_MISMATCH": "Cet e-mail est lié à un autre compte Google.",
     "SEAT_TAKEN": "Cette place est déjà prise.",
     "UNIQUE_EMAIL": "Cet e-mail est déjà utilisé.",
     "OPTIMISTIC_LOCK": "La partie a changé. Actualisez puis réessayez.",
     "CONFLICT": "Impossible de terminer : un changement a été détecté.",
-
     "DB_ERROR": "Une erreur est survenue. Veuillez réessayer.",
     "DB_UNAVAILABLE": "Serveur temporairement indisponible. Veuillez réessayer.",
     "DB_POOL_EXHAUSTED": "Le serveur est occupé. Veuillez réessayer.",
@@ -57,7 +53,6 @@
     "INTERNAL_ERROR": "Une erreur est survenue. Veuillez réessayer.",
     "CONFIG_ERROR": "Le serveur est mal configuré. Veuillez contacter l’assistance.",
     "DATA_CORRUPTION": "Une erreur est survenue. Veuillez contacter l’assistance.",
-
     "UNKNOWN_ERROR": "Une erreur est survenue. Veuillez réessayer."
   },
   "toast": {
@@ -106,7 +101,8 @@
     "failedToSpectateGame": "Échec du visionnage de la partie",
     "failedToDeleteGame": "Échec de la suppression de la partie",
     "failedToFetchGameHistory": "Échec du chargement de l’historique de la partie",
-    "failedToUpdateSettings": "Échec de la mise à jour des paramètres"
+    "failedToUpdateSettings": "Échec de la mise à jour des paramètres",
+    "failedToFetchWaitingGame": "Échec de la récupération de la partie en attente"
   },
   "validation": {
     "invalidBidValue": "Valeur d’annonce invalide",

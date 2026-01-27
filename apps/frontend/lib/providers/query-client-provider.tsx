@@ -8,7 +8,7 @@ import {
 } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState } from 'react'
-import { BackendApiError } from '@/lib/errors'
+import { BackendApiError, isStaleSessionError } from '@/lib/errors'
 import { isNetworkError } from '@/lib/retry'
 import {
   clearBackendSessionClient,
@@ -46,11 +46,7 @@ export function AppQueryClientProvider({
         mutationCache: new MutationCache({
           onError: (error, _variables, _context, mutation) => {
             // Handle session clearing for stale user sessions
-            if (
-              error instanceof BackendApiError &&
-              error.status === 401 &&
-              error.code === 'FORBIDDEN_USER_NOT_FOUND'
-            ) {
+            if (isStaleSessionError(error)) {
               clearBackendSessionClient()
               redirectToHomeClient()
               return // Don't log handled errors
@@ -78,11 +74,7 @@ export function AppQueryClientProvider({
         queryCache: new QueryCache({
           onError: (error, query) => {
             // Handle session clearing for stale user sessions
-            if (
-              error instanceof BackendApiError &&
-              error.status === 401 &&
-              error.code === 'FORBIDDEN_USER_NOT_FOUND'
-            ) {
+            if (isStaleSessionError(error)) {
               clearBackendSessionClient()
               redirectToHomeClient()
               return // Don't log handled errors

@@ -11,7 +11,6 @@
     "BACKEND_STARTING": "Der Server startet gerade. Bitte versuche es gleich noch einmal.",
     "NOT_A_MEMBER": "Du bist kein Mitglied dieses Spiels.",
     "INSUFFICIENT_ROLE": "Du hast dafür keine Berechtigung.",
-
     "INVALID_GAME_ID": "Dieser Spiellink ist ungültig.",
     "INVALID_EMAIL": "Bitte gib eine gültige E-Mail-Adresse ein.",
     "INVALID_GOOGLE_SUB": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
@@ -27,18 +26,15 @@
     "BAD_REQUEST": "Diese Anfrage ist nicht gültig.",
     "INVALID_HEADER": "In deiner Anfrage fehlen erforderliche Informationen.",
     "PRECONDITION_REQUIRED": "Bitte aktualisiere und versuche es erneut.",
-
     "GAME_NOT_FOUND": "Dieses Spiel wurde nicht gefunden.",
     "USER_NOT_FOUND": "Dein Konto konnte nicht gefunden werden.",
     "PLAYER_NOT_FOUND": "Dieser Spieler wurde nicht gefunden.",
     "NOT_FOUND": "Wir konnten das nicht finden.",
-
     "GOOGLE_SUB_MISMATCH": "Diese E-Mail ist mit einem anderen Google-Konto verknüpft.",
     "SEAT_TAKEN": "Dieser Sitzplatz ist bereits belegt.",
     "UNIQUE_EMAIL": "Diese E-Mail wird bereits verwendet.",
     "OPTIMISTIC_LOCK": "Das Spiel hat sich geändert. Bitte aktualisiere und versuche es erneut.",
     "CONFLICT": "Das konnte nicht abgeschlossen werden, weil sich etwas geändert hat.",
-
     "DB_ERROR": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
     "DB_UNAVAILABLE": "Der Server ist vorübergehend nicht verfügbar. Bitte versuche es erneut.",
     "DB_POOL_EXHAUSTED": "Der Server ist ausgelastet. Bitte versuche es erneut.",
@@ -57,7 +53,6 @@
     "INTERNAL_ERROR": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
     "CONFIG_ERROR": "Der Server ist falsch konfiguriert. Bitte kontaktiere den Support.",
     "DATA_CORRUPTION": "Etwas ist schiefgelaufen. Bitte kontaktiere den Support.",
-
     "UNKNOWN_ERROR": "Etwas ist schiefgelaufen. Bitte versuche es erneut."
   },
   "toast": {
@@ -106,7 +101,8 @@
     "failedToSpectateGame": "Spiel konnte nicht beobachtet werden",
     "failedToDeleteGame": "Spiel konnte nicht gelöscht werden",
     "failedToFetchGameHistory": "Spielverlauf konnte nicht geladen werden",
-    "failedToUpdateSettings": "Einstellungen konnten nicht aktualisiert werden"
+    "failedToUpdateSettings": "Einstellungen konnten nicht aktualisiert werden",
+    "failedToFetchWaitingGame": "Fehler beim Abrufen des wartenden Spiels"
   },
   "validation": {
     "invalidBidValue": "Ungültiger Gebotswert",

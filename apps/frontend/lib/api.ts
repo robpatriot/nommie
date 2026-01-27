@@ -3,7 +3,6 @@
 'use server'
 
 import { getTranslations } from 'next-intl/server'
-import { redirect } from 'next/navigation'
 
 import {
   getBackendJwtReadOnly,
@@ -80,12 +79,11 @@ export async function fetchWithAuth(
         )
         throw new BackendApiError(message, 503, 'BACKEND_STARTING')
       }
-      const _message = await getLocalizedErrorMessageForCode(
+      const message = await getLocalizedErrorMessageForCode(
         'MISSING_BACKEND_JWT',
         'Authentication required'
       )
-      // Middleware failed to refresh - redirect to home (effectively logging out)
-      redirect('/')
+      throw new BackendApiError(message, 401, 'MISSING_BACKEND_JWT')
     }
     throw error
   }
@@ -147,11 +145,6 @@ export async function fetchWithAuth(
 
     // Parse Problem Details error response (RFC 7807)
     const parsedError = await parseErrorResponse(response)
-
-    // Handle 401/403 explicitly - redirect to home
-    if (response.status === 401 || response.status === 403) {
-      redirect('/')
-    }
 
     // Only log if we should (outside startup window or runtime failure)
     if (shouldLogError() && response.status >= 500) {

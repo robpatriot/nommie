@@ -11,7 +11,6 @@
     "BACKEND_STARTING": "El servidor se está iniciando. Inténtalo de nuevo en un momento.",
     "NOT_A_MEMBER": "No eres miembro de esta partida.",
     "INSUFFICIENT_ROLE": "No tienes permisos para hacer eso.",
-
     "INVALID_GAME_ID": "Ese enlace de partida no es válido.",
     "INVALID_EMAIL": "Introduce un correo electrónico válido.",
     "INVALID_GOOGLE_SUB": "Error al iniciar sesión. Inténtalo de nuevo.",
@@ -27,18 +26,15 @@
     "BAD_REQUEST": "Esa solicitud no es válida.",
     "INVALID_HEADER": "Falta información necesaria en la solicitud.",
     "PRECONDITION_REQUIRED": "Actualiza e inténtalo de nuevo.",
-
     "GAME_NOT_FOUND": "No se encontró esa partida.",
     "USER_NOT_FOUND": "No se pudo encontrar tu cuenta.",
     "PLAYER_NOT_FOUND": "No se encontró ese jugador.",
     "NOT_FOUND": "No pudimos encontrar lo que buscas.",
-
     "GOOGLE_SUB_MISMATCH": "Ese correo está vinculado a otra cuenta de Google.",
     "SEAT_TAKEN": "Ese asiento ya está ocupado.",
     "UNIQUE_EMAIL": "Ese correo ya está en uso.",
     "OPTIMISTIC_LOCK": "La partida cambió. Actualiza e inténtalo de nuevo.",
     "CONFLICT": "No se pudo completar porque algo cambió.",
-
     "DB_ERROR": "Algo salió mal. Inténtalo de nuevo.",
     "DB_UNAVAILABLE": "El servidor no está disponible temporalmente. Inténtalo de nuevo.",
     "DB_POOL_EXHAUSTED": "El servidor está ocupado. Inténtalo de nuevo.",
@@ -57,7 +53,6 @@
     "INTERNAL_ERROR": "Algo salió mal. Inténtalo de nuevo.",
     "CONFIG_ERROR": "El servidor está mal configurado. Contacta con soporte.",
     "DATA_CORRUPTION": "Algo salió mal. Contacta con soporte.",
-
     "UNKNOWN_ERROR": "Algo salió mal. Inténtalo de nuevo."
   },
   "toast": {
@@ -106,7 +101,8 @@
     "failedToSpectateGame": "Error al ver la partida",
     "failedToDeleteGame": "Error al eliminar la partida",
     "failedToFetchGameHistory": "Error al cargar el historial de la partida",
-    "failedToUpdateSettings": "Error al actualizar la configuración"
+    "failedToUpdateSettings": "Error al actualizar la configuración",
+    "failedToFetchWaitingGame": "Error al obtener la partida en espera"
   },
   "validation": {
     "invalidBidValue": "Valor de puja no válido",

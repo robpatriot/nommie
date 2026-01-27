@@ -4,12 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import {
   refreshGamesListAction,
   getGameHistoryAction,
+  getWaitingLongestGameAction,
 } from '@/app/actions/game-actions'
-import { getWaitingLongestGame } from '@/lib/api'
-import {
-  handleActionResultError,
-  toQueryError,
-} from '@/lib/queries/query-error-handler'
+import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
 import type { Game } from '@/lib/types'
 import type { GameHistoryApiResponse } from '@/app/actions/game-actions'
@@ -47,11 +44,11 @@ export function useWaitingLongestGame(options?: {
   return useQuery({
     queryKey: queryKeys.games.waitingLongest(options?.excludeGameId),
     queryFn: async () => {
-      try {
-        return await getWaitingLongestGame(options?.excludeGameId)
-      } catch (error) {
-        throw toQueryError(error, 'Failed to fetch waiting game')
+      const result = await getWaitingLongestGameAction(options?.excludeGameId)
+      if (result.kind === 'error') {
+        throw handleActionResultError(result)
       }
+      return result.data
     },
     staleTime: Infinity,
     enabled: options?.enabled ?? true,

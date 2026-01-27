@@ -3,10 +3,8 @@
 
 import { auth, getBackendBaseUrlOrThrow } from '@/auth'
 import { cookies } from 'next/headers'
-import {
-  getBackendJwtFromCookie,
-  BACKEND_JWT_COOKIE_NAME,
-} from './backend-jwt-cookie'
+import { BACKEND_JWT_COOKIE_NAME } from './backend-jwt-cookie'
+import { getBackendJwtFromCookie } from './backend-jwt-cookie.server'
 import { checkBackendHealth } from '@/lib/server/backend-health'
 import {
   markBackendUp,

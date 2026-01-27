@@ -11,7 +11,6 @@
     "BACKEND_STARTING": "Il server si sta avviando. Riprova tra poco.",
     "NOT_A_MEMBER": "Non sei membro di questa partita.",
     "INSUFFICIENT_ROLE": "Non hai i permessi necessari.",
-
     "INVALID_GAME_ID": "Quel link alla partita non è valido.",
     "INVALID_EMAIL": "Inserisci un indirizzo email valido.",
     "INVALID_GOOGLE_SUB": "Accesso non riuscito. Riprova.",
@@ -27,18 +26,15 @@
     "BAD_REQUEST": "La richiesta non è valida.",
     "INVALID_HEADER": "Mancano informazioni necessarie nella richiesta.",
     "PRECONDITION_REQUIRED": "Aggiorna e riprova.",
-
     "GAME_NOT_FOUND": "Non è stato possibile trovare la partita.",
     "USER_NOT_FOUND": "Non è stato possibile trovare il tuo account.",
     "PLAYER_NOT_FOUND": "Non è stato possibile trovare quel giocatore.",
     "NOT_FOUND": "Non abbiamo trovato ciò che cercavi.",
-
     "GOOGLE_SUB_MISMATCH": "Questa email è collegata a un altro account Google.",
     "SEAT_TAKEN": "Quel posto è già occupato.",
     "UNIQUE_EMAIL": "Quell’email è già in uso.",
     "OPTIMISTIC_LOCK": "La partita è cambiata. Aggiorna e riprova.",
     "CONFLICT": "Impossibile completare perché qualcosa è cambiato.",
-
     "DB_ERROR": "Qualcosa è andato storto. Riprova.",
     "DB_UNAVAILABLE": "Il server non è disponibile temporaneamente. Riprova.",
     "DB_POOL_EXHAUSTED": "Il server è occupato. Riprova.",
@@ -57,7 +53,6 @@
     "INTERNAL_ERROR": "Qualcosa è andato storto. Riprova.",
     "CONFIG_ERROR": "Il server è configurato in modo errato. Contatta l’assistenza.",
     "DATA_CORRUPTION": "Qualcosa è andato storto. Contatta l’assistenza.",
-
     "UNKNOWN_ERROR": "Qualcosa è andato storto. Riprova."
   },
   "toast": {
@@ -106,7 +101,8 @@
     "failedToSpectateGame": "Impossibile guardare la partita",
     "failedToDeleteGame": "Impossibile eliminare la partita",
     "failedToFetchGameHistory": "Impossibile caricare la cronologia della partita",
-    "failedToUpdateSettings": "Impossibile aggiornare le impostazioni"
+    "failedToUpdateSettings": "Impossibile aggiornare le impostazioni",
+    "failedToFetchWaitingGame": "Impossibile recuperare la partita in attesa"
   },
   "validation": {
     "invalidBidValue": "Valore di puntata non valido",
