@@ -42,7 +42,7 @@
 	}
 
 	# WebSocket endpoint → backend
-	@ws path /ws/*
+	@ws path /ws /ws/*
 	handle @ws {
 		reverse_proxy backend:3001
 	}
