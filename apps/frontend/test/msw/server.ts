@@ -1,7 +1,12 @@
 import { setupServer } from 'msw/node'
+import { http, HttpResponse } from 'msw'
 
-// Create MSW server instance with no handlers (empty setup)
-export const server = setupServer()
+export const handlers = [
+  http.get('/api/ws-token', () => {
+    return HttpResponse.json({ token: 'mock-ws-token' })
+  }),
+]
 
-// Default export for convenience
+export const server = setupServer(...handlers)
+
 export default server

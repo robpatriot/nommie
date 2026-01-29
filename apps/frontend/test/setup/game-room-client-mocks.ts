@@ -10,7 +10,10 @@ import {
   mockRemoveAiSeatAction,
   mockFetchAiRegistryAction,
 } from '../../setupGameRoomActionsMock'
-import { MockWebSocket, mockWebSocketInstances } from './mock-websocket'
+import {
+  MockWebSocket,
+  mockWebSocketInstances,
+} from '@/test/setup/mock-websocket'
 import { createInitialData } from './game-room-client-helpers'
 
 /**

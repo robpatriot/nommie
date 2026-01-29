@@ -4,7 +4,10 @@ import { waitFor } from '@testing-library/react'
 import { expect } from 'vitest'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { initSnapshotFixture } from '../mocks/game-snapshot'
-import { MockWebSocket, mockWebSocketInstances } from './mock-websocket'
+import {
+  MockWebSocket,
+  mockWebSocketInstances,
+} from '@/test/setup/mock-websocket'
 import type { Seat } from '@/lib/game-room/types'
 import { isValidSeat } from '@/utils/seat-validation'
 
@@ -51,8 +54,32 @@ export function createInitialDataWithVersion(
   }
 }
 
+function getSentJson(ws: MockWebSocket): unknown[] {
+  return ws.sent.map((s) => {
+    try {
+      return JSON.parse(s) as unknown
+    } catch {
+      return s
+    }
+  })
+}
+
+function hasSentType(ws: MockWebSocket, type: string): boolean {
+  return getSentJson(ws).some(
+    (m) => typeof m === 'object' && m !== null && (m as any).type === type
+  )
+}
+
+function serverSendJson(ws: MockWebSocket, msg: unknown) {
+  ws.onmessage?.(
+    new MessageEvent('message', {
+      data: JSON.stringify(msg),
+    })
+  )
+}
+
 /**
- * Waits for a WebSocket connection to be established.
+ * Waits for a WebSocket connection to be established AND handshake completed.
  * Returns the first connected WebSocket instance.
  */
 export async function waitForWebSocketConnection(): Promise<MockWebSocket> {
@@ -64,7 +91,25 @@ export async function waitForWebSocketConnection(): Promise<MockWebSocket> {
     },
     { timeout: 2000 }
   )
-  return mockWebSocketInstances[0]
+
+  const ws = mockWebSocketInstances[0]
+
+  // Wait for client hello (sent in ws.onopen)
+  await waitFor(
+    () => {
+      expect(hasSentType(ws, 'hello')).toBe(true)
+    },
+    { timeout: 2000 }
+  )
+
+  // Complete handshake - wrap in act to prevent warnings from WebSocketProvider state updates
+  await act(async () => {
+    serverSendJson(ws, { type: 'hello_ack', protocol: 1, user_id: 123 })
+    // Allow state updates to flush
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+
+  return ws
 }
 
 /**

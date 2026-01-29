@@ -1,21 +1,31 @@
+import React, { type ReactElement } from 'react'
 import {
   render as rtlRender,
+  renderHook as rtlRenderHook,
   type RenderOptions,
   type RenderResult,
+  type RenderHookOptions,
+  type RenderHookResult,
 } from '@testing-library/react'
-import type { ReactElement } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { WebSocketProvider } from '@/lib/providers/web-socket-provider'
 
-// AllProviders wrapper - includes QueryClientProvider for TanStack Query
+// AllProviders wrapper - includes QueryClientProvider + WebSocketProvider
 const AllProviders = ({
   children,
   queryClient,
+  isAuthenticated = false,
 }: {
   children: React.ReactNode
   queryClient: QueryClient
+  isAuthenticated?: boolean
 }) => {
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <WebSocketProvider isAuthenticated={isAuthenticated}>
+        {children}
+      </WebSocketProvider>
+    </QueryClientProvider>
   )
 }
 
@@ -43,7 +53,7 @@ export function createTestQueryClient(): QueryClient {
 }
 
 /**
- * Custom render function that wraps RTL's render and provides QueryClient.
+ * Custom render function that wraps RTL's render and provides QueryClient + WebSocketProvider.
  * If a QueryClient is provided, it will be used; otherwise a new one is created.
  * Returns both the render result and the QueryClient instance.
  */
@@ -51,22 +61,69 @@ const render = (
   ui: ReactElement,
   options?: Omit<RenderOptions, 'wrapper'> & {
     queryClient?: QueryClient
+    isAuthenticated?: boolean
   }
 ): RenderResultWithClient => {
-  // Use provided QueryClient or create a new one for test isolation
   const queryClient = options?.queryClient ?? createTestQueryClient()
+  const isAuthenticated = options?.isAuthenticated ?? true
 
-  const { queryClient: _, ...renderOptions } = options ?? {}
+  const {
+    queryClient: _,
+    isAuthenticated: __,
+    ...renderOptions
+  } = options ?? {}
 
   const renderResult = rtlRender(ui, {
     wrapper: ({ children }) => (
-      <AllProviders queryClient={queryClient}>{children}</AllProviders>
+      <AllProviders queryClient={queryClient} isAuthenticated={isAuthenticated}>
+        {children}
+      </AllProviders>
     ),
     ...renderOptions,
   })
 
   return {
     ...renderResult,
+    queryClient,
+  }
+}
+
+// Extended renderHook result that includes the QueryClient
+export type RenderHookResultWithClient<Result, Props> = RenderHookResult<
+  Result,
+  Props
+> & {
+  queryClient: QueryClient
+}
+
+/**
+ * Custom renderHook function that wraps RTL's renderHook and provides QueryClient + WebSocketProvider.
+ * If a QueryClient is provided, it will be used; otherwise a new one is created.
+ * Returns both the renderHook result and the QueryClient instance.
+ */
+export function renderHook<Result, Props>(
+  callback: (initialProps: Props) => Result,
+  options?: Omit<RenderHookOptions<Props>, 'wrapper'> & {
+    queryClient?: QueryClient
+    isAuthenticated?: boolean
+  }
+): RenderHookResultWithClient<Result, Props> {
+  const queryClient = options?.queryClient ?? createTestQueryClient()
+  const isAuthenticated = options?.isAuthenticated ?? true
+
+  const { queryClient: _, isAuthenticated: __, ...hookOptions } = options ?? {}
+
+  const hookResult = rtlRenderHook(callback, {
+    wrapper: ({ children }) => (
+      <AllProviders queryClient={queryClient} isAuthenticated={isAuthenticated}>
+        {children}
+      </AllProviders>
+    ),
+    ...hookOptions,
+  })
+
+  return {
+    ...hookResult,
     queryClient,
   }
 }

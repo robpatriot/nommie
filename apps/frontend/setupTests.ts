@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
+import { act } from 'react'
 import { beforeAll, afterAll, afterEach, vi } from 'vitest'
+
+import { server } from './test/msw/server'
 
 // Import mocks to register them globally
 import './test/mocks/next-auth'
@@ -9,9 +12,21 @@ import './test/mocks/next-server'
 import './test/mocks/next-intl'
 import './test/mocks/auth'
 
-// Import MSW server
-import { server } from './test/msw/server'
+import { MockWebSocket } from '@/test/setup/mock-websocket'
 
+// Make @testing-library/react waitFor cooperate with fake timers
+configure({
+  unstable_advanceTimersWrapper: async (cb) => {
+    await act(async () => {
+      await cb() // Ensure the callback completes
+    })
+  },
+})
+
+// Global WebSocket stub
+vi.stubGlobal('WebSocket', MockWebSocket)
+
+// matchMedia mock
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,
@@ -46,6 +61,7 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   })
 }
 
+// ResizeObserver mock
 if (typeof globalThis.ResizeObserver === 'undefined') {
   class ResizeObserverMock {
     callback: ResizeObserverCallback
@@ -62,17 +78,16 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
     ResizeObserverMock as unknown as typeof ResizeObserver
 }
 
-// MSW server lifecycle hooks
+// MSW lifecycle hooks
 beforeAll(() => {
   server.listen({
     onUnhandledRequest(request, print) {
-      // Bypass WebSocket connections - they're handled by MockWebSocket in tests
       const url = request.url
+      // We mock WebSockets via MockWebSocket in tests, not MSW.
+      // MSW can still detect WS connections and warn if there is no ws.link handler.
       if (url.startsWith('ws://') || url.startsWith('wss://')) {
         return
       }
-      // For all other unhandled requests, print a warning (not an error)
-      // This allows tests to work while still surfacing missing handlers
       print.warning()
     },
   })
@@ -80,10 +95,7 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup()
-  // Reset MSW handlers to clean slate
   server.resetHandlers()
-  // Clean up Vitest mocks
-  vi.restoreAllMocks()
   vi.clearAllMocks()
 })
 
