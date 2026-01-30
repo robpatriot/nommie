@@ -187,7 +187,11 @@ export function useGameSync({
       }
 
       // handle other message types
-      if (msg.type === 'yourturn' || msg.type === 'your_turn') {
+      if (
+        msg.type === 'yourturn' ||
+        msg.type === 'your_turn' ||
+        msg.type === 'long_wait_invalidated'
+      ) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.games.waitingLongest(),
         })

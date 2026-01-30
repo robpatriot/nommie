@@ -459,6 +459,30 @@ describe('useGameSync', () => {
         expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
       })
     })
+
+    it('invalidates waitingLongest query when receiving long_wait_invalidated', async () => {
+      const initialData = createInitialDataWithVersion(1)
+      const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+
+      renderHook(() => useGameSync({ initialData, gameId: 1 }), { queryClient })
+
+      await waitForWsCount(1)
+      const ws = mockWebSocketInstances[0]
+      await connectAndSubscribe(ws, { expectedGameId: 1 })
+
+      act(() => {
+        serverSendJson(ws, {
+          type: 'long_wait_invalidated',
+          game_id: 1,
+        })
+      })
+
+      await waitFor(() => {
+        expect(invalidateSpy).toHaveBeenCalledWith({
+          queryKey: queryKeys.games.waitingLongest(),
+        })
+      })
+    })
   })
 
   describe('Manual snapshot refresh', () => {

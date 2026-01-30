@@ -69,7 +69,17 @@ export type GameStateMsg = {
   viewer: ViewerState
 }
 
-export type ServerMsg = HelloAckMsg | AckMsg | ErrorMsg | GameStateMsg
+export type LongWaitInvalidatedMsg = {
+  type: 'long_wait_invalidated'
+  game_id: number
+}
+
+export type ServerMsg =
+  | HelloAckMsg
+  | AckMsg
+  | ErrorMsg
+  | GameStateMsg
+  | LongWaitInvalidatedMsg
 
 /**
  * Client -> Server messages

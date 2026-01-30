@@ -45,6 +45,10 @@ pub enum ServerMsg {
         version: i32,
     },
 
+    LongWaitInvalidated {
+        game_id: i64,
+    },
+
     Error {
         code: ErrorCode,
         message: String,
