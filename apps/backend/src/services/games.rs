@@ -548,26 +548,40 @@ impl GameService {
     ///
     /// # Returns
     /// Option<i64> - Game ID if found, None if user has no games
+    /// Find games that have been waiting for the user to act the longest.
+    ///
+    /// Prioritizes games where:
+    /// - The user is a player (not spectator)
+    /// - It is currently the user's turn (Bidding, TrumpSelection, or TrickPlay)
+    /// - The game has been waiting the longest (oldest updated_at)
+    ///
+    /// Returns up to 2 games to allow client-side optimistic switching.
+    ///
+    /// If no games are waiting for the user, falls back to the most recently active game
+    /// (highest updated_at timestamp) where the user is a member.
+    ///
+    /// # Arguments
+    /// * `txn` - Database transaction
+    /// * `user_id` - ID of the user
+    ///
+    /// # Returns
+    /// Vec<i64> - List of Game IDs (empty if none found)
     pub async fn game_waiting_longest(
         &self,
         txn: &DatabaseTransaction,
         user_id: i64,
-        exclude_game_id: Option<i64>,
-    ) -> Result<Option<i64>, AppError> {
+    ) -> Result<Vec<i64>, AppError> {
         // Find all games where user is a player (not spectator)
-        let mut query = game_players::Entity::find()
+        let memberships = game_players::Entity::find()
             .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
             .filter(game_players::Column::HumanUserId.eq(user_id))
-            .filter(game_players::Column::Role.eq(game_players::GameRole::Player));
-
-        if let Some(exclude_id) = exclude_game_id {
-            query = query.filter(game_players::Column::GameId.ne(exclude_id));
-        }
-
-        let memberships = query.all(txn).await.map_err(AppError::from)?;
+            .filter(game_players::Column::Role.eq(game_players::GameRole::Player))
+            .all(txn)
+            .await
+            .map_err(AppError::from)?;
 
         if memberships.is_empty() {
-            return Ok(None);
+            return Ok(Vec::new());
         }
 
         // Build map of game_id -> turn_order for efficient lookup
@@ -634,6 +648,7 @@ impl GameService {
         // Check each actionable game (oldest first) to see if it's the user's turn
         // Prefer games with other humans first.
         let game_flow_service = GameFlowService;
+        let mut result_ids = Vec::new();
 
         for game_model in actionable_games_with_humans
             .iter()
@@ -647,10 +662,17 @@ impl GameService {
 
             match game_flow_service.determine_next_action(txn, &game).await {
                 Ok(Some((seat, _))) if seat == user_turn_order => {
-                    return Ok(Some(game.id));
+                    result_ids.push(game.id);
+                    if result_ids.len() >= 2 {
+                        return Ok(result_ids);
+                    }
                 }
                 _ => continue,
             }
+        }
+
+        if !result_ids.is_empty() {
+            return Ok(result_ids);
         }
 
         // No games waiting for the user - fall back to most recently active game
@@ -663,7 +685,9 @@ impl GameService {
             .await
             .map_err(AppError::from)?;
 
-        Ok(last_active_game.map(|game| game.id))
+        Ok(last_active_game
+            .map(|game| vec![game.id])
+            .unwrap_or_default())
     }
 
     /// Find the next available turn_order (0-3) for a game.

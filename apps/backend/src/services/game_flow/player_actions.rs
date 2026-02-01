@@ -34,7 +34,7 @@ impl GameFlowService {
                 svc.submit_bid_mutation(txn, game_id, player_seat, bid_value, expected_version)
                     .await?;
                 svc.process_game_state(txn, game_id).await?;
-                Ok(())
+                Ok(vec![])
             })
         })
         .await
@@ -172,7 +172,7 @@ impl GameFlowService {
                 svc.set_trump_mutation(txn, game_id, player_seat, trump, expected_version)
                     .await?;
                 svc.process_game_state(txn, game_id).await?;
-                Ok(())
+                Ok(vec![])
             })
         })
         .await
@@ -259,7 +259,7 @@ impl GameFlowService {
                 svc.play_card_mutation(txn, game_id, player_seat, card, expected_version)
                     .await?;
                 svc.process_game_state(txn, game_id).await?;
-                Ok(())
+                Ok(vec![])
             })
         })
         .await

@@ -33,18 +33,14 @@ export function useAvailableGames(initialData?: Game[]) {
 }
 
 /**
- * Query hook to fetch the game ID that has been waiting the longest.
+ * Query hook to fetch the list of game IDs that have been waiting longest.
  * Uses the getWaitingLongestGame server function.
- * @param options.excludeGameId - Optional ID of a game to exclude from the result
  */
-export function useWaitingLongestGame(options?: {
-  excludeGameId?: number
-  enabled?: boolean
-}) {
+export function useWaitingLongestGame(options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: queryKeys.games.waitingLongest(options?.excludeGameId),
+    queryKey: queryKeys.games.waitingLongest(),
     queryFn: async () => {
-      const result = await getWaitingLongestGameAction(options?.excludeGameId)
+      const result = await getWaitingLongestGameAction()
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }

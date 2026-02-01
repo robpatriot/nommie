@@ -2,8 +2,7 @@ use sea_orm::DatabaseTransaction;
 use tracing::{debug, info};
 
 use super::GameFlowService;
-use crate::domain::game_transition::derive_game_transitions;
-use crate::domain::state::PlayerId;
+use crate::domain::game_transition::{derive_game_transitions, GameLifecycleView};
 use crate::entities::games::GameState as DbGameState;
 use crate::error::AppError;
 use crate::errors::domain::{DomainError, ValidationKind};
@@ -11,21 +10,16 @@ use crate::repos::{games, memberships, player_view};
 use crate::services::game_flow::GameFlowMutationResult;
 use crate::services::games::GameService;
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct TurnView {
-    pub(crate) version: i32,
-    pub(crate) turn: Option<PlayerId>,
-}
-
-pub(crate) async fn load_turn_view(
+pub(crate) async fn load_lifecycle_view(
     txn: &DatabaseTransaction,
     game_id: i64,
-) -> Result<TurnView, AppError> {
+) -> Result<GameLifecycleView, AppError> {
     let game = games::require_game(txn, game_id).await?;
     let state = GameService.load_game_state(txn, game_id).await?;
-    Ok(TurnView {
+    Ok(GameLifecycleView {
         version: game.version,
         turn: state.turn,
+        state: game.state,
     })
 }
 
@@ -48,7 +42,7 @@ impl GameFlowService {
                 }
 
                 svc.process_game_state(txn, game_id).await?;
-                Ok(())
+                Ok(vec![])
             })
         })
         .await
@@ -145,14 +139,14 @@ impl GameFlowService {
         game_id: i64,
     ) -> Result<Option<GameFlowMutationResult>, AppError> {
         // Capture entry point (version + whose turn / phase) so we can derive effects.
-        let before = load_turn_view(txn, game_id).await?;
+        let before = load_lifecycle_view(txn, game_id).await?;
         let old_version = before.version;
 
         // Drive the game forward automatically (AI loop) until nothing else can happen.
         self.process_game_state(txn, game_id).await?;
 
         // Capture exit point.
-        let after = load_turn_view(txn, game_id).await?;
+        let after = load_lifecycle_view(txn, game_id).await?;
 
         // If nothing changed, there are no effects to publish.
         if after.version == old_version {
@@ -160,7 +154,7 @@ impl GameFlowService {
         }
 
         // Derive transitions across the entire auto-run window.
-        let transitions = derive_game_transitions(before.turn, after.turn);
+        let transitions = derive_game_transitions(&before, &after);
 
         // Load final game model (authoritative version, state, etc.)
         let final_game = games::require_game(txn, game_id).await?;

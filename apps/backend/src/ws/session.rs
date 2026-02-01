@@ -45,6 +45,7 @@ pub async fn upgrade(
 pub enum HubEvent {
     GameStateAvailable { topic: Topic, version: i32 },
     YourTurn { game_id: i64, version: i32 },
+    LongWaitInvalidated { game_id: i64 },
 }
 
 impl HubEvent {
@@ -55,6 +56,7 @@ impl HubEvent {
         match self {
             // YourTurn is an out-of-band hint; exclude sessions already in the game.
             HubEvent::YourTurn { game_id, .. } => Some(Topic::Game { id: *game_id }),
+            HubEvent::LongWaitInvalidated { .. } => None,
 
             // By default, other events do not exclude any topic subscribers.
             _ => None,
@@ -356,6 +358,9 @@ impl Handler<HubEvent> for WsSession {
         match msg {
             HubEvent::YourTurn { game_id, version } => {
                 Self::send_json(ctx, &ServerMsg::YourTurn { game_id, version });
+            }
+            HubEvent::LongWaitInvalidated { game_id } => {
+                Self::send_json(ctx, &ServerMsg::LongWaitInvalidated { game_id });
             }
             HubEvent::GameStateAvailable { topic, version: _ } => {
                 let Topic::Game { id: game_id } = topic.clone();

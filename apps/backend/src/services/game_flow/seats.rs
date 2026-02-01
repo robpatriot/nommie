@@ -38,8 +38,7 @@ impl GameFlowService {
             .run_mutation(txn, game_id, expected_version, |svc, txn| {
                 Box::pin(async move {
                     svc.join_game_mutation(txn, game_id, user_id, expected_version)
-                        .await?;
-                    Ok(())
+                        .await
                 })
             })
             .await?;
@@ -68,8 +67,7 @@ impl GameFlowService {
             .run_mutation(txn, game_id, expected_version, |svc, txn| {
                 Box::pin(async move {
                     svc.join_as_spectator_mutation(txn, game_id, user_id, expected_version)
-                        .await?;
-                    Ok(())
+                        .await
                 })
             })
             .await?;
@@ -93,8 +91,7 @@ impl GameFlowService {
             .run_mutation(txn, game_id, expected_version, |svc, txn| {
                 Box::pin(async move {
                     svc.rejoin_game_mutation(txn, game_id, user_id, expected_version)
-                        .await?;
-                    Ok(())
+                        .await
                 })
             })
             .await?;
@@ -119,8 +116,7 @@ impl GameFlowService {
             .run_mutation(txn, game_id, expected_version, |svc, txn| {
                 Box::pin(async move {
                     svc.remove_ai_seat_mutation(txn, game_id, user_id, seat, expected_version)
-                        .await?;
-                    Ok(())
+                        .await
                 })
             })
             .await?;
@@ -155,8 +151,7 @@ impl GameFlowService {
             .run_mutation(txn, game_id, expected_version, |svc, txn| {
                 Box::pin(async move {
                     svc.leave_game_mutation(txn, game_id, user_id, expected_version, was_active)
-                        .await?;
-                    Ok(())
+                        .await
                 })
             })
             .await?;
@@ -179,10 +174,7 @@ impl GameFlowService {
 
         let result = self
             .run_mutation(txn, game_id, expected_version, |svc, txn| {
-                Box::pin(async move {
-                    svc.add_ai_seat_mutation(txn, params).await?;
-                    Ok(())
-                })
+                Box::pin(async move { svc.add_ai_seat_mutation(txn, params).await })
             })
             .await?;
 
@@ -204,10 +196,7 @@ impl GameFlowService {
 
         let result = self
             .run_mutation(txn, game_id, expected_version, |svc, txn| {
-                Box::pin(async move {
-                    svc.update_ai_seat_mutation(txn, params).await?;
-                    Ok(())
-                })
+                Box::pin(async move { svc.update_ai_seat_mutation(txn, params).await })
             })
             .await?;
 
@@ -218,18 +207,14 @@ impl GameFlowService {
         Ok((result, memberships))
     }
 
-    /// Mutation: join_as_spectator
-    ///
-    /// - No publish
-    /// - No drain
-    /// - No wrapper calls
+    /// Mutation: join_game
     pub(super) async fn join_game_mutation(
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
         user_id: i64,
         expected_version: i32,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<crate::domain::game_transition::GameTransition>, AppError> {
         // Fetch game and verify it exists
         let game = games_repo::require_game(txn, game_id).await?;
 
@@ -345,7 +330,9 @@ impl GameFlowService {
         // This enforces: if someone else mutated the game since expected_version, this fails.
         let _final_game = games_repo::touch_game(txn, game_id, expected_version).await?;
 
-        Ok(())
+        Ok(vec![
+            crate::domain::game_transition::GameTransition::PlayerJoined { user_id },
+        ])
     }
 
     /// Mutation: join_as_spectator
@@ -355,7 +342,7 @@ impl GameFlowService {
         game_id: i64,
         user_id: i64,
         expected_version: i32,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<crate::domain::game_transition::GameTransition>, AppError> {
         // Fetch game and verify it exists
         let game = games_repo::require_game(txn, game_id).await?;
 
@@ -394,7 +381,9 @@ impl GameFlowService {
         // Optimistic locking / version bump
         let _final_game = games_repo::touch_game(txn, game_id, expected_version).await?;
 
-        Ok(())
+        Ok(vec![
+            crate::domain::game_transition::GameTransition::PlayerJoined { user_id },
+        ])
     }
 
     /// Mutation: rejoin_game
@@ -404,7 +393,7 @@ impl GameFlowService {
         game_id: i64,
         user_id: i64,
         expected_version: i32,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<crate::domain::game_transition::GameTransition>, AppError> {
         // Find AI membership with this user as original_user_id
         let all_memberships = memberships::find_all_by_game(txn, game_id)
             .await
@@ -441,7 +430,9 @@ impl GameFlowService {
         // Optimistic locking / version bump
         let _final_game = games_repo::touch_game(txn, game_id, expected_version).await?;
 
-        Ok(())
+        Ok(vec![
+            crate::domain::game_transition::GameTransition::PlayerRejoined { user_id },
+        ])
     }
 
     /// Mutation: remove_ai_seat
@@ -452,7 +443,7 @@ impl GameFlowService {
         user_id: i64,
         seat: Option<u8>,
         expected_version: i32,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<crate::domain::game_transition::GameTransition>, AppError> {
         let game = games_repo::require_game(txn, game_id).await?;
 
         // Host validation
@@ -536,7 +527,7 @@ impl GameFlowService {
         // Optimistic locking / version bump
         let _final_game = games_repo::touch_game(txn, game_id, expected_version).await?;
 
-        Ok(())
+        Ok(vec![])
     }
 
     /// Mutation: add_ai_seat
@@ -544,7 +535,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         params: ManageAiSeatParams,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<crate::domain::game_transition::GameTransition>, AppError> {
         let game_id = params.game_id;
         let user_id = params.user_id;
         let expected_version = params.expected_version;
@@ -655,7 +646,7 @@ impl GameFlowService {
         // Optimistic locking / version bump
         let _final_game = games_repo::touch_game(txn, game_id, expected_version).await?;
 
-        Ok(())
+        Ok(vec![])
     }
 
     /// Mutation: update_ai_seat
@@ -663,7 +654,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         params: ManageAiSeatParams,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<crate::domain::game_transition::GameTransition>, AppError> {
         let game_id = params.game_id;
         let user_id = params.user_id;
         let seat = params.seat.ok_or_else(|| {
@@ -748,7 +739,7 @@ impl GameFlowService {
         // Optimistic locking / version bump
         let _final_game = games_repo::touch_game(txn, game_id, expected_version).await?;
 
-        Ok(())
+        Ok(vec![])
     }
 
     /// Mutation: leave_game
@@ -759,7 +750,7 @@ impl GameFlowService {
         user_id: i64,
         expected_version: i32,
         was_active: bool,
-    ) -> Result<(), AppError> {
+    ) -> Result<Vec<crate::domain::game_transition::GameTransition>, AppError> {
         // Find the user's membership
         let membership = memberships::find_membership(txn, game_id, user_id)
             .await?
@@ -788,7 +779,9 @@ impl GameFlowService {
         // Optimistic locking / version bump
         let _final_game = games_repo::touch_game(txn, game_id, expected_version).await?;
 
-        Ok(())
+        Ok(vec![
+            crate::domain::game_transition::GameTransition::PlayerLeft { user_id },
+        ])
     }
 
     /// Helper: Convert a human player to an AI player (no touch, just the membership flip)

@@ -5,7 +5,7 @@ use sea_orm::DatabaseTransaction;
 
 use crate::domain::game_transition::{derive_game_transitions, GameTransition};
 use crate::repos::games;
-use crate::services::game_flow::orchestration::load_turn_view;
+use crate::services::game_flow::orchestration::load_lifecycle_view;
 use crate::services::game_flow::GameFlowService;
 use crate::AppError;
 
@@ -34,10 +34,11 @@ impl GameFlowService {
         F: FnOnce(
                 &'a GameFlowService,
                 &'a DatabaseTransaction,
-            ) -> Pin<Box<dyn Future<Output = Result<(), AppError>> + Send + 'a>>
-            + 'a,
+            ) -> Pin<
+                Box<dyn Future<Output = Result<Vec<GameTransition>, AppError>> + Send + 'a>,
+            > + 'a,
     {
-        let before = load_turn_view(txn, game_id).await?;
+        let before = load_lifecycle_view(txn, game_id).await?;
         let old_version = before.version;
 
         if old_version != expected_version {
@@ -51,10 +52,14 @@ impl GameFlowService {
         }
 
         // Execute mutation
-        mutation(self, txn).await?;
+        // Change: mutation now returns explicit transitions (or empty vec)
+        let mut explicit_transitions = mutation(self, txn).await?;
 
-        let after = load_turn_view(txn, game_id).await?;
-        let transitions = derive_game_transitions(before.turn, after.turn);
+        let after = load_lifecycle_view(txn, game_id).await?;
+        let mut transitions = derive_game_transitions(&before, &after);
+
+        // Merge explicit transitions
+        transitions.append(&mut explicit_transitions);
 
         let final_game = games::require_game(txn, game_id).await?;
 

@@ -155,12 +155,12 @@ export async function getGameHistoryAction(
  * Server Action to fetch the game ID that has been waiting the longest.
  * Wraps getWaitingLongestGame to return an ActionResult, ensuring errors are preserved.
  */
-export async function getWaitingLongestGameAction(
-  excludeGameId?: number
-): Promise<ActionResult<number | null>> {
+export async function getWaitingLongestGameAction(): Promise<
+  ActionResult<number[]>
+> {
   try {
-    const gameId = await getWaitingLongestGame(excludeGameId)
-    return { kind: 'ok', data: gameId }
+    const gameIds = await getWaitingLongestGame()
+    return { kind: 'ok', data: gameIds }
   } catch (error) {
     const t = await getTranslations('errors.actions')
     return toErrorResult(error, t('failedToFetchWaitingGame'))

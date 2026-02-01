@@ -36,5 +36,5 @@ export interface GameListResponse {
 }
 
 export interface LastActiveGameResponse {
-  game_id: number | null
+  game_ids: number[]
 }

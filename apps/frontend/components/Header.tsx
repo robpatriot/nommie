@@ -55,11 +55,23 @@ export default function Header({ session }: HeaderProps) {
     ? parseInt(gamePathMatch[1], 10)
     : undefined
 
-  // Fetch the game ID that has been waiting the longest for the user's attention.
-  const { data: waitingGameId } = useWaitingLongestGame({
+  // Fetch the list of games waiting for the user's attention.
+  const { data: waitingGameIds } = useWaitingLongestGame({
     enabled: !!session?.user,
-    excludeGameId: currentGameId,
   })
+
+  // Select the appropriate game to show:
+  // 1. If no waiting games, null
+  // 2. If the first game is NOT the current one, use it
+  // 3. If the first game IS the current one, try to use the second one
+  let targetGameId: number | null = null
+  if (waitingGameIds && waitingGameIds.length > 0) {
+    if (waitingGameIds[0] !== currentGameId) {
+      targetGameId = waitingGameIds[0]
+    } else if (waitingGameIds.length > 1) {
+      targetGameId = waitingGameIds[1]
+    }
+  }
 
   useEffect(() => {
     if (!isUserMenuOpen) {
@@ -222,7 +234,7 @@ export default function Header({ session }: HeaderProps) {
           {session?.user ? (
             <>
               <ResumeGameButton
-                waitingGameId={waitingGameId ?? null}
+                waitingGameId={targetGameId}
                 className="bg-primary/90 px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 hover:bg-primary"
               />
               <div className="relative" ref={userMenuRef}>

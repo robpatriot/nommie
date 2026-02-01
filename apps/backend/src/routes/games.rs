@@ -596,11 +596,6 @@ struct GameListResponse {
 }
 
 #[derive(serde::Serialize)]
-struct LastActiveGameResponse {
-    game_id: Option<i64>,
-}
-
-#[derive(serde::Serialize)]
 struct GameResponse {
     id: i64,
     name: String,
@@ -1117,32 +1112,27 @@ async fn list_overview_games(
 ///
 /// Returns the game ID of the game that has been waiting for the user to act the longest.
 /// If no games are waiting for the user, returns the most recently active game
-/// (highest updated_at timestamp) where the user is a member.
-#[derive(serde::Deserialize)]
-struct WaitingLongestQuery {
-    exclude_game_id: Option<i64>,
+#[derive(serde::Serialize)]
+struct LongestWaitingGamesResponse {
+    game_ids: Vec<i64>,
 }
 
 async fn get_waiting_longest_game(
     http_req: HttpRequest,
     current_user: CurrentUser,
     app_state: web::Data<AppState>,
-    query: web::Query<WaitingLongestQuery>,
-) -> Result<web::Json<LastActiveGameResponse>, AppError> {
+) -> Result<web::Json<LongestWaitingGamesResponse>, AppError> {
     let user_id = current_user.id;
-    let exclude_game_id = query.exclude_game_id;
 
-    let game_id = with_txn(Some(&http_req), &app_state, |txn| {
+    let game_ids = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameService;
-            service
-                .game_waiting_longest(txn, user_id, exclude_game_id)
-                .await
+            service.game_waiting_longest(txn, user_id).await
         })
     })
     .await?;
 
-    Ok(web::Json(LastActiveGameResponse { game_id }))
+    Ok(web::Json(LongestWaitingGamesResponse { game_ids }))
 }
 
 #[derive(serde::Deserialize)]
@@ -1780,39 +1770,64 @@ async fn publish_game_mutation_effects(
     // Post-commit: do lookup using a plain DB connection (Send-safe; ok in tokio::spawn).
     let db = crate::db::require_db(app_state)?;
 
+    // Flag to determine if we should invalidate "Waiting Longest" cache
+    let mut should_invalidate_long_wait = false;
+
     for t in transitions {
-        let GameTransition::TurnBecame { player_id } = *t;
+        match t {
+            GameTransition::TurnBecame { player_id } => {
+                let seat = *player_id;
+                let user_id_res = resolve_human_user_id_for_seat(db, game_id, seat).await;
 
-        let seat = player_id;
-        let user_id_res = resolve_human_user_id_for_seat(db, game_id, seat).await;
-
-        match user_id_res {
-            Ok(Some(user_id)) => {
-                if let Err(err) = realtime
-                    .publish_your_turn(user_id, game_id, final_version)
-                    .await
-                {
-                    tracing::error!(
-                        game_id,
-                        final_version,
-                        user_id,
-                        error = %err,
-                        "Failed to publish your_turn event (Redis may be unavailable). Mutation succeeded, but clients may miss your_turn until Redis recovers."
-                    );
+                match user_id_res {
+                    Ok(Some(user_id)) => {
+                        if let Err(err) = realtime
+                            .publish_your_turn(user_id, game_id, final_version)
+                            .await
+                        {
+                            tracing::error!(
+                                game_id,
+                                final_version,
+                                user_id,
+                                error = %err,
+                                "Failed to publish your_turn event (Redis may be unavailable). Mutation succeeded, but clients may miss your_turn until Redis recovers."
+                            );
+                        }
+                    }
+                    Ok(None) => {
+                        // AI turn or empty seat -> no notification needed
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            game_id,
+                            seat = ?seat,
+                            error = %err,
+                            "Failed to resolve user_id for seat (for YourTurn notification)"
+                        );
+                    }
                 }
             }
-            Ok(None) => {
-                // AI / no human at that seat — ignore.
+            GameTransition::GameStarted
+            | GameTransition::GameEnded
+            | GameTransition::GameAbandoned
+            | GameTransition::PlayerLeft { .. }
+            | GameTransition::PlayerRejoined { .. } => {
+                should_invalidate_long_wait = true;
             }
-            Err(err) => {
-                tracing::error!(
-                    game_id,
-                    final_version,
-                    seat,
-                    error = %err,
-                    "Failed to resolve user_id for TurnBecame; your_turn not published"
-                );
+            GameTransition::PlayerJoined { .. } => {
+                // User requested: join_game doesn't start games so shouldn't cause invalidation.
+                // We rely on GameStarted to signal when the wait is over.
             }
+        }
+    }
+
+    if should_invalidate_long_wait {
+        if let Err(err) = realtime.publish_long_wait_invalidated(game_id).await {
+            tracing::error!(
+                game_id,
+                error = %err,
+                "Failed to publish long_wait_invalidated event. Frontend caches may be stale."
+            );
         }
     }
 

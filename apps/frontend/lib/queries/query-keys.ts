@@ -46,10 +46,7 @@ export const queryKeys = {
     history: (id: number) =>
       [...queryKeys.games.detail(id), 'history'] as const,
 
-    waitingLongest: (excludeId?: number) =>
-      excludeId === undefined
-        ? (['games', 'waitingLongest'] as const)
-        : (['games', 'waitingLongest', { excludeId }] as const),
+    waitingLongest: () => ['games', 'waitingLongest'] as const,
   },
 
   user: {
