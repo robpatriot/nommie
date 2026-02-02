@@ -5,9 +5,12 @@
 
 use backend::domain::Trump;
 use backend::services::game_flow::GameFlowService;
+use backend::services::games::GameService;
 use backend::AppError;
 use sea_orm::DatabaseTransaction;
 
+use super::db_memberships::{create_test_ai_game_player, create_test_game_player_with_ready};
+use super::factory::{create_fresh_lobby_game, create_test_user};
 use super::game_setup::setup_game_with_players;
 
 /// Result of a phase setup operation with additional context
@@ -16,6 +19,78 @@ pub struct PhaseSetup {
     pub user_ids: Vec<i64>,
     pub round_id: i64,
     pub dealer_pos: u8,
+}
+
+#[derive(Debug, Clone)]
+pub enum SeatSpec {
+    /// Reuse an already-created human user (common in multi-game tests).
+    ExistingHuman { user_id: i64 },
+    /// Create a new human user (sub should be unique).
+    NewHuman {
+        sub: String,
+        username: Option<String>,
+    },
+    /// Create an AI player seat (uses default AI profile).
+    Ai,
+}
+
+pub struct PhaseSetupWithSeats {
+    pub game_id: i64,
+    pub seat_user_ids: [Option<i64>; 4],
+    pub round_id: i64,
+    pub dealer_pos: u8,
+}
+
+/// Set up a game in Bidding phase with explicit seat composition.
+///
+/// This creates a fresh lobby game (no memberships), inserts exactly 4 player memberships
+/// (humans and/or AIs), then deals the first round to enter Bidding.
+pub async fn setup_game_in_bidding_phase_with_seats(
+    txn: &DatabaseTransaction,
+    test_name: &str,
+    seats: [SeatSpec; 4],
+) -> Result<PhaseSetupWithSeats, AppError> {
+    let game_id = create_fresh_lobby_game(txn, test_name).await?;
+
+    let service = GameService;
+    let ai_profile_id = service.find_default_ai_profile(txn).await?.id;
+
+    let mut seat_user_ids: [Option<i64>; 4] = [None, None, None, None];
+
+    for (seat, spec) in seats.into_iter().enumerate() {
+        let seat_u8 = u8::try_from(seat).unwrap_or(0);
+        match spec {
+            SeatSpec::ExistingHuman { user_id } => {
+                create_test_game_player_with_ready(txn, game_id, user_id, seat_u8, true).await?;
+                seat_user_ids[seat] = Some(user_id);
+            }
+            SeatSpec::NewHuman { sub, username } => {
+                let user_id = create_test_user(txn, &sub, username.as_deref()).await?;
+                create_test_game_player_with_ready(txn, game_id, user_id, seat_u8, true).await?;
+                seat_user_ids[seat] = Some(user_id);
+            }
+            SeatSpec::Ai => {
+                create_test_ai_game_player(txn, game_id, ai_profile_id, seat_u8, true).await?;
+            }
+        }
+    }
+
+    let flow = GameFlowService;
+    flow.deal_round(txn, game_id).await?;
+
+    let game = backend::repos::games::require_game(txn, game_id).await?;
+    let round_no: u8 = game.current_round.expect("Game should have current round");
+    let dealer_pos = game.dealer_pos().expect("Game should have dealer position");
+    let round = backend::repos::rounds::find_by_game_and_round(txn, game_id, round_no)
+        .await?
+        .expect("Round should exist");
+
+    Ok(PhaseSetupWithSeats {
+        game_id,
+        seat_user_ids,
+        round_id: round.id,
+        dealer_pos,
+    })
 }
 
 /// Set up a game in the Bidding phase (dealt, ready to bid).

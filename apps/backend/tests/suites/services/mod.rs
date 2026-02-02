@@ -7,6 +7,7 @@ pub mod game_flow_happy_paths;
 pub mod game_flow_validations;
 pub mod game_round_progression_props;
 pub mod game_state_loading;
+pub mod game_waiting_longest;
 pub mod games_snapshot;
 pub mod games_snapshot_caching;
 pub mod player_view;
