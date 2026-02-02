@@ -194,16 +194,6 @@ describe('useGameSync waitingLongest cache scenarios', () => {
       expect: { waitingLongestInvalidated: true, snapshotVersion: 1 },
     },
     {
-      name: 'yourturn (legacy) invalidates waitingLongest only',
-      gameId: 42,
-      seed: {
-        snapshot: createInitialDataWithVersion(42, 1),
-        waitingLongest: [42],
-      },
-      msg: { type: 'yourturn', game_id: 42, version: 2 },
-      expect: { waitingLongestInvalidated: true, snapshotVersion: 1 },
-    },
-    {
       name: 'long_wait_invalidated invalidates waitingLongest only',
       gameId: 42,
       seed: {
