@@ -26,6 +26,16 @@ configure({
 // Global WebSocket stub
 vi.stubGlobal('WebSocket', MockWebSocket)
 
+// Default WebSocket config for tests.
+// Many components mount WebSocketProvider via the shared test utils; provide a valid URL
+// so config validation doesn't fail (WebSocket itself is mocked).
+if (
+  !process.env.NEXT_PUBLIC_BACKEND_WS_URL &&
+  !process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+) {
+  process.env.NEXT_PUBLIC_BACKEND_WS_URL = 'ws://localhost:3001'
+}
+
 // matchMedia mock
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
   Object.defineProperty(window, 'matchMedia', {
