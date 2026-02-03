@@ -1,5 +1,7 @@
 //! DTOs for games_sea adapter.
 
+use time::OffsetDateTime;
+
 use crate::entities::games::{GameState, GameVisibility};
 
 /// DTO for creating a new game.
@@ -48,6 +50,8 @@ pub struct GameUpdate {
     pub current_round: Option<u8>,
     pub starting_dealer_pos: Option<u8>,
     pub current_trick_no: Option<u8>,
+    /// Three-state: None = no change, Some(Some(ts)) = set, Some(None) = clear.
+    pub waiting_since: Option<Option<OffsetDateTime>>,
     pub expected_version: i32,
 }
 
@@ -59,6 +63,7 @@ impl GameUpdate {
             current_round: None,
             starting_dealer_pos: None,
             current_trick_no: None,
+            waiting_since: None,
             expected_version,
         }
     }
@@ -80,6 +85,16 @@ impl GameUpdate {
 
     pub fn with_current_trick_no(mut self, trick_no: u8) -> Self {
         self.current_trick_no = Some(trick_no);
+        self
+    }
+
+    pub fn with_waiting_since(mut self, waiting_since: OffsetDateTime) -> Self {
+        self.waiting_since = Some(Some(waiting_since));
+        self
+    }
+
+    pub fn clear_waiting_since(mut self) -> Self {
+        self.waiting_since = Some(None);
         self
     }
 }

@@ -57,6 +57,7 @@ impl GameFlowService {
         bid_value: u8,
         expected_version: i32,
     ) -> Result<Game, AppError> {
+        let waiting_since = time::OffsetDateTime::now_utc();
         debug!(game_id, player_seat, bid_value, "Submitting bid");
 
         // Load game to get current round and hand size for validation
@@ -140,10 +141,13 @@ impl GameFlowService {
             txn,
             game_id,
             expected_version,
-            state_update,
-            None,
-            None,
-            None,
+            games::GameUpdatePatch {
+                state: state_update,
+                current_round: None,
+                starting_dealer_pos: None,
+                current_trick_no: None,
+                waiting_since: Some(Some(waiting_since)),
+            },
         )
         .await?;
 
@@ -189,6 +193,7 @@ impl GameFlowService {
         trump: crate::domain::Trump,
         expected_version: i32,
     ) -> Result<Game, AppError> {
+        let waiting_since = time::OffsetDateTime::now_utc();
         info!(game_id, player_seat, trump = ?trump, "Setting trump");
 
         // Load GameState and apply domain logic
@@ -227,10 +232,13 @@ impl GameFlowService {
             txn,
             game_id,
             expected_version,
-            Some(DbGameState::TrickPlay),
-            None,
-            None,
-            Some(result.trick_no),
+            games::GameUpdatePatch {
+                state: Some(DbGameState::TrickPlay),
+                current_round: None,
+                starting_dealer_pos: None,
+                current_trick_no: Some(result.trick_no),
+                waiting_since: Some(Some(waiting_since)),
+            },
         )
         .await?;
 
@@ -276,6 +284,7 @@ impl GameFlowService {
         card: Card,
         expected_version: i32,
     ) -> Result<Game, AppError> {
+        let waiting_since = time::OffsetDateTime::now_utc();
         debug!(game_id, player_seat, "Playing card");
 
         // Load GameState and apply domain logic
@@ -375,10 +384,13 @@ impl GameFlowService {
             txn,
             game_id,
             expected_version,
-            state_update,
-            None,
-            None,
-            trick_no_update,
+            games::GameUpdatePatch {
+                state: state_update,
+                current_round: None,
+                starting_dealer_pos: None,
+                current_trick_no: trick_no_update,
+                waiting_since: Some(Some(waiting_since)),
+            },
         )
         .await?;
 

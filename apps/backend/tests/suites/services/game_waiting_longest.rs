@@ -39,6 +39,7 @@ async fn create_game_with_state_and_time(
         state: Set(state),
         created_at: Set(now),
         updated_at: Set(updated_at),
+        waiting_since: Set(None),
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some(format!("Test Game {}", test_name))),
@@ -79,6 +80,29 @@ async fn update_game_timestamp(
 
     let mut active_game = game.into_active_model();
     active_game.updated_at = Set(updated_at);
+    active_game.update(txn).await?;
+    Ok(())
+}
+
+/// Helper: Update game's waiting_since timestamp
+async fn update_game_waiting_since(
+    txn: &sea_orm::DatabaseTransaction,
+    game_id: i64,
+    waiting_since: OffsetDateTime,
+) -> Result<(), AppError> {
+    let game = games::Entity::find_by_id(game_id)
+        .one(txn)
+        .await?
+        .ok_or_else(|| {
+            AppError::internal(
+                backend::ErrorCode::InternalError,
+                "Game not found".to_string(),
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Game not found"),
+            )
+        })?;
+
+    let mut active_game = game.into_active_model();
+    active_game.waiting_since = Set(Some(waiting_since));
     active_game.update(txn).await?;
     Ok(())
 }
@@ -227,8 +251,8 @@ async fn prioritizes_oldest_waiting_game() -> Result<(), AppError> {
             let older_time = now - time::Duration::seconds(60);
             let newer_time = now - time::Duration::seconds(30);
 
-            update_game_timestamp(txn, older_setup.game_id, older_time).await?;
-            update_game_timestamp(txn, newer_setup.game_id, newer_time).await?;
+            update_game_waiting_since(txn, older_setup.game_id, older_time).await?;
+            update_game_waiting_since(txn, newer_setup.game_id, newer_time).await?;
 
             // Determine first bidder for both games and use same user
             let older_game = backend::repos::games::require_game(txn, older_setup.game_id).await?;
@@ -317,7 +341,7 @@ async fn prioritizes_games_with_humans_over_ai_only() -> Result<(), AppError> {
             )
             .await?;
             let human_time = now - time::Duration::seconds(60);
-            update_game_timestamp(txn, human_setup.game_id, human_time).await?;
+            update_game_waiting_since(txn, human_setup.game_id, human_time).await?;
 
             sleep_ms(20).await;
 
@@ -334,7 +358,7 @@ async fn prioritizes_games_with_humans_over_ai_only() -> Result<(), AppError> {
             )
             .await?;
             let ai_only_time = now - time::Duration::seconds(120);
-            update_game_timestamp(txn, ai_only_setup.game_id, ai_only_time).await?;
+            update_game_waiting_since(txn, ai_only_setup.game_id, ai_only_time).await?;
 
             let service = GameService;
             let result = service.game_waiting_longest(txn, user_id).await?;
@@ -361,7 +385,7 @@ async fn returns_maximum_two_games() -> Result<(), AppError> {
                 let setup =
                     setup_game_in_bidding_phase(txn, &format!("max_two_game_{}", i)).await?;
                 let timestamp = now - time::Duration::seconds(100 - (i * 10));
-                update_game_timestamp(txn, setup.game_id, timestamp).await?;
+                update_game_waiting_since(txn, setup.game_id, timestamp).await?;
                 game_ids.push((setup.game_id, setup));
                 sleep_ms(10).await;
             }

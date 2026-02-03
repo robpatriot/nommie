@@ -52,6 +52,7 @@ enum Games {
     State,
     CreatedAt,
     UpdatedAt,
+    WaitingSince,
     StartedAt,
     EndedAt,
     Name,
@@ -499,6 +500,7 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
+                    .col(ColumnDef::new(Games::WaitingSince).timestamp_with_time_zone().null())
                     .col(
                         ColumnDef::new(Games::StartedAt)
                             .timestamp_with_time_zone()
@@ -1470,19 +1472,6 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(GameRounds::Table).to_owned())
             .await?;
 
-        manager
-            .drop_index(
-                Index::drop()
-                    .name("ux_ai_profiles_registry_variant")
-                    .table(AiProfiles::Table)
-                    .to_owned(),
-            )
-            .await?;
-
-        manager
-            .drop_table(Table::drop().table(AiProfiles::Table).to_owned())
-            .await?;
-
         // Drop game_players unique constraints and table
         manager
             .drop_index(
@@ -1518,6 +1507,20 @@ impl MigrationTrait for Migration {
 
         manager
             .drop_table(Table::drop().table(GamePlayers::Table).to_owned())
+            .await?;
+
+        // Drop ai_profiles after game_players (game_players has FK to ai_profiles).
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ux_ai_profiles_registry_variant")
+                    .table(AiProfiles::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(AiProfiles::Table).to_owned())
             .await?;
 
         // Drop games indexes and table

@@ -132,6 +132,7 @@ pub async fn create_game(
         state: Set(games::GameState::Lobby),
         created_at: Set(now),
         updated_at: Set(now),
+        waiting_since: NotSet,
         started_at: NotSet,
         ended_at: NotSet,
         name: Set(dto.name),
@@ -187,6 +188,10 @@ pub async fn update_game(
                 games::Column::CurrentTrickNo,
                 Expr::val(trick_no as i16).into(),
             );
+        }
+
+        if let Some(waiting_since) = dto.waiting_since {
+            update = update.col_expr(games::Column::WaitingSince, Expr::val(waiting_since).into());
         }
 
         update

@@ -1,4 +1,5 @@
 use sea_orm::DatabaseTransaction;
+use time::OffsetDateTime;
 use tracing::{debug, info};
 
 use super::GameFlowService;
@@ -50,14 +51,22 @@ impl GameFlowService {
 
         // Update DB: state and round number
         let starting_dealer_pos = if next_round == 1 { Some(0) } else { None };
+        let waiting_since = if next_round == 1 {
+            Some(Some(OffsetDateTime::now_utc()))
+        } else {
+            None
+        };
         let updated_game = games::update_game(
             txn,
             game_id,
             game.version,
-            Some(DbGameState::Bidding),
-            Some(next_round),
-            starting_dealer_pos,
-            None,
+            games::GameUpdatePatch {
+                state: Some(DbGameState::Bidding),
+                current_round: Some(next_round),
+                starting_dealer_pos,
+                current_trick_no: None,
+                waiting_since,
+            },
         )
         .await?;
 
@@ -209,14 +218,18 @@ impl GameFlowService {
             DbGameState::Bidding
         };
 
+        let waiting_since = if is_game_complete { Some(None) } else { None };
         games::update_game(
             txn,
             game_id,
             game.version,
-            Some(next_state),
-            None,
-            None,
-            None,
+            games::GameUpdatePatch {
+                state: Some(next_state),
+                current_round: None,
+                starting_dealer_pos: None,
+                current_trick_no: None,
+                waiting_since,
+            },
         )
         .await?;
 

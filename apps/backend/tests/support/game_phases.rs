@@ -336,6 +336,7 @@ pub async fn setup_game_at_round(
         state: Set(game_state),
         created_at: Set(now),
         updated_at: Set(now),
+        waiting_since: Set(None),
         started_at: Set(if completed_rounds > 0 {
             Some(now)
         } else {

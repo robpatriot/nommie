@@ -22,6 +22,7 @@ fn create_mock_game(game_id: i64, version: i32) -> Game {
         state: backend::entities::games::GameState::Bidding,
         created_at: now,
         updated_at: now,
+        waiting_since: None,
         started_at: None,
         ended_at: None,
         name: None,

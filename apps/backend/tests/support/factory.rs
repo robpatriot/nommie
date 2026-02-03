@@ -122,6 +122,7 @@ pub async fn create_fresh_lobby_game(
         state: Set(GameState::Lobby),
         created_at: Set(now),
         updated_at: Set(now),
+        waiting_since: Set(None),
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),

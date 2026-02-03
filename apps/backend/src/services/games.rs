@@ -536,7 +536,7 @@ impl GameService {
     /// Prioritizes games where:
     /// - The user is a player (not spectator)
     /// - It is currently the user's turn (Bidding, TrumpSelection, or TrickPlay)
-    /// - The game has been waiting the longest (oldest updated_at)
+    /// - The game has been waiting the longest (oldest waiting_since)
     ///
     /// If no games are waiting for the user, falls back to the most recently active game
     /// (highest updated_at timestamp) where the user is a member.
@@ -553,7 +553,7 @@ impl GameService {
     /// Prioritizes games where:
     /// - The user is a player (not spectator)
     /// - It is currently the user's turn (Bidding, TrumpSelection, or TrickPlay)
-    /// - The game has been waiting the longest (oldest updated_at)
+    /// - The game has been waiting the longest (oldest waiting_since)
     ///
     /// Returns up to 2 games to allow client-side optimistic switching.
     ///
@@ -626,7 +626,8 @@ impl GameService {
             games::Entity::find()
                 .filter(games::Column::Id.is_in(game_ids_with_other_humans.clone()))
                 .filter(games::Column::State.is_in(actionable_states.clone()))
-                .order_by_asc(games::Column::UpdatedAt)
+                .filter(games::Column::WaitingSince.is_not_null())
+                .order_by_asc(games::Column::WaitingSince)
                 .all(txn)
                 .await
                 .map_err(AppError::from)?
@@ -636,7 +637,8 @@ impl GameService {
             let mut q = games::Entity::find()
                 .filter(games::Column::Id.is_in(game_ids.clone()))
                 .filter(games::Column::State.is_in(actionable_states.clone()))
-                .order_by_asc(games::Column::UpdatedAt);
+                .filter(games::Column::WaitingSince.is_not_null())
+                .order_by_asc(games::Column::WaitingSince);
 
             if !game_ids_with_other_humans.is_empty() {
                 q = q.filter(games::Column::Id.is_not_in(game_ids_with_other_humans));
@@ -645,7 +647,7 @@ impl GameService {
             q.all(txn).await.map_err(AppError::from)?
         };
 
-        // Check each actionable game (oldest first) to see if it's the user's turn
+        // Check each actionable game (oldest waiting_since first) to see if it's the user's turn
         // Prefer games with other humans first.
         let game_flow_service = GameFlowService;
         let mut result_ids = Vec::new();

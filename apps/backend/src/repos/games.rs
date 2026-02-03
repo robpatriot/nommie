@@ -21,6 +21,7 @@ pub struct Game {
     pub state: DbGameState,
     pub created_at: time::OffsetDateTime,
     pub updated_at: time::OffsetDateTime,
+    pub waiting_since: Option<time::OffsetDateTime>,
     pub started_at: Option<time::OffsetDateTime>,
     pub ended_at: Option<time::OffsetDateTime>,
     pub name: Option<String>,
@@ -98,34 +99,48 @@ pub async fn require_game<C: ConnectionTrait + Send + Sync>(
     Ok(Game::from(game))
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct GameUpdatePatch {
+    pub state: Option<DbGameState>,
+    pub current_round: Option<u8>,
+    pub starting_dealer_pos: Option<u8>,
+    pub current_trick_no: Option<u8>,
+    pub waiting_since: Option<Option<time::OffsetDateTime>>,
+}
+
 /// Update game with optimistic locking.
 ///
-/// Updates any combination of state and round-related fields (current_round, starting_dealer_pos, current_trick_no)
-/// atomically with a single version increment. Returns the updated game model.
-///
-/// `expected_version` validates that the current version matches before updating.
+/// Applies `patch` atomically with a single version increment and updated_at bump.
 pub async fn update_game(
     txn: &DatabaseTransaction,
     id: i64,
     expected_version: i32,
-    state: Option<DbGameState>,
-    current_round: Option<u8>,
-    starting_dealer_pos: Option<u8>,
-    current_trick_no: Option<u8>,
+    patch: GameUpdatePatch,
 ) -> Result<Game, DomainError> {
     let mut dto = games_adapter::GameUpdate::new(id, expected_version);
-    if let Some(s) = state {
+    if let Some(s) = patch.state {
         dto = dto.with_state(s);
     }
-    if let Some(round) = current_round {
+    if let Some(round) = patch.current_round {
         dto = dto.with_current_round(round);
     }
-    if let Some(pos) = starting_dealer_pos {
+    if let Some(pos) = patch.starting_dealer_pos {
         dto = dto.with_starting_dealer_pos(pos);
     }
-    if let Some(trick_no) = current_trick_no {
+    if let Some(trick_no) = patch.current_trick_no {
         dto = dto.with_current_trick_no(trick_no);
     }
+
+    match patch.waiting_since {
+        None => {}
+        Some(Some(ts)) => {
+            dto = dto.with_waiting_since(ts);
+        }
+        Some(None) => {
+            dto = dto.clear_waiting_since();
+        }
+    }
+
     let game = games_adapter::update_game(txn, dto).await?;
     Ok(Game::from(game))
 }
@@ -142,7 +157,7 @@ pub async fn touch_game(
     id: i64,
     expected_version: i32,
 ) -> Result<Game, DomainError> {
-    update_game(txn, id, expected_version, None, None, None, None).await
+    update_game(txn, id, expected_version, GameUpdatePatch::default()).await
 }
 
 /// Delete game with optimistic locking.
@@ -214,6 +229,7 @@ impl From<games::Model> for Game {
             state: model.state,
             created_at: model.created_at,
             updated_at: model.updated_at,
+            waiting_since: model.waiting_since,
             started_at: model.started_at,
             ended_at: model.ended_at,
             name: model.name,

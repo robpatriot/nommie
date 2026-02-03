@@ -215,6 +215,7 @@ async fn create_test_round_with_plays(
         state: Set(GameState::TrickPlay),
         created_at: Set(OffsetDateTime::now_utc()),
         updated_at: Set(OffsetDateTime::now_utc()),
+        waiting_since: Set(None),
         started_at: Set(None),
         ended_at: Set(None),
         name: Set(Some("Test Game".to_string())),

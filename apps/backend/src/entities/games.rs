@@ -47,6 +47,8 @@ pub struct Model {
     pub created_at: OffsetDateTime,
     #[sea_orm(column_name = "updated_at")]
     pub updated_at: OffsetDateTime,
+    #[sea_orm(column_name = "waiting_since")]
+    pub waiting_since: Option<OffsetDateTime>,
     #[sea_orm(column_name = "started_at")]
     pub started_at: Option<OffsetDateTime>,
     #[sea_orm(column_name = "ended_at")]
