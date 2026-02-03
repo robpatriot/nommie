@@ -8,7 +8,7 @@ use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
 use backend::state::security_config::SecurityConfig;
 use backend::AppError;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serde_json::json;
 
 use crate::support::app_builder::create_test_app;
@@ -17,6 +17,98 @@ use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player_with_ready;
 use crate::support::factory::{create_fresh_lobby_game, create_test_user};
 use crate::support::test_utils::test_user_sub;
+
+#[tokio::test]
+async fn starting_game_by_adding_last_ai_seat_drains_ai_turns() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+    let security: SecurityConfig = state.security.clone();
+    let db = require_db(&state).expect("DB required");
+    let shared = SharedTxn::open(db).await?;
+
+    let test_name = "starting_game_by_adding_last_ai_seat_drains_ai_turns";
+    let game_id = create_fresh_lobby_game(shared.transaction(), test_name).await?;
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    let host_user_id = game.created_by.expect("game has creator");
+
+    // 3 humans ready, leaving seat 1 open so the AI will be placed at seat 1 (first bidder when dealer=0).
+    create_test_game_player_with_ready(shared.transaction(), game_id, host_user_id, 0, true)
+        .await?;
+
+    let p2_sub = test_user_sub(&format!("{test_name}_p2"));
+    let p2_user_id = create_test_user(shared.transaction(), &p2_sub, Some("P2")).await?;
+    create_test_game_player_with_ready(shared.transaction(), game_id, p2_user_id, 2, true).await?;
+
+    let p3_sub = test_user_sub(&format!("{test_name}_p3"));
+    let p3_user_id = create_test_user(shared.transaction(), &p3_sub, Some("P3")).await?;
+    create_test_game_player_with_ready(shared.transaction(), game_id, p3_user_id, 3, true).await?;
+
+    let host_sub = test_user_sub(&format!("{test_name}_creator"));
+    let host_email = format!("{host_sub}@example.com");
+    let token = mint_test_token(&host_sub, &host_email, &security);
+
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(
+                web::scope("/api/games")
+                    .wrap(JwtExtract)
+                    .configure(configure_routes),
+            );
+        })
+        .build()
+        .await?;
+
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    let version = game.version;
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/api/games/{game_id}/ai/add"))
+        .insert_header(("Authorization", format!("Bearer {token}")))
+        .set_json(json!({
+            "registry_name": RandomPlayer::NAME,
+            "version": version
+        }))
+        .to_request();
+    req.extensions_mut().insert(shared.clone());
+
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    drop(resp);
+
+    // Game should have started and been dealt into bidding.
+    let game = games::Entity::find_by_id(game_id)
+        .one(shared.transaction())
+        .await?
+        .expect("game exists");
+    assert_eq!(game.state, games::GameState::Bidding);
+    assert_eq!(game.current_round, Some(1));
+
+    // AI at seat 1 should immediately place its bid (AI drain must run on this start path).
+    let round = backend::entities::game_rounds::Entity::find()
+        .filter(backend::entities::game_rounds::Column::GameId.eq(game_id))
+        .filter(backend::entities::game_rounds::Column::RoundNo.eq(1i16))
+        .one(shared.transaction())
+        .await?
+        .expect("round 1 exists");
+
+    let ai_bids_count = backend::entities::round_bids::Entity::find()
+        .filter(backend::entities::round_bids::Column::RoundId.eq(round.id))
+        .filter(backend::entities::round_bids::Column::PlayerSeat.eq(1i16))
+        .count(shared.transaction())
+        .await?;
+    assert_eq!(
+        ai_bids_count, 1,
+        "Expected exactly 1 AI bid for seat 1 after auto-start via add-ai"
+    );
+
+    shared.rollback().await?;
+    Ok(())
+}
 
 #[tokio::test]
 async fn host_can_add_ai_seat() -> Result<(), AppError> {

@@ -163,7 +163,7 @@ impl GameFlowService {
         Ok((result, memberships, was_active))
     }
 
-    /// Wrapper: add_ai_seat (no drain)
+    /// Wrapper: add_ai_seat
     pub async fn add_ai_seat(
         &self,
         txn: &DatabaseTransaction,
@@ -174,7 +174,14 @@ impl GameFlowService {
 
         let result = self
             .run_mutation(txn, game_id, expected_version, |svc, txn| {
-                Box::pin(async move { svc.add_ai_seat_mutation(txn, params).await })
+                Box::pin(async move {
+                    let transitions = svc.add_ai_seat_mutation(txn, params).await?;
+                    let started = svc.check_and_start_game_if_ready(txn, game_id).await?;
+                    if started {
+                        svc.process_game_state(txn, game_id).await?;
+                    }
+                    Ok(transitions)
+                })
             })
             .await?;
 
@@ -640,11 +647,10 @@ impl GameFlowService {
             .await
             .map_err(AppError::from)?;
 
-        // Automatic game start check
-        self.check_and_start_game_if_ready(txn, game_id).await?;
-
-        // Optimistic locking / version bump
-        let _final_game = games_repo::touch_game(txn, game_id, expected_version).await?;
+        // Optimistic locking / version bump for lobby membership changes.
+        // NOTE: this must happen BEFORE check_and_start_game_if_ready(), because
+        // auto-start (deal_round) itself performs a version bump.
+        let _ = games_repo::touch_game(txn, game_id, expected_version).await?;
 
         Ok(vec![])
     }

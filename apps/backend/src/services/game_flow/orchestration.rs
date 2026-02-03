@@ -38,10 +38,13 @@ impl GameFlowService {
                     .await?;
 
                 if is_ready {
-                    svc.check_and_start_game_if_ready(txn, game_id).await?;
+                    let started = svc.check_and_start_game_if_ready(txn, game_id).await?;
+                    if started {
+                        svc.process_game_state(txn, game_id).await?;
+                    }
+                    return Ok(vec![]);
                 }
 
-                svc.process_game_state(txn, game_id).await?;
                 Ok(vec![])
             })
         })
@@ -94,7 +97,7 @@ impl GameFlowService {
         &self,
         txn: &DatabaseTransaction,
         game_id: i64,
-    ) -> Result<(), AppError> {
+    ) -> Result<bool, AppError> {
         let all_memberships = memberships::find_all_by_game(txn, game_id).await?;
         let player_memberships: Vec<_> = all_memberships
             .iter()
@@ -104,7 +107,7 @@ impl GameFlowService {
         let all_ready = player_memberships.iter().all(|m| m.is_ready);
 
         if !(all_ready && player_memberships.len() == 4) {
-            return Ok(());
+            return Ok(false);
         }
 
         let game = games::require_game(txn, game_id).await?;
@@ -114,7 +117,7 @@ impl GameFlowService {
                 game_id,
                 "All players ready but game already completed; skipping auto-start"
             );
-            return Ok(());
+            return Ok(false);
         }
 
         if game.state != DbGameState::Lobby {
@@ -123,14 +126,14 @@ impl GameFlowService {
                 state = ?game.state,
                 "All players ready in non-lobby state; skipping auto-start"
             );
-            return Ok(());
+            return Ok(false);
         }
 
         info!(game_id, "All players ready, starting game");
 
         self.deal_round(txn, game_id).await?;
 
-        Ok(())
+        Ok(true)
     }
 
     pub async fn run_game_flow(
