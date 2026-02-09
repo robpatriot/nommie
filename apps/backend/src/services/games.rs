@@ -538,16 +538,6 @@ impl GameService {
     /// - It is currently the user's turn (Bidding, TrumpSelection, or TrickPlay)
     /// - The game has been waiting the longest (oldest waiting_since)
     ///
-    /// If no games are waiting for the user, falls back to the most recently active game
-    /// (highest updated_at timestamp) where the user is a member.
-    ///
-    /// # Arguments
-    /// * `txn` - Database transaction
-    /// * `user_id` - ID of the user
-    /// * `exclude_game_id` - Optional ID of a game to exclude
-    ///
-    /// # Returns
-    /// Option<i64> - Game ID if found, None if user has no games
     /// Find games that have been waiting for the user to act the longest.
     ///
     /// Prioritizes games where:
@@ -555,10 +545,7 @@ impl GameService {
     /// - It is currently the user's turn (Bidding, TrumpSelection, or TrickPlay)
     /// - The game has been waiting the longest (oldest waiting_since)
     ///
-    /// Returns up to 2 games to allow client-side optimistic switching.
-    ///
-    /// If no games are waiting for the user, falls back to the most recently active game
-    /// (highest updated_at timestamp) where the user is a member.
+    /// Returns up to 5 games to allow client-side navigation without refetching.
     ///
     /// # Arguments
     /// * `txn` - Database transaction
@@ -628,6 +615,7 @@ impl GameService {
                 .filter(games::Column::State.is_in(actionable_states.clone()))
                 .filter(games::Column::WaitingSince.is_not_null())
                 .order_by_asc(games::Column::WaitingSince)
+                .order_by_asc(games::Column::Id)
                 .all(txn)
                 .await
                 .map_err(AppError::from)?
@@ -638,7 +626,8 @@ impl GameService {
                 .filter(games::Column::Id.is_in(game_ids.clone()))
                 .filter(games::Column::State.is_in(actionable_states.clone()))
                 .filter(games::Column::WaitingSince.is_not_null())
-                .order_by_asc(games::Column::WaitingSince);
+                .order_by_asc(games::Column::WaitingSince)
+                .order_by_asc(games::Column::Id);
 
             if !game_ids_with_other_humans.is_empty() {
                 q = q.filter(games::Column::Id.is_not_in(game_ids_with_other_humans));
@@ -665,7 +654,7 @@ impl GameService {
             match game_flow_service.determine_next_action(txn, &game).await {
                 Ok(Some((seat, _))) if seat == user_turn_order => {
                     result_ids.push(game.id);
-                    if result_ids.len() >= 2 {
+                    if result_ids.len() >= 5 {
                         return Ok(result_ids);
                     }
                 }
@@ -673,23 +662,7 @@ impl GameService {
             }
         }
 
-        if !result_ids.is_empty() {
-            return Ok(result_ids);
-        }
-
-        // No games waiting for the user - fall back to most recently active game
-        let last_active_game = games::Entity::find()
-            .filter(games::Column::Id.is_in(game_ids))
-            .filter(games::Column::State.ne(DbGameState::Completed))
-            .filter(games::Column::State.ne(DbGameState::Abandoned))
-            .order_by_desc(games::Column::UpdatedAt)
-            .one(txn)
-            .await
-            .map_err(AppError::from)?;
-
-        Ok(last_active_game
-            .map(|game| vec![game.id])
-            .unwrap_or_default())
+        Ok(result_ids)
     }
 
     /// Find the next available turn_order (0-3) for a game.

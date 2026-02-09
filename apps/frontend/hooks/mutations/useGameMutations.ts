@@ -9,6 +9,7 @@ import {
 } from '@/app/actions/game-actions'
 import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
+import { requestLwRefetch } from '@/lib/queries/lw-cache'
 import type { Game } from '@/lib/types'
 import type { CreateGameRequest } from '@/app/actions/game-actions'
 
@@ -31,10 +32,7 @@ export function useCreateGame() {
     // and we're leaving the lobby, so no need to refetch lobby queries.
     // The destination page will fetch fresh data if needed.
     onSuccess: () => {
-      // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
+      void requestLwRefetch(queryClient, { createSnapshot: false })
     },
   })
 }
@@ -58,10 +56,7 @@ export function useJoinGame() {
     // and we're leaving the lobby, so no need to refetch lobby queries.
     // The destination page will fetch fresh data if needed.
     onSuccess: (_data, _gameId) => {
-      // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
+      void requestLwRefetch(queryClient, { createSnapshot: false })
     },
   })
 }
@@ -85,10 +80,7 @@ export function useSpectateGame() {
     // and we're leaving the lobby, so no need to refetch lobby queries.
     // The destination page will fetch fresh data if needed.
     onSuccess: (_data, _gameId) => {
-      // Only invalidate last active game for header button (fire-and-forget, doesn't affect lobby)
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
+      void requestLwRefetch(queryClient, { createSnapshot: false })
     },
   })
 }
@@ -115,9 +107,7 @@ export function useDeleteGame() {
     },
     onSuccess: (_, { gameId }) => {
       // Invalidate games list and remove the specific game from cache
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
+      void requestLwRefetch(queryClient, { createSnapshot: false })
       queryClient.invalidateQueries({ queryKey: queryKeys.games.listRoot() })
       queryClient.removeQueries({ queryKey: queryKeys.games.detail(gameId) })
     },

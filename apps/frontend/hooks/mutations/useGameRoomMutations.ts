@@ -20,14 +20,13 @@ import {
 import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import { onOptimisticSend, setLwPendingAction } from '@/lib/queries/lw-cache'
 
 /**
  * Mutation hook to set player ready status.
  * Invalidates game snapshot cache on success.
  */
 export function useMarkPlayerReady() {
-  const queryClient = useQueryClient()
-
   return useMutation({
     mutationFn: async ({
       gameId,
@@ -43,12 +42,7 @@ export function useMarkPlayerReady() {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: () => {
-      // Invalidate last active game so header button updates
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
-    },
+    onSuccess: () => {},
   })
 }
 
@@ -57,8 +51,6 @@ export function useMarkPlayerReady() {
  * Invalidates game snapshot cache on success and navigates to lobby.
  */
 export function useLeaveGame() {
-  const queryClient = useQueryClient()
-
   return useMutation({
     mutationFn: async (request: {
       gameId: number
@@ -69,12 +61,7 @@ export function useLeaveGame() {
         throw handleActionResultError(result)
       }
     },
-    onSuccess: () => {
-      // Only invalidate last active game for header button (fire-and-forget, doesn't affect game room)
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
-    },
+    onSuccess: () => {},
   })
 }
 
@@ -101,12 +88,9 @@ export function useRejoinGame() {
     },
     onSuccess: (_, request) => {
       // Only invalidate snapshot for the game we're joining (fire-and-forget, doesn't affect lobby)
-      // and last active game for header button.
+      // LW navigation is refreshed via realtime events + LW cache module.
       queryClient.invalidateQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
-      })
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
       })
       router.push(`/game/${request.gameId}`)
     },
@@ -129,6 +113,8 @@ export function useSubmitBid() {
       }
     },
     onMutate: async (request) => {
+      onOptimisticSend(queryClient, { gameId: request.gameId })
+
       // Cancel outgoing refetches to avoid overwriting optimistic update
       await queryClient.cancelQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
@@ -189,6 +175,7 @@ export function useSubmitBid() {
       return { previousSnapshot }
     },
     onError: (err, request, context) => {
+      setLwPendingAction(queryClient, request.gameId, false)
       // Rollback on error
       if (context?.previousSnapshot) {
         queryClient.setQueryData(
@@ -198,10 +185,7 @@ export function useSubmitBid() {
       }
     },
     onSuccess: () => {
-      // Invalidate last active game so header button updates
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
+      // LW navigation is refreshed via realtime events + LW cache module.
     },
   })
 }
@@ -222,6 +206,8 @@ export function useSelectTrump() {
       }
     },
     onMutate: async (request) => {
+      onOptimisticSend(queryClient, { gameId: request.gameId })
+
       // Cancel outgoing refetches to avoid overwriting optimistic update
       await queryClient.cancelQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
@@ -268,6 +254,7 @@ export function useSelectTrump() {
       return { previousSnapshot }
     },
     onError: (err, request, context) => {
+      setLwPendingAction(queryClient, request.gameId, false)
       // Rollback on error
       if (context?.previousSnapshot) {
         queryClient.setQueryData(
@@ -277,10 +264,7 @@ export function useSelectTrump() {
       }
     },
     onSuccess: () => {
-      // Invalidate last active game so header button updates
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
+      // LW navigation is refreshed via realtime events + LW cache module.
     },
   })
 }
@@ -301,6 +285,8 @@ export function useSubmitPlay() {
       }
     },
     onMutate: async (request) => {
+      onOptimisticSend(queryClient, { gameId: request.gameId })
+
       // Cancel outgoing refetches to avoid overwriting optimistic update
       await queryClient.cancelQueries({
         queryKey: queryKeys.games.snapshot(request.gameId),
@@ -347,6 +333,7 @@ export function useSubmitPlay() {
       return { previousSnapshot }
     },
     onError: (err, request, context) => {
+      setLwPendingAction(queryClient, request.gameId, false)
       // Rollback on error
       if (context?.previousSnapshot) {
         queryClient.setQueryData(
@@ -356,10 +343,7 @@ export function useSubmitPlay() {
       }
     },
     onSuccess: () => {
-      // Invalidate last active game so header button updates
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
+      // LW navigation is refreshed via realtime events + LW cache module.
     },
   })
 }

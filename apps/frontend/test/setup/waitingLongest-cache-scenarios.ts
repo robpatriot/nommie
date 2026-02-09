@@ -1,11 +1,11 @@
 import { act, waitFor } from '@testing-library/react'
 import type { QueryClient } from '@tanstack/react-query'
 import { expect } from 'vitest'
-import type { vi } from 'vitest'
 
 import type { WireMsg } from '@/lib/game-room/protocol/types'
 import { queryKeys } from '@/lib/queries/query-keys'
 import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import { defaultLwCacheState, type LwCacheState } from '@/lib/queries/lw-cache'
 
 import { mockWebSocketInstances } from '@/test/setup/mock-websocket'
 import type { MockWebSocket } from '@/test/setup/mock-websocket'
@@ -15,11 +15,14 @@ export type SeedState = {
     gameId: number
     payload: GameRoomSnapshotPayload
   }
+  lwCache?: Pick<LwCacheState, 'pool' | 'isCompleteFromServer' | 'snapshot'>
 }
 
 export type ExpectedEffects = {
-  waitingLongestInvalidated: boolean
   snapshotVersion?: number
+  lwRefetchCalls?: number
+  lwPoolAfterRefetch?: number[]
+  lwSnapshotGameIdAfter?: number | null
 }
 
 export type RealtimeScenario = {
@@ -105,20 +108,45 @@ export async function runRealtimeScenario(
   opts: {
     queryClient: QueryClient
     ws: MockWebSocket
-    invalidateSpy: ReturnType<typeof vi.spyOn>
+    clearLwRefetchMock?: () => void
+    getLwRefetchMockCallCount?: () => number
+    setLwRefetchMockResponse?: (pool: number[]) => void
   }
 ) {
-  const { queryClient, ws, invalidateSpy } = opts
+  const {
+    queryClient,
+    ws,
+    clearLwRefetchMock,
+    getLwRefetchMockCallCount,
+    setLwRefetchMockResponse,
+  } = opts
 
   // Ensure ws exists (provider auto-connects when authenticated).
   await waitForWsCount(1)
 
   await connectAndSubscribe(ws, scenario.gameId)
 
+  // The provider performs an LW refetch on hello_ack. Clear that so scenario assertions
+  // only reflect effects from the scenario message.
+  clearLwRefetchMock?.()
+
   // Seed cache state (optional) after handshake
   if (scenario.seed?.snapshot) {
     const { gameId, payload } = scenario.seed.snapshot
     queryClient.setQueryData(queryKeys.games.snapshot(gameId), payload)
+  }
+  if (scenario.seed?.lwCache) {
+    queryClient.setQueryData<LwCacheState>(
+      queryKeys.games.waitingLongestCache(),
+      {
+        ...defaultLwCacheState(),
+        ...scenario.seed.lwCache,
+      }
+    )
+  }
+
+  if (scenario.expect.lwPoolAfterRefetch) {
+    setLwRefetchMockResponse?.(scenario.expect.lwPoolAfterRefetch)
   }
 
   // Send the message
@@ -126,20 +154,32 @@ export async function runRealtimeScenario(
     serverSendJson(ws, scenario.msg)
   })
 
-  // Assert waitingLongest invalidation behavior
-  if (scenario.expect.waitingLongestInvalidated) {
+  // Assert LW refetch behavior (via mocked server action call count)
+  if (
+    typeof scenario.expect.lwRefetchCalls === 'number' &&
+    typeof getLwRefetchMockCallCount === 'function'
+  ) {
     await waitFor(() => {
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
+      expect(getLwRefetchMockCallCount()).toBe(scenario.expect.lwRefetchCalls)
     })
-  } else {
-    // Allow microtasks to flush, then assert no invalidation call was made.
-    await act(async () => {
-      await Promise.resolve()
+  }
+
+  if (scenario.expect.lwPoolAfterRefetch) {
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<{
+        pool: number[]
+      }>(queryKeys.games.waitingLongestCache())
+      expect(cached?.pool).toEqual(scenario.expect.lwPoolAfterRefetch)
     })
-    expect(invalidateSpy).not.toHaveBeenCalledWith({
-      queryKey: queryKeys.games.waitingLongest(),
+  }
+
+  if (scenario.expect.lwSnapshotGameIdAfter !== undefined) {
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<{
+        snapshot?: { gameId: number } | undefined
+      }>(queryKeys.games.waitingLongestCache())
+      const actual = cached?.snapshot?.gameId ?? null
+      expect(actual).toBe(scenario.expect.lwSnapshotGameIdAfter)
     })
   }
 

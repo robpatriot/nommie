@@ -3,9 +3,8 @@
 // This module tests the complex prioritization logic for determining which games
 // are waiting for a user's action, including:
 // - Prioritizing games with human players over AI-only games
-// - Ordering by oldest updated_at timestamp within each category
-// - Returning up to 2 game IDs for client-side optimistic switching
-// - Fallback to most recently active game when no games are waiting
+// - Ordering by oldest waiting_since timestamp within each category
+// - Returning up to 5 game IDs for client-side navigation
 
 use backend::db::txn::with_txn;
 use backend::entities::games::{self, GameState};
@@ -59,29 +58,6 @@ async fn create_game_with_state_and_time(
 /// Helper: Small sleep to ensure distinct timestamps
 async fn sleep_ms(ms: u64) {
     tokio::time::sleep(tokio::time::Duration::from_millis(ms)).await;
-}
-
-/// Helper: Update game's updated_at timestamp
-async fn update_game_timestamp(
-    txn: &sea_orm::DatabaseTransaction,
-    game_id: i64,
-    updated_at: OffsetDateTime,
-) -> Result<(), AppError> {
-    let game = games::Entity::find_by_id(game_id)
-        .one(txn)
-        .await?
-        .ok_or_else(|| {
-            AppError::internal(
-                backend::ErrorCode::InternalError,
-                "Game not found".to_string(),
-                std::io::Error::new(std::io::ErrorKind::NotFound, "Game not found"),
-            )
-        })?;
-
-    let mut active_game = game.into_active_model();
-    active_game.updated_at = Set(updated_at);
-    active_game.update(txn).await?;
-    Ok(())
 }
 
 /// Helper: Update game's waiting_since timestamp
@@ -140,8 +116,6 @@ async fn returns_empty_when_all_games_are_non_actionable() -> Result<(), AppErro
             let now = OffsetDateTime::now_utc();
 
             // Create games in non-actionable states
-            // Only Completed and Abandoned are excluded from fallback
-            // So we need to ensure user has NO active games at all
             let completed_game =
                 create_game_with_state_and_time(txn, "completed_game", GameState::Completed, now)
                     .await?;
@@ -168,7 +142,7 @@ async fn returns_empty_when_all_games_are_non_actionable() -> Result<(), AppErro
             let service = GameService;
             let result = service.game_waiting_longest(txn, user_id).await?;
 
-            // Should return empty - no actionable games and fallback excludes Completed/Abandoned
+            // Should return empty - no actionable games
             assert_eq!(result, Vec::<i64>::new());
             Ok(())
         })
@@ -207,7 +181,7 @@ async fn returns_single_game_when_users_turn() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-async fn returns_fallback_when_not_users_turn() -> Result<(), AppError> {
+async fn returns_empty_when_not_users_turn() -> Result<(), AppError> {
     let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
@@ -226,8 +200,7 @@ async fn returns_fallback_when_not_users_turn() -> Result<(), AppError> {
             let service = GameService;
             let result = service.game_waiting_longest(txn, user_id).await?;
 
-            // Should return the game as fallback (most recent active game)
-            assert_eq!(result, vec![setup.game_id]);
+            assert_eq!(result, Vec::<i64>::new());
             Ok(())
         })
     })
@@ -372,7 +345,7 @@ async fn prioritizes_games_with_humans_over_ai_only() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-async fn returns_maximum_two_games() -> Result<(), AppError> {
+async fn returns_maximum_five_games() -> Result<(), AppError> {
     let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
@@ -383,7 +356,7 @@ async fn returns_maximum_two_games() -> Result<(), AppError> {
             // Create 5 games in bidding phase
             for i in 0..5 {
                 let setup =
-                    setup_game_in_bidding_phase(txn, &format!("max_two_game_{}", i)).await?;
+                    setup_game_in_bidding_phase(txn, &format!("max_five_game_{}", i)).await?;
                 let timestamp = now - time::Duration::seconds(100 - (i * 10));
                 update_game_waiting_since(txn, setup.game_id, timestamp).await?;
                 game_ids.push((setup.game_id, setup));
@@ -392,7 +365,8 @@ async fn returns_maximum_two_games() -> Result<(), AppError> {
 
             // Create shared user and attach to all games at first bidder position
             let user_id =
-                create_test_user(txn, &test_user_sub("max_two_user"), Some("Max Two User")).await?;
+                create_test_user(txn, &test_user_sub("max_five_user"), Some("Max Five User"))
+                    .await?;
 
             for (game_id, _setup) in &game_ids {
                 let game = backend::repos::games::require_game(txn, *game_id).await?;
@@ -418,10 +392,13 @@ async fn returns_maximum_two_games() -> Result<(), AppError> {
             let service = GameService;
             let result = service.game_waiting_longest(txn, user_id).await?;
 
-            // Should return exactly 2 games (oldest first)
-            assert_eq!(result.len(), 2);
+            // Should return exactly 5 games (oldest waiting_since first)
+            assert_eq!(result.len(), 5);
             assert_eq!(result[0], game_ids[0].0); // Oldest
-            assert_eq!(result[1], game_ids[1].0); // Second oldest
+            assert_eq!(result[1], game_ids[1].0);
+            assert_eq!(result[2], game_ids[2].0);
+            assert_eq!(result[3], game_ids[3].0);
+            assert_eq!(result[4], game_ids[4].0); // Newest among the five
             Ok(())
         })
     })
@@ -429,52 +406,36 @@ async fn returns_maximum_two_games() -> Result<(), AppError> {
 }
 
 #[tokio::test]
-async fn fallback_returns_most_recently_updated_game() -> Result<(), AppError> {
+async fn orders_by_game_id_when_waiting_since_equal() -> Result<(), AppError> {
     let state = build_test_state().await?;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
             let now = OffsetDateTime::now_utc();
 
-            // Create games where it's NOT the user's turn
-            let older_setup = setup_game_in_bidding_phase(txn, "fallback_older").await?;
-            sleep_ms(20).await;
-            let newer_setup = setup_game_in_bidding_phase(txn, "fallback_newer").await?;
+            // Create two games and force identical waiting_since.
+            let a_setup = setup_game_in_bidding_phase(txn, "tie_break_a").await?;
+            let b_setup = setup_game_in_bidding_phase(txn, "tie_break_b").await?;
 
-            // Set timestamps
-            let older_time = now - time::Duration::seconds(120);
-            let newer_time = now - time::Duration::seconds(60);
+            update_game_waiting_since(txn, a_setup.game_id, now).await?;
+            update_game_waiting_since(txn, b_setup.game_id, now).await?;
 
-            update_game_timestamp(txn, older_setup.game_id, older_time).await?;
-            update_game_timestamp(txn, newer_setup.game_id, newer_time).await?;
-
-            // Create completed game (should be excluded from fallback)
-            let completed_game = create_game_with_state_and_time(
+            let user_id = create_test_user(
                 txn,
-                "fallback_completed",
-                GameState::Completed,
-                now - time::Duration::seconds(30),
+                &test_user_sub("tie_break_user"),
+                Some("Tie Break User"),
             )
             .await?;
 
-            // Create user and add to all games, but NOT at first bidder position
-            let user_id =
-                create_test_user(txn, &test_user_sub("fallback_user"), Some("User")).await?;
-
-            for (game_id, _setup) in [
-                (older_setup.game_id, &older_setup),
-                (newer_setup.game_id, &newer_setup),
-            ] {
+            for game_id in [a_setup.game_id, b_setup.game_id] {
                 let game = backend::repos::games::require_game(txn, game_id).await?;
                 let dealer = game.dealer_pos().expect("Dealer should be set");
                 let first_bidder = ((dealer + 1) % 4) as usize;
-                // Put user at a different seat (not first bidder)
-                let user_seat = (first_bidder + 2) % 4;
 
                 crate::support::db_memberships::attach_human_to_seat(
                     txn,
                     game_id,
-                    user_seat as u8,
+                    first_bidder as u8,
                     user_id,
                 )
                 .await
@@ -487,20 +448,16 @@ async fn fallback_returns_most_recently_updated_game() -> Result<(), AppError> {
                 })?;
             }
 
-            // Add user to completed game
-            crate::support::db_memberships::create_test_game_player(
-                txn,
-                completed_game,
-                user_id,
-                0,
-            )
-            .await?;
-
             let service = GameService;
             let result = service.game_waiting_longest(txn, user_id).await?;
 
-            // Should return newer game (most recent non-completed)
-            assert_eq!(result, vec![newer_setup.game_id]);
+            let (min_id, max_id) = if a_setup.game_id < b_setup.game_id {
+                (a_setup.game_id, b_setup.game_id)
+            } else {
+                (b_setup.game_id, a_setup.game_id)
+            };
+
+            assert_eq!(result, vec![min_id, max_id]);
             Ok(())
         })
     })

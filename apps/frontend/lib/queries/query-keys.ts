@@ -46,7 +46,9 @@ export const queryKeys = {
     history: (id: number) =>
       [...queryKeys.games.detail(id), 'history'] as const,
 
-    waitingLongest: () => ['games', 'waitingLongest'] as const,
+    waitingLongestCache: () => ['games', 'waitingLongestCache'] as const,
+    waitingLongestPendingAction: (gameId: number) =>
+      ['games', 'waitingLongestPendingAction', gameId] as const,
   },
 
   user: {

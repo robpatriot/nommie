@@ -1,15 +1,21 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   refreshGamesListAction,
   getGameHistoryAction,
-  getWaitingLongestGameAction,
 } from '@/app/actions/game-actions'
 import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
 import type { Game } from '@/lib/types'
 import type { GameHistoryApiResponse } from '@/app/actions/game-actions'
+import {
+  defaultLwCacheState,
+  requestLwRefetch,
+  type LwCacheState,
+} from '@/lib/queries/lw-cache'
 
 /**
  * Query hook to fetch available games (joinable and in-progress).
@@ -36,19 +42,36 @@ export function useAvailableGames(initialData?: Game[]) {
  * Query hook to fetch the list of game IDs that have been waiting longest.
  * Uses the getWaitingLongestGame server function.
  */
-export function useWaitingLongestGame(options?: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: queryKeys.games.waitingLongest(),
-    queryFn: async () => {
-      const result = await getWaitingLongestGameAction()
-      if (result.kind === 'error') {
-        throw handleActionResultError(result)
-      }
-      return result.data
-    },
+export function useWaitingLongestCache(options?: { enabled?: boolean }) {
+  const queryClient = useQueryClient()
+  const enabled = options?.enabled ?? true
+
+  const q = useQuery<LwCacheState>({
+    queryKey: queryKeys.games.waitingLongestCache(),
+    queryFn: async (): Promise<LwCacheState> => defaultLwCacheState(),
+    initialData: defaultLwCacheState,
     staleTime: Infinity,
-    enabled: options?.enabled ?? true,
+    gcTime: Infinity,
+    enabled,
   })
+
+  useEffect(() => {
+    if (!enabled) return
+    const state = q.data
+    if (!state) return
+    if (state.refetchInFlight) return
+
+    // Initial fetch: event-driven system still needs a first server answer for navigation.
+    if (state.refetchRequestId === 0 && state.pool.length === 0) {
+      void requestLwRefetch(queryClient, { createSnapshot: false })
+    }
+  }, [enabled, q.data, queryClient])
+
+  return q
+}
+
+export function useWaitingLongestGame(options?: { enabled?: boolean }) {
+  return useWaitingLongestCache(options)
 }
 
 /**

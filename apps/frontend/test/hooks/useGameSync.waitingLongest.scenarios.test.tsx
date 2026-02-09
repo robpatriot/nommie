@@ -15,6 +15,17 @@ import {
 } from '@/test/setup/mock-websocket'
 import { mockGetGameRoomSnapshotAction } from '../../setupGameRoomActionsMock'
 
+const mocks = vi.hoisted(() => ({
+  getWaitingLongestGameAction: vi.fn(),
+}))
+vi.mock('@/app/actions/game-actions', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>
+  return {
+    ...actual,
+    getWaitingLongestGameAction: mocks.getWaitingLongestGameAction,
+  }
+})
+
 // Track original fetch
 const originalFetch = globalThis.fetch
 
@@ -104,12 +115,11 @@ type Scenario = {
   gameId: number
   seed: {
     snapshot: GameRoomSnapshotPayload
-    waitingLongest?: number[]
   }
   msg: unknown
   expect: {
-    waitingLongestInvalidated: boolean
     snapshotVersion: number
+    lwRefetchCalls?: number
   }
 }
 
@@ -150,58 +160,58 @@ describe('useGameSync waitingLongest cache scenarios', () => {
       kind: 'ok',
       data: createInitialDataWithVersion(0, 1),
     })
+
+    mocks.getWaitingLongestGameAction.mockResolvedValue({
+      kind: 'ok',
+      data: [],
+    })
   })
 
   it.each<Scenario>([
     {
-      name: 'game_state (current game, newer version) updates snapshot + invalidates waitingLongest',
+      name: 'game_state (current game, newer version) updates snapshot (no LW refetch)',
       gameId: 42,
       seed: {
         snapshot: createInitialDataWithVersion(42, 1),
-        waitingLongest: [42],
       },
       msg: gameStateMsg({ gameId: 42, version: 2 }),
-      expect: { waitingLongestInvalidated: true, snapshotVersion: 2 },
+      expect: { lwRefetchCalls: 0, snapshotVersion: 2 },
     },
     {
       name: 'game_state (other game) does not touch snapshot or waitingLongest',
       gameId: 42,
       seed: {
         snapshot: createInitialDataWithVersion(42, 1),
-        waitingLongest: [99],
       },
       msg: gameStateMsg({ gameId: 99, version: 2 }),
-      expect: { waitingLongestInvalidated: false, snapshotVersion: 1 },
+      expect: { lwRefetchCalls: 0, snapshotVersion: 1 },
     },
     {
       name: 'game_state (current game, stale version) is ignored (no invalidation)',
       gameId: 42,
       seed: {
         snapshot: createInitialDataWithVersion(42, 5),
-        waitingLongest: [42],
       },
       msg: gameStateMsg({ gameId: 42, version: 5 }),
-      expect: { waitingLongestInvalidated: false, snapshotVersion: 5 },
+      expect: { lwRefetchCalls: 0, snapshotVersion: 5 },
     },
     {
-      name: 'your_turn invalidates waitingLongest only',
+      name: 'your_turn adds to pool when pool is small (no refetch)',
       gameId: 42,
       seed: {
         snapshot: createInitialDataWithVersion(42, 1),
-        waitingLongest: [42],
       },
       msg: { type: 'your_turn', game_id: 42, version: 2 },
-      expect: { waitingLongestInvalidated: true, snapshotVersion: 1 },
+      expect: { lwRefetchCalls: 0, snapshotVersion: 1 },
     },
     {
-      name: 'long_wait_invalidated invalidates waitingLongest only',
+      name: 'long_wait_invalidated triggers LW refetch',
       gameId: 42,
       seed: {
         snapshot: createInitialDataWithVersion(42, 1),
-        waitingLongest: [42],
       },
       msg: { type: 'long_wait_invalidated', game_id: 42 },
-      expect: { waitingLongestInvalidated: true, snapshotVersion: 1 },
+      expect: { lwRefetchCalls: 1, snapshotVersion: 1 },
     },
   ])('$name', async (scenario) => {
     const initialData = scenario.seed.snapshot
@@ -219,31 +229,19 @@ describe('useGameSync waitingLongest cache scenarios', () => {
       queryKeys.games.snapshot(scenario.gameId),
       scenario.seed.snapshot
     )
-    if (scenario.seed.waitingLongest) {
-      queryClient.setQueryData(
-        queryKeys.games.waitingLongest(),
-        scenario.seed.waitingLongest
-      )
-    }
-
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
+    // Provider triggers an LW refetch on hello_ack; clear so scenario expectations
+    // only reflect effects from the scenario message.
+    mocks.getWaitingLongestGameAction.mockClear()
 
     act(() => {
       serverSendJson(ws, scenario.msg)
     })
 
-    if (scenario.expect.waitingLongestInvalidated) {
+    if (typeof scenario.expect.lwRefetchCalls === 'number') {
       await waitFor(() => {
-        expect(invalidateSpy).toHaveBeenCalledWith({
-          queryKey: queryKeys.games.waitingLongest(),
-        })
-      })
-    } else {
-      await act(async () => {
-        await Promise.resolve()
-      })
-      expect(invalidateSpy).not.toHaveBeenCalledWith({
-        queryKey: queryKeys.games.waitingLongest(),
+        expect(mocks.getWaitingLongestGameAction.mock.calls.length).toBe(
+          scenario.expect.lwRefetchCalls
+        )
       })
     }
 

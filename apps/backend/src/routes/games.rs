@@ -1110,8 +1110,7 @@ async fn list_overview_games(
 
 /// GET /api/games/waiting-longest
 ///
-/// Returns the game ID of the game that has been waiting for the user to act the longest.
-/// If no games are waiting for the user, returns the most recently active game
+/// Returns up to 5 game IDs for games that have been waiting for the user to act the longest.
 #[derive(serde::Serialize)]
 struct LongestWaitingGamesResponse {
     game_ids: Vec<i64>,
@@ -1750,6 +1749,27 @@ async fn resolve_human_user_id_for_seat<C: ConnectionTrait + Send + Sync>(
     Ok(user_id)
 }
 
+async fn resolve_human_user_ids_for_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let all = memberships::find_all_by_game(conn, game_id).await?;
+    let mut user_ids: std::collections::HashSet<i64> = std::collections::HashSet::new();
+
+    for m in all {
+        if m.player_kind != crate::entities::game_players::PlayerKind::Human {
+            continue;
+        }
+        if let Some(user_id) = m.user_id {
+            user_ids.insert(user_id);
+        }
+    }
+
+    let mut out: Vec<i64> = user_ids.into_iter().collect();
+    out.sort_unstable();
+    Ok(out)
+}
+
 async fn publish_game_mutation_effects(
     app_state: &web::Data<AppState>,
     game_id: i64,
@@ -1822,12 +1842,29 @@ async fn publish_game_mutation_effects(
     }
 
     if should_invalidate_long_wait {
-        if let Err(err) = realtime.publish_long_wait_invalidated(game_id).await {
-            tracing::error!(
-                game_id,
-                error = %err,
-                "Failed to publish long_wait_invalidated event. Frontend caches may be stale."
-            );
+        match resolve_human_user_ids_for_game(db, game_id).await {
+            Ok(user_ids) => {
+                for user_id in user_ids {
+                    if let Err(err) = realtime
+                        .publish_long_wait_invalidated(user_id, game_id)
+                        .await
+                    {
+                        tracing::error!(
+                            game_id,
+                            user_id,
+                            error = %err,
+                            "Failed to publish long_wait_invalidated event. Frontend caches may be stale."
+                        );
+                    }
+                }
+            }
+            Err(err) => {
+                tracing::warn!(
+                    game_id,
+                    error = %err,
+                    "Failed to resolve user_ids for long_wait_invalidated broadcast"
+                );
+            }
         }
     }
 

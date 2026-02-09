@@ -33,7 +33,8 @@ import {
   signOutAction,
 } from '@/app/actions/auth-actions'
 import { useHeaderBreadcrumbs } from './header-breadcrumbs'
-import { useWaitingLongestGame } from '@/hooks/queries/useGames'
+import { useWaitingLongestCache } from '@/hooks/queries/useGames'
+import { renderNavigationPool } from '@/lib/queries/lw-cache'
 
 type HeaderProps = {
   session: { user?: { email?: string | null } } | null
@@ -56,22 +57,15 @@ export default function Header({ session }: HeaderProps) {
     : undefined
 
   // Fetch the list of games waiting for the user's attention.
-  const { data: waitingGameIds } = useWaitingLongestGame({
+  const { data: lw } = useWaitingLongestCache({
     enabled: !!session?.user,
   })
 
-  // Select the appropriate game to show:
-  // 1. If no waiting games, null
-  // 2. If the first game is NOT the current one, use it
-  // 3. If the first game IS the current one, try to use the second one
-  let targetGameId: number | null = null
-  if (waitingGameIds && waitingGameIds.length > 0) {
-    if (waitingGameIds[0] !== currentGameId) {
-      targetGameId = waitingGameIds[0]
-    } else if (waitingGameIds.length > 1) {
-      targetGameId = waitingGameIds[1]
-    }
-  }
+  const navPool = renderNavigationPool({
+    pool: lw?.pool ?? [],
+    currentGameId,
+  })
+  const targetGameId = navPool[0] ?? null
 
   useEffect(() => {
     if (!isUserMenuOpen) {

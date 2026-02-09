@@ -18,6 +18,11 @@ import { isGameStateMsg } from '@/lib/game-room/protocol/types'
 import { queryKeys } from '@/lib/queries/query-keys'
 import { gameStateMsgToSnapshotPayload } from '@/lib/game-room/protocol/transform'
 import { useWebSocket } from '@/lib/providers/web-socket-provider'
+import {
+  getLwPendingAction,
+  onYourTurn,
+  setLwPendingAction,
+} from '@/lib/queries/lw-cache'
 
 export interface UseGameSyncResult {
   refreshSnapshot: () => Promise<void>
@@ -62,6 +67,7 @@ export function useGameSync({
   const gameIdRef = useRef(gameId)
   const etagRef = useRef<string | undefined>(initialData.etag)
   const lastWsVersionSeenRef = useRef<number | undefined>(undefined)
+  const prevIsUsersTurnRef = useRef<boolean>(false)
 
   // Keep gameIdRef in sync
   useEffect(() => {
@@ -94,13 +100,34 @@ export function useGameSync({
       etagRef.current = payload.etag ?? buildEtag(payload.version)
       setLocalSyncError(null)
       queryClient.setQueryData(queryKeys.games.snapshot(currentGameId), payload)
-
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.games.waitingLongest(),
-      })
     },
     [buildEtag, queryClient]
   )
+
+  const computeMyTurn = useCallback(
+    (payload: GameRoomSnapshotPayload): boolean => {
+      if (payload.viewerSeat === null) return false
+
+      const phase = payload.snapshot.phase
+      if (phase.phase === 'Bidding') {
+        return phase.data.to_act === payload.viewerSeat
+      }
+      if (phase.phase === 'TrumpSelect') {
+        return phase.data.to_act === payload.viewerSeat
+      }
+      if (phase.phase === 'Trick') {
+        return phase.data.to_act === payload.viewerSeat
+      }
+      return false
+    },
+    []
+  )
+
+  // Initialize edge detector from initial HTTP snapshot (prevents false edges on navigation/reload).
+  useEffect(() => {
+    prevIsUsersTurnRef.current = computeMyTurn(initialData)
+    setLwPendingAction(queryClient, gameId, false)
+  }, [computeMyTurn, gameId, initialData, queryClient])
 
   const refreshSnapshot = useCallback(async () => {
     setIsRefreshing(true)
@@ -155,8 +182,23 @@ export function useGameSync({
       lastWsVersionSeenRef.current = message.version
       const payload = gameStateMsgToSnapshotPayload(message)
       applySnapshot(payload)
+
+      // LW cache rules: eligibility derived from game_state for the current game.
+      const myTurn = computeMyTurn(payload)
+      const prev = prevIsUsersTurnRef.current
+      const pendingAction = getLwPendingAction(queryClient, gameIdRef.current)
+      prevIsUsersTurnRef.current = myTurn
+
+      if (pendingAction) {
+        setLwPendingAction(queryClient, gameIdRef.current, false)
+      }
+
+      if (myTurn && (pendingAction || !prev)) {
+        // Edge-trigger: treat as `your_turn` for the current game.
+        void onYourTurn(queryClient, { gameId: gameIdRef.current })
+      }
     },
-    [applySnapshot]
+    [applySnapshot, computeMyTurn, queryClient]
   )
 
   // Handle subscription lifecycle
@@ -187,14 +229,9 @@ export function useGameSync({
       }
 
       // handle other message types
-      if (msg.type === 'your_turn' || msg.type === 'long_wait_invalidated') {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.games.waitingLongest(),
-        })
-        return
-      }
-
       if (msg.type === 'error') {
+        // If the server rejected an action, avoid leaving a pendingAction latch set.
+        setLwPendingAction(queryClient, gameIdRef.current, false)
         // Fallback to HTTP refresh on server-side errors
         void refreshSnapshot()
         return

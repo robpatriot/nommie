@@ -19,6 +19,17 @@ import {
   type RealtimeScenario,
 } from '../setup/waitingLongest-cache-scenarios'
 
+const mocks = vi.hoisted(() => ({
+  getWaitingLongestGameAction: vi.fn(),
+}))
+vi.mock('@/app/actions/game-actions', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>
+  return {
+    ...actual,
+    getWaitingLongestGameAction: mocks.getWaitingLongestGameAction,
+  }
+})
+
 // Track original fetch
 const originalFetch = globalThis.fetch
 
@@ -75,18 +86,23 @@ describe('useGameSync waitingLongest cache scenarios', () => {
 
     // Ensure WebSocket is mocked
     vi.stubGlobal('WebSocket', MockWebSocket)
+
+    mocks.getWaitingLongestGameAction.mockResolvedValue({
+      kind: 'ok',
+      data: [],
+    })
   })
 
   it.each<RealtimeScenario>([
     {
-      name: 'game_state (current game, newer version) updates snapshot + invalidates waitingLongest',
+      name: 'game_state (current game, newer version) updates snapshot (no LW refetch)',
       gameId: 42,
       initialData: createInitialDataWithVersion(42, 1),
       seed: {
         snapshot: { gameId: 42, payload: createInitialDataWithVersion(42, 1) },
       },
       msg: gameStateMsg({ gameId: 42, version: 2 }),
-      expect: { waitingLongestInvalidated: true, snapshotVersion: 2 },
+      expect: { lwRefetchCalls: 0, snapshotVersion: 2 },
     },
     {
       name: 'game_state (other game) does nothing',
@@ -96,7 +112,7 @@ describe('useGameSync waitingLongest cache scenarios', () => {
         snapshot: { gameId: 42, payload: createInitialDataWithVersion(42, 1) },
       },
       msg: gameStateMsg({ gameId: 99, version: 2 }),
-      expect: { waitingLongestInvalidated: false, snapshotVersion: 1 },
+      expect: { lwRefetchCalls: 0, snapshotVersion: 1 },
     },
     {
       name: 'game_state (current game, older/equal version) is ignored',
@@ -106,27 +122,86 @@ describe('useGameSync waitingLongest cache scenarios', () => {
         snapshot: { gameId: 42, payload: createInitialDataWithVersion(42, 5) },
       },
       msg: gameStateMsg({ gameId: 42, version: 5 }),
-      expect: { waitingLongestInvalidated: false, snapshotVersion: 5 },
+      expect: { lwRefetchCalls: 0, snapshotVersion: 5 },
     },
     {
-      name: 'your_turn invalidates waitingLongest only',
+      name: 'your_turn updates LW cache (no refetch when pool is small)',
       gameId: 42,
       initialData: createInitialDataWithVersion(42, 1),
       seed: {
         snapshot: { gameId: 42, payload: createInitialDataWithVersion(42, 1) },
+        lwCache: {
+          pool: [],
+          isCompleteFromServer: false,
+        },
       },
       msg: { type: 'your_turn', game_id: 42, version: 2 },
-      expect: { waitingLongestInvalidated: true, snapshotVersion: 1 },
+      expect: {
+        lwRefetchCalls: 0,
+        lwPoolAfterRefetch: [42],
+        lwSnapshotGameIdAfter: null,
+        snapshotVersion: 1,
+      },
     },
     {
-      name: 'long_wait_invalidated invalidates waitingLongest only',
+      name: 'long_wait_invalidated triggers LW refetch and updates pool',
       gameId: 42,
       initialData: createInitialDataWithVersion(42, 1),
       seed: {
         snapshot: { gameId: 42, payload: createInitialDataWithVersion(42, 1) },
       },
       msg: { type: 'long_wait_invalidated', game_id: 42 },
-      expect: { waitingLongestInvalidated: true, snapshotVersion: 1 },
+      expect: {
+        lwRefetchCalls: 1,
+        lwPoolAfterRefetch: [101, 202, 303],
+        lwSnapshotGameIdAfter: null,
+        snapshotVersion: 1,
+      },
+    },
+
+    {
+      name: 'your_turn (pool full, missing game) refetches and creates snapshot tied to that game',
+      gameId: 42,
+      initialData: createInitialDataWithVersion(42, 1),
+      seed: {
+        snapshot: { gameId: 42, payload: createInitialDataWithVersion(42, 1) },
+        lwCache: {
+          pool: [10, 11],
+          isCompleteFromServer: false,
+        },
+      },
+      msg: { type: 'your_turn', game_id: 99, version: 2 },
+      expect: {
+        lwRefetchCalls: 1,
+        lwPoolAfterRefetch: [401, 402, 403],
+        lwSnapshotGameIdAfter: 99,
+        snapshotVersion: 1,
+      },
+    },
+
+    {
+      name: 'your_turn (snapshot for same game) restores snapshot with no refetch',
+      gameId: 42,
+      initialData: createInitialDataWithVersion(42, 1),
+      seed: {
+        snapshot: { gameId: 42, payload: createInitialDataWithVersion(42, 1) },
+        lwCache: {
+          pool: [10, 11],
+          isCompleteFromServer: false,
+          snapshot: {
+            gameId: 99,
+            pool: [501, 502],
+            isCompleteFromServer: true,
+          },
+        },
+      },
+      msg: { type: 'your_turn', game_id: 99, version: 2 },
+      expect: {
+        lwRefetchCalls: 0,
+        lwPoolAfterRefetch: [501, 502],
+        lwSnapshotGameIdAfter: 99,
+        snapshotVersion: 1,
+      },
     },
   ])('$name', async (scenario) => {
     // Mount the hook (WebSocketProvider auto-connects when authenticated).
@@ -147,10 +222,19 @@ describe('useGameSync waitingLongest cache scenarios', () => {
     })
     const ws = mockWebSocketInstances[0]
 
-    // Spy on invalidation (source of truth for "waitingLongest changed" signals).
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
-
-    await runRealtimeScenario(scenario, { queryClient, ws, invalidateSpy })
+    await runRealtimeScenario(scenario, {
+      queryClient,
+      ws,
+      clearLwRefetchMock: () => mocks.getWaitingLongestGameAction.mockClear(),
+      getLwRefetchMockCallCount: () =>
+        mocks.getWaitingLongestGameAction.mock.calls.length,
+      setLwRefetchMockResponse: (pool) => {
+        mocks.getWaitingLongestGameAction.mockResolvedValue({
+          kind: 'ok',
+          data: pool,
+        })
+      },
+    })
 
     // Sanity: snapshot cache key should be present if we asserted a version.
     if (scenario.expect.snapshotVersion !== undefined) {

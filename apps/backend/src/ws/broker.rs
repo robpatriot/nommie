@@ -91,11 +91,15 @@ impl RealtimeBroker {
     }
 
     /// Publish a "long_wait_invalidated" event for a given game.
-    /// This is broadcast to the game topic so all players in that game (and observers)
-    /// know that the "waiting longest" status might have changed (or they are no longer waiting).
-    pub async fn publish_long_wait_invalidated(&self, game_id: i64) -> Result<(), AppError> {
+    /// This is published on the user channel so the user can refresh LW navigation
+    /// even when not currently subscribed to the game's realtime topic.
+    pub async fn publish_long_wait_invalidated(
+        &self,
+        user_id: i64,
+        game_id: i64,
+    ) -> Result<(), AppError> {
         let envelope = EventEnvelope::LongWaitInvalidated { game_id };
-        self.publish_to_channel(format!("game:{game_id}"), envelope)
+        self.publish_to_channel(format!("user:{user_id}"), envelope)
             .await
     }
 
@@ -377,19 +381,18 @@ async fn run_subscription_loop(redis_url: &str, registry: Arc<WsRegistry>) -> Re
             }
 
             Ok(EventEnvelope::LongWaitInvalidated { game_id }) => {
-                // Optional safety: ensure channel matches the kind we expect.
-                if parse_game_channel(&channel).is_none() {
+                // User-scoped delivery: LW invalidations must reach the user even when not
+                // subscribed to the game topic (e.g. lobby/header navigation).
+                let Some(user_id) = parse_user_channel(&channel) else {
                     warn!(
                         channel = %channel,
                         game_id,
-                        "[WS BROKER] LongWaitInvalidated received on non-game channel"
+                        "[WS BROKER] LongWaitInvalidated received on non-user channel"
                     );
-                }
-                // Broadcast to everyone subscribed to Topic::Game { id: game_id }
-                registry.broadcast_to_topic(
-                    &crate::ws::protocol::Topic::Game { id: game_id },
-                    HubEvent::LongWaitInvalidated { game_id },
-                );
+                    continue;
+                };
+
+                registry.broadcast_to_user(user_id, HubEvent::LongWaitInvalidated { game_id });
             }
 
             Err(err) => {

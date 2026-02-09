@@ -23,7 +23,11 @@ import type {
 } from '@/lib/game-room/protocol/types'
 import { isWireMsg } from '@/lib/game-room/protocol/types'
 import { logError } from '@/lib/logging/error-logger'
-import { queryKeys } from '@/lib/queries/query-keys'
+import {
+  onLongWaitInvalidated,
+  onYourTurn,
+  requestLwRefetch,
+} from '@/lib/queries/lw-cache'
 
 const MAX_RECONNECT_DELAY_MS = 30_000
 const INITIAL_RECONNECT_DELAY_MS = 1000
@@ -324,9 +328,18 @@ export function WebSocketProvider({
             setSyncError(null)
 
             // Resync derived caches after reconnect
-            void queryClient.refetchQueries({
-              queryKey: queryKeys.games.waitingLongest(),
-            })
+            void requestLwRefetch(queryClient, { createSnapshot: false })
+          }
+
+          if (parsed.type === 'your_turn') {
+            const gameId = (parsed as { game_id?: unknown }).game_id
+            if (typeof gameId === 'number') {
+              void onYourTurn(queryClient, { gameId })
+            }
+          }
+
+          if (parsed.type === 'long_wait_invalidated') {
+            void onLongWaitInvalidated(queryClient)
           }
 
           handlersRef.current.forEach((handler) => handler(parsed))
