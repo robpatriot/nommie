@@ -140,7 +140,6 @@ pub fn nth_from(start: PlayerId, n: u8) -> PlayerId {
 /// Round 2 → starting_dealer + 1 (mod 4)
 #[inline]
 pub fn dealer_for_round(starting_dealer: PlayerId, round_no: u8) -> PlayerId {
-    debug_assert!(round_no >= 1, "round_no is 1-based and must be >= 1");
     let steps = round_no.saturating_sub(1);
     nth_from(starting_dealer, steps)
 }
