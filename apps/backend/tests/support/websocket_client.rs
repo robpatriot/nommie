@@ -247,4 +247,18 @@ impl WebSocketClient {
         let game_state = self.recv_type(Duration::from_secs(5), "game_state").await?;
         Ok((ack, game_state))
     }
+
+    /// Protocol helper: unsubscribe from a game, returns the ack.
+    pub async fn unsubscribe_game(
+        &mut self,
+        game_id: i64,
+    ) -> Result<Value, Box<dyn std::error::Error>> {
+        self.send_json(&json!({
+            "type": "unsubscribe",
+            "topic": { "kind": "game", "id": game_id }
+        }))
+        .await?;
+
+        self.recv_type(Duration::from_secs(5), "ack").await
+    }
 }

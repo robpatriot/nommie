@@ -128,7 +128,11 @@ async function connectAndSubscribe(
 
   // Server acks subscription
   await act(async () => {
-    serverSendJson(ws, { type: 'ack', message: 'subscribed' })
+    serverSendJson(ws, {
+      type: 'ack',
+      command: 'subscribe',
+      topic: { kind: 'game', id: opts.expectedGameId },
+    })
   })
 }
 
@@ -267,7 +271,11 @@ describe('useGameSync', () => {
 
       // Server acks subscription (if your hook expects it)
       await act(async () => {
-        serverSendJson(ws, { type: 'ack', message: 'subscribed' })
+        serverSendJson(ws, {
+          type: 'ack',
+          command: 'subscribe',
+          topic: { kind: 'game', id: 2 },
+        })
       })
 
       // Send low-version game_state for game 2 (must NOT be dropped due to old last=100 from game 1).

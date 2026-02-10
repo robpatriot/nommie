@@ -101,6 +101,8 @@ async fn websocket_reconnect_after_multiple_disconnects() -> Result<(), Box<dyn 
 
     let (ack, game_state) = final_client.subscribe_game(setup.game_id).await?;
     assert_eq!(ack["type"], "ack");
+    assert_eq!(ack["command"], "subscribe");
+    assert_eq!(ack["topic"]["id"], setup.game_id);
     assert_eq!(game_state["type"], "game_state");
 
     final_client.close().await?;

@@ -181,7 +181,9 @@ async fn websocket_yourturn_not_delivered_to_sessions_already_in_that_game(
     let ack = client_in_game
         .recv_type(Duration::from_secs(2), "ack")
         .await?;
-    assert_eq!(ack["message"], "subscribed");
+    assert_eq!(ack["command"], "subscribe");
+    assert_eq!(ack["topic"]["kind"], "game");
+    assert_eq!(ack["topic"]["id"], setup.game_id);
 
     // Broadcast a user-scoped your_turn, excluding sessions already in that game
     let version = 456;

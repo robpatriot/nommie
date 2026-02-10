@@ -63,19 +63,19 @@ This keeps Redis messages small and avoids having to serialize/deserialize the f
 Messages are JSON with a `type` discriminator.
 
 ### Server → Client
-- `ack`:
-  - `{ "type": "ack", "message": "connected" }`
-- `snapshot`:
-  - `{ "type": "snapshot", "data": <GameSnapshotResponse>, "viewer_seat": <number|null> }`
-
-Where `data` is equivalent to the HTTP snapshot response:
-- `snapshot`: public game snapshot (no private hands)
-- `viewer_hand`: optional viewer hand (only for the viewing player when available)
-- `bid_constraints`: optional constraints payload (e.g. consecutive zero-bid lock)
-- `version`: optimistic lock version for the game
+- `hello_ack`: `{ "type": "hello_ack", "protocol": 1, "user_id": <id> }` — response to client `hello`
+- `ack`: Machine-correlatable acknowledgement of a client command. Identifies the command and topic:
+  - Subscribe: `{ "type": "ack", "command": "subscribe", "topic": { "kind": "game", "id": <game_id> } }`
+  - Unsubscribe: `{ "type": "ack", "command": "unsubscribe", "topic": { "kind": "game", "id": <game_id> } }`
+- `game_state`: `{ "type": "game_state", "topic": { "kind": "game", "id": <game_id> }, "version": <n>, "game": <GameSnapshot>, "viewer": <ViewerState> }`
+- `your_turn`: `{ "type": "your_turn", "game_id": <id>, "version": <n> }` — user-scoped hint
+- `long_wait_invalidated`: `{ "type": "long_wait_invalidated", "game_id": <id> }`
+- `error`: `{ "type": "error", "code": "<code>", "message": "<string>" }`
 
 ### Client → Server
-The current client does not send application messages. Any client traffic is treated as a heartbeat indicator (and otherwise ignored).
+- `hello`: `{ "type": "hello", "protocol": 1 }` — must be sent first
+- `subscribe`: `{ "type": "subscribe", "topic": { "kind": "game", "id": <game_id> } }`
+- `unsubscribe`: `{ "type": "unsubscribe", "topic": { "kind": "game", "id": <game_id> } }`
 
 ## Frontend Integration
 - The websocket connection lifecycle and reconnection behavior live in `useGameSync`.

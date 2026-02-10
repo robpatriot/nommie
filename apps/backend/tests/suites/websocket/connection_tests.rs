@@ -76,7 +76,9 @@ async fn websocket_subscribe_ack_then_snapshot_ordering() -> Result<(), Box<dyn 
 
     let (ack, game_state) = client.subscribe_game(setup.game_id).await?;
     assert_eq!(ack["type"], "ack");
-    assert_eq!(ack["message"], "subscribed");
+    assert_eq!(ack["command"], "subscribe");
+    assert_eq!(ack["topic"]["kind"], "game");
+    assert_eq!(ack["topic"]["id"], setup.game_id);
 
     assert_eq!(game_state["type"], "game_state");
     assert_eq!(game_state["topic"]["kind"], "game");
@@ -86,6 +88,53 @@ async fn websocket_subscribe_ack_then_snapshot_ordering() -> Result<(), Box<dyn 
     assert!(game_state.get("game").is_some());
     assert!(game_state.get("viewer").is_some());
     assert!(game_state.get("version").is_some());
+
+    client.close().await?;
+    wait_for_connections(&registry, 0, Duration::from_secs(2)).await?;
+    server_handle.stop(true).await;
+    let _ = server_join.await;
+
+    rollback_eventually(shared).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn websocket_ack_semantics_subscribe_and_unsubscribe(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let state = build_test_state().await?;
+    let security = state.security.clone();
+    let db = require_db(&state)?;
+    let shared = backend::db::txn::SharedTxn::open(db).await?;
+
+    let test_name = "ws_ack_semantics";
+    let setup = setup_game_with_players(shared.transaction(), test_name).await?;
+
+    let user_sub = format!("{test_name}_user");
+    let user_email = format!("{test_name}@example.com");
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
+
+    attach_human_to_seat(shared.transaction(), setup.game_id, 0, user_id).await?;
+
+    let (state, registry) = attach_test_registry(state);
+    let token = mint_test_token(&user_sub, &user_email, &security);
+
+    let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
+    let ws_url = format!("ws://{}/ws?token={}", addr, token);
+
+    let mut client = WebSocketClient::connect_retry(&ws_url, Duration::from_secs(1)).await?;
+    client.hello().await?;
+
+    let (sub_ack, _game_state) = client.subscribe_game(setup.game_id).await?;
+    assert_eq!(sub_ack["type"], "ack");
+    assert_eq!(sub_ack["command"], "subscribe");
+    assert_eq!(sub_ack["topic"]["kind"], "game");
+    assert_eq!(sub_ack["topic"]["id"], setup.game_id);
+
+    let unsub_ack = client.unsubscribe_game(setup.game_id).await?;
+    assert_eq!(unsub_ack["type"], "ack");
+    assert_eq!(unsub_ack["command"], "unsubscribe");
+    assert_eq!(unsub_ack["topic"]["kind"], "game");
+    assert_eq!(unsub_ack["topic"]["id"], setup.game_id);
 
     client.close().await?;
     wait_for_connections(&registry, 0, Duration::from_secs(2)).await?;

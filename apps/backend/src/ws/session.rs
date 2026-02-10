@@ -13,7 +13,9 @@ use crate::protocol::game_state::ViewerState;
 use crate::state::app_state::AppState;
 use crate::ws::game;
 use crate::ws::hub::WsRegistry;
-use crate::ws::protocol::{ClientMsg, ErrorCode, GameStateMsg, ServerMsg, Topic, PROTOCOL_VERSION};
+use crate::ws::protocol::{
+    Ack, AckCommand, ClientMsg, ErrorCode, GameStateMsg, ServerMsg, Topic, PROTOCOL_VERSION,
+};
 use crate::AppError;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(20);
@@ -257,9 +259,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                     // Ordering guarantee: ack then game_state
                                     Self::send_json(
                                         ctx,
-                                        &ServerMsg::Ack {
-                                            message: "subscribed",
-                                        },
+                                        &ServerMsg::Ack(Ack {
+                                            command: AckCommand::Subscribe,
+                                            topic: Topic::Game { id: game_id },
+                                        }),
                                     );
                                     Self::send_json(
                                         ctx,
@@ -316,9 +319,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                         }
                         Self::send_json(
                             ctx,
-                            &ServerMsg::Ack {
-                                message: "unsubscribed",
-                            },
+                            &ServerMsg::Ack(Ack {
+                                command: AckCommand::Unsubscribe,
+                                topic: topic.clone(),
+                            }),
                         );
                     }
                 }

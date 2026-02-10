@@ -106,7 +106,11 @@ async function connectAndSubscribe(
   expect(subscribe?.topic).toEqual({ kind: 'game', id: opts.expectedGameId })
 
   await act(async () => {
-    serverSendJson(ws, { type: 'ack', message: 'subscribed' })
+    serverSendJson(ws, {
+      type: 'ack',
+      command: 'subscribe',
+      topic: { kind: 'game', id: opts.expectedGameId },
+    })
   })
 }
 

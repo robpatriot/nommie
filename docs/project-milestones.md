@@ -338,9 +338,9 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 - **Explicit Behavioural Guarantees:** ✅ **Completed** — Tests assert behaviour, not timing or incidental ordering.  
   *Status:* ✅ Complete.  
   *Acceptance:* ✅ No data before subscribe; ordering guarantees asserted.
-- **Acknowledgement Semantics:** ⬜ **Planned** — Make acks unambiguously machine-correlatable and future-proof.  
-  *Status:* ⬜ Planned.  
-  *Acceptance:* ⬜ Ack messages clearly identify the command being acknowledged; tests assert semantics.
+- **Acknowledgement Semantics:** ✅ **Completed** — Acks are machine-correlatable with `command` and `topic` fields.  
+  *Status:* ✅ Complete.  
+  *Acceptance:* ✅ Ack messages clearly identify the command being acknowledged; tests assert semantics.
 - **Dedicated WS Token Type:** ⬜ **Planned / Deferred** — Enforce WS-only token type distinct from access tokens.  
   *Status:* ⬜ Planned / Deferred.  
   *Acceptance:* ⬜ `/ws` rejects non-WS tokens; tests prove access tokens cannot open WS connections.

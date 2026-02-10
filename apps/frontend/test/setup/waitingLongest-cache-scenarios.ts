@@ -92,7 +92,11 @@ export async function connectAndSubscribe(ws: MockWebSocket, gameId: number) {
   expect(subscribe?.topic).toEqual({ kind: 'game', id: gameId })
 
   await act(async () => {
-    serverSendJson(ws, { type: 'ack', message: 'subscribed' })
+    serverSendJson(ws, {
+      type: 'ack',
+      command: 'subscribe',
+      topic: { kind: 'game', id: gameId },
+    })
   })
 }
 

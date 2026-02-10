@@ -50,9 +50,12 @@ export type HelloAckMsg = {
   user_id: number
 }
 
+export type AckCommand = 'subscribe' | 'unsubscribe'
+
 export type AckMsg = {
   type: 'ack'
-  message: string
+  command: AckCommand
+  topic: Topic
 }
 
 export type ErrorMsg = {
