@@ -32,7 +32,7 @@ use crate::services::game_flow::GameFlowService;
 use crate::services::games::GameService;
 use crate::services::players::PlayerService;
 use crate::state::app_state::AppState;
-use crate::ws::protocol::{ServerMsg, Topic};
+use crate::ws::protocol::{GameStateMsg, ServerMsg, Topic};
 
 /// Build shared snapshot parts (cacheable by game_id + version).
 ///
@@ -397,12 +397,12 @@ async fn get_snapshot(
         }
     }
 
-    let msg = ServerMsg::GameState {
+    let msg = ServerMsg::GameState(Box::new(GameStateMsg {
         topic: Topic::Game { id },
         version: snapshot_response.version,
         game: snapshot_response.snapshot,
         viewer: snapshot_response.viewer,
-    };
+    }));
     // Resource is new or modified, return full response
     let mut response = HttpResponse::Ok();
     response.insert_header((ETAG, etag_value));

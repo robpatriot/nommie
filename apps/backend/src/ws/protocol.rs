@@ -20,39 +20,28 @@ pub enum ClientMsg {
     Unsubscribe { topic: Topic },
 }
 
-#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameStateMsg {
+    pub topic: Topic,
+    pub version: i32,
+    pub game: GameSnapshot,
+    pub viewer: ViewerState,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMsg {
-    HelloAck {
-        protocol: i32,
-        user_id: i64,
-    },
+    HelloAck { protocol: i32, user_id: i64 },
 
-    Ack {
-        message: &'static str,
-    },
+    Ack { message: &'static str },
 
-    GameState {
-        topic: Topic,
-        version: i32,
-        game: GameSnapshot,
-        viewer: ViewerState,
-    },
+    GameState(Box<GameStateMsg>),
 
-    YourTurn {
-        game_id: i64,
-        version: i32,
-    },
+    YourTurn { game_id: i64, version: i32 },
 
-    LongWaitInvalidated {
-        game_id: i64,
-    },
+    LongWaitInvalidated { game_id: i64 },
 
-    Error {
-        code: ErrorCode,
-        message: String,
-    },
+    Error { code: ErrorCode, message: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

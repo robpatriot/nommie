@@ -13,7 +13,7 @@ use crate::protocol::game_state::ViewerState;
 use crate::state::app_state::AppState;
 use crate::ws::game;
 use crate::ws::hub::WsRegistry;
-use crate::ws::protocol::{ClientMsg, ErrorCode, ServerMsg, Topic, PROTOCOL_VERSION};
+use crate::ws::protocol::{ClientMsg, ErrorCode, GameStateMsg, ServerMsg, Topic, PROTOCOL_VERSION};
 use crate::AppError;
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(20);
@@ -263,12 +263,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                     );
                                     Self::send_json(
                                         ctx,
-                                        &ServerMsg::GameState {
+                                        &ServerMsg::GameState(Box::new(GameStateMsg {
                                             topic: Topic::Game { id: game_id },
                                             version,
                                             game: game_snapshot,
                                             viewer,
-                                        },
+                                        })),
                                     );
                                 }
                                 Err(err) => {
@@ -384,12 +384,12 @@ impl Handler<HubEvent> for WsSession {
                         Ok((ver, game_snapshot, viewer)) => {
                             Self::send_json(
                                 ctx,
-                                &ServerMsg::GameState {
+                                &ServerMsg::GameState(Box::new(GameStateMsg {
                                     topic: Topic::Game { id: game_id },
                                     version: ver,
                                     game: game_snapshot,
                                     viewer,
-                                },
+                                })),
                             );
                         }
                         Err(err) => {
