@@ -537,6 +537,49 @@ describe('useGameSync', () => {
       expect(cached?.version).toBe(2)
     })
 
+    it('does not synthesize ETag from WS payload version; ETag stays from initialData', async () => {
+      const initialData = createInitialDataWithVersion(1, 1)
+      const httpEtag = initialData.etag
+      expect(httpEtag).toBe('"game-1-v1"')
+
+      const { result } = renderHook(
+        () => useGameSync({ initialData, gameId: 1 }),
+        { queryClient }
+      )
+
+      await waitForWsCount(1)
+      const ws = mockWebSocketInstances[0]
+      await connectAndSubscribe(ws, { expectedGameId: 1 })
+
+      mockGetGameRoomSnapshotAction.mockClear()
+
+      act(() => {
+        serverSendJson(ws, {
+          type: 'game_state',
+          topic: { kind: 'game', id: 1 },
+          version: 5,
+          game: initSnapshotFixture,
+          viewer: { seat: 0, hand: [], bidConstraints: null },
+        })
+      })
+
+      await waitFor(() => {
+        const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(
+          queryKeys.games.snapshot(1)
+        )
+        expect(cached?.version).toBe(5)
+      })
+
+      await act(async () => {
+        await result.current.refreshSnapshot()
+      })
+
+      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledWith({
+        gameId: 1,
+        etag: httpEtag,
+      })
+    })
+
     it('refreshSnapshot surfaces errors in syncError', async () => {
       const initialData = createInitialDataWithVersion(1)
 

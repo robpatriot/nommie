@@ -74,14 +74,6 @@ export function useGameSync({
     gameIdRef.current = gameId
   }, [gameId])
 
-  const buildEtag = useCallback(
-    (version?: number) =>
-      typeof version === 'number'
-        ? `"game-${gameIdRef.current}-v${version}"`
-        : undefined,
-    []
-  )
-
   const applySnapshot = useCallback(
     (payload: GameRoomSnapshotPayload) => {
       const currentGameId = gameIdRef.current
@@ -97,11 +89,11 @@ export function useGameSync({
         return
       }
 
-      etagRef.current = payload.etag ?? buildEtag(payload.version)
+      if (payload.etag !== undefined) etagRef.current = payload.etag
       setLocalSyncError(null)
       queryClient.setQueryData(queryKeys.games.snapshot(currentGameId), payload)
     },
-    [buildEtag, queryClient]
+    [queryClient]
   )
 
   const computeMyTurn = useCallback(
