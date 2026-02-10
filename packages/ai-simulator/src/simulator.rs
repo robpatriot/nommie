@@ -326,9 +326,6 @@ impl Simulator {
                         // Update round memories for all players
                         self.update_round_memories(&trick_plays);
                     }
-
-                    // Keep `trick_no` in sync for AI context/history convenience
-                    self.state.trick_no = Some(self.completed_tricks.len() as u8);
                 }
             }
         }
