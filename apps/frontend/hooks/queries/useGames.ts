@@ -94,7 +94,8 @@ export function useGameHistory(gameId: number | undefined) {
       return result.data
     },
     enabled: !!gameId,
-    // 30 seconds - changes after each round completes
-    staleTime: 30 * 1000,
+    // History only changes when a round completes (or the game ends), so keep it
+    // fresh indefinitely and invalidate explicitly on those events.
+    staleTime: Infinity,
   })
 }

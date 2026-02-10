@@ -44,6 +44,9 @@ import { StatCard } from '@/components/StatCard'
 import { useGameHistory } from '@/hooks/queries/useGames'
 import { mapGameHistory } from '@/lib/game-room/history-mapping'
 import type { GameHistorySummary } from '@/lib/game-room/types'
+import type { GameHistoryApiResponse } from '@/app/actions/game-actions'
+import { queryKeys } from '@/lib/queries/query-keys'
+import { useQueryClient } from '@tanstack/react-query'
 import type {
   AiSeatState,
   BiddingState,
@@ -216,13 +219,91 @@ export function GameRoomView({
 
   const showCardWrapper = useMediaQuery('(min-width: 640px)')
 
+  const queryClient = useQueryClient()
+
   // Use query hook directly
   const {
     data: rawHistory,
     isLoading: isHistoryLoading,
+    isFetching: isHistoryFetching,
     error: historyQueryError,
-    refetch: refetchHistory,
+    dataUpdatedAt: historyUpdatedAt,
   } = useGameHistory(gameId)
+
+  const rawHistoryRounds = useMemo(() => {
+    return (rawHistory as GameHistoryApiResponse | undefined)?.rounds ?? []
+  }, [rawHistory])
+
+  const expectedHistoryLatestRoundNo = useMemo(() => {
+    const roundNo = snapshot.game.round_no
+    if (roundNo <= 0) {
+      return null
+    }
+    // When we’re in Bidding for round N, the latest completed round is N-1.
+    if (phase.phase === 'Bidding') {
+      return Math.max(0, roundNo - 1)
+    }
+    // When the game is over, history should include the final round.
+    if (phase.phase === 'GameOver') {
+      return roundNo
+    }
+    return null
+  }, [phase.phase, snapshot.game.round_no])
+
+  const hasExpectedCompletedRoundInCache = useMemo(() => {
+    const expected = expectedHistoryLatestRoundNo
+    if (!expected || expected <= 0) {
+      return true
+    }
+
+    const expectedRound = rawHistoryRounds.find(
+      (round) => round.round_no === expected
+    )
+    if (!expectedRound) {
+      return false
+    }
+
+    // Treat the expected round as "complete" only if it reflects the snapshot's
+    // post-round cumulative totals. This avoids false positives where history
+    // includes the current (in-progress) round number.
+    return expectedRound.cumulative_scores.every(
+      (score, idx) => score === snapshot.game.scores_total[idx]
+    )
+  }, [
+    expectedHistoryLatestRoundNo,
+    rawHistoryRounds,
+    snapshot.game.scores_total,
+  ])
+
+  const lastForcedHistoryRefreshKeyRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (isHistoryLoading || isHistoryFetching) return
+    if (!rawHistory || historyUpdatedAt === 0) return
+    const expected = expectedHistoryLatestRoundNo
+    if (expected === null || expected <= 0) {
+      return
+    }
+    if (hasExpectedCompletedRoundInCache) return
+
+    const refreshKey = `${expected}:${historyUpdatedAt}`
+    if (lastForcedHistoryRefreshKeyRef.current === refreshKey) return
+    lastForcedHistoryRefreshKeyRef.current = refreshKey
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.games.history(gameId),
+      refetchType: 'active',
+    })
+  }, [
+    gameId,
+    rawHistory,
+    isHistoryFetching,
+    isHistoryLoading,
+    historyUpdatedAt,
+    expectedHistoryLatestRoundNo,
+    hasExpectedCompletedRoundInCache,
+    queryClient,
+  ])
 
   // Map the raw API response to the expected format
   const history: GameHistorySummary | null = useMemo(() => {
@@ -231,6 +312,25 @@ export function GameRoomView({
     }
     return mapGameHistory(rawHistory)
   }, [rawHistory])
+
+  const historyMaxVisibleRoundNo = useMemo(() => {
+    const roundNo = snapshot.game.round_no
+    if (roundNo <= 0) {
+      return 0
+    }
+    if (phase.phase === 'GameOver') {
+      return roundNo
+    }
+    return Math.max(0, roundNo - 1)
+  }, [phase.phase, snapshot.game.round_no])
+
+  const visibleHistoryRounds = useMemo(() => {
+    const rounds = history?.rounds ?? []
+    if (historyMaxVisibleRoundNo <= 0) {
+      return []
+    }
+    return rounds.filter((round) => round.roundNo <= historyMaxVisibleRoundNo)
+  }, [history, historyMaxVisibleRoundNo])
 
   // Convert query error to string
   const historyError = useMemo<string | null>(() => {
@@ -308,13 +408,6 @@ export function GameRoomView({
       })
     })
   }, [phase, effectivePlayState])
-
-  useEffect(() => {
-    if (!isHistoryOpen) {
-      return
-    }
-    void refetchHistory()
-  }, [isHistoryOpen, refetchHistory])
 
   // Get last trick from backend snapshot
   // - In Trick phase: last trick from current round
@@ -665,7 +758,7 @@ export function GameRoomView({
         <ScoreHistoryDialog
           isOpen={isHistoryOpen}
           onClose={handleCloseHistory}
-          rounds={history?.rounds ?? []}
+          rounds={visibleHistoryRounds}
           playerNames={playerNames}
           seatDisplayName={seatDisplayName}
           isLoading={isHistoryLoading}
@@ -815,7 +908,7 @@ export function GameRoomView({
       <ScoreHistoryDialog
         isOpen={isHistoryOpen}
         onClose={handleCloseHistory}
-        rounds={history?.rounds ?? []}
+        rounds={visibleHistoryRounds}
         playerNames={playerNames}
         seatDisplayName={seatDisplayName}
         isLoading={isHistoryLoading}

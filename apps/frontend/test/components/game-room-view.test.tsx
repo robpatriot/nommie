@@ -9,7 +9,8 @@ import {
   initSnapshotFixture,
   trickSnapshotFixture,
 } from '../mocks/game-snapshot'
-import { render, screen } from '../utils'
+import { createTestQueryClient, render, screen, waitFor } from '../utils'
+import { queryKeys } from '@/lib/queries/query-keys'
 
 vi.mock('next/link', () => ({
   __esModule: true,
@@ -18,53 +19,23 @@ vi.mock('next/link', () => ({
   ),
 }))
 
-// Mock server actions - hoist to make available in mocks
-const { mockGetGameHistoryAction, mockHistoryDataRef } = vi.hoisted(() => {
-  const mockGetGameHistoryAction = vi.fn()
-  const mockHistoryDataRef = { current: undefined as unknown }
-  return { mockGetGameHistoryAction, mockHistoryDataRef }
+// Mock server actions - hoist so tests can mutate behavior per-case
+const { mockGetGameHistoryAction } = vi.hoisted(() => {
+  return { mockGetGameHistoryAction: vi.fn() }
 })
 
 vi.mock('@/app/actions/game-actions', () => ({
   getGameHistoryAction: (gameId: number) => mockGetGameHistoryAction(gameId),
-}))
-
-// Mock useGameHistory query hook
-vi.mock('@/hooks/queries/useGames', () => ({
-  useGameHistory: (gameId?: number) => {
-    const refetchFn = vi.fn(async () => {
-      if (gameId) {
-        const result = await mockGetGameHistoryAction(gameId)
-        if (result?.kind === 'ok') {
-          mockHistoryDataRef.current = result.data
-        }
-      }
-      return { data: mockHistoryDataRef.current }
-    })
-
-    // Call the server action when the hook is used with a gameId
-    // Make sure it returns a promise
-    if (gameId) {
-      const promise = Promise.resolve(mockGetGameHistoryAction(gameId))
-      void promise.then((result) => {
-        if (result?.kind === 'ok') {
-          mockHistoryDataRef.current = result.data
-        }
-      })
-    }
-
-    return {
-      data: mockHistoryDataRef.current,
-      isLoading: false,
-      error: null,
-      refetch: refetchFn,
-    }
-  },
+  refreshGamesListAction: vi.fn(),
 }))
 
 describe('GameRoomView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockGetGameHistoryAction.mockResolvedValue({
+      kind: 'ok',
+      data: { rounds: [] },
+    })
   })
   const playerNames: [string, string, string, string] = [
     'Alex',
@@ -189,10 +160,19 @@ describe('GameRoomView', () => {
       data: historyPayload,
     })
 
+    const biddingRound2Snapshot = {
+      ...biddingSnapshotFixture,
+      game: {
+        ...biddingSnapshotFixture.game,
+        round_no: 2,
+        scores_total: [13, 4, 17, 2] as [number, number, number, number],
+      },
+    }
+
     render(
       <GameRoomView
         gameId={42}
-        snapshot={biddingSnapshotFixture}
+        snapshot={biddingRound2Snapshot}
         playerNames={playerNames}
         viewerSeat={0}
         viewerHand={[]}
@@ -200,17 +180,249 @@ describe('GameRoomView', () => {
       />
     )
 
+    // History is fetched on mount (not on dialog open).
+    await waitFor(() => {
+      expect(mockGetGameHistoryAction).toHaveBeenCalledTimes(1)
+      expect(mockGetGameHistoryAction).toHaveBeenCalledWith(42)
+    })
+
     const historyButton = screen.getByRole('button', {
       name: /show score history/i,
     })
     await userEvent.click(historyButton)
 
-    expect(mockGetGameHistoryAction).toHaveBeenCalledWith(42)
+    // Opening the dialog should not trigger a refetch by itself.
+    expect(mockGetGameHistoryAction).toHaveBeenCalledTimes(1)
 
     expect(await screen.findByText('Score sheet')).toBeInTheDocument()
     expect(await screen.findByText('Round 1')).toBeInTheDocument()
     expect(screen.getAllByText('Bid 3').length).toBeGreaterThan(0)
     expect(screen.getAllByText('17').length).toBeGreaterThan(0)
+  })
+
+  it('refreshes history after returning in bidding when cache is behind', async () => {
+    const gameId = 42
+    const queryClient = createTestQueryClient()
+
+    let serverHistory = {
+      rounds: [
+        {
+          round_no: 4,
+          hand_size: 3,
+          dealer_seat: 0,
+          trump_selector_seat: 1,
+          trump: 'HEARTS',
+          bids: [1, 1, 1, 0] as [
+            number | null,
+            number | null,
+            number | null,
+            number | null,
+          ],
+          cumulative_scores: [10, 10, 10, 10] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        },
+      ],
+    }
+
+    mockGetGameHistoryAction.mockImplementation(async () => ({
+      kind: 'ok',
+      data: serverHistory,
+    }))
+
+    const { unmount } = render(
+      <GameRoomView
+        gameId={gameId}
+        snapshot={trickSnapshotFixture}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={['2H', '3C']}
+        status={{ lastSyncedAt: new Date().toISOString() }}
+      />,
+      { queryClient }
+    )
+
+    await waitFor(() => {
+      expect(mockGetGameHistoryAction).toHaveBeenCalledTimes(1)
+    })
+
+    unmount()
+
+    // While the user is away, round 5 completes and the game enters bidding for round 6.
+    serverHistory = {
+      rounds: [
+        ...serverHistory.rounds,
+        {
+          round_no: 5,
+          hand_size: 2,
+          dealer_seat: 3,
+          trump_selector_seat: 2,
+          trump: 'SPADES',
+          bids: [0, 1, 0, 1] as [
+            number | null,
+            number | null,
+            number | null,
+            number | null,
+          ],
+          cumulative_scores: [12, 21, 14, 20] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        },
+      ],
+    }
+
+    const biddingRound6Snapshot = {
+      ...biddingSnapshotFixture,
+      game: {
+        ...biddingSnapshotFixture.game,
+        round_no: 6,
+        scores_total: [12, 21, 14, 20] as [number, number, number, number],
+      },
+    }
+
+    render(
+      <GameRoomView
+        gameId={gameId}
+        snapshot={biddingRound6Snapshot}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString() }}
+      />,
+      { queryClient }
+    )
+
+    await waitFor(() => {
+      expect(mockGetGameHistoryAction).toHaveBeenCalledTimes(2)
+    })
+
+    await waitFor(() => {
+      const data = queryClient.getQueryData(queryKeys.games.history(gameId)) as
+        | typeof serverHistory
+        | undefined
+      expect(data?.rounds.some((r) => r.round_no === 5)).toBe(true)
+    })
+  })
+
+  it('refreshes history on game over when cache is behind', async () => {
+    const gameId = 77
+    const queryClient = createTestQueryClient()
+
+    let serverHistory = {
+      rounds: [
+        {
+          round_no: 7,
+          hand_size: 1,
+          dealer_seat: 0,
+          trump_selector_seat: 0,
+          trump: 'NO_TRUMPS',
+          bids: [0, 0, 0, 0] as [
+            number | null,
+            number | null,
+            number | null,
+            number | null,
+          ],
+          cumulative_scores: [30, 28, 27, 31] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        },
+      ],
+    }
+
+    mockGetGameHistoryAction.mockImplementation(async () => ({
+      kind: 'ok',
+      data: serverHistory,
+    }))
+
+    const baseSnapshot = {
+      ...biddingSnapshotFixture,
+      game: { ...biddingSnapshotFixture.game, round_no: 8 },
+    }
+
+    const { unmount } = render(
+      <GameRoomView
+        gameId={gameId}
+        snapshot={baseSnapshot}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString() }}
+      />,
+      { queryClient }
+    )
+
+    await waitFor(() => {
+      expect(mockGetGameHistoryAction).toHaveBeenCalledTimes(1)
+    })
+
+    unmount()
+
+    // Final round is now recorded in history, and user returns on GameOver.
+    serverHistory = {
+      rounds: [
+        ...serverHistory.rounds,
+        {
+          round_no: 8,
+          hand_size: 1,
+          dealer_seat: 1,
+          trump_selector_seat: 2,
+          trump: 'DIAMONDS',
+          bids: [0, 0, 1, 0] as [
+            number | null,
+            number | null,
+            number | null,
+            number | null,
+          ],
+          cumulative_scores: [40, 38, 39, 41] as [
+            number,
+            number,
+            number,
+            number,
+          ],
+        },
+      ],
+    }
+
+    const gameOverSnapshot = {
+      ...baseSnapshot,
+      game: {
+        ...baseSnapshot.game,
+        scores_total: [40, 38, 39, 41] as [number, number, number, number],
+      },
+      phase: { phase: 'GameOver' as const },
+    }
+
+    render(
+      <GameRoomView
+        gameId={gameId}
+        snapshot={gameOverSnapshot}
+        playerNames={playerNames}
+        viewerSeat={0}
+        viewerHand={[]}
+        status={{ lastSyncedAt: new Date().toISOString() }}
+      />,
+      { queryClient }
+    )
+
+    await waitFor(() => {
+      expect(mockGetGameHistoryAction).toHaveBeenCalledTimes(2)
+    })
+
+    await waitFor(() => {
+      const data = queryClient.getQueryData(queryKeys.games.history(gameId)) as
+        | typeof serverHistory
+        | undefined
+      expect(data?.rounds.some((r) => r.round_no === 8)).toBe(true)
+    })
   })
 
   it('enforces legal card gating and triggers play submission', async () => {
