@@ -7,8 +7,6 @@ use time::OffsetDateTime;
 pub enum GameState {
     #[sea_orm(string_value = "LOBBY")]
     Lobby,
-    #[sea_orm(string_value = "DEALING")]
-    Dealing,
     #[sea_orm(string_value = "BIDDING")]
     Bidding,
     #[sea_orm(string_value = "TRUMP_SELECTION")]
@@ -17,8 +15,6 @@ pub enum GameState {
     TrickPlay,
     #[sea_orm(string_value = "SCORING")]
     Scoring,
-    #[sea_orm(string_value = "BETWEEN_ROUNDS")]
-    BetweenRounds,
     #[sea_orm(string_value = "COMPLETED")]
     Completed,
     #[sea_orm(string_value = "ABANDONED")]

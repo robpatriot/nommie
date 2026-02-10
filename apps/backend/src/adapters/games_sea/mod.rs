@@ -194,6 +194,14 @@ pub async fn update_game(
             update = update.col_expr(games::Column::WaitingSince, Expr::val(waiting_since).into());
         }
 
+        if let Some(started_at) = dto.started_at {
+            update = update.col_expr(games::Column::StartedAt, Expr::val(started_at).into());
+        }
+
+        if let Some(ended_at) = dto.ended_at {
+            update = update.col_expr(games::Column::EndedAt, Expr::val(ended_at).into());
+        }
+
         update
     })
     .await

@@ -254,7 +254,7 @@ pub fn find_winning_bidder(bids: &[u8; 4], dealer_pos: u8) -> u8 {
 
 /// Set up a game at a specific round number (between rounds).
 ///
-/// Creates a game in BetweenRounds state with:
+/// Creates a game ready for dealing the next round with:
 /// - 4 ready players
 /// - All previous rounds completed with simple scoring
 /// - Ready to deal the next round
@@ -321,12 +321,14 @@ pub async fn setup_game_at_round(
         .await?,
     ];
 
-    // Create game in BetweenRounds state (or Lobby if 0 rounds completed)
+    // Create game ready for next deal (or Lobby if 0 rounds completed)
     let now = OffsetDateTime::now_utc();
     let game_state = if completed_rounds == 0 {
         GameState::Lobby
     } else {
-        GameState::BetweenRounds
+        // There is no persisted "between rounds" DB state; use Bidding as the
+        // steady-state active value when a game is already started.
+        GameState::Bidding
     };
 
     let game = games::ActiveModel {

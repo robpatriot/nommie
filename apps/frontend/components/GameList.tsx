@@ -16,12 +16,10 @@ interface GameListProps {
 
 const stateClassNames: Record<Game['state'], string> = {
   LOBBY: 'bg-success/15 text-success-foreground',
-  DEALING: 'bg-accent/15 text-accent-foreground',
   BIDDING: 'bg-warning/15 text-warning-foreground',
   TRUMP_SELECTION: 'bg-warning/15 text-warning-foreground',
   TRICK_PLAY: 'bg-accent/20 text-accent-foreground',
   SCORING: 'bg-primary/15 text-primary',
-  BETWEEN_ROUNDS: 'bg-muted/15 text-muted-foreground',
   COMPLETED: 'bg-muted/15 text-muted-foreground',
   ABANDONED: 'bg-destructive/15 text-destructive-foreground',
 }

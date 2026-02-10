@@ -106,6 +106,8 @@ pub struct GameUpdatePatch {
     pub starting_dealer_pos: Option<u8>,
     pub current_trick_no: Option<u8>,
     pub waiting_since: Option<Option<time::OffsetDateTime>>,
+    pub started_at: Option<time::OffsetDateTime>,
+    pub ended_at: Option<time::OffsetDateTime>,
 }
 
 /// Update game with optimistic locking.
@@ -139,6 +141,14 @@ pub async fn update_game(
         Some(None) => {
             dto = dto.clear_waiting_since();
         }
+    }
+
+    if let Some(ts) = patch.started_at {
+        dto = dto.with_started_at(ts);
+    }
+
+    if let Some(ts) = patch.ended_at {
+        dto = dto.with_ended_at(ts);
     }
 
     let game = games_adapter::update_game(txn, dto).await?;
@@ -201,18 +211,16 @@ pub async fn delete_game(
 ///
 /// This function maps the database representation (DbGameState) to the domain
 /// representation (Phase). The database tracks implementation details like
-/// Lobby and Dealing, while the domain focuses on game logic phases.
+/// Lobby and implementation detail states, while the domain focuses on game logic phases.
 pub fn db_game_state_to_phase(db_state: &DbGameState, current_trick_no: u8) -> Phase {
     match *db_state {
         DbGameState::Lobby => Phase::Init,
-        DbGameState::Dealing => Phase::Init,
         DbGameState::Bidding => Phase::Bidding,
         DbGameState::TrumpSelection => Phase::TrumpSelect,
         DbGameState::TrickPlay => Phase::Trick {
             trick_no: current_trick_no,
         },
         DbGameState::Scoring => Phase::Scoring,
-        DbGameState::BetweenRounds => Phase::Complete,
         DbGameState::Completed => Phase::GameOver,
         DbGameState::Abandoned => Phase::GameOver,
     }

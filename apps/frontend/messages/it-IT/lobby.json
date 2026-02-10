@@ -58,12 +58,10 @@
     "noMatches": "Nessuna partita corrisponde alla tua ricerca",
     "gameStates": {
       "LOBBY": "Sala d'attesa",
-      "DEALING": "Distribuzione",
       "BIDDING": "Licitazione",
       "TRUMP_SELECTION": "Scelta briscola",
       "TRICK_PLAY": "Gioco delle prese",
       "SCORING": "Punteggio",
-      "BETWEEN_ROUNDS": "Tra i round",
       "COMPLETED": "Completata",
       "ABANDONED": "Abbandonata"
     },

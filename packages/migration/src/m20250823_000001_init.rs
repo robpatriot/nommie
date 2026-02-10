@@ -406,12 +406,10 @@ impl MigrationTrait for Migration {
                                 .as_enum(GameStateEnum::Type)
                                 .values([
                                     "LOBBY",
-                                    "DEALING",
                                     "BIDDING",
                                     "TRUMP_SELECTION",
                                     "TRICK_PLAY",
                                     "SCORING",
-                                    "BETWEEN_ROUNDS",
                                     "COMPLETED",
                                     "ABANDONED",
                                 ])

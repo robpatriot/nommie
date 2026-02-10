@@ -52,6 +52,10 @@ pub struct GameUpdate {
     pub current_trick_no: Option<u8>,
     /// Three-state: None = no change, Some(Some(ts)) = set, Some(None) = clear.
     pub waiting_since: Option<Option<OffsetDateTime>>,
+    /// Three-state: None = no change, Some(Some(ts)) = set, Some(None) = clear.
+    pub started_at: Option<Option<OffsetDateTime>>,
+    /// Three-state: None = no change, Some(Some(ts)) = set, Some(None) = clear.
+    pub ended_at: Option<Option<OffsetDateTime>>,
     pub expected_version: i32,
 }
 
@@ -64,6 +68,8 @@ impl GameUpdate {
             starting_dealer_pos: None,
             current_trick_no: None,
             waiting_since: None,
+            started_at: None,
+            ended_at: None,
             expected_version,
         }
     }
@@ -95,6 +101,26 @@ impl GameUpdate {
 
     pub fn clear_waiting_since(mut self) -> Self {
         self.waiting_since = Some(None);
+        self
+    }
+
+    pub fn with_started_at(mut self, started_at: OffsetDateTime) -> Self {
+        self.started_at = Some(Some(started_at));
+        self
+    }
+
+    pub fn clear_started_at(mut self) -> Self {
+        self.started_at = Some(None);
+        self
+    }
+
+    pub fn with_ended_at(mut self, ended_at: OffsetDateTime) -> Self {
+        self.ended_at = Some(Some(ended_at));
+        self
+    }
+
+    pub fn clear_ended_at(mut self) -> Self {
+        self.ended_at = Some(None);
         self
     }
 }

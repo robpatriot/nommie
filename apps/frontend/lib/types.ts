@@ -2,12 +2,10 @@
 
 export type GameState =
   | 'LOBBY'
-  | 'DEALING'
   | 'BIDDING'
   | 'TRUMP_SELECTION'
   | 'TRICK_PLAY'
   | 'SCORING'
-  | 'BETWEEN_ROUNDS'
   | 'COMPLETED'
   | 'ABANDONED'
 

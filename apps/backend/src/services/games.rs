@@ -504,12 +504,10 @@ impl GameService {
         txn: &DatabaseTransaction,
     ) -> Result<Vec<(Game, Vec<memberships::GameMembership>)>, AppError> {
         let active_states = [
-            DbGameState::Dealing,
             DbGameState::Bidding,
             DbGameState::TrumpSelection,
             DbGameState::TrickPlay,
             DbGameState::Scoring,
-            DbGameState::BetweenRounds,
         ];
 
         let active_games = games::Entity::find()
@@ -583,7 +581,7 @@ impl GameService {
         }
 
         // Get all games where user is a member, filtered to actionable states only
-        // (Bidding, TrumpSelection, TrickPlay - skip Lobby, BetweenRounds, etc.)
+        // (Bidding, TrumpSelection, TrickPlay - skip Lobby, etc.)
         let actionable_states = [
             DbGameState::Bidding,
             DbGameState::TrumpSelection,

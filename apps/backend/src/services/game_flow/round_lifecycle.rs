@@ -51,8 +51,14 @@ impl GameFlowService {
 
         // Update DB: state and round number
         let starting_dealer_pos = if next_round == 1 { Some(0) } else { None };
+        let now = OffsetDateTime::now_utc();
         let waiting_since = if next_round == 1 {
-            Some(Some(OffsetDateTime::now_utc()))
+            Some(Some(now))
+        } else {
+            None
+        };
+        let started_at = if next_round == 1 && game.started_at.is_none() {
+            Some(now)
         } else {
             None
         };
@@ -66,6 +72,8 @@ impl GameFlowService {
                 starting_dealer_pos,
                 current_trick_no: None,
                 waiting_since,
+                started_at,
+                ended_at: None,
             },
         )
         .await?;
@@ -219,6 +227,11 @@ impl GameFlowService {
         };
 
         let waiting_since = if is_game_complete { Some(None) } else { None };
+        let ended_at = if is_game_complete && game.ended_at.is_none() {
+            Some(OffsetDateTime::now_utc())
+        } else {
+            None
+        };
         games::update_game(
             txn,
             game_id,
@@ -229,6 +242,8 @@ impl GameFlowService {
                 starting_dealer_pos: None,
                 current_trick_no: None,
                 waiting_since,
+                started_at: None,
+                ended_at,
             },
         )
         .await?;

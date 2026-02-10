@@ -58,12 +58,10 @@
     "noMatches": "Keine Spiele entsprechen deiner Suche",
     "gameStates": {
       "LOBBY": "Wartezimmer",
-      "DEALING": "Geben",
       "BIDDING": "Gebote",
       "TRUMP_SELECTION": "Trumpf wählen",
       "TRICK_PLAY": "Stichspiel",
       "SCORING": "Punkte zählen",
-      "BETWEEN_ROUNDS": "Zwischen Runden",
       "COMPLETED": "Abgeschlossen",
       "ABANDONED": "Abgebrochen"
     },

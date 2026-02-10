@@ -369,7 +369,7 @@ async fn test_game_completes_after_final_round() -> Result<(), AppError> {
             let game = games_repo::find_by_id(txn, setup.game_id)
                 .await?
                 .expect("game should exist");
-            assert_eq!(game.state, GameState::BetweenRounds);
+            assert_eq!(game.state, GameState::Bidding);
             assert_eq!(game.current_round, Some(25));
             assert_eq!(game.starting_dealer_pos, Some(0));
 

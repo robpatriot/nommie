@@ -58,12 +58,10 @@
     "noMatches": "Aucune partie ne correspond à votre recherche",
     "gameStates": {
       "LOBBY": "Salon",
-      "DEALING": "Distribution",
       "BIDDING": "Annonces",
       "TRUMP_SELECTION": "Choix de l'atout",
       "TRICK_PLAY": "Jeu des plis",
       "SCORING": "Calcul des scores",
-      "BETWEEN_ROUNDS": "Entre les manches",
       "COMPLETED": "Terminée",
       "ABANDONED": "Abandonnée"
     },

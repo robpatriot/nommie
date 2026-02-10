@@ -58,12 +58,10 @@
     "noMatches": "No hay partidas que coincidan con tu búsqueda",
     "gameStates": {
       "LOBBY": "Sala",
-      "DEALING": "Repartiendo",
       "BIDDING": "Pujas",
       "TRUMP_SELECTION": "Elegir triunfo",
       "TRICK_PLAY": "Juego de bazas",
       "SCORING": "Puntuación",
-      "BETWEEN_ROUNDS": "Entre rondas",
       "COMPLETED": "Completada",
       "ABANDONED": "Abandonada"
     },

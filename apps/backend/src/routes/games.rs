@@ -618,12 +618,10 @@ struct GameResponse {
 fn game_state_to_string(state: &GameState) -> String {
     match state {
         GameState::Lobby => "LOBBY".to_string(),
-        GameState::Dealing => "DEALING".to_string(),
         GameState::Bidding => "BIDDING".to_string(),
         GameState::TrumpSelection => "TRUMP_SELECTION".to_string(),
         GameState::TrickPlay => "TRICK_PLAY".to_string(),
         GameState::Scoring => "SCORING".to_string(),
-        GameState::BetweenRounds => "BETWEEN_ROUNDS".to_string(),
         GameState::Completed => "COMPLETED".to_string(),
         GameState::Abandoned => "ABANDONED".to_string(),
     }

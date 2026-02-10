@@ -89,7 +89,7 @@ impl GameFlowService {
 
             (profile_id, player.id, profile.cloned())
         } else {
-            // Slow path: Load from database (used for Lobby, Dealing, etc.)
+            // Slow path: Load from database (used for Lobby, etc.)
             let memberships = memberships::find_all_by_game(txn, game.id).await?;
             let Some(player) = memberships
                 .iter()
@@ -342,7 +342,7 @@ impl GameFlowService {
         game: &games::Game,
     ) -> Result<Option<(u8, ActionType)>, AppError> {
         match game.state {
-            DbGameState::Lobby | DbGameState::Dealing | DbGameState::BetweenRounds => {
+            DbGameState::Lobby => {
                 // No action needed - check_and_apply_transition handles state changes
                 Ok(None)
             }

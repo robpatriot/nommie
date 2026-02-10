@@ -147,6 +147,8 @@ impl GameFlowService {
                 starting_dealer_pos: None,
                 current_trick_no: None,
                 waiting_since: Some(Some(waiting_since)),
+                started_at: None,
+                ended_at: None,
             },
         )
         .await?;
@@ -238,6 +240,8 @@ impl GameFlowService {
                 starting_dealer_pos: None,
                 current_trick_no: Some(result.trick_no),
                 waiting_since: Some(Some(waiting_since)),
+                started_at: None,
+                ended_at: None,
             },
         )
         .await?;
@@ -390,6 +394,8 @@ impl GameFlowService {
                 starting_dealer_pos: None,
                 current_trick_no: trick_no_update,
                 waiting_since: Some(Some(waiting_since)),
+                started_at: None,
+                ended_at: None,
             },
         )
         .await?;
