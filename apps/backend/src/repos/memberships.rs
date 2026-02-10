@@ -144,6 +144,24 @@ pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
     Ok(memberships.into_iter().map(GameMembership::from).collect())
 }
 
+pub async fn find_by_game_and_seat<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+    seat: u8,
+) -> Result<Option<GameMembership>, DomainError> {
+    let membership = memberships_adapter::find_by_game_and_seat(conn, game_id, seat).await?;
+    Ok(membership.map(GameMembership::from))
+}
+
+pub async fn find_human_user_ids_by_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Vec<i64>, DomainError> {
+    memberships_adapter::find_human_user_ids_by_game(conn, game_id)
+        .await
+        .map_err(Into::into)
+}
+
 pub async fn delete_membership(
     txn: &DatabaseTransaction,
     membership_id: i64,

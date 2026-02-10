@@ -104,6 +104,36 @@ pub async fn find_all_by_game<C: ConnectionTrait + Send + Sync>(
         .await
 }
 
+pub async fn find_by_game_and_seat<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+    seat: u8,
+) -> Result<Option<game_players::Model>, sea_orm::DbErr> {
+    game_players::Entity::find()
+        .filter(game_players::Column::GameId.eq(game_id))
+        .filter(game_players::Column::TurnOrder.eq(seat as i16))
+        .filter(game_players::Column::Role.eq(game_players::GameRole::Player))
+        .filter(game_players::Column::HumanUserId.is_not_null())
+        .one(conn)
+        .await
+}
+
+pub async fn find_human_user_ids_by_game<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    game_id: i64,
+) -> Result<Vec<i64>, sea_orm::DbErr> {
+    let rows = game_players::Entity::find()
+        .filter(game_players::Column::GameId.eq(game_id))
+        .filter(game_players::Column::PlayerKind.eq(game_players::PlayerKind::Human))
+        .filter(game_players::Column::HumanUserId.is_not_null())
+        .all(conn)
+        .await?;
+    let mut ids: Vec<i64> = rows.into_iter().filter_map(|m| m.human_user_id).collect();
+    ids.sort_unstable();
+    ids.dedup();
+    Ok(ids)
+}
+
 pub async fn delete_membership(txn: &DatabaseTransaction, id: i64) -> Result<(), sea_orm::DbErr> {
     game_players::Entity::delete_many()
         .filter(game_players::Column::Id.eq(id))

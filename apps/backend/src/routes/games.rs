@@ -1,7 +1,7 @@
 use actix_web::http::header::{ETAG, IF_NONE_MATCH};
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
-use sea_orm::{ConnectionTrait, TransactionTrait};
+use sea_orm::TransactionTrait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use time::format_description::well_known::Rfc3339;
@@ -1726,48 +1726,6 @@ async fn publish_snapshot_with_lock(
     Ok(())
 }
 
-async fn resolve_human_user_id_for_seat<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    game_id: i64,
-    seat: u8,
-) -> Result<Option<i64>, AppError> {
-    let all = memberships::find_all_by_game(conn, game_id).await?;
-
-    // We only care about real players (not spectators) with a concrete user_id.
-    // AI seats will have user_id == None (and/or player_kind != Human).
-    let user_id = all
-        .into_iter()
-        .find(|m| {
-            m.role == memberships::GameRole::Player
-                && m.turn_order == Some(seat)
-                && m.user_id.is_some()
-        })
-        .and_then(|m| m.user_id);
-
-    Ok(user_id)
-}
-
-async fn resolve_human_user_ids_for_game<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    game_id: i64,
-) -> Result<Vec<i64>, AppError> {
-    let all = memberships::find_all_by_game(conn, game_id).await?;
-    let mut user_ids: std::collections::HashSet<i64> = std::collections::HashSet::new();
-
-    for m in all {
-        if m.player_kind != crate::entities::game_players::PlayerKind::Human {
-            continue;
-        }
-        if let Some(user_id) = m.user_id {
-            user_ids.insert(user_id);
-        }
-    }
-
-    let mut out: Vec<i64> = user_ids.into_iter().collect();
-    out.sort_unstable();
-    Ok(out)
-}
-
 async fn publish_game_mutation_effects(
     app_state: &web::Data<AppState>,
     game_id: i64,
@@ -1791,39 +1749,60 @@ async fn publish_game_mutation_effects(
     // Flag to determine if we should invalidate "Waiting Longest" cache
     let mut should_invalidate_long_wait = false;
 
+    // Load memberships once for all TurnBecame and long_wait lookups.
+    let (seat_to_user_id, human_user_ids) = if transitions.is_empty() {
+        (std::collections::HashMap::new(), Vec::new())
+    } else {
+        match memberships::find_all_by_game(db, game_id).await {
+            Ok(all) => {
+                let mut seat_map = std::collections::HashMap::new();
+                let mut human_ids = std::collections::HashSet::new();
+                for m in all {
+                    if m.player_kind == crate::entities::game_players::PlayerKind::Human {
+                        if let Some(uid) = m.user_id {
+                            human_ids.insert(uid);
+                        }
+                    }
+                    if m.role == GameRole::Player && m.turn_order.is_some() && m.user_id.is_some() {
+                        if let (Some(seat), Some(uid)) = (m.turn_order, m.user_id) {
+                            seat_map.insert(seat, uid);
+                        }
+                    }
+                }
+                let mut ids: Vec<i64> = human_ids.into_iter().collect();
+                ids.sort_unstable();
+                (seat_map, ids)
+            }
+            Err(err) => {
+                tracing::warn!(
+                    game_id,
+                    error = %err,
+                    "Failed to load memberships for mutation effects. YourTurn and long_wait notifications may be skipped."
+                );
+                (std::collections::HashMap::new(), Vec::new())
+            }
+        }
+    };
+
     for t in transitions {
         match t {
             GameTransition::TurnBecame { player_id } => {
                 let seat = *player_id;
-                let user_id_res = resolve_human_user_id_for_seat(db, game_id, seat).await;
-
-                match user_id_res {
-                    Ok(Some(user_id)) => {
-                        if let Err(err) = realtime
-                            .publish_your_turn(user_id, game_id, final_version)
-                            .await
-                        {
-                            tracing::error!(
-                                game_id,
-                                final_version,
-                                user_id,
-                                error = %err,
-                                "Failed to publish your_turn event (Redis may be unavailable). Mutation succeeded, but clients may miss your_turn until Redis recovers."
-                            );
-                        }
-                    }
-                    Ok(None) => {
-                        // AI turn or empty seat -> no notification needed
-                    }
-                    Err(err) => {
-                        tracing::warn!(
+                if let Some(user_id) = seat_to_user_id.get(&seat) {
+                    if let Err(err) = realtime
+                        .publish_your_turn(*user_id, game_id, final_version)
+                        .await
+                    {
+                        tracing::error!(
                             game_id,
-                            seat = ?seat,
+                            final_version,
+                            user_id,
                             error = %err,
-                            "Failed to resolve user_id for seat (for YourTurn notification)"
+                            "Failed to publish your_turn event (Redis may be unavailable). Mutation succeeded, but clients may miss your_turn until Redis recovers."
                         );
                     }
                 }
+                // AI turn or empty seat -> no notification needed
             }
             GameTransition::GameStarted
             | GameTransition::GameEnded
@@ -1840,27 +1819,16 @@ async fn publish_game_mutation_effects(
     }
 
     if should_invalidate_long_wait {
-        match resolve_human_user_ids_for_game(db, game_id).await {
-            Ok(user_ids) => {
-                for user_id in user_ids {
-                    if let Err(err) = realtime
-                        .publish_long_wait_invalidated(user_id, game_id)
-                        .await
-                    {
-                        tracing::error!(
-                            game_id,
-                            user_id,
-                            error = %err,
-                            "Failed to publish long_wait_invalidated event. Frontend caches may be stale."
-                        );
-                    }
-                }
-            }
-            Err(err) => {
-                tracing::warn!(
+        for user_id in human_user_ids {
+            if let Err(err) = realtime
+                .publish_long_wait_invalidated(user_id, game_id)
+                .await
+            {
+                tracing::error!(
                     game_id,
+                    user_id,
                     error = %err,
-                    "Failed to resolve user_ids for long_wait_invalidated broadcast"
+                    "Failed to publish long_wait_invalidated event. Frontend caches may be stale."
                 );
             }
         }
