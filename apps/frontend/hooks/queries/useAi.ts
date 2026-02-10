@@ -22,7 +22,11 @@ export function useAiRegistry(enabled: boolean = true) {
       return result.data
     },
     enabled,
-    // Infinity - changes very rarely, mutations invalidate cache when updates occur
+    // Cache indefinitely, but always refetch on mount when enabled (e.g., when navigating
+    // to the view where AI seat management is shown).
     staleTime: Infinity,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 }

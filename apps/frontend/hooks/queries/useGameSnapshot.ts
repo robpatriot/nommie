@@ -86,9 +86,11 @@ export function useGameSnapshot(
     },
     enabled: options?.enabled !== false && !!gameId,
     initialData: options?.initialData,
-    // 5 seconds - real-time game data changes frequently, WebSocket handles most updates
-    staleTime: 5 * 1000,
+    // Snapshot is event-authoritative (WS updates + explicit refresh). Avoid time-based staleness.
+    staleTime: Infinity,
     // Disable refetch on window focus since WebSocket handles real-time updates
     refetchOnWindowFocus: false,
+    // Avoid automatic reconnect refetch; WS subscribe delivers authoritative state.
+    refetchOnReconnect: false,
   })
 }

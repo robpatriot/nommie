@@ -353,20 +353,12 @@ export function useSubmitPlay() {
  * Invalidates game snapshot cache on success.
  */
 export function useAddAiSeat() {
-  const queryClient = useQueryClient()
-
   return useMutation({
     mutationFn: async (request: ManageAiSeatRequest): Promise<void> => {
       const result = await addAiSeatAction(request)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }
-    },
-    onSuccess: () => {
-      // Invalidate AI registry since seat assignments changed
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.ai.registry(),
-      })
     },
   })
 }
@@ -376,20 +368,12 @@ export function useAddAiSeat() {
  * Invalidates game snapshot and AI registry cache on success.
  */
 export function useUpdateAiSeat() {
-  const queryClient = useQueryClient()
-
   return useMutation({
     mutationFn: async (request: ManageAiSeatRequest): Promise<void> => {
       const result = await updateAiSeatAction(request)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }
-    },
-    onSuccess: () => {
-      // Invalidate AI registry since seat assignments changed
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.ai.registry(),
-      })
     },
   })
 }
@@ -399,20 +383,12 @@ export function useUpdateAiSeat() {
  * Invalidates game snapshot and AI registry cache on success.
  */
 export function useRemoveAiSeat() {
-  const queryClient = useQueryClient()
-
   return useMutation({
     mutationFn: async (request: ManageAiSeatRequest): Promise<void> => {
       const result = await removeAiSeatAction(request)
       if (result.kind === 'error') {
         throw handleActionResultError(result)
       }
-    },
-    onSuccess: () => {
-      // Invalidate AI registry since seat assignments changed
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.ai.registry(),
-      })
     },
   })
 }
