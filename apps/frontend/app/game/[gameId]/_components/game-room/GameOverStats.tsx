@@ -47,14 +47,14 @@ function PlayerCard({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-2xl border bg-card/90 p-4 shadow-elevated backdrop-blur transition',
+        'relative overflow-hidden rounded-2xl border bg-card/90 px-4 pb-4 pt-5 shadow-elevated backdrop-blur transition',
         isWinner
           ? 'border-primary/50 ring-2 ring-primary/20'
           : 'border-border/60'
       )}
     >
       {isWinner ? (
-        <div className="absolute right-2 top-2 rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+        <div className="absolute right-0 top-0 rounded-bl-lg bg-primary/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
           {t('gameOver.stats.winner')}
         </div>
       ) : null}
