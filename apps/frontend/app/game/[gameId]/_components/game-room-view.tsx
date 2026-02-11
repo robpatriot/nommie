@@ -717,24 +717,37 @@ export function GameRoomView({
         <PageContainer className="pb-16">
           <div className="mx-auto max-w-4xl">
             <header className="mb-8 rounded-3xl border border-border/60 bg-gradient-to-br from-card/95 to-muted/30 px-6 py-8 shadow-elevated">
-              <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
-                {t('gameOver.title')}
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {t('gameOver.description')}
-              </p>
-              {winnerSeats.length > 0 && winnerSeats.length < 4 ? (
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
-                    {winnerSeats.length === 1
-                      ? t('gameOver.stats.winner')
-                      : t('gameOver.stats.winners')}
-                  </span>
-                  <span className="font-semibold text-primary">
-                    {winnerSeats.map((s) => seatDisplayName(s)).join(', ')}
-                  </span>
+              <div className="flex flex-wrap items-start gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+                    {t('gameOver.title')}
+                  </h1>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {t('gameOver.description')}
+                  </p>
                 </div>
-              ) : null}
+                {winnerSeats.length > 0 && winnerSeats.length < 4 ? (
+                  <div className="flex flex-1 min-w-0 items-center justify-center">
+                    <div className="flex items-center gap-2 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-2.5">
+                      <span className="text-2xl" aria-hidden>
+                        🏆
+                      </span>
+                      <div className="text-left">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                          {winnerSeats.length === 1
+                            ? t('gameOver.stats.winner')
+                            : t('gameOver.stats.winners')}
+                        </p>
+                        <p className="font-bold text-primary">
+                          {winnerSeats
+                            .map((s) => seatDisplayName(s))
+                            .join(', ')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </header>
 
             <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
