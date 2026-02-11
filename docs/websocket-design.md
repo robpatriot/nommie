@@ -8,7 +8,7 @@ If you are looking for game snapshot shape: see `docs/game-snapshot-contract.md`
 ## Current State (Reality)
 - The web client uses **WebSockets as the primary sync mechanism** for active game sessions.
 - Backend provides:
-  - `GET /ws/games/{game_id}` websocket upgrade endpoint.
+  - `GET /ws` websocket upgrade endpoint (game subscription happens via subscribe messages after connect).
   - `GET|POST /api/ws/token` short-lived websocket token issuance for browser clients.
   - Redis pub/sub fan-out to support multi-instance realtime delivery.
 - HTTP `GET /api/games/{game_id}/snapshot` remains available and is used for:
@@ -28,7 +28,7 @@ If you are looking for game snapshot shape: see `docs/game-snapshot-contract.md`
 
 ### Transport & Auth
 Clients connect to:
-- `GET /ws/games/{game_id}?token=<jwt>`
+- `GET /ws?token=<jwt>`
 
 Authentication is performed by `JwtExtract` middleware:
 - Primary: `Authorization: Bearer <jwt>`
@@ -41,9 +41,8 @@ Browser clients obtain a short-lived websocket token via:
 Tokens are minted with a short TTL (currently ~90 seconds) and are intended only for establishing websocket connections.
 
 ### Connection Lifecycle
-- Each websocket connection is handled by an Actix actor (`GameWsSession`).
-- The server sends an initial “connected” ack and an initial snapshot immediately after upgrade.
-- Server heartbeats:
+- Each websocket connection is handled by an Actix actor (`WsSession`).
+- The client must send `hello` first; the server responds with `hello_ack`. The client then sends `subscribe` with a topic; the server sends `ack` followed by `game_state`.
   - sends ping periodically
   - disconnects clients that fail to respond within the timeout window
 
@@ -78,7 +77,8 @@ Messages are JSON with a `type` discriminator.
 - `unsubscribe`: `{ "type": "unsubscribe", "topic": { "kind": "game", "id": <game_id> } }`
 
 ## Frontend Integration
-- The websocket connection lifecycle and reconnection behavior live in `useGameSync`.
+- `WebSocketProvider` manages the low-level connection (token fetch, connect, handshake, reconnection).
+- `useGameSync` consumes `useWebSocket` and handles per-game subscribe/unsubscribe and applies snapshots to the React Query cache.
 - `GameRoomClient` consumes `useGameSync` and treats websocket updates as the source of truth.
 - Manual refresh remains available (HTTP snapshot fetch using ETags) for resilience/debugging.
 
@@ -96,10 +96,12 @@ Messages are JSON with a `type` discriminator.
 
 ### Backend (✅ Complete)
 Backend integration tests cover:
-- **Connection tests**: WebSocket connect with JWT authentication, initial ack message, and initial snapshot delivery
+- **Connection tests**: WebSocket connect with JWT authentication, hello/hello_ack handshake, subscribe → ack + game_state delivery
 - **Broadcast tests**: Multi-client broadcast fan-out (all connected clients receive updates, game isolation ensures broadcasts only reach same-game clients)
 - **Reconnect tests**: Client reconnection receives latest snapshot, multiple disconnect/reconnect cycles
 - **Shutdown tests**: Registry cleanup and connection count management
+- **Error handling tests**: Invalid JSON, missing hello, forbidden subscription
+- **YourTurn tests**: User-scoped your_turn hints and broadcast behaviour
 
 **Test Implementation Details:**
 - Tests use **in-memory `WsRegistry`** (not Redis) for concurrency safety and deterministic test execution

@@ -12,46 +12,47 @@ Next.js frontend and how to extend it responsibly.
 ## Overview
 
 - **Source of truth**: semantic CSS variables live in
-  `apps/frontend/app/globals.css`. They define tokens such as
-  `--color-bg`, `--color-surface`, and `--color-primary`, with both light and
-  dark values (plus `.theme-light` / `.theme-dark` overrides).
-- **Tailwind mapping**: `apps/frontend/tailwind.config.js` maps those variables
-  to Tailwind color names (for example `bg-background`, `text-muted`,
-  `border-border`, `bg-primary`, `bg-success`, `bg-warning`, etc.). This keeps
-  utility usage consistent and makes palettes easy to swap.
-- **Runtime colour scheme control**: `ThemeProvider` (`apps/frontend/components/theme-provider.tsx`)
-  manages the user’s preference. It:
-  - reads `localStorage` for a stored choice (`light`, `dark`, or `system`);
-  - listens to `prefers-color-scheme`;
-  - applies `data-theme-name` and `data-colour-scheme` class to the root element;
-  - exposes `useTheme()` so components can react to `theme` / `resolvedTheme`.
-- **Initial render**: `app/layout.tsx` injects a small script before hydration to
+  `apps/frontend/app/globals.css`. Tailwind v4 uses an `@theme` block for default
+  values (e.g. `--color-background`, `--color-card`, `--color-primary`). Dark mode
+  overrides live in `.dark`; named themes (standard, high_roller, oldtime) use
+  `[data-theme-name='...']` selectors.
+- **Tailwind mapping**: Tailwind v4 generates utilities from `@theme` variables
+  automatically (e.g. `bg-background`, `text-muted`, `border-border`, `bg-primary`,
+  `bg-success`, `bg-warning`, `bg-destructive`). No explicit config mapping is
+  needed for colours; `tailwind.config.js` extends only fonts.
+- **Runtime control**: `ThemeProvider` (`apps/frontend/components/theme-provider.tsx`)
+  manages theme name and colour scheme. It:
+  - reads `localStorage` for stored choices (`theme_name`, `colour_scheme`);
+  - listens to `prefers-color-scheme` when scheme is `system`;
+  - applies `data-theme-name`, `data-colour-scheme`, and `dark` class on the root;
+  - exposes `useTheme()` so components can read `themeName`, `colourScheme`,
+    `resolvedColourScheme` and call `applyPreferences()`.
+- **Initial render**: `app/layout.tsx` injects a boot script before hydration to
   apply the correct theme immediately and wraps the app in `ThemeProvider`.
-- **User control**: `ColourSchemeSelector` (`apps/frontend/components/ColourSchemeSelector.tsx`)
-  submits changes to `/api/user/options`, ensuring the backend-stored colour scheme
-  preference stays in sync with the local cookie/localStorage cache.
+- **User controls**: `ColourSchemeSelector` (light/dark/system) and `ThemeSelector`
+  (standard/high_roller/oldtime) both call `applyPreferences()` with
+  `persistBackend: true`, syncing to the backend and localStorage.
 
 ## Using Theme Tokens
 
 When building UI components:
 
-- Prefer semantic utilities such as `bg-background`, `bg-surface`,
-  `bg-surface-strong`, `text-foreground`, `text-muted`, `border-border`,
-  `ring`, `bg-primary`, `bg-accent`, `bg-success`, `bg-warning`, `bg-danger`.
+- Prefer semantic utilities such as `bg-background`, `bg-card`, `bg-muted`,
+  `text-foreground`, `text-muted`, `border-border`, `ring`, `bg-primary`,
+  `bg-accent`, `bg-success`, `bg-warning`, `bg-destructive`.
 - Avoid hard-coded Tailwind palette colors (`bg-slate-900`, `text-gray-500`,
   etc.) unless you are introducing a brand-new semantic token.
 - For elevated surfaces use the provided `shadow-elevated`.
 - If you need additional states (e.g., `info`, `neutral`), add matching CSS
-  variables in `globals.css` and register them in `tailwind.config.js`.
+  variables in the `@theme` block or theme overrides in `globals.css`.
 
 ## Extending the Palette
 
-1. Define light/dark values inside `:root` and `.theme-dark` blocks in
-   `globals.css`. Stick to RGB triplets so they work with Tailwind alpha
-   suffixes (`/10`, `/90`, etc.).
-2. Update `tailwind.config.js` to expose the new token under `theme.extend.colors`
-   (and, if necessary, the related `backgroundColor`, `textColor`, `borderColor`,
-   `ringColor`, or `boxShadow` entries).
+1. Define the token in the `@theme` block in `globals.css` for light/default
+   values. Add dark overrides in `.dark` (and `[data-theme-name='...'].dark` for
+   named themes). Use hex values; Tailwind v4 supports alpha suffixes (`/10`, `/90`).
+2. Tailwind v4 auto-generates utilities from `@theme` variables; no config changes
+   are needed for standard colour tokens.
 3. Reference the new semantic utility in components (`bg-info`, `text-info`,
    `border-info`, etc.).
 4. Document the addition here to keep the palette discoverable.
@@ -62,22 +63,24 @@ When building UI components:
 import { useTheme } from '@/components/theme-provider'
 
 function Example() {
-  const { theme, resolvedTheme, setTheme } = useTheme()
-  // theme: 'light' | 'dark' | 'system'
-  // resolvedTheme: 'light' | 'dark'
-  // setTheme('dark') forces dark mode until changed again
+  const { themeName, colourScheme, resolvedColourScheme, applyPreferences } = useTheme()
+  // themeName: 'standard' | 'high_roller' | 'oldtime'
+  // colourScheme: 'light' | 'dark' | 'system'
+  // resolvedColourScheme: 'light' | 'dark'
+  // applyPreferences({ colourScheme: 'dark' }, { persistBackend: true, persistStorage: true })
 }
 ```
 
-If you need custom controls, build them on top of `useTheme()` rather than
-re-implementing preference storage or DOM updates.
+If you need custom controls, build them on top of `useTheme()` and
+`applyPreferences()` rather than re-implementing preference storage or DOM updates.
 
 ## Testing & QA Checklist
 
 - Verify light/dark modes in browsers that support `prefers-color-scheme`.
-- Ensure the Colour Scheme selector updates all three states and the selection
-  persists across reloads.
-- Confirm overriding the theme does not break when system preference changes.
+- Ensure `ColourSchemeSelector` and `ThemeSelector` update all options and
+  selections persist across reloads.
+- Confirm `system` mode tracks OS preference; explicit light/dark overrides
+  remain stable when system preference changes.
 - When adding new components, audit for stray palette colors (`gray-*`,
   `slate-*`, etc.) and swap them to semantic tokens.
 

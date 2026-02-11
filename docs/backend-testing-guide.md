@@ -4,16 +4,17 @@
 
 Explains how automated tests interact with the database layer, the guard rails
 that prevent accidental prod access, and the available harness helpers.
-Complementary docs: `backend-error-handling.md` for error assertions and
+Complementary docs: `backend-error-handling.md` for error assertions,
+`database-url-calculation.md` for env vars and URL construction, and
 `project-milestones.md` for when new suites are expected.
 
 ## Database Environment Policy
 
 ### Code Requirements
-- **Backend code reads only `DATABASE_URL`** - no references to `TEST_DATABASE_URL`
-- **Tests must run against a database whose name ends with `_test`**
+- **Backend uses env parts, not `DATABASE_URL`** - `POSTGRES_HOST`, `POSTGRES_PORT`, `TEST_DB`, `APP_DB_USER`, `APP_DB_PASSWORD`, etc. URLs are constructed in code
+- **Tests use `TEST_DB`** - must end with `_test`; no `TEST_DATABASE_URL` or URL derivation
 - **Schema is automatically initialized** - `build_state()` handles empty databases
-- **The test runner automatically derives the test database URL** by appending `_test` to the existing `DATABASE_URL`
+- **Source env before running tests** - `set -a; source apps/backend/.env; source docker/dev-db/db.env; set +a` (see global rules)
 
 ### Selecting the Test Database Backend
 - **Default backend is PostgreSQL.** Tests fall back to Postgres when no override is provided.
@@ -33,10 +34,10 @@ Complementary docs: `backend-error-handling.md` for error assertions and
   ```
 
 ### Database Setup
-- Tests run against a database suffixed with `_test`
+- **Postgres:** Tests use `TEST_DB` (must end with `_test`)
+- **SQLite:** Tests use file or in-memory DB per `NOMMIE_TEST_DB_KIND`; no `TEST_DB` required
 - **Schema is automatically initialized by `build_state()`** - no manual preparation needed
-- Tests connect to the database and schema is auto-migrated if empty
-- **Fresh databases are automatically migrated on first connection**
+- Fresh databases are automatically migrated on first connection
 
 ## Test Support Functions
 
@@ -53,33 +54,45 @@ These functions automatically:
 
 ## Safety Features
 
-- **Database Guard**: Tests panic if `DATABASE_URL` doesn't end with `_test` (enforced in `apps/backend/src/config/db.rs`)
+- **Database Guard**: Tests fail if `TEST_DB` doesn't end with `_test` (enforced in `packages/db-infra/src/config/db.rs`)
 - **Auto-Migration**: Empty databases are automatically migrated on connection
-- **Environment Isolation**: Test-specific environment via `.env.test`
+- **Environment Isolation**: Tests use the same env vars as dev (source `docker/dev-db/db.env` before running)
 - **Automatic Schema Migration**: `build_state()` automatically migrates empty databases for both prod and test
 
 ## Running Tests
 
 ```bash
+# Source env once per shell (required)
+set -a; source apps/backend/.env; source docker/dev-db/db.env; set +a
+
 # Run all backend tests (schema auto-migrates on first connection)
-pnpm test
+pnpm be:test
 
-# Run tests with verbose output (requires DATABASE_URL to end with _test)
-cargo test --verbose
+# Run tests with verbose output (requires TEST_DB ending with _test when using Postgres)
+pnpm be:test:v
 
-# Run specific test (requires DATABASE_URL to end with _test)
-cargo test test_health_endpoint
+# Run specific test
+pnpm be:test -- test_health_endpoint
 ```
 
 **Note**: Schema is automatically initialized on first connection to empty databases.
 
-**Note**: Running `cargo test` directly (without `pnpm test`) will fail fast with a clear `_test` guard panic if `DATABASE_URL` doesn't end with `_test`.
+**Note**: When using Postgres (`NOMMIE_TEST_DB_KIND=postgres` or default), `TEST_DB` must end with `_test` or the build will fail with a clear config error.
 
-## Example `.env.test`
+## Example `docker/dev-db/db.env`
 
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/nommie_test
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+PROD_DB=nommie
+TEST_DB=nommie_test   # must end with "_test"
+APP_DB_USER=nommie_app
+APP_DB_PASSWORD=your-password
+NOMMIE_OWNER_USER=nommie_owner
+NOMMIE_OWNER_PASSWORD=your-owner-password
 ```
+
+For local dev without TLS, set `POSTGRES_SSL_MODE=disable` in `apps/backend/.env` (see `database-url-calculation.md`).
 
 ## Architecture Notes
 
