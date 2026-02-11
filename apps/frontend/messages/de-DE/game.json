@@ -284,6 +284,7 @@
     "sidebar": {
       "kicker": "Spiel {gameId}",
       "turnLabel": "Zug",
+      "turnNone": "Keiner",
       "trick": {
         "label": "Stich"
       },
@@ -323,6 +324,22 @@
       },
       "error": {
         "loadFailed": "Spielverlauf konnte nicht geladen werden"
+      }
+    },
+    "gameOver": {
+      "title": "Spiel beendet",
+      "description": "Alle 26 Runden gespielt. So hat der Tisch abgeschlossen.",
+      "stats": {
+        "mostCommonTrump": "Häufigster Trumpf",
+        "mostBidWins": "Meiste Gebotsgewinne",
+        "playerStats": "Spielerstatistik",
+        "winner": "Gewinner",
+        "winners": "Gewinner",
+        "bidAccuracy": "Gebotsgenauigkeit",
+        "roundsWon": "Gewonnene Runden",
+        "totalTricks": "Gesamte Stiche",
+        "biggestRound": "Beste Runde",
+        "perfectRounds": "{count, plural, one {# perfekte Runde} other {# perfekte Runden}}"
       }
     },
     "error": {

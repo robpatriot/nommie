@@ -284,6 +284,7 @@
     "sidebar": {
       "kicker": "Game {gameId}",
       "turnLabel": "Turn",
+      "turnNone": "None",
       "trick": {
         "label": "Trick"
       },
@@ -323,6 +324,22 @@
         "pending": "(pending)",
         "bid": "Bid {bid}",
         "total": "Total"
+      }
+    },
+    "gameOver": {
+      "title": "Game complete",
+      "description": "All 26 rounds played. Here’s how the table did.",
+      "stats": {
+        "mostCommonTrump": "Most common trump",
+        "mostBidWins": "Most bid wins",
+        "playerStats": "Player stats",
+        "winner": "Winner",
+        "winners": "Winners",
+        "bidAccuracy": "Bid accuracy",
+        "roundsWon": "Rounds won",
+        "totalTricks": "Total tricks",
+        "biggestRound": "Biggest round",
+        "perfectRounds": "{count, plural, one {# perfect round} other {# perfect rounds}}"
       }
     },
     "error": {

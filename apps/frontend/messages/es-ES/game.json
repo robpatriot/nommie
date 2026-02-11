@@ -284,6 +284,7 @@
     "sidebar": {
       "kicker": "Partida {gameId}",
       "turnLabel": "Turno",
+      "turnNone": "Ninguno",
       "trick": {
         "label": "Baza"
       },
@@ -323,6 +324,22 @@
       },
       "error": {
         "loadFailed": "No se pudo cargar el historial de puntuación"
+      }
+    },
+    "gameOver": {
+      "title": "Partida terminada",
+      "description": "Las 26 rondas completadas. Así quedó la mesa.",
+      "stats": {
+        "mostCommonTrump": "Triunfo más elegido",
+        "mostBidWins": "Más pujas ganadas",
+        "playerStats": "Estadísticas por jugador",
+        "winner": "Ganador",
+        "winners": "Ganadores",
+        "bidAccuracy": "Precisión de pujas",
+        "roundsWon": "Rondas ganadas",
+        "totalTricks": "Total de bazas",
+        "biggestRound": "Mejor ronda",
+        "perfectRounds": "{count, plural, one {# ronda perfecta} other {# rondas perfectas}}"
       }
     },
     "error": {

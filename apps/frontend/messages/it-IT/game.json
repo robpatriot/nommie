@@ -284,6 +284,7 @@
     "sidebar": {
       "kicker": "Partita {gameId}",
       "turnLabel": "Turno",
+      "turnNone": "Nessuno",
       "trick": {
         "label": "Presa"
       },
@@ -323,6 +324,22 @@
       },
       "error": {
         "loadFailed": "Impossibile caricare lo storico dei punteggi"
+      }
+    },
+    "gameOver": {
+      "title": "Partita conclusa",
+      "description": "Tutte le 26 mani giocate. Ecco come è andata la tavolo.",
+      "stats": {
+        "mostCommonTrump": "Briscola più scelta",
+        "mostBidWins": "Più puntate vinte",
+        "playerStats": "Statistiche per giocatore",
+        "winner": "Vincitore",
+        "winners": "Vincitori",
+        "bidAccuracy": "Precisione puntate",
+        "roundsWon": "Mani vinte",
+        "totalTricks": "Presa totali",
+        "biggestRound": "Mano migliore",
+        "perfectRounds": "{count, plural, one {# mano perfetta} other {# mani perfette}}"
       }
     },
     "error": {

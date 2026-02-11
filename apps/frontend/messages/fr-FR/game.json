@@ -284,6 +284,7 @@
     "sidebar": {
       "kicker": "Partie {gameId}",
       "turnLabel": "Tour",
+      "turnNone": "Aucun",
       "trick": {
         "label": "Pli"
       },
@@ -323,6 +324,22 @@
       },
       "error": {
         "loadFailed": "Impossible de charger l’historique des scores"
+      }
+    },
+    "gameOver": {
+      "title": "Partie terminée",
+      "description": "Les 26 manches jouées. Voici le bilan de la table.",
+      "stats": {
+        "mostCommonTrump": "Atout le plus choisi",
+        "mostBidWins": "Plus d'annonces gagnées",
+        "playerStats": "Statistiques par joueur",
+        "winner": "Gagnant",
+        "winners": "Gagnants",
+        "bidAccuracy": "Précision des annonces",
+        "roundsWon": "Manches gagnées",
+        "totalTricks": "Total de plis",
+        "biggestRound": "Meilleure manche",
+        "perfectRounds": "{count, plural, one {# manche parfaite} other {# manches parfaites}}"
       }
     },
     "error": {

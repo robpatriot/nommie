@@ -33,6 +33,7 @@ import { PlayerHand } from './game-room/PlayerHand'
 import { PlayerActions } from './game-room/PlayerActions'
 import { ScoreSidebar } from './game-room/ScoreSidebar'
 import { ScoreHistoryDialog } from './game-room/ScoreHistoryDialog'
+import { GameOverStatsDisplay } from './game-room/GameOverStats'
 import { AiSeatManager } from './game-room/AiSeatManager'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { cn } from '@/lib/cn'
@@ -43,6 +44,10 @@ import { PageContainer } from '@/components/PageContainer'
 import { StatCard } from '@/components/StatCard'
 import { useGameHistory } from '@/hooks/queries/useGames'
 import { mapGameHistory } from '@/lib/game-room/history-mapping'
+import {
+  computeGameOverStats,
+  type GameOverStats,
+} from '@/lib/game-room/game-stats'
 import type { GameHistorySummary } from '@/lib/game-room/types'
 import type { GameHistoryApiResponse } from '@/app/actions/game-actions'
 import { queryKeys } from '@/lib/queries/query-keys'
@@ -120,6 +125,7 @@ export function GameRoomView({
 
   const tYou = t('you')
   const tStatusWaiting = t('status.waiting')
+  const tTurnNone = t('sidebar.turnNone')
   const seatDisplayName = useCallback(
     (seat: Seat) =>
       getPlayerDisplayName(seat, effectiveViewerSeat, playerNames, tYou),
@@ -128,7 +134,9 @@ export function GameRoomView({
   const activeName =
     typeof activeSeat === 'number'
       ? seatDisplayName(activeSeat)
-      : tStatusWaiting
+      : isGameOver
+        ? tTurnNone
+        : tStatusWaiting
 
   const setupSeatEntries = useMemo(
     () =>
@@ -341,6 +349,17 @@ export function GameRoomView({
       ? historyQueryError.message
       : t('history.error.loadFailed')
   }, [historyQueryError, t])
+
+  const gameOverStats = useMemo<GameOverStats | null>(() => {
+    if (!visibleHistoryRounds.length) return null
+    return computeGameOverStats(visibleHistoryRounds)
+  }, [visibleHistoryRounds])
+
+  const winnerSeats = useMemo<Seat[]>(() => {
+    const scores = snapshot.game.scores_total
+    const max = Math.max(...scores)
+    return [0, 1, 2, 3].filter((s) => scores[s] === max) as Seat[]
+  }, [snapshot.game.scores_total])
 
   useEffect(() => {
     if (!selectedCard) {
@@ -696,63 +715,103 @@ export function GameRoomView({
     return (
       <div className="flex flex-col text-foreground">
         <PageContainer className="pb-16">
-          <div className="mx-auto max-w-md">
-            <aside className="flex flex-col gap-4">
-              <ScoreSidebar
-                gameId={gameId}
-                phase={phase}
-                activeName={activeName}
-                playerNames={playerNames}
-                scores={snapshot.game.scores_total}
-                round={round}
-                roundNo={snapshot.game.round_no}
-                dealer={snapshot.game.dealer}
-                seatDisplayName={seatDisplayName}
-                error={error}
-                onShowHistory={handleOpenHistory}
-                isHistoryLoading={isHistoryLoading}
-              />
-              {onLeaveGame ? (
-                <button
-                  type="button"
-                  onClick={onLeaveGame}
-                  disabled={isLeavePending}
-                  className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-destructive/50 hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={
-                    isLeavePending
-                      ? t('setup.quickActions.leavingAria')
-                      : t('setup.quickActions.leaveGameAria')
-                  }
-                >
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
-                      {t('setup.quickActions.leaveGame')}
-                    </p>
-                    <p className="text-base font-semibold text-foreground">
-                      {isLeavePending
-                        ? t('setup.quickActions.leaving')
-                        : t('setup.quickActions.leaveGameLabel')}
-                    </p>
-                  </div>
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-card/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
-                    <svg
-                      aria-hidden="true"
-                      className="h-5 w-5"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.8}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" x2="9" y1="12" y2="12" />
-                    </svg>
+          <div className="mx-auto max-w-4xl">
+            <header className="mb-8 rounded-3xl border border-border/60 bg-gradient-to-br from-card/95 to-muted/30 px-6 py-8 shadow-elevated">
+              <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+                {t('gameOver.title')}
+              </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {t('gameOver.description')}
+              </p>
+              {winnerSeats.length > 0 && winnerSeats.length < 4 ? (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-[0.3em] text-muted-foreground">
+                    {winnerSeats.length === 1
+                      ? t('gameOver.stats.winner')
+                      : t('gameOver.stats.winners')}
                   </span>
-                </button>
+                  <span className="font-semibold text-primary">
+                    {winnerSeats.map((s) => seatDisplayName(s)).join(', ')}
+                  </span>
+                </div>
               ) : null}
-            </aside>
+            </header>
+
+            <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+              <section className="min-w-0">
+                {gameOverStats ? (
+                  <GameOverStatsDisplay
+                    stats={gameOverStats}
+                    playerNames={playerNames}
+                    seatDisplayName={seatDisplayName}
+                    winnerSeats={winnerSeats}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-border/60 bg-card/60 px-6 py-12 text-center text-muted-foreground">
+                    {isHistoryLoading
+                      ? t('history.loading')
+                      : t('history.empty')}
+                  </div>
+                )}
+              </section>
+
+              <aside className="flex flex-col gap-4 self-start">
+                <ScoreSidebar
+                  gameId={gameId}
+                  phase={phase}
+                  activeName={activeName}
+                  playerNames={playerNames}
+                  scores={snapshot.game.scores_total}
+                  round={round}
+                  roundNo={snapshot.game.round_no}
+                  dealer={snapshot.game.dealer}
+                  seatDisplayName={seatDisplayName}
+                  error={error}
+                  onShowHistory={handleOpenHistory}
+                  isHistoryLoading={isHistoryLoading}
+                />
+                {onLeaveGame ? (
+                  <button
+                    type="button"
+                    onClick={onLeaveGame}
+                    disabled={isLeavePending}
+                    className="group flex items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-destructive/50 hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={
+                      isLeavePending
+                        ? t('setup.quickActions.leavingAria')
+                        : t('setup.quickActions.leaveGameAria')
+                    }
+                  >
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.35em] text-muted-foreground">
+                        {t('setup.quickActions.leaveGame')}
+                      </p>
+                      <p className="text-base font-semibold text-foreground">
+                        {isLeavePending
+                          ? t('setup.quickActions.leaving')
+                          : t('setup.quickActions.leaveGameLabel')}
+                      </p>
+                    </div>
+                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-card/80 text-foreground transition group-hover:bg-destructive/10 group-hover:text-destructive">
+                      <svg
+                        aria-hidden="true"
+                        className="h-5 w-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" x2="9" y1="12" y2="12" />
+                      </svg>
+                    </span>
+                  </button>
+                ) : null}
+              </aside>
+            </div>
           </div>
         </PageContainer>
         <ScoreHistoryDialog
@@ -832,7 +891,7 @@ export function GameRoomView({
             )}
           </section>
 
-          <aside className="flex flex-col gap-4 lg:sticky lg:top-6">
+          <aside className="flex flex-col gap-4 self-start lg:sticky lg:top-6">
             <PlayerActions
               phase={phase}
               viewerSeat={effectiveViewerSeat}
@@ -867,7 +926,7 @@ export function GameRoomView({
                 type="button"
                 onClick={onLeaveGame}
                 disabled={isLeavePending}
-                className="group flex h-full items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-destructive/50 hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
+                className="group flex items-center justify-between rounded-2xl border border-border/60 bg-background/40 px-4 py-3 text-left transition hover:border-destructive/50 hover:bg-destructive/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/40 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label={
                   isLeavePending
                     ? t('setup.quickActions.leavingAria')
