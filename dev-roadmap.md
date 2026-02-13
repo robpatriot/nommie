@@ -5,3 +5,7 @@ This document tracks the current work plan for building the Nommie UI on web (Ne
 ---
 
 # Next Steps
+
+- Confirm that etags are working
+- Add further tests as per recommendations from AG
+- Debug reconnection issues
