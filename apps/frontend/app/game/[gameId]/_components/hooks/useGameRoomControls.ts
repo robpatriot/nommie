@@ -10,9 +10,7 @@ import {
 interface UseGameRoomControlsProps {
   phase: GameSnapshot['phase']
   viewerSeatForInteractions: Seat | null
-  snapshot: {
-    bidConstraints?: { zeroBidLocked?: boolean } | null
-  }
+  bidConstraints: { zeroBidLocked?: boolean } | null | undefined
   handleSubmitBid: (bid: number) => Promise<void>
   handleSelectTrump: (trump: Trump) => Promise<void>
   handlePlayCard: (card: string) => Promise<void>
@@ -28,7 +26,7 @@ interface UseGameRoomControlsProps {
 export function useGameRoomControls({
   phase,
   viewerSeatForInteractions,
-  snapshot,
+  bidConstraints,
   handleSubmitBid,
   handleSelectTrump,
   handlePlayCard,
@@ -48,7 +46,7 @@ export function useGameRoomControls({
     return {
       viewerSeat: viewerSeatForInteractions,
       isPending: isBidPending,
-      zeroBidLocked: snapshot.bidConstraints?.zeroBidLocked ?? false,
+      zeroBidLocked: bidConstraints?.zeroBidLocked ?? false,
       onSubmit: handleSubmitBid,
     }
   }, [
@@ -56,7 +54,7 @@ export function useGameRoomControls({
     isBidPending,
     phase,
     viewerSeatForInteractions,
-    snapshot.bidConstraints,
+    bidConstraints,
   ])
 
   const trumpControls = useMemo(() => {

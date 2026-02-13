@@ -2,11 +2,11 @@
 
 import { fetchWithAuth, BackendApiError } from '@/lib/api'
 import { fetchWithAuthWithRetry } from '@/lib/server/fetch-with-retry'
-import type { Card, GameSnapshot, Trump } from '@/lib/game-room/types'
+import type { Trump } from '@/lib/game-room/types'
 import { isGameStateMsg, isWireMsg } from '@/lib/game-room/protocol/types'
 import type { GameStateMsg } from '@/lib/game-room/protocol/types'
 
-export type GameSnapshotResult =
+export type GameStateResult =
   | {
       kind: 'ok'
       msg: GameStateMsg
@@ -14,28 +14,19 @@ export type GameSnapshotResult =
     }
   | { kind: 'not_modified' }
 
-export interface SnapshotEnvelope {
-  snapshot: GameSnapshot
-  version?: number
-  viewer_hand?: Card[] | null
-  bid_constraints?: {
-    zero_bid_locked?: boolean[]
-  }
-}
-
 /**
- * Fetch game snapshot.
+ * Fetch game state.
  * Works from both Server Components and Server Actions.
  * Uses fetchWithAuthWithRetry for improved SSR resilience on initial page load.
  * Automatically refreshes JWT if needed.
  */
-export async function fetchGameSnapshot(
+export async function fetchGameState(
   gameId: number,
   options: { etag?: string } = {}
-): Promise<GameSnapshotResult> {
+): Promise<GameStateResult> {
   try {
     const response = await fetchWithAuthWithRetry(
-      `/api/games/${gameId}/snapshot`,
+      `/api/games/${gameId}/state`,
       {
         headers: options.etag ? { 'If-None-Match': options.etag } : undefined,
       }
@@ -45,11 +36,11 @@ export async function fetchGameSnapshot(
     const etag = response.headers.get('etag') ?? undefined
 
     if (!isWireMsg(raw)) {
-      throw new Error('Invalid snapshot response: not a wire message')
+      throw new Error('Invalid state response: not a wire message')
     }
     if (!isGameStateMsg(raw)) {
       throw new Error(
-        `Invalid snapshot response: expected game_state, got ${String(
+        `Invalid state response: expected game_state, got ${String(
           (raw as { type?: unknown }).type
         )}`
       )

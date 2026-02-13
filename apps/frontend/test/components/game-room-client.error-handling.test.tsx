@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 
 import { GameRoomClient } from '@/app/game/[gameId]/_components/game-room-client'
-import { mockGetGameRoomSnapshotAction } from '../../setupGameRoomActionsMock'
-import { createInitialData } from '../setup/game-room-client-helpers'
+import { mockGetGameRoomStateAction } from '../../setupGameRoomActionsMock'
+import { createInitialState } from '../setup/game-room-client-helpers'
 import {
   createMockMutationHooks,
   setupFetchMock,
@@ -81,9 +81,9 @@ describe('GameRoomClient', () => {
 
   describe('Error handling', () => {
     it('displays error messages with traceId', async () => {
-      const initialData = createInitialData()
+      const initialState = createInitialState(42)
 
-      mockGetGameRoomSnapshotAction.mockResolvedValue({
+      mockGetGameRoomStateAction.mockResolvedValue({
         kind: 'error',
         message: 'Failed to fetch',
         status: 500,
@@ -91,7 +91,7 @@ describe('GameRoomClient', () => {
       })
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       // There might be multiple refresh buttons, get the first one
@@ -103,7 +103,7 @@ describe('GameRoomClient', () => {
       // Wait for async operations
       await waitFor(
         () => {
-          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+          expect(mockGetGameRoomStateAction).toHaveBeenCalled()
         },
         { timeout: 2000 }
       )
@@ -114,36 +114,36 @@ describe('GameRoomClient', () => {
     })
 
     it('handles network errors gracefully', async () => {
-      const initialData = createInitialData()
+      const initialState = createInitialState(42)
 
       const expectedError = new Error('Network error')
-      mockGetGameRoomSnapshotAction.mockRejectedValue(expectedError)
+      mockGetGameRoomStateAction.mockRejectedValue(expectedError)
       const consoleErrorSpy = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {})
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       const refreshButton = screen.getByRole('button', {
         name: /Refresh game state/i,
       })
       try {
-        const callCountBefore = mockGetGameRoomSnapshotAction.mock.calls.length
+        const callCountBefore = mockGetGameRoomStateAction.mock.calls.length
 
         await expect(userEvent.click(refreshButton)).resolves.toBeUndefined()
 
         await waitFor(
           () => {
-            expect(mockGetGameRoomSnapshotAction.mock.calls.length).toBe(
+            expect(mockGetGameRoomStateAction.mock.calls.length).toBe(
               callCountBefore + 1
             )
           },
           { timeout: 2000 }
         )
 
-        const results = mockGetGameRoomSnapshotAction.mock.results
+        const results = mockGetGameRoomStateAction.mock.results
         const failingCall =
           results.length > 0
             ? results[results.length - 1]?.value

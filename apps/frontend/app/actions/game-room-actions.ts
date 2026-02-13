@@ -3,7 +3,7 @@
 import { getTranslations } from 'next-intl/server'
 import { BackendApiError } from '@/lib/api'
 import {
-  fetchGameSnapshot,
+  fetchGameState,
   markPlayerReady,
   leaveGame,
   rejoinGame,
@@ -20,58 +20,43 @@ import {
   toErrorResult,
   type ActionResult,
   type SimpleActionResult,
-  type SnapshotActionResult,
+  type StateActionResult,
 } from '@/lib/api/action-helpers'
 import { validateSeat } from '@/utils/seat-validation'
-import type {
-  BidConstraints,
-  Card,
-  GameSnapshot,
-  Seat,
-  Trump,
-} from '@/lib/game-room/types'
-import { gameStateMsgToSnapshotPayload } from '@/lib/game-room/protocol/transform'
+import type { Seat, Trump } from '@/lib/game-room/types'
+import type { GameRoomState } from '@/lib/game-room/state'
+import { gameStateMsgToRoomState } from '@/lib/game-room/state'
 
-export interface GameRoomSnapshotRequest {
+export interface GameRoomStateRequest {
   gameId: number
   etag?: string
 }
 
-export type GameRoomSnapshotActionResult =
-  SnapshotActionResult<GameRoomSnapshotPayload>
+export type GameRoomStateActionResult = StateActionResult<GameRoomState>
 
-export interface GameRoomSnapshotPayload {
-  snapshot: GameSnapshot
-  etag?: string
-  version?: number
-  playerNames: [string, string, string, string]
-  viewerSeat: Seat | null
-  viewerHand: Card[]
-  timestamp: string
-  hostSeat: Seat
-  bidConstraints?: BidConstraints | null
-}
-
-export async function getGameRoomSnapshotAction(
-  request: GameRoomSnapshotRequest
-): Promise<GameRoomSnapshotActionResult> {
+export async function getGameRoomStateAction(
+  request: GameRoomStateRequest
+): Promise<GameRoomStateActionResult> {
   try {
-    const snapshotResult = await fetchGameSnapshot(request.gameId, {
+    const fetchResult = await fetchGameState(request.gameId, {
       etag: request.etag,
     })
 
-    if (snapshotResult.kind === 'not_modified') {
+    if (fetchResult.kind === 'not_modified') {
       return { kind: 'not_modified' }
     }
 
-    const payload = gameStateMsgToSnapshotPayload(snapshotResult.msg, {
-      etag: snapshotResult.etag,
-      timestamp: new Date().toISOString(),
-    })
+    const roomState: GameRoomState = {
+      ...gameStateMsgToRoomState(fetchResult.msg, {
+        source: 'http',
+        receivedAt: new Date().toISOString(),
+      }),
+      ...(fetchResult.etag && { etag: fetchResult.etag }),
+    }
 
     return {
       kind: 'ok',
-      data: payload,
+      data: roomState,
     }
   } catch (error) {
     // Handle not_modified case (304 status)
@@ -79,7 +64,7 @@ export async function getGameRoomSnapshotAction(
       return { kind: 'not_modified' }
     }
     const t = await getTranslations('errors.actions')
-    return toErrorResult(error, t('failedToFetchGameSnapshot'))
+    return toErrorResult(error, t('failedToFetchGameState'))
   }
 }
 
@@ -105,12 +90,9 @@ export async function leaveGameAction(
     // If no version is provided, fetch the game snapshot to get it
     let finalVersion = version
     if (finalVersion === undefined) {
-      const snapshotResult = await getGameRoomSnapshotAction({ gameId })
-      if (
-        snapshotResult.kind === 'ok' &&
-        snapshotResult.data.version !== undefined
-      ) {
-        finalVersion = snapshotResult.data.version
+      const stateResult = await getGameRoomStateAction({ gameId })
+      if (stateResult.kind === 'ok' && stateResult.data.version !== undefined) {
+        finalVersion = stateResult.data.version
       }
     }
 
@@ -141,14 +123,11 @@ export async function rejoinGameAction(
   try {
     let finalVersion = request.version
     if (finalVersion === undefined) {
-      const snapshotResult = await getGameRoomSnapshotAction({
+      const stateResult = await getGameRoomStateAction({
         gameId: request.gameId,
       })
-      if (
-        snapshotResult.kind === 'ok' &&
-        snapshotResult.data.version !== undefined
-      ) {
-        finalVersion = snapshotResult.data.version
+      if (stateResult.kind === 'ok' && stateResult.data.version !== undefined) {
+        finalVersion = stateResult.data.version
       }
     }
 
@@ -297,9 +276,9 @@ export async function addAiSeatAction(
   let finalVersion = request.version
   if (finalVersion === undefined) {
     try {
-      const snapshotResult = await fetchGameSnapshot(request.gameId)
-      if (snapshotResult.kind === 'ok') {
-        finalVersion = snapshotResult.msg.version
+      const fetchResult = await fetchGameState(request.gameId)
+      if (fetchResult.kind === 'ok') {
+        finalVersion = fetchResult.msg.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(
@@ -344,9 +323,9 @@ export async function removeAiSeatAction(
   let finalVersion = request.version
   if (finalVersion === undefined) {
     try {
-      const snapshotResult = await fetchGameSnapshot(request.gameId)
-      if (snapshotResult.kind === 'ok') {
-        finalVersion = snapshotResult.msg.version
+      const fetchResult = await fetchGameState(request.gameId)
+      if (fetchResult.kind === 'ok') {
+        finalVersion = fetchResult.msg.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(
@@ -388,9 +367,9 @@ export async function updateAiSeatAction(
   let finalVersion = request.version
   if (finalVersion === undefined) {
     try {
-      const snapshotResult = await fetchGameSnapshot(request.gameId)
-      if (snapshotResult.kind === 'ok') {
-        finalVersion = snapshotResult.msg.version
+      const fetchResult = await fetchGameState(request.gameId)
+      if (fetchResult.kind === 'ok') {
+        finalVersion = fetchResult.msg.version
       } else {
         const t = await getTranslations('errors.actions')
         return toErrorResult(

@@ -18,7 +18,7 @@ import {
   useDeleteGame,
 } from '@/hooks/mutations/useGameMutations'
 import { useRejoinGame } from '@/hooks/mutations/useGameRoomMutations'
-import { getGameRoomSnapshotAction } from '@/app/actions/game-room-actions'
+import { getGameRoomStateAction } from '@/app/actions/game-room-actions'
 import type { Game } from '@/lib/types'
 import { toQueryError } from '@/lib/queries/query-error-handler'
 import { logBackendError } from '@/lib/logging/error-logger'
@@ -160,17 +160,14 @@ export default function LobbyClient({
 
   const handleRejoin = async (gameId: number) => {
     try {
-      // Fetch snapshot to get current version
-      const snapshotResult = await getGameRoomSnapshotAction({ gameId })
-      if (
-        snapshotResult.kind !== 'ok' ||
-        snapshotResult.data.version === undefined
-      ) {
+      // Fetch state to get current version
+      const stateResult = await getGameRoomStateAction({ gameId })
+      if (stateResult.kind !== 'ok' || stateResult.data.version === undefined) {
         showToast(t('toasts.rejoinFailedNoVersion'), 'error')
         return
       }
 
-      const version = snapshotResult.data.version
+      const version = stateResult.data.version
 
       // Call rejoin API
       await rejoinGameMutation.mutateAsync({

@@ -74,7 +74,7 @@
     "devDetails": "Fehlerdetails (nur Dev)"
   },
   "actions": {
-    "failedToFetchGameSnapshot": "Spielzustand konnte nicht geladen werden",
+    "failedToFetchGameState": "Spielzustand konnte nicht geladen werden",
     "failedToMarkPlayerReady": "Spieler konnte nicht als bereit markiert werden",
     "failedToSubmitBid": "Gebot konnte nicht abgegeben werden",
     "failedToSelectTrump": "Trumpf konnte nicht gewählt werden",
@@ -111,6 +111,6 @@
     "noSettingsProvided": "Keine Einstellungen angegeben"
   },
   "page": {
-    "failedToLoadGameSnapshot": "Spielzustand konnte nicht geladen werden: unerwartete Antwort"
+    "failedToLoadGameState": "Spielzustand konnte nicht geladen werden: unerwartete Antwort"
   }
 }

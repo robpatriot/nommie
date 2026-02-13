@@ -6,18 +6,24 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act, createTestQueryClient } from '../utils'
 import type { QueryClient } from '@tanstack/react-query'
 import { useGameSync } from '@/hooks/useGameSync'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
 import { initSnapshotFixture } from '../mocks/game-snapshot'
 import { queryKeys } from '@/lib/queries/query-keys'
-import { mockGetGameRoomSnapshotAction } from '../../setupGameRoomActionsMock'
+import { mockGetGameRoomStateAction } from '../../setupGameRoomActionsMock'
 import {
   MockWebSocket,
   mockWebSocketInstances,
 } from '@/test/setup/mock-websocket'
 import { setupFetchMock } from '../setup/game-room-client-mocks'
+import type { GameRoomState } from '@/lib/game-room/state'
 import {
-  createInitialData,
-  createInitialDataWithVersion,
+  selectSnapshot,
+  selectVersion,
+  selectViewerHand,
+} from '@/lib/game-room/state'
+import {
+  createInitialState,
+  createInitialStateWithVersion,
+  createStateWithVersionForMock,
 } from '../setup/game-room-client-helpers'
 
 const mocks = vi.hoisted(() => ({
@@ -157,10 +163,10 @@ describe('useGameSync', () => {
       data: [],
     })
 
-    mockGetGameRoomSnapshotAction.mockImplementation(
+    mockGetGameRoomStateAction.mockImplementation(
       async ({ gameId }: { gameId: number }) => ({
         kind: 'ok' as const,
-        data: createInitialDataWithVersion(gameId),
+        data: createStateWithVersionForMock(gameId),
       })
     )
 
@@ -182,10 +188,10 @@ describe('useGameSync', () => {
 
   describe('Subscription + Version gating', () => {
     it('subscribes on mount and reports connected after hello_ack', async () => {
-      const initialData = createInitialDataWithVersion(1)
+      const initialState = createInitialStateWithVersion(1)
 
       const { result } = renderHook(
-        () => useGameSync({ initialData, gameId: 1 }),
+        () => useGameSync({ initialState, gameId: 1 }),
         { queryClient }
       )
 
@@ -201,19 +207,20 @@ describe('useGameSync', () => {
     })
 
     it('does not create a new socket when gameId changes; it re-subscribes and resets version gate', async () => {
-      const initialData1 = createInitialData()
-      initialData1.version = 1
-      initialData1.etag = 'etag-1'
-
-      const initialData2 = createInitialData()
-      initialData2.version = 1
-      initialData2.etag = 'etag-2'
+      const initialState1 = createInitialState(1, initSnapshotFixture, {
+        version: 1,
+        etag: 'etag-1',
+      })
+      const initialState2 = createInitialState(2, initSnapshotFixture, {
+        version: 1,
+        etag: 'etag-2',
+      })
 
       const { rerender } = renderHook(
-        ({ gameId, initialData }) => useGameSync({ initialData, gameId }),
+        ({ gameId, initialState }) => useGameSync({ initialState, gameId }),
         {
           queryClient,
-          initialProps: { gameId: 1, initialData: initialData1 },
+          initialProps: { gameId: 1, initialState: initialState1 },
         }
       )
 
@@ -221,24 +228,22 @@ describe('useGameSync', () => {
       const ws = mockWebSocketInstances[0]
       await connectAndSubscribe(ws, { expectedGameId: 1 })
 
-      // Apply high-version game_state for game 1 (sets last seen high)
       act(() => {
         serverSendJson(ws, {
           type: 'game_state',
           topic: { kind: 'game', id: 1 },
           version: 100,
-          game: initialData1.snapshot,
+          game: initialState1.game,
           viewer: {
-            seat: initialData1.viewerSeat ?? null,
+            seat: initialState1.viewer.seat ?? null,
             hand: [],
             bidConstraints: null,
           },
         })
       })
 
-      // Change gameId WITHOUT unmounting.
       await act(async () => {
-        rerender({ gameId: 2, initialData: initialData2 })
+        rerender({ gameId: 2, initialState: initialState2 })
       })
 
       // Still exactly one socket (WS is visit-lifetime).
@@ -278,15 +283,14 @@ describe('useGameSync', () => {
         })
       })
 
-      // Send low-version game_state for game 2 (must NOT be dropped due to old last=100 from game 1).
       act(() => {
         serverSendJson(ws, {
           type: 'game_state',
           topic: { kind: 'game', id: 2 },
           version: 2,
-          game: initialData2.snapshot,
+          game: initialState2.game,
           viewer: {
-            seat: initialData2.viewerSeat ?? null,
+            seat: initialState2.viewer.seat ?? null,
             hand: [],
             bidConstraints: null,
           },
@@ -294,20 +298,20 @@ describe('useGameSync', () => {
       })
 
       await waitFor(() => {
-        const data = queryClient.getQueryData(queryKeys.games.snapshot(2))
+        const data = queryClient.getQueryData(queryKeys.games.state(2))
         expect(data).toBeTruthy()
       })
     })
 
-    it('does not re-subscribe when initialData changes but gameId stays the same', async () => {
-      const initialDataV1 = createInitialDataWithVersion(1, 1)
-      const initialDataV2 = createInitialDataWithVersion(1, 2)
+    it('does not re-subscribe when initialState changes but gameId stays the same', async () => {
+      const initialStateV1 = createInitialStateWithVersion(1, 1)
+      const initialStateV2 = createInitialStateWithVersion(1, 2)
 
       const { rerender } = renderHook(
-        ({ gameId, initialData }) => useGameSync({ initialData, gameId }),
+        ({ gameId, initialState }) => useGameSync({ initialState, gameId }),
         {
           queryClient,
-          initialProps: { gameId: 1, initialData: initialDataV1 },
+          initialProps: { gameId: 1, initialState: initialStateV1 },
         }
       )
 
@@ -320,8 +324,7 @@ describe('useGameSync', () => {
           typeof m === 'object' && m !== null && (m as any).type === 'subscribe'
       ).length
 
-      // Rerender with SAME gameId but NEW initialData (new etag + version)
-      rerender({ gameId: 1, initialData: initialDataV2 })
+      rerender({ gameId: 1, initialState: initialStateV2 })
 
       // No new subscribe should be sent
       await waitFor(() => {
@@ -338,9 +341,11 @@ describe('useGameSync', () => {
 
   describe('WebSocket message handling', () => {
     it('updates query cache when receiving game_state', async () => {
-      const initialData = createInitialDataWithVersion(1, 1)
+      const initialState = createInitialStateWithVersion(1, 1)
 
-      renderHook(() => useGameSync({ initialData, gameId: 1 }), { queryClient })
+      renderHook(() => useGameSync({ initialState, gameId: 1 }), {
+        queryClient,
+      })
 
       await waitForWsCount(1)
       const ws = mockWebSocketInstances[0]
@@ -366,24 +371,24 @@ describe('useGameSync', () => {
       })
 
       await waitFor(() => {
-        const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(1)
+        const cached = queryClient.getQueryData<GameRoomState>(
+          queryKeys.games.state(1)
         )
         expect(cached).toBeDefined()
-        expect(cached?.version).toBe(2)
-        expect(cached?.snapshot.game.round_no).toBe(2)
-        expect(cached?.viewerHand).toEqual(['2H', '3C'])
+        expect(selectVersion(cached!)).toBe(2)
+        expect(selectSnapshot(cached!).game.round_no).toBe(2)
+        expect(selectViewerHand(cached!)).toEqual(['2H', '3C'])
       })
     })
 
     it('ignores stale game_state and applies newer ones', async () => {
-      const initialDataV1 = createInitialDataWithVersion(1, 1)
+      const initialStateV1 = createInitialStateWithVersion(1, 1)
 
       const { rerender } = renderHook(
-        ({ initialData }) => useGameSync({ initialData, gameId: 1 }),
+        ({ initialState }) => useGameSync({ initialState, gameId: 1 }),
         {
           queryClient,
-          initialProps: { initialData: initialDataV1 },
+          initialProps: { initialState: initialStateV1 },
         }
       )
 
@@ -403,14 +408,15 @@ describe('useGameSync', () => {
       })
 
       await waitFor(() => {
-        const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(1)
+        const cached = queryClient.getQueryData<GameRoomState>(
+          queryKeys.games.state(1)
         )
-        expect(cached?.version).toBe(5)
+        expect(cached).toBeDefined()
+        expect(selectVersion(cached!)).toBe(5)
       })
 
-      const before = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(1)
+      const before = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(1)
       )
 
       // Send stale v3 (different content) -> should not change cache
@@ -428,8 +434,8 @@ describe('useGameSync', () => {
       })
 
       await waitFor(() => {
-        const afterStale = queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(1)
+        const afterStale = queryClient.getQueryData<GameRoomState>(
+          queryKeys.games.state(1)
         )
         expect(afterStale).toEqual(before)
       })
@@ -449,23 +455,26 @@ describe('useGameSync', () => {
       })
 
       await waitFor(() => {
-        const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(1)
+        const cached = queryClient.getQueryData<GameRoomState>(
+          queryKeys.games.state(1)
         )
-        expect(cached?.version).toBe(6)
-        expect(cached?.snapshot.game.round_no).toBe(2)
-        expect(cached?.viewerHand).toEqual(['AS'])
+        expect(cached).toBeDefined()
+        expect(selectVersion(cached!)).toBe(6)
+        expect(selectSnapshot(cached!).game.round_no).toBe(2)
+        expect(selectViewerHand(cached!)).toEqual(['AS'])
       })
 
-      // (Optional) If your hook seeds version from initialData on rerender, this ensures no churn.
-      rerender({ initialData: createInitialDataWithVersion(1, 2) })
+      // (Optional) If your hook seeds version from initialState on rerender, this ensures no churn.
+      rerender({ initialState: createInitialStateWithVersion(1, 2) })
       expect(mockWebSocketInstances.length).toBe(1)
     })
 
     it('triggers an HTTP refresh when receiving an error message', async () => {
-      const initialData = createInitialDataWithVersion(1)
+      const initialState = createInitialStateWithVersion(1)
 
-      renderHook(() => useGameSync({ initialData, gameId: 1 }), { queryClient })
+      renderHook(() => useGameSync({ initialState, gameId: 1 }), {
+        queryClient,
+      })
 
       await waitForWsCount(1)
       const ws = mockWebSocketInstances[0]
@@ -480,14 +489,16 @@ describe('useGameSync', () => {
       })
 
       await waitFor(() => {
-        expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+        expect(mockGetGameRoomStateAction).toHaveBeenCalled()
       })
     })
 
     it('refetches LW cache when receiving long_wait_invalidated', async () => {
-      const initialData = createInitialDataWithVersion(1)
+      const initialState = createInitialStateWithVersion(1)
 
-      renderHook(() => useGameSync({ initialData, gameId: 1 }), { queryClient })
+      renderHook(() => useGameSync({ initialState, gameId: 1 }), {
+        queryClient,
+      })
 
       await waitForWsCount(1)
       const ws = mockWebSocketInstances[0]
@@ -513,11 +524,11 @@ describe('useGameSync', () => {
   })
 
   describe('Manual snapshot refresh', () => {
-    it('refreshSnapshot calls action with etag and updates cache', async () => {
-      const initialData = createInitialDataWithVersion(1, 1)
+    it('refreshStateFromHttp calls action with etag and updates cache', async () => {
+      const initialState = createInitialStateWithVersion(1, 1)
 
       const { result } = renderHook(
-        () => useGameSync({ initialData, gameId: 1 }),
+        () => useGameSync({ initialState, gameId: 1 }),
         { queryClient }
       )
 
@@ -525,33 +536,32 @@ describe('useGameSync', () => {
       const ws = mockWebSocketInstances[0]
       await connectAndSubscribe(ws, { expectedGameId: 1 })
 
-      mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
+      mockGetGameRoomStateAction.mockResolvedValueOnce({
         kind: 'ok',
-        data: createInitialDataWithVersion(1, 2),
+        data: createStateWithVersionForMock(1, 2),
       })
 
       await act(async () => {
-        await result.current.refreshSnapshot()
+        await result.current.refreshStateFromHttp()
       })
 
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledWith({
+      expect(mockGetGameRoomStateAction).toHaveBeenCalledWith({
         gameId: 1,
-        etag: initialData.etag,
+        etag: initialState.etag,
       })
 
-      const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(1)
+      const cached = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(1)
       )
-      expect(cached?.version).toBe(2)
+      expect(cached).toBeDefined()
+      expect(selectVersion(cached!)).toBe(2)
     })
 
-    it('does not synthesize ETag from WS payload version; ETag stays from initialData', async () => {
-      const initialData = createInitialDataWithVersion(1, 1)
-      const httpEtag = initialData.etag
-      expect(httpEtag).toBe('"game-1-v1"')
+    it('refreshStateFromHttp does not update cache on not_modified (avoids receivedAt-only churn)', async () => {
+      const initialState = createInitialStateWithVersion(1, 1)
 
       const { result } = renderHook(
-        () => useGameSync({ initialData, gameId: 1 }),
+        () => useGameSync({ initialState, gameId: 1 }),
         { queryClient }
       )
 
@@ -559,7 +569,56 @@ describe('useGameSync', () => {
       const ws = mockWebSocketInstances[0]
       await connectAndSubscribe(ws, { expectedGameId: 1 })
 
-      mockGetGameRoomSnapshotAction.mockClear()
+      act(() => {
+        serverSendJson(ws, {
+          type: 'game_state',
+          topic: { kind: 'game', id: 1 },
+          version: 2,
+          game: initSnapshotFixture,
+          viewer: { seat: 0, hand: [], bidConstraints: null },
+        })
+      })
+
+      await waitFor(() => {
+        const cached = queryClient.getQueryData<GameRoomState>(
+          queryKeys.games.state(1)
+        )
+        expect(cached).toBeDefined()
+        expect(selectVersion(cached!)).toBe(2)
+      })
+
+      const cachedBeforeRefresh = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(1)
+      )
+      mockGetGameRoomStateAction.mockResolvedValueOnce({
+        kind: 'not_modified',
+      })
+
+      await act(async () => {
+        await result.current.refreshStateFromHttp()
+      })
+
+      const cachedAfterRefresh = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(1)
+      )
+      expect(cachedAfterRefresh).toBe(cachedBeforeRefresh)
+    })
+
+    it('does not synthesize ETag from WS payload version; ETag stays from initialState', async () => {
+      const initialState = createInitialStateWithVersion(1, 1)
+      const httpEtag = initialState.etag
+      expect(httpEtag).toBe('"game-1-v1"')
+
+      const { result } = renderHook(
+        () => useGameSync({ initialState, gameId: 1 }),
+        { queryClient }
+      )
+
+      await waitForWsCount(1)
+      const ws = mockWebSocketInstances[0]
+      await connectAndSubscribe(ws, { expectedGameId: 1 })
+
+      mockGetGameRoomStateAction.mockClear()
 
       act(() => {
         serverSendJson(ws, {
@@ -572,27 +631,28 @@ describe('useGameSync', () => {
       })
 
       await waitFor(() => {
-        const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(1)
+        const cached = queryClient.getQueryData<GameRoomState>(
+          queryKeys.games.state(1)
         )
-        expect(cached?.version).toBe(5)
+        expect(cached).toBeDefined()
+        expect(selectVersion(cached!)).toBe(5)
       })
 
       await act(async () => {
-        await result.current.refreshSnapshot()
+        await result.current.refreshStateFromHttp()
       })
 
-      expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledWith({
+      expect(mockGetGameRoomStateAction).toHaveBeenCalledWith({
         gameId: 1,
         etag: httpEtag,
       })
     })
 
-    it('refreshSnapshot surfaces errors in syncError', async () => {
-      const initialData = createInitialDataWithVersion(1)
+    it('refreshStateFromHttp surfaces errors in syncError', async () => {
+      const initialState = createInitialStateWithVersion(1)
 
       const { result } = renderHook(
-        () => useGameSync({ initialData, gameId: 1 }),
+        () => useGameSync({ initialState, gameId: 1 }),
         { queryClient }
       )
 
@@ -600,12 +660,12 @@ describe('useGameSync', () => {
       const ws = mockWebSocketInstances[0]
       await connectAndSubscribe(ws, { expectedGameId: 1 })
 
-      mockGetGameRoomSnapshotAction.mockRejectedValueOnce(
+      mockGetGameRoomStateAction.mockRejectedValueOnce(
         new Error('Network error')
       )
 
       await act(async () => {
-        await result.current.refreshSnapshot()
+        await result.current.refreshStateFromHttp()
       })
 
       expect(result.current.syncError).toBeDefined()

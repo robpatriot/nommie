@@ -3,11 +3,19 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import type { GameRoomState } from '@/lib/game-room/state'
+import {
+  selectBidConstraints,
+  selectHostSeat,
+  selectPlayerNames,
+  selectSnapshot,
+  selectViewerHand,
+  selectViewerSeat,
+} from '@/lib/game-room/state'
 import Toast from '@/components/Toast'
 import { useToast } from '@/hooks/useToast'
 import { useGameSync } from '@/hooks/useGameSync'
-import { useGameSnapshot } from '@/hooks/queries/useGameSnapshot'
+import { useGameRoomState } from '@/hooks/queries/useGameRoomState'
 import type { Seat } from '@/lib/game-room/types'
 
 import { GameRoomView } from './game-room-view'
@@ -21,32 +29,29 @@ import { normalizeViewerSeat } from './game-room/utils'
 import { isInitPhase } from './game-room/phase-helpers'
 
 interface GameRoomClientProps {
-  initialData: GameRoomSnapshotPayload
+  initialState: GameRoomState
   gameId: number
   requireCardConfirmation?: boolean
   trickDisplayDurationSeconds?: number | null
 }
 
 export function GameRoomClient({
-  initialData,
+  initialState,
   gameId,
   requireCardConfirmation = true,
   trickDisplayDurationSeconds = null,
 }: GameRoomClientProps) {
-  // Read snapshot from TanStack Query cache (single source of truth)
-  // WebSocket updates will automatically update the cache and trigger re-renders
   const {
-    data: snapshot = initialData,
+    data: state = initialState,
     error: queryError,
-    isLoading: isSnapshotLoading,
-  } = useGameSnapshot(gameId, {
-    initialData,
-    etag: initialData.etag,
+    isLoading: isStateLoading,
+  } = useGameRoomState(gameId, {
+    initialData: initialState,
+    etag: initialState.etag,
   })
 
-  // Get WebSocket connection state and refresh function
   const {
-    refreshSnapshot,
+    refreshStateFromHttp,
     syncError,
     isRefreshing: syncIsRefreshing,
     disconnect,
@@ -54,7 +59,7 @@ export function GameRoomClient({
     connectionState,
     reconnectAttempts,
     maxReconnectAttempts,
-  } = useGameSync({ initialData, gameId })
+  } = useGameSync({ initialState, gameId })
 
   const { toasts, showToast, hideToast } = useToast()
   const tGame = useTranslations('game.gameRoom')
@@ -65,25 +70,23 @@ export function GameRoomClient({
   // Combine loading/refreshing states
   // Only show loading for initial loads (isLoading) or manual refreshes (syncIsRefreshing)
   // Background refetches won't trigger loading indicators
-  const isRefreshing = syncIsRefreshing || isSnapshotLoading
+  const isRefreshing = syncIsRefreshing || isStateLoading
 
-  // Normalize viewer seat once and reuse
   const viewerSeatForInteractions = useMemo<Seat | null>(
-    () => normalizeViewerSeat(snapshot.viewerSeat),
-    [snapshot.viewerSeat]
+    () => normalizeViewerSeat(selectViewerSeat(state)),
+    [state]
   )
 
-  const phase = snapshot.snapshot.phase
+  const phase = selectSnapshot(state).phase
   const phaseName = phase.phase
 
-  // AI registry query visibility
-  const hostSeat: Seat = snapshot.hostSeat
-  const viewerIsHost = viewerSeatForInteractions === hostSeat
+  const hostSeat = selectHostSeat(state)
+  const viewerIsHost =
+    hostSeat !== null && viewerSeatForInteractions === hostSeat
   const canViewAiManager = viewerIsHost && isInitPhase(phase)
 
-  // Ready state management
   const { hasMarkedReady, setHasMarkedReady, canMarkReady } =
-    useGameRoomReadyState(snapshot, viewerSeatForInteractions, phaseName)
+    useGameRoomReadyState(state, viewerSeatForInteractions, phaseName)
 
   // Slow sync indicator
   useSlowSyncIndicator({
@@ -145,11 +148,10 @@ export function GameRoomClient({
     viewerSeat: viewerSeatForInteractions,
   })
 
-  // Game room controls
   const { biddingControls, trumpControls, playControls } = useGameRoomControls({
     phase,
     viewerSeatForInteractions,
-    snapshot,
+    bidConstraints: selectBidConstraints(state),
     handleSubmitBid,
     handleSelectTrump,
     handlePlayCard,
@@ -158,10 +160,9 @@ export function GameRoomClient({
     isPlayPending,
   })
 
-  // AI seat management
   const { aiSeatState } = useAiSeatManagement({
     gameId,
-    snapshot,
+    state,
     canViewAiManager,
     showToast,
   })
@@ -182,11 +183,11 @@ export function GameRoomClient({
     <>
       <GameRoomView
         gameId={gameId}
-        snapshot={snapshot.snapshot}
-        playerNames={snapshot.playerNames}
-        viewerSeat={snapshot.viewerSeat ?? null}
-        viewerHand={snapshot.viewerHand}
-        onRefresh={() => void refreshSnapshot()}
+        snapshot={selectSnapshot(state)}
+        playerNames={selectPlayerNames(state)}
+        viewerSeat={selectViewerSeat(state)}
+        viewerHand={selectViewerHand(state)}
+        onRefresh={() => void refreshStateFromHttp()}
         isRefreshing={isRefreshing}
         error={combinedError}
         readyState={useMemo(

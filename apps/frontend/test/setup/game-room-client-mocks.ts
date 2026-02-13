@@ -1,6 +1,6 @@
 import { vi } from 'vitest'
 import {
-  mockGetGameRoomSnapshotAction,
+  mockGetGameRoomStateAction,
   mockMarkPlayerReadyAction,
   mockSubmitBidAction,
   mockSelectTrumpAction,
@@ -14,7 +14,7 @@ import {
   MockWebSocket,
   mockWebSocketInstances,
 } from '@/test/setup/mock-websocket'
-import { createInitialData } from './game-room-client-helpers'
+import { createStateForMock } from './game-room-client-helpers'
 
 /**
  * Module-level state for tracking pending operations.
@@ -236,7 +236,7 @@ export function setupGameRoomClientTest(): void {
   resetGameRoomTestState()
 
   // Reset all action mocks to clear call history and implementation queues
-  mockGetGameRoomSnapshotAction.mockReset()
+  mockGetGameRoomStateAction.mockReset()
   mockMarkPlayerReadyAction.mockReset()
   mockSubmitBidAction.mockReset()
   mockSelectTrumpAction.mockReset()
@@ -254,9 +254,9 @@ export function setupGameRoomClientTest(): void {
   vi.stubGlobal('WebSocket', MockWebSocket)
 
   // Set default mock implementations
-  mockGetGameRoomSnapshotAction.mockResolvedValue({
+  mockGetGameRoomStateAction.mockResolvedValue({
     kind: 'ok',
-    data: createInitialData(),
+    data: createStateForMock(42),
   })
   mockMarkPlayerReadyAction.mockResolvedValue({ kind: 'ok' })
   mockSubmitBidAction.mockResolvedValue({ kind: 'ok' })

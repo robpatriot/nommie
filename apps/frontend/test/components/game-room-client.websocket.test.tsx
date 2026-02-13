@@ -9,14 +9,15 @@ import {
   biddingSnapshotFixture,
 } from '../mocks/game-snapshot'
 import {
-  mockGetGameRoomSnapshotAction,
+  mockGetGameRoomStateAction,
   mockMarkPlayerReadyAction,
 } from '../../setupGameRoomActionsMock'
 import {
-  createInitialData,
-  waitForWebSocketConnection,
+  createInitialState,
+  createInitialStateWithVersion,
+  createStateForMock,
   sendWebSocketSnapshot,
-  createInitialDataWithVersion,
+  waitForWebSocketConnection,
 } from '../setup/game-room-client-helpers'
 import {
   createMockMutationHooks,
@@ -93,10 +94,12 @@ describe('GameRoomClient', () => {
 
   describe('WebSocket integration', () => {
     it('updates snapshot when WebSocket receives message', async () => {
-      const initialData = createInitialData()
+      const initialState = createInitialState(42)
 
       const { queryClient } = await act(async () => {
-        return render(<GameRoomClient initialData={initialData} gameId={42} />)
+        return render(
+          <GameRoomClient initialState={initialState} gameId={42} />
+        )
       })
 
       // Wait for WebSocket to connect
@@ -119,10 +122,12 @@ describe('GameRoomClient', () => {
     })
 
     it('updates snapshot after action completes via WebSocket', async () => {
-      const initialData = createInitialDataWithVersion(42, 1)
+      const initialState = createInitialStateWithVersion(42, 1)
 
       const { queryClient } = await act(async () => {
-        return render(<GameRoomClient initialData={initialData} gameId={42} />)
+        return render(
+          <GameRoomClient initialState={initialState} gameId={42} />
+        )
       })
 
       // Wait for WebSocket to connect
@@ -159,18 +164,18 @@ describe('GameRoomClient', () => {
       )
 
       // Verify no manual refresh was called (WebSocket updates the cache directly)
-      // Note: useGameSync might call getGameRoomSnapshotAction during initialization,
+      // Note: useGameSync might call getGameRoomStateAction during initialization,
       // so we just verify the WebSocket update worked
       const biddingElements = screen.getAllByText(/Bidding/i)
       expect(biddingElements.length).toBeGreaterThan(0)
     })
 
     it('automatically retries via HTTP when WebSocket error received', async () => {
-      const initialData = createInitialData()
+      const initialState = createInitialState(42)
 
       await act(async () => {
         const { queryClient: _ } = render(
-          <GameRoomClient initialData={initialData} gameId={42} />
+          <GameRoomClient initialState={initialState} gameId={42} />
         )
       })
 
@@ -178,7 +183,7 @@ describe('GameRoomClient', () => {
       const ws = await waitForWebSocketConnection()
 
       // Clear any previous calls
-      mockGetGameRoomSnapshotAction.mockClear()
+      mockGetGameRoomStateAction.mockClear()
 
       // Send error message
       act(() => {
@@ -196,7 +201,7 @@ describe('GameRoomClient', () => {
       // Verify HTTP refresh was automatically triggered
       await waitFor(
         () => {
-          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+          expect(mockGetGameRoomStateAction).toHaveBeenCalled()
         },
         { timeout: 2000 }
       )
@@ -208,11 +213,11 @@ describe('GameRoomClient', () => {
     })
 
     it('shows error only if HTTP retry also fails', async () => {
-      const initialData = createInitialData()
+      const initialState = createInitialState(42)
 
       await act(async () => {
         const { queryClient: _ } = render(
-          <GameRoomClient initialData={initialData} gameId={42} />
+          <GameRoomClient initialState={initialState} gameId={42} />
         )
       })
 
@@ -220,7 +225,7 @@ describe('GameRoomClient', () => {
       const ws = await waitForWebSocketConnection()
 
       // Mock HTTP refresh to fail
-      mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
+      mockGetGameRoomStateAction.mockResolvedValueOnce({
         kind: 'error',
         message: 'HTTP refresh also failed',
         traceId: 'test-trace-id',
@@ -242,7 +247,7 @@ describe('GameRoomClient', () => {
       // Verify HTTP refresh was triggered
       await waitFor(
         () => {
-          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+          expect(mockGetGameRoomStateAction).toHaveBeenCalled()
         },
         { timeout: 2000 }
       )
@@ -259,11 +264,11 @@ describe('GameRoomClient', () => {
     })
 
     it('clears error when HTTP retry succeeds', async () => {
-      const initialData = createInitialData()
+      const initialState = createInitialState(42)
 
       await act(async () => {
         const { queryClient: _ } = render(
-          <GameRoomClient initialData={initialData} gameId={42} />
+          <GameRoomClient initialState={initialState} gameId={42} />
         )
       })
 
@@ -271,12 +276,12 @@ describe('GameRoomClient', () => {
       const ws = await waitForWebSocketConnection()
 
       // Mock HTTP refresh to succeed
-      const refreshedData = createInitialData(initSnapshotFixture, {
+      const refreshedState = createStateForMock(42, initSnapshotFixture, {
         version: 2,
       })
-      mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
+      mockGetGameRoomStateAction.mockResolvedValueOnce({
         kind: 'ok',
-        data: refreshedData,
+        data: refreshedState,
       })
 
       // Send error message
@@ -295,7 +300,7 @@ describe('GameRoomClient', () => {
       // Wait for HTTP retry to complete
       await waitFor(
         () => {
-          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+          expect(mockGetGameRoomStateAction).toHaveBeenCalled()
         },
         { timeout: 2000 }
       )

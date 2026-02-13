@@ -13,7 +13,7 @@ import { vi } from 'vitest'
 // Hoisted mock functions for game-room-actions
 // Using vi.hoisted() ensures these are available when the mock factory runs
 const {
-  mockGetGameRoomSnapshotAction,
+  mockGetGameRoomStateAction,
   mockMarkPlayerReadyAction,
   mockSubmitBidAction,
   mockSelectTrumpAction,
@@ -23,7 +23,7 @@ const {
   mockRemoveAiSeatAction,
   mockFetchAiRegistryAction,
 } = vi.hoisted(() => ({
-  mockGetGameRoomSnapshotAction: vi.fn(),
+  mockGetGameRoomStateAction: vi.fn(),
   mockMarkPlayerReadyAction: vi.fn(),
   mockSubmitBidAction: vi.fn(),
   mockSelectTrumpAction: vi.fn(),
@@ -36,7 +36,7 @@ const {
 
 // Export the mock functions so test files can configure them
 export {
-  mockGetGameRoomSnapshotAction,
+  mockGetGameRoomStateAction,
   mockMarkPlayerReadyAction,
   mockSubmitBidAction,
   mockSelectTrumpAction,
@@ -50,8 +50,8 @@ export {
 // Register the mock for @/app/actions/game-room-actions
 // This must be done in a setup file so it runs before any test files import the module
 vi.mock('@/app/actions/game-room-actions', () => ({
-  getGameRoomSnapshotAction: (request: unknown) =>
-    mockGetGameRoomSnapshotAction(request),
+  getGameRoomStateAction: (request: unknown) =>
+    mockGetGameRoomStateAction(request),
   markPlayerReadyAction: (gameId: number, isReady: boolean, version: number) =>
     mockMarkPlayerReadyAction(gameId, isReady, version),
   submitBidAction: (request: unknown) => mockSubmitBidAction(request),

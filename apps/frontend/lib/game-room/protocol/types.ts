@@ -10,19 +10,14 @@
 //   { type: "subscribe", topic: { kind: "game", id } }
 //   { type: "unsubscribe", topic: { kind: "game", id } } // supported by backend
 
-import type { Seat } from '@/lib/game-room/types'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import type { GameSnapshot, Seat } from '@/lib/game-room/types'
 
 /**
  * WS topic. Backend uses `kind` (not `type`).
  */
 export type Topic = { kind: 'game'; id: number }
 
-/**
- * Snapshot DTO carried on the wire for `game_state`.
- * We derive from the HTTP payload to avoid duplicating snapshot shapes.
- */
-export type GameSnapshot = GameRoomSnapshotPayload['snapshot']
+export type { GameSnapshot }
 
 /**
  * Bid constraints sent to the viewer.

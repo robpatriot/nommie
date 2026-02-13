@@ -74,7 +74,7 @@
     "devDetails": "Détails de l'erreur (dev uniquement)"
   },
   "actions": {
-    "failedToFetchGameSnapshot": "Échec du chargement de l'état de la partie",
+    "failedToFetchGameState": "Échec du chargement de l'état de la partie",
     "failedToMarkPlayerReady": "Échec du marquage du joueur comme prêt",
     "failedToSubmitBid": "Échec de la soumission de l'enchère",
     "failedToSelectTrump": "Échec de la sélection de l'atout",
@@ -111,6 +111,6 @@
     "noSettingsProvided": "Aucun paramètre fourni"
   },
   "page": {
-    "failedToLoadGameSnapshot": "Échec du chargement de l'état de la partie : réponse inattendue"
+    "failedToLoadGameState": "Échec du chargement de l'état de la partie : réponse inattendue"
   }
 }

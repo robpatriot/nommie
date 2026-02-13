@@ -19,12 +19,19 @@ import {
 } from '@/app/actions/game-room-actions'
 import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import {
+  type GameRoomState,
+  isBiddingPhase,
+  isTrumpSelectPhase,
+  isTrickPhase,
+  selectSnapshot,
+  selectViewerSeat,
+} from '@/lib/game-room/state'
 import { onOptimisticSend, setLwPendingAction } from '@/lib/queries/lw-cache'
 
 /**
  * Mutation hook to set player ready status.
- * Invalidates game snapshot cache on success.
+ * Invalidates game state cache on success.
  */
 export function useMarkPlayerReady() {
   return useMutation({
@@ -48,7 +55,7 @@ export function useMarkPlayerReady() {
 
 /**
  * Mutation hook to leave a game.
- * Invalidates game snapshot cache on success and navigates to lobby.
+ * Invalidates game state cache on success and navigates to lobby.
  */
 export function useLeaveGame() {
   return useMutation({
@@ -67,7 +74,7 @@ export function useLeaveGame() {
 
 /**
  * Mutation hook to rejoin a game.
- * Invalidates game snapshot cache on success and navigates to game room.
+ * Invalidates game state cache on success and navigates to game room.
  */
 export function useRejoinGame() {
   const queryClient = useQueryClient()
@@ -87,10 +94,8 @@ export function useRejoinGame() {
       }
     },
     onSuccess: (_, request) => {
-      // Only invalidate snapshot for the game we're joining (fire-and-forget, doesn't affect lobby)
-      // LW navigation is refreshed via realtime events + LW cache module.
       queryClient.invalidateQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
+        queryKey: queryKeys.games.state(request.gameId),
       })
       router.push(`/game/${request.gameId}`)
     },
@@ -100,7 +105,7 @@ export function useRejoinGame() {
 /**
  * Mutation hook to submit a bid.
  * Uses optimistic updates to immediately show the bid in the UI.
- * Invalidates game snapshot cache on success.
+ * Invalidates game state cache on success.
  */
 export function useSubmitBid() {
   const queryClient = useQueryClient()
@@ -115,46 +120,42 @@ export function useSubmitBid() {
     onMutate: async (request) => {
       onOptimisticSend(queryClient, { gameId: request.gameId })
 
-      // Cancel outgoing refetches to avoid overwriting optimistic update
       await queryClient.cancelQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
+        queryKey: queryKeys.games.state(request.gameId),
       })
 
-      // Snapshot current value for rollback
-      const previousSnapshot =
-        queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(request.gameId)
-        )
+      const previousState = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(request.gameId)
+      )
 
-      if (!previousSnapshot) {
-        return { previousSnapshot: undefined }
+      if (!previousState) {
+        return { previousState: undefined }
       }
 
-      // Skip optimistic update if viewerSeat is null (user shouldn't be able to bid anyway)
-      if (
-        previousSnapshot.viewerSeat === null ||
-        previousSnapshot.snapshot.phase.phase !== 'Bidding'
-      ) {
-        return { previousSnapshot }
+      const viewerSeat = selectViewerSeat(previousState)
+      const snapshot = selectSnapshot(previousState)
+      const phase = snapshot.phase
+      if (viewerSeat === null || !isBiddingPhase(phase)) {
+        return { previousState }
       }
 
-      // Optimistically update bid
-      const updatedSnapshot: GameRoomSnapshotPayload = {
-        ...previousSnapshot,
-        snapshot: {
-          ...previousSnapshot.snapshot,
+      const phaseData = phase.data
+      const updatedState: GameRoomState = {
+        ...previousState,
+        source: 'optimistic',
+        game: {
+          ...snapshot,
           phase: {
             phase: 'Bidding',
             data: {
-              ...previousSnapshot.snapshot.phase.data,
-              bids: previousSnapshot.snapshot.phase.data.bids.map((bid, idx) =>
-                idx === previousSnapshot.viewerSeat ? request.bid : bid
+              ...phaseData,
+              bids: phaseData.bids.map((bid, idx) =>
+                idx === viewerSeat ? request.bid : bid
               ) as [number | null, number | null, number | null, number | null],
               round: {
-                ...previousSnapshot.snapshot.phase.data.round,
-                bids: previousSnapshot.snapshot.phase.data.round.bids.map(
-                  (bid, idx) =>
-                    idx === previousSnapshot.viewerSeat ? request.bid : bid
+                ...phaseData.round,
+                bids: phaseData.round.bids.map((bid, idx) =>
+                  idx === viewerSeat ? request.bid : bid
                 ) as [
                   number | null,
                   number | null,
@@ -168,19 +169,18 @@ export function useSubmitBid() {
       }
 
       queryClient.setQueryData(
-        queryKeys.games.snapshot(request.gameId),
-        updatedSnapshot
+        queryKeys.games.state(request.gameId),
+        updatedState
       )
 
-      return { previousSnapshot }
+      return { previousState }
     },
     onError: (err, request, context) => {
       setLwPendingAction(queryClient, request.gameId, false)
-      // Rollback on error
-      if (context?.previousSnapshot) {
+      if (context?.previousState) {
         queryClient.setQueryData(
-          queryKeys.games.snapshot(request.gameId),
-          context.previousSnapshot
+          queryKeys.games.state(request.gameId),
+          context.previousState
         )
       }
     },
@@ -193,7 +193,7 @@ export function useSubmitBid() {
 /**
  * Mutation hook to select trump suit.
  * Uses optimistic updates to immediately show the trump suit in the UI.
- * Invalidates game snapshot cache on success.
+ * Invalidates game state cache on success.
  */
 export function useSelectTrump() {
   const queryClient = useQueryClient()
@@ -208,37 +208,36 @@ export function useSelectTrump() {
     onMutate: async (request) => {
       onOptimisticSend(queryClient, { gameId: request.gameId })
 
-      // Cancel outgoing refetches to avoid overwriting optimistic update
       await queryClient.cancelQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
+        queryKey: queryKeys.games.state(request.gameId),
       })
 
-      // Snapshot current value for rollback
-      const previousSnapshot =
-        queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(request.gameId)
-        )
+      const previousState = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(request.gameId)
+      )
 
-      if (!previousSnapshot) {
-        return { previousSnapshot: undefined }
+      if (!previousState) {
+        return { previousState: undefined }
       }
 
-      // Skip optimistic update if not in TrumpSelect phase
-      if (previousSnapshot.snapshot.phase.phase !== 'TrumpSelect') {
-        return { previousSnapshot }
+      const snapshot = selectSnapshot(previousState)
+      const phase = snapshot.phase
+      if (!isTrumpSelectPhase(phase)) {
+        return { previousState }
       }
 
-      // Optimistically update trump suit
-      const updatedSnapshot: GameRoomSnapshotPayload = {
-        ...previousSnapshot,
-        snapshot: {
-          ...previousSnapshot.snapshot,
+      const phaseData = phase.data
+      const updatedState: GameRoomState = {
+        ...previousState,
+        source: 'optimistic',
+        game: {
+          ...snapshot,
           phase: {
             phase: 'TrumpSelect',
             data: {
-              ...previousSnapshot.snapshot.phase.data,
+              ...phaseData,
               round: {
-                ...previousSnapshot.snapshot.phase.data.round,
+                ...phaseData.round,
                 trump: request.trump,
               },
             },
@@ -247,19 +246,18 @@ export function useSelectTrump() {
       }
 
       queryClient.setQueryData(
-        queryKeys.games.snapshot(request.gameId),
-        updatedSnapshot
+        queryKeys.games.state(request.gameId),
+        updatedState
       )
 
-      return { previousSnapshot }
+      return { previousState }
     },
     onError: (err, request, context) => {
       setLwPendingAction(queryClient, request.gameId, false)
-      // Rollback on error
-      if (context?.previousSnapshot) {
+      if (context?.previousState) {
         queryClient.setQueryData(
-          queryKeys.games.snapshot(request.gameId),
-          context.previousSnapshot
+          queryKeys.games.state(request.gameId),
+          context.previousState
         )
       }
     },
@@ -272,7 +270,7 @@ export function useSelectTrump() {
 /**
  * Mutation hook to submit a card play.
  * Uses optimistic updates to immediately show the card in the trick.
- * Invalidates game snapshot cache on success.
+ * Invalidates game state cache on success.
  */
 export function useSubmitPlay() {
   const queryClient = useQueryClient()
@@ -287,38 +285,37 @@ export function useSubmitPlay() {
     onMutate: async (request) => {
       onOptimisticSend(queryClient, { gameId: request.gameId })
 
-      // Cancel outgoing refetches to avoid overwriting optimistic update
       await queryClient.cancelQueries({
-        queryKey: queryKeys.games.snapshot(request.gameId),
+        queryKey: queryKeys.games.state(request.gameId),
       })
 
-      // Snapshot current value for rollback
-      const previousSnapshot =
-        queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(request.gameId)
-        )
+      const previousState = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(request.gameId)
+      )
 
-      if (!previousSnapshot) {
-        return { previousSnapshot: undefined }
+      if (!previousState) {
+        return { previousState: undefined }
       }
 
-      // Skip optimistic update if not in Trick phase
-      if (previousSnapshot.snapshot.phase.phase !== 'Trick') {
-        return { previousSnapshot }
+      const snapshot = selectSnapshot(previousState)
+      const phase = snapshot.phase
+      if (!isTrickPhase(phase)) {
+        return { previousState }
       }
 
-      // Optimistically add card to current_trick
-      const updatedSnapshot: GameRoomSnapshotPayload = {
-        ...previousSnapshot,
-        snapshot: {
-          ...previousSnapshot.snapshot,
+      const phaseData = phase.data
+      const updatedState: GameRoomState = {
+        ...previousState,
+        source: 'optimistic',
+        game: {
+          ...snapshot,
           phase: {
             phase: 'Trick',
             data: {
-              ...previousSnapshot.snapshot.phase.data,
+              ...phaseData,
               current_trick: [
-                ...previousSnapshot.snapshot.phase.data.current_trick,
-                [previousSnapshot.snapshot.phase.data.to_act, request.card],
+                ...phaseData.current_trick,
+                [phaseData.to_act, request.card],
               ],
             },
           },
@@ -326,19 +323,18 @@ export function useSubmitPlay() {
       }
 
       queryClient.setQueryData(
-        queryKeys.games.snapshot(request.gameId),
-        updatedSnapshot
+        queryKeys.games.state(request.gameId),
+        updatedState
       )
 
-      return { previousSnapshot }
+      return { previousState }
     },
     onError: (err, request, context) => {
       setLwPendingAction(queryClient, request.gameId, false)
-      // Rollback on error
-      if (context?.previousSnapshot) {
+      if (context?.previousState) {
         queryClient.setQueryData(
-          queryKeys.games.snapshot(request.gameId),
-          context.previousSnapshot
+          queryKeys.games.state(request.gameId),
+          context.previousState
         )
       }
     },
@@ -350,7 +346,7 @@ export function useSubmitPlay() {
 
 /**
  * Mutation hook to add an AI seat.
- * Invalidates game snapshot cache on success.
+ * Invalidates game state cache on success.
  */
 export function useAddAiSeat() {
   return useMutation({
@@ -365,7 +361,7 @@ export function useAddAiSeat() {
 
 /**
  * Mutation hook to update an AI seat.
- * Invalidates game snapshot and AI registry cache on success.
+ * Invalidates game state and AI registry cache on success.
  */
 export function useUpdateAiSeat() {
   return useMutation({
@@ -380,7 +376,7 @@ export function useUpdateAiSeat() {
 
 /**
  * Mutation hook to remove an AI seat.
- * Invalidates game snapshot and AI registry cache on success.
+ * Invalidates game state and AI registry cache on success.
  */
 export function useRemoveAiSeat() {
   return useMutation({

@@ -74,7 +74,7 @@
     "devDetails": "Dettagli errore (solo dev)"
   },
   "actions": {
-    "failedToFetchGameSnapshot": "Impossibile caricare lo stato della partita",
+    "failedToFetchGameState": "Impossibile caricare lo stato della partita",
     "failedToMarkPlayerReady": "Impossibile segnare il giocatore come pronto",
     "failedToSubmitBid": "Impossibile inviare la puntata",
     "failedToSelectTrump": "Impossibile selezionare la briscola",
@@ -111,6 +111,6 @@
     "noSettingsProvided": "Nessuna impostazione fornita"
   },
   "page": {
-    "failedToLoadGameSnapshot": "Impossibile caricare lo stato della partita: risposta inattesa"
+    "failedToLoadGameState": "Impossibile caricare lo stato della partita: risposta inattesa"
   }
 }

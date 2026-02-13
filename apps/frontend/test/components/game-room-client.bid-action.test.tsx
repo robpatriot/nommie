@@ -7,12 +7,12 @@ import { queryKeys } from '@/lib/queries/query-keys'
 import { GameRoomClient } from '@/app/game/[gameId]/_components/game-room-client'
 import { biddingSnapshotFixture } from '../mocks/game-snapshot'
 import {
-  mockGetGameRoomSnapshotAction,
+  mockGetGameRoomStateAction,
   mockSubmitBidAction,
   mockFetchAiRegistryAction,
 } from '../../setupGameRoomActionsMock'
 import {
-  createInitialData,
+  createInitialState,
   waitForWebSocketConnection,
 } from '../setup/game-room-client-helpers'
 import {
@@ -114,25 +114,22 @@ describe('GameRoomClient', () => {
           },
         },
       } as typeof biddingSnapshotFixture
-      const biddingData = createInitialData(biddingSnapshotWithNoBid, {
+      const biddingState = createInitialState(42, biddingSnapshotWithNoBid, {
         viewerSeat: 0,
         viewerHand: ['2H', '3C'],
         version: 1,
       })
 
-      // Initialize query cache with bidding data BEFORE rendering
       const queryClient = createTestQueryClient()
-      queryClient.setQueryData(queryKeys.games.snapshot(42), biddingData)
+      queryClient.setQueryData(queryKeys.games.state(42), biddingState)
 
-      // Override the default mock to return bidding data for this test
-      // This ensures if the query fetches, it returns the correct data
-      mockGetGameRoomSnapshotAction.mockResolvedValueOnce({
+      mockGetGameRoomStateAction.mockResolvedValueOnce({
         kind: 'ok',
-        data: biddingData,
+        data: biddingState,
       })
 
       await act(async () => {
-        render(<GameRoomClient initialData={biddingData} gameId={42} />, {
+        render(<GameRoomClient initialState={biddingState} gameId={42} />, {
           queryClient,
         })
       })

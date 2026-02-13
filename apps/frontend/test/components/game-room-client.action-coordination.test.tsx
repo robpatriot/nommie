@@ -5,10 +5,10 @@ import type { ReactNode } from 'react'
 
 import { GameRoomClient } from '@/app/game/[gameId]/_components/game-room-client'
 import {
-  mockGetGameRoomSnapshotAction,
+  mockGetGameRoomStateAction,
   mockMarkPlayerReadyAction,
 } from '../../setupGameRoomActionsMock'
-import { createInitialDataWithVersion } from '../setup/game-room-client-helpers'
+import { createInitialStateWithVersion } from '../setup/game-room-client-helpers'
 import {
   createMockMutationHooks,
   setupFetchMock,
@@ -89,7 +89,7 @@ describe('GameRoomClient', () => {
 
   describe('Action coordination', () => {
     it('prevents actions when another action is in progress', async () => {
-      const initialData = createInitialDataWithVersion(42, 1)
+      const initialState = createInitialStateWithVersion(42, 1)
 
       // Make ready action slow
       let resolveReady: () => void
@@ -99,7 +99,7 @@ describe('GameRoomClient', () => {
       mockMarkPlayerReadyAction.mockReturnValueOnce(readyPromise)
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       // Start ready action
@@ -124,7 +124,7 @@ describe('GameRoomClient', () => {
     })
 
     it('allows manual refresh independently of actions', async () => {
-      const initialData = createInitialDataWithVersion(42, 1)
+      const initialState = createInitialStateWithVersion(42, 1)
 
       // Make ready action slow
       let resolveReady: () => void
@@ -134,7 +134,7 @@ describe('GameRoomClient', () => {
       mockMarkPlayerReadyAction.mockReturnValueOnce(readyPromise)
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       // Start ready action
@@ -153,7 +153,7 @@ describe('GameRoomClient', () => {
       // Refresh should execute independently
       await waitFor(
         () => {
-          expect(mockGetGameRoomSnapshotAction).toHaveBeenCalled()
+          expect(mockGetGameRoomStateAction).toHaveBeenCalled()
         },
         { timeout: 2000 }
       )

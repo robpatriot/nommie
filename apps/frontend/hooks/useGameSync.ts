@@ -3,10 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { logError } from '@/lib/logging/error-logger'
 
-import {
-  getGameRoomSnapshotAction,
-  type GameRoomSnapshotPayload,
-} from '@/app/actions/game-room-actions'
+import { getGameRoomStateAction } from '@/app/actions/game-room-actions'
 import type { GameRoomError } from '@/app/game/[gameId]/_components/game-room-view.types'
 import type {
   GameStateMsg,
@@ -16,7 +13,12 @@ import type {
 } from '@/lib/game-room/protocol/types'
 import { isGameStateMsg } from '@/lib/game-room/protocol/types'
 import { queryKeys } from '@/lib/queries/query-keys'
-import { gameStateMsgToSnapshotPayload } from '@/lib/game-room/protocol/transform'
+import {
+  type GameRoomState,
+  gameStateMsgToRoomState,
+  selectSnapshot,
+  selectViewerSeat,
+} from '@/lib/game-room/state'
 import { useWebSocket } from '@/lib/providers/web-socket-provider'
 import {
   getLwPendingAction,
@@ -25,7 +27,7 @@ import {
 } from '@/lib/queries/lw-cache'
 
 export interface UseGameSyncResult {
-  refreshSnapshot: () => Promise<void>
+  refreshStateFromHttp: () => Promise<void>
   connectionState: 'connecting' | 'connected' | 'reconnecting' | 'disconnected'
   syncError: GameRoomError | null
   reconnectAttempts: number
@@ -36,12 +38,12 @@ export interface UseGameSyncResult {
 }
 
 interface UseGameSyncOptions {
-  initialData: GameRoomSnapshotPayload
+  initialState: GameRoomState
   gameId: number
 }
 
 export function useGameSync({
-  initialData,
+  initialState,
   gameId,
 }: UseGameSyncOptions): UseGameSyncResult {
   const queryClient = useQueryClient()
@@ -65,90 +67,85 @@ export function useGameSync({
   const syncError = localSyncError ?? wsSyncError
 
   const gameIdRef = useRef(gameId)
-  const etagRef = useRef<string | undefined>(initialData.etag)
+  const etagRef = useRef<string | undefined>(initialState.etag)
   const lastWsVersionSeenRef = useRef<number | undefined>(undefined)
   const prevIsUsersTurnRef = useRef<boolean>(false)
+  const didInitRef = useRef<number | null>(null)
 
   // Keep gameIdRef in sync
   useEffect(() => {
     gameIdRef.current = gameId
   }, [gameId])
 
-  const applySnapshot = useCallback(
-    (payload: GameRoomSnapshotPayload) => {
+  const applyState = useCallback(
+    (roomState: GameRoomState) => {
       const currentGameId = gameIdRef.current
-      const current = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(currentGameId)
+      const current = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(currentGameId)
       )
       if (
         current &&
         current.version !== undefined &&
-        payload.version !== undefined &&
-        current.version >= payload.version
+        roomState.version !== undefined &&
+        current.version >= roomState.version
       ) {
         return
       }
 
-      if (payload.etag !== undefined) etagRef.current = payload.etag
+      if (roomState.etag !== undefined) etagRef.current = roomState.etag
       setLocalSyncError(null)
-      queryClient.setQueryData(queryKeys.games.snapshot(currentGameId), payload)
+      queryClient.setQueryData(queryKeys.games.state(currentGameId), roomState)
     },
     [queryClient]
   )
 
-  const computeMyTurn = useCallback(
-    (payload: GameRoomSnapshotPayload): boolean => {
-      if (payload.viewerSeat === null) return false
+  const computeMyTurnFromState = useCallback(
+    (state: GameRoomState): boolean => {
+      const viewerSeat = selectViewerSeat(state)
+      if (viewerSeat === null) return false
 
-      const phase = payload.snapshot.phase
+      const phase = selectSnapshot(state).phase
       if (phase.phase === 'Bidding') {
-        return phase.data.to_act === payload.viewerSeat
+        return phase.data.to_act === viewerSeat
       }
       if (phase.phase === 'TrumpSelect') {
-        return phase.data.to_act === payload.viewerSeat
+        return phase.data.to_act === viewerSeat
       }
       if (phase.phase === 'Trick') {
-        return phase.data.to_act === payload.viewerSeat
+        return phase.data.to_act === viewerSeat
       }
       return false
     },
     []
   )
 
-  // Initialize edge detector from initial HTTP snapshot (prevents false edges on navigation/reload).
+  // Initialize edge detector from initial HTTP state (prevents false edges on navigation/reload).
+  // Run only when gameId changes; initialState is seed-only, not live query state.
   useEffect(() => {
-    prevIsUsersTurnRef.current = computeMyTurn(initialData)
-    setLwPendingAction(queryClient, gameId, false)
-  }, [computeMyTurn, gameId, initialData, queryClient])
+    if (didInitRef.current !== gameId) {
+      didInitRef.current = gameId
+      prevIsUsersTurnRef.current = computeMyTurnFromState(initialState)
+      setLwPendingAction(queryClient, gameId, false)
+    }
+  }, [gameId, initialState, computeMyTurnFromState, queryClient])
 
-  const refreshSnapshot = useCallback(async () => {
+  const refreshStateFromHttp = useCallback(async () => {
     setIsRefreshing(true)
     try {
-      const result = await getGameRoomSnapshotAction({
+      const result = await getGameRoomStateAction({
         gameId: gameIdRef.current,
         etag: etagRef.current,
       })
 
       if (result.kind === 'ok') {
-        applySnapshot(result.data)
+        applyState(result.data)
       } else if (result.kind === 'not_modified') {
-        const cachedData = queryClient.getQueryData<GameRoomSnapshotPayload>(
-          queryKeys.games.snapshot(gameIdRef.current)
-        )
-        if (cachedData) {
-          queryClient.setQueryData(
-            queryKeys.games.snapshot(gameIdRef.current),
-            {
-              ...cachedData,
-              timestamp: new Date().toISOString(),
-            }
-          )
-        }
+        // No cache write: 304 means nothing changed; avoid receivedAt-only churn.
       } else {
         setLocalSyncError({ message: result.message, traceId: result.traceId })
       }
     } catch (error) {
-      logError('Manual snapshot refresh failed', error, {
+      logError('Manual state refresh failed', error, {
         gameId: gameIdRef.current,
       })
       setLocalSyncError({
@@ -160,7 +157,7 @@ export function useGameSync({
     } finally {
       setIsRefreshing(false)
     }
-  }, [applySnapshot, queryClient])
+  }, [applyState])
 
   const handleGameStateMessage = useCallback(
     (message: GameStateMsg) => {
@@ -172,11 +169,10 @@ export function useGameSync({
       }
 
       lastWsVersionSeenRef.current = message.version
-      const payload = gameStateMsgToSnapshotPayload(message)
-      applySnapshot(payload)
+      const roomState = gameStateMsgToRoomState(message, { source: 'ws' })
+      applyState(roomState)
 
-      // LW cache rules: eligibility derived from game_state for the current game.
-      const myTurn = computeMyTurn(payload)
+      const myTurn = computeMyTurnFromState(roomState)
       const prev = prevIsUsersTurnRef.current
       const pendingAction = getLwPendingAction(queryClient, gameIdRef.current)
       prevIsUsersTurnRef.current = myTurn
@@ -190,7 +186,7 @@ export function useGameSync({
         void onYourTurn(queryClient, { gameId: gameIdRef.current })
       }
     },
-    [applySnapshot, computeMyTurn, queryClient]
+    [applyState, computeMyTurnFromState, queryClient]
   )
 
   // Handle subscription lifecycle
@@ -225,18 +221,23 @@ export function useGameSync({
         // If the server rejected an action, avoid leaving a pendingAction latch set.
         setLwPendingAction(queryClient, gameIdRef.current, false)
         // Fallback to HTTP refresh on server-side errors
-        void refreshSnapshot()
+        void refreshStateFromHttp()
         return
       }
     })
-  }, [registerHandler, handleGameStateMessage, queryClient, refreshSnapshot])
+  }, [
+    registerHandler,
+    handleGameStateMessage,
+    queryClient,
+    refreshStateFromHttp,
+  ])
 
   useEffect(() => {
-    etagRef.current = initialData.etag
-  }, [initialData.etag])
+    etagRef.current = initialState.etag
+  }, [initialState.etag])
 
   return {
-    refreshSnapshot,
+    refreshStateFromHttp,
     connectionState,
     syncError,
     isRefreshing,

@@ -31,11 +31,11 @@ export type SimpleActionResult =
     }
 
 /**
- * Snapshot action result type for actions that support ETag/conditional requests.
+ * State action result type for actions that support ETag/conditional requests.
  * Extends ActionResult with a 'not_modified' variant for 304 responses.
- * Use this for actions that fetch snapshots and need to handle cache hits.
+ * Use this for actions that fetch state and need to handle cache hits.
  */
-export type SnapshotActionResult<T> = ActionResult<T> | { kind: 'not_modified' }
+export type StateActionResult<T> = ActionResult<T> | { kind: 'not_modified' }
 
 /**
  * Convert an error (BackendApiError or unknown) to an error result.

@@ -6,15 +6,16 @@ import { GameRoomClient } from './_components/game-room-client'
 import { GameJoinErrorClient } from './_components/GameJoinErrorClient'
 import ErrorBoundaryWithTranslations from '@/components/ErrorBoundaryWithTranslations'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
-import { fetchGameSnapshot } from '@/lib/api/game-room'
-import { extractPlayerNames } from '@/utils/player-names'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import { fetchGameState } from '@/lib/api/game-room'
 import { getUserOptions } from '@/lib/api/user-options'
 import { BackendApiError } from '@/lib/api'
 import { isInStartupWindow } from '@/lib/server/backend-status'
 import { isBackendStartupError } from '@/lib/server/connection-errors'
 import { handleStaleSessionError } from '@/lib/auth/allowlist'
-import { gameStateMsgToSnapshotPayload } from '@/lib/game-room/protocol/transform'
+import {
+  gameStateMsgToRoomState,
+  selectViewerSeat,
+} from '@/lib/game-room/state'
 
 export default async function GamePage({
   params,
@@ -35,9 +36,9 @@ export default async function GamePage({
   // Fetch game snapshot, but handle backend startup gracefully
   // Error handling is centralized in fetchWithAuth - errors during startup
   // are suppressed automatically. If backend is starting up, redirect to lobby.
-  let snapshotResult
+  let fetchResult
   try {
-    snapshotResult = await fetchGameSnapshot(resolvedGameId)
+    fetchResult = await fetchGameState(resolvedGameId)
   } catch (error) {
     await handleStaleSessionError(error)
     if (error instanceof BackendApiError) {
@@ -60,32 +61,18 @@ export default async function GamePage({
     throw error
   }
 
-  if (snapshotResult.kind !== 'ok') {
+  if (fetchResult.kind !== 'ok') {
     // 'not_modified' should not occur on initial page load without an ETag
     const t = await getTranslations('errors.page')
-    throw new Error(t('failedToLoadGameSnapshot'))
+    throw new Error(t('failedToLoadGameState'))
   }
 
-  const payload = gameStateMsgToSnapshotPayload(snapshotResult.msg, {
-    etag: snapshotResult.etag,
-    timestamp: new Date().toISOString(),
-  })
-
-  const seating = payload.snapshot.game.seating
-  const playerNames = extractPlayerNames(seating)
-
-  const { hostSeat, viewerSeat } = payload
-
-  const initialPayload: GameRoomSnapshotPayload = {
-    snapshot: payload.snapshot,
-    etag: snapshotResult.etag,
-    version: payload.version,
-    playerNames,
-    viewerSeat,
-    viewerHand: payload.viewerHand,
-    timestamp: new Date().toISOString(),
-    hostSeat,
-    bidConstraints: payload.bidConstraints,
+  const initialState = {
+    ...gameStateMsgToRoomState(fetchResult.msg, {
+      source: 'http',
+      receivedAt: new Date().toISOString(),
+    }),
+    ...(fetchResult.etag && { etag: fetchResult.etag }),
   }
 
   let requireCardConfirmation = true
@@ -101,7 +88,7 @@ export default async function GamePage({
 
   const t = await getTranslations('common')
   const tLobby = await getTranslations('lobby')
-  const isSpectator = payload.viewerSeat === null
+  const isSpectator = selectViewerSeat(initialState) === null
   const gameName = isSpectator
     ? `${t('gameName', { gameId: resolvedGameId })} (spectating)`
     : t('gameName', { gameId: resolvedGameId })
@@ -115,7 +102,7 @@ export default async function GamePage({
         ]}
       />
       <GameRoomClient
-        initialData={initialPayload}
+        initialState={initialState}
         gameId={resolvedGameId}
         requireCardConfirmation={requireCardConfirmation}
         trickDisplayDurationSeconds={trickDisplayDurationSeconds}

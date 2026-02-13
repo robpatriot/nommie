@@ -74,7 +74,7 @@
     "devDetails": "Detalles del error (solo dev)"
   },
   "actions": {
-    "failedToFetchGameSnapshot": "Error al cargar el estado de la partida",
+    "failedToFetchGameState": "Error al cargar el estado de la partida",
     "failedToMarkPlayerReady": "Error al marcar al jugador como listo",
     "failedToSubmitBid": "Error al enviar la puja",
     "failedToSelectTrump": "Error al seleccionar el triunfo",
@@ -111,6 +111,6 @@
     "noSettingsProvided": "No se proporcionaron ajustes"
   },
   "page": {
-    "failedToLoadGameSnapshot": "Error al cargar el estado de la partida: respuesta inesperada"
+    "failedToLoadGameState": "Error al cargar el estado de la partida: respuesta inesperada"
   }
 }

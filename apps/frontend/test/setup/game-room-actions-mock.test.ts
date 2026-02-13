@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
-  getGameRoomSnapshotAction,
+  getGameRoomStateAction,
   markPlayerReadyAction,
   fetchAiRegistryAction,
 } from '@/app/actions/game-room-actions'
 import {
-  mockGetGameRoomSnapshotAction,
+  mockGetGameRoomStateAction,
   mockMarkPlayerReadyAction,
   mockFetchAiRegistryAction,
 } from '../../setupGameRoomActionsMock'
@@ -20,8 +20,8 @@ import {
 describe('game-room-actions mock guard', () => {
   it('should have mocked exports from @/app/actions/game-room-actions', () => {
     // Verify that the exported functions exist and are callable
-    expect(getGameRoomSnapshotAction).toBeDefined()
-    expect(typeof getGameRoomSnapshotAction).toBe('function')
+    expect(getGameRoomStateAction).toBeDefined()
+    expect(typeof getGameRoomStateAction).toBe('function')
 
     expect(markPlayerReadyAction).toBeDefined()
     expect(typeof markPlayerReadyAction).toBe('function')
@@ -31,12 +31,12 @@ describe('game-room-actions mock guard', () => {
 
     // Verify that calling the exported functions invokes the underlying mock functions
     // by setting up return values and verifying they are called
-    mockGetGameRoomSnapshotAction.mockReturnValueOnce({
+    mockGetGameRoomStateAction.mockReturnValueOnce({
       kind: 'ok',
       data: null,
     })
-    const result1 = getGameRoomSnapshotAction({ gameId: 1 })
-    expect(mockGetGameRoomSnapshotAction).toHaveBeenCalledWith({ gameId: 1 })
+    const result1 = getGameRoomStateAction({ gameId: 1 })
+    expect(mockGetGameRoomStateAction).toHaveBeenCalledWith({ gameId: 1 })
     expect(result1).toEqual({ kind: 'ok', data: null })
 
     mockMarkPlayerReadyAction.mockReturnValueOnce({ kind: 'ok' })

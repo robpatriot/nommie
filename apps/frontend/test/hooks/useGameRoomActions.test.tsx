@@ -5,7 +5,9 @@ import type { QueryClient } from '@tanstack/react-query'
 import React, { type ReactNode } from 'react'
 import { useGameRoomActions } from '@/app/game/[gameId]/_components/hooks/useGameRoomActions'
 import { createTestQueryClient } from '../utils'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import type { GameRoomState } from '@/lib/game-room/state'
+import type { Seat } from '@/lib/game-room/types'
+import { gameStateMsgToRoomState } from '@/lib/game-room/state'
 import { initSnapshotFixture } from '../mocks/game-snapshot'
 import { queryKeys } from '@/lib/queries/query-keys'
 import {
@@ -65,22 +67,17 @@ function createWrapper(queryClient: QueryClient) {
   return Wrapper
 }
 
-function createSnapshotData(
-  overrides?: Partial<GameRoomSnapshotPayload>
-): GameRoomSnapshotPayload {
+function createState(overrides?: { version?: number }): GameRoomState {
   const version = overrides?.version ?? 1
-  return {
-    snapshot: initSnapshotFixture,
-    etag: `"game-42-v${version}"`,
+  const msg = {
+    type: 'game_state' as const,
+    topic: { kind: 'game' as const, id: 42 },
     version,
-    playerNames: ['Alex', 'Bailey', 'Casey', 'Dakota'],
-    viewerSeat: 0,
-    viewerHand: [],
-    timestamp: new Date().toISOString(),
-    hostSeat: 0,
-    bidConstraints: null,
-    ...overrides,
+    game: initSnapshotFixture,
+    viewer: { seat: 0 as Seat, hand: [], bidConstraints: null },
   }
+  const state = gameStateMsgToRoomState(msg, { source: 'http' })
+  return { ...state, etag: `"game-42-v${version}"` }
 }
 
 describe('useGameRoomActions', () => {
@@ -96,10 +93,9 @@ describe('useGameRoomActions', () => {
     mockConfirm.mockReturnValue(true)
     window.confirm = mockConfirm
 
-    // Set up initial cache data
     queryClient.setQueryData(
-      queryKeys.games.snapshot(42),
-      createSnapshotData({ version: 1 })
+      queryKeys.games.state(42),
+      createState({ version: 1 })
     )
   })
 
@@ -233,7 +229,7 @@ describe('useGameRoomActions', () => {
     })
 
     it('shows error when version is missing', async () => {
-      queryClient.setQueryData(queryKeys.games.snapshot(42), null)
+      queryClient.setQueryData(queryKeys.games.state(42), null)
 
       const { result } = renderHook(
         () =>

@@ -4,16 +4,20 @@ import type { QueryClient } from '@tanstack/react-query'
 import { QueryClient as RQQueryClient } from '@tanstack/react-query'
 
 import { useGameSync } from '@/hooks/useGameSync'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import type { GameRoomState } from '@/lib/game-room/state'
+import { selectVersion } from '@/lib/game-room/state'
 import { queryKeys } from '@/lib/queries/query-keys'
 import { initSnapshotFixture } from '../mocks/game-snapshot'
-import { createInitialDataWithVersion } from '../setup/game-room-client-helpers'
+import {
+  createInitialStateWithVersion,
+  createStateWithVersionForMock,
+} from '../setup/game-room-client-helpers'
 import { setupFetchMock } from '../setup/game-room-client-mocks'
 import {
   MockWebSocket,
   mockWebSocketInstances,
 } from '@/test/setup/mock-websocket'
-import { mockGetGameRoomSnapshotAction } from '../../setupGameRoomActionsMock'
+import { mockGetGameRoomStateAction } from '../../setupGameRoomActionsMock'
 
 const mocks = vi.hoisted(() => ({
   getWaitingLongestGameAction: vi.fn(),
@@ -118,7 +122,7 @@ type Scenario = {
   name: string
   gameId: number
   seed: {
-    snapshot: GameRoomSnapshotPayload
+    state: GameRoomState
   }
   msg: unknown
   expect: {
@@ -160,9 +164,9 @@ describe('useGameSync waitingLongest cache scenarios', () => {
     vi.stubGlobal('WebSocket', MockWebSocket)
 
     // Default snapshot action mock (should not be called by these scenarios)
-    mockGetGameRoomSnapshotAction.mockResolvedValue({
+    mockGetGameRoomStateAction.mockResolvedValue({
       kind: 'ok',
-      data: createInitialDataWithVersion(0, 1),
+      data: createStateWithVersionForMock(0, 1),
     })
 
     mocks.getWaitingLongestGameAction.mockResolvedValue({
@@ -176,7 +180,7 @@ describe('useGameSync waitingLongest cache scenarios', () => {
       name: 'game_state (current game, newer version) updates snapshot (no LW refetch)',
       gameId: 42,
       seed: {
-        snapshot: createInitialDataWithVersion(42, 1),
+        state: createInitialStateWithVersion(42, 1),
       },
       msg: gameStateMsg({ gameId: 42, version: 2 }),
       expect: { lwRefetchCalls: 0, snapshotVersion: 2 },
@@ -185,7 +189,7 @@ describe('useGameSync waitingLongest cache scenarios', () => {
       name: 'game_state (other game) does not touch snapshot or waitingLongest',
       gameId: 42,
       seed: {
-        snapshot: createInitialDataWithVersion(42, 1),
+        state: createInitialStateWithVersion(42, 1),
       },
       msg: gameStateMsg({ gameId: 99, version: 2 }),
       expect: { lwRefetchCalls: 0, snapshotVersion: 1 },
@@ -194,7 +198,7 @@ describe('useGameSync waitingLongest cache scenarios', () => {
       name: 'game_state (current game, stale version) is ignored (no invalidation)',
       gameId: 42,
       seed: {
-        snapshot: createInitialDataWithVersion(42, 5),
+        state: createInitialStateWithVersion(42, 5),
       },
       msg: gameStateMsg({ gameId: 42, version: 5 }),
       expect: { lwRefetchCalls: 0, snapshotVersion: 5 },
@@ -203,7 +207,7 @@ describe('useGameSync waitingLongest cache scenarios', () => {
       name: 'your_turn adds to pool when pool is small (no refetch)',
       gameId: 42,
       seed: {
-        snapshot: createInitialDataWithVersion(42, 1),
+        state: createInitialStateWithVersion(42, 1),
       },
       msg: { type: 'your_turn', game_id: 42, version: 2 },
       expect: { lwRefetchCalls: 0, snapshotVersion: 1 },
@@ -212,15 +216,15 @@ describe('useGameSync waitingLongest cache scenarios', () => {
       name: 'long_wait_invalidated triggers LW refetch',
       gameId: 42,
       seed: {
-        snapshot: createInitialDataWithVersion(42, 1),
+        state: createInitialStateWithVersion(42, 1),
       },
       msg: { type: 'long_wait_invalidated', game_id: 42 },
       expect: { lwRefetchCalls: 1, snapshotVersion: 1 },
     },
   ])('$name', async (scenario) => {
-    const initialData = scenario.seed.snapshot
+    const initialState = scenario.seed.state
 
-    renderHook(() => useGameSync({ initialData, gameId: scenario.gameId }), {
+    renderHook(() => useGameSync({ initialState, gameId: scenario.gameId }), {
       queryClient,
     })
 
@@ -228,10 +232,9 @@ describe('useGameSync waitingLongest cache scenarios', () => {
     const ws = mockWebSocketInstances[0]
     await connectAndSubscribe(ws, { expectedGameId: scenario.gameId })
 
-    // Seed cache state
     queryClient.setQueryData(
-      queryKeys.games.snapshot(scenario.gameId),
-      scenario.seed.snapshot
+      queryKeys.games.state(scenario.gameId),
+      scenario.seed.state
     )
     // Provider triggers an LW refetch on hello_ack; clear so scenario expectations
     // only reflect effects from the scenario message.
@@ -250,10 +253,11 @@ describe('useGameSync waitingLongest cache scenarios', () => {
     }
 
     await waitFor(() => {
-      const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(scenario.gameId)
+      const cached = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(scenario.gameId)
       )
-      expect(cached?.version).toBe(scenario.expect.snapshotVersion)
+      expect(cached).toBeDefined()
+      expect(selectVersion(cached!)).toBe(scenario.expect.snapshotVersion)
     })
   })
 })

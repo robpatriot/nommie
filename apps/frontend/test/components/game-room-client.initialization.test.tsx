@@ -3,7 +3,7 @@ import { render, screen, act } from '../utils'
 import type { ReactNode } from 'react'
 
 import { GameRoomClient } from '@/app/game/[gameId]/_components/game-room-client'
-import { createInitialData } from '../setup/game-room-client-helpers'
+import { createInitialState } from '../setup/game-room-client-helpers'
 import {
   createMockMutationHooks,
   setupFetchMock,
@@ -79,20 +79,20 @@ describe('GameRoomClient', () => {
 
   describe('Initialization', () => {
     it('renders with initial data', async () => {
-      const initialData = createInitialData()
+      const initialState = createInitialState(42)
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       expect(screen.getByText(/Init/i)).toBeInTheDocument()
     })
 
     it('starts in idle state', async () => {
-      const initialData = createInitialData()
+      const initialState = createInitialState(42)
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       // Component should render without errors

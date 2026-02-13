@@ -74,7 +74,7 @@
     "devDetails": "Error details (dev only)"
   },
   "actions": {
-    "failedToFetchGameSnapshot": "Failed to fetch game snapshot",
+    "failedToFetchGameState": "Failed to fetch game state",
     "failedToMarkPlayerReady": "Failed to mark player ready",
     "failedToSubmitBid": "Failed to submit bid",
     "failedToSelectTrump": "Failed to select trumps",
@@ -111,6 +111,6 @@
     "noSettingsProvided": "No settings provided"
   },
   "page": {
-    "failedToLoadGameSnapshot": "Failed to load game snapshot: unexpected response"
+    "failedToLoadGameState": "Failed to load game state: unexpected response"
   }
 }

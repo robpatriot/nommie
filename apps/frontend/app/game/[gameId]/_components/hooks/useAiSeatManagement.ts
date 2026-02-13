@@ -2,14 +2,15 @@ import { useCallback, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslations } from 'next-intl'
 import type { Seat } from '@/lib/game-room/types'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import type { GameRoomState } from '@/lib/game-room/state'
+import { selectSnapshot } from '@/lib/game-room/state'
 import { useAiRegistry } from '@/hooks/queries/useAi'
 import {
   useAddAiSeat,
   useUpdateAiSeat,
   useRemoveAiSeat,
 } from '@/hooks/mutations/useGameRoomMutations'
-import { getGameVersionFromCache } from '@/lib/queries/game-snapshot-helpers'
+import { getGameVersionFromCache } from '@/lib/queries/game-state-helpers'
 import type { ToastMessage } from '@/components/Toast'
 import type { BackendApiError } from '@/lib/errors'
 import { toQueryError } from '@/lib/queries/query-error-handler'
@@ -24,7 +25,7 @@ type AiRegistryEntryState = {
 
 interface UseAiSeatManagementProps {
   gameId: number
-  snapshot: GameRoomSnapshotPayload
+  state: GameRoomState
   canViewAiManager: boolean
   showToast: (
     message: string,
@@ -39,7 +40,7 @@ interface UseAiSeatManagementProps {
  */
 export function useAiSeatManagement({
   gameId,
-  snapshot,
+  state,
   canViewAiManager,
   showToast,
 }: UseAiSeatManagementProps) {
@@ -211,7 +212,7 @@ export function useAiSeatManagement({
   )
 
   const seatInfo = useMemo(() => {
-    return snapshot.snapshot.game.seating.map((seat, index) => {
+    return selectSnapshot(state).game.seating.map((seat, index) => {
       const seatIndex =
         typeof seat.seat === 'number' && !Number.isNaN(seat.seat)
           ? (seat.seat as Seat)
@@ -234,7 +235,7 @@ export function useAiSeatManagement({
         aiProfile: seat.ai_profile ?? null,
       }
     })
-  }, [snapshot.snapshot.game.seating])
+  }, [state])
 
   const totalSeats = seatInfo.length
   const occupiedSeats = seatInfo.filter((seat) => seat.isOccupied).length

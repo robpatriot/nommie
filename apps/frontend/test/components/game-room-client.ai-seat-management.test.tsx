@@ -6,7 +6,7 @@ import { GameRoomClient } from '@/app/game/[gameId]/_components/game-room-client
 import { initSnapshotFixture } from '../mocks/game-snapshot'
 import { mockFetchAiRegistryAction } from '../../setupGameRoomActionsMock'
 import {
-  createInitialData,
+  createInitialState,
   waitForWebSocketConnection,
 } from '../setup/game-room-client-helpers'
 import {
@@ -84,13 +84,12 @@ describe('GameRoomClient', () => {
 
   describe('AI seat management', () => {
     it('loads AI registry when host views AI manager', async () => {
-      const initialData = createInitialData(initSnapshotFixture, {
-        viewerSeat: 0, // Host
-        hostSeat: 0,
+      const initialState = createInitialState(42, initSnapshotFixture, {
+        viewerSeat: 0,
       })
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       // Wait for async operations (AI registry fetch - enough for promise to resolve)
@@ -104,9 +103,8 @@ describe('GameRoomClient', () => {
     })
 
     it('does not load AI registry for non-host', async () => {
-      const initialData = createInitialData(initSnapshotFixture, {
-        viewerSeat: 1, // Not host
-        hostSeat: 0,
+      const initialState = createInitialState(42, initSnapshotFixture, {
+        viewerSeat: 1,
       })
 
       // Clear any previous calls (already cleared in beforeEach)
@@ -114,7 +112,7 @@ describe('GameRoomClient', () => {
       const callCountBefore = mockFetchAiRegistryAction.mock.calls.length
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       // Wait for WebSocket to connect and component to fully render
@@ -141,13 +139,12 @@ describe('GameRoomClient', () => {
     })
 
     it('adds AI seat', async () => {
-      const initialData = createInitialData(initSnapshotFixture, {
+      const initialState = createInitialState(42, initSnapshotFixture, {
         viewerSeat: 0,
-        hostSeat: 0,
       })
 
       await act(async () => {
-        render(<GameRoomClient initialData={initialData} gameId={42} />)
+        render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
       // Wait for AI registry to load
@@ -163,9 +160,8 @@ describe('GameRoomClient', () => {
     })
 
     it('cleans up AI registry fetch on unmount', async () => {
-      const initialData = createInitialData(initSnapshotFixture, {
+      const initialState = createInitialState(42, initSnapshotFixture, {
         viewerSeat: 0,
-        hostSeat: 0,
       })
 
       let resolveRegistry: () => void
@@ -190,7 +186,7 @@ describe('GameRoomClient', () => {
       let unmount: () => void
       await act(async () => {
         const result = render(
-          <GameRoomClient initialData={initialData} gameId={42} />
+          <GameRoomClient initialState={initialState} gameId={42} />
         )
         unmount = result.unmount
       })

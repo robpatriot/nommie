@@ -15,9 +15,7 @@ describe('useGameRoomControls', () => {
 
   const defaultProps = {
     viewerSeatForInteractions: 0 as const,
-    snapshot: {
-      bidConstraints: { zeroBidLocked: false },
-    },
+    bidConstraints: { zeroBidLocked: false },
     handleSubmitBid: mockHandleSubmitBid,
     handleSelectTrump: mockHandleSelectTrump,
     handlePlayCard: mockHandlePlayCard,
@@ -138,9 +136,7 @@ describe('useGameRoomControls', () => {
         useGameRoomControls({
           ...defaultProps,
           phase,
-          snapshot: {
-            bidConstraints: { zeroBidLocked: true },
-          },
+          bidConstraints: { zeroBidLocked: true },
         })
       )
 

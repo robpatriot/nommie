@@ -344,15 +344,15 @@ async fn list_registered_ais() -> Result<web::Json<AiRegistryListResponse>, AppE
     }))
 }
 
-/// GET /api/games/{game_id}/snapshot
+/// GET /api/games/{game_id}/state
 ///
-/// Returns the current game snapshot as JSON with an ETag header for optimistic concurrency.
+/// Returns the current game state as JSON with an ETag header for optimistic concurrency.
 /// This is a read-only endpoint that produces a public view of the game state
 /// without exposing private information (e.g., other players' hands).
 ///
 /// Supports `If-None-Match` for HTTP caching: if the client's ETag matches the current version,
 /// returns `304 Not Modified` with no body.
-async fn get_snapshot(
+async fn get_state(
     http_req: HttpRequest,
     game_id: GameId,
     current_user: CurrentUser,
@@ -1856,7 +1856,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/{game_id}/bid").route(web::post().to(submit_bid)));
     cfg.service(web::resource("/{game_id}/trump").route(web::post().to(select_trump)));
     cfg.service(web::resource("/{game_id}/play").route(web::post().to(play_card)));
-    cfg.service(web::resource("/{game_id}/snapshot").route(web::get().to(get_snapshot)));
+    cfg.service(web::resource("/{game_id}/state").route(web::get().to(get_state)));
     cfg.service(web::resource("/{game_id}/history").route(web::get().to(get_game_history)));
     cfg.service(
         web::resource("/{game_id}/players/{seat}/display_name")

@@ -1,4 +1,4 @@
-// Integration tests for GET /api/games/{game_id}/snapshot caching behavior.
+// Integration tests for GET /api/games/{game_id}/state caching behavior.
 //
 // Tests include:
 // - ETag header presence and format
@@ -71,7 +71,7 @@ async fn test_snapshot_returns_etag_header() -> Result<(), AppError> {
         .await?;
 
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -132,7 +132,7 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
 
     // First GET to capture ETag
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -154,7 +154,7 @@ async fn test_snapshot_with_if_none_match_returns_304() -> Result<(), AppError> 
 
     // Second GET with If-None-Match matching the ETag
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header((IF_NONE_MATCH, HeaderValue::from_str(&etag).unwrap()))
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
@@ -219,7 +219,7 @@ async fn test_snapshot_with_if_none_match_mismatch_returns_200() -> Result<(), A
     // GET with If-None-Match that doesn't match (stale version)
     let stale_etag = format!(r#""game-{}-v3""#, game.game_id); // Resource is at v5
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header((IF_NONE_MATCH, HeaderValue::from_str(&stale_etag).unwrap()))
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
@@ -286,7 +286,7 @@ async fn test_snapshot_with_if_none_match_wildcard_returns_304() -> Result<(), A
 
     // GET with If-None-Match: * (wildcard per RFC 9110)
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header((IF_NONE_MATCH, HeaderValue::from_static("*")))
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
@@ -355,7 +355,7 @@ async fn test_snapshot_with_if_none_match_comma_separated_one_match() -> Result<
         game.game_id, game.game_id, game.game_id
     );
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header((
             IF_NONE_MATCH,
             HeaderValue::from_str(&if_none_match_value).unwrap(),
@@ -408,7 +408,7 @@ async fn test_snapshot_with_if_none_match_comma_separated_no_match() -> Result<(
         game.game_id, game.game_id, game.game_id
     );
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header((
             IF_NONE_MATCH,
             HeaderValue::from_str(&if_none_match_value).unwrap(),

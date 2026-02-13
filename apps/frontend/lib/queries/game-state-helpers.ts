@@ -1,9 +1,9 @@
 /**
- * Helper functions for working with game snapshot query data.
+ * Helper functions for working with game room state query data.
  */
 
 import type { QueryClient } from '@tanstack/react-query'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import type { GameRoomState } from '@/lib/game-room/state'
 import { queryKeys } from './query-keys'
 
 /**
@@ -18,8 +18,8 @@ export function getGameVersionFromCache(
   queryClient: QueryClient,
   gameId: number
 ): number | undefined {
-  const cachedSnapshot = queryClient.getQueryData<GameRoomSnapshotPayload>(
-    queryKeys.games.snapshot(gameId)
+  const cachedState = queryClient.getQueryData<GameRoomState>(
+    queryKeys.games.state(gameId)
   )
-  return cachedSnapshot?.version
+  return cachedState?.version
 }

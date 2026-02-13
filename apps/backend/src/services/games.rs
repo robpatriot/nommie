@@ -567,13 +567,6 @@ impl GameService {
     /// - It is currently the user's turn (Bidding, TrumpSelection, or TrickPlay)
     /// - The game has been waiting the longest (oldest waiting_since)
     ///
-    /// Find games that have been waiting for the user to act the longest.
-    ///
-    /// Prioritizes games where:
-    /// - The user is a player (not spectator)
-    /// - It is currently the user's turn (Bidding, TrumpSelection, or TrickPlay)
-    /// - The game has been waiting the longest (oldest waiting_since)
-    ///
     /// Returns up to 5 games to allow client-side navigation without refetching.
     ///
     /// # Arguments

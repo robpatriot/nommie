@@ -6,13 +6,13 @@ import { BackendApiError } from '@/lib/errors'
 import type {
   ActionResult,
   SimpleActionResult,
-  SnapshotActionResult,
+  StateActionResult,
 } from '@/lib/api/action-helpers'
 
 type ActionErrorResult =
   | Extract<ActionResult<unknown>, { kind: 'error' }>
   | Extract<SimpleActionResult, { kind: 'error' }>
-  | Extract<SnapshotActionResult<unknown>, { kind: 'error' }>
+  | Extract<StateActionResult<unknown>, { kind: 'error' }>
 
 /**
  * Convert an ActionResult error to a BackendApiError.

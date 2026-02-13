@@ -7,7 +7,7 @@ import {
   getAvailableGames,
   getWaitingLongestGame,
 } from '@/lib/api'
-import { fetchGameSnapshot } from '@/lib/api/game-room'
+import { fetchGameState } from '@/lib/api/game-room'
 import { toErrorResult } from '@/lib/api/action-helpers'
 import type { ActionResult, SimpleActionResult } from '@/lib/api/action-helpers'
 import type { Game } from '@/lib/types'
@@ -99,9 +99,9 @@ export async function deleteGameAction(
     let finalVersion = version
     if (finalVersion === undefined) {
       try {
-        const snapshotResult = await fetchGameSnapshot(gameId)
-        if (snapshotResult.kind === 'ok') {
-          finalVersion = snapshotResult.msg.version
+        const fetchResult = await fetchGameState(gameId)
+        if (fetchResult.kind === 'ok') {
+          finalVersion = fetchResult.msg.version
         } else {
           const t = await getTranslations('errors.actions')
           return toErrorResult(

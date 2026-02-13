@@ -1,4 +1,4 @@
-// Integration tests for GET /api/games/{game_id}/snapshot endpoint.
+// Integration tests for GET /api/games/{game_id}/state endpoint.
 //
 // Tests include:
 // - Basic 200 responses with valid JSON
@@ -71,7 +71,7 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
         .await?;
 
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -143,7 +143,7 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
 
     // Call with invalid game_id (not a number)
     let req = test::TestRequest::get()
-        .uri("/api/games/not-a-number/snapshot")
+        .uri("/api/games/not-a-number/state")
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -183,7 +183,7 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
 
     // Call with a valid ID format but nonexistent game (very large ID)
     let req = test::TestRequest::get()
-        .uri("/api/games/999999999/snapshot")
+        .uri("/api/games/999999999/state")
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -223,7 +223,7 @@ async fn test_snapshot_phase_structure() -> Result<(), AppError> {
         .await?;
 
     let req = test::TestRequest::get()
-        .uri(&format!("/api/games/{}/snapshot", game.game_id))
+        .uri(&format!("/api/games/{}/state", game.game_id))
         .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());

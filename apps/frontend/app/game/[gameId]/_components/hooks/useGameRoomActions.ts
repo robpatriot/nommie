@@ -13,7 +13,7 @@ import {
   useSubmitPlay,
 } from '@/hooks/mutations/useGameRoomMutations'
 import { toQueryError } from '@/lib/queries/query-error-handler'
-import { getGameVersionFromCache } from '@/lib/queries/game-snapshot-helpers'
+import { getGameVersionFromCache } from '@/lib/queries/game-state-helpers'
 import type { BackendApiError } from '@/lib/errors'
 
 interface UseGameRoomActionsProps {

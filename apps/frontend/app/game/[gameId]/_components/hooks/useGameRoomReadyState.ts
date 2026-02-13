@@ -1,47 +1,43 @@
 import { useEffect, useRef, useState } from 'react'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import type { GameRoomState } from '@/lib/game-room/state'
+import { selectSnapshot } from '@/lib/game-room/state'
 
 /**
  * Manages the ready state for the viewer in the game room.
- * Syncs with the snapshot data and resets when phase changes away from Init.
+ * Syncs with the state data and resets when phase changes away from Init.
  */
 export function useGameRoomReadyState(
-  snapshot: GameRoomSnapshotPayload,
+  state: GameRoomState,
   viewerSeatForInteractions: number | null,
   phaseName: string
 ) {
   const [hasMarkedReady, setHasMarkedReady] = useState(false)
-  // Only players (with a seat) can mark ready, not spectators
   const canMarkReady =
     phaseName === 'Init' && viewerSeatForInteractions !== null
-  // Track the last synced snapshot value to avoid unnecessary updates
   const lastSyncedReadyState = useRef<boolean | null>(null)
 
-  // Initialize hasMarkedReady from snapshot on mount and when snapshot updates
-  // Only sync when the actual is_ready value in the snapshot differs from what we last synced
-  // to avoid overwriting optimistic updates during mutations
+  const seating = selectSnapshot(state).game.seating
+
   useEffect(() => {
     if (viewerSeatForInteractions !== null && canMarkReady) {
-      const viewerSeatAssignment = snapshot.snapshot.game.seating.find(
-        (seat, index) => {
-          const seatIndex =
-            typeof seat.seat === 'number' && !Number.isNaN(seat.seat)
-              ? seat.seat
-              : index
-          return seatIndex === viewerSeatForInteractions
-        }
-      )
+      const viewerSeatAssignment = seating.find((seat, index) => {
+        const seatIndex =
+          typeof seat.seat === 'number' && !Number.isNaN(seat.seat)
+            ? seat.seat
+            : index
+        return seatIndex === viewerSeatForInteractions
+      })
       if (viewerSeatAssignment) {
-        const snapshotReadyState = viewerSeatAssignment.is_ready
-        // Only update if the snapshot value differs from what we last synced
+        const stateReadyState = viewerSeatAssignment.is_ready
+        // Only update if the state value differs from what we last synced
         // This prevents overwriting optimistic updates during mutations
-        if (lastSyncedReadyState.current !== snapshotReadyState) {
-          lastSyncedReadyState.current = snapshotReadyState
-          setHasMarkedReady(snapshotReadyState)
+        if (lastSyncedReadyState.current !== stateReadyState) {
+          lastSyncedReadyState.current = stateReadyState
+          setHasMarkedReady(stateReadyState)
         }
       }
     }
-  }, [snapshot.snapshot.game.seating, viewerSeatForInteractions, canMarkReady])
+  }, [seating, viewerSeatForInteractions, canMarkReady])
 
   // Reset hasMarkedReady when phase changes away from Init.
   // Use phase directly (not canMarkReady) to avoid race conditions on rapid phase changes.

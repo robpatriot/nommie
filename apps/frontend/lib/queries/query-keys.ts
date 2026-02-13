@@ -4,7 +4,7 @@
  *
  * Query keys are hierarchical arrays that allow for:
  * - Invalidating related queries (e.g., invalidate all games queries)
- * - Precise cache invalidation (e.g., invalidate specific game snapshot)
+ * - Precise cache invalidation (e.g., invalidate specific game state)
  * - Type-safe query key references
  */
 
@@ -41,8 +41,7 @@ export const queryKeys = {
     detailRoot: () => ['games', 'detail'] as const,
     detail: (id: number) => [...queryKeys.games.detailRoot(), id] as const,
 
-    snapshot: (id: number) =>
-      [...queryKeys.games.detail(id), 'snapshot'] as const,
+    state: (id: number) => [...queryKeys.games.detail(id), 'state'] as const,
     history: (id: number) =>
       [...queryKeys.games.detail(id), 'history'] as const,
 

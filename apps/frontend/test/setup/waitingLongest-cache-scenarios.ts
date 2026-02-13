@@ -4,16 +4,17 @@ import { expect } from 'vitest'
 
 import type { WireMsg } from '@/lib/game-room/protocol/types'
 import { queryKeys } from '@/lib/queries/query-keys'
-import type { GameRoomSnapshotPayload } from '@/app/actions/game-room-actions'
+import type { GameRoomState } from '@/lib/game-room/state'
+import { selectVersion } from '@/lib/game-room/state'
 import { defaultLwCacheState, type LwCacheState } from '@/lib/queries/lw-cache'
 
 import { mockWebSocketInstances } from '@/test/setup/mock-websocket'
 import type { MockWebSocket } from '@/test/setup/mock-websocket'
 
 export type SeedState = {
-  snapshot?: {
+  state?: {
     gameId: number
-    payload: GameRoomSnapshotPayload
+    state: GameRoomState
   }
   lwCache?: Pick<LwCacheState, 'pool' | 'isCompleteFromServer' | 'snapshot'>
 }
@@ -28,7 +29,7 @@ export type ExpectedEffects = {
 export type RealtimeScenario = {
   name: string
   gameId: number
-  initialData: GameRoomSnapshotPayload
+  initialState: GameRoomState
   seed?: SeedState
   msg: WireMsg
   expect: ExpectedEffects
@@ -134,10 +135,9 @@ export async function runRealtimeScenario(
   // only reflect effects from the scenario message.
   clearLwRefetchMock?.()
 
-  // Seed cache state (optional) after handshake
-  if (scenario.seed?.snapshot) {
-    const { gameId, payload } = scenario.seed.snapshot
-    queryClient.setQueryData(queryKeys.games.snapshot(gameId), payload)
+  if (scenario.seed?.state) {
+    const { gameId, state } = scenario.seed.state
+    queryClient.setQueryData(queryKeys.games.state(gameId), state)
   }
   if (scenario.seed?.lwCache) {
     queryClient.setQueryData<LwCacheState>(
@@ -187,13 +187,13 @@ export async function runRealtimeScenario(
     })
   }
 
-  // Assert snapshot version if requested
   if (scenario.expect.snapshotVersion !== undefined) {
     await waitFor(() => {
-      const cached = queryClient.getQueryData<GameRoomSnapshotPayload>(
-        queryKeys.games.snapshot(scenario.gameId)
+      const cached = queryClient.getQueryData<GameRoomState>(
+        queryKeys.games.state(scenario.gameId)
       )
-      expect(cached?.version).toBe(scenario.expect.snapshotVersion)
+      expect(cached).toBeDefined()
+      expect(selectVersion(cached!)).toBe(scenario.expect.snapshotVersion)
     })
   }
 }
