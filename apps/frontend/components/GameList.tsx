@@ -116,11 +116,17 @@ export default function GameList({
               Math.max(game.max_players - game.player_count, 0),
               locale
             )
+            const isYourTurn = game.viewer_is_turn === true
+            const isYourGame = game.viewer_is_member === true
 
             return (
               <article
                 key={game.id}
-                className="group card-hover-shadow rounded-2xl border border-border/60 bg-card px-4 py-5 transition-transform duration-200 hover:-translate-y-1 hover:border-primary/40"
+                className={`group card-hover-shadow rounded-2xl border border-border/60 bg-card px-4 py-5 transition-transform duration-200 hover:-translate-y-1 hover:border-primary/40 ${
+                  isYourTurn
+                    ? 'border-l-4 border-l-accent hover:border-l-accent'
+                    : ''
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -131,11 +137,13 @@ export default function GameList({
                       {game.name}
                     </h3>
                   </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${stateClass}`}
-                  >
-                    {stateLabel}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${stateClass}`}
+                    >
+                      {stateLabel}
+                    </span>
+                  </div>
                 </div>
 
                 <dl className="mt-4 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
@@ -166,12 +174,22 @@ export default function GameList({
                   </div>
                 </dl>
 
-                {showActions && actions ? (
+                {(showActions && actions) || isYourGame ? (
                   <div
-                    className="mt-5 flex flex-wrap gap-2 text-sm"
+                    className="mt-5 flex flex-wrap items-center justify-between gap-2 text-sm"
                     aria-label={actionsLabel ?? tLobby('lists.actionsLabel')}
                   >
-                    {actions}
+                    {showActions && actions ? (
+                      <div className="flex flex-wrap gap-2">{actions}</div>
+                    ) : null}
+                    {isYourGame && (
+                      <span
+                        className="rounded-2xl bg-muted/70 px-3 py-2 text-sm font-medium text-muted-foreground shrink-0"
+                        aria-label={tLobby('labels.inGame')}
+                      >
+                        {tLobby('labels.inGame')}
+                      </span>
+                    )}
                   </div>
                 ) : null}
               </article>

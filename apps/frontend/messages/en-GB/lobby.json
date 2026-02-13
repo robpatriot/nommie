@@ -48,7 +48,9 @@
     }
   },
   "labels": {
-    "fullTable": "Full table"
+    "fullTable": "Full table",
+    "inGame": "In game",
+    "yourTurn": "Your turn"
   },
   "gameList": {
     "search": {

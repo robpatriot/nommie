@@ -48,7 +48,9 @@
     }
   },
   "labels": {
-    "fullTable": "Tavolo pieno"
+    "fullTable": "Tavolo pieno",
+    "inGame": "In partita",
+    "yourTurn": "Il tuo turno"
   },
   "gameList": {
     "search": {

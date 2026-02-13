@@ -612,6 +612,7 @@ struct GameResponse {
     viewer_is_member: bool,
     viewer_is_host: bool,
     can_rejoin: bool,
+    viewer_is_turn: bool,
 }
 
 /// Helper function to convert GameState enum to frontend string format
@@ -667,6 +668,7 @@ fn game_to_response(
     game: &crate::repos::games::Game,
     memberships: &[memberships::GameMembership],
     viewer_user_id: Option<i64>,
+    viewer_is_turn: bool,
 ) -> Result<GameResponse, AppError> {
     let created_by = game.created_by.ok_or_else(|| {
         AppError::internal(
@@ -729,6 +731,7 @@ fn game_to_response(
         viewer_is_member,
         viewer_is_host,
         can_rejoin,
+        viewer_is_turn,
     })
 }
 
@@ -765,7 +768,7 @@ async fn create_game(
     })
     .await?;
 
-    let response = game_to_response(&game_model, &memberships, Some(user_id))?;
+    let response = game_to_response(&game_model, &memberships, Some(user_id), false)?;
 
     Ok(web::Json(CreateGameResponse { game: response }))
 }
@@ -801,7 +804,7 @@ async fn join_game(
     )
     .await?;
 
-    let response = game_to_response(&res.final_game, &memberships, Some(user_id))?;
+    let response = game_to_response(&res.final_game, &memberships, Some(user_id), false)?;
     Ok(web::Json(JoinGameResponse { game: response }))
 }
 
@@ -837,7 +840,7 @@ async fn spectate_game(
     )
     .await?;
 
-    let response = game_to_response(&res.final_game, &memberships, Some(user_id))?;
+    let response = game_to_response(&res.final_game, &memberships, Some(user_id), false)?;
     Ok(web::Json(JoinGameResponse { game: response }))
 }
 
@@ -988,7 +991,7 @@ async fn list_joinable_games(
     let response_games = games
         .into_iter()
         .map(|(game_model, memberships)| {
-            game_to_response(&game_model, &memberships, Some(viewer_id))
+            game_to_response(&game_model, &memberships, Some(viewer_id), false)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -1007,36 +1010,37 @@ async fn list_in_progress_games(
 ) -> Result<web::Json<GameListResponse>, AppError> {
     let viewer_id = current_user.id;
 
-    let games = with_txn(Some(&http_req), &app_state, |txn| {
+    let visible_games = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameService;
-            service.list_active_games(txn).await
+            let games = service.list_active_games(txn).await?;
+            let mut results = Vec::new();
+            for (game_model, memberships) in games {
+                let viewer_is_member = is_human_member(Some(viewer_id), &memberships);
+                let viewer_is_spectator = memberships.iter().any(|m| {
+                    m.user_id == Some(viewer_id)
+                        && m.role == GameRole::Spectator
+                        && m.player_kind == crate::entities::game_players::PlayerKind::Human
+                });
+                if game_model.visibility == GameVisibility::Public
+                    || viewer_is_member
+                    || viewer_is_spectator
+                {
+                    let viewer_is_turn = GameService
+                        .compute_is_users_turn(txn, &game_model, &memberships, viewer_id)
+                        .await?;
+                    results.push(game_to_response(
+                        &game_model,
+                        &memberships,
+                        Some(viewer_id),
+                        viewer_is_turn,
+                    )?);
+                }
+            }
+            Ok::<_, AppError>(results)
         })
     })
     .await?;
-
-    let mut visible_games = Vec::new();
-
-    for (game_model, memberships) in games {
-        let viewer_is_member = is_human_member(Some(viewer_id), &memberships);
-        // Check if viewer is a spectator
-        let viewer_is_spectator = memberships.iter().any(|m| {
-            m.user_id == Some(viewer_id)
-                && m.role == GameRole::Spectator
-                && m.player_kind == crate::entities::game_players::PlayerKind::Human
-        });
-
-        if game_model.visibility == GameVisibility::Public
-            || viewer_is_member
-            || viewer_is_spectator
-        {
-            visible_games.push(game_to_response(
-                &game_model,
-                &memberships,
-                Some(viewer_id),
-            )?);
-        }
-    }
 
     Ok(web::Json(GameListResponse {
         games: visible_games,
@@ -1053,53 +1057,50 @@ async fn list_overview_games(
 ) -> Result<web::Json<GameListResponse>, AppError> {
     let viewer_id = current_user.id;
 
-    let lobby_games = with_txn(Some(&http_req), &app_state, |txn| {
+    let combined_games = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = GameService;
-            service.list_public_lobby_games(txn).await
+            let lobby_games = service.list_public_lobby_games(txn).await?;
+            let active_games = service.list_active_games(txn).await?;
+
+            let mut results = Vec::new();
+            for (game_model, memberships) in lobby_games {
+                results.push(game_to_response(
+                    &game_model,
+                    &memberships,
+                    Some(viewer_id),
+                    false,
+                )?);
+            }
+
+            for (game_model, memberships) in active_games {
+                let viewer_is_member = is_human_member(Some(viewer_id), &memberships);
+                let viewer_is_spectator = memberships.iter().any(|m| {
+                    m.user_id == Some(viewer_id)
+                        && m.role == GameRole::Spectator
+                        && m.player_kind == crate::entities::game_players::PlayerKind::Human
+                });
+                if game_model.visibility == GameVisibility::Public
+                    || viewer_is_member
+                    || viewer_is_spectator
+                {
+                    let viewer_is_turn = GameService
+                        .compute_is_users_turn(txn, &game_model, &memberships, viewer_id)
+                        .await?;
+                    results.push(game_to_response(
+                        &game_model,
+                        &memberships,
+                        Some(viewer_id),
+                        viewer_is_turn,
+                    )?);
+                }
+            }
+
+            results.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            Ok::<_, AppError>(results)
         })
     })
     .await?;
-
-    let active_games = with_txn(Some(&http_req), &app_state, |txn| {
-        Box::pin(async move {
-            let service = GameService;
-            service.list_active_games(txn).await
-        })
-    })
-    .await?;
-
-    let mut combined_games = Vec::new();
-
-    for (game_model, memberships) in lobby_games {
-        combined_games.push(game_to_response(
-            &game_model,
-            &memberships,
-            Some(viewer_id),
-        )?);
-    }
-
-    for (game_model, memberships) in active_games {
-        let viewer_is_member = is_human_member(Some(viewer_id), &memberships);
-        // Check if viewer is a spectator
-        let viewer_is_spectator = memberships.iter().any(|m| {
-            m.user_id == Some(viewer_id)
-                && m.role == GameRole::Spectator
-                && m.player_kind == crate::entities::game_players::PlayerKind::Human
-        });
-        if game_model.visibility == GameVisibility::Public
-            || viewer_is_member
-            || viewer_is_spectator
-        {
-            combined_games.push(game_to_response(
-                &game_model,
-                &memberships,
-                Some(viewer_id),
-            )?);
-        }
-    }
-
-    combined_games.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
 
     Ok(web::Json(GameListResponse {
         games: combined_games,

@@ -48,7 +48,9 @@
     }
   },
   "labels": {
-    "fullTable": "Tisch voll"
+    "fullTable": "Tisch voll",
+    "inGame": "Im Spiel",
+    "yourTurn": "Du bist dran"
   },
   "gameList": {
     "search": {

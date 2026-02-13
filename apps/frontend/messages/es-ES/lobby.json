@@ -48,7 +48,9 @@
     }
   },
   "labels": {
-    "fullTable": "Mesa completa"
+    "fullTable": "Mesa completa",
+    "inGame": "En partida",
+    "yourTurn": "Tu turno"
   },
   "gameList": {
     "search": {

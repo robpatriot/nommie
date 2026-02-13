@@ -529,6 +529,37 @@ impl GameService {
         Ok(results)
     }
 
+    /// Compute whether it is the given user's turn in an active game.
+    ///
+    /// Returns true only if the user is a player and determine_next_action
+    /// indicates their seat is expected to act.
+    pub async fn compute_is_users_turn(
+        &self,
+        txn: &DatabaseTransaction,
+        game: &games_repo::Game,
+        memberships: &[memberships::GameMembership],
+        user_id: i64,
+    ) -> Result<bool, AppError> {
+        let user_seat = memberships
+            .iter()
+            .find(|m| {
+                m.user_id == Some(user_id)
+                    && m.role == GameRole::Player
+                    && m.player_kind == game_players::PlayerKind::Human
+            })
+            .and_then(|m| m.turn_order);
+
+        let Some(seat) = user_seat else {
+            return Ok(false);
+        };
+
+        let game_flow = GameFlowService;
+        match game_flow.determine_next_action(txn, game).await? {
+            Some((to_act, _)) if to_act == seat => Ok(true),
+            _ => Ok(false),
+        }
+    }
+
     /// Find the game that has been waiting for the user to act the longest.
     ///
     /// Prioritizes games where:

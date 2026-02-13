@@ -5,7 +5,3 @@ This document tracks the current work plan for building the Nommie UI on web (Ne
 ---
 
 # Next Steps
-
-- Update lobby to: 
- - indicate which the user is in
- - indicate games where it's the user's turn

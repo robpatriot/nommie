@@ -27,6 +27,7 @@ export interface Game {
   viewer_is_member?: boolean
   viewer_is_host?: boolean
   can_rejoin?: boolean
+  viewer_is_turn?: boolean
 }
 
 export interface GameListResponse {
