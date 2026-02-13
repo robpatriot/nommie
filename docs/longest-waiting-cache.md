@@ -226,21 +226,25 @@ A `your_turn` message changes eligibility. Snapshot reuse is allowed only when c
 
 Triggered by `GameState(myTurn = true)`.
 
-The frontend tracks `prevIsUsersTurn` for the **currently subscribed game**.
+The frontend tracks two values for the **currently subscribed game**:
 
-- It is initialized from the initial HTTP snapshot (`initialData`) when `useGameSync` mounts.
-- It is updated after each `game_state` message is applied.
+- **`prevIsUsersTurn`**: Initialized from the initial HTTP snapshot (`initialData`) when `useGameSync` mounts; updated after each `game_state` message is applied.
+- **`pendingAction`**: Set when the user sends a move (`onOptimisticSend`); cleared when `game_state` is received or on server error.
 
-### Rising edge
+### Trigger condition
 
-If `prevIsUsersTurn == false` and `myTurn == true` for the current game, treat it the same as receiving `your_turn(gameId)`:
+Treat as `your_turn(gameId)` when `myTurn == true` **and** either:
+
+- **Rising edge**: `prevIsUsersTurn == false` (turn just became ours), or
+- **Pending action**: `pendingAction == true` (we just sent a move; server confirms we are still the actor, e.g. multi-step phases or round completion).
+
+This ensures only GameState messages that correspond to a previously initiated action drive cache reconstruction. Incidental navigation must not mutate cache state.
+
+### Actions (same as R4)
 
 - If `LW.pool.length < 2`, append `gameId` to `LW.pool` (if missing) and do not refetch
 - Else if `snapshot.gameId === gameId`, restore from snapshot (no refetch)
 - Otherwise refetch with `createSnapshot = true`
-
-**Reason**:
-Only GameState messages that correspond to a previously initiated action can safely drive cache reconstruction. Incidental navigation must not mutate cache state.
 
 ---
 
