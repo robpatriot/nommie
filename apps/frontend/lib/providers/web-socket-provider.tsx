@@ -1,6 +1,45 @@
 'use client'
 
 import type { ReactNode } from 'react'
+
+let lifecycleListenersInstalled = false
+
+type ResumeHandlerRef = { current: (() => void) | null }
+type PageFrozenRef = { current: boolean }
+
+function installLifecycleListenersOnce(
+  resumeHandlerRef: ResumeHandlerRef,
+  pageFrozenRef: PageFrozenRef
+) {
+  if (lifecycleListenersInstalled || typeof window === 'undefined') return
+  lifecycleListenersInstalled = true
+  const doc = document
+  const win = window
+
+  const tryResume = () => {
+    resumeHandlerRef.current?.()
+  }
+
+  doc.addEventListener('visibilitychange', () => {
+    if (!doc.hidden) tryResume()
+  })
+  win.addEventListener('pageshow', () => {
+    tryResume()
+  })
+  win.addEventListener('freeze', () => {
+    pageFrozenRef.current = true
+  })
+  win.addEventListener('resume', () => {
+    pageFrozenRef.current = false
+    tryResume()
+  })
+  win.addEventListener('focus', () => {
+    if (!doc.hidden) tryResume()
+  })
+  win.addEventListener('online', () => {
+    tryResume()
+  })
+}
 import {
   createContext,
   useCallback,
@@ -90,6 +129,14 @@ export function WebSocketProvider({
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY_MS)
   const reconnectAttemptsRef = useRef(0)
+  const pendingReconnectRef = useRef(false)
+  const pageFrozenRef = useRef(false)
+  const connectInFlightRef = useRef(false)
+
+  function isPageActive(): boolean {
+    if (typeof document === 'undefined') return true
+    return !document.hidden && !pageFrozenRef.current
+  }
   const hasTriggeredStaleSignoutRef = useRef(false)
   const closeReasonRef = useRef<CloseReason | null>(null)
   const genRef = useRef(0)
@@ -148,7 +195,8 @@ export function WebSocketProvider({
       return body.token
     } catch (error) {
       clearTimeout(timeoutId)
-      if (error instanceof Error && error.name === 'AbortError') {
+      const err = error instanceof Error ? error : new Error(String(error))
+      if (err.name === 'AbortError') {
         throw new Error('Request to fetch realtime token timed out')
       }
       throw error
@@ -218,7 +266,6 @@ export function WebSocketProvider({
       }
 
       helloAckedRef.current = false
-      reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
       reconnectAttemptsRef.current = 0
       setReconnectAttempts(0)
     },
@@ -227,6 +274,11 @@ export function WebSocketProvider({
 
   const scheduleReconnect = useCallback(
     (connectFn: () => Promise<void>) => {
+      if (!isPageActive()) {
+        pendingReconnectRef.current = true
+        return
+      }
+
       reconnectAttemptsRef.current += 1
       const attempts = reconnectAttemptsRef.current
       setReconnectAttempts(attempts)
@@ -242,13 +294,18 @@ export function WebSocketProvider({
       setConnectionState('reconnecting')
 
       const delay = reconnectDelayRef.current
-      reconnectDelayRef.current = Math.min(
+      const nextDelay = Math.min(
         reconnectDelayRef.current * 2,
         MAX_RECONNECT_DELAY_MS
       )
+      reconnectDelayRef.current = nextDelay
 
       clearReconnectTimeout()
       reconnectTimeoutRef.current = setTimeout(() => {
+        if (!isPageActive()) {
+          pendingReconnectRef.current = true
+          return
+        }
         void connectFn()
       }, delay)
     },
@@ -256,6 +313,11 @@ export function WebSocketProvider({
   )
 
   const connect = useCallback(async () => {
+    if (!isPageActive()) {
+      pendingReconnectRef.current = true
+      return
+    }
+
     const existingWs = wsRef.current
     if (
       existingWs &&
@@ -265,6 +327,7 @@ export function WebSocketProvider({
       return
     }
 
+    connectInFlightRef.current = true
     try {
       // State transition: avoid incorrectly flipping 'connecting' -> 'reconnecting'
       setConnectionState((prev) => {
@@ -402,6 +465,8 @@ export function WebSocketProvider({
 
       closeReasonRef.current = 'error'
       scheduleReconnect(connect)
+    } finally {
+      connectInFlightRef.current = false
     }
   }, [
     armHandshakeTimeout,
@@ -411,6 +476,25 @@ export function WebSocketProvider({
     resolveWsUrl,
     scheduleReconnect,
   ])
+
+  const tryResumeReconnect = useCallback(() => {
+    if (!isAuthenticated) return
+    clearReconnectTimeout()
+    if (connectInFlightRef.current) return
+    const ws = wsRef.current
+    const needsReconnect =
+      pendingReconnectRef.current || !ws || ws.readyState !== WebSocket.OPEN
+    if (!needsReconnect) return
+
+    pendingReconnectRef.current = false
+    reconnectAttemptsRef.current = 0
+    setReconnectAttempts(0)
+    reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
+    void connect()
+  }, [isAuthenticated, connect, clearReconnectTimeout])
+
+  const resumeHandlerRef = useRef<(() => void) | null>(null)
+  resumeHandlerRef.current = tryResumeReconnect
 
   const disconnect = useCallback(() => {
     cleanupSocketAndTimers('manual')
@@ -423,6 +507,11 @@ export function WebSocketProvider({
     return () => {
       handlersRef.current.delete(handler)
     }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined')
+      installLifecycleListenersOnce(resumeHandlerRef, pageFrozenRef)
   }, [])
 
   useEffect(() => {
