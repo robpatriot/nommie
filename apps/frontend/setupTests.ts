@@ -3,6 +3,12 @@ import { cleanup, configure } from '@testing-library/react'
 import { act } from 'react'
 import { beforeAll, afterAll, afterEach, vi } from 'vitest'
 
+// Indicate that we are in a React testing environment that supports act()
+// This is required for React 18+ to suppress warnings about act(...) configuration.
+;(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true
+
 import { server } from './test/msw/server'
 
 // Import mocks to register them globally

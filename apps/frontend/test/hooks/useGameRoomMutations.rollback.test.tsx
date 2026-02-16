@@ -176,7 +176,7 @@ describe('Optimistic Update Rollback Tests', () => {
       )
 
       // Start mutation
-      const mutationPromise = act(async () => {
+      const mutationPromise = await act(async () => {
         try {
           await result.current.mutateAsync({
             gameId,
