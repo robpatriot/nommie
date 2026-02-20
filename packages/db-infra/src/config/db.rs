@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::{env, process};
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
+use tracing::info;
 use sea_orm::DatabaseBackend;
 
 use crate::error::DbInfraError;
@@ -326,6 +327,21 @@ pub fn sqlite_lock_path(
     Ok(std::path::Path::new(&file_spec).with_extension("migrate.lock"))
 }
 
+/// Redact password from connection string for safe logging.
+fn redact_conn_spec_for_log(url: &str) -> String {
+    if url.starts_with("postgresql://") {
+        if let Some(auth_end) = url.find('@') {
+            let scheme_end = url.find("://").unwrap_or(0) + 3;
+            let creds = &url[scheme_end..auth_end];
+            if let Some(colon) = creds.find(':') {
+                let user = &creds[..colon];
+                return format!("postgresql://{user}:***@{rest}", rest = &url[auth_end + 1..]);
+            }
+        }
+    }
+    url.to_string()
+}
+
 /// Create connection string from environment, database kind, and database owner
 pub fn make_conn_spec(
     env: RuntimeEnv,
@@ -391,13 +407,20 @@ pub fn make_conn_spec(
                 url.push_str(&root_cert);
             }
 
+            info!(conn_spec = %redact_conn_spec_for_log(&url), "make_conn_spec returning postgres connection string");
             Ok(url)
         }
         DbKind::SqliteFile => {
             let file_spec = sqlite_file_spec(db_kind, env)?;
-            Ok(format!("sqlite:{}?mode=rwc", file_spec))
+            let url = format!("sqlite:{}?mode=rwc", file_spec);
+            info!(conn_spec = %url, "make_conn_spec returning sqlite file connection string");
+            Ok(url)
         }
-        DbKind::SqliteMemory => Ok("sqlite::memory:".to_string()),
+        DbKind::SqliteMemory => {
+            let url = "sqlite::memory:".to_string();
+            info!(conn_spec = %url, "make_conn_spec returning sqlite memory connection string");
+            Ok(url)
+        }
     }
 }
 
