@@ -22,6 +22,7 @@ import {
   waitForWebSocketConnection,
 } from '../setup/game-room-client-helpers'
 import { initSnapshotFixture } from '../mocks/game-snapshot'
+import { TEST_BACKEND_WS_URL } from '@/test/setup/test-constants'
 
 const mocks = vi.hoisted(() => ({
   getWaitingLongestGameAction: vi.fn(),
@@ -43,7 +44,7 @@ vi.stubGlobal('WebSocket', MockWebSocket)
 
 // Mock WebSocket config validation
 vi.mock('@/lib/config/env-validation', () => ({
-  resolveWebSocketUrl: () => 'ws://localhost:3001',
+  resolveWebSocketUrl: () => TEST_BACKEND_WS_URL,
   validateWebSocketConfig: () => {},
 }))
 
@@ -112,8 +113,6 @@ describe('Version Conflict Edge Cases', () => {
       kind: 'ok',
       data: createInitialStateWithVersion(1, 1),
     })
-
-    process.env.NEXT_PUBLIC_BACKEND_BASE_URL = 'http://localhost:3001'
   })
 
   afterEach(() => {

@@ -7,12 +7,15 @@ export const BACKEND_BASE_URL_ERROR_MSG =
   'NEXT_PUBLIC_BACKEND_BASE_URL must be set to an absolute URL when minting backend JWT'
 
 /**
- * Get and validate NEXT_PUBLIC_BACKEND_BASE_URL.
+ * Get and validate backend base URL for server-side use.
+ * Prefers BACKEND_BASE_URL (internal) when set; otherwise NEXT_PUBLIC_BACKEND_BASE_URL.
+ * Client always uses NEXT_PUBLIC_BACKEND_BASE_URL.
  * Throws if missing or not an absolute http(s) URL.
  * Only throws when called (lazy evaluation).
  */
 export function getBackendBaseUrlOrThrow(): string {
-  const url = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+  const url =
+    process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
   if (!url) {
     throw new Error(BACKEND_BASE_URL_ERROR_MSG)
   }

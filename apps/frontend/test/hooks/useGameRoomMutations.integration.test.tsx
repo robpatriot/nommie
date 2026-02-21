@@ -35,6 +35,7 @@ import {
   biddingSnapshotFixture,
   trickSnapshotFixture,
 } from '../mocks/game-snapshot'
+import { TEST_BACKEND_WS_URL } from '@/test/setup/test-constants'
 
 const mocks = vi.hoisted(() => ({
   submitBidAction: vi.fn(),
@@ -69,7 +70,7 @@ vi.stubGlobal('WebSocket', MockWebSocket)
 
 // Mock WebSocket config validation
 vi.mock('@/lib/config/env-validation', () => ({
-  resolveWebSocketUrl: () => 'ws://localhost:3001',
+  resolveWebSocketUrl: () => TEST_BACKEND_WS_URL,
   validateWebSocketConfig: () => {},
 }))
 
@@ -103,9 +104,6 @@ describe('Full Mutation Cycle Integration Tests', () => {
       kind: 'ok',
       data: createInitialStateWithVersion(1, 1),
     })
-
-    // Used by env-validation mock / resolveWebSocketUrl
-    process.env.NEXT_PUBLIC_BACKEND_BASE_URL = 'http://localhost:3001'
   })
 
   afterEach(() => {

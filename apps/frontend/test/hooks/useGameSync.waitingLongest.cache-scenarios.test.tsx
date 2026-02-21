@@ -19,6 +19,7 @@ import {
   runRealtimeScenario,
   type RealtimeScenario,
 } from '../setup/waitingLongest-cache-scenarios'
+import { TEST_BACKEND_WS_URL } from '@/test/setup/test-constants'
 
 const mocks = vi.hoisted(() => ({
   getWaitingLongestGameAction: vi.fn(),
@@ -39,7 +40,7 @@ vi.stubGlobal('WebSocket', MockWebSocket)
 
 // WebSocket config mocks (avoid env-validation coupling)
 vi.mock('@/lib/config/env-validation', () => ({
-  resolveWebSocketUrl: () => 'ws://localhost:3001',
+  resolveWebSocketUrl: () => TEST_BACKEND_WS_URL,
   validateWebSocketConfig: () => {},
 }))
 

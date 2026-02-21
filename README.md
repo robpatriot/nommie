@@ -51,7 +51,7 @@ docker run --env-file .env.frontend.prod -p 3000:3000 nommie-frontend:prod
 
 Important env:
 
-- `BACKEND_BASE_URL` pointing at your backend API
+- `NEXT_PUBLIC_BACKEND_BASE_URL` pointing at your backend API (required)
 - NextAuth secrets/providers (`AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`)
 - Any `NEXT_PUBLIC_*` values you expose to the client
 
@@ -94,9 +94,10 @@ docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
 - `REDIS_URL` - Redis connection string for realtime fan-out (e.g. `redis://127.0.0.1:6379/0`)
 
 **Frontend Configuration:**
-- `BACKEND_BASE_URL` - Backend API URL (e.g., `http://localhost:3001`)
+- `NEXT_PUBLIC_BACKEND_BASE_URL` - Backend API URL, required (e.g., `http://localhost:3001`)
+- `BACKEND_BASE_URL` - Optional internal URL for server-side fe->be calls; when set, overrides `NEXT_PUBLIC_BACKEND_BASE_URL` for auth/JWT/API
 - `APP_JWT_SECRET` - NextAuth secret (shared with backend JWT secret from root .env)
-- `NEXT_PUBLIC_BACKEND_WS_URL` - Optional override for websocket base (falls back to `BACKEND_BASE_URL` with `ws://`)
+- `NEXT_PUBLIC_BACKEND_WS_URL` - Optional override for websocket base (falls back to `NEXT_PUBLIC_BACKEND_BASE_URL` with `ws://`)
 - See Authentication Setup section for Google OAuth configuration
 
 ### Environment File Setup
@@ -172,7 +173,7 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 1. **Copy frontend env file:** `cp apps/frontend/.env.local.example apps/frontend/.env.local`
 2. **Update required variables:**
    - `AUTH_GOOGLE_ID` & `AUTH_GOOGLE_SECRET`: Get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-   - `BACKEND_BASE_URL`: Set to `http://localhost:3001` for local development
+   - `NEXT_PUBLIC_BACKEND_BASE_URL`: Set to `http://localhost:3001` for local development
    - `APP_JWT_SECRET`: Already configured in root `.env` (shared with backend)
 
 ### 🔑 Google OAuth Setup

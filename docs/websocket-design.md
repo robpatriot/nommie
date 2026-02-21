@@ -86,8 +86,8 @@ Messages are JSON with a `type` discriminator.
 - Backend:
   - `REDIS_URL` enables realtime fan-out (when present, realtime is enabled in `AppState`).
 - Frontend:
+  - `NEXT_PUBLIC_BACKEND_BASE_URL` (required; converted `http(s) -> ws(s)` by the client for WebSocket)
   - `NEXT_PUBLIC_BACKEND_WS_URL` (optional explicit WS base)
-  - `NEXT_PUBLIC_BACKEND_BASE_URL` (fallback; converted `http(s) -> ws(s)` by the client)
 
 ## Testing Strategy
 

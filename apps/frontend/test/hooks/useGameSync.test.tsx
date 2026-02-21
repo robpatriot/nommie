@@ -25,6 +25,7 @@ import {
   createInitialStateWithVersion,
   createStateWithVersionForMock,
 } from '../setup/game-room-client-helpers'
+import { TEST_BACKEND_WS_URL } from '@/test/setup/test-constants'
 
 const mocks = vi.hoisted(() => ({
   getWaitingLongestGameAction: vi.fn(),
@@ -45,7 +46,7 @@ vi.stubGlobal('WebSocket', MockWebSocket)
 
 // Mock WebSocket config validation
 vi.mock('@/lib/config/env-validation', () => ({
-  resolveWebSocketUrl: () => 'ws://localhost:3001',
+  resolveWebSocketUrl: () => TEST_BACKEND_WS_URL,
   validateWebSocketConfig: () => {},
 }))
 
@@ -169,9 +170,6 @@ describe('useGameSync', () => {
         data: createStateWithVersionForMock(gameId),
       })
     )
-
-    // Used by env-validation mock / resolveWebSocketUrl in some codepaths
-    process.env.NEXT_PUBLIC_BACKEND_BASE_URL = 'http://localhost:3001'
   })
 
   afterEach(() => {

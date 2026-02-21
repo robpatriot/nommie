@@ -246,9 +246,6 @@ export function setupGameRoomClientTest(): void {
   mockRemoveAiSeatAction.mockReset()
   mockFetchAiRegistryAction.mockReset()
 
-  // Set environment variable for useGameSync to resolve WebSocket URL
-  process.env.NEXT_PUBLIC_BACKEND_BASE_URL = 'http://localhost:3001'
-
   // Reset WebSocket mock
   mockWebSocketInstances.length = 0
   vi.stubGlobal('WebSocket', MockWebSocket)
@@ -298,6 +295,4 @@ export function teardownGameRoomClientTest(): void {
   vi.clearAllTimers()
   // Restore original WebSocket and fetch
   vi.unstubAllGlobals()
-  // Clear environment variable
-  delete process.env.NEXT_PUBLIC_BACKEND_BASE_URL
 }

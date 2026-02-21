@@ -2,8 +2,14 @@ const createNextIntlPlugin = require('next-intl/plugin')
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
-const canonicalBackendBase =
-  process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+// Client always uses NEXT_PUBLIC_BACKEND_BASE_URL (required). No fallback.
+const clientBackendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+
+if (!clientBackendBase) {
+  throw new Error(
+    'NEXT_PUBLIC_BACKEND_BASE_URL must be set for the frontend build'
+  )
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -23,13 +29,10 @@ const nextConfig = {
   },
   
   env: {
-    NEXT_PUBLIC_BACKEND_BASE_URL: canonicalBackendBase,
+    NEXT_PUBLIC_BACKEND_BASE_URL: clientBackendBase,
     NEXT_PUBLIC_BACKEND_WS_URL:
-      process.env.BACKEND_WS_URL ||
       process.env.NEXT_PUBLIC_BACKEND_WS_URL ||
-      (canonicalBackendBase
-        ? canonicalBackendBase.replace(/^http/, 'ws')
-        : undefined),
+      clientBackendBase.replace(/^http/, 'ws'),
   },
   output: 'standalone',
   async headers() {
@@ -37,9 +40,11 @@ const nextConfig = {
     // Allows 'unsafe-inline' for Next.js hydration and theme scripts
     // while restricting external sources to only what's needed
     
-    // Get backend URLs for CSP connect-src directive
-  const backendBaseUrl = process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
-  const backendWsUrl = process.env.BACKEND_WS_URL || process.env.NEXT_PUBLIC_BACKEND_WS_URL
+    // CSP uses client-facing URLs only (browser connects to these)
+    const backendBaseUrl = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+    const backendWsUrl =
+      process.env.NEXT_PUBLIC_BACKEND_WS_URL ||
+      (backendBaseUrl ? backendBaseUrl.replace(/^http/, 'ws') : undefined)
       
     // Build connect-src directive with backend URLs
     const connectSrc = [

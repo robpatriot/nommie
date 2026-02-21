@@ -4,6 +4,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import { useWebSocket } from '@/lib/providers/web-socket-provider'
 import { MockWebSocket, mockWebSocketInstances } from '../setup/mock-websocket'
 import { setupFetchMock } from '../setup/game-room-client-mocks'
+import { TEST_BACKEND_WS_URL } from '@/test/setup/test-constants'
 
 // Track original fetch
 const originalFetch = globalThis.fetch
@@ -13,7 +14,7 @@ vi.stubGlobal('WebSocket', MockWebSocket)
 
 // Mock WebSocket config validation
 vi.mock('@/lib/config/env-validation', () => ({
-  resolveWebSocketUrl: () => 'ws://localhost:3001',
+  resolveWebSocketUrl: () => TEST_BACKEND_WS_URL,
   validateWebSocketConfig: () => {},
 }))
 
@@ -73,7 +74,6 @@ describe('WebSocketProvider', () => {
     vi.useRealTimers()
     setupFetchMock(originalFetch)
     vi.stubGlobal('WebSocket', MockWebSocket)
-    process.env.NEXT_PUBLIC_BACKEND_BASE_URL = 'http://localhost:3001'
   })
 
   afterEach(() => {

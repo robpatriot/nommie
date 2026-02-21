@@ -149,8 +149,9 @@ async function fetchNewBackendJwtGeneric(
 
   if (!googleSub || !email) return null
 
-  // Get Backend URL - needs env var
-  const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+  // Get Backend URL - prefer internal when set
+  const backendBase =
+    process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
   if (!backendBase) return null
 
   try {

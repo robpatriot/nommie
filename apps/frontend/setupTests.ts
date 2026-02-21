@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 import { act } from 'react'
-import { beforeAll, afterAll, afterEach, vi } from 'vitest'
+import { beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest'
 
 // Indicate that we are in a React testing environment that supports act()
 // This is required for React 18+ to suppress warnings about act(...) configuration.
@@ -19,6 +19,10 @@ import './test/mocks/next-intl'
 import './test/mocks/auth'
 
 import { MockWebSocket } from '@/test/setup/mock-websocket'
+import {
+  TEST_BACKEND_BASE_URL,
+  TEST_BACKEND_WS_URL,
+} from '@/test/setup/test-constants'
 
 // Make @testing-library/react waitFor cooperate with fake timers
 configure({
@@ -32,15 +36,11 @@ configure({
 // Global WebSocket stub
 vi.stubGlobal('WebSocket', MockWebSocket)
 
-// Default WebSocket config for tests.
-// Many components mount WebSocketProvider via the shared test utils; provide a valid URL
-// so config validation doesn't fail (WebSocket itself is mocked).
-if (
-  !process.env.NEXT_PUBLIC_BACKEND_WS_URL &&
-  !process.env.NEXT_PUBLIC_BACKEND_BASE_URL
-) {
-  process.env.NEXT_PUBLIC_BACKEND_WS_URL = 'ws://localhost:3001'
-}
+// Set backend URL env vars before every test so config validation and WebSocket resolution work.
+beforeEach(() => {
+  process.env.NEXT_PUBLIC_BACKEND_BASE_URL = TEST_BACKEND_BASE_URL
+  process.env.NEXT_PUBLIC_BACKEND_WS_URL = TEST_BACKEND_WS_URL
+})
 
 // matchMedia mock
 if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {

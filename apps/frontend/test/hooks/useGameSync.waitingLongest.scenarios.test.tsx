@@ -18,6 +18,7 @@ import {
   mockWebSocketInstances,
 } from '@/test/setup/mock-websocket'
 import { mockGetGameRoomStateAction } from '../../setupGameRoomActionsMock'
+import { TEST_BACKEND_WS_URL } from '@/test/setup/test-constants'
 
 const mocks = vi.hoisted(() => ({
   getWaitingLongestGameAction: vi.fn(),
@@ -38,7 +39,7 @@ vi.stubGlobal('WebSocket', MockWebSocket)
 
 // Mock WebSocket config validation (avoid env coupling)
 vi.mock('@/lib/config/env-validation', () => ({
-  resolveWebSocketUrl: () => 'ws://localhost:3001',
+  resolveWebSocketUrl: () => TEST_BACKEND_WS_URL,
   validateWebSocketConfig: () => {},
 }))
 
