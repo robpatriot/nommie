@@ -19,7 +19,7 @@
       },
       "trickArea": {
         "title": "Trick-Bereich",
-        "description": "Die Mitte des Tisches zeigt den aktuell gespielten Trick. Karten werden offen angezeigt, wenn sie gespielt werden. Nach Abschluss eines Tricks werden die Karten kurz angezeigt (in den Einstellungen konfigurierbar), damit Sie sehen können, wer ihn gewonnen hat und welche Karten gespielt wurden. Der letzte abgeschlossene Trick wird zwischen den Runden angezeigt."
+        "description": "Die Mitte des Tisches zeigt den aktuell gespielten Trick. Karten werden offen angezeigt, wenn sie gespielt werden. Nach Abschluss eines Tricks werden die Karten kurz angezeigt (in den Einstellungen konfigurierbar), damit Sie sehen können, wer ihn gewonnen hat und welche Karten gespielt wurden. Nach der Pause wird der abgeschlossene Trick im Bereich des letzten Tricks angezeigt, bis der nächste Trick beginnt."
       },
       "biddingPanel": {
         "title": "Biet-Panel",
@@ -76,12 +76,35 @@
       },
       "nextGameButton": {
         "title": "Nächstes-Spiel-Schaltfläche",
-        "description": "Die Schaltfläche 'Nächstes Spiel' in der Kopfzeile (auf kleinen Bildschirmen als ▶ angezeigt) bringt Sie direkt zu Ihrem zuletzt aktiven Spiel. Dies erleichtert die Rückkehr zu einem Spiel, das Sie gespielt haben. Die Schaltfläche erscheint nur, wenn Sie ein aktives Spiel haben."
+        "description": "Die Schaltfläche 'Nächstes Spiel' in der Kopfzeile (auf kleinen Bildschirmen als ▶ angezeigt) bringt Sie zu einem Spiel, in dem Sie an der Reihe sind. Die Schaltfläche erscheint, wenn Sie ein anderes Spiel haben—außer dem, das Sie gerade ansehen—in dem Sie an der Reihe sind. So können Sie schnell zwischen Spielen wechseln, wenn Sie in mehreren Partien Züge ausstehend haben."
       },
       "spectators": {
         "title": "Spiele beobachten",
         "description": "Sie können Spiele als Zuschauer beobachten, ohne als Spieler beizutreten. Als Zuschauer können Sie die Karten sehen, wie sie in Tricks gespielt werden, und den Spielzustand, aber Sie können keine Karten in den Händen der Spieler sehen und Sie können nicht am Bieten oder Spielen teilnehmen. Zuschauer können jederzeit verlassen, ohne das Spiel zu beeinflussen."
       }
+    },
+    "setup": {
+      "kicker": "Einrichtung",
+      "title": "Spieleinrichtung",
+      "description": "So konfigurieren und starten Sie ein Spiel:",
+      "startingGame": {
+        "title": "Spiel starten",
+        "description": "Das Spiel startet automatisch, wenn alle Spieler sich als bereit markiert haben. Menschliche Spieler müssen in der Lobby auf die Bereit-Schaltfläche klicken; sobald alle bereit sind, beginnt das Spiel sofort."
+      },
+      "aiPlayers": {
+        "title": "KI-Spieler",
+        "description": "Als Spielleiter können Sie vor Spielbeginn KI-Spieler konfigurieren. KI-Spieler füllen leere Plätze, damit Sie mit weniger als vier menschlichen Spielern starten können. KI-Spieler sind immer als bereit markiert, sodass Sie nur Ihre menschlichen Spieler auf Bereit klicken lassen müssen.",
+        "add": "Fügen Sie KI-Spieler hinzu, um den nächsten freien Platz zu füllen. Jede KI nimmt einen offenen Platz ein.",
+        "remove": "Entfernen Sie KI-Spieler, um Plätze für menschliche Spieler freizugeben. Andere Spieler können dann dem Spiel beitreten.",
+        "changeType": "Ändern Sie das KI-Profil für jeden Platz, um verschiedene Spielstile auszuprobieren—von zufällig bis strategischer."
+      }
     }
+  },
+  "toc": {
+    "title": "Inhalt",
+    "rules": "Wie man Nommie spielt",
+    "ui": "Die Spieloberfläche verstehen",
+    "setup": "Spieleinrichtung",
+    "features": "Spiel-Funktionen"
   }
 }

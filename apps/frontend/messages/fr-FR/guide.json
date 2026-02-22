@@ -19,7 +19,7 @@
       },
       "trickArea": {
         "title": "Zone de Plis",
-        "description": "Le centre de la table montre le pli actuel en cours de jeu. Les cartes sont affichées face visible lorsqu'elles sont jouées. Après qu'un pli soit terminé, les cartes sont affichées pendant un court instant (configurable dans les paramètres) afin que vous puissiez voir qui l'a gagné et quelles cartes ont été jouées. Le dernier pli terminé est affiché entre les rondes."
+        "description": "Le centre de la table montre le pli actuel en cours de jeu. Les cartes sont affichées face visible lorsqu'elles sont jouées. Après qu'un pli soit terminé, les cartes sont affichées pendant un court instant (configurable dans les paramètres) afin que vous puissiez voir qui l'a gagné et quelles cartes ont été jouées. Après la pause, le pli terminé est affiché dans la zone du dernier pli jusqu'au début du pli suivant."
       },
       "biddingPanel": {
         "title": "Panneau d'Enchères",
@@ -76,12 +76,35 @@
       },
       "nextGameButton": {
         "title": "Bouton Jeu Suivant",
-        "description": "Le bouton 'Jeu Suivant' dans l'en-tête (affiché comme ▶ sur les petits écrans) vous emmène directement à votre jeu le plus récemment actif. Cela facilite le retour à un jeu que vous jouiez. Le bouton n'apparaît que si vous avez un jeu actif."
+        "description": "Le bouton 'Jeu Suivant' dans l'en-tête (affiché comme ▶ sur les petits écrans) vous emmène à un jeu où c'est votre tour. Le bouton apparaît lorsque vous avez un autre jeu—en plus de celui que vous consultez—en attente de votre coup. Cela vous permet de passer rapidement d'un jeu à l'autre lorsque vous avez des coups en attente dans plusieurs parties."
       },
       "spectators": {
         "title": "Observer les Jeux",
         "description": "Vous pouvez regarder des jeux en tant qu'observateur sans rejoindre en tant que joueur. En tant qu'observateur, vous pouvez voir les cartes à mesure qu'elles sont jouées dans les plis et l'état du jeu, mais vous ne pouvez pas voir les cartes dans les mains des joueurs et vous ne pouvez pas participer aux enchères ou jouer. Les observateurs peuvent partir à tout moment sans affecter le jeu."
       }
+    },
+    "setup": {
+      "kicker": "Configuration",
+      "title": "Configuration de la Partie",
+      "description": "Comment configurer et démarrer une partie :",
+      "startingGame": {
+        "title": "Démarrer la Partie",
+        "description": "La partie démarre automatiquement lorsque tous les joueurs se sont marqués comme prêts. Les joueurs humains doivent cliquer sur le bouton prêt dans le lobby ; une fois que tout le monde est prêt, la partie commence immédiatement."
+      },
+      "aiPlayers": {
+        "title": "Joueurs IA",
+        "description": "En tant qu'hôte, vous pouvez configurer les joueurs IA avant le début de la partie. Les joueurs IA remplissent les places vides pour que vous puissiez commencer avec moins de quatre joueurs humains. Les joueurs IA sont toujours marqués comme prêts, donc vous n'avez besoin que de vos joueurs humains pour cliquer sur prêt.",
+        "add": "Ajoutez des joueurs IA pour remplir la prochaine place disponible. Chaque IA occupe une place.",
+        "remove": "Retirez des joueurs IA pour libérer des places aux joueurs humains. D'autres joueurs pourront alors rejoindre la partie.",
+        "changeType": "Changez le profil IA de chaque place pour essayer différents styles de jeu—du hasard au plus stratégique."
+      }
     }
+  },
+  "toc": {
+    "title": "Sommaire",
+    "rules": "Comment Jouer à Nommie",
+    "ui": "Comprendre l'Interface du Jeu",
+    "setup": "Configuration de la Partie",
+    "features": "Fonctionnalités du Jeu"
   }
 }

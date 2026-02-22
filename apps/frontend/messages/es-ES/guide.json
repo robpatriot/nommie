@@ -19,7 +19,7 @@
       },
       "trickArea": {
         "title": "Área de Trucos",
-        "description": "El centro de la mesa muestra el truco actual que se está jugando. Las cartas se muestran boca arriba cuando se juegan. Después de completar un truco, las cartas se muestran por un breve tiempo (configurable en los ajustes) para que puedas ver quién lo ganó y qué cartas se jugaron. El último truco completado se muestra entre rondas."
+        "description": "El centro de la mesa muestra el truco actual que se está jugando. Las cartas se muestran boca arriba cuando se juegan. Después de completar un truco, las cartas se muestran por un breve tiempo (configurable en los ajustes) para que puedas ver quién lo ganó y qué cartas se jugaron. Después de la pausa, el truco completado se muestra en el área del último truco hasta que comience el siguiente."
       },
       "biddingPanel": {
         "title": "Panel de Ofertas",
@@ -76,12 +76,35 @@
       },
       "nextGameButton": {
         "title": "Botón del Siguiente Juego",
-        "description": "El botón 'Siguiente Juego' en el encabezado (mostrado como ▶ en pantallas pequeñas) te lleva directamente a tu juego más recientemente activo. Esto facilita volver a un juego que estabas jugando. El botón solo aparece si tienes un juego activo."
+        "description": "El botón 'Siguiente Juego' en el encabezado (mostrado como ▶ en pantallas pequeñas) te lleva a un juego donde es tu turno. El botón aparece cuando tienes otro juego—además del que estás viendo—que está esperando tu jugada. Así puedes cambiar rápidamente entre juegos cuando tienes turnos pendientes en varias partidas."
       },
       "spectators": {
         "title": "Observar Juegos",
         "description": "Puedes ver juegos como espectador sin unirte como jugador. Como espectador, puedes ver las cartas a medida que se juegan en trucos y el estado del juego, pero no puedes ver cartas en las manos de los jugadores y no puedes participar en ofertas o jugar. Los espectadores pueden salir en cualquier momento sin afectar el juego."
       }
+    },
+    "setup": {
+      "kicker": "Configuración",
+      "title": "Configuración del Juego",
+      "description": "Cómo configurar y empezar una partida:",
+      "startingGame": {
+        "title": "Iniciar la Partida",
+        "description": "La partida comienza automáticamente cuando todos los jugadores se han marcado como listos. Los jugadores humanos deben hacer clic en el botón de listo en el lobby; cuando todos estén listos, la partida comienza de inmediato."
+      },
+      "aiPlayers": {
+        "title": "Jugadores IA",
+        "description": "Como anfitrión, puedes configurar jugadores IA antes de que comience la partida. Los jugadores IA ocupan los asientos vacíos para que puedas empezar con menos de cuatro jugadores humanos. Los jugadores IA siempre están marcados como listos, así que solo necesitas que tus jugadores humanos hagan clic en listo.",
+        "add": "Añade jugadores IA para ocupar el siguiente asiento disponible. Cada IA ocupa un asiento.",
+        "remove": "Elimina jugadores IA para liberar asientos para jugadores humanos. Otros jugadores podrán entonces unirse a la partida.",
+        "changeType": "Cambia el perfil de IA de cada asiento para probar diferentes estilos de juego—desde más aleatorio hasta más estratégico."
+      }
     }
+  },
+  "toc": {
+    "title": "Contenido",
+    "rules": "Cómo Jugar Nommie",
+    "ui": "Entender la Interfaz del Juego",
+    "setup": "Configuración del Juego",
+    "features": "Funciones del Juego"
   }
 }

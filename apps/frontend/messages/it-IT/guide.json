@@ -19,7 +19,7 @@
       },
       "trickArea": {
         "title": "Area delle Prese",
-        "description": "Il centro del tavolo mostra la presa attuale in corso. Le carte vengono mostrate scoperte quando vengono giocate. Dopo che una presa è completata, le carte vengono mostrate per un breve periodo (configurabile nelle impostazioni) in modo che tu possa vedere chi l'ha vinta e quali carte sono state giocate. L'ultima presa completata viene mostrata tra i round."
+        "description": "Il centro del tavolo mostra la presa attuale in corso. Le carte vengono mostrate scoperte quando vengono giocate. Dopo che una presa è completata, le carte vengono mostrate per un breve periodo (configurabile nelle impostazioni) in modo che tu possa vedere chi l'ha vinta e quali carte sono state giocate. Dopo la pausa, la presa completata viene mostrata nell'area dell'ultima presa fino all'inizio della presa successiva."
       },
       "biddingPanel": {
         "title": "Pannello delle Offerte",
@@ -76,12 +76,35 @@
       },
       "nextGameButton": {
         "title": "Pulsante Prossimo Gioco",
-        "description": "Il pulsante 'Prossimo Gioco' nell'intestazione (mostrato come ▶ su schermi piccoli) ti porta direttamente al tuo gioco più recentemente attivo. Questo rende facile tornare a un gioco che stavi giocando. Il pulsante appare solo se hai un gioco attivo."
+        "description": "Il pulsante 'Prossimo Gioco' nell'intestazione (mostrato come ▶ su schermi piccoli) ti porta a un gioco dove è il tuo turno. Il pulsante appare quando hai un altro gioco—oltre a quello che stai visualizzando—in attesa della tua mossa. Così puoi passare rapidamente tra i giochi quando hai turni pendenti in più partite."
       },
       "spectators": {
         "title": "Osservare i Giochi",
         "description": "Puoi guardare giochi come spettatore senza unirti come giocatore. Come spettatore, puoi vedere le carte mentre vengono giocate nelle prese e lo stato del gioco, ma non puoi vedere carte nelle mani dei giocatori e non puoi partecipare alle offerte o giocare. Gli spettatori possono uscire in qualsiasi momento senza influenzare il gioco."
       }
+    },
+    "setup": {
+      "kicker": "Configurazione",
+      "title": "Configurazione della Partita",
+      "description": "Come configurare e avviare una partita:",
+      "startingGame": {
+        "title": "Avviare la Partita",
+        "description": "La partita inizia automaticamente quando tutti i giocatori si sono segnati come pronti. I giocatori umani devono cliccare sul pulsante pronto nella lobby; quando tutti sono pronti, la partita inizia immediatamente."
+      },
+      "aiPlayers": {
+        "title": "Giocatori IA",
+        "description": "Come host, puoi configurare i giocatori IA prima dell'inizio della partita. I giocatori IA riempiono i posti vuoti così puoi iniziare con meno di quattro giocatori umani. I giocatori IA sono sempre segnati come pronti, quindi devi solo far clic su pronto per i tuoi giocatori umani.",
+        "add": "Aggiungi giocatori IA per riempire il prossimo posto disponibile. Ogni IA occupa un posto.",
+        "remove": "Rimuovi i giocatori IA per liberare posti per i giocatori umani. Altri giocatori potranno poi unirsi alla partita.",
+        "changeType": "Cambia il profilo IA per ogni posto per provare diversi stili di gioco—dal casuale al più strategico."
+      }
     }
+  },
+  "toc": {
+    "title": "Indice",
+    "rules": "Come Giocare a Nommie",
+    "ui": "Comprendere l'Interfaccia di Gioco",
+    "setup": "Configurazione della Partita",
+    "features": "Funzionalità del Gioco"
   }
 }

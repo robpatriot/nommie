@@ -19,7 +19,7 @@
       },
       "trickArea": {
         "title": "Trick Area",
-        "description": "The center of the table shows the current trick being played. Cards are displayed face-up as they're played. After a trick is completed, the cards are shown for a short time (configurable in settings) so you can see who won it and which cards were played. The last completed trick is shown between rounds."
+        "description": "The center of the table shows the current trick being played. Cards are displayed face-up as they're played. After a trick is completed, the cards are shown for a short time (configurable in settings) so you can see who won it and which cards were played. After the pause, the completed trick is shown in the last-trick area until the next trick begins."
       },
       "biddingPanel": {
         "title": "Bidding Panel",
@@ -76,12 +76,35 @@
       },
       "nextGameButton": {
         "title": "Next Game Button",
-        "description": "The 'Next Game' button in the header (shown as ▶ on small screens) takes you directly to your most recently active game. This makes it easy to return to a game you were playing. The button only appears if you have an active game."
+        "description": "The 'Next Game' button in the header (shown as ▶ on small screens) takes you to a game where it is your turn. The button appears when you have another game—besides the one you are currently viewing—that is waiting for your move. This lets you quickly switch between games when you have turns pending in multiple matches."
       },
       "spectators": {
         "title": "Spectating Games",
         "description": "You can watch games as a spectator without joining as a player. As a spectator, you can see the cards as they are played in tricks and the game state, but you cannot see cards in players' hands and you cannot participate in bidding or playing. Spectators can leave at any time without affecting the game."
       }
+    },
+    "setup": {
+      "kicker": "Setup",
+      "title": "Game Setup",
+      "description": "How to configure and start a game:",
+      "startingGame": {
+        "title": "Starting the Game",
+        "description": "The game automatically starts when all players have marked themselves as ready. Human players must click the ready button in the lobby; once everyone is ready, the game begins immediately."
+      },
+      "aiPlayers": {
+        "title": "AI Players",
+        "description": "As the game host, you can configure AI players before the game starts. AI players fill empty seats so you can start a game with fewer than four human players. AI players are always marked ready, so you only need your human players to click ready.",
+        "add": "Add AI players to fill the next available seat. Each AI takes one open slot.",
+        "remove": "Remove AI players to free seats for human players. Other players can then join the game.",
+        "changeType": "Change the AI profile for each seat to try different playstyles—from random to more strategic bots."
+      }
     }
+  },
+  "toc": {
+    "title": "Contents",
+    "rules": "How to Play Nommie",
+    "ui": "Understanding the Game Interface",
+    "setup": "Game Setup",
+    "features": "Game Features"
   }
 }

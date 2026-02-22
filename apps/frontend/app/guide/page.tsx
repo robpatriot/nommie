@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { auth } from '@/auth'
 import { redirect } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
@@ -23,71 +24,53 @@ export default async function GuidePage() {
           <p className="mt-2 text-muted-foreground">{t('description')}</p>
         </div>
 
-        <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
-          <div className="mb-6">
-            <p className="text-sm uppercase tracking-wide text-muted-foreground">
-              {t('sections.ui.kicker')}
-            </p>
-            <h2 className="text-2xl font-semibold text-foreground">
-              {t('sections.ui.title')}
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t('sections.ui.description')}
-            </p>
-          </div>
-          <div className="space-y-4 text-foreground">
-            <div>
-              <h3 className="font-semibold text-foreground">
-                {t('sections.ui.playerHand.title')}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('sections.ui.playerHand.description')}
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                {t('sections.ui.seatCards.title')}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('sections.ui.seatCards.description')}
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                {t('sections.ui.trickArea.title')}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('sections.ui.trickArea.description')}
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                {t('sections.ui.biddingPanel.title')}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('sections.ui.biddingPanel.description')}
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                {t('sections.ui.scoreSidebar.title')}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('sections.ui.scoreSidebar.description')}
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                {t('sections.ui.gameInfo.title')}
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {t('sections.ui.gameInfo.description')}
-              </p>
-            </div>
-          </div>
-        </section>
+        <nav
+          aria-label={t('toc.title')}
+          className="rounded-3xl border border-border/50 bg-card/70 p-6 shadow-elevated"
+        >
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {t('toc.title')}
+          </h2>
+          <ol className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <li>
+              <Link
+                href="#rules"
+                className="font-medium text-foreground underline-offset-4 transition hover:text-primary hover:underline"
+              >
+                {t('toc.rules')}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#ui"
+                className="font-medium text-foreground underline-offset-4 transition hover:text-primary hover:underline"
+              >
+                {t('toc.ui')}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#setup"
+                className="font-medium text-foreground underline-offset-4 transition hover:text-primary hover:underline"
+              >
+                {t('toc.setup')}
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="#features"
+                className="font-medium text-foreground underline-offset-4 transition hover:text-primary hover:underline"
+              >
+                {t('toc.features')}
+              </Link>
+            </li>
+          </ol>
+        </nav>
 
-        <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
+        <section
+          id="rules"
+          className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated scroll-mt-6"
+        >
           <div className="mb-6">
             <p className="text-sm uppercase tracking-wide text-muted-foreground">
               {t('sections.rules.kicker')}
@@ -151,7 +134,117 @@ export default async function GuidePage() {
           </div>
         </section>
 
-        <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
+        <section
+          id="ui"
+          className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated scroll-mt-6"
+        >
+          <div className="mb-6">
+            <p className="text-sm uppercase tracking-wide text-muted-foreground">
+              {t('sections.ui.kicker')}
+            </p>
+            <h2 className="text-2xl font-semibold text-foreground">
+              {t('sections.ui.title')}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t('sections.ui.description')}
+            </p>
+          </div>
+          <div className="space-y-4 text-foreground">
+            <div>
+              <h3 className="font-semibold text-foreground">
+                {t('sections.ui.playerHand.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sections.ui.playerHand.description')}
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">
+                {t('sections.ui.seatCards.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sections.ui.seatCards.description')}
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">
+                {t('sections.ui.trickArea.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sections.ui.trickArea.description')}
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">
+                {t('sections.ui.biddingPanel.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sections.ui.biddingPanel.description')}
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">
+                {t('sections.ui.scoreSidebar.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sections.ui.scoreSidebar.description')}
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground">
+                {t('sections.ui.gameInfo.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sections.ui.gameInfo.description')}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="setup"
+          className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated scroll-mt-6"
+        >
+          <div className="mb-6">
+            <p className="text-sm uppercase tracking-wide text-muted-foreground">
+              {t('sections.setup.kicker')}
+            </p>
+            <h2 className="text-2xl font-semibold text-foreground">
+              {t('sections.setup.title')}
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {t('sections.setup.description')}
+            </p>
+          </div>
+          <div className="space-y-4 text-foreground">
+            <div>
+              <h3 className="font-semibold text-foreground">
+                {t('sections.setup.startingGame.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sections.setup.startingGame.description')}
+              </p>
+            </div>
+            <div id="ai-players" className="scroll-mt-6">
+              <h3 className="font-semibold text-foreground">
+                {t('sections.setup.aiPlayers.title')}
+              </h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {t('sections.setup.aiPlayers.description')}
+              </p>
+              <ul className="mt-2 ml-4 list-disc space-y-1 text-sm text-muted-foreground">
+                <li>{t('sections.setup.aiPlayers.add')}</li>
+                <li>{t('sections.setup.aiPlayers.remove')}</li>
+                <li>{t('sections.setup.aiPlayers.changeType')}</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="features"
+          className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated scroll-mt-6"
+        >
           <div className="mb-6">
             <p className="text-sm uppercase tracking-wide text-muted-foreground">
               {t('sections.features.kicker')}
