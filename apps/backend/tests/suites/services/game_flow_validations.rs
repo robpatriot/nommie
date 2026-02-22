@@ -7,8 +7,7 @@
 // - Card play constraints
 
 use backend::adapters::games_sea;
-use backend::db::require_db;
-use backend::db::txn::{with_txn, SharedTxn};
+use backend::db::txn::with_txn;
 use backend::domain::Trump;
 use backend::repos::rounds;
 use backend::services::game_flow::GameFlowService;
@@ -16,7 +15,8 @@ use backend::{AppError, ErrorCode};
 
 use crate::support::build_test_state;
 use crate::support::game_phases::{
-    setup_game_in_bidding_phase, setup_game_in_trump_selection_phase,
+    setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
+    setup_game_in_trump_selection_phase,
 };
 use crate::support::game_setup::setup_game_with_players;
 
@@ -402,113 +402,78 @@ async fn test_trump_selection_with_tied_bids() -> Result<(), AppError> {
 async fn test_cannot_play_same_card_twice() -> Result<(), AppError> {
     let state = build_test_state().await?;
 
-    let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
-    let txn = shared.transaction();
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let setup = setup_game_in_trick_play_phase(
+                txn,
+                "game_validation_seed",
+                [1, 1, 0, 0],
+                Trump::Hearts,
+            )
+            .await?;
+            let game_id = setup.game_id;
 
-    let setup = crate::support::game_setup::setup_game_with_players_ex(
-        txn,
-        "game_validation_seed",
-        4,
-        false,
-        backend::entities::games::GameVisibility::Private,
-    )
+            let service = GameFlowService;
+            let round = backend::repos::rounds::find_by_game_and_round(txn, game_id, 1)
+                .await?
+                .expect("Round should exist");
+
+            let game_state = {
+                use backend::services::games::GameService;
+                GameService.load_game_state(txn, game_id).await?
+            };
+            let leader = game_state
+                .turn
+                .expect("expected Some(leader) in Trick phase setup");
+
+            let hand = backend::repos::hands::find_by_round_and_seat(txn, round.id, leader)
+                .await?
+                .expect("Leader should have a hand");
+            let first_card = backend::domain::cards_parsing::from_stored_format(
+                &hand.cards[0].suit,
+                &hand.cards[0].rank,
+            )?;
+
+            let game = backend::repos::games::require_game(txn, game_id).await?;
+            service
+                .play_card(txn, game_id, leader, first_card, game.version)
+                .await?;
+
+            for i in 1..4 {
+                let seat = ((leader as u16 + i as u16) % 4) as u8;
+                let hand = backend::repos::hands::find_by_round_and_seat(txn, round.id, seat)
+                    .await?
+                    .expect("Player should have a hand");
+                let card = backend::domain::cards_parsing::from_stored_format(
+                    &hand.cards[0].suit,
+                    &hand.cards[0].rank,
+                )?;
+                let game = backend::repos::games::require_game(txn, game_id).await?;
+                service
+                    .play_card(txn, game_id, seat, card, game.version)
+                    .await?;
+            }
+
+            let game = backend::repos::games::require_game(txn, game_id).await?;
+            let result = service
+                .play_card(txn, game_id, leader, first_card, game.version)
+                .await;
+
+            match result {
+                Err(AppError::Validation { code, .. })
+                    if code == ErrorCode::CardNotInHand || code == ErrorCode::OutOfTurn => {}
+                Ok(_) => {
+                    panic!("BUG: Game allowed playing the same card twice!");
+                }
+                Err(other) => {
+                    panic!("Unexpected error: {other:?}");
+                }
+            }
+
+            Ok::<_, AppError>(())
+        })
+    })
     .await?;
-    let game_id = setup.game_id;
-
-    let service = GameFlowService;
-
-    for user_id in &setup.user_ids {
-        let game = backend::repos::games::require_game(txn, game_id).await?;
-        service
-            .mark_ready(txn, game_id, *user_id, true, game.version)
-            .await?;
-    }
-
-    let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-    let round_no: u8 = game
-        .current_round
-        .and_then(|value| value.try_into().ok())
-        .expect("Game should have started");
-    let round = backend::repos::rounds::find_by_game_and_round(txn, game_id, round_no)
-        .await?
-        .expect("Round should exist");
-
-    // Determine the current player to act from the domain game state
-    let game_state = {
-        use backend::services::games::GameService;
-        let service = GameService;
-        service.load_game_state(txn, game_id).await?
-    };
-    let leader = game_state.turn;
-    let leader = leader.expect("expected Some(leader) in Trick phase setup");
-
-    let hand = backend::repos::hands::find_by_round_and_seat(txn, round.id, leader)
-        .await?
-        .expect("Leader should have a hand");
-    let first_card = backend::domain::cards_parsing::from_stored_format(
-        &hand.cards[0].suit,
-        &hand.cards[0].rank,
-    )?;
-
-    let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-    let dealer: u8 = game
-        .starting_dealer_pos
-        .and_then(|value| value.try_into().ok())
-        .expect("Dealer position should be set");
-
-    for i in 0..4 {
-        let seat = ((dealer as u16 + 1 + i as u16) % 4) as u8;
-        let bid_value = if i < 3 { 1 } else { 0 };
-        let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-        service
-            .submit_bid(txn, game_id, seat, bid_value, game.version)
-            .await?;
-    }
-
-    let trump_selector = ((dealer as u16 + 1) % 4) as u8;
-    let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-    service
-        .set_trump(txn, game_id, trump_selector, Trump::Hearts, game.version)
-        .await?;
-
-    let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-    service
-        .play_card(txn, game_id, leader, first_card, game.version)
-        .await?;
-
-    for i in 1..4 {
-        let seat = ((leader as u16 + i as u16) % 4) as u8;
-        let hand = backend::repos::hands::find_by_round_and_seat(txn, round.id, seat)
-            .await?
-            .expect("Player should have a hand");
-        let card = backend::domain::cards_parsing::from_stored_format(
-            &hand.cards[0].suit,
-            &hand.cards[0].rank,
-        )?;
-        let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-        service
-            .play_card(txn, game_id, seat, card, game.version)
-            .await?;
-    }
-
-    let game = backend::adapters::games_sea::require_game(txn, game_id).await?;
-    let result = service
-        .play_card(txn, game_id, leader, first_card, game.version)
-        .await;
-
-    match result {
-        Err(AppError::Validation { code, .. })
-            if code == ErrorCode::CardNotInHand || code == ErrorCode::OutOfTurn => {}
-        Ok(_) => {
-            panic!("BUG: Game allowed playing the same card twice!");
-        }
-        Err(other) => {
-            panic!("Unexpected error: {other:?}");
-        }
-    }
-
-    shared.rollback().await?;
 
     Ok(())
 }

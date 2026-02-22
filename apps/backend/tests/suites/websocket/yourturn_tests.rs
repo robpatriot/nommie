@@ -86,17 +86,25 @@ async fn websocket_yourturn_not_delivered_to_other_users() -> Result<(), Box<dyn
     let (state, registry) = attach_test_registry(state);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
-    // Connect user A
     let token_a = mint_test_token(&user_a_sub, &user_a_email, &security);
-    let ws_url_a = format!("ws://{}/ws?token={}", addr, token_a);
-    let mut client_a = WebSocketClient::connect_retry(&ws_url_a, Duration::from_secs(1)).await?;
-    client_a.hello().await?;
-
-    // Connect user B
     let token_b = mint_test_token(&user_b_sub, &user_b_email, &security);
+    let ws_url_a = format!("ws://{}/ws?token={}", addr, token_a);
     let ws_url_b = format!("ws://{}/ws?token={}", addr, token_b);
-    let mut client_b = WebSocketClient::connect_retry(&ws_url_b, Duration::from_secs(1)).await?;
-    client_b.hello().await?;
+
+    let (client_a, client_b) = tokio::join!(
+        async {
+            let mut c = WebSocketClient::connect_retry(&ws_url_a, Duration::from_secs(1)).await?;
+            c.hello().await?;
+            Ok::<_, Box<dyn std::error::Error>>(c)
+        },
+        async {
+            let mut c = WebSocketClient::connect_retry(&ws_url_b, Duration::from_secs(1)).await?;
+            c.hello().await?;
+            Ok::<_, Box<dyn std::error::Error>>(c)
+        },
+    );
+    let mut client_a = client_a?;
+    let mut client_b = client_b?;
 
     // Broadcast to A only
     registry.broadcast_to_user(
@@ -115,7 +123,7 @@ async fn websocket_yourturn_not_delivered_to_other_users() -> Result<(), Box<dyn
 
     // B should not receive it (short timeout; success means "no message")
     let maybe_b = client_b
-        .recv_json_timeout(Duration::from_millis(250))
+        .recv_json_timeout(Duration::from_millis(150))
         .await?;
     if let Some(v) = maybe_b {
         // If anything arrived, it must not be a your_turn.

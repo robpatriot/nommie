@@ -369,7 +369,7 @@ async fn acquire_timeout_distinct() {
         barrier_a.wait().await;
 
         // Hold lock for longer than B's acquire timeout
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        tokio::time::sleep(Duration::from_millis(250)).await;
 
         guard.release().await.expect("A should release guard");
         true

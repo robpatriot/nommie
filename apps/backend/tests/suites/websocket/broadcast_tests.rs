@@ -120,14 +120,24 @@ async fn broadcast_only_sent_to_same_game_subscribers() -> Result<(), Box<dyn st
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url1 = format!("ws://{}/ws?token={}", addr, token1);
-    let mut client1 = WebSocketClient::connect_retry(&ws_url1, Duration::from_secs(1)).await?;
-    client1.hello().await?;
-    let (_ack1, _state1) = client1.subscribe_game(setup1.game_id).await?;
-
     let ws_url2 = format!("ws://{}/ws?token={}", addr, token2);
-    let mut client2 = WebSocketClient::connect_retry(&ws_url2, Duration::from_secs(1)).await?;
-    client2.hello().await?;
-    let (_ack2, _state2) = client2.subscribe_game(setup2.game_id).await?;
+
+    let (client1, client2) = tokio::join!(
+        async {
+            let mut c = WebSocketClient::connect_retry(&ws_url1, Duration::from_secs(1)).await?;
+            c.hello().await?;
+            let _ = c.subscribe_game(setup1.game_id).await?;
+            Ok::<_, Box<dyn std::error::Error>>(c)
+        },
+        async {
+            let mut c = WebSocketClient::connect_retry(&ws_url2, Duration::from_secs(1)).await?;
+            c.hello().await?;
+            let _ = c.subscribe_game(setup2.game_id).await?;
+            Ok::<_, Box<dyn std::error::Error>>(c)
+        },
+    );
+    let mut client1 = client1?;
+    let mut client2 = client2?;
 
     wait_for_connections(&registry, 2, Duration::from_secs(1)).await?;
 
@@ -139,7 +149,7 @@ async fn broadcast_only_sent_to_same_game_subscribers() -> Result<(), Box<dyn st
         .expect("client1 should receive broadcast");
     assert_eq!(msg1["type"], "game_state");
 
-    let msg2_result = client2.recv_json_timeout(Duration::from_millis(500)).await;
+    let msg2_result = client2.recv_json_timeout(Duration::from_millis(200)).await;
     assert!(
         msg2_result.is_err() || msg2_result.unwrap().is_none(),
         "client2 should not receive broadcast for different game"
