@@ -11,7 +11,7 @@
       "description": "La sala di gioco è divisa in diverse aree chiave che ti aiutano a giocare e seguire il gioco.",
       "playerHand": {
         "title": "La Tua Mano",
-        "description": "In basso sullo schermo, vedrai le tue carte. Clicca su una carta per selezionarla, poi clicca sul pulsante gioca per giocarla. Se la conferma della carta è disabilitata nelle impostazioni, le carte vengono giocate immediatamente quando cliccate. Le carte che puoi giocare legalmente sono evidenziate. La tua mano si aggiorna automaticamente quando vengono giocate le carte."
+        "description": "🃏 In basso sullo schermo, vedrai le tue carte. Clicca su una carta per selezionarla, poi clicca sul pulsante gioca per giocarla. Se la conferma della carta è disabilitata nelle impostazioni, le carte vengono giocate immediatamente quando cliccate. Le carte che puoi giocare legalmente sono evidenziate. La tua mano si aggiorna automaticamente quando vengono giocate le carte."
       },
       "seatCards": {
         "title": "Posti dei Giocatori",
@@ -27,7 +27,7 @@
       },
       "scoreSidebar": {
         "title": "Barra Laterale dei Punteggi",
-        "description": "Su schermi larghi, vedrai i punteggi attuali di tutti i giocatori sul lato dello schermo. Su schermi stretti, appare più in basso. Questo si aggiorna dopo ogni round. La barra laterale mostra anche le offerte del round attuale e il seme del briscola selezionato. Clicca sul pulsante cronologia per vedere una cronologia dettagliata dei punteggi su tutti i round."
+        "description": "Su schermi larghi, vedrai i punteggi attuali di tutti i giocatori sul lato dello schermo. Su schermi stretti, appare più in basso. Questo si aggiorna dopo ogni round. La barra laterale mostra anche le offerte del round attuale e il seme del briscola selezionato. Clicca sul pulsante cronologia 📊 per vedere una cronologia dettagliata dei punteggi su tutti i round."
       },
       "gameInfo": {
         "title": "Visualizzazione delle Informazioni di Gioco",
@@ -71,7 +71,7 @@
         "title": "Lasciare un Gioco",
         "description": "Puoi lasciare un gioco in qualsiasi momento, ma ciò che accade dipende se il gioco è iniziato:",
         "inLobby": "Se il gioco è ancora nella lobby (non avviato), verrai semplicemente rimosso dal gioco.",
-        "activeGame": "Se il gioco è iniziato, un giocatore IA prenderà il tuo posto e continuerà a giocare. Vedrai una finestra di dialogo di conferma prima che ciò accada. Puoi riunirti al gioco più tardi dalla lobby e riprendere il tuo posto.",
+        "activeGame": "Se il gioco è iniziato, un 🤖 giocatore IA prenderà il tuo posto e continuerà a giocare. Vedrai una finestra di dialogo di conferma prima che ciò accada. Puoi riunirti al gioco più tardi dalla lobby e riprendere il tuo posto.",
         "spectator": "Se stai osservando, puoi uscire senza alcuna conferma - verrai semplicemente rimosso."
       },
       "nextGameButton": {
@@ -80,7 +80,7 @@
       },
       "spectators": {
         "title": "Osservare i Giochi",
-        "description": "Puoi guardare giochi come spettatore senza unirti come giocatore. Come spettatore, puoi vedere le carte mentre vengono giocate nelle prese e lo stato del gioco, ma non puoi vedere carte nelle mani dei giocatori e non puoi partecipare alle offerte o giocare. Gli spettatori possono uscire in qualsiasi momento senza influenzare il gioco."
+        "description": "Puoi guardare giochi come spettatore senza unirti come giocatore. 👁️ Come spettatore, puoi vedere le carte mentre vengono giocate nelle prese e lo stato del gioco, ma non puoi vedere carte nelle mani dei giocatori e non puoi partecipare alle offerte o giocare. Gli spettatori possono uscire in qualsiasi momento senza influenzare il gioco."
       }
     },
     "setup": {
@@ -89,11 +89,11 @@
       "description": "Come configurare e avviare una partita:",
       "startingGame": {
         "title": "Avviare la Partita",
-        "description": "La partita inizia automaticamente quando tutti i giocatori si sono segnati come pronti. I giocatori umani devono cliccare sul pulsante pronto nella lobby; quando tutti sono pronti, la partita inizia immediatamente."
+        "description": "La partita inizia automaticamente quando tutti i giocatori si sono segnati come pronti. I giocatori umani devono cliccare sul pulsante pronto ✅ nella lobby; quando tutti sono pronti, la partita inizia immediatamente."
       },
       "aiPlayers": {
         "title": "Giocatori IA",
-        "description": "Come host, puoi configurare i giocatori IA prima dell'inizio della partita. I giocatori IA riempiono i posti vuoti così puoi iniziare con meno di quattro giocatori umani. I giocatori IA sono sempre segnati come pronti, quindi devi solo far clic su pronto per i tuoi giocatori umani.",
+        "description": "Come host, puoi configurare i 🤖 giocatori IA prima dell'inizio della partita. I giocatori IA riempiono i posti vuoti così puoi iniziare con meno di quattro giocatori umani. I giocatori IA sono sempre segnati come pronti, quindi devi solo far clic su pronto per i tuoi giocatori umani.",
         "add": "Aggiungi giocatori IA per riempire il prossimo posto disponibile. Ogni IA occupa un posto.",
         "remove": "Rimuovi i giocatori IA per liberare posti per i giocatori umani. Altri giocatori potranno poi unirsi alla partita.",
         "changeType": "Cambia il profilo IA per ogni posto per provare diversi stili di gioco—dal casuale al più strategico."

@@ -11,7 +11,7 @@
       "description": "Der Spielraum ist in mehrere wichtige Bereiche unterteilt, die Ihnen beim Spielen und Verfolgen des Spiels helfen.",
       "playerHand": {
         "title": "Ihre Hand",
-        "description": "Am unteren Bildschirmrand sehen Sie Ihre Karten. Klicken Sie auf eine Karte, um sie auszuwählen, und klicken Sie dann auf die Schaltfläche Spielen, um sie zu spielen. Wenn die Kartenbestätigung in den Einstellungen deaktiviert ist, werden Karten sofort beim Klicken gespielt. Karten, die Sie legal spielen können, sind hervorgehoben. Ihre Hand wird automatisch aktualisiert, wenn Karten gespielt werden."
+        "description": "🃏 Am unteren Bildschirmrand sehen Sie Ihre Karten. Klicken Sie auf eine Karte, um sie auszuwählen, und klicken Sie dann auf die Schaltfläche Spielen, um sie zu spielen. Wenn die Kartenbestätigung in den Einstellungen deaktiviert ist, werden Karten sofort beim Klicken gespielt. Karten, die Sie legal spielen können, sind hervorgehoben. Ihre Hand wird automatisch aktualisiert, wenn Karten gespielt werden."
       },
       "seatCards": {
         "title": "Spielerplätze",
@@ -27,7 +27,7 @@
       },
       "scoreSidebar": {
         "title": "Punkte-Seitenleiste",
-        "description": "Auf breiten Bildschirmen sehen Sie die aktuellen Punktzahlen aller Spieler an der Seite des Bildschirms. Auf schmalen Bildschirmen erscheint sie weiter unten. Dies wird nach jeder Runde aktualisiert. Die Seitenleiste zeigt auch die Gebote aus der aktuellen Runde und die ausgewählte Trumpffarbe an. Klicken Sie auf die Schaltfläche Historie, um eine detaillierte Historie der Punktzahlen über alle Runden hinweg zu sehen."
+        "description": "Auf breiten Bildschirmen sehen Sie die aktuellen Punktzahlen aller Spieler an der Seite des Bildschirms. Auf schmalen Bildschirmen erscheint sie weiter unten. Dies wird nach jeder Runde aktualisiert. Die Seitenleiste zeigt auch die Gebote aus der aktuellen Runde und die ausgewählte Trumpffarbe an. Klicken Sie auf die Schaltfläche Historie 📊, um eine detaillierte Historie der Punktzahlen über alle Runden hinweg zu sehen."
       },
       "gameInfo": {
         "title": "Spielinformationsanzeige",
@@ -71,7 +71,7 @@
         "title": "Ein Spiel verlassen",
         "description": "Sie können ein Spiel jederzeit verlassen, aber was passiert, hängt davon ab, ob das Spiel gestartet wurde:",
         "inLobby": "Wenn das Spiel noch in der Lobby ist (nicht gestartet), werden Sie einfach aus dem Spiel entfernt.",
-        "activeGame": "Wenn das Spiel gestartet wurde, übernimmt ein KI-Spieler Ihren Platz und spielt weiter. Sie sehen einen Bestätigungsdialog, bevor dies geschieht. Sie können das Spiel später von der Lobby aus wieder beitreten und Ihren Platz zurücknehmen.",
+        "activeGame": "Wenn das Spiel gestartet wurde, übernimmt ein 🤖 KI-Spieler Ihren Platz und spielt weiter. Sie sehen einen Bestätigungsdialog, bevor dies geschieht. Sie können das Spiel später von der Lobby aus wieder beitreten und Ihren Platz zurücknehmen.",
         "spectator": "Wenn Sie zuschauen, können Sie ohne Bestätigung verlassen - Sie werden einfach entfernt."
       },
       "nextGameButton": {
@@ -80,7 +80,7 @@
       },
       "spectators": {
         "title": "Spiele beobachten",
-        "description": "Sie können Spiele als Zuschauer beobachten, ohne als Spieler beizutreten. Als Zuschauer können Sie die Karten sehen, wie sie in Tricks gespielt werden, und den Spielzustand, aber Sie können keine Karten in den Händen der Spieler sehen und Sie können nicht am Bieten oder Spielen teilnehmen. Zuschauer können jederzeit verlassen, ohne das Spiel zu beeinflussen."
+        "description": "Sie können Spiele als Zuschauer beobachten, ohne als Spieler beizutreten. 👁️ Als Zuschauer können Sie die Karten sehen, wie sie in Tricks gespielt werden, und den Spielzustand, aber Sie können keine Karten in den Händen der Spieler sehen und Sie können nicht am Bieten oder Spielen teilnehmen. Zuschauer können jederzeit verlassen, ohne das Spiel zu beeinflussen."
       }
     },
     "setup": {
@@ -89,11 +89,11 @@
       "description": "So konfigurieren und starten Sie ein Spiel:",
       "startingGame": {
         "title": "Spiel starten",
-        "description": "Das Spiel startet automatisch, wenn alle Spieler sich als bereit markiert haben. Menschliche Spieler müssen in der Lobby auf die Bereit-Schaltfläche klicken; sobald alle bereit sind, beginnt das Spiel sofort."
+        "description": "Das Spiel startet automatisch, wenn alle Spieler sich als bereit markiert haben. Menschliche Spieler müssen in der Lobby auf die Bereit-✅-Schaltfläche klicken; sobald alle bereit sind, beginnt das Spiel sofort."
       },
       "aiPlayers": {
         "title": "KI-Spieler",
-        "description": "Als Spielleiter können Sie vor Spielbeginn KI-Spieler konfigurieren. KI-Spieler füllen leere Plätze, damit Sie mit weniger als vier menschlichen Spielern starten können. KI-Spieler sind immer als bereit markiert, sodass Sie nur Ihre menschlichen Spieler auf Bereit klicken lassen müssen.",
+        "description": "Als Spielleiter können Sie vor Spielbeginn 🤖 KI-Spieler konfigurieren. KI-Spieler füllen leere Plätze, damit Sie mit weniger als vier menschlichen Spielern starten können. KI-Spieler sind immer als bereit markiert, sodass Sie nur Ihre menschlichen Spieler auf Bereit klicken lassen müssen.",
         "add": "Fügen Sie KI-Spieler hinzu, um den nächsten freien Platz zu füllen. Jede KI nimmt einen offenen Platz ein.",
         "remove": "Entfernen Sie KI-Spieler, um Plätze für menschliche Spieler freizugeben. Andere Spieler können dann dem Spiel beitreten.",
         "changeType": "Ändern Sie das KI-Profil für jeden Platz, um verschiedene Spielstile auszuprobieren—von zufällig bis strategischer."

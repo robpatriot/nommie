@@ -12,12 +12,15 @@ interface TrickAreaHeaderProps {
   trump: Trump | null
   totalBids: number
   handSize: number
+  /** When true, always show (for guide preview); otherwise hidden on lg+ viewports */
+  alwaysShow?: boolean
 }
 
 export function TrickAreaHeader({
   trump,
   totalBids,
   handSize,
+  alwaysShow = false,
 }: TrickAreaHeaderProps) {
   const trumpDisplay = trump
     ? trump === 'NO_TRUMPS'
@@ -62,7 +65,12 @@ export function TrickAreaHeader({
   )
 
   return (
-    <div className="flex w-full items-center justify-between gap-2 lg:hidden">
+    <div
+      className={cn(
+        'flex w-full items-center justify-between gap-2',
+        !alwaysShow && 'lg:hidden'
+      )}
+    >
       <>
         {bidsElement}
         {trumpElement}

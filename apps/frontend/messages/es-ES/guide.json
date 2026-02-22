@@ -11,7 +11,7 @@
       "description": "La sala de juego está dividida en varias áreas clave que te ayudan a jugar y seguir el juego.",
       "playerHand": {
         "title": "Tu Mano",
-        "description": "En la parte inferior de la pantalla, verás tus cartas. Haz clic en una carta para seleccionarla, luego haz clic en el botón de jugar para jugarla. Si la confirmación de carta está deshabilitada en los ajustes, las cartas se juegan inmediatamente al hacer clic. Las cartas que puedes jugar legalmente están resaltadas. Tu mano se actualiza automáticamente cuando se juegan cartas."
+        "description": "🃏 En la parte inferior de la pantalla, verás tus cartas. Haz clic en una carta para seleccionarla, luego haz clic en el botón de jugar para jugarla. Si la confirmación de carta está deshabilitada en los ajustes, las cartas se juegan inmediatamente al hacer clic. Las cartas que puedes jugar legalmente están resaltadas. Tu mano se actualiza automáticamente cuando se juegan cartas."
       },
       "seatCards": {
         "title": "Asientos de Jugadores",
@@ -27,7 +27,7 @@
       },
       "scoreSidebar": {
         "title": "Barra Lateral de Puntuación",
-        "description": "En pantallas anchas, verás las puntuaciones actuales de todos los jugadores en el lado de la pantalla. En pantallas estrechas, aparece más abajo. Esto se actualiza después de cada ronda. La barra lateral también muestra las ofertas de la ronda actual y el palo de triunfo seleccionado. Haz clic en el botón de historial para ver un historial detallado de puntuaciones en todas las rondas."
+        "description": "En pantallas anchas, verás las puntuaciones actuales de todos los jugadores en el lado de la pantalla. En pantallas estrechas, aparece más abajo. Esto se actualiza después de cada ronda. La barra lateral también muestra las ofertas de la ronda actual y el palo de triunfo seleccionado. Haz clic en el botón de historial 📊 para ver un historial detallado de puntuaciones en todas las rondas."
       },
       "gameInfo": {
         "title": "Visualización de Información del Juego",
@@ -71,7 +71,7 @@
         "title": "Abandonar un Juego",
         "description": "Puedes abandonar un juego en cualquier momento, pero lo que sucede depende de si el juego ha comenzado:",
         "inLobby": "Si el juego todavía está en el lobby (no iniciado), simplemente serás eliminado del juego.",
-        "activeGame": "Si el juego ha comenzado, un jugador de IA tomará tu asiento y continuará jugando. Verás un diálogo de confirmación antes de que esto suceda. Puedes volver a unirte al juego más tarde desde el lobby y recuperar tu asiento.",
+        "activeGame": "Si el juego ha comenzado, un 🤖 jugador de IA tomará tu asiento y continuará jugando. Verás un diálogo de confirmación antes de que esto suceda. Puedes volver a unirte al juego más tarde desde el lobby y recuperar tu asiento.",
         "spectator": "Si estás observando, puedes salir sin ninguna confirmación - simplemente serás eliminado."
       },
       "nextGameButton": {
@@ -80,7 +80,7 @@
       },
       "spectators": {
         "title": "Observar Juegos",
-        "description": "Puedes ver juegos como espectador sin unirte como jugador. Como espectador, puedes ver las cartas a medida que se juegan en trucos y el estado del juego, pero no puedes ver cartas en las manos de los jugadores y no puedes participar en ofertas o jugar. Los espectadores pueden salir en cualquier momento sin afectar el juego."
+        "description": "Puedes ver juegos como espectador sin unirte como jugador. 👁️ Como espectador, puedes ver las cartas a medida que se juegan en trucos y el estado del juego, pero no puedes ver cartas en las manos de los jugadores y no puedes participar en ofertas o jugar. Los espectadores pueden salir en cualquier momento sin afectar el juego."
       }
     },
     "setup": {
@@ -89,11 +89,11 @@
       "description": "Cómo configurar y empezar una partida:",
       "startingGame": {
         "title": "Iniciar la Partida",
-        "description": "La partida comienza automáticamente cuando todos los jugadores se han marcado como listos. Los jugadores humanos deben hacer clic en el botón de listo en el lobby; cuando todos estén listos, la partida comienza de inmediato."
+        "description": "La partida comienza automáticamente cuando todos los jugadores se han marcado como listos. Los jugadores humanos deben hacer clic en el botón listo ✅ en el lobby; cuando todos estén listos, la partida comienza de inmediato."
       },
       "aiPlayers": {
         "title": "Jugadores IA",
-        "description": "Como anfitrión, puedes configurar jugadores IA antes de que comience la partida. Los jugadores IA ocupan los asientos vacíos para que puedas empezar con menos de cuatro jugadores humanos. Los jugadores IA siempre están marcados como listos, así que solo necesitas que tus jugadores humanos hagan clic en listo.",
+        "description": "Como anfitrión, puedes configurar 🤖 jugadores IA antes de que comience la partida. Los jugadores IA ocupan los asientos vacíos para que puedas empezar con menos de cuatro jugadores humanos. Los jugadores IA siempre están marcados como listos, así que solo necesitas que tus jugadores humanos hagan clic en listo.",
         "add": "Añade jugadores IA para ocupar el siguiente asiento disponible. Cada IA ocupa un asiento.",
         "remove": "Elimina jugadores IA para liberar asientos para jugadores humanos. Otros jugadores podrán entonces unirse a la partida.",
         "changeType": "Cambia el perfil de IA de cada asiento para probar diferentes estilos de juego—desde más aleatorio hasta más estratégico."

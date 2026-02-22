@@ -11,7 +11,7 @@
       "description": "The game room is divided into several key areas that help you play and track the game.",
       "playerHand": {
         "title": "Your Hand",
-        "description": "At the bottom of the screen, you'll see your cards. Click on a card to select it, then click the play button to play it. If card confirmation is disabled in settings, cards are played immediately when clicked. Cards that you can legally play are highlighted. Your hand updates automatically as cards are played."
+        "description": "🃏 At the bottom of the screen, you'll see your cards. Click on a card to select it, then click the play button to play it. If card confirmation is disabled in settings, cards are played immediately when clicked. Cards that you can legally play are highlighted. Your hand updates automatically as cards are played."
       },
       "seatCards": {
         "title": "Player Seats",
@@ -27,7 +27,7 @@
       },
       "scoreSidebar": {
         "title": "Score Sidebar",
-        "description": "On wide screens, you'll see the current scores for all players on the side of the screen. On narrow screens, it appears lower down. This updates after each round. The sidebar also displays the bids from the current round and the selected trump suit. Click the history button to see a detailed history of scores across all rounds."
+        "description": "On wide screens, you'll see the current scores for all players on the side of the screen. On narrow screens, it appears lower down. This updates after each round. The sidebar also displays the bids from the current round and the selected trump suit. Click the history 📊 button to see a detailed history of scores across all rounds."
       },
       "gameInfo": {
         "title": "Game Information Display",
@@ -71,7 +71,7 @@
         "title": "Leaving a Game",
         "description": "You can leave a game at any time, but what happens depends on whether the game has started:",
         "inLobby": "If the game is still in the lobby (not started), you'll simply be removed from the game.",
-        "activeGame": "If the game has started, an AI player will take over your seat and continue playing. You'll see a confirmation dialog before this happens. You can rejoin the game later from the lobby and take back your seat.",
+        "activeGame": "If the game has started, a 🤖 AI player will take over your seat and continue playing. You'll see a confirmation dialog before this happens. You can rejoin the game later from the lobby and take back your seat.",
         "spectator": "If you're spectating, you can leave without any confirmation - you'll simply be removed."
       },
       "nextGameButton": {
@@ -80,7 +80,7 @@
       },
       "spectators": {
         "title": "Spectating Games",
-        "description": "You can watch games as a spectator without joining as a player. As a spectator, you can see the cards as they are played in tricks and the game state, but you cannot see cards in players' hands and you cannot participate in bidding or playing. Spectators can leave at any time without affecting the game."
+        "description": "You can watch games as a spectator without joining as a player. 👁️ As a spectator, you can see the cards as they are played in tricks and the game state, but you cannot see cards in players' hands and you cannot participate in bidding or playing. Spectators can leave at any time without affecting the game."
       }
     },
     "setup": {
@@ -89,11 +89,11 @@
       "description": "How to configure and start a game:",
       "startingGame": {
         "title": "Starting the Game",
-        "description": "The game automatically starts when all players have marked themselves as ready. Human players must click the ready button in the lobby; once everyone is ready, the game begins immediately."
+        "description": "The game automatically starts when all players have marked themselves as ready. Human players must click the ready ✅ button in the lobby; once everyone is ready, the game begins immediately."
       },
       "aiPlayers": {
         "title": "AI Players",
-        "description": "As the game host, you can configure AI players before the game starts. AI players fill empty seats so you can start a game with fewer than four human players. AI players are always marked ready, so you only need your human players to click ready.",
+        "description": "As the game host, you can configure 🤖 AI players before the game starts. AI players fill empty seats so you can start a game with fewer than four human players. AI players are always marked ready, so you only need your human players to click ready.",
         "add": "Add AI players to fill the next available seat. Each AI takes one open slot.",
         "remove": "Remove AI players to free seats for human players. Other players can then join the game.",
         "changeType": "Change the AI profile for each seat to try different playstyles—from random to more strategic bots."
