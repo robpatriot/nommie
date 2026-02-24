@@ -7,8 +7,8 @@ services:
     #   NOMMIE_CA_KEY_PATH (default: ~/secrets/nommie-ca/ca.key)
     #   NOMMIE_CA_CERT_PATH (default: ~/secrets/nommie-ca/ca.crt)
     build:
-      context: ../postgres-tls
-      dockerfile: Dockerfile
+      context: ${NOMMIE_REPO_DIR:-../..}
+      dockerfile: docker/postgres-tls/Dockerfile
       secrets:
         - nommie_ca_key
         - nommie_ca_crt
@@ -34,8 +34,8 @@ services:
 
   redis:
     build: 
-      context: ../shared
-      dockerfile: redis.Dockerfile
+      context: ${NOMMIE_REPO_DIR:-../..}
+      dockerfile: docker/shared/redis.Dockerfile
     image: nommie-redis:latest
     command: ["redis-server", "--save", ""] # disable RDB for dev
     ports:

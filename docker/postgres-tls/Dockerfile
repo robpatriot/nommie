@@ -22,11 +22,11 @@ RUN mkdir -p /opt/nommie/ssl && \
     chmod 755 /opt/nommie/ssl
 
 # Copy the CA certificate from build context so changes bust cache
-COPY ca.crt /opt/nommie/ssl/ca.crt
+COPY docker/postgres-tls/ca.crt /opt/nommie/ssl/ca.crt
 RUN chmod 644 /opt/nommie/ssl/ca.crt
 
 # Copy certificate generation script
-COPY generate-server-cert.sh /usr/local/bin/generate-server-cert.sh
+COPY docker/postgres-tls/generate-server-cert.sh /usr/local/bin/generate-server-cert.sh
 RUN chmod +x /usr/local/bin/generate-server-cert.sh
 
 # Generate server certificate during build (using build secrets)
@@ -35,11 +35,11 @@ RUN --mount=type=secret,id=nommie_ca_key \
     /usr/local/bin/generate-server-cert.sh
 
 # Copy entrypoint script that handles volume persistence
-COPY entrypoint-ssl.sh /usr/local/bin/entrypoint-ssl.sh
+COPY docker/postgres-tls/entrypoint-ssl.sh /usr/local/bin/entrypoint-ssl.sh
 RUN chmod +x /usr/local/bin/entrypoint-ssl.sh
 
 # Copy database initialization script
-COPY init.sh /docker-entrypoint-initdb.d/00-init.sh
+COPY docker/postgres-tls/init.sh /docker-entrypoint-initdb.d/00-init.sh
 RUN chmod +x /docker-entrypoint-initdb.d/00-init.sh
 
 # Set permissions on server certs (they'll be copied to volume on first run)

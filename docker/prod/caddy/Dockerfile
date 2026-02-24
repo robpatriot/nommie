@@ -13,5 +13,5 @@ FROM caddy:2.10.2
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
 
 # Copy Caddyfile (uses native Caddy environment variable interpolation)
-COPY Caddyfile /etc/caddy/Caddyfile
+COPY docker/prod/caddy/Caddyfile /etc/caddy/Caddyfile
 
