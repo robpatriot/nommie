@@ -12,7 +12,7 @@ services:
       secrets:
         - nommie_ca_key
         - nommie_ca_crt
-    image: ${COMPOSE_PROJECT_NAME}-postgres:latest
+    image: nommie-postgres:latest
     restart: unless-stopped
     env_file:
       - ./db.env
@@ -32,6 +32,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/prod/backend.Dockerfile
+    image: nommie-backend:latest
     restart: unless-stopped
     env_file:
       - ./backend.env
@@ -49,6 +50,7 @@ services:
     build:
       context: ../..
       dockerfile: docker/prod/frontend.Dockerfile
+    image: nommie-frontend:latest
     restart: unless-stopped
     env_file:
       - ./backend_base_url.env
@@ -63,7 +65,7 @@ services:
     build: 
       context: ../shared
       dockerfile: redis.Dockerfile
-    image: ${COMPOSE_PROJECT_NAME}-redis:8.2
+    image: nommie-redis:latest
     command: ["redis-server", "--save", ""] # disable RDB for prod
     restart: unless-stopped
     expose:
@@ -71,6 +73,7 @@ services:
 
   caddy:
     build: ./caddy
+    image: nommie-caddy:latest
     restart: unless-stopped
     depends_on:
       - backend
