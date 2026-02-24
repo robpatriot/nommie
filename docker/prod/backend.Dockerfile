@@ -43,14 +43,14 @@ FROM rust:1.91.1-slim AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl3 \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd -m -u 1000 appuser \
+    && useradd -m -u 1000 nommie \
     && mkdir -p /app \
-    && chown -R appuser:appuser /app
+    && chown -R nommie:nommie /app
 
 COPY docker/postgres-tls/ca.crt /etc/ssl/certs/nommie-ca.crt
 RUN chmod 644 /etc/ssl/certs/nommie-ca.crt
 
-USER appuser
+USER nommie
 WORKDIR /app
 EXPOSE 3001
 
