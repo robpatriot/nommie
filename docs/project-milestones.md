@@ -15,470 +15,474 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 
 ### ✅ **1. Repository & Project Bootstrap**
 **Dependencies:** none  
-- **Monorepo Setup:** ✅ **Completed** — Monorepo with `apps/frontend`, `apps/backend`, and `packages/`. Root `.env` is canonical; frontend `.env.local` mirrors only `NEXT_PUBLIC_*`.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Hello-world frontend and backend build locally.
-- **Linting & Formatting:** ✅ **Completed** — ESLint/Prettier configured for the frontend. Pre-commit hooks active. Scripts: `backend:fmt` → `cargo fmt --manifest-path apps/backend/Cargo.toml --all`; `backend:clippy` → `cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings`.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Lint and format hooks pass.
+- **Monorepo Setup:**  
+  *Acceptance:* Hello-world frontend and backend build locally.  
+  *Status:* ✅ Complete — Monorepo with `apps/frontend`, `apps/backend`, and `packages/`. Root `.env` is canonical; frontend `.env.local` mirrors only `NEXT_PUBLIC_*`.
+- **Linting & Formatting:**  
+  *Acceptance:* Lint and format hooks pass.  
+  *Status:* ✅ Complete — ESLint/Prettier configured for the frontend. Pre-commit hooks active. Scripts: `backend:fmt` → `cargo fmt --manifest-path apps/backend/Cargo.toml --all`; `backend:clippy` → `cargo clippy --manifest-path apps/backend/Cargo.toml --all-targets --all-features -- -D warnings`.
 
 ---
-
+ 
 ### ✅ **2. Docker-First Development Environment**
 **Dependencies:** 1  
-- **Docker Compose Setup:** ✅ **Completed** — Docker Compose with Postgres (roles, DBs, grants). Host-pnpm for speed; backend runs on host or in container.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ `pnpm start` starts frontend and backend; frontend communicates with backend.
-- **Postgres TLS/SSL Support:** ✅ **Completed** — Postgres connections use TLS with `verify-full` default; shared Postgres TLS image with build-time certificate generation; separate volume for certificates.  
-  *Status:* ✅ Complete. TLS-enabled Postgres configured; certificates managed via shared volume; backend supports TLS connections with verify-full validation.  
-  *Acceptance:* ✅ Postgres reachable with TLS.
-
+- **Docker Compose Setup:**  
+  *Acceptance:* `pnpm start` starts frontend and backend; frontend communicates with backend.  
+  *Status:* ✅ Complete — Docker Compose with Postgres (roles, DBs, grants). Host-pnpm for speed; backend runs on host or in container.
+- **Postgres TLS/SSL Support:**  
+  *Acceptance:* Postgres reachable with TLS.  
+  *Status:* ✅ Complete — Postgres connections use TLS with `verify-full` default; shared Postgres TLS image with build-time certificate generation; separate volume for certificates.
+ 
 ---
-
+ 
 ### ✅ **3. Database Schema via Init SQL (Scaffolding Only)**
 **Dependencies:** 2  
-- **Schema Management:** ✅ **Completed** — Single `init.sql` is source of truth. Test harness applies schema to `_test` database at startup with guard.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Tests bootstrap schema cleanly; `_test` guard enforced.  
-*(Actual entities defined in milestone 6.)*
-
+- **Schema Management:**  
+  *Acceptance:* Tests bootstrap schema cleanly; `_test` guard enforced.  
+  *Status:* ✅ Complete — Single `init.sql` is source of truth; test harness applies schema to `_test` database at startup with guard.
+ 
 ---
-
+ 
 ### ✅ **4. Testing Harness & Policies**
 **Dependencies:** 3  
-- **Test Infrastructure:** ✅ **Completed** — `pnpm test` runs unit, integration, and smoke tests. Actix in-process integration harness. First smoke test: `create → add AI → snapshot`.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Tests pass locally and in CI.
-
+- **Test Infrastructure:**  
+  *Acceptance:* Tests pass locally and in CI.  
+  *Status:* ✅ Complete — `pnpm test` runs unit, integration, and smoke tests; Actix in-process integration harness; first smoke test `create → add AI → snapshot`.
+ 
 ---
-
+ 
 ### ✅ **5. Error Shapes & Logging**
 **Dependencies:** 4  
-- **Problem Details Format:** ✅ **Completed** — Problem Details error format: `{ type, title, status, detail, code, trace_id }`. `code` uses SCREAMING_SNAKE convention. Middleware assigns a `trace_id` per request.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Consistent error responses; logs include `trace_id`.
-
+- **Problem Details Format:**  
+  *Acceptance:* Consistent error responses; logs include `trace_id`.  
+  *Status:* ✅ Complete — Problem Details error format `{ type, title, status, detail, code, trace_id }`; `code` uses SCREAMING_SNAKE convention; middleware assigns a `trace_id` per request.
+ 
 ---
-
+ 
 ### ✅ **6. Database Schema (Actual Entities)**
 **Dependencies:** 3, 4  
-- **Entity Definitions:** ✅ **Completed** — Entities defined in `init.sql`: `users`, `games`, `memberships`, `bids`, `plays`, `scores`. Enums for game and membership states. Foreign keys and indexes added. AI players represented in `users` table like humans.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Schema applies cleanly and aligns with game lifecycle.
-
+- **Entity Definitions:**  
+  *Acceptance:* Schema applies cleanly and aligns with game lifecycle.  
+  *Status:* ✅ Complete — Entities defined in `init.sql`: `users`, `games`, `memberships`, `bids`, `plays`, `scores`; enums for game and membership states; foreign keys and indexes added; AI players represented in `users` table like humans.
+ 
 ---
-
+ 
 ### ✅ **7. User Authentication**
 **Dependencies:** 6  
-- **OAuth & JWT:** ✅ **Completed** — Google OAuth for login and account creation. JWTs for frontend/backend authentication. Authentication extractor validates JWT and resolves current user.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Users authenticate via Google; JWT validation works end-to-end.
-
+- **OAuth & JWT:**  
+  *Acceptance:* Users authenticate via Google; JWT validation works end-to-end.  
+  *Status:* ✅ Complete — Google OAuth for login and account creation; JWTs for frontend/backend authentication; authentication extractor validates JWT and resolves current user.
+ 
 ---
-
+ 
 ### ✅ **8. Transactional Tests & DB Access Pattern**
 **Dependencies:** 4  
-- **Transaction Management:** ✅ **Completed** — Unified request-path DB access through `with_txn`. Rollback-by-default test policy. Nested `with_txn` behavior defined and tested.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ All handlers use `with_txn`; no direct `state.db` usage; lint and tests clean.
-- **Determinism Tools:** ✅ **Completed** — Injectable clock, seeded RNG, and mock time for reproducible tests (transactional harness and DTO structure already support deterministic time injection).  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Tests are reproducible with deterministic time injection.
-
+- **Transaction Management:**  
+  *Acceptance:* All handlers use `with_txn`; no direct `state.db` usage; lint and tests clean.  
+  *Status:* ✅ Complete — Unified request-path DB access through `with_txn`; rollback-by-default test policy; nested `with_txn` behavior defined and tested.
+- **Determinism Tools:**  
+  *Acceptance:* Tests are reproducible with deterministic time injection.  
+  *Status:* ✅ Complete — Injectable clock, seeded RNG, and mock time for reproducible tests.
+ 
 ---
-
+ 
 ### ✅ **9. Extractors**
 **Dependencies:** 5, 6, 7  
-- **Extractor Implementation:** ✅ **Completed** — Implemented: `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, and `ValidatedJson<T>`.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Handlers are thin; extractor tests pass; single DB hit for user and membership; input validation consistent across all handlers.
-- **Extractor Unification:** ✅ **Completed** — All routes use `ValidatedJson<T>`, `AuthToken`, `CurrentUser`, `GameId`, and `GameMembership` consistently.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Input validation consistent across all handlers.
-
+- **Extractor Implementation:**  
+  *Acceptance:* Handlers are thin; extractor tests pass; single DB hit for user and membership; input validation consistent across all handlers.  
+  *Status:* ✅ Complete — Implemented `AuthToken`, `JwtClaims`, `CurrentUser`, `GameId`, `GameMembership`, and `ValidatedJson<T>`.
+- **Extractor Unification:**  
+  *Acceptance:* Input validation consistent across all handlers.  
+  *Status:* ✅ Complete — All routes use `ValidatedJson<T>`, `AuthToken`, `CurrentUser`, `GameId`, and `GameMembership` consistently.
+ 
 ---
-
+ 
 ### ✅ **10. Backend Domain Modules**
 **Dependencies:** 7  
-- **Pure Domain Logic:** ✅ **Completed** — Pure logic modules: `rules`, `bidding`, `tricks`, `scoring`, `state`. No SeaORM in domain modules.  
-  *Status:* ✅ Complete. All domain modules are ORM-free. `CurrentRoundInfo::load()` and `GameHistory::load()` moved to `repos::player_view`. `CurrentRoundInfo` now uses domain `Phase` enum instead of `DbGameState`.  
-  *Acceptance:* ✅ `grep` shows no ORM usage in domain code.
-
+- **Pure Domain Logic:**  
+  *Acceptance:* `grep` shows no ORM usage in domain code.  
+  *Status:* ✅ Complete — Pure logic modules: `rules`, `bidding`, `tricks`, `scoring`, `state`; no SeaORM in domain modules.
+ 
 ---
-
+ 
 ### ✅ **11. Frontend App Router Seed**
 **Dependencies:** 5, 7  
-- **Next.js App Router:** ✅ **Completed** — Next.js App Router with server components/actions, guarded by backend JWT resolution. Authenticated layout with shared header, theme provider, and suspense-loading states. Lobby and Game routes backed by live data fetching (ETag-aware snapshot polling) and server mutations.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Users can authenticate and reach lobby/game views with real data and actions wired end-to-end.
-
+- **Next.js App Router:**  
+  *Acceptance:* Users can authenticate and reach lobby/game views with real data and actions wired end-to-end.  
+  *Status:* ✅ Complete — Next.js App Router with server components/actions, guarded by backend JWT resolution; authenticated layout with shared header, theme provider, suspense-loading states; lobby and game routes backed by live data fetching and server mutations.
+ 
 ---
-
+ 
 ### ✅ **12. Game Lifecycle (Happy Path)**
 **Dependencies:** 9, 7, 10, 11  
-- **Complete Game Flow:** ✅ **Completed** — Complete flow: `create → join → ready → deal → bid → trump → tricks → scoring → next round`. Integration test covers minimal end-to-end loop.  
-  *Status:* ✅ Complete. `services::game_flow` exercises full round progression with scoring, and `tests/suites/services/game_flow_happy_paths.rs` verifies deal→bid→play→score transitions.  
-  *Acceptance:* ✅ A full happy-path game completes successfully with deterministic tests guarding regressions.
-
+- **Complete Game Flow:**  
+  *Acceptance:* A full happy-path game completes successfully with deterministic tests guarding regressions.  
+  *Status:* ✅ Complete — Complete flow `create → join → ready → deal → bid → trump → tricks → scoring → next round`; integration test covers minimal end-to-end loop.
+ 
 ---
-
+ 
 ### ✅ **13. AI Orchestration**
 **Dependencies:** 11  
-- **AI Automation:** ✅ **Completed** — AI performs bidding and legal plays. Game advances automatically until human input is required.  
-  *Status:* ✅ Complete. `GameFlowService::process_game_state` drives automatic turns with retry logic, `round_cache` eliminates redundant reads, and per-instance AI overrides merge profile + game config.  
-  *Acceptance:* ✅ Full AI-only games complete successfully; orchestration tests cover bidding, trump selection, trick play, and auto-start flows.
-
+- **AI Automation:**  
+  *Acceptance:* Full AI-only games complete successfully; orchestration tests cover bidding, trump selection, trick play, and auto-start flows.  
+  *Status:* ✅ Complete — AI performs bidding and legal plays; game advances automatically until human input is required.
+ 
 ---
-
+ 
 ### ✅ **14. Validation, Edge Cases, and Property Tests**
 **Dependencies:** 11  
-- **Error Handling:** ✅ **Completed** — Invalid bids/plays return proper Problem Details.  
-  *Status:* ✅ Complete. Service suites assert Problem Details codes for invalid bids/plays.  
-  *Acceptance:* ✅ Error cases handled consistently.
-- **Property Tests:** ✅ **Completed** — Property tests confirm trick/scoring invariants. Extended property tests verify correctness for dealing, progression, scoring, bidding, and serialization invariants (bidding, tricks, legality, consistency already covered).  
-  *Status:* ✅ Complete. `domain/tests_props_*.rs` proptest suites lock in trick legality, scoring, and consistency invariants (with regression seeds tracked).  
-  *Acceptance:* ✅ All properties hold across generated games; invariants verified for dealing, progression, scoring, bidding, and serialization.
-
+- **Error Handling:**  
+  *Acceptance:* Error cases handled consistently.  
+  *Status:* ✅ Complete — Invalid bids/plays return proper Problem Details.
+- **Property Tests:**  
+  *Acceptance:* All properties hold across generated games; invariants verified for dealing, progression, scoring, bidding, and serialization.  
+  *Status:* ✅ Complete — Property tests confirm trick/scoring invariants; extended property tests verify correctness across generated games.
+ 
 ---
-
+ 
 ### ✅ **15. Frontend UX Pass (Round 1)**
 **Dependencies:** 11, 13  
-- **Core Game UI:** ✅ **Completed** — Hand display, trick area, bidding UI, trump selector. Frontend shows Problem Details errors clearly.  
-  *Status:* ✅ Complete. Core components implemented and functional. Ongoing UX refinements include phase-specific waiting messages in trick area (shows "Waiting for bidding to complete…" during bidding, "Waiting for trumps to be chosen…" during trump selection, and "Waiting for lead…" during trick play).  
-  *Acceptance:* ✅ Gameplay readable and intuitive.
-
+- **Core Game UI:**  
+  *Acceptance:* Gameplay readable and intuitive.  
+  *Status:* ✅ Complete — Hand display, trick area, bidding UI, trump selector; frontend shows Problem Details errors clearly.
+ 
 ---
-
+ 
 ### ✅ **16. Frontend UX Pass (Round 2)**
 **Dependencies:** 15  
-- **Design v1 Implementation:** ✅ **Completed** — Apply the first-endorsed product design across Nommie (typography, spacing, components).  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Core screens match design reference.
-- **Game Config vs Play UI Split:** ✅ **Completed** — Split the game experience into a configuration surface (seating, AI seats, options) and an in-game surface focused on play.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Users transition smoothly between config and play areas.
-- **Last Trick UI:** ✅ **Completed** — Persist the most recent trick as a compact card row so play can continue immediately after the final card.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Previous trick reviewable.
-- **User Options:** ✅ **Completed** — Add per-account settings (e.g., theme, gameplay preferences) surfaced via a profile/options view.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Account preferences persist.
-- **Card Play Confirmation Toggle:** ✅ **Completed** — Provide a per-account option for confirming card plays before submission.  
-  *Status:* ✅ Complete. Stage 1 UI roadmap items are complete—Design v1, the config/play split, Last Trick UI, user options, confirmation toggle, and polish/animation passes are live in production.  
-  *Acceptance:* ✅ Card confirmation toggle works.
-
+- **Design v1 Implementation:**  
+  *Acceptance:* Core screens match design reference.  
+  *Status:* ✅ Complete — First-endorsed product design applied across Nommie (typography, spacing, components).
+- **Game Config vs Play UI Split:**  
+  *Acceptance:* Users transition smoothly between config and play areas.  
+  *Status:* ✅ Complete — Game experience split into configuration surface and in-game play surface.
+- **Last Trick UI:**  
+  *Acceptance:* Previous trick reviewable.  
+  *Status:* ✅ Complete — Most recent trick persisted as compact card row so play can continue immediately.
+- **User Options:**  
+  *Acceptance:* Account preferences persist.  
+  *Status:* ✅ Complete — Per-account settings (theme, gameplay preferences) surfaced via profile/options view.
+- **Card Play Confirmation Toggle:**  
+  *Acceptance:* Card confirmation toggle works.  
+  *Status:* ✅ Complete — Per-account option for confirming card plays before submission implemented.
+ 
 ---
-
+ 
 ### ✅ **17. Mobile Design & UI Implementation**
 **Dependencies:** 11, 15, 16  
-- **Design System Parity:** ✅ **Completed** — Define a mobile-specific design kit (spacing, typography, colors, components) that mirrors the web experience while honoring native platform conventions and accessibility.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Navigation, theming, and interactions feel native.
-- **Expo App Foundations:** ✅ **Completed** — Scaffold the `apps/mobile` Expo client with navigation (stack + modal flows), theming, and auth hand-off using the existing backend JWT flow.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Mobile users can authenticate.
-- **End-to-End Screens:** ✅ **Completed** — Implement lobby list, game configuration, and in-game play surfaces (bidding, trump select, trick play, last-trick review) with responsive layouts, gestures, and haptics.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Mobile users can configure games and play full rounds with UX parity to the web client.
-- **State & Sync:** ✅ **Completed** — Reuse shared types/API wrapper and support offline/foreground-resume states with snapshot hydration.  
-  *Status:* ✅ Complete. Mobile UX parity delivered—Expo app foundations, theming/auth hand-off, core screens (lobby, config, play), and sync/resume flows are complete.  
-  *Acceptance:* ✅ The app handles reconnects and snapshot refreshes gracefully.
-
+- **Design System Parity:**  
+  *Acceptance:* Navigation, theming, and interactions feel native.  
+  *Status:* ✅ Complete — Mobile-specific design kit defined mirroring web while honoring platform conventions and accessibility.
+- **Expo App Foundations:**  
+  *Acceptance:* Mobile users can authenticate.  
+  *Status:* ✅ Complete — `apps/mobile` Expo client scaffolded with navigation, theming, and auth hand-off using existing backend JWT flow.
+- **End-to-End Screens:**  
+  *Acceptance:* Mobile users can configure games and play full rounds with UX parity to the web client.  
+  *Status:* ✅ Complete — Lobby list, game configuration, and in-game play surfaces implemented with responsive layouts, gestures, and haptics.
+- **State & Sync:**  
+  *Acceptance:* The app handles reconnects and snapshot refreshes gracefully.  
+  *Status:* ✅ Complete — Shared types/API wrapper reused; offline/foreground-resume states with snapshot hydration supported.
+ 
 ---
-
+ 
 ### ✅ **18. Architecture & Reliability**
-- **WebSockets / Server Push & Architecture:** ✅ **Completed** — Replace polling with WebSockets (or SSE) and decide on the long‑term realtime architecture and testing strategy. Add end-to-end WebSocket integration tests for game sessions (connect, initial snapshot, broadcasts, shutdown). Document the chosen realtime architecture (registry/broker split, Redis pub/sub fan-out) and how it is tested.  
-  *Status:* ✅ Complete. WebSocket infrastructure implemented and deployed; polling replaced. Frontend uses `useGameSync` hook; backend publishes snapshots via Redis after mutations. End-to-end backend integration tests added covering connection (JWT auth, initial ack, initial snapshot), multi-client broadcast (all clients, game isolation), reconnect behavior, and shutdown (registry cleanup). Tests use in-memory registry for concurrency safety and transaction-per-test isolation. Architecture documented in `docs/websocket-design.md`.  
-  *Acceptance:* ✅ WebSocket sync is the primary update mechanism for active game clients; the architecture and testing strategy are documented and enforced via automated tests.
-- **Deployment Stub:** ✅ **Completed** — Minimal production-style environment including FE, BE, DB, and Redis.  
-  *Status:* ✅ Complete. Application runs in `docker/prod` with TLS, Caddy reverse proxy, and all services containerized.  
-  *Acceptance:* ✅ Application runs in a minimal production-style configuration.
-- **Race-Safe `ensure_user`:** ✅ **Completed** — Handle concurrent insertions safely using non-aborting upserts (`ON CONFLICT DO NOTHING`) with follow-up SELECT.  
-  *Status:* ✅ Complete. Concurrent OAuth logins for same email succeed without duplicate users/credentials or transaction aborts. `ensure_user_by_sub()` and `ensure_credentials_by_email()` adapters prevent transaction-aborting unique violations; cleanup logic ensures no orphan users on email ownership conflicts. Concurrency regression test proves correctness under parallel first-login scenarios.  
-  *Acceptance:* ✅ No duplicate users/credentials under concurrency.
-
+- **WebSockets / Server Push & Architecture:**  
+  *Acceptance:* WebSocket sync is the primary update mechanism for active game clients; architecture and testing strategy documented and enforced via automated tests.  
+  *Status:* ✅ Complete — Polling replaced with WebSockets; registry/broker split; Redis pub/sub fan-out; end-to-end WebSocket integration tests; architecture documented in `docs/websocket-design.md`.
+- **Deployment Stub:**  
+  *Acceptance:* Application runs in a minimal production-style configuration.  
+  *Status:* ✅ Complete — Minimal production-style environment including FE, BE, DB, and Redis in `docker/prod` with TLS and Caddy reverse proxy.
+- **Race-Safe `ensure_user`:**  
+  *Acceptance:* No duplicate users/credentials under concurrency.  
+  *Status:* ✅ Complete — Non-aborting upserts (`ON CONFLICT DO NOTHING`) with follow-up SELECT; concurrency regression test proves correctness.
+ 
 ---
-
+ 
 ### ✅ **19. Observability & Stability**
 **Dependencies:** 5, 11  
-- **Trace Context Enrichment:** ✅ **Completed** — Logs always include `trace_id`, `user_id`, and `game_id` when relevant.  
-  *Status:* ✅ Complete. `TraceSpan` middleware creates spans with `trace_id`, `user_id` (from JWT), and `game_id` (from path params). All logs within handlers automatically inherit these fields via instrumented spans.  
-  *Acceptance:* ✅ Logs actionable; trace ID visible end-to-end.
-- **Frontend Trace Display:** ✅ **Completed** — Frontend displays `trace_id` on error surfaces.  
-  *Status:* ✅ Complete. Toast component displays `trace_id` for error toasts behind a collapsible "Show details" button. ErrorBoundary component now displays `trace_id` (along with status and code) for `BackendApiError` instances behind a collapsible "Show details" button, matching the Toast pattern.  
-  *Acceptance:* ✅ Trace ID visible end-to-end.
-- **Health Endpoint:** ✅ **Completed** — Add `/health` route reporting DB connectivity and version info.  
-  *Status:* ✅ Complete. `/health` route implemented at `apps/backend/src/routes/health.rs`, reporting DB connectivity, app version, migration status, and timestamp. Response includes `X-Trace-Id` header automatically via middleware.  
-  *Acceptance:* ✅ Endpoint returns up/down status with trace context.
-- **Security Logging:** ✅ **Completed** — Structured security logging for authentication failures and rate limit hits with appropriate log levels and context.  
-  *Status:* ✅ Complete. `login_failed()` and `rate_limit_hit()` functions log security events with `trace_id` and appropriate context. Auth failures logged in JWT validation; rate limits logged in structured logger middleware.  
-  *Acceptance:* ✅ Security events logged with appropriate detail.
-
+- **Trace Context Enrichment:**  
+  *Acceptance:* Logs actionable; trace ID visible end-to-end.  
+  *Status:* ✅ Complete — Logs include `trace_id`, `user_id`, and `game_id` when relevant via instrumented spans.
+- **Frontend Trace Display:**  
+  *Acceptance:* Trace ID visible end-to-end.  
+  *Status:* ✅ Complete — Frontend displays `trace_id` on error surfaces via toast and error boundary components.
+- **Health Endpoint:**  
+  *Acceptance:* Endpoint returns up/down status with trace context.  
+  *Status:* ✅ Complete — `/health` route reports DB connectivity, app version, migration status, and timestamp with `X-Trace-Id` header.
+- **Security Logging:**  
+  *Acceptance:* Security events logged with appropriate detail.  
+  *Status:* ✅ Complete — Structured security logging for authentication failures and rate limit hits.
+ 
 ---
-
-### ✅ **21. Internationalisation & Frontend Localisation**
+ 
+### ✅ **20. Internationalisation & Frontend Localisation**
 **Dependencies:** 11, 15  
-- **End-to-End Frontend Internationalisation:** ✅ **Completed** — Implement a code-driven i18n strategy using `next-intl`, with locale-aware request handling, message loading, and per-namespace translation files for all user-facing UI.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Frontend UI text is fully localized and driven by error codes and message keys rather than inline strings; adding or updating locales is a data change (messages) rather than a code change.
-- **Error Localisation via Codes:** ✅ **Completed** — Backend exposes structured Problem Details with stable `code` values; frontend maps codes through a single source of truth (`i18n/errors.ts` + `errors.*` namespaces) to derive localized messages for toasts, error boundaries, and inline surfaces.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Error codes mapped to localized messages.
-- **Coverage & Tooling:** ✅ **Completed** — All interactive frontend flows (lobby, game room, settings, actions, toasts) use translations instead of hard-coded strings; multiple locales (`en-GB`, `fr-FR`, `de-DE`, `es-ES`, `it-IT`) are kept in sync via i18n lint scripts (`i18n-check`, `i18n-unused`) wired into `pnpm lint`. Debug/log output remains English-only and is not localized.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ I18n consistency is enforced in the lint pipeline.
-- **Error Code Enforcement:** ✅ **Completed** — Frontend i18n check script verifies that all `KNOWN_ERROR_CODES` have corresponding translation keys in all locale `errors.json` files, ensuring complete coverage. Frontend logs warnings when encountering unknown error codes not present in the i18n key registry.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Error code coverage is verified automatically.
-- **Systematic Date/Number Formatting:** ✅ **Completed** — Locale-aware formatting for dates, times, and numbers using `Intl` APIs (`Intl.DateTimeFormat`, `Intl.NumberFormat`) implemented via centralized utilities (`utils/date-formatting.ts`, `utils/number-formatting.ts`). All user-facing dates, timestamps, durations, and numeric values (round numbers, player counts, hand sizes, performance metrics) are formatted according to the user's locale preferences.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Date and number formatting respects user locale preferences.
-
+- **End-to-End Frontend Internationalisation:**  
+  *Acceptance:* Frontend UI text fully localized and driven by error codes and message keys rather than inline strings; adding/updating locales is a data change.  
+  *Status:* ✅ Complete — Code-driven i18n strategy using `next-intl` with locale-aware request handling, message loading, and per-namespace translation files.
+- **Error Localisation via Codes:**  
+  *Acceptance:* Error codes mapped to localized messages.  
+  *Status:* ✅ Complete — Backend exposes stable `code` values; frontend maps codes via single source of truth (`i18n/errors.ts` + `errors.*` namespaces).
+- **Coverage & Tooling:**  
+  *Acceptance:* I18n consistency enforced in lint pipeline.  
+  *Status:* ✅ Complete — All interactive flows use translations; multiple locales kept in sync via `i18n-check` and `i18n-unused` scripts.
+- **Error Code Enforcement:**  
+  *Acceptance:* Error code coverage verified automatically.  
+  *Status:* ✅ Complete — i18n check script verifies all `KNOWN_ERROR_CODES` have translation keys; frontend warns on unknown codes.
+- **Systematic Date/Number Formatting:**  
+  *Acceptance:* Date and number formatting respects user locale preferences.  
+  *Status:* ✅ Complete — Locale-aware formatting implemented using `Intl` APIs via centralized utilities.
+ 
 ---
 
-### ✅ **22. Email Allowlist & Access Control**
+ 
+---
+ 
+### ✅ **21. Email Allowlist & Access Control**
 **Dependencies:** 7  
-- **Email Allowlist:** ✅ **Completed** — Implement email allowlist for signup and login to restrict access to authorized email addresses.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Only emails on the allowlist can sign up or log in.
-- **Backend Implementation:** ✅ **Completed** — Allowlist validation in authentication flow with configurable allowlist via environment variables.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Configuration is documented and testable.
-- **Frontend Error Handling:** ✅ **Completed** — Frontend handles allowlist errors gracefully with sign-out flow when access is denied.  
-  *Status:* ✅ Complete. Email allowlist fully implemented in backend and frontend; configuration documented; tests updated to avoid env var dependencies.  
-  *Acceptance:* ✅ Denied access triggers appropriate error handling and sign-out.
-- **StateBuilder Integration:** ✅ **Completed** — Allowlist ownership managed through StateBuilder for consistent configuration.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Configuration is consistent.
-- **Documentation:** ✅ **Completed** — Email allowlist configuration documented with environment variable setup.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Configuration is documented.
-
+- **Email Allowlist:**  
+  *Acceptance:* Only emails on the allowlist can sign up or log in.  
+  *Status:* ✅ Complete — Email allowlist implemented for signup and login to restrict access to authorised email addresses.
+- **Backend Implementation:**  
+  *Acceptance:* Configuration is documented and testable.  
+  *Status:* ✅ Complete — Allowlist validation integrated into authentication flow with configurable environment variables.
+- **Frontend Error Handling:**  
+  *Acceptance:* Denied access triggers appropriate error handling and sign-out.  
+  *Status:* ✅ Complete — Frontend handles allowlist errors gracefully with sign-out flow when access is denied.
+- **StateBuilder Integration:**  
+  *Acceptance:* Configuration is consistent.  
+  *Status:* ✅ Complete — Allowlist ownership managed through StateBuilder for consistent configuration.
+- **Documentation:**  
+  *Acceptance:* Email allowlist documented.  
+  *Status:* ✅ Complete — Email allowlist configuration documented with environment variable setup.
+ 
 ---
-
-### ✅ **23. Security Hardening**
+ 
+### ✅ **22. Security Hardening**
 **Dependencies:** 2, 7  
-- **Docker Image Hardening:** ✅ **Completed** — Non-root users and pinned base images for backend and frontend containers.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Containers run as non-root.
-- **Security Headers:** ✅ **Completed** — Content Security Policy (CSP), Permissions-Policy, and X-XSS-Protection headers implemented.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Security headers present.
-- **Rate Limiting:** ✅ **Completed** — Rate limiting middleware with security-specific logging for rate limit hits.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Rate limiting functional.
-- **CORS Configuration:** ✅ **Completed** — Tightened CORS configuration for backend API.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ CORS properly configured.
-- **Environment Validation:** ✅ **Completed** — Startup validation for critical backend environment variables.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Environment validation in place.
-- **Authentication Security:** ✅ **Completed** — JWT lifetime adjustments, NextAuth session lifetime shortened, NextAuth updated to address security vulnerabilities.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Authentication lifetimes adjusted.
-- **Upload Limits:** ✅ **Completed** — Universal upload limits implemented.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Upload limits enforced.
-- **Error Security:** ✅ **Completed** — Avoid leaking user existence in forbidden user errors.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ No information leakage in errors.
-- **Connection Security:** ✅ **Completed** — Postgres credentials percent-encoded in connection URLs.  
-  *Status:* ✅ Complete. Docker images hardened; security headers implemented; rate limiting active; CORS tightened; environment validation in place; authentication lifetimes adjusted; upload limits enforced; error messages sanitized.  
-  *Acceptance:* ✅ All security hardening measures implemented and tested.
-
+- **Docker Image Hardening:**  
+  *Acceptance:* Containers run as non-root.  
+  *Status:* ✅ Complete — Non-root users and pinned base images for backend and frontend containers.
+- **Security Headers:**  
+  *Acceptance:* Security headers present.  
+  *Status:* ✅ Complete — Content Security Policy (CSP), Permissions-Policy, and X-XSS-Protection headers implemented.
+- **Rate Limiting:**  
+  *Acceptance:* Rate limiting functional.  
+  *Status:* ✅ Complete — Rate limiting middleware implemented with security-specific logging for rate limit hits.
+- **CORS Configuration:**  
+  *Acceptance:* CORS properly configured.  
+  *Status:* ✅ Complete — Tightened CORS configuration for backend API.
+- **Environment Validation:**  
+  *Acceptance:* Environment validation in place.  
+  *Status:* ✅ Complete — Startup validation for critical backend environment variables.
+- **Authentication Security:**  
+  *Acceptance:* Authentication lifetimes adjusted.  
+  *Status:* ✅ Complete — JWT lifetime adjustments; NextAuth session lifetime shortened; security vulnerabilities addressed.
+- **Upload Limits:**  
+  *Acceptance:* Upload limits enforced.  
+  *Status:* ✅ Complete — Universal upload limits implemented.
+- **Error Security:**  
+  *Acceptance:* No information leakage in errors.  
+  *Status:* ✅ Complete — Avoid leaking user existence in forbidden user errors.
+- **Connection Security:**  
+  *Acceptance:* Credentials handled securely in connection URLs.  
+  *Status:* ✅ Complete — Postgres credentials percent-encoded in connection URLs.
+ 
 ---
-
-### 🚀 **24. WebSocket Architecture Refactor & Realtime Foundations**
+ 
+### 🚀 **23. WebSocket Architecture Refactor & Realtime Foundations**
 **Dependencies:** 10, 18, 23  
-- **Generic WebSocket Sessions:** ✅ **Completed** — Single `WsSession` decoupled from games and URLs.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Connections no longer tied to `{game_id}` routes.
-- **Explicit Subscription Model:** ✅ **Completed** — Clients explicitly `subscribe` / `unsubscribe` to topics via JSON protocol.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Connections may dynamically change subscriptions.
-- **User-Based Registration:** ✅ **Completed** — Connections registered under authenticated `user_id` for user-scoped delivery.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Backend can broadcast to all active connections for a user.
-- **Topic-Based Routing:** ✅ **Completed** — Game events routed only to explicitly subscribed connections.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ No implicit routing via URLs.
-- **Registry & Responsibility Split:** ✅ **Completed** — Clear separation between session lifecycle, routing registries, and game-specific realtime logic.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ No game logic in generic session or hub layers.
-- **Explicit JSON Protocol:** ✅ **Completed** — Typed client commands and server events with documented semantics.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ All WS communication conforms to the defined protocol.
-- **User-Scoped Events:** ✅ **Completed** — User-targeted events (e.g. `your_turn`) delivered independently of game subscriptions.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Backend can notify users across games.
-- **Your-Turn Suppression:** ✅ **Completed** — Suppress `your_turn` for connections already subscribed to the relevant game; other connections still receive it.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ No redundant `your_turn` for in-game connections; client-side dedupe remains a defensive fallback.
-- **WS Token Strategy:** ✅ **Completed** — Short-lived WS tokens minted via `/api/ws/token` and presented on upgrade.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ WS connections authenticate using short-lived tokens.
-- **Subscription Authorisation:** ✅ **Completed** — Server-side validation ensures users may only subscribe to authorised games.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Invalid subscriptions rejected with explicit errors and no data leakage.
-- **Broker Generalisation:** ✅ **Completed** — Redis Pub/Sub supports both game-scoped and user-scoped realtime events.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Cross-instance realtime delivery supports multiple event types.
-- **Authoritative Game State Delivery:** ✅ **Completed** — State delivered only for subscribed games with monotonic versioning.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Clients receive only authoritative, versioned game state.
-- **Version Source Guarantee:** ✅ **Completed** — `game_state.version` sourced from `games.version` with explicit increment semantics.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Backend guarantees monotonic versions; client dedupe semantics are correct.
-- **Client Version Reset Semantics:** ✅ **Completed** — `wsVersionRef` behaviour explicit and resilient to UI refactors.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Safe resets on game change; reconnect behaviour defined.
-- **WebSocket Test Suite Update:** ✅ **Completed** — Tests updated for generic connections and subscriptions (one flaky FE lifecycle assertion tracked).  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Lifecycle, routing, protocol, and reconnect behaviour covered.
-- **Explicit Behavioural Guarantees:** ✅ **Completed** — Tests assert behaviour, not timing or incidental ordering.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ No data before subscribe; ordering guarantees asserted.
-- **Acknowledgement Semantics:** ✅ **Completed** — Acks are machine-correlatable with `command` and `topic` fields.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Ack messages clearly identify the command being acknowledged; tests assert semantics.
-- **Dedicated WS Token Type:** ⬜ **Planned / Deferred** — Enforce WS-only token type distinct from access tokens.  
-  *Status:* ⬜ Planned / Deferred.  
-  *Acceptance:* ⬜ `/ws` rejects non-WS tokens; tests prove access tokens cannot open WS connections.
-
+- **Generic WebSocket Sessions:**  
+  *Acceptance:* Connections no longer tied to `{game_id}` routes.  
+  *Status:* ✅ Complete — Single `WsSession` decoupled from games and URLs.
+- **Explicit Subscription Model:**  
+  *Acceptance:* Connections may dynamically change subscriptions.  
+  *Status:* ✅ Complete — Clients explicitly `subscribe` / `unsubscribe` to topics via JSON protocol.
+- **User-Based Registration:**  
+  *Acceptance:* Backend can broadcast to all active connections for a user.  
+  *Status:* ✅ Complete — Connections registered under authenticated `user_id` for user-scoped delivery.
+- **Topic-Based Routing:**  
+  *Acceptance:* No implicit routing via URLs.  
+  *Status:* ✅ Complete — Game events routed only to explicitly subscribed connections.
+- **Registry & Responsibility Split:**  
+  *Acceptance:* No game logic in generic session or hub layers.  
+  *Status:* ✅ Complete — Clear separation between session lifecycle, routing registries, and game-specific realtime logic.
+- **Explicit JSON Protocol:**  
+  *Acceptance:* All WS communication conforms to the defined protocol.  
+  *Status:* ✅ Complete — Typed client commands and server events with documented semantics.
+- **User-Scoped Events:**  
+  *Acceptance:* Backend can notify users across games.  
+  *Status:* ✅ Complete — User-targeted events (e.g. `your_turn`) delivered independently of game subscriptions.
+- **Your-Turn Suppression:**  
+  *Acceptance:* No redundant `your_turn` for in-game connections; client-side dedupe remains defensive fallback.  
+  *Status:* ✅ Complete — Suppress `your_turn` for connections already subscribed to the relevant game.
+- **WS Token Strategy:**  
+  *Acceptance:* WS connections authenticate using short-lived tokens.  
+  *Status:* ✅ Complete — Short-lived WS tokens minted via `/api/ws/token` and presented on upgrade.
+- **Subscription Authorisation:**  
+  *Acceptance:* Invalid subscriptions rejected with explicit errors and no data leakage.  
+  *Status:* ✅ Complete — Server-side validation ensures users may only subscribe to authorised games.
+- **Broker Generalisation:**  
+  *Acceptance:* Cross-instance realtime delivery supports multiple event types.  
+  *Status:* ✅ Complete — Redis Pub/Sub supports both game-scoped and user-scoped realtime events.
+- **Authoritative Game State Delivery:**  
+  *Acceptance:* Clients receive only authoritative, versioned game state.  
+  *Status:* ✅ Complete — State delivered only for subscribed games with monotonic versioning.
+- **Version Source Guarantee:**  
+  *Acceptance:* Backend guarantees monotonic versions; client dedupe semantics correct.  
+  *Status:* ✅ Complete — `game_state.version` sourced from `games.version` with explicit increment semantics.
+- **Client Version Reset Semantics:**  
+  *Acceptance:* Safe resets on game change; reconnect behaviour defined.  
+  *Status:* ✅ Complete — `wsVersionRef` behaviour explicit and resilient to UI refactors.
+- **WebSocket Test Suite Update:**  
+  *Acceptance:* Lifecycle, routing, protocol, and reconnect behaviour covered.  
+  *Status:* ✅ Complete — Tests updated for generic connections and subscriptions.
+- **Explicit Behavioural Guarantees:**  
+  *Acceptance:* No data before subscribe; ordering guarantees asserted.  
+  *Status:* ✅ Complete — Tests assert behaviour rather than incidental timing.
+- **Acknowledgement Semantics:**  
+  *Acceptance:* Ack messages clearly identify the command being acknowledged.  
+  *Status:* ✅ Complete — Acks machine-correlatable with `command` and `topic` fields.
+- **Dedicated WS Token Type:**  
+  *Acceptance:* `/ws` rejects non-WS tokens; tests prove access tokens cannot open WS connections.  
+  *Status:* ⬜ Planned — Enforce WS-only token type distinct from access tokens.
+ 
 ---
 
-### 🟨 **25. Documentation Maintenance (Ongoing)**
-**Dependencies:** 11  
-**Status:** Long-standing milestone — documentation is continuously maintained and updated as the project evolves.
-
-- **README:** Setup and reset flow; architecture explanation (including layering and DTO policies).  
-  *Status:* ✅ Current.  
-  *Acceptance:* ✅ New developers can onboard independently.
-- **CONTRIBUTING:** Module layout, extractor policy, `_test` guard, layering guidelines, and DTO policies.  
-  *Status:* ✅ Current. README and CONTRIBUTING updated with layering and DTO policies.  
-  *Acceptance:* ✅ Architecture is documented.
-- **Inline Comments:** Add comments for complex logic (e.g., JWT refresh, domain algorithms) as code evolves.  
-  *Status:* ✅ Ongoing. JSDoc and inline comments are added incrementally as new code is written.  
-  *Acceptance:* ✅ Complex logic is explained inline.
-- **JSDoc Documentation:** Add JSDoc for public APIs and complex functions as new features are added.  
-  *Status:* ✅ Ongoing.  
-  *Acceptance:* ✅ APIs have JSDoc comments.
-- **Environment Variable Documentation:** Comprehensive documentation for all environment variables including security-related configuration.  
-  *Status:* ✅ Current. Environment variable documentation improved.  
-  *Acceptance:* ✅ Environment variables and security features are documented.
-- **TLS Setup Documentation:** Documentation for Postgres TLS/SSL configuration and certificate management.  
-  *Status:* ✅ Current. TLS setup documented.  
-  *Acceptance:* ✅ TLS configuration documented.
-- **Email Allowlist Documentation:** Configuration documentation for email allowlist feature.  
-  *Status:* ✅ Current. Email allowlist configuration documented.  
-  *Acceptance:* ✅ Email allowlist documented.
-- **Architecture Documentation:** Keep architecture docs (`docs/architecture-*.md`) current with system changes.  
-  *Status:* ✅ Current. `.cursorrules` and roadmap current.  
-  *Acceptance:* ✅ Documentation stays current with codebase changes.
-
-**Note:** This milestone is never "complete" — it represents an ongoing commitment to maintain documentation quality as the project grows. Documentation should be updated alongside code changes, not as a separate phase.
+### 🚀 **24. Startup Readiness, Dependency Health, and Degraded Mode**
+**Dependencies:** 18, 19  
+- **Health & Readiness Endpoints:**  
+  *Acceptance:* Public endpoints expose only up/down status; internal endpoints expose full diagnostic state.  
+  *Status:* ⬜ Planned
+- **Dependency Mapping & Enforcement:**  
+  *Acceptance:* `ready` remains false until all required dependencies are confirmed.  
+  *Status:* ⬜ Planned
+- **Migration-Gated Readiness:**  
+  *Acceptance:* Migration failure results in persistent not-ready state and `503` for normal API routes.  
+  *Status:* ⬜ Planned
+- **Frontend Degraded Mode:**  
+  *Acceptance:* Users see a clear non-technical message; normal UI is gated until recovery.  
+  *Status:* ⬜ Planned
+- **Conditional Dependency Polling:**  
+  *Acceptance:* Startup and recovery converge to ready state without restart loops.  
+  *Status:* ⬜ Planned
+- **Operational Logging:**  
+  *Acceptance:* Logs are actionable and explain why readiness is blocked.  
+  *Status:* ⬜ Planned
 
 ---
-
-## Optional & Enhancement Track
-
-Independent improvements that enhance robustness, performance, and developer experience.
-
+ 
+# Optional & Enhancement Track
+ 
 ---
-
+ 
 ### ✅ **1. Code Organization & Refactoring**
-- **Refactor `game-room-client.tsx`:** ✅ **Completed** — The component has been refactored from 791 lines to 155 lines (80% reduction). State management extracted into focused custom hooks: `useGameRoomReadyState`, `useGameRoomActions`, `useGameRoomControls`, `useAiSeatManagement`, and `useSlowSyncIndicator`. View logic separated into `GameRoomView` component.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* ✅ Component is refactored with improved state management; complexity is reduced; maintainability is improved.
-
+- **Refactor `game-room-client.tsx`:**  
+  *Acceptance:* Component refactored; complexity reduced; maintainability improved.  
+  *Status:* ✅ Complete — Reduced from 791 to 155 lines; state extracted into focused custom hooks; view logic separated.
+ 
 ---
-
+ 
 ### ✅ **2. Frontend Experience Enhancements**
-- **React Query Adoption:** ✅ **Completed** — React Query (TanStack Query) has been adopted for client data fetching.
-  - ✅ **Completed:** Polling inefficiency addressed (ETag-based caching and not_modified handling).
-  - ✅ **Completed:** Request deduplication works automatically via React Query.
-  - ✅ **Completed:** Centralized query key factory implemented for cache management.
-  - ✅ **Completed:** Consistent error handling across query hooks.
-  - ✅ **Completed:** Caching and state synchronization improved with proper invalidation strategies.
-  - ✅ **Decision made:** Optimistic updates determined to be unnecessary — WebSocket updates provide real-time state synchronization, making optimistic updates redundant. Decision aligns with track 6 architecture review.
-  *Status:* ✅ Complete. All React Query enhancements implemented; optimistic updates decided against.  
-  *Acceptance:* ✅ React Query fully adopted with all planned enhancements; decision on optimistic updates documented.
-- **Import Hygiene:** ✅ **Completed** — Type-only imports are now enforced via ESLint rule `@typescript-eslint/consistent-type-imports`. All type-only imports use `import type` syntax, improving tree-shaking and build performance. Lazy loading removed from scope (not needed per track 6 decision).  
-  *Status:* ✅ Complete. ESLint rule added and all violations auto-fixed. All tests pass.  
-  *Acceptance:* ✅ Type-only imports are enforced; consistent import syntax across codebase.
-- **Tailwind CSS v3 to v4 Migration:** ✅ **Completed** — Migrated from Tailwind CSS v3.4.19 to v4.0.6. Replaced PostCSS plugin with `@tailwindcss/postcss`, removed autoprefixer (now handled automatically), migrated CSS imports to `@import "tailwindcss"` with `@config` directive, and added preflight overrides for button cursor and dialog margins. Theme configuration preserved using CSS-first approach.  
-  *Status:* ✅ Complete. Production build passes; all styling preserved.  
-  *Acceptance:* ✅ Application successfully runs on Tailwind v4 with all styling preserved; configuration updated; breaking changes addressed.
-
+- **React Query Adoption:**  
+  *Acceptance:* React Query fully adopted; decision on optimistic updates documented.  
+  *Status:* ✅ Complete — TanStack Query adopted; polling inefficiency addressed; centralized query keys; consistent error handling; optimistic updates deemed unnecessary.
+- **Import Hygiene:**  
+  *Acceptance:* Type-only imports enforced; consistent syntax across codebase.  
+  *Status:* ✅ Complete — ESLint `consistent-type-imports` rule added; all violations fixed.
+- **Tailwind CSS v3 to v4 Migration:**  
+  *Acceptance:* Application runs on Tailwind v4 with styling preserved.  
+  *Status:* ✅ Complete — Migrated to Tailwind v4; updated PostCSS plugin; preserved theme configuration.
+ 
 ---
-
+ 
 ### ✅ **3. Behavioral & Infrastructure Improvements**
-- **Data & Auth Hygiene:** ✅ **Completed** — Email normalization (trim, lowercase, Unicode NFKC) implemented in `normalize_email()`; email validation implemented in `validate_email()`; username cleaning/derivation implemented in `derive_username()`. Skip redundant writes determined to be not needed — analysis shows all `update_game` calls either have actual field changes or intentionally need `version` increments for WebSocket broadcasts. ETag-based caching handles read optimization (304 Not Modified).  
-  *Status:* ✅ Complete. Email normalization, validation, and username cleaning are production-ready. Skip redundant writes not needed per codebase analysis.  
-  *Acceptance:* ✅ Email normalization, validation, and username cleaning implemented and tested.
-- **PII-Safe Logging:** ✅ **Completed** — Comprehensive PII redaction implemented in `apps/backend/src/logging/pii.rs`. `Redacted` wrapper type automatically masks emails (keeps first char, masks rest), base64/hex tokens, and google_sub values. Used in security logging (`login_failed`, `rate_limit_hit`) and throughout user service.  
-  *Status:* ✅ Complete. All sensitive identifiers are masked/hashed in logs.  
-  *Acceptance:* ✅ Sensitive identifiers (emails, tokens, google_sub) are masked in all log output.
-- **Error Code Catalog:** ✅ **Completed** — All SCREAMING_SNAKE error codes centralized in `apps/backend/src/errors/error_code.rs` as a type-safe enum. Prevents ad-hoc error code strings. All codes documented and organized by category (Auth, Validation, Conflicts, System, etc.).  
-  *Status:* ✅ Complete. Error codes are centralized, type-safe, and well-documented.  
-  *Acceptance:* ✅ All error codes use the centralized enum; no ad-hoc error code strings.
-- ~~**Rate Limiting:** Apply `429 RATE_LIMITED` to authentication endpoints.~~ ✅ **Completed:** Rate limiting middleware implemented with security-specific logging (see Milestone 23).
-
+- **Data & Auth Hygiene:**  
+  *Acceptance:* Email normalization, validation, and username cleaning implemented and tested.  
+  *Status:* ✅ Complete — `normalize_email()`, `validate_email()`, `derive_username()` implemented; redundant writes analysis completed.
+- **PII-Safe Logging:**  
+  *Acceptance:* Sensitive identifiers masked in all log output.  
+  *Status:* ✅ Complete — `Redacted` wrapper masks emails, tokens, and `google_sub` values.
+- **Error Code Catalog:**  
+  *Acceptance:* All error codes use centralized enum; no ad-hoc strings.  
+  *Status:* ✅ Complete — SCREAMING_SNAKE error codes centralized in `error_code.rs`.
+ 
 ---
-
+ 
 ### ✅ **4. Testing & Validation Enhancements**
-- **Deterministic AI Simulation:** ✅ **Completed** — Replay identical seeded games for regression testing.  
-  *Status:* ✅ Complete. Seed infrastructure implemented (`rng_seed` field, seed derivation utilities). Tests verify identical seeds produce identical results for AI decisions (bidding, playing, trump selection), game state, and memory degradation. `test_seed()` utility provides deterministic seed generation from test names.  
-  *Acceptance:* ✅ Identical seeds yield identical results.
-
+- **Deterministic AI Simulation:**  
+  *Acceptance:* Identical seeds yield identical results.  
+  *Status:* ✅ Complete — Seed infrastructure implemented; AI decisions and game state reproducible across runs.
+ 
 ---
-
+ 
 ### ✅ **5. AI & Simulation Initiatives**
-- **AI Profile Discovery & Registry Alignment:** ✅ **Completed** — Registry now surfaces all AI profiles, discovery tooling points to a single authoritative source, and onboarding docs guide contributors through registration.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* Contributors can register/discover AIs via a single authoritative source with clear onboarding steps.
-- **Multi-Engine AI Implementation Drive:** ✅ **Completed** — All simulation and production engines expose documented, production-ready AIs aligned with the AI Player guide; implementation plan centralized via the AI registry.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* Each engine exposes at least one production-ready AI with documented characteristics.
-- **In-Memory AI Comparison Harness:** ✅ **Completed** — Extended in-memory engine now includes a benchmarking mode for head-to-head comparisons, capturing comparative metrics for rapid experimentation.  
-  *Status:* ✅ Complete.  
-  *Acceptance:* Developers can pit AIs against each other rapidly and capture comparative metrics.
-
+- **AI Profile Discovery & Registry Alignment:**  
+  *Acceptance:* Contributors can register/discover AIs via a single authoritative source.  
+  *Status:* ✅ Complete — Registry surfaces all AI profiles; onboarding docs updated.
+- **Multi-Engine AI Implementation Drive:**  
+  *Acceptance:* Each engine exposes at least one production-ready AI.  
+  *Status:* ✅ Complete — Simulation and production engines expose documented AIs aligned with guide.
+- **In-Memory AI Comparison Harness:**  
+  *Acceptance:* Developers can pit AIs head-to-head and capture metrics.  
+  *Status:* ✅ Complete — Benchmarking mode implemented for rapid experimentation.
+ 
 ---
-
+ 
 ### ✅ **6. Future Architecture Considerations**
-- **State Management Library:** ✅ **Decision made** — TanStack Query is sufficient for state management. Server state is managed via TanStack Query cache (single source of truth), WebSocket updates write directly to the cache, and local UI state is minimal and well-scoped via custom hooks. No need for Redux/Zustand.  
-  *Status:* ✅ Complete. Architecture review confirms TanStack Query handles all state management needs without additional complexity.  
-  *Acceptance:* ✅ Decision made; no external state management library needed.
-- **Component-Level Lazy Loading:** ✅ **Decision made** — Lazy loading is not needed. Since 99% of user time and functionality is spent on the game page, the game room should be in the initial bundle for optimal performance. Lazy loading would add unnecessary delay to the primary user journey (lobby → game). The current bundle size is acceptable for the use case.  
-  *Status:* ✅ Complete. Architecture review confirms lazy loading would not provide value given usage patterns.  
-  *Acceptance:* ✅ Decision made; no lazy loading needed.
-
+- **State Management Library:**  
+  *Acceptance:* Decision made; no external state management library needed.  
+  *Status:* ✅ Complete — TanStack Query confirmed sufficient for server state and cache sync.
+- **Component-Level Lazy Loading:**  
+  *Acceptance:* Decision made; no lazy loading needed.  
+  *Status:* ✅ Complete — Lazy loading deemed unnecessary given usage patterns.
+ 
 ---
-
+ 
 ### ✅ **7. Trace ID Logging Strategy Review**
-- **Trace ID Logging Strategy Review:** ✅ **Completed** — Decide on a single source of truth for `trace_id` emission (span-only vs. event field vs. conditional) so console and aggregated logs stay consistent without duplicate IDs.  
-  *Status:* ✅ Complete. Implemented span-only approach for handler code (removed explicit `trace_id` from error.rs, db_errors.rs, validated_json.rs). Kept explicit `trace_id` for code outside spans (StructuredLogger middleware, security logging). Added ephemeral `trace_id` logging in WebSocket upgrade to bridge HTTP request `trace_id` to WebSocket `session_id` for end-to-end traceability.  
-  *Acceptance:* ✅ `trace_id` appears once per log line; handler logs inherit from spans; request completion and security logs use explicit fields; WebSocket upgrade logs bridge HTTP `trace_id` to session lifecycle via `session_id`.
-
+- **Trace ID Logging Strategy Review:**  
+  *Acceptance:* `trace_id` appears once per log line; consistent emission strategy.  
+  *Status:* ✅ Complete — Span-only approach adopted for handlers; explicit logging retained where needed; WebSocket upgrade bridges HTTP `trace_id` to session lifecycle.
+ 
 ---
-
+ 
 ### 🟨 **8. CI Pipeline**
 **Dependencies:** 4, 5, 6, 7, 9, 14, 15  
-- **Local Pre-commit Hooks:** ✅ **Completed** — Pre-commit hooks with FE lint/format and BE clippy/rustfmt.  
-  *Status:* ✅ Complete. Local grep gates and lint/test guards complete.  
-  *Acceptance:* ✅ Pre-commit hooks active.
-- **Planned CI:** GitHub Actions gates merges with lint, tests, and schema checks.  
-  *Status:* Deferred. As a solo developer, local lint/test + pre-commit hooks are sufficient for now. Full CI will be added if/when collaboration increases or automated deploys make it clearly worthwhile.  
-  *Acceptance:* CI green gate required for merges; schema re-applies cleanly (once CI is introduced).
-- **Security Scanning:** Automated container image vulnerability scanning (e.g., Trivy, Snyk) for backend and frontend images.  
-  *Status:* Container vulnerability scanning task defined.  
-  *Acceptance:* Image scans run on CI and block merges on critical vulnerabilities.
-
+- **Local Pre-commit Hooks:**  
+  *Acceptance:* Pre-commit hooks active.  
+  *Status:* ✅ Complete — FE lint/format and BE clippy/rustfmt enforced locally.
+- **Planned CI:**  
+  *Acceptance:* CI green gate required for merges once introduced.  
+  *Status:* ⬜ Deferred — Full GitHub Actions pipeline deferred as solo developer.
+- **Security Scanning:**  
+  *Acceptance:* Image scans run on CI and block merges on critical vulnerabilities.  
+  *Status:* ⬜ Planned — Container vulnerability scanning task defined.
+ 
 ---
-
+ 
 ### 🟨 **9. Open Source Observability Stack**
 **Dependencies:** 10  
-- **Observability Stack:** Integrate Grafana, Tempo, Loki, and Prometheus in Docker Compose for full observability.  
-  *Status:* Deferred until needed. Docker baseline complete; observability stack implementation deferred. Can be implemented with opt-in approach using `OBSERVABILITY_ENABLED` environment variable (single switch for both dev and docker contexts). Implementation estimated at 6-10 hours with zero overhead when disabled.  
-  *Acceptance:* Metrics, logs, and traces visible in dashboards when enabled.
+- **Observability Stack:**  
+  *Acceptance:* Metrics, logs, and traces visible in dashboards when enabled.  
+  *Status:* ⬜ Deferred — Grafana, Tempo, Loki, Prometheus integration defined; implementation deferred until needed.
+ 
+---
+ 
+# Documentation Commitment (Ongoing)
+- **README:**  
+  *Acceptance:* New developers can onboard independently.  
+  *Status:* Ongoing — Setup, reset flow, and architecture explanation kept current.
+- **CONTRIBUTING:**  
+  *Acceptance:* Architecture and layering guidelines documented.  
+  *Status:* Ongoing — Module layout, extractor policy, `_test` guard, DTO policies maintained.
+- **Inline Comments & JSDoc:**  
+  *Acceptance:* Complex logic explained inline; public APIs documented.  
+  *Status:* Ongoing — Documentation updated alongside code changes.
+- **Environment Variable Documentation:**  
+  *Acceptance:* Environment variables and security features documented.  
+  *Status:* Ongoing — Comprehensive environment and security configuration documentation maintained.
+- **Architecture Documentation:**  
+  *Acceptance:* Architecture docs stay current with system changes.  
+  *Status:* Ongoing — `docs/architecture-*.md` updated as system evolves.
+ 
+---
