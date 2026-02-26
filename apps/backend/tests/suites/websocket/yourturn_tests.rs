@@ -18,9 +18,9 @@ use crate::support::websocket_client::WebSocketClient;
 #[tokio::test]
 async fn websocket_yourturn_delivered_to_target_user() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_yourturn_delivered_to_target_user";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;
@@ -68,9 +68,9 @@ async fn websocket_yourturn_delivered_to_target_user() -> Result<(), Box<dyn std
 async fn websocket_yourturn_not_delivered_to_other_users() -> Result<(), Box<dyn std::error::Error>>
 {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_yourturn_not_delivered_to_other_users";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;
@@ -146,9 +146,9 @@ async fn websocket_yourturn_not_delivered_to_sessions_already_in_that_game(
     use serde_json::json;
 
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_yourturn_not_delivered_to_sessions_already_in_that_game";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;

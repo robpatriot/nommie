@@ -70,7 +70,7 @@ async fn resolve_membership(req: HttpRequest) -> Result<GameMembership, AppError
         Some(shared_txn) => users::find_user_by_sub(shared_txn.transaction(), &claims.sub).await?,
         _ => {
             let db = require_db(app_state)?;
-            users::find_user_by_sub(db, &claims.sub).await?
+            users::find_user_by_sub(&db, &claims.sub).await?
         }
     };
 
@@ -90,7 +90,7 @@ async fn resolve_membership(req: HttpRequest) -> Result<GameMembership, AppError
         }
         _ => {
             let db = require_db(app_state)?;
-            service.find_membership(db, game_id_value, user.id).await?
+            service.find_membership(&db, game_id_value, user.id).await?
         }
     };
 

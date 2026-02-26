@@ -34,7 +34,7 @@ async fn test_memory_mode_conversions() {
 async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     // Create a game and round but no card plays
@@ -105,7 +105,7 @@ async fn test_get_round_card_plays_empty_round() -> Result<(), AppError> {
 async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     use backend::entities::games::{self, GameState, GameVisibility};
@@ -250,7 +250,7 @@ async fn test_get_round_card_plays_with_tricks() -> Result<(), AppError> {
 async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     use backend::ai::RandomPlayer;
@@ -307,7 +307,7 @@ async fn test_ai_profile_memory_level_persistence() -> Result<(), AppError> {
 async fn test_ai_service_creates_profile_with_memory_level() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     use backend::ai::memory::MemoryMode;

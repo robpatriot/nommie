@@ -18,9 +18,9 @@ use crate::support::websocket_client::WebSocketClient;
 async fn websocket_reconnect_receives_snapshot_after_resubscribe(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_reconnect_snapshot";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;
@@ -68,9 +68,9 @@ async fn websocket_reconnect_receives_snapshot_after_resubscribe(
 async fn websocket_reconnect_after_multiple_disconnects() -> Result<(), Box<dyn std::error::Error>>
 {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_reconnect_after_disconnect";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;

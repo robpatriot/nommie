@@ -19,9 +19,9 @@ use crate::support::websocket_client::WebSocketClient;
 #[tokio::test]
 async fn broadcast_reaches_all_subscribed_clients() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "broadcast_all_clients";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;
@@ -93,9 +93,9 @@ async fn broadcast_reaches_all_subscribed_clients() -> Result<(), Box<dyn std::e
 #[tokio::test]
 async fn broadcast_only_sent_to_same_game_subscribers() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name1 = "broadcast_game1";
     let test_name2 = "broadcast_game2";

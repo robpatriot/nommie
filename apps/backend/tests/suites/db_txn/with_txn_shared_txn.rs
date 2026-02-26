@@ -18,7 +18,7 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
 
     // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Create a mutable request and inject the shared transaction
     let mut req = test::TestRequest::default().to_http_request();
@@ -82,7 +82,7 @@ async fn test_shared_txn_reuse_bypasses_policy() -> Result<(), Box<dyn std::erro
 
     // Outside the transaction, verify the row is gone after rollback
     let db = require_db(&state)?;
-    let found = games::Entity::find_by_id(inserted_id).one(db).await?;
+    let found = games::Entity::find_by_id(inserted_id).one(&db).await?;
     assert!(
         found.is_none(),
         "row should not persist after SharedTxn rollback"

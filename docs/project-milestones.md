@@ -353,22 +353,22 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Dependencies:** 18, 19  
 - **Health & Readiness Endpoints:**  
   *Acceptance:* Public endpoints expose only up/down status; internal endpoints expose full diagnostic state.  
-  *Status:* ⬜ Planned
+  *Status:* ✅ Complete — `/healthz`, `/readyz`, and `/internal/*` endpoints implemented in BE and proxied in FE.
 - **Dependency Mapping & Enforcement:**  
   *Acceptance:* `ready` remains false until all required dependencies are confirmed.  
-  *Status:* ⬜ Planned
+  *Status:* ✅ Complete — `ReadinessManager` tracks Postgres and Redis status with failure/success thresholds.
 - **Migration-Gated Readiness:**  
   *Acceptance:* Migration failure results in persistent not-ready state and `503` for normal API routes.  
-  *Status:* ⬜ Planned
+  *Status:* ✅ Complete — Backend stays alive on migration failure but remains in `Failed` mode; `ReadinessGate` middleware returns 503.
 - **Frontend Degraded Mode:**  
   *Acceptance:* Users see a clear non-technical message; normal UI is gated until recovery.  
-  *Status:* ⬜ Planned
+  *Status:* ✅ Complete — `DegradedModeBanner` gates entire UI based on backend readiness state.
 - **Conditional Dependency Polling:**  
   *Acceptance:* Startup and recovery converge to ready state without restart loops.  
-  *Status:* ⬜ Planned
+  *Status:* ✅ Complete — Startup and recovery polling implemented; runtime failure detection integrated via `with_txn` and `RealtimeBroker` error reporting.
 - **Operational Logging:**  
   *Acceptance:* Logs are actionable and explain why readiness is blocked.  
-  *Status:* ⬜ Planned
+  *Status:* ✅ Complete — Structured logging for state transitions and dependency failures implemented.
 
 ---
  

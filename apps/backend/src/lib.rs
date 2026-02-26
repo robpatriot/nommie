@@ -31,6 +31,7 @@ pub mod infra;
 pub mod logging;
 pub mod middleware;
 pub mod protocol;
+pub mod readiness;
 pub mod repos;
 pub mod routes;
 pub mod services;

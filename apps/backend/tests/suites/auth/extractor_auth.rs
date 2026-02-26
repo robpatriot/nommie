@@ -150,7 +150,7 @@ async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
     let expired_token = mint_expired_token(&sub, &email, &security_config);
 
     let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     create_test_user(shared.transaction(), &sub, Some("Expired User")).await?;
 
     let mut app = build_auth_test_app(state).await?;
@@ -186,7 +186,7 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
     let token = mint_test_token(&sub, &email, &security_config);
 
     let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     create_test_user(shared.transaction(), &sub, Some("Happy User")).await?;
 
     let app = build_auth_test_app(state).await?;

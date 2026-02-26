@@ -12,7 +12,7 @@ use crate::state::app_state::AppState;
 /// This is the canonical way to access the database from application code.
 /// It returns a borrowed reference to the DatabaseConnection if available,
 /// or an AppError::db_unavailable() if the database is not configured.
-pub fn require_db(state: &AppState) -> Result<&DatabaseConnection, AppError> {
+pub fn require_db(state: &AppState) -> Result<DatabaseConnection, AppError> {
     state.db().ok_or_else(|| {
         AppError::db_unavailable(
             "database unavailable",
@@ -29,12 +29,21 @@ mod tests {
     use backend_test_support::problem_details::assert_problem_details_from_http_response;
 
     use super::*;
+    use crate::config::db::{DbKind, RuntimeEnv};
+    use crate::state::app_state::{AppConfig, Secret};
     use crate::state::security_config::SecurityConfig;
 
     #[tokio::test]
     async fn test_require_db_without_db() {
-        let security_config = SecurityConfig::default();
-        let app_state = AppState::new_without_db(security_config, None);
+        let config = AppConfig {
+            env: RuntimeEnv::Test,
+            db_kind: DbKind::SqliteMemory,
+            db_url: Secret("".to_string()),
+            redis_url: Secret(None),
+            security: SecurityConfig::default(),
+            email_allowlist: None,
+        };
+        let app_state = AppState::new_without_db(config, None);
 
         let result = require_db(&app_state);
         assert!(result.is_err());
@@ -56,8 +65,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_require_db_error_code() {
-        let security_config = SecurityConfig::default();
-        let app_state = AppState::new_without_db(security_config, None);
+        let config = AppConfig {
+            env: RuntimeEnv::Test,
+            db_kind: DbKind::SqliteMemory,
+            db_url: Secret("".to_string()),
+            redis_url: Secret(None),
+            security: SecurityConfig::default(),
+            email_allowlist: None,
+        };
+        let app_state = AppState::new_without_db(config, None);
 
         let result = require_db(&app_state);
         assert!(result.is_err());

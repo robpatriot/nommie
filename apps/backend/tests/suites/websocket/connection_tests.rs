@@ -17,9 +17,9 @@ use crate::support::websocket_client::WebSocketClient;
 #[tokio::test]
 async fn websocket_hello_ack_succeeds_with_valid_jwt() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_hello_ack_valid_jwt";
     let user_sub = format!("{test_name}_user");
@@ -52,9 +52,9 @@ async fn websocket_hello_ack_succeeds_with_valid_jwt() -> Result<(), Box<dyn std
 async fn websocket_subscribe_ack_then_snapshot_ordering() -> Result<(), Box<dyn std::error::Error>>
 {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_subscribe_ack_then_snapshot";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;
@@ -102,9 +102,9 @@ async fn websocket_subscribe_ack_then_snapshot_ordering() -> Result<(), Box<dyn 
 async fn websocket_ack_semantics_subscribe_and_unsubscribe(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_ack_semantics";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;

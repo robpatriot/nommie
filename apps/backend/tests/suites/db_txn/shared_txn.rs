@@ -49,7 +49,7 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
 
     // Open a shared txn first
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Seed user using the shared transaction
     let test_sub = unique_str("test-sub-shared");
@@ -95,7 +95,7 @@ async fn test_game_id_with_shared_txn() -> Result<(), Box<dyn std::error::Error>
 
     // Open a shared txn first
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Insert game using the shared transaction
     let game_id = insert_test_game(shared.transaction()).await?;

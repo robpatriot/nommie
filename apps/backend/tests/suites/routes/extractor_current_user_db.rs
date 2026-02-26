@@ -78,7 +78,7 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
 
     // Open SharedTxn for this test
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Seed user with specific sub - use unique helpers to ensure uniqueness
     let test_sub = unique_str("test-sub");

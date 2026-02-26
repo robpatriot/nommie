@@ -41,9 +41,9 @@ struct IfMatchTestContext {
 
 async fn setup_bidding_test(test_name: &str) -> Result<IfMatchTestContext, AppError> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let setup = setup_game_in_bidding_phase(shared.transaction(), test_name).await?;
     let dealer_pos = setup.dealer_pos as usize;
@@ -67,9 +67,9 @@ async fn setup_bidding_test(test_name: &str) -> Result<IfMatchTestContext, AppEr
 
 async fn setup_trump_test(test_name: &str) -> Result<IfMatchTestContext, AppError> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let setup =
         setup_game_in_trump_selection_phase(shared.transaction(), test_name, [3, 3, 4, 2]).await?;
@@ -97,9 +97,9 @@ async fn setup_play_test(
     test_name: &str,
 ) -> Result<(IfMatchTestContext, backend::domain::Card), AppError> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let setup = setup_game_in_trick_play_phase(
         shared.transaction(),
@@ -163,9 +163,9 @@ async fn setup_play_test(
 
 async fn setup_delete_test(test_name: &str) -> Result<IfMatchTestContext, AppError> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let game_id = create_fresh_lobby_game(shared.transaction(), test_name).await?;
     let user_sub = format!("{test_name}_host");

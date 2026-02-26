@@ -9,7 +9,6 @@ import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { fetchGameState } from '@/lib/api/game-room'
 import { getUserOptions } from '@/lib/api/user-options'
 import { BackendApiError } from '@/lib/api'
-import { isInStartupWindow } from '@/lib/server/backend-status'
 import { isBackendStartupError } from '@/lib/server/connection-errors'
 import { handleStaleSessionError } from '@/lib/auth/allowlist'
 import {
@@ -45,7 +44,7 @@ export default async function GamePage({
       const isStartupError =
         error.status === 503 ||
         error.code === 'BACKEND_STARTING' ||
-        isBackendStartupError(error, isInStartupWindow)
+        isBackendStartupError(error)
 
       if (isStartupError) {
         redirect('/lobby')
@@ -54,7 +53,7 @@ export default async function GamePage({
       return <GameJoinErrorClient code={error.code} status={error.status} />
     }
 
-    if (isBackendStartupError(error, isInStartupWindow)) {
+    if (isBackendStartupError(error)) {
       redirect('/lobby')
     }
 

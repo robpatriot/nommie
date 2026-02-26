@@ -55,7 +55,7 @@ impl FromRequest for CurrentUser {
                 _ => {
                     // Fall back to pooled connection
                     let db = require_db(app_state)?;
-                    users::find_user_by_sub(db, &claims.sub).await?
+                    users::find_user_by_sub(&db, &claims.sub).await?
                 }
             };
 

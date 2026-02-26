@@ -114,7 +114,21 @@ where
     let db = require_db(state)?;
 
     // Real DB path: own the transaction lifecycle
-    let txn = db.begin().await?;
+    let txn_res = db.begin().await;
+
+    // Report connection failures to readiness manager.
+    // We only report sustainable failures (DbErr) here; the monitor task handles
+    // the recovery polling.
+    if let Err(ref e) = txn_res {
+        state.readiness().update_dependency(
+            crate::readiness::types::DependencyName::Postgres,
+            crate::readiness::types::DependencyCheck::Down {
+                error: e.to_string(),
+                latency: std::time::Duration::from_millis(1),
+            },
+        );
+    }
+    let txn = txn_res?;
 
     // Increment active transaction counter
     ACTIVE_TXNS.fetch_add(1, Ordering::SeqCst);
@@ -124,19 +138,29 @@ where
     match out {
         Ok(val) => {
             // Apply transaction policy on success
-            match txn_policy::current() {
-                txn_policy::TxnPolicy::CommitOnOk => {
-                    txn.commit().await?;
-                    ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
-                    Ok(val)
-                }
+            let commit_res = match txn_policy::current() {
+                txn_policy::TxnPolicy::CommitOnOk => txn.commit().await,
                 _ => {
                     // RollbackOnOk (test-only policy) - rollback on success
-                    txn.rollback().await?;
-                    ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
-                    Ok(val)
+                    txn.rollback().await
                 }
+            };
+
+            ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
+
+            if let Err(e) = commit_res {
+                // Report commit failures to readiness manager
+                state.readiness().update_dependency(
+                    crate::readiness::types::DependencyName::Postgres,
+                    crate::readiness::types::DependencyCheck::Down {
+                        error: e.to_string(),
+                        latency: std::time::Duration::from_millis(1),
+                    },
+                );
+                return Err(AppError::from(e));
             }
+
+            Ok(val)
         }
         Err(err) => {
             // Best-effort rollback; preserve original error

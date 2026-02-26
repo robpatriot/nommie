@@ -16,7 +16,7 @@ import { parseErrorResponse } from './api/error-parsing'
 import {
   markBackendUp,
   shouldLogError,
-  isInStartupWindow,
+  getBackendMode,
 } from '@/lib/server/backend-status'
 import { isBackendConnectionError } from '@/lib/server/connection-errors'
 import { fetchWithAuthWithRetry } from './server/fetch-with-retry'
@@ -72,7 +72,10 @@ export async function fetchWithAuth(
       }
       // During startup, if backend isn't ready, use 503 (Service Unavailable)
       // Otherwise, use 401 (Unauthorized) for actual auth issues
-      if (isInStartupWindow() && error.message.includes('starting up')) {
+      if (
+        getBackendMode() === 'startup' &&
+        error.message.includes('starting up')
+      ) {
         const message = await getLocalizedErrorMessageForCode(
           'BACKEND_STARTING',
           'Backend is starting up, please try again shortly'

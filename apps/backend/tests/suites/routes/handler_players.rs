@@ -16,7 +16,7 @@ async fn test_get_player_display_name_success() -> Result<(), AppError> {
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     // Create test data using the shared transaction
     let game_id = create_test_game(shared.transaction()).await?;
@@ -57,7 +57,7 @@ async fn test_get_player_display_name_ai_user() -> Result<(), AppError> {
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     // Create test data with AI user
     let game_id = create_test_game(shared.transaction()).await?;
@@ -104,7 +104,7 @@ async fn test_get_player_display_name_not_found() -> Result<(), AppError> {
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     // Create test game but no players
     let game_id = create_test_game(shared.transaction()).await?;
@@ -146,7 +146,7 @@ async fn test_get_player_display_name_invalid_seat() -> Result<(), AppError> {
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     // Create test data
     let game_id = create_test_game(shared.transaction()).await?;
@@ -190,7 +190,7 @@ async fn test_get_player_display_name_fallback_to_sub() -> Result<(), AppError> 
 
     // Get pooled DB and open a shared txn
     let db = backend::db::require_db(&state).expect("DB required for this test");
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     // Create test data with no username (should fall back to sub)
     let game_id = create_test_game(shared.transaction()).await?;

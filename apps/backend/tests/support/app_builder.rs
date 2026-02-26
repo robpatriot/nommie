@@ -18,8 +18,11 @@ type RouteConfigFn = Box<dyn Fn(&mut web::ServiceConfig) + Send + Sync>;
 /// tests we register the same paths without those wrappers so that
 /// endpoint behavior can be exercised directly.
 fn configure_test_routes(cfg: &mut web::ServiceConfig) {
-    // Health check routes: /health
-    cfg.service(web::scope("/health").configure(routes::health::configure_routes));
+    // Health check routes: /healthz and /readyz (public)
+    cfg.configure(routes::health::configure_public_health_routes);
+
+    // Internal diagnostics: /internal/healthz and /internal/readyz
+    cfg.service(web::scope("/internal").configure(routes::health::configure_internal_routes));
 
     // Auth routes: /api/auth/**
     cfg.service(web::scope("/api/auth").configure(routes::auth::configure_routes));

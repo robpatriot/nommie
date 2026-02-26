@@ -63,7 +63,7 @@ impl FromRequest for GameId {
                 _ => {
                     // Fall back to pooled connection
                     let db = require_db(app_state)?;
-                    games::exists(db, game_id).await?
+                    games::exists(&db, game_id).await?
                 }
             };
 

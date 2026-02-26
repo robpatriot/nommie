@@ -98,7 +98,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
 
     let credential_count = user_credentials::Entity::find()
         .filter(user_credentials::Column::Email.eq(&normalized_email))
-        .count(conn)
+        .count(&conn)
         .await?;
     assert_eq!(
         credential_count, 1,
@@ -107,7 +107,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
 
     let user_count = users::Entity::find()
         .filter(users::Column::Sub.eq(&google_sub))
-        .count(conn)
+        .count(&conn)
         .await?;
     assert_eq!(user_count, 1, "should not commit an orphan user row");
 

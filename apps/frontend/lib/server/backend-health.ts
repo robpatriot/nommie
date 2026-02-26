@@ -1,46 +1,55 @@
-// Server-only utility to check backend health
-// This file must never be imported by client code
+// Server-only utility to check backend readiness.
+// This file must never be imported by client code.
 
 import { getBackendBaseUrlOrThrow } from '@/auth'
-import { markBackendUp, shouldLogError } from './backend-status'
+import {
+  markBackendUp,
+  markBackendDown,
+  shouldLogError,
+} from './backend-status'
 import { isBackendConnectionError } from './connection-errors'
 import { logError } from '@/lib/logging/error-logger'
 
+export interface BackendReadinessResult {
+  ready: boolean
+  error?: string
+}
+
 /**
- * Checks if the backend is available by hitting the /health endpoint.
- * This endpoint is not rate-limited, making it safe for startup probing.
+ * Check if the backend is ready by hitting `/readyz`.
  *
- * @returns true if backend is healthy, false otherwise
+ * Updates the server-side readiness state on success/failure.
  */
-export async function checkBackendHealth(): Promise<boolean> {
+export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
   try {
     const backendBase = getBackendBaseUrlOrThrow()
-    const response = await fetch(`${backendBase}/health`, {
+    const response = await fetch(`${backendBase}/readyz`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
-      // Use a shorter timeout for health checks
-      signal: AbortSignal.timeout(5000), // 5 second timeout
+      signal: AbortSignal.timeout(5000),
     })
 
     if (response.ok) {
-      // Backend is up - mark it as such
       markBackendUp()
-      return true
+      return { ready: true }
     }
 
-    return false
+    // Got a response (e.g. 503) – backend is alive but not ready
+    const errorMsg = `Backend not ready (HTTP ${response.status})`
+    markBackendDown(errorMsg)
+    return { ready: false, error: errorMsg }
   } catch (error) {
-    // Check if this is a connection error
-    const isConnectionError = isBackendConnectionError(error)
+    const isConnection = isBackendConnectionError(error)
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
 
-    // Only log if we should (outside startup window or runtime failure)
-    if (shouldLogError() && isConnectionError) {
-      logError('Backend health check failed (connection error)', error)
-    } else if (shouldLogError() && !isConnectionError) {
-      // Non-connection errors should be logged if outside startup window
-      logError('Backend health check failed', error)
+    markBackendDown(errorMsg)
+
+    if (shouldLogError() && isConnection) {
+      logError('Backend readiness check failed (connection error)', error)
+    } else if (shouldLogError() && !isConnection) {
+      logError('Backend readiness check failed', error)
     }
 
-    return false
+    return { ready: false, error: errorMsg }
   }
 }

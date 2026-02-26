@@ -86,7 +86,7 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
         .await?;
 
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Create a test user
     let user_sub = unique_str("test-user");
@@ -168,7 +168,7 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
         .await?;
 
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Create a test user
     let user_sub = unique_str("test-user");

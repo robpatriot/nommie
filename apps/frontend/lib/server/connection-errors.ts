@@ -1,5 +1,6 @@
 // Server-only utility for detecting backend connection errors
 // This file must never be imported by client code
+import { getBackendMode } from './backend-status'
 
 /**
  * Determines if an error is a backend connection error.
@@ -36,12 +37,8 @@ export function isBackendConnectionError(error: unknown): boolean {
  * This is true when we're in the startup window AND it's a connection error.
  *
  * @param error - The error to check
- * @param isInStartupWindow - Function to check if we're in startup window
  * @returns true if this is likely a startup error
  */
-export function isBackendStartupError(
-  error: unknown,
-  isInStartupWindow: () => boolean
-): boolean {
-  return isInStartupWindow() && isBackendConnectionError(error)
+export function isBackendStartupError(error: unknown): boolean {
+  return getBackendMode() === 'startup' && isBackendConnectionError(error)
 }

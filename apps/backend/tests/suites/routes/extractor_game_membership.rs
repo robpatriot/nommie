@@ -60,7 +60,7 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
@@ -142,7 +142,7 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
 
     // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Create a test user
     let user_sub = unique_str("test-user");
@@ -214,7 +214,7 @@ async fn test_membership_invalid_user_id() -> Result<(), Box<dyn std::error::Err
 
     // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Create a test game
     let now = OffsetDateTime::now_utc();
@@ -280,7 +280,7 @@ async fn test_membership_composition_with_current_user_and_game_id(
         .await?;
 
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
@@ -368,7 +368,7 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
     let token = mint_test_token(&user_sub, &user_email, &security_config);
 
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
 
     // Build test app with echo route

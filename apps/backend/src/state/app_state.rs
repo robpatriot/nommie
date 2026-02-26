@@ -1,93 +1,133 @@
-use std::sync::Arc;
+use std::fmt;
+use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, RwLock};
 
 use sea_orm::DatabaseConnection;
 
 use super::security_config::SecurityConfig;
+use crate::config::db::{DbKind, RuntimeEnv};
 use crate::config::email_allowlist::EmailAllowlist;
+use crate::readiness::ReadinessManager;
 use crate::routes::snapshot_cache::SnapshotCache;
 use crate::ws::hub::{RealtimeBroker, WsRegistry};
 
+/// Simple wrapper to protect sensitive strings from accidental logging
+#[derive(Clone)]
+pub struct Secret<T>(pub T);
+
+impl<T> fmt::Debug for Secret<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<REDACTED>")
+    }
+}
+
+/// Consolidated configuration DNA for the AppState
+#[derive(Clone, Debug)]
+pub struct AppConfig {
+    pub env: RuntimeEnv,
+    pub db_kind: DbKind,
+    pub db_url: Secret<String>,
+    pub redis_url: Secret<Option<String>>,
+    pub security: SecurityConfig,
+    pub email_allowlist: Option<EmailAllowlist>,
+}
+
 /// Application state containing shared resources
 pub struct AppState {
-    /// Database connection (optional)
-    db: Option<DatabaseConnection>,
-    /// Security configuration including JWT settings
-    pub security: SecurityConfig,
-    /// Email allowlist for restricting signup and login (None = allowlist disabled)
-    pub email_allowlist: Option<EmailAllowlist>,
-    /// Realtime broker for websocket fan-out (optional in tests)
-    pub realtime: Option<Arc<RealtimeBroker>>,
+    /// Consolidated configuration
+    pub config: AppConfig,
+    /// Database connection (optional, can be updated via background recovery)
+    db: Arc<RwLock<Option<DatabaseConnection>>>,
+    /// Realtime broker (optional, can be updated via background recovery)
+    realtime: Arc<RwLock<Option<Arc<RealtimeBroker>>>>,
     /// WebSocket session registry.
-    ///
-    /// In production this is sourced from `realtime` (and is backed by Redis pub/sub fan-out).
-    /// In tests it can be set directly to an in-memory registry to avoid Redis.
-    pub(crate) websocket_registry: Option<Arc<WsRegistry>>,
+    websocket_registry: Arc<RwLock<Option<Arc<WsRegistry>>>>,
+    /// Singleflight flags for resolution
+    pub db_resolution_in_flight: AtomicBool,
+    pub redis_resolution_in_flight: AtomicBool,
     /// Snapshot cache for optimizing WebSocket broadcasts.
-    ///
-    /// Caches shared snapshot parts (game state, seating) to avoid redundant
-    /// database queries when multiple users receive broadcasts for the same game version.
     pub snapshot_cache: Arc<SnapshotCache>,
+    /// Readiness state manager.
+    readiness: Arc<ReadinessManager>,
 }
 
 impl AppState {
-    fn new_inner(
+    pub fn new(
+        config: AppConfig,
         db: Option<DatabaseConnection>,
-        security: SecurityConfig,
-        email_allowlist: Option<EmailAllowlist>,
         realtime: Option<Arc<RealtimeBroker>>,
+        readiness: Arc<ReadinessManager>,
     ) -> Self {
-        let websocket_registry = realtime.as_ref().map(|broker| broker.registry());
-        let snapshot_cache = Arc::new(SnapshotCache::new());
+        let registry = realtime.as_ref().map(|broker| broker.registry());
         Self {
-            db,
-            security,
-            email_allowlist,
-            realtime,
-            websocket_registry,
-            snapshot_cache,
+            config,
+            db: Arc::new(RwLock::new(db)),
+            realtime: Arc::new(RwLock::new(realtime)),
+            websocket_registry: Arc::new(RwLock::new(registry)),
+            db_resolution_in_flight: AtomicBool::new(false),
+            redis_resolution_in_flight: AtomicBool::new(false),
+            snapshot_cache: Arc::new(SnapshotCache::new()),
+            readiness,
         }
     }
 
-    /// Create a new AppState with the given database connection and security config
-    pub fn new(
-        db: DatabaseConnection,
-        security: SecurityConfig,
-        email_allowlist: Option<EmailAllowlist>,
-    ) -> Self {
-        Self::new_inner(Some(db), security, email_allowlist, None)
+    /// Create a new AppState with no database connection (used primarily in tests)
+    pub fn new_without_db(config: AppConfig, readiness: Option<Arc<ReadinessManager>>) -> Self {
+        let readiness = readiness.unwrap_or_else(|| Arc::new(ReadinessManager::new()));
+        Self::new(config, None, None, readiness)
     }
 
-    /// Create a new AppState with no database connection
-    pub fn new_without_db(
-        security: SecurityConfig,
-        email_allowlist: Option<EmailAllowlist>,
-    ) -> Self {
-        Self::new_inner(None, security, email_allowlist, None)
+    /// Attach realtime broker (replaces existing if any)
+    pub fn set_realtime(&self, realtime: Arc<RealtimeBroker>) {
+        if let Ok(mut reg) = self.websocket_registry.write() {
+            *reg = Some(realtime.registry());
+        }
+        if let Ok(mut rt) = self.realtime.write() {
+            *rt = Some(realtime);
+        }
     }
 
-    /// Attach realtime broker after initialization
-    pub fn with_realtime(mut self, realtime: Arc<RealtimeBroker>) -> Self {
-        self.websocket_registry = Some(realtime.registry());
-        self.realtime = Some(realtime);
-        self
+    /// Attach database connection (replaces existing if any)
+    pub fn set_db(&self, db: DatabaseConnection) {
+        if let Ok(mut d) = self.db.write() {
+            *d = Some(db);
+        }
     }
 
-    /// Get a reference to the database connection if available
-    pub fn db(&self) -> Option<&DatabaseConnection> {
-        self.db.as_ref()
+    /// Get the security configuration.
+    pub fn security(&self) -> &SecurityConfig {
+        &self.config.security
+    }
+
+    /// Get a clone of the database connection if available
+    ///
+    /// Note: Returns an Option<DatabaseConnection> because SeaORM connections
+    /// are internally Arcs and safe to clone.
+    pub fn db(&self) -> Option<DatabaseConnection> {
+        self.db.read().ok()?.clone()
+    }
+
+    /// Get the readiness manager.
+    pub fn readiness(&self) -> &Arc<ReadinessManager> {
+        &self.readiness
     }
 
     /// Attach a WebSocket session registry.
-    ///
-    /// Provides an in-memory registry without requiring Redis.
-    pub fn with_websocket_registry(mut self, registry: Arc<WsRegistry>) -> Self {
-        self.websocket_registry = Some(registry);
+    pub fn with_websocket_registry(self, registry: Arc<WsRegistry>) -> Self {
+        if let Ok(mut reg) = self.websocket_registry.write() {
+            *reg = Some(registry);
+        }
         self
     }
 
     /// Get the WebSocket session registry, if configured.
     pub fn websocket_registry(&self) -> Option<Arc<WsRegistry>> {
-        self.websocket_registry.clone()
+        self.websocket_registry.read().ok()?.clone()
+    }
+
+    /// Get the realtime broker, if configured.
+    pub fn realtime(&self) -> Option<Arc<RealtimeBroker>> {
+        self.realtime.read().ok()?.clone()
     }
 
     /// Get a reference to the snapshot cache.
@@ -96,8 +136,6 @@ impl AppState {
     }
 
     /// Get an Arc clone of the snapshot cache.
-    ///
-    /// Useful when the cache needs to be moved into async closures.
     pub fn snapshot_cache_arc(&self) -> Arc<SnapshotCache> {
         self.snapshot_cache.clone()
     }

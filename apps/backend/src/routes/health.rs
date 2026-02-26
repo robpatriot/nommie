@@ -1,87 +1,69 @@
 use actix_web::{web, HttpResponse};
-use migration::get_latest_migration_version;
-use sea_orm::ConnectionTrait;
-use serde::Serialize;
-use time::OffsetDateTime;
 
-use crate::db::require_db;
-use crate::error::AppError;
 use crate::state::app_state::AppState;
 
-pub async fn root() -> Result<HttpResponse, AppError> {
-    Ok(HttpResponse::Ok().body("Hello from Nommie Backend! 🃏"))
+// ── Public endpoints ───────────────────────────────────────────────
+
+/// `GET /healthz` – liveness probe. Always 200 if the process is alive.
+pub async fn healthz() -> HttpResponse {
+    HttpResponse::Ok()
+        .insert_header(("Cache-Control", "no-store"))
+        .json(serde_json::json!({ "status": "alive" }))
 }
 
-#[derive(Debug, Serialize)]
-struct HealthResponse {
-    status: String,
-    app_version: String,
-    db: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    db_error: Option<String>,
-    migrations: String,
-    time: String,
-}
+/// `GET /readyz` – readiness probe. 200 if ready, 503 if not.
+pub async fn readyz(app_state: web::Data<AppState>) -> HttpResponse {
+    let manager = app_state.readiness();
+    let body = manager.to_public_json();
 
-async fn health(app_state: web::Data<AppState>) -> Result<HttpResponse, AppError> {
-    // Get app version from Cargo.toml
-    let app_version = env!("CARGO_PKG_VERSION").to_string();
-
-    // Get current time in ISO 8601 format
-    let now = OffsetDateTime::now_utc();
-    let time = now
-        .format(&time::format_description::well_known::Rfc3339)
-        .unwrap_or_else(|_| "unknown".to_string());
-
-    // Check database connectivity and get migration status
-    let (db_status, db_error, migrations) = match require_db(&app_state) {
-        Ok(db) => {
-            // Try a lightweight query to verify connection
-            match db
-                .query_one(sea_orm::Statement::from_string(
-                    db.get_database_backend(),
-                    "SELECT 1 as health_check".to_string(),
-                ))
-                .await
-            {
-                Ok(_) => {
-                    // Query migration status using the new migration function
-                    let migration_version = match get_latest_migration_version(db).await {
-                        Ok(Some(version)) => version,
-                        Ok(None) => "no_migrations".to_string(),
-                        Err(_) => "unknown".to_string(),
-                    };
-                    ("ok".to_string(), None, migration_version)
-                }
-                Err(e) => (
-                    "error".to_string(),
-                    Some(format!("DB query failed: {e}")),
-                    "unknown".to_string(),
-                ),
-            }
-        }
-        Err(e) => (
-            "error".to_string(),
-            Some(format!("DB unavailable: {e}")),
-            "unknown".to_string(),
-        ),
+    let mut response = if manager.is_ready() {
+        HttpResponse::Ok()
+    } else {
+        HttpResponse::ServiceUnavailable()
     };
 
-    let response = HealthResponse {
-        status: "ok".to_string(),
-        app_version,
-        db: db_status,
-        db_error,
-        migrations,
-        time,
-    };
-
-    Ok(HttpResponse::Ok().json(response))
+    response
+        .insert_header(("Cache-Control", "no-store"))
+        .json(body)
 }
 
-pub fn configure_routes(cfg: &mut actix_web::web::ServiceConfig) {
-    // Only configure health route - root route is configured separately in main.rs
-    // Note: This is called within a /health scope in main.rs, so we use "" here
-    // to create /health (without trailing slash), matching the pattern used in games routes
-    cfg.service(web::resource("").route(web::get().to(health)));
+// ── Internal endpoints ─────────────────────────────────────────────
+
+/// `GET /internal/healthz` – rich liveness info.
+pub async fn internal_healthz(app_state: web::Data<AppState>) -> HttpResponse {
+    let body = app_state.readiness().to_internal_healthz_json();
+    HttpResponse::Ok()
+        .insert_header(("Cache-Control", "no-store"))
+        .json(body)
+}
+
+/// `GET /internal/readyz` – rich readiness info.
+pub async fn internal_readyz(app_state: web::Data<AppState>) -> HttpResponse {
+    let manager = app_state.readiness();
+    let body = manager.to_internal_json();
+
+    let mut response = if manager.is_ready() {
+        HttpResponse::Ok()
+    } else {
+        HttpResponse::ServiceUnavailable()
+    };
+
+    response
+        .insert_header(("Cache-Control", "no-store"))
+        .json(body)
+}
+
+// ── Route configuration ────────────────────────────────────────────
+
+/// Register public health routes on the given scope.
+/// Called from main.rs for the root scope.
+pub fn configure_public_health_routes(cfg: &mut actix_web::web::ServiceConfig) {
+    cfg.service(web::resource("/healthz").route(web::get().to(healthz)))
+        .service(web::resource("/readyz").route(web::get().to(readyz)));
+}
+
+/// Register internal health routes under `/internal`.
+pub fn configure_internal_routes(cfg: &mut actix_web::web::ServiceConfig) {
+    cfg.service(web::resource("/healthz").route(web::get().to(internal_healthz)))
+        .service(web::resource("/readyz").route(web::get().to(internal_readyz)));
 }

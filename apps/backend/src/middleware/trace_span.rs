@@ -121,7 +121,7 @@ fn extract_user_id_from_jwt(req: &ServiceRequest) -> Option<String> {
 
     // Get JWT secret from AppState
     let state = req.app_data::<actix_web::web::Data<crate::state::app_state::AppState>>()?;
-    let secret = &state.security.jwt_secret;
+    let secret = &state.security().jwt_secret;
 
     // Use shared utility to extract sub claim for logging
     extract_sub_for_logging(token, secret)

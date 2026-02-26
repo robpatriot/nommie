@@ -29,6 +29,9 @@ import { loadMessages } from '@/i18n/messages'
 import { getUserOptions } from '@/lib/api/user-options'
 import { BACKEND_JWT_COOKIE_NAME } from '@/lib/auth/backend-jwt-cookie'
 import { WebSocketProvider } from '@/lib/providers/web-socket-provider'
+import { BackendReadinessProvider } from '@/lib/providers/backend-readiness-provider'
+import DegradedModeBanner from '@/components/DegradedModeBanner'
+import ReadinessQueryObserver from '@/components/ReadinessQueryObserver'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -181,19 +184,24 @@ export default async function RootLayout({
             isAuthenticated={!!session}
           >
             <AppQueryClientProvider>
-              <WebSocketProvider isAuthenticated={!!session}>
-                <PerformanceMonitorWrapper />
+              <BackendReadinessProvider>
+                <ReadinessQueryObserver />
+                <DegradedModeBanner>
+                  <WebSocketProvider isAuthenticated={!!session}>
+                    <PerformanceMonitorWrapper />
 
-                <HeaderBreadcrumbProvider>
-                  <div className="tabletop-content">
-                    <Suspense fallback={null}>
-                      <Header session={session} />
-                    </Suspense>
+                    <HeaderBreadcrumbProvider>
+                      <div className="tabletop-content">
+                        <Suspense fallback={null}>
+                          <Header session={session} />
+                        </Suspense>
 
-                    {children}
-                  </div>
-                </HeaderBreadcrumbProvider>
-              </WebSocketProvider>
+                        {children}
+                      </div>
+                    </HeaderBreadcrumbProvider>
+                  </WebSocketProvider>
+                </DegradedModeBanner>
+              </BackendReadinessProvider>
             </AppQueryClientProvider>
           </ThemeProvider>
         </NextIntlClientProvider>

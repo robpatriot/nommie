@@ -16,7 +16,7 @@ use crate::support::test_utils::test_seed;
 async fn test_game_history_empty_game() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     let game_id = create_fresh_lobby_game(txn, "game_hist_empty").await?;
@@ -35,7 +35,7 @@ async fn test_game_history_empty_game() -> Result<(), AppError> {
 async fn test_game_history_with_rounds() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     use backend::entities::game_rounds::{self, CardTrump};
@@ -176,7 +176,7 @@ async fn test_game_history_with_rounds() -> Result<(), AppError> {
 async fn test_trump_selector_tie_breaking() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     use backend::entities::games::{self, GameState, GameVisibility};

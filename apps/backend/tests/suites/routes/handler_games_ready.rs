@@ -19,9 +19,9 @@ use crate::support::factory::{create_fresh_lobby_game, create_test_user};
 #[tokio::test]
 async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security.clone();
+    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let game_id = create_fresh_lobby_game(shared.transaction(), "ready_endpoint_basic").await?;
     let user_sub = "ready-user-basic";
@@ -76,9 +76,9 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
 #[tokio::test]
 async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security.clone();
+    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let game_id = create_fresh_lobby_game(shared.transaction(), "ready_endpoint_autostart").await?;
 

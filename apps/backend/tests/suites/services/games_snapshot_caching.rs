@@ -31,9 +31,9 @@ struct SnapshotTestContext {
 
 async fn setup_snapshot_test(test_name: &str) -> Result<SnapshotTestContext, AppError> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let viewer_sub = test_user_sub(&format!("{test_name}_viewer"));
     let viewer_email = format!("{viewer_sub}@example.com");

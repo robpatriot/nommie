@@ -12,6 +12,8 @@ use tracing::{error, info, warn};
 
 use crate::error::AppError;
 use crate::errors::ErrorCode;
+use crate::readiness::types::{DependencyCheck, DependencyName};
+use crate::readiness::ReadinessManager;
 use crate::ws::hub::WsRegistry;
 use crate::ws::session::HubEvent;
 
@@ -35,10 +37,14 @@ pub enum EventEnvelope {
 pub struct RealtimeBroker {
     registry: Arc<WsRegistry>,
     publisher: Mutex<ConnectionManager>,
+    readiness: Arc<ReadinessManager>,
 }
 
 impl RealtimeBroker {
-    pub async fn connect(redis_url: &str) -> Result<Arc<Self>, AppError> {
+    pub async fn connect(
+        redis_url: &str,
+        readiness: Arc<ReadinessManager>,
+    ) -> Result<Arc<Self>, AppError> {
         let client = Client::open(redis_url).map_err(|err| AppError::Config {
             detail: format!("Invalid REDIS_URL: {err}"),
             source: Box::new(err),
@@ -46,19 +52,29 @@ impl RealtimeBroker {
 
         let manager = ConnectionManager::new(client.clone())
             .await
-            .map_err(|err| AppError::Internal {
-                code: ErrorCode::ConfigError,
-                detail: "Unable to initialize Redis connection manager".to_string(),
-                source: Box::new(err),
+            .map_err(|err| {
+                readiness.update_dependency(
+                    DependencyName::Redis,
+                    DependencyCheck::Down {
+                        error: err.to_string(),
+                        latency: Duration::from_millis(1),
+                    },
+                );
+                AppError::Internal {
+                    code: ErrorCode::ConfigError,
+                    detail: "Unable to initialize Redis connection manager".to_string(),
+                    source: Box::new(err),
+                }
             })?;
 
         let registry = Arc::new(WsRegistry::new());
         let broker = Arc::new(Self {
             registry: registry.clone(),
             publisher: Mutex::new(manager),
+            readiness: readiness.clone(),
         });
 
-        spawn_subscriber(redis_url, registry);
+        spawn_subscriber(redis_url, registry, readiness);
 
         Ok(broker)
     }
@@ -135,6 +151,14 @@ impl RealtimeBroker {
                     };
 
                     if attempt >= PUBLISHER_MAX_ATTEMPTS || !is_transient_error(&app_err) {
+                        // Report failure to readiness manager on sustainable errors
+                        self.readiness.update_dependency(
+                            DependencyName::Redis,
+                            DependencyCheck::Down {
+                                error: app_err.to_string(),
+                                latency: Duration::from_millis(1),
+                            },
+                        );
                         return Err(app_err);
                     }
 
@@ -165,10 +189,10 @@ const PUBLISHER_MAX_ATTEMPTS: u32 = 3;
 const PUBLISHER_INITIAL_RETRY_DELAY_MS: u64 = 50;
 const PUBLISHER_MAX_RETRY_DELAY_MS: u64 = 200;
 
-fn spawn_subscriber(redis_url: &str, registry: Arc<WsRegistry>) {
+fn spawn_subscriber(redis_url: &str, registry: Arc<WsRegistry>, readiness: Arc<ReadinessManager>) {
     let redis_url = redis_url.to_string();
     tokio::spawn(async move {
-        run_subscription_loop_with_retry(&redis_url, registry).await;
+        run_subscription_loop_with_retry(&redis_url, registry, readiness).await;
     });
 }
 
@@ -231,7 +255,11 @@ fn calculate_retry_delay(attempt: u32) -> Duration {
     Duration::from_secs_f64(final_delay)
 }
 
-async fn run_subscription_loop_with_retry(redis_url: &str, registry: Arc<WsRegistry>) {
+async fn run_subscription_loop_with_retry(
+    redis_url: &str,
+    registry: Arc<WsRegistry>,
+    readiness: Arc<ReadinessManager>,
+) {
     let mut attempt = 0u32;
 
     loop {
@@ -244,6 +272,15 @@ async fn run_subscription_loop_with_retry(redis_url: &str, registry: Arc<WsRegis
                 break;
             }
             Err(err) => {
+                // Report failure to readiness manager
+                readiness.update_dependency(
+                    DependencyName::Redis,
+                    DependencyCheck::Down {
+                        error: err.to_string(),
+                        latency: Duration::from_millis(1),
+                    },
+                );
+
                 if !is_transient_error(&err) {
                     error!(
                         error = %err,

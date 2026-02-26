@@ -5,30 +5,51 @@ use serde_json::Value;
 use crate::support::app_builder::create_test_app;
 
 #[actix_web::test]
-async fn test_health_endpoint() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state, then app using the two-stage harness
+async fn test_public_health_probes() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().build().await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    let req = test::TestRequest::get().uri("/health").to_request();
+    // 1. Liveness check (/healthz)
+    let req = test::TestRequest::get().uri("/healthz").to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success());
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "alive");
+
+    // 2. Readiness check (/readyz)
+    // Initially not ready (mode=Startup)
+    let req = test::TestRequest::get().uri("/readyz").to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status().as_u16(), 503);
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["status"], "not_ready");
+    assert_eq!(body["ready"], false);
+
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_internal_readiness_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
+    let state = build_state().build().await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
+
+    let req = test::TestRequest::get()
+        .uri("/internal/readyz")
+        .to_request();
     let resp = test::call_service(&app, req).await;
 
-    assert!(resp.status().is_success());
-    assert_eq!(resp.status().as_u16(), 200);
+    // Should be 503 initially (Startup mode)
+    assert_eq!(resp.status().as_u16(), 503);
 
-    let body = test::read_body(resp).await;
-    let json: Value = serde_json::from_slice(&body)?;
+    let json: Value = test::read_body_json(resp).await;
 
-    // Verify required fields are present
-    assert_eq!(json["status"], "ok");
-    assert_eq!(json["app_version"], env!("CARGO_PKG_VERSION"));
-    assert!(json["db"].is_string());
-    assert!(json["migrations"].is_string());
-    assert!(json["time"].is_string());
-
-    // db field should be either "ok" or "error"
-    let db_status = json["db"].as_str().unwrap();
-    assert!(db_status == "ok" || db_status == "error");
+    // Verify rich diagnostic fields
+    assert_eq!(json["service"], "backend");
+    assert!(json["uptime_seconds"].is_number());
+    assert_eq!(json["state"]["mode"], "startup");
+    assert_eq!(json["state"]["ready"], false);
+    assert!(json["dependencies"].is_array());
+    assert!(json["migration"].is_object());
 
     Ok(())
 }

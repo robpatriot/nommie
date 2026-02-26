@@ -30,27 +30,34 @@ async fn main() -> std::io::Result<()> {
         "🚀 Starting Nommie Backend on http://{}:{}",
         config.host, config.port
     );
+
     let security_config =
         backend::state::security_config::SecurityConfig::new(config.jwt_secret.as_bytes());
 
-    // Create application state using unified builder
+    // ── Readiness manager ──────────────────────────────────────────
+    let readiness = Arc::new(backend::readiness::ReadinessManager::new());
+
+    // ── Build application state (Resilient Mode) ───────────────────
+    //
+    // By providing the ReadinessManager to the builder, we enable
+    // Resilient Mode. Failures in DB or Redis will be caught, reported
+    // to the manager, and the service will continue to start.
     let app_state = backend::infra::state::build_state()
         .with_env(config.runtime_env)
         .with_db(config.db_kind)
         .with_security(security_config)
-        .with_email_allowlist(config.email_allowlist)
+        .with_email_allowlist(config.email_allowlist.clone())
         .with_redis_url(Some(config.redis_url.clone()))
+        .with_readiness(readiness.clone())
         .build()
         .await
-        .map_err(|e| std::io::Error::other(format!("❌ Failed to build application state: {e}")))?;
-
-    println!("✅ Database connected");
+        .map_err(|e| std::io::Error::other(format!("Critical assembly failure: {e}")))?;
 
     // Check TLS certificate expiry (logs warning if expiring soon)
     backend::bin_support::tls_checks::check_postgres_cert_expiry();
 
     // Log email allowlist status
-    match &app_state.email_allowlist {
+    match &app_state.config.email_allowlist {
         Some(allowlist) => {
             println!(
                 "🔒 Email allowlist enabled with {} pattern(s)",
@@ -62,8 +69,25 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // Console diagnostic summary
+    if app_state.db().is_some() {
+        println!("✅ Database connected and migrations applied");
+    } else {
+        eprintln!("⚠️  Database connection/migration failed — NOT READY (searching in background)");
+    }
+
+    if app_state.realtime().is_some() {
+        println!("✅ Redis connected (realtime enabled)");
+    } else {
+        eprintln!("⚠️  Redis connection failed — NOT READY (searching in background)");
+    }
+
+    // ── Spawn dependency monitor ───────────────────────────────────
+    let app_state_arc = Arc::new(app_state);
+    backend::readiness::monitor::spawn_startup_monitor(app_state_arc.clone());
+
     // Wrap AppState with web::Data before passing to HttpServer
-    let data = actix_web::web::Data::new(app_state);
+    let data = actix_web::web::Data::from(app_state_arc);
 
     // Clone registry for shutdown handler
     let registry_for_shutdown = data.websocket_registry();
@@ -106,6 +130,7 @@ async fn main() -> std::io::Result<()> {
                 // Auth routes with strict rate limiting (5 req/min) and security headers
                 actix_web::web::scope("/api/auth")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
+                    .wrap(backend::middleware::readiness_gate::ReadinessGate)
                     .wrap(auth_limiter)
                     .configure(backend::routes::auth::configure_routes),
             )
@@ -113,6 +138,7 @@ async fn main() -> std::io::Result<()> {
                 // Games routes with general rate limiting (100 req/min) and security headers
                 actix_web::web::scope("/api/games")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
+                    .wrap(backend::middleware::readiness_gate::ReadinessGate)
                     .wrap(api_limiter.clone())
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
                     .configure(backend::routes::games::configure_routes),
@@ -121,6 +147,7 @@ async fn main() -> std::io::Result<()> {
                 // User routes with general rate limiting (100 req/min) and security headers
                 actix_web::web::scope("/api/user")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
+                    .wrap(backend::middleware::readiness_gate::ReadinessGate)
                     .wrap(api_limiter.clone())
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
                     .configure(backend::routes::user_options::configure_routes),
@@ -129,15 +156,10 @@ async fn main() -> std::io::Result<()> {
                 // WebSocket token endpoint - issues short-lived tokens for WS connections
                 actix_web::web::scope("/api/ws")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
+                    .wrap(backend::middleware::readiness_gate::ReadinessGate)
                     .wrap(api_limiter.clone())
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
                     .configure(backend::routes::realtime::configure_routes),
-            )
-            // Health check route - security headers only, no rate limiting
-            .service(
-                actix_web::web::scope("/health")
-                    .wrap(backend::middleware::security_headers::SecurityHeaders)
-                    .configure(backend::routes::health::configure_routes),
             )
             // WebSocket upgrade endpoint (generic, authenticated transport)
             .service(
@@ -150,11 +172,16 @@ async fn main() -> std::io::Result<()> {
                             .name("websocket_upgrade"),
                     ),
             )
-            // Root route - security headers (but no Cache-Control: no-store)
+            // Internal health endpoints - no rate limiting, no readiness gate
+            .service(
+                actix_web::web::scope("/internal")
+                    .configure(backend::routes::health::configure_internal_routes),
+            )
+            // Public health endpoints - no rate limiting, no readiness gate
             .service(
                 actix_web::web::scope("")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
-                    .route("/", actix_web::web::get().to(backend::routes::health::root)),
+                    .configure(backend::routes::health::configure_public_health_routes),
             )
     })
     .bind((host.as_str(), port))?

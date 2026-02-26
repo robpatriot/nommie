@@ -25,7 +25,7 @@ async fn test_full_game_with_ai_players() -> Result<(), AppError> {
 
     // Open SharedTxn for this test
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     let ai_service = AiService;

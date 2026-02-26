@@ -9,6 +9,10 @@ import {
 } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { WebSocketProvider } from '@/lib/providers/web-socket-provider'
+import type {
+  CancelPoll,
+  PollDriver,
+} from '@/lib/providers/backend-readiness-provider'
 
 // AllProviders wrapper - includes QueryClientProvider + WebSocketProvider
 const AllProviders = ({
@@ -125,6 +129,46 @@ export function renderHook<Result, Props>(
   return {
     ...hookResult,
     queryClient,
+  }
+}
+
+type Task = { cb: () => void; canceled: boolean }
+
+export class ManualPollDriver implements PollDriver {
+  private queue: Task[] = []
+
+  run(cb: () => void) {
+    // Queue so tests control everything deterministically.
+    this.queue.push({ cb, canceled: false })
+  }
+
+  schedule(cb: () => void, _delayMs: number): CancelPoll {
+    const task: Task = { cb, canceled: false }
+    this.queue.push(task)
+    return {
+      cancel: () => {
+        task.canceled = true
+      },
+    }
+  }
+
+  async tickN(n: number): Promise<void> {
+    for (let i = 0; i < n; i++) {
+      await this.tick()
+    }
+  }
+
+  async tick(): Promise<void> {
+    const idx = this.queue.findIndex((t) => !t.canceled)
+    if (idx === -1) {
+      throw new Error('ManualPollDriver.tick(): no pending tasks')
+    }
+
+    const [task] = this.queue.splice(idx, 1)
+    task.cb()
+
+    // Flush microtasks (fetch resolution -> React state updates)
+    await Promise.resolve()
   }
 }
 

@@ -101,11 +101,11 @@ async fn test_security_headers_present_on_health_endpoint() -> Result<(), Box<dy
             .wrap(TraceSpan)
             .wrap(RequestTrace)
             .wrap(SecurityHeaders)
-            .route("/health", web::get().to(test_handler)),
+            .route("/healthz", web::get().to(test_handler)),
     )
     .await;
 
-    let req = test::TestRequest::get().uri("/health").to_request();
+    let req = test::TestRequest::get().uri("/healthz").to_request();
     let resp = test::call_service(&app, req).await;
 
     assert!(resp.status().is_success());

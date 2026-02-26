@@ -18,7 +18,7 @@ fn test_seed_u64(name: &str) -> u64 {
 async fn test_memory_degradation_determinism() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     // Create a game with some played cards
@@ -91,7 +91,7 @@ async fn test_memory_degradation_determinism() -> Result<(), AppError> {
 async fn test_memory_levels() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     let (round_id, _game_id) = create_test_round_with_plays(txn).await?;
@@ -147,7 +147,7 @@ async fn test_memory_levels() -> Result<(), AppError> {
 async fn test_partial_memory_types() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
     let (round_id, _game_id) = create_test_round_with_plays(txn).await?;

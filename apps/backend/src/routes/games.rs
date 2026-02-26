@@ -1714,7 +1714,7 @@ async fn publish_snapshot_with_lock(
         app_state.snapshot_cache().remove((game_id, version - 1));
     }
 
-    if let Some(realtime) = &app_state.realtime {
+    if let Some(realtime) = app_state.realtime() {
         if let Err(err) = realtime.publish_game_state(game_id, version).await {
             tracing::error!(
                 game_id,
@@ -1740,7 +1740,7 @@ async fn publish_game_mutation_effects(
     }
 
     // Publish YourTurn transitions (best-effort; do not fail the mutation response)
-    let Some(realtime) = &app_state.realtime else {
+    let Some(realtime) = app_state.realtime() else {
         return Ok(());
     };
 
@@ -1754,7 +1754,7 @@ async fn publish_game_mutation_effects(
     let (seat_to_user_id, human_user_ids) = if transitions.is_empty() {
         (std::collections::HashMap::new(), Vec::new())
     } else {
-        match memberships::find_all_by_game(db, game_id).await {
+        match memberships::find_all_by_game(&db, game_id).await {
             Ok(all) => {
                 let mut seat_map = std::collections::HashMap::new();
                 let mut human_ids = std::collections::HashSet::new();

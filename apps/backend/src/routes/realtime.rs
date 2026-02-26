@@ -34,7 +34,7 @@ async fn issue_ws_token(
         &email,
         SystemTime::now(),
         WS_TOKEN_TTL_SECONDS,
-        &app_state.security,
+        app_state.security(),
     )?;
 
     Ok(HttpResponse::Ok().json(WsTokenResponse {

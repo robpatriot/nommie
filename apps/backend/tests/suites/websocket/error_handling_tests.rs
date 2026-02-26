@@ -17,9 +17,9 @@ use crate::support::websocket_client::WebSocketClient;
 #[tokio::test]
 async fn websocket_bad_protocol_sends_error_and_closes() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_bad_protocol";
     let user_sub = format!("{test_name}_user");
@@ -62,9 +62,9 @@ async fn websocket_bad_protocol_sends_error_and_closes() -> Result<(), Box<dyn s
 async fn websocket_malformed_json_sends_bad_request_and_closes(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_bad_json";
     let user_sub = format!("{test_name}_user");
@@ -102,9 +102,9 @@ async fn websocket_malformed_json_sends_bad_request_and_closes(
 #[tokio::test]
 async fn websocket_subscribe_before_hello_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_subscribe_before_hello";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;
@@ -149,9 +149,9 @@ async fn websocket_subscribe_before_hello_is_rejected() -> Result<(), Box<dyn st
 async fn websocket_unauthorized_subscription_is_forbidden() -> Result<(), Box<dyn std::error::Error>>
 {
     let state = build_test_state().await?;
-    let security = state.security.clone();
+    let security = state.security().clone();
     let db = require_db(&state)?;
-    let shared = backend::db::txn::SharedTxn::open(db).await?;
+    let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
     let test_name = "ws_forbidden_subscription";
     let setup = setup_game_with_players(shared.transaction(), test_name).await?;

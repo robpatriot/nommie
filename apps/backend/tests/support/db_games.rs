@@ -55,7 +55,7 @@ pub async fn count_games_by_name_pool(state: &AppState, name: &str) -> Result<i6
     let db = require_db(state)?;
     let count = games::Entity::find()
         .filter(games::Column::Name.eq(Some(name.to_string())))
-        .count(db)
+        .count(&db)
         .await
         .map_err(|e| AppError::from(map_db_err(e)))?;
     Ok(count as i64)
@@ -66,7 +66,7 @@ pub async fn fetch_one_game_by_name_pool(state: &AppState, name: &str) -> Result
     let db = require_db(state)?;
     let found = games::Entity::find()
         .filter(games::Column::Name.eq(Some(name.to_string())))
-        .one(db)
+        .one(&db)
         .await
         .map_err(|e| AppError::from(map_db_err(e)))?;
     Ok(found.is_some())

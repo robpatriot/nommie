@@ -33,7 +33,7 @@ pub async fn authorize_game_subscription(
         game_players::Entity::find()
             .filter(game_players::Column::GameId.eq(game_id))
             .filter(game_players::Column::HumanUserId.eq(Some(user.id)))
-            .one(db)
+            .one(&db)
             .await?
     };
 

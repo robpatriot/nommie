@@ -5,11 +5,11 @@ import { auth, getBackendBaseUrlOrThrow } from '@/auth'
 import { cookies } from 'next/headers'
 import { BACKEND_JWT_COOKIE_NAME } from './backend-jwt-cookie'
 import { getBackendJwtFromCookie } from './backend-jwt-cookie.server'
-import { checkBackendHealth } from '@/lib/server/backend-health'
+import { checkBackendReadiness } from '@/lib/server/backend-health'
 import {
   markBackendUp,
   shouldLogError,
-  isInStartupWindow,
+  getBackendMode,
 } from '@/lib/server/backend-status'
 import { isBackendConnectionError } from '@/lib/server/connection-errors'
 import { parseErrorResponse } from '@/lib/api/error-parsing'
@@ -108,8 +108,8 @@ export async function refreshBackendJwtIfNeeded(
     }
 
     // No valid JWT available
-    if (isInStartupWindow()) {
-      const backendHealthy = await checkBackendHealth()
+    if (getBackendMode() === 'startup') {
+      const { ready: backendHealthy } = await checkBackendReadiness()
       if (!backendHealthy) {
         throw new BackendJwtError(
           'Backend is starting up, please try again shortly'
@@ -198,9 +198,9 @@ async function fetchNewBackendJwt(
   }
 
   // Check backend health first
-  const backendHealthy = await checkBackendHealth()
+  const { ready: backendHealthy } = await checkBackendReadiness()
   if (!backendHealthy) {
-    if (isInStartupWindow()) {
+    if (getBackendMode() === 'startup') {
       // Backend not ready yet - return null silently
       return null
     }

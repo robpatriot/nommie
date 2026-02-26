@@ -21,9 +21,9 @@ use crate::support::test_utils::test_user_sub;
 #[tokio::test]
 async fn starting_game_by_adding_last_ai_seat_drains_ai_turns() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security.clone();
+    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let test_name = "starting_game_by_adding_last_ai_seat_drains_ai_turns";
     let game_id = create_fresh_lobby_game(shared.transaction(), test_name).await?;
@@ -113,9 +113,9 @@ async fn starting_game_by_adding_last_ai_seat_drains_ai_turns() -> Result<(), Ap
 #[tokio::test]
 async fn host_can_add_ai_seat() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security.clone();
+    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let test_name = "host_can_add_ai_seat";
     let game_id = create_fresh_lobby_game(shared.transaction(), test_name).await?;
@@ -192,9 +192,9 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
 #[tokio::test]
 async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security.clone();
+    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let test_name = "host_can_update_ai_seat_profile";
     let game_id = create_fresh_lobby_game(shared.transaction(), test_name).await?;
@@ -302,9 +302,9 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
 #[tokio::test]
 async fn host_can_remove_ai_seat() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security.clone();
+    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let test_name = "host_can_remove_ai_seat";
     let game_id = create_fresh_lobby_game(shared.transaction(), test_name).await?;
@@ -384,9 +384,9 @@ async fn host_can_remove_ai_seat() -> Result<(), AppError> {
 #[tokio::test]
 async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security.clone();
+    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let test_name = "non_host_cannot_manage_ai";
     let game_id = create_fresh_lobby_game(shared.transaction(), test_name).await?;
@@ -446,9 +446,9 @@ async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
 #[tokio::test]
 async fn ai_registry_endpoint_lists_factories() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security.clone();
+    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     let host_sub = test_user_sub("ai_registry_host");
     let host_email = format!("{host_sub}@example.com");

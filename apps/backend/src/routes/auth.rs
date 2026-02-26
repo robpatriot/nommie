@@ -59,7 +59,7 @@ async fn login(
 
     // Check email allowlist before proceeding (prevents both signup and login)
     // The allowlist's is_allowed() method handles normalization internally
-    if let Some(allowlist) = &app_state.email_allowlist {
+    if let Some(allowlist) = &app_state.config.email_allowlist {
         if !allowlist.is_allowed(&req.email) {
             return Err(AppError::email_not_allowed());
         }
@@ -69,7 +69,7 @@ async fn login(
     let email = req.email.clone();
     let name = req.name.clone();
     let google_sub = req.google_sub.clone();
-    let email_allowlist = app_state.email_allowlist.clone();
+    let email_allowlist = app_state.config.email_allowlist.clone();
 
     // Own the transaction boundary here and pass a borrowed txn to the service
     let user = with_txn(Some(&http_req), &app_state, |txn| {
@@ -93,7 +93,7 @@ async fn login(
         &user.sub,
         &req.email,
         SystemTime::now(),
-        &app_state.security,
+        app_state.security(),
     )?;
 
     let response = LoginResponse { token };
@@ -117,7 +117,7 @@ async fn check_allowlist(
     }
 
     // Check allowlist - no database work, just in-memory pattern matching
-    let allowed = if let Some(allowlist) = &app_state.email_allowlist {
+    let allowed = if let Some(allowlist) = &app_state.config.email_allowlist {
         allowlist.is_allowed(&req.email)
     } else {
         // No allowlist configured - all emails allowed

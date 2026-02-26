@@ -5,11 +5,7 @@ import {
   ensureBackendJwtForServerAction,
   BackendJwtError,
 } from '@/lib/auth/refresh-backend-jwt'
-import {
-  shouldLogError,
-  isInStartupWindow,
-  markBackendUp,
-} from '@/lib/server/backend-status'
+import { shouldLogError, markBackendUp } from '@/lib/server/backend-status'
 import { isBackendStartupError } from '@/lib/server/connection-errors'
 import { logError } from '@/lib/logging/error-logger'
 
@@ -61,7 +57,7 @@ export async function GET() {
     }
 
     // Check if this is a backend startup error
-    const isStartupError = isBackendStartupError(error, isInStartupWindow)
+    const isStartupError = isBackendStartupError(error)
 
     // Only log if we should (outside startup window or runtime failure)
     if (shouldLogError() && !isStartupError) {

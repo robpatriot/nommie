@@ -165,6 +165,25 @@ impl AppError {
         }
     }
 
+    /// Returns true if the error is considered transient (e.g. connectivity, timeout)
+    /// and might be resolved by retrying.
+    pub fn is_transient(&self) -> bool {
+        match self {
+            AppError::DbUnavailable { .. } => true,
+            AppError::Timeout { .. } => true,
+            _ => {
+                // Check if the detail or source suggests a connectivity issue
+                let detail = self.detail().to_lowercase();
+                detail.contains("connection refused")
+                    || detail.contains("connection reset")
+                    || detail.contains("connection aborted")
+                    || detail.contains("timed out")
+                    || detail.contains("timeout")
+                    || detail.contains("broken pipe")
+            }
+        }
+    }
+
     /// Helper method to extract error detail from any error variant
     fn detail(&self) -> String {
         match self {

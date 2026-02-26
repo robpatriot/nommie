@@ -16,7 +16,7 @@ async fn test_from_req_injected_case() -> Result<(), Box<dyn std::error::Error>>
 
     // Get pooled DB and open a shared txn
     let db = require_db(&state).expect("DB required for this test");
-    let shared = SharedTxn::open(db).await?;
+    let shared = SharedTxn::open(&db).await?;
 
     // Build an HttpRequest and inject the shared txn
     let mut req = test::TestRequest::default().to_http_request();

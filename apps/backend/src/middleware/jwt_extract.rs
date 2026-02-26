@@ -92,12 +92,12 @@ where
         };
 
         // Verify the JWT token
-        let jwt_result = JwtClaims::<BackendClaims>::verify(&token, &app_state.security);
+        let jwt_result = JwtClaims::<BackendClaims>::verify(&token, app_state.security());
 
         match jwt_result {
             Ok(jwt_claims) => {
                 // Check email allowlist if enabled (invalidates existing sessions for non-allowlisted users)
-                if let Some(allowlist) = &app_state.email_allowlist {
+                if let Some(allowlist) = app_state.config.email_allowlist.as_ref() {
                     let email = &jwt_claims.claims.email;
                     if !allowlist.is_allowed(email) {
                         // Use structured AppError so the frontend receives a proper
