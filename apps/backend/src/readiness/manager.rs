@@ -63,9 +63,18 @@ impl ReadinessManager {
     }
 
     /// Current service mode.
-    #[allow(clippy::expect_used)]
     pub fn mode(&self) -> ServiceMode {
-        self.inner.read().expect("readiness lock poisoned").mode
+        match self.inner.read() {
+            Ok(inner) => inner.mode,
+            Err(poisoned) => {
+                let inner = poisoned.into_inner();
+                tracing::error!(
+                    previous_mode = %inner.mode,
+                    "readiness: RwLock poisoned when reading service mode; treating as failed"
+                );
+                ServiceMode::Failed
+            }
+        }
     }
 
     /// Notify the readiness monitor that state may have changed.
@@ -81,9 +90,16 @@ impl ReadinessManager {
     // ── Mutation ────────────────────────────────────────────────────
 
     /// Record migration outcome. A failure is a **hard** failure → immediate `Failed`.
-    #[allow(clippy::expect_used)]
     pub fn set_migration_result(&self, ok: bool, error: Option<String>) {
-        let mut inner = self.inner.write().expect("readiness lock poisoned");
+        let mut inner = match self.inner.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::error!(
+                    "readiness: RwLock poisoned when setting migration result; continuing with last known state"
+                );
+                poisoned.into_inner()
+            }
+        };
         inner.migration.completed = ok;
         inner.migration.error = error.clone();
 
@@ -120,9 +136,17 @@ impl ReadinessManager {
     /// dependencies like Postgres in production is unsupported.
     ///
     /// Returns `true` if this call caused a mode transition.
-    #[allow(clippy::expect_used)]
     pub fn disable_dependency(&self, name: DependencyName, reason: String) -> bool {
-        let mut inner = self.inner.write().expect("readiness lock poisoned");
+        let mut inner = match self.inner.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::error!(
+                    dependency = %name,
+                    "readiness: RwLock poisoned when disabling dependency; continuing with last known state"
+                );
+                poisoned.into_inner()
+            }
+        };
 
         // Hard-failed services never recover.
         if inner.mode == ServiceMode::Failed {
@@ -172,19 +196,30 @@ impl ReadinessManager {
     ///
     /// Returns `true` if a mode transition occurred (caller can use this to
     /// decide whether to wake the monitor task).
-    #[allow(clippy::expect_used)]
     pub fn update_dependency(&self, name: DependencyName, check: DependencyCheck) -> bool {
-        let mut inner = self.inner.write().expect("readiness lock poisoned");
+        let mut inner = match self.inner.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::error!(
+                    dependency = %name,
+                    "readiness: RwLock poisoned when updating dependency; continuing with last known state"
+                );
+                poisoned.into_inner()
+            }
+        };
 
         // Hard-failed services never recover.
         if inner.mode == ServiceMode::Failed {
             return false;
         }
 
-        let dep = inner
-            .dependencies
-            .get_mut(&name)
-            .expect("dependency must be registered");
+        let Some(dep) = inner.dependencies.get_mut(&name) else {
+            tracing::error!(
+                dependency = %name,
+                "readiness: update_dependency called for unregistered dependency; ignoring update"
+            );
+            return false;
+        };
 
         let now = OffsetDateTime::now_utc();
         dep.checked_at = Some(now);
@@ -293,39 +328,72 @@ impl ReadinessManager {
     }
 
     /// Rich internal response body.
-    #[allow(clippy::expect_used)]
     pub fn to_internal_json(&self) -> Value {
-        let inner = self.inner.read().expect("readiness lock poisoned");
-        let uptime_secs = inner.boot_time.elapsed().as_secs();
+        match self.inner.read() {
+            Ok(inner) => {
+                let uptime_secs = inner.boot_time.elapsed().as_secs();
 
-        let deps: Vec<Value> = inner
-            .dependencies
-            .values()
-            .map(|d| serde_json::to_value(d).unwrap_or_default())
-            .collect();
+                let deps: Vec<Value> = inner
+                    .dependencies
+                    .values()
+                    .map(|d| serde_json::to_value(d).unwrap_or_default())
+                    .collect();
 
-        json!({
-            "service": "backend",
-            "uptime_seconds": uptime_secs,
-            "state": {
-                "mode": inner.mode,
-                "ready": self.is_ready(),
-            },
-            "dependencies": deps,
-            "migration": inner.migration,
-        })
+                json!({
+                    "service": "backend",
+                    "uptime_seconds": uptime_secs,
+                    "state": {
+                        "mode": inner.mode,
+                        "ready": inner.mode == ServiceMode::Healthy,
+                    },
+                    "dependencies": deps,
+                    "migration": inner.migration,
+                })
+            }
+            Err(poisoned) => {
+                let inner = poisoned.into_inner();
+                let uptime_secs = inner.boot_time.elapsed().as_secs();
+                tracing::error!(
+                    "readiness: RwLock poisoned when building internal readiness JSON; reporting error state"
+                );
+                json!({
+                    "service": "backend",
+                    "uptime_seconds": uptime_secs,
+                    "state": {
+                        "mode": ServiceMode::Failed,
+                        "ready": false,
+                    },
+                    "error": "readiness_lock_poisoned",
+                })
+            }
+        }
     }
 
     /// Rich internal healthz body (always returned, even when not ready).
-    #[allow(clippy::expect_used)]
     pub fn to_internal_healthz_json(&self) -> Value {
-        let inner = self.inner.read().expect("readiness lock poisoned");
-        let uptime_secs = inner.boot_time.elapsed().as_secs();
-        json!({
-            "service": "backend",
-            "status": "alive",
-            "uptime_seconds": uptime_secs,
-        })
+        match self.inner.read() {
+            Ok(inner) => {
+                let uptime_secs = inner.boot_time.elapsed().as_secs();
+                json!({
+                    "service": "backend",
+                    "status": "alive",
+                    "uptime_seconds": uptime_secs,
+                })
+            }
+            Err(poisoned) => {
+                let inner = poisoned.into_inner();
+                let uptime_secs = inner.boot_time.elapsed().as_secs();
+                tracing::error!(
+                    "readiness: RwLock poisoned when building internal healthz JSON; reporting error state"
+                );
+                json!({
+                    "service": "backend",
+                    "status": "error",
+                    "uptime_seconds": uptime_secs,
+                    "error": "readiness_lock_poisoned",
+                })
+            }
+        }
     }
 }
 
