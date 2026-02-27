@@ -113,6 +113,61 @@ impl ReadinessManager {
         }
     }
 
+    /// Mark a dependency as permanently disabled/not applicable.
+    ///
+    /// This is intended only for optional dependencies (currently Redis) in
+    /// controlled scenarios such as tests or bootstrap. Disabling core
+    /// dependencies like Postgres in production is unsupported.
+    ///
+    /// Returns `true` if this call caused a mode transition.
+    #[allow(clippy::expect_used)]
+    pub fn disable_dependency(&self, name: DependencyName, reason: String) -> bool {
+        let mut inner = self.inner.write().expect("readiness lock poisoned");
+
+        // Hard-failed services never recover.
+        if inner.mode == ServiceMode::Failed {
+            return false;
+        }
+
+        // Only Redis is intended to be optional/disable-able.
+        if name != DependencyName::Redis {
+            tracing::warn!(
+                dependency = %name,
+                "readiness: disable_dependency is only supported for Redis; ignoring request"
+            );
+            return false;
+        }
+
+        if let Some(dep) = inner.dependencies.get_mut(&name) {
+            dep.status = CheckStatus::Disabled {
+                reason: reason.clone(),
+            };
+            dep.last_error = None;
+            dep.last_ok = None;
+            dep.latency_ms = None;
+            dep.consecutive_successes = 0;
+            dep.consecutive_failures = 0;
+            dep.checked_at = None;
+        }
+
+        let previous = inner.mode;
+        let new_mode = compute_new_mode(&inner);
+        let transitioned = new_mode != previous;
+
+        if transitioned {
+            inner.mode = new_mode;
+            tracing::info!(
+                previous_mode = %previous,
+                new_mode = %new_mode,
+                dependency = %name,
+                disable_reason = %reason,
+                "readiness: dependency disabled – recomputed mode"
+            );
+        }
+
+        transitioned
+    }
+
     /// Update a dependency's health after a check.
     ///
     /// Returns `true` if a mode transition occurred (caller can use this to
@@ -171,41 +226,7 @@ impl ReadinessManager {
         // ── Evaluate mode transitions ──────────────────────────────
 
         let previous = inner.mode;
-
-        let all_healthy = inner
-            .dependencies
-            .values()
-            .all(|d| d.status == CheckStatus::Ok && d.consecutive_successes >= RECOVERY_THRESHOLD);
-
-        let any_over_threshold = inner
-            .dependencies
-            .values()
-            .any(|d| d.consecutive_failures >= FAILURE_THRESHOLD);
-
-        let new_mode = match previous {
-            ServiceMode::Startup => {
-                if all_healthy && inner.migration.completed && inner.migration.error.is_none() {
-                    ServiceMode::Healthy
-                } else {
-                    ServiceMode::Startup
-                }
-            }
-            ServiceMode::Healthy => {
-                if any_over_threshold {
-                    ServiceMode::Recovering
-                } else {
-                    ServiceMode::Healthy
-                }
-            }
-            ServiceMode::Recovering => {
-                if all_healthy && inner.migration.completed && inner.migration.error.is_none() {
-                    ServiceMode::Healthy
-                } else {
-                    ServiceMode::Recovering
-                }
-            }
-            ServiceMode::Failed => ServiceMode::Failed,
-        };
+        let new_mode = compute_new_mode(&inner);
 
         let transitioned = new_mode != previous;
         let mut should_wake = false;
@@ -311,6 +332,46 @@ impl ReadinessManager {
 impl Default for ReadinessManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Single source of truth for mode transitions based on dependency and migration state.
+fn compute_new_mode(inner: &Inner) -> ServiceMode {
+    let previous = inner.mode;
+
+    let all_healthy = inner.dependencies.values().all(|d| match &d.status {
+        CheckStatus::Ok => d.consecutive_successes >= RECOVERY_THRESHOLD,
+        CheckStatus::Disabled { .. } => true,
+        _ => false,
+    });
+
+    let any_over_threshold = inner.dependencies.values().any(|d| {
+        matches!(d.status, CheckStatus::Down) && d.consecutive_failures >= FAILURE_THRESHOLD
+    });
+
+    match previous {
+        ServiceMode::Startup => {
+            if all_healthy && inner.migration.completed && inner.migration.error.is_none() {
+                ServiceMode::Healthy
+            } else {
+                ServiceMode::Startup
+            }
+        }
+        ServiceMode::Healthy => {
+            if any_over_threshold {
+                ServiceMode::Recovering
+            } else {
+                ServiceMode::Healthy
+            }
+        }
+        ServiceMode::Recovering => {
+            if all_healthy && inner.migration.completed && inner.migration.error.is_none() {
+                ServiceMode::Healthy
+            } else {
+                ServiceMode::Recovering
+            }
+        }
+        ServiceMode::Failed => ServiceMode::Failed,
     }
 }
 
@@ -611,5 +672,130 @@ mod tests {
         assert_eq!(j["state"]["ready"], true);
         assert!(j["dependencies"].is_array());
         assert!(j["migration"]["completed"].as_bool().unwrap_or(false));
+    }
+
+    #[test]
+    fn dependency_status_unknown_serializes_with_state_field() {
+        let mgr = ReadinessManager::new();
+        let j = mgr.to_internal_json();
+        let deps = j["dependencies"].as_array().unwrap();
+        let postgres = deps
+            .iter()
+            .find(|d| d["name"] == "postgres")
+            .expect("postgres dependency present");
+        assert_eq!(postgres["status"]["state"], "unknown");
+    }
+
+    #[test]
+    fn disabled_dependencies_are_treated_as_healthy() {
+        let mgr = ReadinessManager::new();
+        mgr.set_migration_result(true, None);
+
+        mgr.disable_dependency(DependencyName::Redis, "disabled for test".to_string());
+
+        for _ in 0..2 {
+            mgr.update_dependency(
+                DependencyName::Postgres,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+        }
+
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+        assert!(mgr.is_ready());
+
+        let j = mgr.to_internal_json();
+        let deps = j["dependencies"].as_array().unwrap();
+        let redis = deps
+            .iter()
+            .find(|d| d["name"] == "redis")
+            .expect("redis dependency present");
+        assert_eq!(redis["status"]["state"], "disabled");
+        assert_eq!(redis["status"]["reason"], "disabled for test");
+    }
+
+    #[test]
+    fn disabling_failing_dependency_recovers_immediately() {
+        let mgr = ReadinessManager::new();
+        mgr.set_migration_result(true, None);
+
+        // Drive both dependencies to healthy first.
+        for _ in 0..2 {
+            mgr.update_dependency(
+                DependencyName::Postgres,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+            mgr.update_dependency(
+                DependencyName::Redis,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+        }
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+        assert!(mgr.is_ready());
+
+        // Now drive Redis into failure to enter Recovering.
+        for _ in 0..2 {
+            mgr.update_dependency(
+                DependencyName::Redis,
+                DependencyCheck::Down {
+                    error: "timeout".to_string(),
+                    latency: Duration::from_millis(5000),
+                },
+            );
+        }
+        assert_eq!(mgr.mode(), ServiceMode::Recovering);
+        assert!(!mgr.is_ready());
+
+        // Disable Redis and ensure we immediately recover to Healthy.
+        let transitioned =
+            mgr.disable_dependency(DependencyName::Redis, "disabled for test".to_string());
+        assert!(transitioned);
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+        assert!(mgr.is_ready());
+
+        let j = mgr.to_internal_json();
+        let deps = j["dependencies"].as_array().unwrap();
+        let redis = deps
+            .iter()
+            .find(|d| d["name"] == "redis")
+            .expect("redis dependency present");
+        assert_eq!(redis["status"]["state"], "disabled");
+        assert_eq!(redis["status"]["reason"], "disabled for test");
+    }
+
+    #[test]
+    fn disabling_non_redis_dependency_is_ignored() {
+        let mgr = ReadinessManager::new();
+        mgr.set_migration_result(true, None);
+
+        // Bring both dependencies to healthy.
+        for _ in 0..2 {
+            mgr.update_dependency(
+                DependencyName::Postgres,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+            mgr.update_dependency(
+                DependencyName::Redis,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+        }
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+        assert!(mgr.is_ready());
+
+        // Attempt to disable Postgres – should be ignored and not transition.
+        let transitioned =
+            mgr.disable_dependency(DependencyName::Postgres, "should be ignored".to_string());
+        assert!(!transitioned);
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+        assert!(mgr.is_ready());
     }
 }

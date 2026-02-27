@@ -44,12 +44,13 @@ impl std::fmt::Display for DependencyName {
 }
 
 /// Current check status of a dependency.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
 pub enum CheckStatus {
     Ok,
     Down,
     Unknown,
+    Disabled { reason: String },
 }
 
 /// Per-dependency health tracking state.

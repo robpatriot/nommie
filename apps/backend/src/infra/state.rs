@@ -218,6 +218,8 @@ impl StateBuilder {
         self
     }
 
+    const REDIS_DISABLED_REASON_TEST: &'static str = "redis_url not configured in test env";
+
     pub async fn build(self) -> Result<AppState, AppError> {
         let readiness = self
             .readiness
@@ -237,6 +239,20 @@ impl StateBuilder {
                     email_allowlist: self.email_allowlist,
                 };
                 let state = AppState::new(config, None, None, readiness);
+
+                if state.config.env == RuntimeEnv::Test && state.config.redis_url.0.is_none() {
+                    state.readiness().disable_dependency(
+                        crate::readiness::types::DependencyName::Redis,
+                        Self::REDIS_DISABLED_REASON_TEST.to_string(),
+                    );
+                } else if state.config.env != RuntimeEnv::Test && state.config.redis_url.0.is_none()
+                {
+                    return Err(AppError::config_msg(
+                        "REDIS_URL must be set outside test environment",
+                        "redis_url missing for non-test env",
+                    ));
+                }
+
                 (state, true)
             }
             _ => {
@@ -316,5 +332,99 @@ mod tests {
         // So this will actually be Err.
         assert!(result.is_err());
         assert!(!manager.is_ready());
+    }
+
+    #[tokio::test]
+    async fn test_test_env_without_redis_url_disables_redis_and_allows_readiness() {
+        let manager = Arc::new(ReadinessManager::new());
+        let state = build_state()
+            .with_env(RuntimeEnv::Test)
+            .with_db(DbKind::SqliteMemory)
+            .with_readiness(manager.clone())
+            .build()
+            .await
+            .unwrap();
+
+        assert!(state.config.redis_url.0.is_none());
+
+        manager.set_migration_result(true, None);
+
+        for _ in 0..2 {
+            manager.update_dependency(
+                crate::readiness::types::DependencyName::Postgres,
+                crate::readiness::types::DependencyCheck::Ok {
+                    latency: std::time::Duration::from_millis(1),
+                },
+            );
+        }
+
+        assert!(manager.is_ready());
+
+        let internal = manager.to_internal_json();
+        let deps = internal["dependencies"].as_array().unwrap();
+        let redis = deps
+            .iter()
+            .find(|d| d["name"] == "redis")
+            .expect("redis dependency present");
+        assert_eq!(redis["status"]["state"], "disabled");
+        assert_eq!(
+            redis["status"]["reason"],
+            StateBuilder::REDIS_DISABLED_REASON_TEST
+        );
+    }
+
+    #[tokio::test]
+    async fn test_non_test_env_without_redis_url_fails_fast() {
+        let manager = Arc::new(ReadinessManager::new());
+        let result = build_state()
+            .with_env(RuntimeEnv::Prod)
+            .with_db(DbKind::Postgres)
+            .with_readiness(manager)
+            .build()
+            .await;
+
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        assert_eq!(err.code(), crate::errors::ErrorCode::ConfigError);
+    }
+
+    #[tokio::test]
+    async fn test_test_env_with_redis_url_keeps_redis_required() {
+        let manager = Arc::new(ReadinessManager::new());
+        let _state = build_state()
+            .with_env(RuntimeEnv::Test)
+            .with_db(DbKind::SqliteMemory)
+            .with_redis_url(Some("redis://localhost:6379".to_string()))
+            .with_readiness(manager.clone())
+            .build()
+            .await
+            .unwrap();
+
+        // Simulate successful migrations.
+        manager.set_migration_result(true, None);
+
+        // Only Postgres is marked healthy; Redis is configured (not disabled),
+        // so readiness must remain not ready.
+        for _ in 0..2 {
+            manager.update_dependency(
+                crate::readiness::types::DependencyName::Postgres,
+                crate::readiness::types::DependencyCheck::Ok {
+                    latency: std::time::Duration::from_millis(1),
+                },
+            );
+        }
+
+        assert!(
+            !manager.is_ready(),
+            "readiness must not become ready when Redis is configured but not healthy"
+        );
+
+        let internal = manager.to_internal_json();
+        let deps = internal["dependencies"].as_array().unwrap();
+        let redis = deps
+            .iter()
+            .find(|d| d["name"] == "redis")
+            .expect("redis dependency present");
+        assert_ne!(redis["status"]["state"], "disabled");
     }
 }
