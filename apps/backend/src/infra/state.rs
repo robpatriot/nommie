@@ -69,6 +69,7 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
         };
 
         if needs_resolution {
+            let start = std::time::Instant::now();
             match bootstrap_db(state.config.env, state.config.db_kind).await {
                 Ok(conn) => {
                     state.set_db(conn.clone());
@@ -81,6 +82,14 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
                     tracing::info!("readiness: database resolution successful");
                 }
                 Err(e) => {
+                    let latency = start.elapsed();
+                    state.readiness().update_dependency(
+                        crate::readiness::types::DependencyName::Postgres,
+                        crate::readiness::types::DependencyCheck::Down {
+                            error: format!("{e}"),
+                            latency,
+                        },
+                    );
                     if e.is_transient() {
                         tracing::warn!(error = %e, "readiness: transient database error during resolution");
                     } else {
@@ -118,6 +127,7 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
             };
 
             if needs_resolution {
+                let start = std::time::Instant::now();
                 match RealtimeBroker::connect(url, state.readiness().clone()).await {
                     Ok(broker) => {
                         state.set_realtime(broker);
@@ -129,6 +139,14 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
                         tracing::info!("readiness: Redis resolution successful");
                     }
                     Err(e) => {
+                        let latency = start.elapsed();
+                        state.readiness().update_dependency(
+                            crate::readiness::types::DependencyName::Redis,
+                            crate::readiness::types::DependencyCheck::Down {
+                                error: format!("{e}"),
+                                latency,
+                            },
+                        );
                         tracing::debug!(error = %e, "readiness: Redis resolution attempt failed");
                     }
                 }
@@ -426,5 +444,30 @@ mod tests {
             .find(|d| d["name"] == "redis")
             .expect("redis dependency present");
         assert_ne!(redis["status"]["state"], "disabled");
+    }
+
+    #[tokio::test]
+    async fn test_redis_connect_failure_marks_dependency_down() {
+        let manager = Arc::new(ReadinessManager::new());
+
+        let result = build_state()
+            .with_env(RuntimeEnv::Test)
+            .with_db(DbKind::SqliteMemory)
+            .with_redis_url(Some("invalid-redis-url".to_string()))
+            .with_readiness(manager.clone())
+            .build()
+            .await;
+
+        // DB bootstrap succeeds in test with SqliteMemory; Redis connect failure is non-terminal.
+        assert!(result.is_ok());
+
+        let internal = manager.to_internal_json();
+        let deps = internal["dependencies"].as_array().unwrap();
+        let redis = deps
+            .iter()
+            .find(|d| d["name"] == "redis")
+            .expect("redis dependency present after failed connect");
+        assert_eq!(redis["status"]["state"], "down");
+        assert!(redis["consecutive_failures"].as_u64().unwrap_or(0) >= 1);
     }
 }
