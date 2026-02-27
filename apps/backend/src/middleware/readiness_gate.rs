@@ -5,6 +5,7 @@ use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Tr
 use actix_web::{web, HttpResponse};
 use futures_util::future::LocalBoxFuture;
 
+use crate::readiness::READINESS_RETRY_AFTER_SECS;
 use crate::state::app_state::AppState;
 
 /// Middleware that gates `/api/*` requests behind readiness.
@@ -55,6 +56,7 @@ where
         if !is_ready {
             let response = HttpResponse::ServiceUnavailable()
                 .insert_header(("Cache-Control", "no-store"))
+                .insert_header(("Retry-After", READINESS_RETRY_AFTER_SECS.to_string()))
                 .json(serde_json::json!({ "error": "service_not_ready" }));
             return Box::pin(async { Ok(req.into_response(response).map_into_right_body()) });
         }

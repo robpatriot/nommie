@@ -1,5 +1,6 @@
 use actix_web::{web, HttpResponse};
 
+use crate::readiness::READINESS_RETRY_AFTER_SECS;
 use crate::state::app_state::AppState;
 
 // ── Public endpoints ───────────────────────────────────────────────
@@ -15,16 +16,18 @@ pub async fn healthz() -> HttpResponse {
 pub async fn readyz(app_state: web::Data<AppState>) -> HttpResponse {
     let manager = app_state.readiness();
     let body = manager.to_public_json();
+    let is_ready = manager.is_ready();
 
-    let mut response = if manager.is_ready() {
+    if is_ready {
         HttpResponse::Ok()
+            .insert_header(("Cache-Control", "no-store"))
+            .json(body)
     } else {
         HttpResponse::ServiceUnavailable()
-    };
-
-    response
-        .insert_header(("Cache-Control", "no-store"))
-        .json(body)
+            .insert_header(("Cache-Control", "no-store"))
+            .insert_header(("Retry-After", READINESS_RETRY_AFTER_SECS.to_string()))
+            .json(body)
+    }
 }
 
 // ── Internal endpoints ─────────────────────────────────────────────
@@ -41,16 +44,18 @@ pub async fn internal_healthz(app_state: web::Data<AppState>) -> HttpResponse {
 pub async fn internal_readyz(app_state: web::Data<AppState>) -> HttpResponse {
     let manager = app_state.readiness();
     let body = manager.to_internal_json();
+    let is_ready = manager.is_ready();
 
-    let mut response = if manager.is_ready() {
+    if is_ready {
         HttpResponse::Ok()
+            .insert_header(("Cache-Control", "no-store"))
+            .json(body)
     } else {
         HttpResponse::ServiceUnavailable()
-    };
-
-    response
-        .insert_header(("Cache-Control", "no-store"))
-        .json(body)
+            .insert_header(("Cache-Control", "no-store"))
+            .insert_header(("Retry-After", READINESS_RETRY_AFTER_SECS.to_string()))
+            .json(body)
+    }
 }
 
 // ── Route configuration ────────────────────────────────────────────
