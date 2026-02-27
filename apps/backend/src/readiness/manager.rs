@@ -70,7 +70,7 @@ impl ReadinessManager {
 
     /// Notify the readiness monitor that state may have changed.
     pub fn wake_monitor(&self) {
-        self.notify.notify_waiters();
+        self.notify.notify_one();
     }
 
     /// Get a future that completes when the readiness monitor is notified.
@@ -797,5 +797,18 @@ mod tests {
         assert!(!transitioned);
         assert_eq!(mgr.mode(), ServiceMode::Healthy);
         assert!(mgr.is_ready());
+    }
+
+    #[tokio::test]
+    async fn wake_monitor_is_buffered_for_notified() {
+        let mgr = ReadinessManager::new();
+
+        mgr.wake_monitor();
+
+        let result = tokio::time::timeout(Duration::from_millis(50), mgr.notified()).await;
+        assert!(
+            result.is_ok(),
+            "notified did not resolve after wake_monitor"
+        );
     }
 }
