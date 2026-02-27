@@ -112,12 +112,11 @@ impl AppState {
         &self.readiness
     }
 
-    /// Attach a WebSocket session registry.
-    pub fn with_websocket_registry(self, registry: Arc<WsRegistry>) -> Self {
+    /// Attach a WebSocket session registry (replaces existing if any).
+    pub fn set_websocket_registry(&self, registry: Arc<WsRegistry>) {
         if let Ok(mut reg) = self.websocket_registry.write() {
             *reg = Some(registry);
         }
-        self
     }
 
     /// Get the WebSocket session registry, if configured.

@@ -23,7 +23,7 @@ use crate::support::test_middleware::TestTxnInjector;
 /// 2) Call registry.broadcast_* directly to simulate realtime events
 pub fn attach_test_registry(state: AppState) -> (AppState, Arc<WsRegistry>) {
     let registry = Arc::new(WsRegistry::new());
-    let state = state.with_websocket_registry(registry.clone());
+    state.set_websocket_registry(registry.clone());
     (state, registry)
 }
 
