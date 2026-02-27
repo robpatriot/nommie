@@ -105,6 +105,10 @@ impl ReadinessManager {
 
         let mut should_wake = false;
 
+        if ok {
+            tracing::info!("readiness: migrations completed successfully");
+        }
+
         if !ok {
             let previous = inner.mode;
             inner.mode = ServiceMode::Failed;
@@ -213,6 +217,8 @@ impl ReadinessManager {
             return false;
         }
 
+        let current_mode = inner.mode;
+
         let Some(dep) = inner.dependencies.get_mut(&name) else {
             tracing::error!(
                 dependency = %name,
@@ -232,10 +238,18 @@ impl ReadinessManager {
                 dep.consecutive_successes += 1;
                 dep.consecutive_failures = 0;
 
-                if dep.consecutive_successes == 1 && inner.mode != ServiceMode::Startup {
+                if dep.consecutive_successes == 1 && current_mode != ServiceMode::Startup {
                     tracing::info!(
                         dependency = %name,
                         "readiness: dependency check succeeded"
+                    );
+                }
+
+                if dep.consecutive_successes == RECOVERY_THRESHOLD {
+                    tracing::info!(
+                        dependency = %name,
+                        recovery_threshold = RECOVERY_THRESHOLD,
+                        "readiness: dependency recovered (threshold met)"
                     );
                 }
             }
@@ -276,7 +290,7 @@ impl ReadinessManager {
                     tracing::info!(
                         previous_mode = %previous,
                         new_mode = %new_mode,
-                        "readiness: transitioned to READY"
+                        "readiness: service transitioned to Healthy"
                     );
                 }
                 ServiceMode::Recovering => {
@@ -290,6 +304,7 @@ impl ReadinessManager {
                         previous_mode = %previous,
                         new_mode = %new_mode,
                         failing_dependencies = ?failing,
+                        failure_threshold = FAILURE_THRESHOLD,
                         "readiness: transitioned to NOT READY – dependency failures exceeded threshold"
                     );
 
