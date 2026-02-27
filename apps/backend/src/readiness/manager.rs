@@ -4,6 +4,7 @@ use std::time::Instant;
 
 use serde_json::{json, Value};
 use time::OffsetDateTime;
+use tokio::sync::Notify;
 
 use super::types::{
     CheckStatus, DependencyCheck, DependencyName, DependencyStatus, MigrationState, ServiceMode,
@@ -19,6 +20,7 @@ const RECOVERY_THRESHOLD: u32 = 2;
 /// All public methods acquire locks internally – callers never see the lock.
 pub struct ReadinessManager {
     inner: RwLock<Inner>,
+    notify: Notify,
 }
 
 struct Inner {
@@ -48,6 +50,7 @@ impl ReadinessManager {
                 migration: MigrationState::default(),
                 boot_time: Instant::now(),
             }),
+            notify: Notify::new(),
         }
     }
 
@@ -65,6 +68,16 @@ impl ReadinessManager {
         self.inner.read().expect("readiness lock poisoned").mode
     }
 
+    /// Notify the readiness monitor that state may have changed.
+    pub fn wake_monitor(&self) {
+        self.notify.notify_waiters();
+    }
+
+    /// Get a future that completes when the readiness monitor is notified.
+    pub fn notified(&self) -> tokio::sync::futures::Notified<'_> {
+        self.notify.notified()
+    }
+
     // ── Mutation ────────────────────────────────────────────────────
 
     /// Record migration outcome. A failure is a **hard** failure → immediate `Failed`.
@@ -73,6 +86,8 @@ impl ReadinessManager {
         let mut inner = self.inner.write().expect("readiness lock poisoned");
         inner.migration.completed = ok;
         inner.migration.error = error.clone();
+
+        let mut should_wake = false;
 
         if !ok {
             let previous = inner.mode;
@@ -85,6 +100,16 @@ impl ReadinessManager {
                     "readiness: hard failure – migrations failed, service permanently not ready"
                 );
             }
+        } else if inner.mode != ServiceMode::Healthy {
+            // Migrations have now completed successfully while not healthy;
+            // wake the monitor so it can re-evaluate dependencies promptly.
+            should_wake = true;
+        }
+
+        drop(inner);
+
+        if should_wake {
+            self.wake_monitor();
         }
     }
 
@@ -183,7 +208,12 @@ impl ReadinessManager {
         };
 
         let transitioned = new_mode != previous;
+        let mut should_wake = false;
+
         if transitioned {
+            let transitioned_to_recovering =
+                previous != ServiceMode::Recovering && new_mode == ServiceMode::Recovering;
+
             inner.mode = new_mode;
             match new_mode {
                 ServiceMode::Healthy => {
@@ -206,6 +236,10 @@ impl ReadinessManager {
                         failing_dependencies = ?failing,
                         "readiness: transitioned to NOT READY – dependency failures exceeded threshold"
                     );
+
+                    if transitioned_to_recovering {
+                        should_wake = true;
+                    }
                 }
                 _ => {
                     tracing::info!(
@@ -215,6 +249,12 @@ impl ReadinessManager {
                     );
                 }
             }
+        }
+
+        drop(inner);
+
+        if should_wake {
+            self.wake_monitor();
         }
 
         transitioned
@@ -411,6 +451,51 @@ mod tests {
         );
         assert_eq!(mgr.mode(), ServiceMode::Recovering);
         assert!(!mgr.is_ready());
+    }
+
+    #[test]
+    fn update_dependency_returns_true_on_transition_to_recovering() {
+        let mgr = ReadinessManager::new();
+        mgr.set_migration_result(true, None);
+
+        // Reach healthy first.
+        for _ in 0..2 {
+            mgr.update_dependency(
+                DependencyName::Postgres,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+            mgr.update_dependency(
+                DependencyName::Redis,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+        }
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+
+        // First failure does not cross the threshold; no transition yet.
+        let transitioned = mgr.update_dependency(
+            DependencyName::Redis,
+            DependencyCheck::Down {
+                error: "timeout".into(),
+                latency: Duration::from_millis(5000),
+            },
+        );
+        assert!(!transitioned);
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+
+        // Second consecutive failure crosses the threshold and triggers the transition.
+        let transitioned = mgr.update_dependency(
+            DependencyName::Redis,
+            DependencyCheck::Down {
+                error: "timeout".into(),
+                latency: Duration::from_millis(5000),
+            },
+        );
+        assert!(transitioned);
+        assert_eq!(mgr.mode(), ServiceMode::Recovering);
     }
 
     #[test]

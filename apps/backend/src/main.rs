@@ -84,7 +84,7 @@ async fn main() -> std::io::Result<()> {
 
     // ── Spawn dependency monitor ───────────────────────────────────
     let app_state_arc = Arc::new(app_state);
-    backend::readiness::monitor::spawn_startup_monitor(app_state_arc.clone());
+    backend::readiness::monitor::spawn_monitor(app_state_arc.clone());
 
     // Wrap AppState with web::Data before passing to HttpServer
     let data = actix_web::web::Data::from(app_state_arc);
