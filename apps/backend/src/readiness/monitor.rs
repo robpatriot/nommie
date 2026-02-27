@@ -37,8 +37,15 @@ async fn run_monitor(state: &AppState) {
                 recovering_attempt = 0;
                 manager.notified().await;
             }
+            // `Failed` can come from a true hard dependency/migration failure
+            // (via `set_migration_result(false, ...)` inside `resolve_dependencies`) OR from
+            // a readiness-infrastructure failure where `ReadinessManager::mode()` treats a
+            // poisoned RwLock as failed. In the poisoning case, we never call
+            // `resolve_dependencies` and instead stop the monitor based on `mode()` alone.
             ServiceMode::Failed => {
-                tracing::info!("readiness: monitor stopping – service in permanent failed state");
+                tracing::info!(
+                    "readiness: monitor stopping – service in failed mode (dependency or readiness manager failure)"
+                );
                 break;
             }
             ServiceMode::Startup | ServiceMode::Recovering => {
