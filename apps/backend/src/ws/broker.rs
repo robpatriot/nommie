@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant as StdInstant};
 
 use rand::random;
 use redis::aio::{ConnectionManager, PubSub};
@@ -50,14 +50,16 @@ impl RealtimeBroker {
             source: Box::new(err),
         })?;
 
+        let connect_start = StdInstant::now();
         let manager = ConnectionManager::new(client.clone())
             .await
             .map_err(|err| {
+                let latency = connect_start.elapsed();
                 readiness.update_dependency(
                     DependencyName::Redis,
                     DependencyCheck::Down {
                         error: err.to_string(),
-                        latency: Duration::from_millis(1),
+                        latency,
                     },
                 );
                 AppError::Internal {
@@ -135,15 +137,18 @@ impl RealtimeBroker {
             attempt += 1;
 
             let publish_res = {
+                let start = StdInstant::now();
                 let mut publisher = self.publisher.lock().await;
-                publisher
+                let res = publisher
                     .publish::<_, _, ()>(channel.clone(), encoded.clone())
-                    .await
+                    .await;
+                let latency = start.elapsed();
+                (res, latency)
             };
 
             match publish_res {
-                Ok(_) => return Ok(()),
-                Err(err) => {
+                (Ok(_), _) => return Ok(()),
+                (Err(err), latency) => {
                     let app_err = AppError::Internal {
                         code: ErrorCode::InternalError,
                         detail: "Failed to publish realtime event to Redis".to_string(),
@@ -156,7 +161,7 @@ impl RealtimeBroker {
                             DependencyName::Redis,
                             DependencyCheck::Down {
                                 error: app_err.to_string(),
-                                latency: Duration::from_millis(1),
+                                latency,
                             },
                         );
                         return Err(app_err);
@@ -265,7 +270,9 @@ async fn run_subscription_loop_with_retry(
     loop {
         attempt += 1;
 
+        let start = StdInstant::now();
         let loop_res = run_subscription_loop(redis_url, registry.clone()).await;
+        let latency = start.elapsed();
         match loop_res {
             Ok(()) => {
                 info!("Redis subscription loop completed normally");
@@ -277,7 +284,7 @@ async fn run_subscription_loop_with_retry(
                     DependencyName::Redis,
                     DependencyCheck::Down {
                         error: err.to_string(),
-                        latency: Duration::from_millis(1),
+                        latency,
                     },
                 );
 

@@ -2,6 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::Instant;
 
 use actix_web::{HttpMessage, HttpRequest};
 use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
@@ -114,7 +115,9 @@ where
     let db = require_db(state)?;
 
     // Real DB path: own the transaction lifecycle
+    let begin_start = Instant::now();
     let txn_res = db.begin().await;
+    let begin_latency = begin_start.elapsed();
 
     // Report connection failures to readiness manager.
     // We only report sustainable failures (DbErr) here; the monitor task handles
@@ -124,7 +127,7 @@ where
             crate::readiness::types::DependencyName::Postgres,
             crate::readiness::types::DependencyCheck::Down {
                 error: e.to_string(),
-                latency: std::time::Duration::from_millis(1),
+                latency: begin_latency,
             },
         );
     }
@@ -138,6 +141,7 @@ where
     match out {
         Ok(val) => {
             // Apply transaction policy on success
+            let commit_start = Instant::now();
             let commit_res = match txn_policy::current() {
                 txn_policy::TxnPolicy::CommitOnOk => txn.commit().await,
                 _ => {
@@ -145,6 +149,7 @@ where
                     txn.rollback().await
                 }
             };
+            let commit_latency = commit_start.elapsed();
 
             ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
 
@@ -154,7 +159,7 @@ where
                     crate::readiness::types::DependencyName::Postgres,
                     crate::readiness::types::DependencyCheck::Down {
                         error: e.to_string(),
-                        latency: std::time::Duration::from_millis(1),
+                        latency: commit_latency,
                     },
                 );
                 return Err(AppError::from(e));
