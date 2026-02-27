@@ -15,6 +15,28 @@ use crate::state::app_state::AppState;
 /// Used for monitoring connection pool usage and detecting transaction leaks.
 pub(crate) static ACTIVE_TXNS: AtomicU64 = AtomicU64::new(0);
 
+struct TxnCounterGuard;
+
+impl TxnCounterGuard {
+    fn new() -> Self {
+        ACTIVE_TXNS.fetch_add(1, Ordering::Relaxed);
+        TxnCounterGuard
+    }
+}
+
+impl Drop for TxnCounterGuard {
+    fn drop(&mut self) {
+        ACTIVE_TXNS.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+/// Returns the current number of active owned transactions (not SharedTxn).
+///
+/// Used for monitoring and integration tests. Not re-exported in the crate prelude.
+pub fn active_txns_count() -> u64 {
+    ACTIVE_TXNS.load(Ordering::Relaxed)
+}
+
 /// A shared transaction wrapper that can be injected into request extensions
 #[derive(Clone)]
 pub struct SharedTxn(pub Arc<DatabaseTransaction>);
@@ -132,9 +154,7 @@ where
         );
     }
     let txn = txn_res?;
-
-    // Increment active transaction counter
-    ACTIVE_TXNS.fetch_add(1, Ordering::SeqCst);
+    let _txn_guard = TxnCounterGuard::new();
 
     let out = f(&txn).await;
 
@@ -150,8 +170,6 @@ where
                 }
             };
             let commit_latency = commit_start.elapsed();
-
-            ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
 
             if let Err(e) = commit_res {
                 // Report commit failures to readiness manager
@@ -170,7 +188,6 @@ where
         Err(err) => {
             // Best-effort rollback; preserve original error
             let _ = txn.rollback().await;
-            ACTIVE_TXNS.fetch_sub(1, Ordering::SeqCst);
             Err(err)
         }
     }
