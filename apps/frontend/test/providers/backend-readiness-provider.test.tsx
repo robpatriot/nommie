@@ -10,7 +10,7 @@ import { ManualPollDriver } from '@/test/utils'
 function TestConsumer({
   onState,
 }: {
-  onState?: (val: { isReady: boolean; triggerRecovery: () => void }) => void
+  onState?: (val: ReturnType<typeof useBackendReadiness>) => void
 }) {
   const state = useBackendReadiness()
   onState?.(state)
@@ -46,42 +46,79 @@ describe('BackendReadinessProvider', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('shows not-ready after triggerRecovery and polls frontend /readyz', async () => {
-    const driver = new ManualPollDriver()
-    const fetchSpy = vi.mocked(global.fetch)
-    fetchSpy.mockResolvedValueOnce({ ok: true } as Response)
-
-    let triggerRecovery: () => void = () => {}
+  it('enters degraded immediately on reportFailure("permanent")', () => {
+    let reportFailure: (kind: 'permanent' | 'transient') => void = () => {}
 
     const { getByTestId } = render(
-      <BackendReadinessProvider pollDriver={driver}>
+      <BackendReadinessProvider>
         <TestConsumer
           onState={(s) => {
-            triggerRecovery = s.triggerRecovery
+            reportFailure = s.reportFailure
           }}
         />
       </BackendReadinessProvider>
     )
 
     expect(getByTestId('readiness').textContent).toBe('ready')
-
     act(() => {
-      triggerRecovery()
+      reportFailure('permanent')
     })
     expect(getByTestId('readiness').textContent).toBe('not-ready')
-
-    await act(async () => {
-      await driver.tick()
-    })
-    expect(getByTestId('readiness').textContent).toBe('ready')
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
-    expect(fetchSpy).toHaveBeenCalledWith(
-      '/readyz',
-      expect.objectContaining({ method: 'GET' })
-    )
   })
 
-  it('exits degraded on first 200 and stops polling', async () => {
+  it('enters degraded after 2 consecutive reportFailure("transient")', () => {
+    let reportFailure: (kind: 'permanent' | 'transient') => void = () => {}
+
+    const { getByTestId } = render(
+      <BackendReadinessProvider>
+        <TestConsumer
+          onState={(s) => {
+            reportFailure = s.reportFailure
+          }}
+        />
+      </BackendReadinessProvider>
+    )
+
+    expect(getByTestId('readiness').textContent).toBe('ready')
+    act(() => {
+      reportFailure('transient')
+    })
+    expect(getByTestId('readiness').textContent).toBe('ready')
+    act(() => {
+      reportFailure('transient')
+    })
+    expect(getByTestId('readiness').textContent).toBe('not-ready')
+  })
+
+  it('resets transient count on reportSuccess()', () => {
+    let reportFailure: (kind: 'permanent' | 'transient') => void = () => {}
+    let reportSuccess: () => void = () => {}
+
+    const { getByTestId } = render(
+      <BackendReadinessProvider>
+        <TestConsumer
+          onState={(s) => {
+            reportFailure = s.reportFailure
+            reportSuccess = s.reportSuccess
+          }}
+        />
+      </BackendReadinessProvider>
+    )
+
+    act(() => {
+      reportFailure('transient')
+    })
+    expect(getByTestId('readiness').textContent).toBe('ready')
+    act(() => {
+      reportSuccess()
+    })
+    act(() => {
+      reportFailure('transient')
+    })
+    expect(getByTestId('readiness').textContent).toBe('ready')
+  })
+
+  it('shows not-ready after triggerRecovery and exits after 2 consecutive successful /readyz probes', async () => {
     const driver = new ManualPollDriver()
     const fetchSpy = vi.mocked(global.fetch)
     fetchSpy.mockResolvedValue({ ok: true } as Response)
@@ -98,6 +135,7 @@ describe('BackendReadinessProvider', () => {
       </BackendReadinessProvider>
     )
 
+    expect(getByTestId('readiness').textContent).toBe('ready')
     act(() => {
       triggerRecovery()
     })
@@ -106,17 +144,24 @@ describe('BackendReadinessProvider', () => {
     await act(async () => {
       await driver.tick()
     })
+    expect(getByTestId('readiness').textContent).toBe('not-ready')
+    await act(async () => {
+      await driver.tick()
+    })
     expect(getByTestId('readiness').textContent).toBe('ready')
-
-    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/readyz',
+      expect.objectContaining({ method: 'GET' })
+    )
   })
 
-  it('stays not-ready while probe returns non-200 and recovers on first 200', async () => {
+  it('stays not-ready while probe fails and exits after 2 consecutive successes', async () => {
     const driver = new ManualPollDriver()
     const fetchSpy = vi.mocked(global.fetch)
     fetchSpy
       .mockResolvedValueOnce({ ok: false } as Response)
       .mockResolvedValueOnce({ ok: false } as Response)
+      .mockResolvedValueOnce({ ok: true } as Response)
       .mockResolvedValueOnce({ ok: true } as Response)
 
     let triggerRecovery: () => void = () => {}
@@ -140,17 +185,47 @@ describe('BackendReadinessProvider', () => {
       await driver.tick()
     })
     expect(getByTestId('readiness').textContent).toBe('not-ready')
-
     await act(async () => {
       await driver.tick()
     })
     expect(getByTestId('readiness').textContent).toBe('not-ready')
-
+    await act(async () => {
+      await driver.tick()
+    })
+    expect(getByTestId('readiness').textContent).toBe('not-ready')
     await act(async () => {
       await driver.tick()
     })
     expect(getByTestId('readiness').textContent).toBe('ready')
+    expect(fetchSpy).toHaveBeenCalledTimes(4)
+  })
 
-    expect(fetchSpy).toHaveBeenCalledTimes(3)
+  it('stops polling on unmount', async () => {
+    const driver = new ManualPollDriver()
+    const fetchSpy = vi.mocked(global.fetch)
+    fetchSpy.mockResolvedValue({ ok: false } as Response)
+
+    let triggerRecovery: () => void = () => {}
+
+    const { getByTestId, unmount } = render(
+      <BackendReadinessProvider pollDriver={driver}>
+        <TestConsumer
+          onState={(s) => {
+            triggerRecovery = s.triggerRecovery
+          }}
+        />
+      </BackendReadinessProvider>
+    )
+
+    act(() => {
+      triggerRecovery()
+    })
+    expect(getByTestId('readiness').textContent).toBe('not-ready')
+    await act(async () => {
+      await driver.tick()
+    })
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 })

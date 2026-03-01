@@ -3,56 +3,59 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useBackendReadiness } from '@/lib/providers/backend-readiness-provider'
+import type { FailureKind } from '@/lib/providers/backend-readiness-provider'
 import { BackendApiError } from '@/lib/errors'
 import { isNetworkError } from '@/lib/retry'
 
-/**
- * Helper to check if a status code indicates an infrastructure failure.
- * 503: Service Unavailable (Backend Gate)
- * 502: Bad Gateway
- * 504: Gateway Timeout
- */
-function isInfraFailure(status: number): boolean {
-  return status === 503 || status === 502 || status === 504
+function isPermanentFailure(error: unknown): boolean {
+  if (error instanceof BackendApiError) {
+    if (error.status === 503 || error.status === 502 || error.status === 504) {
+      return true
+    }
+  }
+  if (isNetworkError(error)) {
+    return true
+  }
+  return false
+}
+
+function classifyFailure(error: unknown): FailureKind {
+  return isPermanentFailure(error) ? 'permanent' : 'transient'
 }
 
 /**
- * Component that bridges TanStack Query errors to the BackendReadinessProvider.
- *
- * It listens to the QueryCache for specific errors (503, 502, 504, and network failures)
- * and triggers the readiness recovery polling loop when they occur.
+ * Subscribes to React Query's QueryCache and reports backend failures to
+ * BackendReadinessProvider (reportFailure). Permanent errors (503, 502, 504,
+ * network) enter degraded immediately; others require 2 consecutive failures.
  */
 export default function ReadinessQueryObserver() {
-  const { triggerRecovery } = useBackendReadiness()
+  const { reportFailure, reportSuccess } = useBackendReadiness()
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    // Subscribe to all changes in the query cache
-    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      // We only care about queries that transitioned to an error state
-      if (event.type === 'updated' && event.action.type === 'error') {
-        const error = event.action.error
-
-        let shouldTrigger = false
-
-        if (error instanceof BackendApiError) {
-          if (isInfraFailure(error.status)) {
-            shouldTrigger = true
-          }
-        } else if (isNetworkError(error)) {
-          shouldTrigger = true
-        }
-
-        if (shouldTrigger) {
-          triggerRecovery()
-        }
-      }
+    const cache = queryClient.getQueryCache()
+    const unsubscribe = cache.subscribe((event) => {
+      if (event.type !== 'updated' || event.action.type !== 'error') return
+      const error = event.action.error
+      reportFailure(classifyFailure(error))
     })
 
     return () => {
       unsubscribe()
     }
-  }, [queryClient, triggerRecovery])
+  }, [queryClient, reportFailure])
+
+  useEffect(() => {
+    const cache = queryClient.getQueryCache()
+    const unsubscribe = cache.subscribe((event) => {
+      if (event.type !== 'updated' || event.action.type !== 'success') return
+      reportSuccess()
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [queryClient, reportSuccess])
 
   return null
 }

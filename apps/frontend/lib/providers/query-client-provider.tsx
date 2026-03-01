@@ -15,7 +15,6 @@ import {
   redirectToHomeClient,
 } from '@/lib/auth/clear-session-client'
 import { logError, logBackendError } from '@/lib/logging/error-logger'
-import { BACKEND_RECOVERY_TRIGGER_EVENT } from '@/lib/providers/backend-readiness-provider'
 
 /**
  * Helper to check if a 5xx error is transient (should be retried).
@@ -26,12 +25,13 @@ function isTransient5xx(status: number): boolean {
 }
 
 /**
- * True when the error is an expected backend-down/infra case (503 or connection failure).
+ * True when the error is an expected backend-down/infra case (502/503/504 or connection failure).
  * We suppress logging for these in the query client to avoid console spam when BE is down.
  */
 function shouldSuppressBackendError(error: unknown): boolean {
   if (error instanceof BackendApiError) {
-    if (error.status === 503) return true
+    if (error.status === 502 || error.status === 503 || error.status === 504)
+      return true
     if (isNetworkError(error)) return true
   }
   return false
@@ -66,11 +66,6 @@ export function AppQueryClientProvider({
             }
 
             if (shouldSuppressBackendError(error)) {
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(
-                  new CustomEvent(BACKEND_RECOVERY_TRIGGER_EVENT)
-                )
-              }
               return
             }
 
@@ -103,11 +98,6 @@ export function AppQueryClientProvider({
             }
 
             if (shouldSuppressBackendError(error)) {
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(
-                  new CustomEvent(BACKEND_RECOVERY_TRIGGER_EVENT)
-                )
-              }
               return
             }
 

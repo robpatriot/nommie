@@ -83,13 +83,9 @@ export function markBackendUp(): void {
     if (consecutiveSuccesses >= RECOVERY_THRESHOLD) {
       const previous = mode
       mode = 'healthy'
-      const g = globalThis as { __readinessLoggedHealthy?: boolean }
-      if (!g.__readinessLoggedHealthy) {
-        g.__readinessLoggedHealthy = true
-        console.log(
-          `[readiness] frontend mode: ${previous} → healthy (backend reachable) pid=${process.pid}`
-        )
-      }
+      console.log(
+        `[readiness] frontend mode: ${previous} → healthy (backend reachable) pid=${process.pid}`
+      )
     }
   }
 }

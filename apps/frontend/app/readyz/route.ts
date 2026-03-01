@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 
-import { checkBackendReadiness } from '@/lib/server/backend-health'
+import { probeBackendReadiness } from '@/lib/server/backend-health'
 
 export async function GET() {
-  const result = await checkBackendReadiness()
+  const result = await probeBackendReadiness()
 
   const body = result.ready
     ? { status: 'ready', ready: true }

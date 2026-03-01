@@ -5,28 +5,51 @@ import { getBackendBaseUrlOrThrow } from '@/auth'
 import {
   markBackendUp,
   markBackendDown,
-  shouldLogError,
   getBackendMode,
   getBackendStatus,
 } from './backend-status'
-import { isBackendConnectionError } from './connection-errors'
-import { logError } from '@/lib/logging/error-logger'
 
 export interface BackendReadinessResult {
   ready: boolean
   error?: string
 }
 
+const PROBE_TIMEOUT_MS = 1_000
 const READINESS_RETRY_AFTER_MS = 30_000
 
 let lastBackendAttemptAt = 0
 
 /**
- * Check if the backend is ready by hitting `/api/readyz`.
- *
- * Updates the server-side readiness state on success/failure.
- * When we already know the backend is down, returns not ready without calling it,
- * except we try again every READINESS_RETRY_AFTER_MS to discover when it recovers.
+ * True probe used by FE /readyz: always hits the backend with a 1s timeout.
+ * Does not use cached "known down" state, so client polling can detect recovery promptly.
+ */
+export async function probeBackendReadiness(): Promise<BackendReadinessResult> {
+  try {
+    const backendBase = getBackendBaseUrlOrThrow()
+    const base = backendBase.replace(/\/$/, '')
+    const response = await fetch(`${base}/api/readyz`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    })
+
+    if (response.ok) {
+      return { ready: true }
+    }
+    return {
+      ready: false,
+      error: `Backend not ready (HTTP ${response.status})`,
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+    return { ready: false, error: errorMsg }
+  }
+}
+
+/**
+ * SSR/RSC path: checks backend readiness with backoff when backend is known down
+ * (avoids hammering the backend). Updates server-side readiness state.
+ * Use this for layout, refresh-backend-jwt, etc. Do NOT use for FE /readyz polling.
  */
 export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
   const mode = getBackendMode()
@@ -57,24 +80,12 @@ export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
       return { ready: true }
     }
 
-    // Got a response (e.g. 503) – backend is alive but not ready
     const errorMsg = `Backend not ready (HTTP ${response.status})`
     markBackendDown(errorMsg)
     return { ready: false, error: errorMsg }
   } catch (error) {
-    const isConnection = isBackendConnectionError(error)
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-
     markBackendDown(errorMsg)
-
-    if (getBackendMode() === 'healthy' && shouldLogError()) {
-      if (isConnection) {
-        logError('Backend readiness check failed (connection error)', error)
-      } else {
-        logError('Backend readiness check failed', error)
-      }
-    }
-
     return { ready: false, error: errorMsg }
   }
 }

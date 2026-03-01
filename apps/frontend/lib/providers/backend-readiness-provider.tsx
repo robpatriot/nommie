@@ -9,15 +9,19 @@ import React, {
   useState,
 } from 'react'
 
+export type FailureKind = 'permanent' | 'transient'
+
 interface BackendReadinessContextValue {
-  /** Whether the backend is confirmed ready. */
   isReady: boolean
-  /** Force resume readiness polling if an API request fails. */
+  reportFailure: (kind: FailureKind) => void
+  reportSuccess: () => void
   triggerRecovery: () => void
 }
 
 const BackendReadinessContext = createContext<BackendReadinessContextValue>({
   isReady: true,
+  reportFailure: () => {},
+  reportSuccess: () => {},
   triggerRecovery: () => {},
 })
 
@@ -28,21 +32,16 @@ export function useBackendReadiness() {
 
 // ── Configuration ──────────────────────────────────────────────────
 
-/** Event dispatched when a query/mutation fails with backend-down (suppressed); listener calls triggerRecovery. */
-export const BACKEND_RECOVERY_TRIGGER_EVENT = 'nommie:backend-recovery-trigger'
-
-/** Persists across remounts (e.g. Strict Mode) so we stay in recovery and don't re-request ws-token. */
-let recoveryTriggeredThisSession = false
-
 const IS_TEST = process.env.NEXT_PUBLIC_FETCH_MODE === 'test'
 const PROBE_TIMEOUT_MS = 1_000
-const FAILURE_THRESHOLD = 2
+const TRANSIENT_FAILURE_THRESHOLD = 2
+const RECOVERY_SUCCESS_THRESHOLD = 2
 
 // Recovery polling: 1s for 30s, then 5s till 5min, then 30s
 const RECOVERY_FAST_MS = IS_TEST ? 10 : 1_000
 const RECOVERY_FAST_DURATION_MS = IS_TEST ? 50 : 30_000
 const RECOVERY_MEDIUM_MS = IS_TEST ? 20 : 5_000
-const RECOVERY_MEDIUM_DURATION_MS = IS_TEST ? 100 : 300_000 // 5 min
+const RECOVERY_MEDIUM_DURATION_MS = IS_TEST ? 100 : 300_000
 const RECOVERY_SLOW_MS = IS_TEST ? 30 : 30_000
 
 function nextRecoveryDelayMs(elapsedMs: number): number {
@@ -56,9 +55,7 @@ function nextRecoveryDelayMs(elapsedMs: number): number {
 export type CancelPoll = { cancel: () => void }
 
 export interface PollDriver {
-  /** “Run immediately” in prod. Tests may choose to queue and require manual ticks. */
   run: (cb: () => void) => void
-  /** Schedule next poll attempt. */
   schedule: (cb: () => void, delayMs: number) => CancelPoll
 }
 
@@ -75,11 +72,10 @@ const defaultPollDriver: PollDriver = {
 interface BackendReadinessProviderProps {
   children: React.ReactNode
   /**
-   * Initial ready state from the server (e.g. from layout/page after a backend call failed).
-   * Defaults to true (assume BE is up); set false when server already knows BE is down.
+   * Initial ready state from the server (e.g. from layout when backend is known down).
+   * Defaults to true (optimistic: assume BE is up).
    */
   initialReady?: boolean
-  /** Injected poll driver for deterministic tests; defaults to real timers in production. */
   pollDriver?: PollDriver
 }
 
@@ -88,15 +84,15 @@ export function BackendReadinessProvider({
   initialReady = true,
   pollDriver = defaultPollDriver,
 }: BackendReadinessProviderProps) {
-  const [isReady, setIsReady] = useState(
-    () => initialReady && !recoveryTriggeredThisSession
+  const [isReady, setIsReady] = useState(initialReady)
+  const modeRef = useRef<'healthy' | 'degraded'>(
+    initialReady ? 'healthy' : 'degraded'
   )
-  const modeRef = useRef<'healthy' | 'recovering'>(
-    initialReady && !recoveryTriggeredThisSession ? 'healthy' : 'recovering'
-  )
-  const consecutiveFailuresRef = useRef(0)
+  const consecutiveTransientRef = useRef(0)
+  const consecutiveSuccessRef = useRef(0)
   const scheduledRef = useRef<CancelPoll | null>(null)
   const recoveryStartedAtRef = useRef<number>(0)
+  const mountedRef = useRef(true)
 
   const clearScheduled = useCallback(() => {
     if (scheduledRef.current) {
@@ -105,8 +101,18 @@ export function BackendReadinessProvider({
     }
   }, [])
 
+  const enterDegraded = useCallback(() => {
+    if (modeRef.current === 'degraded') return
+    modeRef.current = 'degraded'
+    setIsReady(false)
+    consecutiveSuccessRef.current = 0
+    recoveryStartedAtRef.current = Date.now()
+  }, [])
+
   const poll = useCallback(
     async function pollInner() {
+      if (!mountedRef.current) return
+
       try {
         const response = await fetch('/readyz', {
           method: 'GET',
@@ -114,23 +120,27 @@ export function BackendReadinessProvider({
         })
 
         if (response.ok) {
-          recoveryTriggeredThisSession = false
-          modeRef.current = 'healthy'
-          setIsReady(true)
-          clearScheduled()
-          return
+          const next = consecutiveSuccessRef.current + 1
+          consecutiveSuccessRef.current = next
+          if (next >= RECOVERY_SUCCESS_THRESHOLD) {
+            modeRef.current = 'healthy'
+            setIsReady(true)
+            clearScheduled()
+            return
+          }
+        } else {
+          consecutiveSuccessRef.current = 0
         }
       } catch {
-        consecutiveFailuresRef.current += 1
+        consecutiveSuccessRef.current = 0
       }
 
+      if (!mountedRef.current) return
       const elapsed = Date.now() - recoveryStartedAtRef.current
       const delayMs = nextRecoveryDelayMs(elapsed)
+      if (typeof document !== 'undefined' && document.hidden) return
 
       clearScheduled()
-      if (typeof document !== 'undefined' && document.hidden) {
-        return
-      }
       scheduledRef.current = pollDriver.schedule(() => {
         void pollInner()
       }, delayMs)
@@ -138,39 +148,54 @@ export function BackendReadinessProvider({
     [clearScheduled, pollDriver]
   )
 
-  const triggerRecovery = useCallback(() => {
-    if (modeRef.current !== 'healthy') return
-
-    recoveryTriggeredThisSession = true
-    modeRef.current = 'recovering'
-    setIsReady(false)
-    consecutiveFailuresRef.current = FAILURE_THRESHOLD
-    recoveryStartedAtRef.current = Date.now()
-
+  const startPolling = useCallback(() => {
     clearScheduled()
     pollDriver.run(() => {
       void poll()
     })
   }, [clearScheduled, poll, pollDriver])
 
-  useEffect(() => {
-    if (!initialReady) {
-      recoveryTriggeredThisSession = true
-      recoveryStartedAtRef.current = Date.now()
-      consecutiveFailuresRef.current = FAILURE_THRESHOLD
-      pollDriver.run(() => {
-        void poll()
-      })
-    }
-  }, [initialReady, pollDriver, poll])
+  const reportFailure = useCallback(
+    (kind: FailureKind) => {
+      if (kind === 'permanent') {
+        enterDegraded()
+        startPolling()
+        return
+      }
+      const next = consecutiveTransientRef.current + 1
+      consecutiveTransientRef.current = next
+      if (next >= TRANSIENT_FAILURE_THRESHOLD) {
+        enterDegraded()
+        startPolling()
+      }
+    },
+    [enterDegraded, startPolling]
+  )
+
+  const reportSuccess = useCallback(() => {
+    consecutiveTransientRef.current = 0
+  }, [])
+
+  const triggerRecovery = useCallback(() => {
+    if (modeRef.current !== 'healthy') return
+    enterDegraded()
+    startPolling()
+  }, [enterDegraded, startPolling])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const onTrigger = () => triggerRecovery()
-    window.addEventListener(BACKEND_RECOVERY_TRIGGER_EVENT, onTrigger)
-    return () =>
-      window.removeEventListener(BACKEND_RECOVERY_TRIGGER_EVENT, onTrigger)
-  }, [triggerRecovery])
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      clearScheduled()
+    }
+  }, [clearScheduled])
+
+  useEffect(() => {
+    if (!initialReady) {
+      enterDegraded()
+      startPolling()
+    }
+  }, [initialReady, enterDegraded, startPolling])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -179,7 +204,7 @@ export function BackendReadinessProvider({
       if (document.hidden) {
         clearScheduled()
       } else {
-        if (modeRef.current === 'recovering') {
+        if (modeRef.current === 'degraded') {
           recoveryStartedAtRef.current = Date.now()
           clearScheduled()
           pollDriver.run(() => {
@@ -197,7 +222,9 @@ export function BackendReadinessProvider({
   }, [clearScheduled, poll, pollDriver])
 
   return (
-    <BackendReadinessContext.Provider value={{ isReady, triggerRecovery }}>
+    <BackendReadinessContext.Provider
+      value={{ isReady, reportFailure, reportSuccess, triggerRecovery }}
+    >
       {children}
     </BackendReadinessContext.Provider>
   )

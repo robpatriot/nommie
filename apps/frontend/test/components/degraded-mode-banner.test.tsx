@@ -11,6 +11,8 @@ describe('DegradedModeBanner', () => {
   it('renders children when isReady is true', () => {
     vi.mocked(useBackendReadiness).mockReturnValue({
       isReady: true,
+      reportFailure: vi.fn(),
+      reportSuccess: vi.fn(),
       triggerRecovery: vi.fn(),
     })
 
@@ -27,6 +29,8 @@ describe('DegradedModeBanner', () => {
   it('renders the banner when isReady is false', () => {
     vi.mocked(useBackendReadiness).mockReturnValue({
       isReady: false,
+      reportFailure: vi.fn(),
+      reportSuccess: vi.fn(),
       triggerRecovery: vi.fn(),
     })
 
