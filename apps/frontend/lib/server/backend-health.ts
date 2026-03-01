@@ -1,7 +1,6 @@
 // Server-only utility to check backend readiness.
 // This file must never be imported by client code.
 
-import { getBackendBaseUrlOrThrow } from '@/auth'
 import {
   markBackendUp,
   markBackendDown,
@@ -20,13 +19,53 @@ const READINESS_RETRY_AFTER_MS = 30_000
 let lastBackendAttemptAt = 0
 
 /**
- * True probe used by FE /readyz: always hits the backend with a 1s timeout.
- * Does not use cached "known down" state, so client polling can detect recovery promptly.
+ * Resolves the backend base URL for the readiness probe. When BACKEND_BASE_URL or
+ * NEXT_PUBLIC_BACKEND_BASE_URL is set, uses that; otherwise uses same-origin (caller must pass).
+ * Never throws.
  */
-export async function probeBackendReadiness(): Promise<BackendReadinessResult> {
+function getProbeBaseUrl(
+  sameOriginFallback: string | undefined
+): string | undefined {
+  const url =
+    process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+  if (url) {
+    try {
+      const parsed = new URL(url)
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        return url.replace(/\/$/, '')
+      }
+    } catch {
+      // fall through to same-origin
+    }
+  }
+  return sameOriginFallback?.replace(/\/$/, '')
+}
+
+/**
+ * Probe used by FE /readyz: hits the backend readiness endpoint with a 1s timeout.
+ * Does not use cached "known down" state, so client polling can detect recovery promptly.
+ *
+ * **Origin / base URL:** If BACKEND_BASE_URL or NEXT_PUBLIC_BACKEND_BASE_URL is set, that is used.
+ * Otherwise, `sameOriginFallback` must be provided (e.g. `new URL(request.url).origin` from the
+ * /readyz route handler). If no env is set and no fallback is passed, returns `{ ready: false }`
+ * without throwing. Never throws due to missing env or origin.
+ *
+ * @param sameOriginFallback - When env vars are unset, this origin is used (required for FE /readyz to work without env).
+ */
+export async function probeBackendReadiness(
+  sameOriginFallback?: string
+): Promise<BackendReadinessResult> {
+  const base = getProbeBaseUrl(sameOriginFallback)
+  if (!base) {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(
+        '[probeBackendReadiness] No backend base URL (env unset and no sameOriginFallback); returning ready: false'
+      )
+    }
+    return { ready: false, error: 'Backend URL not configured' }
+  }
+
   try {
-    const backendBase = getBackendBaseUrlOrThrow()
-    const base = backendBase.replace(/\/$/, '')
     const response = await fetch(`${base}/api/readyz`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -67,7 +106,12 @@ export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
 
   try {
     lastBackendAttemptAt = Date.now()
-    const backendBase = getBackendBaseUrlOrThrow()
+    const backendBase =
+      process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
+    if (!backendBase) {
+      markBackendDown('Backend URL not configured')
+      return { ready: false, error: 'Backend URL not configured' }
+    }
     const base = backendBase.replace(/\/$/, '')
     const response = await fetch(`${base}/api/readyz`, {
       method: 'GET',

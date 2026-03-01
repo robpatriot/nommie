@@ -27,12 +27,13 @@ function isTransient5xx(status: number): boolean {
 /**
  * True when the error is an expected backend-down/infra case (502/503/504 or connection failure).
  * We suppress logging for these in the query client to avoid console spam when BE is down.
+ * Network errors are checked first so they are suppressed even when not BackendApiError.
  */
 function shouldSuppressBackendError(error: unknown): boolean {
+  if (isNetworkError(error)) return true
   if (error instanceof BackendApiError) {
     if (error.status === 502 || error.status === 503 || error.status === 504)
       return true
-    if (isNetworkError(error)) return true
   }
   return false
 }

@@ -29,6 +29,7 @@ pub async fn readyz(app_state: web::Data<AppState>) -> HttpResponse {
 }
 
 /// `GET /api/internal/readyz` – rich readiness info (humans/devops).
+/// Backend-only; not exposed via Caddy. For internal/devops use only.
 pub async fn internal_readyz(app_state: web::Data<AppState>) -> HttpResponse {
     let manager = app_state.readiness();
     let body = manager.to_internal_json();
@@ -52,7 +53,7 @@ pub fn configure_api_health_routes(cfg: &mut actix_web::web::ServiceConfig) {
         .service(web::resource("/readyz").route(web::get().to(readyz)));
 }
 
-/// Register API internal routes: /api/internal/readyz.
+/// Register API internal routes: /api/internal/readyz (backend-only, not routed by Caddy).
 pub fn configure_api_internal_routes(cfg: &mut actix_web::web::ServiceConfig) {
     cfg.service(web::resource("/readyz").route(web::get().to(internal_readyz)));
 }

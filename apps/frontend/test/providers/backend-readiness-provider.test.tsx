@@ -1,10 +1,16 @@
 import React from 'react'
-import { render, act } from '@testing-library/react'
+import { render, act, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import {
+  QueryClient,
+  QueryClientProvider,
+  useMutation,
+} from '@tanstack/react-query'
 import {
   BackendReadinessProvider,
   useBackendReadiness,
 } from '@/lib/providers/backend-readiness-provider'
+import ReadinessQueryObserver from '@/components/ReadinessQueryObserver'
 import { ManualPollDriver } from '@/test/utils'
 
 function TestConsumer({
@@ -118,6 +124,48 @@ describe('BackendReadinessProvider', () => {
     expect(getByTestId('readiness').textContent).toBe('ready')
   })
 
+  it('does not transition to healthy on reportSuccess(); only /readyz probe successes do', async () => {
+    const driver = new ManualPollDriver()
+    const fetchSpy = vi.mocked(global.fetch)
+    fetchSpy.mockResolvedValue({ ok: false } as Response)
+
+    let reportSuccess: () => void = () => {}
+    let triggerRecovery: () => void = () => {}
+
+    const { getByTestId } = render(
+      <BackendReadinessProvider pollDriver={driver}>
+        <TestConsumer
+          onState={(s) => {
+            reportSuccess = s.reportSuccess
+            triggerRecovery = s.triggerRecovery
+          }}
+        />
+      </BackendReadinessProvider>
+    )
+
+    act(() => {
+      triggerRecovery()
+    })
+    expect(getByTestId('readiness').textContent).toBe('not-ready')
+
+    act(() => {
+      reportSuccess()
+      reportSuccess()
+      reportSuccess()
+    })
+    expect(getByTestId('readiness').textContent).toBe('not-ready')
+
+    fetchSpy.mockResolvedValue({ ok: true } as Response)
+    await act(async () => {
+      await driver.tick()
+    })
+    expect(getByTestId('readiness').textContent).toBe('not-ready')
+    await act(async () => {
+      await driver.tick()
+    })
+    expect(getByTestId('readiness').textContent).toBe('ready')
+  })
+
   it('shows not-ready after triggerRecovery and exits after 2 consecutive successful /readyz probes', async () => {
     const driver = new ManualPollDriver()
     const fetchSpy = vi.mocked(global.fetch)
@@ -227,5 +275,45 @@ describe('BackendReadinessProvider', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     unmount()
     expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('mutation error triggers reportFailure and enters degraded', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        mutations: { retry: 0 },
+      },
+    })
+    function FailingMutationButton() {
+      const mutation = useMutation({
+        mutationFn: async () => {
+          throw new Error('network error')
+        },
+      })
+      return (
+        <button
+          type="button"
+          onClick={() => mutation.mutate()}
+          data-testid="trigger-mutation"
+        >
+          Fail
+        </button>
+      )
+    }
+    const { getByTestId } = render(
+      <QueryClientProvider client={queryClient}>
+        <BackendReadinessProvider>
+          <ReadinessQueryObserver />
+          <TestConsumer />
+          <FailingMutationButton />
+        </BackendReadinessProvider>
+      </QueryClientProvider>
+    )
+    expect(getByTestId('readiness').textContent).toBe('ready')
+    await act(async () => {
+      getByTestId('trigger-mutation').click()
+    })
+    await waitFor(() => {
+      expect(getByTestId('readiness').textContent).toBe('not-ready')
+    })
   })
 })

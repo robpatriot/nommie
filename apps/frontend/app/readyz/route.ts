@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server'
 
 import { probeBackendReadiness } from '@/lib/server/backend-health'
 
-export async function GET() {
-  const result = await probeBackendReadiness()
+export async function GET(request: Request) {
+  const sameOrigin =
+    typeof request.url === 'string' ? new URL(request.url).origin : undefined
+  const result = await probeBackendReadiness(sameOrigin)
 
   const body = result.ready
     ? { status: 'ready', ready: true }

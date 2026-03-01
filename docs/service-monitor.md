@@ -33,11 +33,13 @@ The system distinguishes between **Liveness** (process is alive) and **Readiness
 | Endpoint | Purpose | Behavior |
 |---|---|---|
 | `GET /api/livez` | Liveness | Returns `200 OK` if the process is up. |
-| `GET /api/readyz` | Readiness | Returns `200 OK` when deps/migrations/monitor are ready; `503` otherwise. |
-| `GET /api/internal/readyz` | Readiness (rich) | Same status codes as `/api/readyz`; richer JSON for humans/devops. |
+| `GET /api/readyz` | Readiness | Returns `200 OK` when deps/migrations/monitor are ready; `503` otherwise. This is the **canonical public** readiness endpoint (routed by Caddy). |
+| `GET /api/internal/readyz` | Readiness (rich) | **Backend-only, not exposed via Caddy.** Same status codes as `/api/readyz`; richer JSON for humans/devops. Intended for internal/devops use only (e.g. direct backend access). |
 
 > [!NOTE]
 > All health responses include `Cache-Control: no-store` to prevent stale caching by proxies or browsers.
+>
+> **Internal endpoints:** `/api/internal/*` (including `/api/internal/readyz`) are **not** routed by Caddy and are not publicly accessible. The public readiness endpoint is `/api/readyz`.
 
 ---
 
