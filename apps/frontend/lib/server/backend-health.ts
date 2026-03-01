@@ -16,14 +16,15 @@ export interface BackendReadinessResult {
 }
 
 /**
- * Check if the backend is ready by hitting `/readyz`.
+ * Check if the backend is ready by hitting `/api/readyz`.
  *
  * Updates the server-side readiness state on success/failure.
  */
 export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
   try {
     const backendBase = getBackendBaseUrlOrThrow()
-    const response = await fetch(`${backendBase}/readyz`, {
+    const base = backendBase.replace(/\/$/, '')
+    const response = await fetch(`${base}/api/readyz`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(5000),

@@ -18,23 +18,16 @@ type RouteConfigFn = Box<dyn Fn(&mut web::ServiceConfig) + Send + Sync>;
 /// tests we register the same paths without those wrappers so that
 /// endpoint behavior can be exercised directly.
 fn configure_test_routes(cfg: &mut web::ServiceConfig) {
-    // Health check routes: /healthz and /readyz (public)
-    cfg.configure(routes::health::configure_public_health_routes);
-
-    // Internal diagnostics: /internal/healthz and /internal/readyz
-    cfg.service(web::scope("/internal").configure(routes::health::configure_internal_routes));
-
-    // Auth routes: /api/auth/**
+    // More specific /api/* scopes before generic /api (health) so e.g. /api/auth/login matches.
     cfg.service(web::scope("/api/auth").configure(routes::auth::configure_routes));
-
-    // Games routes: /api/games/**
     cfg.service(web::scope("/api/games").configure(routes::games::configure_routes));
-
-    // User routes: /api/user/**
     cfg.service(web::scope("/api/user").configure(routes::user_options::configure_routes));
-
-    // Realtime routes: /api/ws/**
     cfg.service(web::scope("/api/ws").configure(routes::realtime::configure_routes));
+
+    cfg.service(
+        web::scope("/api/internal").configure(routes::health::configure_api_internal_routes),
+    );
+    cfg.service(web::scope("/api").configure(routes::health::configure_api_health_routes));
 }
 
 /// Builder for creating test Actix service instances

@@ -9,16 +9,13 @@ async fn test_public_health_probes() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().build().await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    // 1. Liveness check (/healthz)
-    let req = test::TestRequest::get().uri("/healthz").to_request();
+    let req = test::TestRequest::get().uri("/api/livez").to_request();
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["status"], "alive");
 
-    // 2. Readiness check (/readyz)
-    // Initially not ready (mode=Startup)
-    let req = test::TestRequest::get().uri("/readyz").to_request();
+    let req = test::TestRequest::get().uri("/api/readyz").to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status().as_u16(), 503);
     let body: Value = test::read_body_json(resp).await;
@@ -34,16 +31,14 @@ async fn test_internal_readiness_diagnostics() -> Result<(), Box<dyn std::error:
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let req = test::TestRequest::get()
-        .uri("/internal/readyz")
+        .uri("/api/internal/readyz")
         .to_request();
     let resp = test::call_service(&app, req).await;
 
-    // Should be 503 initially (Startup mode)
     assert_eq!(resp.status().as_u16(), 503);
 
     let json: Value = test::read_body_json(resp).await;
 
-    // Verify rich diagnostic fields
     assert_eq!(json["service"], "backend");
     assert!(json["uptime_seconds"].is_number());
     assert_eq!(json["state"]["mode"], "startup");

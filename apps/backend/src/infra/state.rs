@@ -291,6 +291,7 @@ impl StateBuilder {
 
         if needs_resolution {
             resolve_dependencies(&state).await?;
+            state.readiness().mark_initial_resolution_success();
         }
 
         Ok(state)
@@ -418,19 +419,18 @@ mod tests {
             .await
             .unwrap();
 
-        // Simulate successful migrations.
-        manager.set_migration_result(true, None);
-
-        // Only Postgres is marked healthy; Redis is configured (not disabled),
-        // so readiness must remain not ready.
-        for _ in 0..2 {
-            manager.update_dependency(
-                crate::readiness::types::DependencyName::Postgres,
-                crate::readiness::types::DependencyCheck::Ok {
-                    latency: std::time::Duration::from_millis(1),
-                },
-            );
-        }
+        // After build, Redis is configured and was healthy; simulate it going down.
+        // Two consecutive failures are required to transition to Recovering.
+        // Readiness must not be ready when Redis is configured but not healthy.
+        let redis_down = crate::readiness::types::DependencyCheck::Down {
+            error: "connection refused".to_string(),
+            latency: std::time::Duration::from_millis(1),
+        };
+        manager.update_dependency(
+            crate::readiness::types::DependencyName::Redis,
+            redis_down.clone(),
+        );
+        manager.update_dependency(crate::readiness::types::DependencyName::Redis, redis_down);
 
         assert!(
             !manager.is_ready(),

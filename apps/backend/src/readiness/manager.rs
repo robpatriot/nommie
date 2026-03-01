@@ -133,6 +133,49 @@ impl ReadinessManager {
         }
     }
 
+    /// Mark initial resolution as successful so the service transitions to Healthy
+    /// without requiring a second resolution pass from the monitor.
+    ///
+    /// Call this after `resolve_dependencies` succeeds during startup. Any dependency
+    /// that already has at least one success has its consecutive success count set to
+    /// the recovery threshold, so `compute_new_mode` can transition Startup → Healthy.
+    /// The monitor still runs for recovery but will immediately park on `notified()`.
+    pub fn mark_initial_resolution_success(&self) {
+        let mut inner = match self.inner.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::error!(
+                    "readiness: RwLock poisoned in mark_initial_resolution_success; skipping"
+                );
+                drop(poisoned.into_inner());
+                return;
+            }
+        };
+
+        if inner.mode != ServiceMode::Startup {
+            return;
+        }
+        if !inner.migration.completed || inner.migration.error.is_some() {
+            return;
+        }
+
+        for dep in inner.dependencies.values_mut() {
+            if matches!(dep.status, CheckStatus::Ok) && dep.consecutive_successes >= 1 {
+                dep.consecutive_successes = RECOVERY_THRESHOLD;
+            }
+        }
+
+        let new_mode = compute_new_mode(&inner);
+        if new_mode == ServiceMode::Healthy {
+            inner.mode = new_mode;
+            tracing::info!(
+                previous_mode = %ServiceMode::Startup,
+                new_mode = %new_mode,
+                "readiness: service transitioned to Healthy (initial resolution)"
+            );
+        }
+    }
+
     /// Mark a dependency as permanently disabled/not applicable.
     ///
     /// This is intended only for optional dependencies (currently Redis) in
@@ -383,33 +426,6 @@ impl ReadinessManager {
             }
         }
     }
-
-    /// Rich internal healthz body (always returned, even when not ready).
-    pub fn to_internal_healthz_json(&self) -> Value {
-        match self.inner.read() {
-            Ok(inner) => {
-                let uptime_secs = inner.boot_time.elapsed().as_secs();
-                json!({
-                    "service": "backend",
-                    "status": "alive",
-                    "uptime_seconds": uptime_secs,
-                })
-            }
-            Err(poisoned) => {
-                let inner = poisoned.into_inner();
-                let uptime_secs = inner.boot_time.elapsed().as_secs();
-                tracing::error!(
-                    "readiness: RwLock poisoned when building internal healthz JSON; reporting error state"
-                );
-                json!({
-                    "service": "backend",
-                    "status": "error",
-                    "uptime_seconds": uptime_secs,
-                    "error": "readiness_lock_poisoned",
-                })
-            }
-        }
-    }
 }
 
 impl Default for ReadinessManager {
@@ -469,6 +485,33 @@ mod tests {
         let mgr = ReadinessManager::new();
         assert_eq!(mgr.mode(), ServiceMode::Startup);
         assert!(!mgr.is_ready());
+    }
+
+    #[test]
+    fn mark_initial_resolution_success_transitions_startup_to_healthy() {
+        let mgr = ReadinessManager::new();
+        mgr.set_migration_result(true, None);
+        mgr.update_dependency(
+            DependencyName::Postgres,
+            DependencyCheck::Ok {
+                latency: Duration::from_millis(1),
+            },
+        );
+        mgr.update_dependency(
+            DependencyName::Redis,
+            DependencyCheck::Ok {
+                latency: Duration::from_millis(1),
+            },
+        );
+        assert_eq!(
+            mgr.mode(),
+            ServiceMode::Startup,
+            "one success each still Startup"
+        );
+
+        mgr.mark_initial_resolution_success();
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+        assert!(mgr.is_ready());
     }
 
     #[test]

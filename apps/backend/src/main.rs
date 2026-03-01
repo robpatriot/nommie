@@ -152,6 +152,8 @@ async fn main() -> std::io::Result<()> {
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
                     .configure(backend::routes::user_options::configure_routes),
             )
+            // More specific /api/* scopes must be registered before the generic /api scope
+            // so that e.g. /api/auth/login matches /api/auth, not /api (which only has livez/readyz).
             .service(
                 // WebSocket token endpoint - issues short-lived tokens for WS connections
                 actix_web::web::scope("/api/ws")
@@ -172,16 +174,16 @@ async fn main() -> std::io::Result<()> {
                             .name("websocket_upgrade"),
                     ),
             )
-            // Internal health endpoints - no rate limiting, no readiness gate
+            // API health probes - no rate limiting, no readiness gate
             .service(
-                actix_web::web::scope("/internal")
-                    .configure(backend::routes::health::configure_internal_routes),
-            )
-            // Public health endpoints - no rate limiting, no readiness gate
-            .service(
-                actix_web::web::scope("")
+                actix_web::web::scope("/api/internal")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
-                    .configure(backend::routes::health::configure_public_health_routes),
+                    .configure(backend::routes::health::configure_api_internal_routes),
+            )
+            .service(
+                actix_web::web::scope("/api")
+                    .wrap(backend::middleware::security_headers::SecurityHeaders)
+                    .configure(backend::routes::health::configure_api_health_routes),
             )
     })
     .bind((host.as_str(), port))?

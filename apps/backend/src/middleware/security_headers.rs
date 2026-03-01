@@ -7,7 +7,7 @@
 //! - Referrer-Policy: strict-origin-when-cross-origin
 //! - Content-Security-Policy: Restrictive policy to prevent XSS attacks
 //! - Permissions-Policy: Restricts browser features
-//! - Cache-Control: no-store (only for /api/*, /healthz, and /readyz endpoints)
+//! - Cache-Control: no-store (only for /api/* endpoints)
 
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::http::header;
@@ -86,7 +86,7 @@ where
 
             // Content-Security-Policy: Restrictive policy to prevent XSS attacks
             // For API endpoints, we can be very restrictive since we only return JSON
-            if path.starts_with("/api/") || path == "/healthz" || path == "/readyz" {
+            if path.starts_with("/api/") {
                 // API endpoints: very restrictive CSP (no scripts, styles, etc.)
                 headers.insert(
                     header::HeaderName::from_static("content-security-policy"),
@@ -116,7 +116,7 @@ where
 
             // Cache-Control: no-store - Only for API and health endpoints
             // Skip for root / endpoint to allow browser default caching behavior
-            if path.starts_with("/api/") || path == "/healthz" || path == "/readyz" {
+            if path.starts_with("/api/") {
                 headers.insert(
                     header::CACHE_CONTROL,
                     header::HeaderValue::from_static("no-store"),

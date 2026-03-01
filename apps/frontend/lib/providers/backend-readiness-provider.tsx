@@ -29,11 +29,10 @@ export function useBackendReadiness() {
 // ── Configuration ──────────────────────────────────────────────────
 
 const IS_TEST = process.env.NEXT_PUBLIC_FETCH_MODE === 'test'
-const STARTUP_POLL_MS = IS_TEST ? 10 : 2_000
 const RECOVERY_BASE_MS = IS_TEST ? 10 : 2_000
 const RECOVERY_MAX_MS = IS_TEST ? 50 : 30_000
+const PROBE_TIMEOUT_MS = 1_000
 const FAILURE_THRESHOLD = 2
-const RECOVERY_THRESHOLD = 2
 
 // ── Poll driver ────────────────────────────────────────────────────
 
@@ -66,11 +65,8 @@ export function BackendReadinessProvider({
   children,
   pollDriver = defaultPollDriver,
 }: BackendReadinessProviderProps) {
-  const [isReady, setIsReady] = useState(false)
-
-  // Track mode internally (not exposed to consumers — they only see isReady)
-  const modeRef = useRef<'startup' | 'healthy' | 'recovering'>('startup')
-  const consecutiveSuccessesRef = useRef(0)
+  const [isReady, setIsReady] = useState(true)
+  const modeRef = useRef<'healthy' | 'recovering'>('healthy')
   const consecutiveFailuresRef = useRef(0)
   const attemptRef = useRef(0)
   const scheduledRef = useRef<CancelPoll | null>(null)
@@ -85,71 +81,26 @@ export function BackendReadinessProvider({
   const poll = useCallback(
     async function pollInner() {
       try {
-        const backendBase = process.env.NEXT_PUBLIC_BACKEND_BASE_URL
-        if (!backendBase) {
-          return
-        }
-
-        const response = await fetch(`${backendBase}/readyz`, {
+        const response = await fetch('/readyz', {
           method: 'GET',
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
         })
 
         if (response.ok) {
-          consecutiveSuccessesRef.current += 1
-          consecutiveFailuresRef.current = 0
-
-          if (
-            modeRef.current !== 'healthy' &&
-            consecutiveSuccessesRef.current >= RECOVERY_THRESHOLD
-          ) {
-            modeRef.current = 'healthy'
-            attemptRef.current = 0
-            setIsReady(true)
-            // Stop polling – we're healthy
-            clearScheduled()
-            return
-          }
-
-          if (modeRef.current === 'healthy') {
-            // Already healthy and still healthy – stop polling
-            clearScheduled()
-            return
-          }
-        } else {
-          consecutiveFailuresRef.current += 1
-          consecutiveSuccessesRef.current = 0
-
-          if (
-            modeRef.current === 'healthy' &&
-            consecutiveFailuresRef.current >= FAILURE_THRESHOLD
-          ) {
-            modeRef.current = 'recovering'
-            setIsReady(false)
-          }
+          modeRef.current = 'healthy'
+          attemptRef.current = 0
+          setIsReady(true)
+          clearScheduled()
+          return
         }
       } catch {
         consecutiveFailuresRef.current += 1
-        consecutiveSuccessesRef.current = 0
-
-        if (
-          modeRef.current === 'healthy' &&
-          consecutiveFailuresRef.current >= FAILURE_THRESHOLD
-        ) {
-          modeRef.current = 'recovering'
-          setIsReady(false)
-        }
       }
 
-      // Schedule next poll
-      const interval =
-        modeRef.current === 'startup'
-          ? STARTUP_POLL_MS
-          : Math.min(
-              RECOVERY_BASE_MS * Math.pow(2, attemptRef.current),
-              RECOVERY_MAX_MS
-            )
-
+      const interval = Math.min(
+        RECOVERY_BASE_MS * Math.pow(2, attemptRef.current),
+        RECOVERY_MAX_MS
+      )
       attemptRef.current += 1
 
       clearScheduled()
@@ -161,32 +112,24 @@ export function BackendReadinessProvider({
   )
 
   const triggerRecovery = useCallback(() => {
-    // Only trigger if we think we're healthy.
-    // If we're already startup/recovering, the poll loop is already running.
-    if (modeRef.current === 'healthy') {
-      modeRef.current = 'recovering'
-      setIsReady(false)
-      consecutiveFailuresRef.current = FAILURE_THRESHOLD
-      consecutiveSuccessesRef.current = 0
-      attemptRef.current = 0
+    if (modeRef.current !== 'healthy') return
 
-      clearScheduled()
-      pollDriver.run(() => {
-        void poll()
-      })
-    }
-  }, [clearScheduled, poll, pollDriver])
+    modeRef.current = 'recovering'
+    setIsReady(false)
+    consecutiveFailuresRef.current = FAILURE_THRESHOLD
+    attemptRef.current = 0
 
-  useEffect(() => {
-    // Start initial poll immediately (via driver.run for test determinism)
+    clearScheduled()
     pollDriver.run(() => {
       void poll()
     })
+  }, [clearScheduled, poll, pollDriver])
 
+  useEffect(() => {
     return () => {
       clearScheduled()
     }
-  }, [clearScheduled, poll, pollDriver])
+  }, [clearScheduled])
 
   return (
     <BackendReadinessContext.Provider value={{ isReady, triggerRecovery }}>

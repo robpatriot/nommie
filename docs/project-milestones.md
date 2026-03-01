@@ -208,7 +208,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
   *Status:* ✅ Complete — Frontend displays `trace_id` on error surfaces via toast and error boundary components.
 - **Health Endpoint:**  
   *Acceptance:* Endpoint returns up/down status with trace context.  
-  *Status:* ✅ Complete — `/health` route reports DB connectivity, app version, migration status, and timestamp with `X-Trace-Id` header.
+  *Status:* ✅ Complete — Health/readiness probes under `/api/livez`, `/api/readyz`, `/api/internal/readyz`; frontend `/livez`, `/readyz`.
 - **Security Logging:**  
   *Acceptance:* Security events logged with appropriate detail.  
   *Status:* ✅ Complete — Structured security logging for authentication failures and rate limit hits.
@@ -353,7 +353,7 @@ Core milestones first, then optional and enhancement tracks that can be implemen
 **Dependencies:** 18, 19  
 - **Health & Readiness Endpoints:**  
   *Acceptance:* Public endpoints expose only up/down status; internal endpoints expose full diagnostic state.  
-  *Status:* ✅ Complete — `/healthz`, `/readyz`, and `/internal/*` endpoints implemented in BE and proxied in FE.
+  *Status:* ✅ Complete — `/api/livez`, `/api/readyz`, `/api/internal/readyz` in BE; frontend `/livez`, `/readyz` (aggregate).
 - **Dependency Mapping & Enforcement:**  
   *Acceptance:* `ready` remains false until all required dependencies are confirmed.  
   *Status:* ✅ Complete — `ReadinessManager` tracks Postgres and Redis status with failure/success thresholds.

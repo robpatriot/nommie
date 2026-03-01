@@ -3,16 +3,14 @@ use actix_web::{web, HttpResponse};
 use crate::readiness::READINESS_RETRY_AFTER_SECS;
 use crate::state::app_state::AppState;
 
-// ── Public endpoints ───────────────────────────────────────────────
-
-/// `GET /healthz` – liveness probe. Always 200 if the process is alive.
-pub async fn healthz() -> HttpResponse {
+/// `GET /api/livez` – liveness probe. Always 200 if the process is alive.
+pub async fn livez() -> HttpResponse {
     HttpResponse::Ok()
         .insert_header(("Cache-Control", "no-store"))
         .json(serde_json::json!({ "status": "alive" }))
 }
 
-/// `GET /readyz` – readiness probe. 200 if ready, 503 if not.
+/// `GET /api/readyz` – readiness probe. 200 if ready, 503 if not.
 pub async fn readyz(app_state: web::Data<AppState>) -> HttpResponse {
     let manager = app_state.readiness();
     let body = manager.to_public_json();
@@ -30,17 +28,7 @@ pub async fn readyz(app_state: web::Data<AppState>) -> HttpResponse {
     }
 }
 
-// ── Internal endpoints ─────────────────────────────────────────────
-
-/// `GET /internal/healthz` – rich liveness info.
-pub async fn internal_healthz(app_state: web::Data<AppState>) -> HttpResponse {
-    let body = app_state.readiness().to_internal_healthz_json();
-    HttpResponse::Ok()
-        .insert_header(("Cache-Control", "no-store"))
-        .json(body)
-}
-
-/// `GET /internal/readyz` – rich readiness info.
+/// `GET /api/internal/readyz` – rich readiness info (humans/devops).
 pub async fn internal_readyz(app_state: web::Data<AppState>) -> HttpResponse {
     let manager = app_state.readiness();
     let body = manager.to_internal_json();
@@ -58,17 +46,13 @@ pub async fn internal_readyz(app_state: web::Data<AppState>) -> HttpResponse {
     }
 }
 
-// ── Route configuration ────────────────────────────────────────────
-
-/// Register public health routes on the given scope.
-/// Called from main.rs for the root scope.
-pub fn configure_public_health_routes(cfg: &mut actix_web::web::ServiceConfig) {
-    cfg.service(web::resource("/healthz").route(web::get().to(healthz)))
+/// Register API health routes: /api/livez, /api/readyz.
+pub fn configure_api_health_routes(cfg: &mut actix_web::web::ServiceConfig) {
+    cfg.service(web::resource("/livez").route(web::get().to(livez)))
         .service(web::resource("/readyz").route(web::get().to(readyz)));
 }
 
-/// Register internal health routes under `/internal`.
-pub fn configure_internal_routes(cfg: &mut actix_web::web::ServiceConfig) {
-    cfg.service(web::resource("/healthz").route(web::get().to(internal_healthz)))
-        .service(web::resource("/readyz").route(web::get().to(internal_readyz)));
+/// Register API internal routes: /api/internal/readyz.
+pub fn configure_api_internal_routes(cfg: &mut actix_web::web::ServiceConfig) {
+    cfg.service(web::resource("/readyz").route(web::get().to(internal_readyz)));
 }

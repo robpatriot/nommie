@@ -21,14 +21,20 @@ The system distinguishes between **Liveness** (process is alive) and **Readiness
 
 ## 📡 Endpoint Architecture
 
-Both Frontend (FE) and Backend (BE) expose four standardized health endpoints.
+**Frontend** (root, for browser and public probing):
 
-| Endpoint | Purpose | Publicity | Behavior |
-|---|---|---|---|
-| `/healthz` | Liveness Probe | Public | Returns `200 OK` if the process is running. |
-| `/readyz` | Readiness Probe | Public | Returns `200 OK` only if all dependencies are ready. Returns `503 Service Unavailable` otherwise. |
-| `/internal/healthz` | Rich Liveness | Internal | Rich JSON including service name and uptime. |
-| `/internal/readyz` | Rich Readiness | Internal | Rich JSON including state mode, dependency statuses, and migration state. |
+| Endpoint | Purpose | Behavior |
+|---|---|---|
+| `GET /livez` | Liveness | Returns `200 OK` if the process is up. |
+| `GET /readyz` | Readiness (aggregate) | Returns `200 OK` when app is ready (e.g. backend ready); `503` otherwise. |
+
+**Backend** (under `/api`, externally routed):
+
+| Endpoint | Purpose | Behavior |
+|---|---|---|
+| `GET /api/livez` | Liveness | Returns `200 OK` if the process is up. |
+| `GET /api/readyz` | Readiness | Returns `200 OK` when deps/migrations/monitor are ready; `503` otherwise. |
+| `GET /api/internal/readyz` | Readiness (rich) | Same status codes as `/api/readyz`; richer JSON for humans/devops. |
 
 > [!NOTE]
 > All health responses include `Cache-Control: no-store` to prevent stale caching by proxies or browsers.
@@ -65,13 +71,12 @@ To prevent flapping and unnecessary restarts, the system uses threshold-based tr
 
 ## 🧪 Frontend Degraded Mode
 
-The frontend monitors the backend's `/readyz` status. If the backend is not ready:
+The frontend assumes the backend is healthy on startup (optimistic). Degraded mode only triggers after a real failed API request (network error, timeout, 5xx, 503). When degraded:
 
-1.  **Readiness Probe:** The frontend `/readyz` returns `503`.
+1.  **Readiness Probe:** The frontend aggregate `/readyz` returns `503`.
 2.  **UI Gate:** A full-page **Degraded Mode Banner** is displayed, blocking all user 
     interaction and navigation.
-3.  **Polling:** The frontend continues to poll the backend readiness endpoint in the 
-    background and automatically clears the banner once the backend returns to `healthy`.
+3.  **Polling:** The frontend polls `GET /api/readyz` (1s timeout) and exits degraded on first `200`.
 4.  **WebSocket Protection:** The WebSocket connection is suspended or delayed until 
     backend readiness is confirmed.
 

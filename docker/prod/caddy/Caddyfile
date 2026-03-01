@@ -2,7 +2,6 @@
 	# Enable compression ONLY for non-API routes
 	@no_api {
 		not path /api/*
-		not path /health
 	}
 	encode @no_api gzip zstd
 
@@ -29,15 +28,9 @@
 		reverse_proxy frontend:3000
 	}
 
-	# All other API routes → backend
-	@api path /api/*
+	# All other API routes → backend (exclude internal; /api/internal/* falls through to frontend and 404s)
+	@api path /api/* and not path /api/internal/*
 	handle @api {
-		reverse_proxy backend:3001
-	}
-
-	# Health endpoint → backend
-	@health path /health
-	handle @health {
 		reverse_proxy backend:3001
 	}
 
