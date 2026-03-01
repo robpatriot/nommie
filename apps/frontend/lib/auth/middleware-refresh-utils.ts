@@ -114,6 +114,22 @@ export async function refreshBackendJwtIfNeeded(
 }
 
 /**
+ * Detect connection-type errors (backend unreachable) without server-only imports.
+ * Used to suppress log spam when backend is down.
+ */
+function isConnectionError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  const msg = err.message.toLowerCase()
+  const causeMsg =
+    err.cause instanceof Error ? err.cause.message.toLowerCase() : ''
+  const patterns = ['econnrefused', 'fetch failed', 'connection', 'timeout']
+  return (
+    patterns.some((p) => msg.includes(p)) ||
+    patterns.some((p) => causeMsg.includes(p))
+  )
+}
+
+/**
  * Fetch new JWT - Generic version for middleware
  */
 async function fetchNewBackendJwtGeneric(
@@ -172,7 +188,9 @@ async function fetchNewBackendJwtGeneric(
       return data.token
     }
   } catch (err) {
-    console.error('Middleware: Failed to fetch backend JWT', err)
+    if (!isConnectionError(err)) {
+      console.error('Middleware: Failed to fetch backend JWT', err)
+    }
   }
   return null
 }

@@ -39,6 +39,15 @@ export function isBackendReady(): boolean {
   return mode === 'healthy'
 }
 
+/**
+ * True when we have concluded the backend is down (were healthy, then 2+ failures).
+ * Use this (not !isBackendReady()) to decide whether to tell the client to show
+ * the degraded banner: only when known down, not during startup.
+ */
+export function isBackendKnownDown(): boolean {
+  return mode === 'recovering'
+}
+
 export function getBackendMode(): FrontendServiceMode {
   return mode
 }

@@ -15,6 +15,7 @@ import {
   redirectToHomeClient,
 } from '@/lib/auth/clear-session-client'
 import { logError, logBackendError } from '@/lib/logging/error-logger'
+import { BACKEND_RECOVERY_TRIGGER_EVENT } from '@/lib/providers/backend-readiness-provider'
 
 /**
  * Helper to check if a 5xx error is transient (should be retried).
@@ -22,6 +23,18 @@ import { logError, logBackendError } from '@/lib/logging/error-logger'
  */
 function isTransient5xx(status: number): boolean {
   return status === 502 || status === 503 || status === 504
+}
+
+/**
+ * True when the error is an expected backend-down/infra case (503 or connection failure).
+ * We suppress logging for these in the query client to avoid console spam when BE is down.
+ */
+function shouldSuppressBackendError(error: unknown): boolean {
+  if (error instanceof BackendApiError) {
+    if (error.status === 503) return true
+    if (isNetworkError(error)) return true
+  }
+  return false
 }
 
 /**
@@ -52,6 +65,15 @@ export function AppQueryClientProvider({
               return // Don't log handled errors
             }
 
+            if (shouldSuppressBackendError(error)) {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent(BACKEND_RECOVERY_TRIGGER_EVENT)
+                )
+              }
+              return
+            }
+
             // Log all other errors for debugging and observability
             const mutationKey =
               mutation && typeof mutation === 'object' && 'options' in mutation
@@ -78,6 +100,15 @@ export function AppQueryClientProvider({
               clearBackendSessionClient()
               redirectToHomeClient()
               return // Don't log handled errors
+            }
+
+            if (shouldSuppressBackendError(error)) {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                  new CustomEvent(BACKEND_RECOVERY_TRIGGER_EVENT)
+                )
+              }
+              return
             }
 
             // Log all other errors for debugging and observability

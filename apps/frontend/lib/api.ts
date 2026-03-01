@@ -15,8 +15,10 @@ import { BackendApiError } from './errors'
 import { parseErrorResponse } from './api/error-parsing'
 import {
   markBackendUp,
+  markBackendDown,
   shouldLogError,
   getBackendMode,
+  isBackendReady,
 } from '@/lib/server/backend-status'
 import { isBackendConnectionError } from '@/lib/server/connection-errors'
 import { fetchWithAuthWithRetry } from './server/fetch-with-retry'
@@ -110,17 +112,21 @@ export async function fetchWithAuth(
     // This helps differentiate startup failures from runtime failures
     markBackendUp()
   } catch (error) {
-    // Handle network errors - check if we should log
     const isConnectionError = isBackendConnectionError(error)
 
-    // Only log connection errors if we should (outside startup window or runtime failure)
-    if (shouldLogError() && isConnectionError) {
-      logError('Backend connection error during API request', error, {
-        endpoint,
-      })
-    } else if (shouldLogError() && !isConnectionError) {
-      // Other errors should be logged if outside startup window
-      logError('Network error during API request', error, { endpoint })
+    if (isConnectionError) {
+      const msg = error instanceof Error ? error.message : String(error)
+      markBackendDown(msg)
+    }
+
+    if (isBackendReady() && shouldLogError()) {
+      if (isConnectionError) {
+        logError('Backend connection error during API request', error, {
+          endpoint,
+        })
+      } else {
+        logError('Network error during API request', error, { endpoint })
+      }
     }
 
     throw error

@@ -4,6 +4,8 @@ import { getTranslations } from 'next-intl/server'
 import LobbyClient from '@/components/LobbyClient'
 import ErrorBoundaryWithTranslations from '@/components/ErrorBoundaryWithTranslations'
 import { getAvailableGames } from '@/lib/api'
+import { isBackendKnownDown } from '@/lib/server/backend-status'
+import BackendStatusSync from '@/components/BackendStatusSync'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import {
   handleAllowlistError,
@@ -36,6 +38,8 @@ export default async function LobbyPage() {
     // allGames remains empty array - client will show empty state and can retry
   }
 
+  const backendKnownDown = isBackendKnownDown()
+
   const lobbyGames = allGames.filter((game) => game.state === 'LOBBY')
   const joinableGames = lobbyGames.filter(
     (game) => game.player_count < game.max_players
@@ -55,6 +59,7 @@ export default async function LobbyPage() {
 
   return (
     <ErrorBoundaryWithTranslations>
+      <BackendStatusSync ready={!backendKnownDown} />
       <BreadcrumbSetter crumbs={[{ label: t('breadcrumbs.lobby') }]} />
       <LobbyClient
         joinableGames={joinableGames}

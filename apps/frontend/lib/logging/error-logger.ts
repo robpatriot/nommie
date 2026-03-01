@@ -193,20 +193,6 @@ export function logBackendError(
     }
   }
 
-  // Debug: Log what we're about to pass to logError
-  if (process.env.NODE_ENV === 'development') {
-    console.error('[logBackendError] Debug:', {
-      message,
-      errorDetails,
-      errorType: error instanceof Error ? 'Error instance' : 'Plain object',
-      errorMessage: error.message,
-      hasTraceId: error.traceId !== undefined,
-      hasStatus: error.status !== undefined,
-      hasCode: error.code !== undefined,
-      additionalContext,
-    })
-  }
-
   logError(message, errorDetails, {
     traceId: error.traceId,
     status: error.status,

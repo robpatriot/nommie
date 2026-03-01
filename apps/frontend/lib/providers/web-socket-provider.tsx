@@ -67,6 +67,7 @@ import {
   onYourTurn,
   requestLwRefetch,
 } from '@/lib/queries/lw-cache'
+import { useBackendReadiness } from '@/lib/providers/backend-readiness-provider'
 
 const MAX_RECONNECT_DELAY_MS = 30_000
 const INITIAL_RECONNECT_DELAY_MS = 1000
@@ -124,6 +125,7 @@ export function WebSocketProvider({
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
 
   const queryClient = useQueryClient()
+  const { isReady, triggerRecovery } = useBackendReadiness()
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -175,6 +177,9 @@ export function WebSocketProvider({
       clearTimeout(timeoutId)
 
       if (!response.ok) {
+        if (response.status === 503) {
+          triggerRecovery()
+        }
         if (response.status === 401) {
           if (!hasTriggeredStaleSignoutRef.current) {
             hasTriggeredStaleSignoutRef.current = true
@@ -201,7 +206,7 @@ export function WebSocketProvider({
       }
       throw error
     }
-  }, [])
+  }, [triggerRecovery])
 
   const resolveWsUrl = useCallback(() => {
     try {
@@ -313,6 +318,8 @@ export function WebSocketProvider({
   )
 
   const connect = useCallback(async () => {
+    if (!isReady) return
+
     if (!isPageActive()) {
       pendingReconnectRef.current = true
       return
@@ -449,10 +456,13 @@ export function WebSocketProvider({
         }
       }
     } catch (error) {
-      logError('Failed to establish realtime connection', error)
-
       const message =
         error instanceof Error ? error.message : 'Unknown realtime error'
+      const is503 =
+        message.includes('503') || message.includes('Service Unavailable')
+      if (!is503) {
+        logError('Failed to establish realtime connection', error)
+      }
       setSyncError({ message })
 
       if (
@@ -464,7 +474,9 @@ export function WebSocketProvider({
       }
 
       closeReasonRef.current = 'error'
-      scheduleReconnect(connect)
+      if (!is503) {
+        scheduleReconnect(connect)
+      }
     } finally {
       connectInFlightRef.current = false
     }
@@ -472,13 +484,14 @@ export function WebSocketProvider({
     armHandshakeTimeout,
     clearHandshakeTimeout,
     fetchWsToken,
+    isReady,
     queryClient,
     resolveWsUrl,
     scheduleReconnect,
   ])
 
   const tryResumeReconnect = useCallback(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated || !isReady) return
     clearReconnectTimeout()
     if (connectInFlightRef.current) return
     const ws = wsRef.current
@@ -491,7 +504,7 @@ export function WebSocketProvider({
     setReconnectAttempts(0)
     reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
     void connect()
-  }, [isAuthenticated, connect, clearReconnectTimeout])
+  }, [isAuthenticated, isReady, connect, clearReconnectTimeout])
 
   const resumeHandlerRef = useRef<(() => void) | null>(null)
   resumeHandlerRef.current = tryResumeReconnect
@@ -515,17 +528,17 @@ export function WebSocketProvider({
   }, [])
 
   useEffect(() => {
-    if (isAuthenticated) {
-      void connect()
-    } else {
+    if (!isAuthenticated || !isReady) {
       disconnect()
+    } else {
+      void connect()
     }
 
     return () => {
       // On provider unmount, clean up socket/timers.
       cleanupSocketAndTimers('unmount')
     }
-  }, [isAuthenticated, connect, disconnect, cleanupSocketAndTimers])
+  }, [isAuthenticated, isReady, connect, disconnect, cleanupSocketAndTimers])
 
   return (
     <WebSocketContext.Provider

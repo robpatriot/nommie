@@ -27,6 +27,7 @@ import { AppQueryClientProvider } from '@/lib/providers/query-client-provider'
 import { LOCALE_COOKIE_NAME, resolveLocale } from '@/i18n/locale'
 import { loadMessages } from '@/i18n/messages'
 import { getUserOptions } from '@/lib/api/user-options'
+import { isBackendKnownDown } from '@/lib/server/backend-status'
 import { BACKEND_JWT_COOKIE_NAME } from '@/lib/auth/backend-jwt-cookie'
 import { WebSocketProvider } from '@/lib/providers/web-socket-provider'
 import { BackendReadinessProvider } from '@/lib/providers/backend-readiness-provider'
@@ -139,6 +140,8 @@ export default async function RootLayout({
     }
   }
 
+  const backendKnownDown = isBackendKnownDown()
+
   const messages = await loadMessages(locale, [
     'common',
     'nav',
@@ -184,7 +187,7 @@ export default async function RootLayout({
             isAuthenticated={!!session}
           >
             <AppQueryClientProvider>
-              <BackendReadinessProvider>
+              <BackendReadinessProvider initialReady={!backendKnownDown}>
                 <ReadinessQueryObserver />
                 <DegradedModeBanner>
                   <WebSocketProvider isAuthenticated={!!session}>

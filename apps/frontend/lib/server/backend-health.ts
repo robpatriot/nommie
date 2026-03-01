@@ -6,6 +6,8 @@ import {
   markBackendUp,
   markBackendDown,
   shouldLogError,
+  getBackendMode,
+  getBackendStatus,
 } from './backend-status'
 import { isBackendConnectionError } from './connection-errors'
 import { logError } from '@/lib/logging/error-logger'
@@ -15,13 +17,33 @@ export interface BackendReadinessResult {
   error?: string
 }
 
+const READINESS_RETRY_AFTER_MS = 30_000
+
+let lastBackendAttemptAt = 0
+
 /**
  * Check if the backend is ready by hitting `/api/readyz`.
  *
  * Updates the server-side readiness state on success/failure.
+ * When we already know the backend is down, returns not ready without calling it,
+ * except we try again every READINESS_RETRY_AFTER_MS to discover when it recovers.
  */
 export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
+  const mode = getBackendMode()
+  const { consecutiveFailures } = getBackendStatus()
+  const knownDown =
+    mode === 'recovering' || (mode === 'startup' && consecutiveFailures > 0)
+
+  if (knownDown) {
+    const now = Date.now()
+    if (now - lastBackendAttemptAt < READINESS_RETRY_AFTER_MS) {
+      return { ready: false, error: 'Backend known down' }
+    }
+    lastBackendAttemptAt = now
+  }
+
   try {
+    lastBackendAttemptAt = Date.now()
     const backendBase = getBackendBaseUrlOrThrow()
     const base = backendBase.replace(/\/$/, '')
     const response = await fetch(`${base}/api/readyz`, {
@@ -45,10 +67,12 @@ export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
 
     markBackendDown(errorMsg)
 
-    if (shouldLogError() && isConnection) {
-      logError('Backend readiness check failed (connection error)', error)
-    } else if (shouldLogError() && !isConnection) {
-      logError('Backend readiness check failed', error)
+    if (getBackendMode() === 'healthy' && shouldLogError()) {
+      if (isConnection) {
+        logError('Backend readiness check failed (connection error)', error)
+      } else {
+        logError('Backend readiness check failed', error)
+      }
     }
 
     return { ready: false, error: errorMsg }

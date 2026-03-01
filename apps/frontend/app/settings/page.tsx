@@ -8,10 +8,12 @@ import { CardConfirmationToggle } from '@/components/CardConfirmationToggle'
 import { LanguageSelector } from '@/components/LanguageSelector'
 import { TrickDisplayDurationInput } from '@/components/TrickDisplayDurationInput'
 import { getUserOptions } from '@/lib/api/user-options'
+import { isBackendKnownDown } from '@/lib/server/backend-status'
 import {
   handleAllowlistError,
   handleStaleSessionError,
 } from '@/lib/auth/allowlist'
+import BackendStatusSync from '@/components/BackendStatusSync'
 import { logError } from '@/lib/logging/error-logger'
 import type { ColourScheme, ThemeName } from '@/components/theme-provider'
 import type { SupportedLocale } from '@/i18n/locale'
@@ -52,8 +54,11 @@ export default async function SettingsPage() {
     // Fall back to defaults
   }
 
+  const backendKnownDown = isBackendKnownDown()
+
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-10">
+      <BackendStatusSync ready={!backendKnownDown} />
       <BreadcrumbSetter crumbs={[{ label: t('breadcrumbs.settings') }]} />
       <section className="rounded-3xl border border-border/50 bg-card/70 p-8 shadow-elevated">
         <div className="mb-6">
