@@ -73,12 +73,12 @@ To prevent flapping and unnecessary restarts, the system uses threshold-based tr
 
 ## 🧪 Frontend Degraded Mode
 
-The frontend assumes the backend is healthy on startup (optimistic). Degraded mode only triggers after a real failed API request (network error, timeout, 5xx, 503). When degraded:
+The frontend assumes the backend is healthy on startup (optimistic). Degraded mode triggers after a real failed API request (network error, timeout, 5xx, 503); both query and mutation failures are observed (via React Query QueryCache and MutationCache). When degraded:
 
 1.  **Readiness Probe:** The frontend aggregate `/readyz` returns `503`.
 2.  **UI Gate:** A full-page **Degraded Mode Banner** is displayed, blocking all user 
     interaction and navigation.
-3.  **Polling:** The frontend polls `GET /api/readyz` (1s timeout) and exits degraded on first `200`.
+3.  **Polling:** The frontend polls `GET /readyz` (its aggregate endpoint, 1s timeout), which checks backend readiness; it exits degraded after **2 consecutive** successful probe responses.
 4.  **WebSocket Protection:** The WebSocket connection is suspended or delayed until 
     backend readiness is confirmed.
 
