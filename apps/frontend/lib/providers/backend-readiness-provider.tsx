@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
+import { drainResponseBody } from '../http/drain-response'
 
 export type FailureKind = 'permanent' | 'transient'
 
@@ -124,6 +125,10 @@ export function BackendReadinessProvider({
           method: 'GET',
           signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
         })
+
+        // Always drain/cancel the body so the connection can be reused and
+        // DevTools/network tooling do not show hanging downloads.
+        await drainResponseBody(response)
 
         if (response.ok) {
           const next = consecutiveSuccessRef.current + 1

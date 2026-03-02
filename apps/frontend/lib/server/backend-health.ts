@@ -7,6 +7,7 @@ import {
   getBackendMode,
   getBackendStatus,
 } from './backend-status'
+import { drainResponseBody } from '../http/drain-response'
 
 export interface BackendReadinessResult {
   ready: boolean
@@ -72,6 +73,10 @@ export async function probeBackendReadiness(
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     })
 
+    // Always drain/cancel the body so the connection can be reused and
+    // DevTools/network tooling do not show hanging downloads.
+    await drainResponseBody(response)
+
     if (response.ok) {
       return { ready: true }
     }
@@ -118,6 +123,10 @@ export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(5000),
     })
+
+    // Always drain/cancel the body so the connection can be reused and
+    // DevTools/network tooling do not show hanging downloads.
+    await drainResponseBody(response)
 
     if (response.ok) {
       markBackendUp()
