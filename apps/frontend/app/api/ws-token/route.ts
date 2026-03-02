@@ -11,11 +11,9 @@ import {
   markBackendDown,
   getBackendMode,
   getBackendStatus,
+  isBackendKnownDown,
 } from '@/lib/server/backend-status'
-import {
-  isBackendStartupError,
-  isBackendConnectionError,
-} from '@/lib/server/connection-errors'
+import { isBackendConnectionError } from '@/lib/server/connection-errors'
 import { logError } from '@/lib/logging/error-logger'
 
 export async function GET() {
@@ -69,32 +67,43 @@ export async function GET() {
     return NextResponse.json(payload, { status: 200 })
   } catch (error) {
     if (error instanceof BackendJwtError) {
-      // Return 401 for auth errors so client can redirect
+      // When the backend is known unavailable the JWT refresh failed due to
+      // infrastructure, not because the session is stale. Return 503 so the
+      // client enters degraded mode instead of redirecting to signout.
+      if (isBackendKnownDown()) {
+        return NextResponse.json(
+          { error: 'Backend not ready' },
+          { status: 503 }
+        )
+      }
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       )
     }
 
-    if (isBackendConnectionError(error)) {
+    const isConnectionErr = isBackendConnectionError(error)
+
+    if (isConnectionErr) {
       const msg = error instanceof Error ? error.message : String(error)
       markBackendDown(msg)
+      // Always return 503 for connection errors regardless of current mode.
+      // This stops the WS provider from scheduling a reconnect (which would
+      // just generate another connection error) and ensures triggerRecovery()
+      // is called on the client side exactly once.
+      return NextResponse.json({ error: 'Backend not ready' }, { status: 503 })
     }
 
-    // Check if this is a backend startup error
-    const isStartupError = isBackendStartupError(error)
-
-    // Only log if we should (outside startup window or runtime failure)
-    if (shouldLogError() && !isStartupError) {
+    // Non-connection errors are genuine application failures — log and return 500.
+    if (shouldLogError()) {
       logError('Unexpected websocket token error', error, {
         action: 'fetchWsToken',
       })
     }
 
-    // Return 503 for startup errors (retriable), 500 for other errors
     return NextResponse.json(
       { error: 'Unable to issue websocket token' },
-      { status: isStartupError ? 503 : 500 }
+      { status: 500 }
     )
   }
 }

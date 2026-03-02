@@ -1,6 +1,7 @@
 // Server-only utility functions for converting errors to action result formats
 
 import { BackendApiError } from '@/lib/errors'
+import { isNetworkError } from '@/lib/retry'
 
 /**
  * Generic action result type with discriminated union.
@@ -40,6 +41,9 @@ export type StateActionResult<T> = ActionResult<T> | { kind: 'not_modified' }
 /**
  * Convert an error (BackendApiError or unknown) to an error result.
  * Wraps unexpected errors in BackendApiError for consistent error handling.
+ * Network/connection errors are surfaced as 503 BACKEND_UNAVAILABLE so the
+ * client-side ReadinessQueryObserver can reliably classify them as permanent
+ * failures without relying on error message pattern matching.
  */
 export function toErrorResult(
   error: unknown,
@@ -56,11 +60,11 @@ export function toErrorResult(
     }
   }
 
-  // Wrap unexpected errors in BackendApiError for consistent error handling
+  const network = error instanceof Error && isNetworkError(error)
   const wrappedError = new BackendApiError(
     error instanceof Error ? error.message : defaultMessage,
     defaultStatus,
-    'UNKNOWN_ERROR'
+    network ? 'BACKEND_UNAVAILABLE' : 'UNKNOWN_ERROR'
   )
   return {
     kind: 'error',

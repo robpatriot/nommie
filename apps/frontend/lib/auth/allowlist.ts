@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { BackendApiError, isStaleSessionError } from '@/lib/errors'
+import { isBackendKnownDown } from '@/lib/server/backend-status'
 
 /**
  * Handle an email-allowlist failure in a server component.
@@ -32,7 +33,10 @@ export async function handleAllowlistError(error: unknown) {
  * to a Route Handler that can modify cookies.
  */
 export async function handleStaleSessionError(error: unknown) {
-  if (isStaleSessionError(error)) {
+  // When the backend is known unavailable the session may appear stale only
+  // because the JWT refresh failed. Don't sign the user out in that case —
+  // the degraded-mode system will handle it.
+  if (isStaleSessionError(error) && !isBackendKnownDown()) {
     // Redirect to route handler that signs out and redirects to home
     redirect('/api/auth/signout-session-stale')
   }

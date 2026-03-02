@@ -93,6 +93,12 @@ export function BackendReadinessProvider({
   const scheduledRef = useRef<CancelPoll | null>(null)
   const recoveryStartedAtRef = useRef<number>(0)
   const mountedRef = useRef(true)
+  // Tracks whether a healthy backend has ever been confirmed for this client
+  // session. Before the first confirmed success, any failure (even 'transient')
+  // immediately enters degraded — there is no established healthy baseline to
+  // protect against flapping. Always starts false: optimistic initialReady is
+  // an assumption, not confirmation.
+  const hasEverSucceededRef = useRef(false)
 
   const clearScheduled = useCallback(() => {
     if (scheduledRef.current) {
@@ -123,11 +129,16 @@ export function BackendReadinessProvider({
           const next = consecutiveSuccessRef.current + 1
           consecutiveSuccessRef.current = next
           if (next >= RECOVERY_SUCCESS_THRESHOLD) {
+            hasEverSucceededRef.current = true
             modeRef.current = 'healthy'
             setIsReady(true)
             clearScheduled()
             return
           }
+          // A successful probe is a positive signal: reset the elapsed clock so
+          // the confirmatory probe fires at the fast rate rather than whichever
+          // backoff tier we've drifted into.
+          recoveryStartedAtRef.current = Date.now()
         } else {
           consecutiveSuccessRef.current = 0
         }
@@ -157,7 +168,9 @@ export function BackendReadinessProvider({
 
   const reportFailure = useCallback(
     (kind: FailureKind) => {
-      if (kind === 'permanent') {
+      // Before a healthy baseline is established any failure is sufficient
+      // evidence the backend is down — skip the threshold.
+      if (kind === 'permanent' || !hasEverSucceededRef.current) {
         enterDegraded()
         startPolling()
         return
@@ -173,6 +186,7 @@ export function BackendReadinessProvider({
   )
 
   const reportSuccess = useCallback(() => {
+    hasEverSucceededRef.current = true
     consecutiveTransientRef.current = 0
   }, [])
 

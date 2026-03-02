@@ -12,6 +12,11 @@ function isPermanentFailure(error: unknown): boolean {
     if (error.status === 503 || error.status === 502 || error.status === 504) {
       return true
     }
+    // toErrorResult wraps server-side network errors with this code so detection
+    // does not depend on error message pattern matching.
+    if (error.code === 'BACKEND_UNAVAILABLE') {
+      return true
+    }
   }
   if (isNetworkError(error)) {
     return true

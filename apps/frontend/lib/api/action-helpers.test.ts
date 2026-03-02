@@ -22,16 +22,30 @@ describe('toErrorResult', () => {
     })
   })
 
-  it('converts Error to error result with default message', () => {
-    const error = new Error('Network timeout')
+  it('converts non-network Error to error result preserving message', () => {
+    const error = new Error('Something went wrong')
 
     const result = toErrorResult(error, 'Failed to submit bid')
 
     expect(result).toEqual({
       kind: 'error',
-      message: 'Network timeout',
+      message: 'Something went wrong',
       status: 500,
       code: 'UNKNOWN_ERROR',
+      traceId: undefined,
+    })
+  })
+
+  it('converts network/connection error to BACKEND_UNAVAILABLE', () => {
+    const error = new Error('fetch failed')
+
+    const result = toErrorResult(error, 'Failed to submit bid')
+
+    expect(result).toEqual({
+      kind: 'error',
+      message: 'fetch failed',
+      status: 500,
+      code: 'BACKEND_UNAVAILABLE',
       traceId: undefined,
     })
   })

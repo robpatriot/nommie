@@ -34,6 +34,8 @@ function shouldSuppressBackendError(error: unknown): boolean {
   if (error instanceof BackendApiError) {
     if (error.status === 502 || error.status === 503 || error.status === 504)
       return true
+    // toErrorResult wraps server-side network/connection errors with this code.
+    if (error.code === 'BACKEND_UNAVAILABLE') return true
   }
   return false
 }
