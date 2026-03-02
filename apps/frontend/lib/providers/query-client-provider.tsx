@@ -147,6 +147,17 @@ export function AppQueryClientProvider({
                   return false
                 }
 
+                // DB_UNAVAILABLE / BACKEND_UNAVAILABLE means the backend's
+                // dependency (postgres, redis) is persistently down — retrying
+                // will just block the thread for another 5 s pool timeout and
+                // delays ReadinessQueryObserver firing reportFailure.
+                if (
+                  error.code === 'DB_UNAVAILABLE' ||
+                  error.code === 'BACKEND_UNAVAILABLE'
+                ) {
+                  return false
+                }
+
                 // Retry transient 5xx errors (502, 503, 504) once
                 if (isTransient5xx(status)) {
                   return failureCount < 1

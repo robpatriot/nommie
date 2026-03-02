@@ -61,7 +61,7 @@ export default function LobbyClient({
     data: allGames = initialAllGames,
     refetch: refetchGames,
     isFetching: isRefreshing,
-  } = useAvailableGames(initialAllGames)
+  } = useAvailableGames(initialAllGames, { refetchInterval: 5_000 })
 
   // Mutations
   const createGameMutation = useCreateGame()

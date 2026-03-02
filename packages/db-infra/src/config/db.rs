@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::{env, process};
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
-use tracing::info;
+use tracing::trace;
 use sea_orm::DatabaseBackend;
 
 use crate::error::DbInfraError;
@@ -407,18 +407,18 @@ pub fn make_conn_spec(
                 url.push_str(&root_cert);
             }
 
-            info!(conn_spec = %redact_conn_spec_for_log(&url), "make_conn_spec returning postgres connection string");
+            trace!(conn_spec = %redact_conn_spec_for_log(&url), "make_conn_spec returning postgres connection string");
             Ok(url)
         }
         DbKind::SqliteFile => {
             let file_spec = sqlite_file_spec(db_kind, env)?;
             let url = format!("sqlite:{}?mode=rwc", file_spec);
-            info!(conn_spec = %url, "make_conn_spec returning sqlite file connection string");
+            trace!(conn_spec = %url, "make_conn_spec returning sqlite file connection string");
             Ok(url)
         }
         DbKind::SqliteMemory => {
             let url = "sqlite::memory:".to_string();
-            info!(conn_spec = %url, "make_conn_spec returning sqlite memory connection string");
+            trace!(conn_spec = %url, "make_conn_spec returning sqlite memory connection string");
             Ok(url)
         }
     }

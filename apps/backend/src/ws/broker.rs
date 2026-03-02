@@ -147,7 +147,14 @@ impl RealtimeBroker {
             };
 
             match publish_res {
-                (Ok(_), _) => return Ok(()),
+                (Ok(_), latency) => {
+                    // Successful publish confirms the Redis connection is alive.
+                    // Resets consecutive_failures so stale counts from past blips
+                    // don't cause a spurious Recovering transition later.
+                    self.readiness
+                        .update_dependency(DependencyName::Redis, DependencyCheck::Ok { latency });
+                    return Ok(());
+                }
                 (Err(err), latency) => {
                     let app_err = AppError::Internal {
                         code: ErrorCode::InternalError,
@@ -271,7 +278,7 @@ async fn run_subscription_loop_with_retry(
         attempt += 1;
 
         let start = StdInstant::now();
-        let loop_res = run_subscription_loop(redis_url, registry.clone()).await;
+        let loop_res = run_subscription_loop(redis_url, registry.clone(), readiness.clone()).await;
         let latency = start.elapsed();
         match loop_res {
             Ok(()) => {
@@ -314,7 +321,11 @@ async fn run_subscription_loop_with_retry(
     }
 }
 
-async fn run_subscription_loop(redis_url: &str, registry: Arc<WsRegistry>) -> Result<(), AppError> {
+async fn run_subscription_loop(
+    redis_url: &str,
+    registry: Arc<WsRegistry>,
+    readiness: Arc<ReadinessManager>,
+) -> Result<(), AppError> {
     let client = Client::open(redis_url).map_err(|err| AppError::Internal {
         code: ErrorCode::ConfigError,
         detail: format!("Failed to create Redis client: {err}"),
@@ -377,6 +388,16 @@ async fn run_subscription_loop(redis_url: &str, registry: Arc<WsRegistry>) -> Re
         })?;
 
     info!("Redis subscription established, processing messages");
+
+    // Connection and subscriptions confirmed — reset any stale failure count so
+    // that a previous blip that recovered here doesn't cause a spurious
+    // Recovering transition on the next failure.
+    readiness.update_dependency(
+        DependencyName::Redis,
+        DependencyCheck::Ok {
+            latency: StdInstant::now().elapsed(),
+        },
+    );
 
     let mut stream = pubsub.into_on_message();
 

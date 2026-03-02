@@ -33,7 +33,10 @@ async fn run_monitor(state: &AppState) {
 
         match mode {
             ServiceMode::Healthy => {
-                // Reset recovery backoff and wait until explicitly woken.
+                // Park until woken. Failure detection is passive: with_txn
+                // reports begin/commit failures to the ReadinessManager, which
+                // transitions to Recovering and calls wake_monitor() after
+                // FAILURE_THRESHOLD consecutive failures.
                 recovering_attempt = 0;
                 manager.notified().await;
             }

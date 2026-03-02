@@ -183,11 +183,35 @@ where
                 return Err(AppError::from(e));
             }
 
+            // Successful commit confirms the connection is alive. This resets
+            // consecutive_failures and status back to Ok, preventing stale
+            // failure counts from causing spurious Recovering transitions later.
+            state.readiness().update_dependency(
+                crate::readiness::types::DependencyName::Postgres,
+                crate::readiness::types::DependencyCheck::Ok {
+                    latency: commit_latency,
+                },
+            );
+
             Ok(val)
         }
         Err(err) => {
-            // Best-effort rollback; preserve original error
-            let _ = txn.rollback().await;
+            let rollback_start = Instant::now();
+            let rollback_res = txn.rollback().await;
+            let rollback_latency = rollback_start.elapsed();
+            // If rollback itself fails the connection is dead. Report it so the
+            // ReadinessManager can detect failures that surface mid-transaction
+            // (e.g. the connection appeared alive for BEGIN but dropped before
+            // the query completed).
+            if let Err(e) = rollback_res {
+                state.readiness().update_dependency(
+                    crate::readiness::types::DependencyName::Postgres,
+                    crate::readiness::types::DependencyCheck::Down {
+                        error: e.to_string(),
+                        latency: rollback_latency,
+                    },
+                );
+            }
             Err(err)
         }
     }

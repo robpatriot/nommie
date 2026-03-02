@@ -257,10 +257,13 @@ pub async fn bootstrap_db(
 
     let pid = process::id();
 
-    //  Bootstrap start marker - BEFORE any work
-    info!(
+    // Emitted on every resolve_dependencies call (startup and recovery probes).
+    // debug-level to avoid spamming logs during recovery polling.
+    tracing::debug!(
         "bootstrap=start env={:?} db_kind={:?} pid={}",
-        env, db_kind, pid
+        env,
+        db_kind,
+        pid
     );
 
     // Build migration pool (shared for SqliteMemory, admin for others)

@@ -33,7 +33,10 @@ export async function fetchWithAuthWithRetry(
     // Determine if this error should be retried
     const shouldRetry =
       isNetworkError(error) ||
-      (error instanceof BackendApiError && isTransient5xx(error.status))
+      (error instanceof BackendApiError &&
+        isTransient5xx(error.status) &&
+        error.code !== 'DB_UNAVAILABLE' &&
+        error.code !== 'BACKEND_UNAVAILABLE')
 
     if (shouldRetry) {
       // Wait a bit before retry (simple delay, no exponential backoff needed for 1 retry)

@@ -275,10 +275,19 @@ impl ReadinessManager {
 
         match check {
             DependencyCheck::Ok { latency } => {
+                // Capture pre-mutation successes to detect the exact crossing of the
+                // recovery threshold. was_down can't be used for the threshold log
+                // because dep.status is set to Ok on the FIRST success; by the time
+                // the threshold is reached (second success), status is already Ok and
+                // was_down would be false.
+                let prev_successes = dep.consecutive_successes;
+
                 dep.status = CheckStatus::Ok;
                 dep.last_ok = Some(now);
                 dep.latency_ms = Some(latency.as_millis() as u64);
-                dep.consecutive_successes += 1;
+                // Cap at RECOVERY_THRESHOLD: beyond that the value has no new meaning
+                // and an ever-growing counter is confusing in diagnostics.
+                dep.consecutive_successes = (dep.consecutive_successes + 1).min(RECOVERY_THRESHOLD);
                 dep.consecutive_failures = 0;
 
                 if dep.consecutive_successes == 1 && current_mode != ServiceMode::Startup {
@@ -288,7 +297,14 @@ impl ReadinessManager {
                     );
                 }
 
-                if dep.consecutive_successes == RECOVERY_THRESHOLD {
+                // Fire "recovered" exactly when consecutive_successes crosses the
+                // threshold and we were below it before (i.e., genuine recovery, not
+                // an already-healthy ping). Filter startup so the log only fires during
+                // Recovering → Healthy transitions.
+                if dep.consecutive_successes == RECOVERY_THRESHOLD
+                    && prev_successes < RECOVERY_THRESHOLD
+                    && current_mode != ServiceMode::Startup
+                {
                     tracing::info!(
                         dependency = %name,
                         recovery_threshold = RECOVERY_THRESHOLD,

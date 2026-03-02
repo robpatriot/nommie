@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::time::{Duration, Instant};
 
 use migration::{migrate, MigrationCommand, Migrator, MigratorTrait};
@@ -37,48 +36,6 @@ fn get_db_path(db_kind: DbKind, env: RuntimeEnv) -> String {
     }
 }
 
-async fn retry_connection<T, F, Fut>(
-    mut connect_fn: F,
-    max_attempts: u32,
-    interval_ms: u64,
-) -> Result<T, DbInfraError>
-where
-    F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, DbInfraError>>,
-{
-    let mut last_error = None;
-
-    for attempt in 1..=max_attempts {
-        let connect_result = connect_fn().await;
-
-        match connect_result {
-            Ok(result) => {
-                if attempt > 1 {
-                    info!(
-                        "connection_retry=success attempts={} interval_ms={}",
-                        attempt, interval_ms
-                    );
-                }
-                return Ok(result);
-            }
-            Err(e) => {
-                last_error = Some(e);
-                if attempt < max_attempts {
-                    warn!(
-                        "connection_retry=failed attempt={} max_attempts={} interval_ms={}",
-                        attempt, max_attempts, interval_ms
-                    );
-                    tokio::time::sleep(Duration::from_millis(interval_ms)).await;
-                }
-            }
-        }
-    }
-
-    let final_error = last_error.unwrap_or_else(|| DbInfraError::Config {
-        message: "no error recorded after max attempts (this should not happen)".to_string(),
-    });
-    Err(final_error)
-}
 
 pub async fn build_admin_pool(
     env: RuntimeEnv,
@@ -92,29 +49,14 @@ pub async fn build_admin_pool(
         .acquire_timeout(Duration::from_secs(2))
         .sqlx_logging(true);
 
-    let pool = if matches!(db_kind, DbKind::Postgres) {
-        retry_connection(
-            || {
-                let opt_clone = opt.clone();
-                async move {
-                    Database::connect(opt_clone)
-                        .await
-                        .map_err(|e| DbInfraError::Config {
-                            message: format!("failed to connect to Postgres (admin pool): {}", e),
-                        })
-                }
-            },
-            5,
-            500,
-        )
-        .await?
-    } else {
-        Database::connect(opt)
-            .await
-            .map_err(|e| DbInfraError::Config {
-                message: format!("failed to connect to database (admin pool): {}", e),
-            })?
-    };
+    // Single attempt — the ReadinessManager monitor owns retry scheduling.
+    // The old retry_connection(5, 500) loop predates the monitor and added
+    // ~12 s of noise per probe; retries now happen at the monitor level.
+    let pool = Database::connect(opt)
+        .await
+        .map_err(|e| DbInfraError::Config {
+            message: format!("failed to connect to database (admin pool): {e}"),
+        })?;
 
     Ok(pool)
 }

@@ -22,7 +22,10 @@ import {
  * Uses the refreshGamesListAction server action.
  * @param initialData - Optional initial data from server component
  */
-export function useAvailableGames(initialData?: Game[]) {
+export function useAvailableGames(
+  initialData?: Game[],
+  options?: { refetchInterval?: number | false }
+) {
   return useQuery({
     queryKey: queryKeys.games.listRoot(),
     queryFn: async () => {
@@ -35,6 +38,7 @@ export function useAvailableGames(initialData?: Game[]) {
     initialData,
     // Data is considered stale immediately so it refetches in background
     staleTime: 0,
+    refetchInterval: options?.refetchInterval,
   })
 }
 
