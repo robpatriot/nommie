@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use actix_web::{HttpMessage, HttpRequest};
 use sea_orm::{DatabaseConnection, DatabaseTransaction, TransactionTrait};
+use tracing::warn;
 
 use super::{require_db, txn_policy};
 use crate::error::AppError;
@@ -133,24 +134,26 @@ where
         return f(shared.transaction()).await;
     }
 
+    let (method, path) = req
+        .map(|r| (r.method().to_string(), r.path().to_string()))
+        .unwrap_or_else(|| ("<none>".to_string(), "<none>".to_string()));
+
     // Check if database is available
     let db = require_db(state)?;
 
     // Real DB path: own the transaction lifecycle
     let begin_start = Instant::now();
     let txn_res = db.begin().await;
-    let begin_latency = begin_start.elapsed();
+    let _begin_latency = begin_start.elapsed();
 
-    // Report connection failures to readiness manager.
-    // We only report sustainable failures (DbErr) here; the monitor task handles
-    // the recovery polling.
+    // Log connection failures; readiness reporting for database outages is handled
+    // centrally by the DbReadinessReporter middleware based on AppError mapping.
     if let Err(ref e) = txn_res {
-        state.readiness().update_dependency(
-            crate::readiness::types::DependencyName::Postgres,
-            crate::readiness::types::DependencyCheck::Down {
-                error: e.to_string(),
-                latency: begin_latency,
-            },
+        warn!(
+            method = %method,
+            path = %path,
+            error = %e,
+            "with_txn: failed to begin transaction"
         );
     }
     let txn = txn_res?;
@@ -169,47 +172,39 @@ where
                     txn.rollback().await
                 }
             };
-            let commit_latency = commit_start.elapsed();
+            let _commit_latency = commit_start.elapsed();
 
             if let Err(e) = commit_res {
-                // Report commit failures to readiness manager
-                state.readiness().update_dependency(
-                    crate::readiness::types::DependencyName::Postgres,
-                    crate::readiness::types::DependencyCheck::Down {
-                        error: e.to_string(),
-                        latency: commit_latency,
-                    },
+                warn!(
+                    method = %method,
+                    path = %path,
+                    error = %e,
+                    "with_txn: commit/rollback-on-ok failed"
                 );
                 return Err(AppError::from(e));
             }
 
-            // Successful commit confirms the connection is alive. This resets
-            // consecutive_failures and status back to Ok, preventing stale
-            // failure counts from causing spurious Recovering transitions later.
-            state.readiness().update_dependency(
-                crate::readiness::types::DependencyName::Postgres,
-                crate::readiness::types::DependencyCheck::Ok {
-                    latency: commit_latency,
-                },
-            );
-
             Ok(val)
         }
         Err(err) => {
+            // Capture basic request context for diagnostics (if available).
+            warn!(
+                method = %method,
+                path = %path,
+                code = %err.code(),
+                is_transient = %err.is_transient(),
+                "with_txn: transaction body returned error before rollback"
+            );
+
             let rollback_start = Instant::now();
             let rollback_res = txn.rollback().await;
-            let rollback_latency = rollback_start.elapsed();
-            // If rollback itself fails the connection is dead. Report it so the
-            // ReadinessManager can detect failures that surface mid-transaction
-            // (e.g. the connection appeared alive for BEGIN but dropped before
-            // the query completed).
+            let _rollback_latency = rollback_start.elapsed();
             if let Err(e) = rollback_res {
-                state.readiness().update_dependency(
-                    crate::readiness::types::DependencyName::Postgres,
-                    crate::readiness::types::DependencyCheck::Down {
-                        error: e.to_string(),
-                        latency: rollback_latency,
-                    },
+                warn!(
+                    method = %method,
+                    path = %path,
+                    error = %e,
+                    "with_txn: rollback failed"
                 );
             }
             Err(err)

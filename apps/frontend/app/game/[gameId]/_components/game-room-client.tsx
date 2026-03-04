@@ -27,6 +27,7 @@ import { useGameRoomControls } from './hooks/useGameRoomControls'
 import { useAiSeatManagement } from './hooks/useAiSeatManagement'
 import { normalizeViewerSeat } from './game-room/utils'
 import { isInitPhase } from './game-room/phase-helpers'
+import { useBackendReadiness } from '@/lib/providers/backend-readiness-provider'
 
 interface GameRoomClientProps {
   initialState: GameRoomState
@@ -123,6 +124,13 @@ export function GameRoomClient({
     showToast,
     hideToast,
   ])
+
+  const { mode } = useBackendReadiness()
+  useEffect(() => {
+    if (mode === 'suspect') {
+      showToast(tGame('status.backendSuspect'), 'warning')
+    }
+  }, [mode, showToast, tGame])
 
   // Game room actions
   const {

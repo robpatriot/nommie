@@ -3,6 +3,7 @@
  */
 
 import { BackendApiError } from '@/lib/errors'
+import { useBackendReadiness } from '@/lib/providers/backend-readiness-provider'
 import type {
   ActionResult,
   SimpleActionResult,
@@ -36,6 +37,29 @@ export function handleActionResultError(
     errorResult.code,
     errorResult.traceId
   )
+}
+
+/**
+ * Hook-aware wrapper around handleActionResultError for client mutations.
+ * For dependency-outage errors (DB_UNAVAILABLE / REDIS_UNAVAILABLE) it:
+ * - Signals a backend dependency outage to the readiness provider
+ * - Marks that the current game should reconcile once recovery is confirmed
+ * - Still returns a BackendApiError for per-action handling.
+ */
+export function useHandleActionError() {
+  const { reportDependencyOutage, markNeedsReconcileAfterRecovery } =
+    useBackendReadiness()
+
+  return (errorResult: ActionErrorResult): BackendApiError => {
+    const err = handleActionResultError(errorResult)
+
+    if (err.code === 'DB_UNAVAILABLE' || err.code === 'REDIS_UNAVAILABLE') {
+      reportDependencyOutage()
+      markNeedsReconcileAfterRecovery()
+    }
+
+    return err
+  }
 }
 
 /**

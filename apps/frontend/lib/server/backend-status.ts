@@ -6,24 +6,6 @@ export type FrontendServiceMode = 'startup' | 'healthy' | 'recovering'
 
 // ── Internal state ──────────────────────────────────────────────────
 
-const LOAD_COUNT_WARN_THRESHOLD = 10
-
-const loadId = (() => {
-  const g = globalThis as {
-    __readinessLoadId?: number
-    __readinessWarnedHighLoad?: boolean
-  }
-  g.__readinessLoadId = (g.__readinessLoadId ?? 0) + 1
-  const count = g.__readinessLoadId
-  if (count > LOAD_COUNT_WARN_THRESHOLD && !g.__readinessWarnedHighLoad) {
-    g.__readinessWarnedHighLoad = true
-    console.warn(
-      `[readiness] frontend module loaded ${count} times in this process (possible repeated evaluation) pid=${process.pid}`
-    )
-  }
-  return count
-})()
-
 let mode: FrontendServiceMode = 'startup'
 let consecutiveSuccesses = 0
 let consecutiveFailures = 0
@@ -85,11 +67,7 @@ export function markBackendUp(): void {
 
   if (mode === 'startup' || mode === 'recovering') {
     if (consecutiveSuccesses >= RECOVERY_THRESHOLD) {
-      const previous = mode
       mode = 'healthy'
-      console.log(
-        `[readiness] frontend mode: ${previous} → healthy (backend reachable) pid=${process.pid}`
-      )
     }
   }
 }
@@ -105,13 +83,6 @@ export function markBackendDown(error?: string): void {
   if (mode === 'healthy') {
     if (consecutiveFailures >= FAILURE_THRESHOLD) {
       mode = 'recovering'
-      console.error(
-        `[readiness] frontend mode: healthy → recovering (backend unreachable: ${error ?? 'unknown'}) pid=${process.pid} loadId=${loadId}`
-      )
-    } else if (consecutiveFailures === 1) {
-      console.warn(
-        `[readiness] first backend failure detected: ${error ?? 'unknown'} pid=${process.pid} loadId=${loadId}`
-      )
     }
   }
 }

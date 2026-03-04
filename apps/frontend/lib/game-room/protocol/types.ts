@@ -55,7 +55,13 @@ export type AckMsg = {
 
 export type ErrorMsg = {
   type: 'error'
-  code: 'bad_protocol' | 'bad_topic' | 'bad_request' | 'forbidden'
+  code:
+    | 'bad_protocol'
+    | 'bad_topic'
+    | 'bad_request'
+    | 'forbidden'
+    | 'db_unavailable'
+    | 'redis_unavailable'
   message: string
 }
 

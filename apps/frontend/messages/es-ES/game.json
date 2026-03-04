@@ -22,7 +22,8 @@
       "empty": "Aún no se ha completado ninguna baza."
     },
     "status": {
-      "waiting": "En espera"
+      "waiting": "En espera",
+      "backendSuspect": "Estamos teniendo problemas para conectar con el servidor de partida. Es posible que tu última acción no se haya aplicado."
     },
     "phase": {
       "init": "Inicializando",

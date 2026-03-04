@@ -12,6 +12,7 @@ import {
   type CancelPoll,
 } from '@/lib/providers/backend-readiness-provider'
 import ReadinessQueryObserver from '@/components/ReadinessQueryObserver'
+import { BackendApiError } from '@/lib/errors'
 import { ManualPollDriver } from '@/test/utils'
 
 function TestConsumer({
@@ -53,150 +54,45 @@ describe('BackendReadinessProvider', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('enters degraded immediately on reportFailure("permanent")', () => {
-    let reportFailure: (kind: 'permanent' | 'transient') => void = () => {}
-    const driver = new ManualPollDriver()
-
-    const { getByTestId } = render(
-      <BackendReadinessProvider pollDriver={driver}>
-        <TestConsumer
-          onState={(s) => {
-            reportFailure = s.reportFailure
-          }}
-        />
-      </BackendReadinessProvider>
-    )
-
-    expect(getByTestId('readiness').textContent).toBe('ready')
-    act(() => {
-      reportFailure('permanent')
-    })
-    expect(getByTestId('readiness').textContent).toBe('not-ready')
-  })
-
-  it('enters degraded immediately on first reportFailure("transient") before any success (startup)', () => {
-    // Before a baseline is established (no reportSuccess() call yet), even
-    // a transient failure is sufficient evidence the backend is down.
-    let reportFailure: (kind: 'permanent' | 'transient') => void = () => {}
-    const driver = new ManualPollDriver()
-
-    const { getByTestId } = render(
-      <BackendReadinessProvider pollDriver={driver}>
-        <TestConsumer
-          onState={(s) => {
-            reportFailure = s.reportFailure
-          }}
-        />
-      </BackendReadinessProvider>
-    )
-
-    expect(getByTestId('readiness').textContent).toBe('ready')
-    act(() => {
-      reportFailure('transient')
-    })
-    expect(getByTestId('readiness').textContent).toBe('not-ready')
-  })
-
-  it('after baseline: stays ready on a single transient failure', () => {
-    let reportFailure: (kind: 'permanent' | 'transient') => void = () => {}
-    let reportSuccess: () => void = () => {}
+  it('enters suspect on dependency outage and clears on successful operation', () => {
+    let reportDependencyOutage: () => void = () => {}
+    let reportOperationSuccess: () => void = () => {}
 
     const { getByTestId } = render(
       <BackendReadinessProvider>
         <TestConsumer
           onState={(s) => {
-            reportFailure = s.reportFailure
-            reportSuccess = s.reportSuccess
+            reportDependencyOutage = s.reportDependencyOutage
+            reportOperationSuccess = s.reportOperationSuccess
           }}
         />
       </BackendReadinessProvider>
     )
 
-    // Establish baseline first
-    act(() => {
-      reportSuccess()
-    })
     expect(getByTestId('readiness').textContent).toBe('ready')
     act(() => {
-      reportFailure('transient')
-    })
-    expect(getByTestId('readiness').textContent).toBe('ready')
-  })
-
-  it('after baseline: enters degraded after 2 consecutive transient failures', () => {
-    let reportFailure: (kind: 'permanent' | 'transient') => void = () => {}
-    let reportSuccess: () => void = () => {}
-    const driver = new ManualPollDriver()
-
-    const { getByTestId } = render(
-      <BackendReadinessProvider pollDriver={driver}>
-        <TestConsumer
-          onState={(s) => {
-            reportFailure = s.reportFailure
-            reportSuccess = s.reportSuccess
-          }}
-        />
-      </BackendReadinessProvider>
-    )
-
-    act(() => {
-      reportSuccess()
-    })
-    act(() => {
-      reportFailure('transient')
-    })
-    expect(getByTestId('readiness').textContent).toBe('ready')
-    act(() => {
-      reportFailure('transient')
+      reportDependencyOutage()
     })
     expect(getByTestId('readiness').textContent).toBe('not-ready')
-  })
-
-  it('after baseline: reportSuccess() resets transient count', () => {
-    let reportFailure: (kind: 'permanent' | 'transient') => void = () => {}
-    let reportSuccess: () => void = () => {}
-
-    const { getByTestId } = render(
-      <BackendReadinessProvider>
-        <TestConsumer
-          onState={(s) => {
-            reportFailure = s.reportFailure
-            reportSuccess = s.reportSuccess
-          }}
-        />
-      </BackendReadinessProvider>
-    )
-
-    // Establish baseline
     act(() => {
-      reportSuccess()
-    })
-    act(() => {
-      reportFailure('transient')
-    })
-    expect(getByTestId('readiness').textContent).toBe('ready')
-    act(() => {
-      reportSuccess()
-    })
-    act(() => {
-      reportFailure('transient')
+      reportOperationSuccess()
     })
     expect(getByTestId('readiness').textContent).toBe('ready')
   })
 
-  it('does not transition to healthy on reportSuccess(); only /readyz probe successes do', async () => {
+  it('does not transition to healthy on reportOperationSuccess() while degraded; only /readyz probe successes do', async () => {
     const driver = new ManualPollDriver()
     const fetchSpy = vi.mocked(global.fetch)
     fetchSpy.mockResolvedValue({ ok: false } as Response)
 
-    let reportSuccess: () => void = () => {}
+    let reportOperationSuccess: () => void = () => {}
     let triggerRecovery: () => void = () => {}
 
     const { getByTestId } = render(
       <BackendReadinessProvider pollDriver={driver}>
         <TestConsumer
           onState={(s) => {
-            reportSuccess = s.reportSuccess
+            reportOperationSuccess = s.reportOperationSuccess
             triggerRecovery = s.triggerRecovery
           }}
         />
@@ -209,9 +105,9 @@ describe('BackendReadinessProvider', () => {
     expect(getByTestId('readiness').textContent).toBe('not-ready')
 
     act(() => {
-      reportSuccess()
-      reportSuccess()
-      reportSuccess()
+      reportOperationSuccess()
+      reportOperationSuccess()
+      reportOperationSuccess()
     })
     expect(getByTestId('readiness').textContent).toBe('not-ready')
 
@@ -390,7 +286,7 @@ describe('BackendReadinessProvider', () => {
     expect(driver.capturedDelays.at(-1)).toBeLessThanOrEqual(1_000)
   })
 
-  it('mutation error triggers reportFailure and enters degraded', async () => {
+  it('mutation error with DB_UNAVAILABLE triggers reportDependencyOutage and enters suspect', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         mutations: { retry: 0 },
@@ -399,7 +295,11 @@ describe('BackendReadinessProvider', () => {
     function FailingMutationButton() {
       const mutation = useMutation({
         mutationFn: async () => {
-          throw new Error('network error')
+          throw new BackendApiError(
+            'database unavailable',
+            503,
+            'DB_UNAVAILABLE'
+          )
         },
       })
       return (

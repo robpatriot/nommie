@@ -133,6 +133,13 @@ pub enum AppError {
         source: BoxError,
         retry_after_secs: Option<u32>,
     },
+    #[error("Redis unavailable: {reason}")]
+    RedisUnavailable {
+        reason: String,
+        #[source]
+        source: BoxError,
+        retry_after_secs: Option<u32>,
+    },
     #[error("Timeout: {detail}")]
     Timeout {
         code: ErrorCode,
@@ -141,6 +148,11 @@ pub enum AppError {
         source: BoxError,
     },
 }
+
+/// Marker type used in `HttpResponse` extensions to indicate that the response
+/// was generated due to a database outage (e.g. `AppError::DbUnavailable`).
+/// This is consumed by middleware that reports DB health to the readiness system.
+pub struct DbOutageMarker;
 
 impl AppError {
     /// Helper method to extract error code from any error variant
@@ -161,6 +173,7 @@ impl AppError {
             AppError::Config { .. } => ErrorCode::ConfigError,
             AppError::Conflict { code, .. } => *code,
             AppError::DbUnavailable { .. } => ErrorCode::DbUnavailable,
+            AppError::RedisUnavailable { .. } => ErrorCode::RedisUnavailable,
             AppError::Timeout { code, .. } => *code,
         }
     }
@@ -170,6 +183,7 @@ impl AppError {
     pub fn is_transient(&self) -> bool {
         match self {
             AppError::DbUnavailable { .. } => true,
+            AppError::RedisUnavailable { .. } => true,
             AppError::Timeout { .. } => true,
             _ => {
                 // Check if the detail or source suggests a connectivity issue
@@ -205,6 +219,7 @@ impl AppError {
             AppError::Config { detail, .. } => detail.clone(),
             AppError::Conflict { detail, .. } => detail.clone(),
             AppError::DbUnavailable { reason, .. } => reason.clone(),
+            AppError::RedisUnavailable { reason, .. } => reason.clone(),
             AppError::Timeout { detail, .. } => detail.clone(),
         }
     }
@@ -226,6 +241,7 @@ impl AppError {
             AppError::Config { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::Conflict { .. } => StatusCode::CONFLICT,
             AppError::DbUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::RedisUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Timeout { .. } => StatusCode::GATEWAY_TIMEOUT,
         }
     }
@@ -370,6 +386,19 @@ impl AppError {
         }
     }
 
+    /// Create a Redis unavailable error (503) with optional retry_after_secs
+    pub fn redis_unavailable(
+        reason: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+        retry_after_secs: Option<u32>,
+    ) -> Self {
+        Self::RedisUnavailable {
+            reason: reason.into(),
+            source: Box::new(source),
+            retry_after_secs,
+        }
+    }
+
     /// Create a timeout error with source (504)
     pub fn timeout(
         code: ErrorCode,
@@ -471,7 +500,11 @@ impl From<db_infra::DbInfraError> for AppError {
 
 impl From<sea_orm::DbErr> for AppError {
     fn from(e: sea_orm::DbErr) -> Self {
-        // Delegate to infra adapter, then into AppError via DomainError mapping
+        // Delegate to infra adapter, then into AppError via DomainError mapping.
+        // This path is hit when a SeaORM operation bubbles a DbErr directly into
+        // handler code (e.g., connection pool timeouts). Log here so we can
+        // correlate raw DbErr instances with the resulting AppError.
+        warn!(raw_error = %e, "app_error: mapping SeaORM DbErr into AppError");
         let de = crate::infra::db_errors::map_db_err(e);
         AppError::from(de)
     }
@@ -606,6 +639,16 @@ impl From<crate::errors::domain::DomainError> for AppError {
                         )
                     }
                     InfraErrorKind::DbUnavailable => {
+                        // This is the exact point where connection-level database
+                        // failures (e.g. pool timeouts mapped via db_errors) are
+                        // converted into AppError::DbUnavailable / DB_UNAVAILABLE.
+                        // We log explicitly so we can correlate the infra error
+                        // with readiness behaviour and potential dependency updates.
+                        warn!(
+                            infra_kind = ?kind,
+                            detail = %detail,
+                            "app_error: mapping DomainError::Infra(DbUnavailable) into AppError::DbUnavailable"
+                        );
                         let detail_for_source = detail.clone();
                         AppError::db_unavailable(
                             detail,
@@ -668,6 +711,7 @@ impl ResponseError for AppError {
             // Infra/system-level
             AppError::Db { .. }
             | AppError::DbUnavailable { .. }
+            | AppError::RedisUnavailable { .. }
             | AppError::Timeout { .. }
             | AppError::Internal { .. }
             | AppError::Config { .. } => {
@@ -698,9 +742,12 @@ impl ResponseError for AppError {
             }
             StatusCode::SERVICE_UNAVAILABLE => {
                 // RFC 7231: 503 responses should include Retry-After
-                // Use retry_after_secs from DbUnavailable, otherwise default to 1
+                // Use retry_after_secs from DbUnavailable/RedisUnavailable, otherwise default to 1
                 let retry_secs: u32 = match self {
                     AppError::DbUnavailable {
+                        retry_after_secs, ..
+                    }
+                    | AppError::RedisUnavailable {
                         retry_after_secs, ..
                     } => retry_after_secs.unwrap_or(1),
                     _ => 1,
@@ -717,13 +764,26 @@ impl ResponseError for AppError {
             }
         }
 
-        builder.json(problem_details)
+        // Build the response body.
+        let mut resp = builder.json(problem_details);
+
+        // Mark responses that are definitively caused by database outages so that
+        // middleware can update the readiness manager without relying on status
+        // codes alone.
+        if matches!(self, AppError::DbUnavailable { .. })
+            || matches!(self, AppError::Timeout { code, .. } if *code == ErrorCode::DbTimeout)
+        {
+            resp.extensions_mut().insert(DbOutageMarker);
+        }
+
+        resp
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::errors::ErrorCode;
 
     #[test]
     fn test_classify_transient_sqlite_locked() {
@@ -770,6 +830,46 @@ mod tests {
         assert_eq!(hdr.to_str().unwrap(), "5");
 
         let err2 = AppError::DbUnavailable {
+            reason: "down".to_string(),
+            source: Box::new(Dummy),
+            retry_after_secs: None,
+        };
+        let resp2 = err2.error_response();
+        assert_eq!(resp2.status().as_u16(), 503);
+        let hdr2 = resp2
+            .headers()
+            .get(actix_web::http::header::RETRY_AFTER)
+            .unwrap();
+        assert_eq!(hdr2.to_str().unwrap(), "1");
+    }
+
+    #[test]
+    fn test_response_headers_redis_unavailable_retry_after() {
+        #[derive(Debug)]
+        struct Dummy;
+        impl std::fmt::Display for Dummy {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "dummy")
+            }
+        }
+        impl std::error::Error for Dummy {}
+
+        let err = AppError::RedisUnavailable {
+            reason: "connection refused".to_string(),
+            source: Box::new(Dummy),
+            retry_after_secs: Some(3),
+        };
+        let resp = err.error_response();
+        assert_eq!(resp.status().as_u16(), 503);
+        let hdr = resp
+            .headers()
+            .get(actix_web::http::header::RETRY_AFTER)
+            .unwrap();
+        assert_eq!(hdr.to_str().unwrap(), "3");
+        assert_eq!(err.code(), ErrorCode::RedisUnavailable);
+        assert!(err.is_transient());
+
+        let err2 = AppError::RedisUnavailable {
             reason: "down".to_string(),
             source: Box::new(Dummy),
             retry_after_secs: None,

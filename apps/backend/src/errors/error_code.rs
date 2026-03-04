@@ -94,6 +94,8 @@ pub enum ErrorCode {
     DbError,
     /// Database unavailable
     DbUnavailable,
+    /// Redis unavailable
+    RedisUnavailable,
     /// Database pool exhausted
     DbPoolExhausted,
     /// Database timeout (gateway timeout)
@@ -187,6 +189,7 @@ impl ErrorCode {
             // System Errors
             Self::DbError => "DB_ERROR",
             Self::DbUnavailable => "DB_UNAVAILABLE",
+            Self::RedisUnavailable => "REDIS_UNAVAILABLE",
             Self::DbPoolExhausted => "DB_POOL_EXHAUSTED",
             Self::DbTimeout => "DB_TIMEOUT",
 
@@ -275,6 +278,7 @@ mod tests {
         assert_eq!(ErrorCode::GoogleSubMismatch.as_str(), "GOOGLE_SUB_MISMATCH");
         assert_eq!(ErrorCode::DbError.as_str(), "DB_ERROR");
         assert_eq!(ErrorCode::DbUnavailable.as_str(), "DB_UNAVAILABLE");
+        assert_eq!(ErrorCode::RedisUnavailable.as_str(), "REDIS_UNAVAILABLE");
         assert_eq!(ErrorCode::DbPoolExhausted.as_str(), "DB_POOL_EXHAUSTED");
         assert_eq!(
             ErrorCode::LockTimeoutAcquire.as_str(),

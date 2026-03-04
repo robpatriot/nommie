@@ -2,9 +2,12 @@ pub mod shared_pool_cache;
 pub mod txn;
 pub mod txn_policy;
 
+use std::time::Duration;
+
 use sea_orm::DatabaseConnection;
 
 use crate::error::AppError;
+use crate::readiness::types::{DependencyCheck, DependencyName};
 use crate::state::app_state::AppState;
 
 /// Centralized helper to access the database connection from AppState.
@@ -12,14 +15,27 @@ use crate::state::app_state::AppState;
 /// This is the canonical way to access the database from application code.
 /// It returns a borrowed reference to the DatabaseConnection if available,
 /// or an AppError::db_unavailable() if the database is not configured.
+/// When returning an error, also reports Postgres as down to the readiness
+/// manager so /readyz can transition to not ready.
 pub fn require_db(state: &AppState) -> Result<DatabaseConnection, AppError> {
-    state.db().ok_or_else(|| {
-        AppError::db_unavailable(
-            "database unavailable",
-            crate::error::Sentinel("database not configured in AppState"),
-            Some(1),
-        )
-    })
+    match state.db() {
+        Some(db) => Ok(db),
+        None => {
+            let err = AppError::db_unavailable(
+                "database unavailable",
+                crate::error::Sentinel("database not configured in AppState"),
+                Some(1),
+            );
+            state.readiness().update_dependency(
+                DependencyName::Postgres,
+                DependencyCheck::Down {
+                    error: err.to_string(),
+                    latency: Duration::ZERO,
+                },
+            );
+            Err(err)
+        }
+    }
 }
 
 #[cfg(test)]

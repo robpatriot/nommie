@@ -108,9 +108,10 @@ export async function fetchWithAuth(
       },
     })
 
-    // Mark backend as up if we got a response (even if error) - connection succeeded
-    // This helps differentiate startup failures from runtime failures
-    markBackendUp()
+    // Only mark backend up when we got a successful response. 503/5xx means not ready.
+    if (response.ok) {
+      markBackendUp()
+    }
   } catch (error) {
     const isConnectionError = isBackendConnectionError(error)
 
@@ -128,7 +129,6 @@ export async function fetchWithAuth(
         logError('Network error during API request', error, { endpoint })
       }
     }
-
     throw error
   }
 
@@ -155,9 +155,17 @@ export async function fetchWithAuth(
     // Parse Problem Details error response (RFC 7807)
     const parsedError = await parseErrorResponse(response)
 
-    // Only log if we should (outside startup window or runtime failure)
-    if (shouldLogError() && response.status >= 500) {
-      // Server errors should be logged
+    // Mark backend as down when it returns 503 so server-side readiness is correct
+    if (response.status === 503) {
+      markBackendDown(parsedError.message)
+    }
+
+    // Only log 5xx as errors when we should; skip 503 (expected when backend is not ready)
+    const isServiceUnavailable =
+      response.status === 503 ||
+      parsedError.code === 'DB_UNAVAILABLE' ||
+      parsedError.code === 'REDIS_UNAVAILABLE'
+    if (shouldLogError() && response.status >= 500 && !isServiceUnavailable) {
       logError('Backend API error', new Error(parsedError.message), {
         status: response.status,
         code: parsedError.code,

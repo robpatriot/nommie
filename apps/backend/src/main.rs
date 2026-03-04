@@ -131,6 +131,7 @@ async fn main() -> std::io::Result<()> {
                 actix_web::web::scope("/api/auth")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .wrap(backend::middleware::readiness_gate::ReadinessGate)
+                    .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(auth_limiter)
                     .configure(backend::routes::auth::configure_routes),
             )
@@ -139,6 +140,7 @@ async fn main() -> std::io::Result<()> {
                 actix_web::web::scope("/api/games")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .wrap(backend::middleware::readiness_gate::ReadinessGate)
+                    .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(api_limiter.clone())
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
                     .configure(backend::routes::games::configure_routes),
@@ -148,6 +150,7 @@ async fn main() -> std::io::Result<()> {
                 actix_web::web::scope("/api/user")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .wrap(backend::middleware::readiness_gate::ReadinessGate)
+                    .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(api_limiter.clone())
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
                     .configure(backend::routes::user_options::configure_routes),
@@ -159,6 +162,7 @@ async fn main() -> std::io::Result<()> {
                 actix_web::web::scope("/api/ws")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)
                     .wrap(backend::middleware::readiness_gate::ReadinessGate)
+                    .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(api_limiter.clone())
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
                     .configure(backend::routes::realtime::configure_routes),

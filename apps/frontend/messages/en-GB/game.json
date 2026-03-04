@@ -22,7 +22,8 @@
       "empty": "No trick completed yet."
     },
     "status": {
-      "waiting": "Waiting"
+      "waiting": "Waiting",
+      "backendSuspect": "We’re having trouble talking to the game server. Your last action may not have gone through."
     },
     "phase": {
       "init": "Initializing",

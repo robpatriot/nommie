@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::db::txn::SharedTxn;
 use crate::extractors::current_user::CurrentUser;
 use crate::protocol::game_state::ViewerState;
+use crate::readiness::types::{DependencyCheck, DependencyName};
 use crate::state::app_state::AppState;
 use crate::ws::game;
 use crate::ws::hub::WsRegistry;
@@ -250,7 +251,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                 >((version, game_snapshot, viewer))
                             }
                             .into_actor(self)
-                            .map(move |res, _actor, ctx| match res {
+                            .map(move |res, actor, ctx| match res {
                                 Ok((version, game_snapshot, viewer)) => {
                                     if let Some(registry) = &registry {
                                         registry.subscribe(conn_id, Topic::Game { id: game_id });
@@ -287,12 +288,31 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                             Self::send_json(
                                                 ctx,
                                                 &ServerMsg::Error {
-                                                    code: crate::ws::protocol::ErrorCode::Forbidden,
+                                                    code: ErrorCode::Forbidden,
                                                     message: detail.clone(),
                                                 },
                                             );
                                         }
-
+                                        AppError::DbUnavailable { reason, .. } => {
+                                            let readiness = actor.app_state.readiness();
+                                            let transitioned = readiness.update_dependency(
+                                                DependencyName::Postgres,
+                                                DependencyCheck::Down {
+                                                    error: reason.clone(),
+                                                    latency: Duration::from_millis(0),
+                                                },
+                                            );
+                                            if transitioned {
+                                                readiness.wake_monitor();
+                                            }
+                                            Self::send_json(
+                                                ctx,
+                                                &ServerMsg::Error {
+                                                    code: ErrorCode::DbUnavailable,
+                                                    message: reason.clone(),
+                                                },
+                                            );
+                                        }
                                         _ => {
                                             ctx.close(Some(ws::CloseReason::from(
                                                 ws::CloseCode::Error,
@@ -413,6 +433,26 @@ impl Handler<HubEvent> for WsSession {
                                         &ServerMsg::Error {
                                             code: ErrorCode::Forbidden,
                                             message: "Not a member of this game".to_string(),
+                                        },
+                                    );
+                                }
+                                AppError::DbUnavailable { reason, .. } => {
+                                    let readiness = actor.app_state.readiness();
+                                    let transitioned = readiness.update_dependency(
+                                        DependencyName::Postgres,
+                                        DependencyCheck::Down {
+                                            error: reason.clone(),
+                                            latency: Duration::from_millis(0),
+                                        },
+                                    );
+                                    if transitioned {
+                                        readiness.wake_monitor();
+                                    }
+                                    Self::send_json(
+                                        ctx,
+                                        &ServerMsg::Error {
+                                            code: ErrorCode::DbUnavailable,
+                                            message: reason.clone(),
                                         },
                                     );
                                 }

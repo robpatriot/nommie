@@ -29,6 +29,7 @@ fn error_codes_are_unique() {
         ErrorCode::Conflict,
         ErrorCode::DbError,
         ErrorCode::DbUnavailable,
+        ErrorCode::RedisUnavailable,
         ErrorCode::DbPoolExhausted,
         ErrorCode::DbTimeout,
         ErrorCode::UniqueViolation,

@@ -3,30 +3,8 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useBackendReadiness } from '@/lib/providers/backend-readiness-provider'
-import type { FailureKind } from '@/lib/providers/backend-readiness-provider'
 import { BackendApiError } from '@/lib/errors'
 import { isNetworkError } from '@/lib/retry'
-
-function isPermanentFailure(error: unknown): boolean {
-  if (error instanceof BackendApiError) {
-    if (error.status === 503 || error.status === 502 || error.status === 504) {
-      return true
-    }
-    // toErrorResult wraps server-side network errors with this code so detection
-    // does not depend on error message pattern matching.
-    if (error.code === 'BACKEND_UNAVAILABLE') {
-      return true
-    }
-  }
-  if (isNetworkError(error)) {
-    return true
-  }
-  return false
-}
-
-function classifyFailure(error: unknown): FailureKind {
-  return isPermanentFailure(error) ? 'permanent' : 'transient'
-}
 
 /**
  * Type guard for QueryCache/MutationCache "updated" events with action.type === 'error'.
@@ -77,42 +55,59 @@ function isCacheSuccessEvent(
  * driven solely by the /readyz polling loop (2 consecutive probe successes).
  */
 export default function ReadinessQueryObserver() {
-  const { reportFailure, reportSuccess } = useBackendReadiness()
+  const { reportDependencyOutage, reportOperationSuccess } =
+    useBackendReadiness()
   const queryClient = useQueryClient()
 
   useEffect(() => {
     const queryCache = queryClient.getQueryCache()
     const unsubQuery = queryCache.subscribe((event) => {
       if (!isCacheErrorEvent(event)) return
-      reportFailure(classifyFailure(event.action.error))
+      const error = event.action.error
+      // Network errors are treated as client connectivity problems and do not
+      // assert backend dependency failure.
+      if (isNetworkError(error)) return
+      if (
+        error instanceof BackendApiError &&
+        (error.code === 'DB_UNAVAILABLE' || error.code === 'REDIS_UNAVAILABLE')
+      ) {
+        reportDependencyOutage()
+      }
     })
     const mutationCache = queryClient.getMutationCache()
     const unsubMutation = mutationCache.subscribe((event) => {
       if (!isCacheErrorEvent(event)) return
-      reportFailure(classifyFailure(event.action.error))
+      const error = event.action.error
+      if (isNetworkError(error)) return
+      if (
+        error instanceof BackendApiError &&
+        (error.code === 'DB_UNAVAILABLE' || error.code === 'REDIS_UNAVAILABLE')
+      ) {
+        reportDependencyOutage()
+      }
     })
     return () => {
       unsubQuery()
       unsubMutation()
     }
-  }, [queryClient, reportFailure])
+  }, [queryClient, reportDependencyOutage])
 
   useEffect(() => {
     const queryCache = queryClient.getQueryCache()
     const unsubQuery = queryCache.subscribe((event) => {
       if (!isCacheSuccessEvent(event)) return
-      reportSuccess()
+      reportOperationSuccess()
     })
     const mutationCache = queryClient.getMutationCache()
     const unsubMutation = mutationCache.subscribe((event) => {
       if (!isCacheSuccessEvent(event)) return
-      reportSuccess()
+      reportOperationSuccess()
     })
     return () => {
       unsubQuery()
       unsubMutation()
     }
-  }, [queryClient, reportSuccess])
+  }, [queryClient, reportOperationSuccess])
 
   return null
 }

@@ -17,7 +17,6 @@ import {
   type SubmitPlayRequest,
   type ManageAiSeatRequest,
 } from '@/app/actions/game-room-actions'
-import { handleActionResultError } from '@/lib/queries/query-error-handler'
 import { queryKeys } from '@/lib/queries/query-keys'
 import {
   type GameRoomState,
@@ -28,12 +27,14 @@ import {
   selectViewerSeat,
 } from '@/lib/game-room/state'
 import { onOptimisticSend, setLwPendingAction } from '@/lib/queries/lw-cache'
+import { useHandleActionError } from '@/lib/queries/query-error-handler'
 
 /**
  * Mutation hook to set player ready status.
  * Invalidates game state cache on success.
  */
 export function useMarkPlayerReady() {
+  const handleActionError = useHandleActionError()
   return useMutation({
     mutationFn: async ({
       gameId,
@@ -46,7 +47,7 @@ export function useMarkPlayerReady() {
     }): Promise<void> => {
       const result = await markPlayerReadyAction(gameId, isReady, version)
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
     onSuccess: () => {},
@@ -58,6 +59,7 @@ export function useMarkPlayerReady() {
  * Invalidates game state cache on success and navigates to lobby.
  */
 export function useLeaveGame() {
+  const handleActionError = useHandleActionError()
   return useMutation({
     mutationFn: async (request: {
       gameId: number
@@ -65,7 +67,7 @@ export function useLeaveGame() {
     }): Promise<void> => {
       const result = await leaveGameAction(request.gameId, request.version)
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
     onSuccess: () => {},
@@ -79,6 +81,7 @@ export function useLeaveGame() {
 export function useRejoinGame() {
   const queryClient = useQueryClient()
   const router = useRouter()
+  const handleActionError = useHandleActionError()
 
   return useMutation({
     mutationFn: async (request: {
@@ -90,7 +93,7 @@ export function useRejoinGame() {
         version: request.version,
       })
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
     onSuccess: (_, request) => {
@@ -109,12 +112,13 @@ export function useRejoinGame() {
  */
 export function useSubmitBid() {
   const queryClient = useQueryClient()
+  const handleActionError = useHandleActionError()
 
   return useMutation({
     mutationFn: async (request: SubmitBidRequest): Promise<void> => {
       const result = await submitBidAction(request)
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
     onMutate: async (request) => {
@@ -197,12 +201,13 @@ export function useSubmitBid() {
  */
 export function useSelectTrump() {
   const queryClient = useQueryClient()
+  const handleActionError = useHandleActionError()
 
   return useMutation({
     mutationFn: async (request: SelectTrumpRequest): Promise<void> => {
       const result = await selectTrumpAction(request)
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
     onMutate: async (request) => {
@@ -274,12 +279,13 @@ export function useSelectTrump() {
  */
 export function useSubmitPlay() {
   const queryClient = useQueryClient()
+  const handleActionError = useHandleActionError()
 
   return useMutation({
     mutationFn: async (request: SubmitPlayRequest): Promise<void> => {
       const result = await submitPlayAction(request)
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
     onMutate: async (request) => {
@@ -349,11 +355,12 @@ export function useSubmitPlay() {
  * Invalidates game state cache on success.
  */
 export function useAddAiSeat() {
+  const handleActionError = useHandleActionError()
   return useMutation({
     mutationFn: async (request: ManageAiSeatRequest): Promise<void> => {
       const result = await addAiSeatAction(request)
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
   })
@@ -364,11 +371,12 @@ export function useAddAiSeat() {
  * Invalidates game state and AI registry cache on success.
  */
 export function useUpdateAiSeat() {
+  const handleActionError = useHandleActionError()
   return useMutation({
     mutationFn: async (request: ManageAiSeatRequest): Promise<void> => {
       const result = await updateAiSeatAction(request)
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
   })
@@ -379,11 +387,12 @@ export function useUpdateAiSeat() {
  * Invalidates game state and AI registry cache on success.
  */
 export function useRemoveAiSeat() {
+  const handleActionError = useHandleActionError()
   return useMutation({
     mutationFn: async (request: ManageAiSeatRequest): Promise<void> => {
       const result = await removeAiSeatAction(request)
       if (result.kind === 'error') {
-        throw handleActionResultError(result)
+        throw handleActionError(result)
       }
     },
   })

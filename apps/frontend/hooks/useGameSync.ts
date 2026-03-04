@@ -25,6 +25,7 @@ import {
   onYourTurn,
   setLwPendingAction,
 } from '@/lib/queries/lw-cache'
+import { useBackendReadiness } from '@/lib/providers/backend-readiness-provider'
 
 export interface UseGameSyncResult {
   refreshStateFromHttp: () => Promise<void>
@@ -57,6 +58,11 @@ export function useGameSync({
     connect: wsConnect,
     disconnect: wsDisconnect,
   } = useWebSocket()
+  const {
+    reportDependencyOutage,
+    markNeedsReconcileAfterRecovery,
+    recoveryGeneration,
+  } = useBackendReadiness()
 
   const [localSyncError, setLocalSyncError] = useState<GameRoomError | null>(
     null
@@ -71,6 +77,8 @@ export function useGameSync({
   const lastWsVersionSeenRef = useRef<number | undefined>(undefined)
   const prevIsUsersTurnRef = useRef<boolean>(false)
   const didInitRef = useRef<number | null>(null)
+  const needsReconcileRef = useRef(false)
+  const lastRecoveryGenerationRef = useRef(recoveryGeneration)
 
   // Keep gameIdRef in sync
   useEffect(() => {
@@ -218,10 +226,23 @@ export function useGameSync({
 
       // handle other message types
       if (msg.type === 'error') {
-        // If the server rejected an action, avoid leaving a pendingAction latch set.
+        // Always clear any pending LW action latches for this game.
         setLwPendingAction(queryClient, gameIdRef.current, false)
-        // Fallback to HTTP refresh on server-side errors
-        void refreshStateFromHttp()
+
+        const code = typeof msg.code === 'string' ? msg.code : undefined
+        if (code === 'db_unavailable' || code === 'redis_unavailable') {
+          // Dependency outage via WebSocket:
+          // - Enter Suspect on the frontend
+          // - Mark that we need a single reconciliation after recovery
+          // - Do NOT refetch immediately.
+          reportDependencyOutage()
+          markNeedsReconcileAfterRecovery()
+          needsReconcileRef.current = true
+        } else {
+          // Other protocol/auth errors:
+          // keep existing behavior of reconciling via HTTP once.
+          void refreshStateFromHttp()
+        }
         return
       }
     })
@@ -230,7 +251,24 @@ export function useGameSync({
     handleGameStateMessage,
     queryClient,
     refreshStateFromHttp,
+    reportDependencyOutage,
+    markNeedsReconcileAfterRecovery,
   ])
+
+  // Post-recovery reconciliation: when Degraded transitions back to Healthy,
+  // recoveryGeneration increments. If a dependency-outage occurred while this
+  // game was visible, perform a single HTTP refetch then clear the flag.
+  useEffect(() => {
+    if (!needsReconcileRef.current) {
+      lastRecoveryGenerationRef.current = recoveryGeneration
+      return
+    }
+    if (recoveryGeneration !== lastRecoveryGenerationRef.current) {
+      lastRecoveryGenerationRef.current = recoveryGeneration
+      needsReconcileRef.current = false
+      void refreshStateFromHttp()
+    }
+  }, [recoveryGeneration, refreshStateFromHttp])
 
   useEffect(() => {
     etagRef.current = initialState.etag

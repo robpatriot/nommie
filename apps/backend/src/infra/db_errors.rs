@@ -118,7 +118,15 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
             );
         }
         sea_orm::DbErr::ConnectionAcquire(_) | sea_orm::DbErr::Conn(_) => {
-            warn!(raw_error = %Redacted(&error_msg), "Database unavailable");
+            // Connection-level failures when talking to the database. These are
+            // surfaced as infrastructure "DB unavailable" errors at the domain
+            // layer and ultimately map to AppError::DbUnavailable/DB_UNAVAILABLE.
+            // We log explicitly here so we can correlate request spans that hit
+            // connection pool timeouts with the higher-level AppError handling.
+            warn!(
+                raw_error = %Redacted(&error_msg),
+                "db_errors: mapping connection error to Infra(DbUnavailable)"
+            );
             return DomainError::infra(InfraErrorKind::DbUnavailable, "Database unavailable");
         }
         _ => {}

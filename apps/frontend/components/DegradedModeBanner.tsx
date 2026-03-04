@@ -13,9 +13,9 @@ export default function DegradedModeBanner({
 }: {
   children: React.ReactNode
 }) {
-  const { isReady } = useBackendReadiness()
+  const { mode } = useBackendReadiness()
 
-  if (isReady) {
+  if (mode !== 'degraded') {
     return <>{children}</>
   }
 

@@ -22,7 +22,8 @@
       "empty": "Nessuna presa completata finora."
     },
     "status": {
-      "waiting": "In attesa"
+      "waiting": "In attesa",
+      "backendSuspect": "Stiamo avendo problemi a contattare il server di gioco. È possibile che la tua ultima azione non sia andata a buon fine."
     },
     "phase": {
       "init": "Inizializzazione",

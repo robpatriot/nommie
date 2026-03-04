@@ -125,7 +125,7 @@ export function WebSocketProvider({
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
 
   const queryClient = useQueryClient()
-  const { isReady, triggerRecovery } = useBackendReadiness()
+  const { mode, triggerRecovery } = useBackendReadiness()
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -318,7 +318,9 @@ export function WebSocketProvider({
   )
 
   const connect = useCallback(async () => {
-    if (!isReady) return
+    // Pause all connect/reconnect attempts while the backend is in Degraded
+    // mode; allow connections in Healthy and Suspect.
+    if (mode === 'degraded') return
 
     if (!isPageActive()) {
       pendingReconnectRef.current = true
@@ -484,14 +486,14 @@ export function WebSocketProvider({
     armHandshakeTimeout,
     clearHandshakeTimeout,
     fetchWsToken,
-    isReady,
+    mode,
     queryClient,
     resolveWsUrl,
     scheduleReconnect,
   ])
 
   const tryResumeReconnect = useCallback(() => {
-    if (!isAuthenticated || !isReady) return
+    if (!isAuthenticated || mode === 'degraded') return
     clearReconnectTimeout()
     if (connectInFlightRef.current) return
     const ws = wsRef.current
@@ -504,7 +506,7 @@ export function WebSocketProvider({
     setReconnectAttempts(0)
     reconnectDelayRef.current = INITIAL_RECONNECT_DELAY_MS
     void connect()
-  }, [isAuthenticated, isReady, connect, clearReconnectTimeout])
+  }, [isAuthenticated, mode, connect, clearReconnectTimeout])
 
   const resumeHandlerRef = useRef<(() => void) | null>(null)
   resumeHandlerRef.current = tryResumeReconnect
@@ -528,7 +530,7 @@ export function WebSocketProvider({
   }, [])
 
   useEffect(() => {
-    if (!isAuthenticated || !isReady) {
+    if (!isAuthenticated || mode === 'degraded') {
       disconnect()
     } else {
       void connect()
@@ -538,7 +540,7 @@ export function WebSocketProvider({
       // On provider unmount, clean up socket/timers.
       cleanupSocketAndTimers('unmount')
     }
-  }, [isAuthenticated, isReady, connect, disconnect, cleanupSocketAndTimers])
+  }, [isAuthenticated, mode, connect, disconnect, cleanupSocketAndTimers])
 
   return (
     <WebSocketContext.Provider

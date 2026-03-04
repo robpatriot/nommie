@@ -22,7 +22,8 @@
       "empty": "Aucun pli terminé pour l’instant."
     },
     "status": {
-      "waiting": "En attente"
+      "waiting": "En attente",
+      "backendSuspect": "Nous avons des difficultés à joindre le serveur de jeu. Votre dernière action n’a peut‑être pas abouti."
     },
     "phase": {
       "init": "Initialisation",

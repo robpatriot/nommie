@@ -28,7 +28,8 @@ export async function fetchWithAuthWithRetry(
   options: RequestInit = {}
 ): Promise<Response> {
   try {
-    return await fetchWithAuth(endpoint, options)
+    const res = await fetchWithAuth(endpoint, options)
+    return res
   } catch (error) {
     // Determine if this error should be retried
     const shouldRetry =
@@ -36,14 +37,14 @@ export async function fetchWithAuthWithRetry(
       (error instanceof BackendApiError &&
         isTransient5xx(error.status) &&
         error.code !== 'DB_UNAVAILABLE' &&
-        error.code !== 'BACKEND_UNAVAILABLE')
+        error.code !== 'REDIS_UNAVAILABLE')
 
     if (shouldRetry) {
       // Wait a bit before retry (simple delay, no exponential backoff needed for 1 retry)
       await new Promise((resolve) => setTimeout(resolve, 500))
-      return await fetchWithAuth(endpoint, options)
+      const res = await fetchWithAuth(endpoint, options)
+      return res
     }
-
     // Don't retry - re-throw the error
     throw error
   }

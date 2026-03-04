@@ -22,7 +22,8 @@
       "empty": "Noch kein Stich abgeschlossen."
     },
     "status": {
-      "waiting": "Warten"
+      "waiting": "Warten",
+      "backendSuspect": "Verbindung zum Spielserver gestört. Deine letzte Aktion wurde möglicherweise nicht ausgeführt."
     },
     "phase": {
       "init": "Initialisieren",

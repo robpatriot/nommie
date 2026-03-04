@@ -1055,13 +1055,18 @@ async fn list_overview_games(
     current_user: CurrentUser,
     app_state: web::Data<AppState>,
 ) -> Result<web::Json<GameListResponse>, AppError> {
+    info!("overview: handler_enter");
     let viewer_id = current_user.id;
 
     let combined_games = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
+            info!("overview: txn_start");
             let service = GameService;
             let lobby_games = service.list_public_lobby_games(txn).await?;
             let active_games = service.list_active_games(txn).await?;
+
+            let lobby_count = lobby_games.len();
+            let active_count = active_games.len();
 
             let mut results = Vec::new();
             for (game_model, memberships) in lobby_games {
@@ -1096,11 +1101,22 @@ async fn list_overview_games(
                 }
             }
 
+            info!(
+                lobby_count = lobby_count,
+                active_count = active_count,
+                combined_count = results.len(),
+                "overview: db_query_complete"
+            );
             results.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
             Ok::<_, AppError>(results)
         })
     })
     .await?;
+
+    info!(
+        response_count = combined_games.len(),
+        "overview: handler_exit"
+    );
 
     Ok(web::Json(GameListResponse {
         games: combined_games,

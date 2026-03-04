@@ -8,22 +8,29 @@ import React, {
   useRef,
   useState,
 } from 'react'
+import { useRouter } from 'next/navigation'
 import { drainResponseBody } from '../http/drain-response'
 
-export type FailureKind = 'permanent' | 'transient'
+type ReadinessMode = 'healthy' | 'suspect' | 'degraded'
 
 interface BackendReadinessContextValue {
   isReady: boolean
-  reportFailure: (kind: FailureKind) => void
-  reportSuccess: () => void
+  mode: ReadinessMode
+  reportDependencyOutage: () => void
+  reportOperationSuccess: () => void
   triggerRecovery: () => void
+  markNeedsReconcileAfterRecovery: () => void
+  recoveryGeneration: number
 }
 
 const BackendReadinessContext = createContext<BackendReadinessContextValue>({
   isReady: true,
-  reportFailure: () => {},
-  reportSuccess: () => {},
+  mode: 'healthy',
+  reportDependencyOutage: () => {},
+  reportOperationSuccess: () => {},
   triggerRecovery: () => {},
+  markNeedsReconcileAfterRecovery: () => {},
+  recoveryGeneration: 0,
 })
 
 /** Access backend readiness state from any client component. */
@@ -35,7 +42,6 @@ export function useBackendReadiness() {
 
 const IS_TEST = process.env.NEXT_PUBLIC_FETCH_MODE === 'test'
 const PROBE_TIMEOUT_MS = 1_000
-const TRANSIENT_FAILURE_THRESHOLD = 2
 const RECOVERY_SUCCESS_THRESHOLD = 2
 
 // Recovery polling: 1s for 30s, then 5s till 5min, then 30s
@@ -85,11 +91,11 @@ export function BackendReadinessProvider({
   initialReady = true,
   pollDriver = defaultPollDriver,
 }: BackendReadinessProviderProps) {
-  const [isReady, setIsReady] = useState(initialReady)
-  const modeRef = useRef<'healthy' | 'degraded'>(
+  const [mode, setMode] = useState<ReadinessMode>(
     initialReady ? 'healthy' : 'degraded'
   )
-  const consecutiveTransientRef = useRef(0)
+  const isReady = mode === 'healthy'
+  const modeRef = useRef<ReadinessMode>(mode)
   const consecutiveSuccessRef = useRef(0)
   const scheduledRef = useRef<CancelPoll | null>(null)
   const recoveryStartedAtRef = useRef<number>(0)
@@ -100,6 +106,18 @@ export function BackendReadinessProvider({
   // protect against flapping. Always starts false: optimistic initialReady is
   // an assumption, not confirmation.
   const hasEverSucceededRef = useRef(false)
+  const needsReconcileAfterRecoveryRef = useRef(false)
+  const [recoveryGeneration, setRecoveryGeneration] = useState(0)
+  // True when we mounted in degraded mode (initialReady=false). Used to trigger
+  // a route refresh on first recovery so the client gets a fresh RSC payload
+  // instead of the one produced while the backend was down (which can leave
+  // the tree suspended and never render).
+  const startedInDegradedRef = useRef(!initialReady)
+  // Set when we transition to healthy after having started in degraded; consumed
+  // by useEffect so router.refresh() runs after React has committed (avoids
+  // "Rendered more hooks than during the previous render").
+  const pendingStartupRecoveryRefreshRef = useRef(false)
+  const router = useRouter()
 
   const clearScheduled = useCallback(() => {
     if (scheduledRef.current) {
@@ -111,8 +129,15 @@ export function BackendReadinessProvider({
   const enterDegraded = useCallback(() => {
     if (modeRef.current === 'degraded') return
     modeRef.current = 'degraded'
-    setIsReady(false)
+    setMode('degraded')
     consecutiveSuccessRef.current = 0
+    recoveryStartedAtRef.current = Date.now()
+  }, [])
+
+  const enterSuspect = useCallback(() => {
+    if (modeRef.current !== 'healthy') return
+    modeRef.current = 'suspect'
+    setMode('suspect')
     recoveryStartedAtRef.current = Date.now()
   }, [])
 
@@ -131,21 +156,35 @@ export function BackendReadinessProvider({
         await drainResponseBody(response)
 
         if (response.ok) {
-          const next = consecutiveSuccessRef.current + 1
-          consecutiveSuccessRef.current = next
-          if (next >= RECOVERY_SUCCESS_THRESHOLD) {
-            hasEverSucceededRef.current = true
-            modeRef.current = 'healthy'
-            setIsReady(true)
-            clearScheduled()
-            return
+          // /readyz 200 is authoritative only for recovering from Degraded.
+          if (modeRef.current === 'degraded') {
+            const next = consecutiveSuccessRef.current + 1
+            consecutiveSuccessRef.current = next
+            if (next >= RECOVERY_SUCCESS_THRESHOLD) {
+              hasEverSucceededRef.current = true
+              modeRef.current = 'healthy'
+              setMode('healthy')
+              clearScheduled()
+              if (needsReconcileAfterRecoveryRef.current) {
+                needsReconcileAfterRecoveryRef.current = false
+              }
+              setRecoveryGeneration((g) => g + 1)
+              if (startedInDegradedRef.current) {
+                startedInDegradedRef.current = false
+                pendingStartupRecoveryRefreshRef.current = true
+              }
+              return
+            }
+            // A successful probe is a positive signal: reset the elapsed clock so
+            // the confirmatory probe fires at the fast rate rather than whichever
+            // backoff tier we've drifted into.
+            recoveryStartedAtRef.current = Date.now()
           }
-          // A successful probe is a positive signal: reset the elapsed clock so
-          // the confirmatory probe fires at the fast rate rather than whichever
-          // backoff tier we've drifted into.
-          recoveryStartedAtRef.current = Date.now()
         } else {
           consecutiveSuccessRef.current = 0
+          if (modeRef.current !== 'degraded') {
+            enterDegraded()
+          }
         }
       } catch {
         consecutiveSuccessRef.current = 0
@@ -161,7 +200,7 @@ export function BackendReadinessProvider({
         void pollInner()
       }, delayMs)
     },
-    [clearScheduled, pollDriver]
+    [clearScheduled, pollDriver, enterDegraded]
   )
 
   const startPolling = useCallback(() => {
@@ -171,35 +210,35 @@ export function BackendReadinessProvider({
     })
   }, [clearScheduled, poll, pollDriver])
 
-  const reportFailure = useCallback(
-    (kind: FailureKind) => {
-      // Before a healthy baseline is established any failure is sufficient
-      // evidence the backend is down — skip the threshold.
-      if (kind === 'permanent' || !hasEverSucceededRef.current) {
-        enterDegraded()
-        startPolling()
-        return
-      }
-      const next = consecutiveTransientRef.current + 1
-      consecutiveTransientRef.current = next
-      if (next >= TRANSIENT_FAILURE_THRESHOLD) {
-        enterDegraded()
-        startPolling()
-      }
-    },
-    [enterDegraded, startPolling]
-  )
+  const reportDependencyOutage = useCallback(() => {
+    if (modeRef.current === 'healthy') {
+      enterSuspect()
+      startPolling()
+    } else if (modeRef.current === 'suspect') {
+      startPolling()
+    } else if (modeRef.current === 'degraded') {
+      startPolling()
+    }
+  }, [enterSuspect, startPolling])
 
-  const reportSuccess = useCallback(() => {
+  const reportOperationSuccess = useCallback(() => {
     hasEverSucceededRef.current = true
-    consecutiveTransientRef.current = 0
-  }, [])
+    if (modeRef.current === 'suspect') {
+      modeRef.current = 'healthy'
+      setMode('healthy')
+      clearScheduled()
+    }
+  }, [clearScheduled])
 
   const triggerRecovery = useCallback(() => {
     if (modeRef.current !== 'healthy') return
     enterDegraded()
     startPolling()
   }, [enterDegraded, startPolling])
+
+  const markNeedsReconcileAfterRecovery = useCallback(() => {
+    needsReconcileAfterRecoveryRef.current = true
+  }, [])
 
   useEffect(() => {
     mountedRef.current = true
@@ -208,6 +247,15 @@ export function BackendReadinessProvider({
       clearScheduled()
     }
   }, [clearScheduled])
+
+  // Run router.refresh() after we've transitioned to healthy from startup-degraded,
+  // so it runs in a separate commit and avoids hook-order issues when the tree expands.
+  useEffect(() => {
+    if (mode === 'healthy' && pendingStartupRecoveryRefreshRef.current) {
+      pendingStartupRecoveryRefreshRef.current = false
+      router.refresh()
+    }
+  }, [mode, router])
 
   useEffect(() => {
     if (!initialReady) {
@@ -242,7 +290,15 @@ export function BackendReadinessProvider({
 
   return (
     <BackendReadinessContext.Provider
-      value={{ isReady, reportFailure, reportSuccess, triggerRecovery }}
+      value={{
+        isReady,
+        mode,
+        reportDependencyOutage,
+        reportOperationSuccess,
+        triggerRecovery,
+        markNeedsReconcileAfterRecovery,
+        recoveryGeneration,
+      }}
     >
       {children}
     </BackendReadinessContext.Provider>

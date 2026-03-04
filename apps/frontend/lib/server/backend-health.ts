@@ -58,11 +58,6 @@ export async function probeBackendReadiness(
 ): Promise<BackendReadinessResult> {
   const base = getProbeBaseUrl(sameOriginFallback)
   if (!base) {
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(
-        '[probeBackendReadiness] No backend base URL (env unset and no sameOriginFallback); returning ready: false'
-      )
-    }
     return { ready: false, error: 'Backend URL not configured' }
   }
 
@@ -80,9 +75,10 @@ export async function probeBackendReadiness(
     if (response.ok) {
       return { ready: true }
     }
+    const errorMsg = `Backend not ready (HTTP ${response.status})`
     return {
       ready: false,
-      error: `Backend not ready (HTTP ${response.status})`,
+      error: errorMsg,
     }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'

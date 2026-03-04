@@ -36,7 +36,7 @@ describe('toErrorResult', () => {
     })
   })
 
-  it('converts network/connection error to BACKEND_UNAVAILABLE', () => {
+  it('converts network/connection error to NETWORK_ERROR', () => {
     const error = new Error('fetch failed')
 
     const result = toErrorResult(error, 'Failed to submit bid')
@@ -45,7 +45,7 @@ describe('toErrorResult', () => {
       kind: 'error',
       message: 'fetch failed',
       status: 500,
-      code: 'BACKEND_UNAVAILABLE',
+      code: 'NETWORK_ERROR',
       traceId: undefined,
     })
   })

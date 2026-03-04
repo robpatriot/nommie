@@ -1,4 +1,5 @@
 pub mod cors;
+pub mod db_readiness_reporter;
 pub mod jwt_extract;
 pub mod rate_limit;
 pub mod readiness_gate;

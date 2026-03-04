@@ -41,9 +41,8 @@ export type StateActionResult<T> = ActionResult<T> | { kind: 'not_modified' }
 /**
  * Convert an error (BackendApiError or unknown) to an error result.
  * Wraps unexpected errors in BackendApiError for consistent error handling.
- * Network/connection errors are surfaced as 503 BACKEND_UNAVAILABLE so the
- * client-side ReadinessQueryObserver can reliably classify them as permanent
- * failures without relying on error message pattern matching.
+ * Network/connection errors are surfaced with code NETWORK_ERROR so callers
+ * can distinguish client connectivity from backend dependency outages.
  */
 export function toErrorResult(
   error: unknown,
@@ -64,7 +63,7 @@ export function toErrorResult(
   const wrappedError = new BackendApiError(
     error instanceof Error ? error.message : defaultMessage,
     defaultStatus,
-    network ? 'BACKEND_UNAVAILABLE' : 'UNKNOWN_ERROR'
+    network ? 'NETWORK_ERROR' : 'UNKNOWN_ERROR'
   )
   return {
     kind: 'error',

@@ -35,7 +35,7 @@ function shouldSuppressBackendError(error: unknown): boolean {
     if (error.status === 502 || error.status === 503 || error.status === 504)
       return true
     // toErrorResult wraps server-side network/connection errors with this code.
-    if (error.code === 'BACKEND_UNAVAILABLE') return true
+    if (error.code === 'NETWORK_ERROR') return true
   }
   return false
 }
@@ -150,10 +150,10 @@ export function AppQueryClientProvider({
                 // DB_UNAVAILABLE / BACKEND_UNAVAILABLE means the backend's
                 // dependency (postgres, redis) is persistently down — retrying
                 // will just block the thread for another 5 s pool timeout and
-                // delays ReadinessQueryObserver firing reportFailure.
+                // delays readiness signalling.
                 if (
                   error.code === 'DB_UNAVAILABLE' ||
-                  error.code === 'BACKEND_UNAVAILABLE'
+                  error.code === 'REDIS_UNAVAILABLE'
                 ) {
                   return false
                 }
