@@ -1,0 +1,7 @@
+---
+description: Pointer to canonical agent instructions
+globs: ["**/*"]
+alwaysApply: true
+---
+
+Follow AGENTS.md at the repository root as the canonical source of rules.
