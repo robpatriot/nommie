@@ -1,190 +1,105 @@
-# Game Snapshot (Wire Contract)
+===== game-rules.md =====
 
-## Document Scope
+# Game Rules
 
-Defines the serialized shape delivered to clients for rendering active games.
-Pair this with `dev-roadmap.md` for UX expectations and
-`architecture-game-context.md` for the backend assembly pipeline.
+This project implements Nomination Whist with a fixed ruleset.  
+All game logic, validation, and UI must conform to these rules.
 
-**Purpose:**
-Canonical, read-only view of a game for the frontend. This is the single source of truth for rendering and client-side logic.
+## Players
 
----
+- Exactly **4 players**.
+- Turn order is **clockwise**.
 
-## Root Shape
+## Rounds
 
-- **`GameHeader`**: Immutable identifiers & top-level metadata
-  (e.g., game id, players, seat order, current dealer if relevant).
+The game contains **26 rounds**.
 
-- **`PhaseSnapshot`** (discriminated union): exactly one active phase at any time:
-  - `Init`
-  - `Bidding`
-  - `TrumpSelect` (may include `NO_TRUMPS`)
-  - `Trick`
-  - `Scoring`
-  - `Complete`
-  - `GameOver`
+Hand sizes per round:
 
-- **`RoundPublic`**: Public round facts
-  (round number, hand size, leader seat, trick number, etc.).
+13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3,  
+2, 2, 2, 2,  
+3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
 
----
+Rules:
 
-## Discriminated Union
+- Each round uses a freshly shuffled 52-card deck.
+- The **dealer rotates clockwise** each round.
 
-- The phase is tagged (serde adjacently or internally tagged).
-- FE should **switch on this tag** to branch rendering/logic.
-- Only fields for the active phase will be present.
-- Do **not** rely on inactive-phase fields.
+## Bidding
 
----
+Each player submits exactly one bid per round.
 
-## Conventions
+Valid bids:
 
-- **Trick numbering:** `trick_no` is **1-based**. The first trick in a round has `trick_no = 1`.
-- **Trump semantics:** `Trump` can be any suit or `NO_TRUMPS`.
-  - When `NO_TRUMPS`, trick winners are decided purely by lead suit
-    (highest of lead suit wins if no trumps are present).
-- **Follow-suit rule:**
-  - If a player can follow the lead suit, they must.
-  - FE should **not** replicate legality checks; treat snapshot as truth.
-- **Player seats:**
-  - Seats are numeric identifiers (0, 1, 2, 3) representing the four player positions.
-  - Rotation/next-to-play is derivable from snapshot data.
-  - Future helpers may be provided server-side.
-- **Public vs private info:**
-  - Snapshot exposes **public** state only.
-  - Hidden information (e.g., full hands) is not included unless explicitly allowed.
+0 … hand_size
 
----
+Rules:
 
-## Enums & Casing
+- The **dealer bids last**.
+- The dealer may not choose a bid that causes:
 
-- Enum casing and string values are **stable** once published.
-- Only **new** enum variants may be added in non-breaking expansions.
-- Removals/renames are considered breaking changes and will be coordinated.
+sum(all bids) == hand_size
 
----
+- A player may bid **0**, but not **more than three rounds in a row**.
+- After three consecutive 0 bids, that player must bid at least 1.
 
-## Stability & Evolution
+After bidding:
 
-- Snapshot shape is intended to be stable during active FE development.
-- Additions may occur in non-breaking ways (new optional fields / new tagged variants).
-- Breaking changes will be called out in PRs and release notes.
-- A `version` field may be added in a future update to support explicit contract versioning.
+- The **highest bid** wins the right to select trump.
+- If tied, the earliest bidder among the tied players wins.
 
----
+## Trump Selection
 
-## Error Handling
+The winning bidder selects the trump suit.
 
-- The snapshot route returns a structured error (`AppError`) for not-found/invalid state.
-- FE should parse and present these gracefully.
+Valid choices:
 
----
+- Spades
+- Hearts
+- Diamonds
+- Clubs
+- No Trumps
 
-## Testing References
+If **No Trumps** is selected:
 
-- Golden JSON fixtures illustrate representative states:
-  - `Init`
-  - `Bidding`
-  - `TrumpSelect (NO_TRUMPS)`
-  - `Trick`
-  - `Scoring`
-  - `Complete`
-- FE can use these as examples for parsing and UI snapshots.
+- No cards have trump priority.
+- Tricks are won by the highest card of the lead suit.
 
----
+## Trick Play
 
-## High-Level Examples
+- The player to the **left of the dealer** leads the first trick.
+- Players must **follow suit if able**.
+- If unable to follow suit, any card may be played.
 
-### `GameHeader`
-```json
-{
-  "round_no": 3,
-  "dealer": 0,
-  "seating": [
-    { "seat": 0, "user_id": 1, "display_name": "Alice", "is_ai": false, "is_ready": true },
-    { "seat": 1, "user_id": 2, "display_name": "Bob", "is_ai": false, "is_ready": true }
-  ],
-  "scores_total": [10, 8, 12, 9],
-  "host_seat": 0
-}
-```
+Trick resolution:
 
-### `RoundPublic`
-```json
-{
-  "hand_size": 11,
-  "leader": 2,
-  "bid_winner": 0,
-  "trump": "Spades",
-  "tricks_won": [3, 2, 4, 2]
-}
-```
+- If a trump suit exists and at least one trump is played, the highest trump wins.
+- Otherwise the highest card of the lead suit wins.
 
-### `PhaseSnapshot` Examples
+Additional rules:
 
-- **Bidding**
-```json
-{
-  "phase": "Bidding",
-  "data": {
-    "round": { "hand_size": 11, "leader": 0, "bid_winner": null, "trump": null, "tricks_won": [0, 0, 0, 0] },
-    "to_act": 1,
-    "bids": [4, null, null, null],
-    "min_bid": 0,
-    "max_bid": 11
-  }
-}
-```
+- The trick winner leads the next trick.
+- Each round contains exactly **hand_size tricks**.
 
-- **TrumpSelect**
-```json
-{
-  "phase": "TrumpSelect",
-  "data": {
-    "round": { "hand_size": 11, "leader": 0, "bid_winner": 0, "trump": null, "tricks_won": [0, 0, 0, 0] },
-    "to_act": 0,
-    "allowed_trumps": ["Clubs", "Diamonds", "Hearts", "Spades", "NO_TRUMPS"]
-  }
-}
-```
+## Scoring
 
-- **Trick**
-```json
-{
-  "phase": "Trick",
-  "data": {
-    "round": { "hand_size": 11, "leader": 0, "bid_winner": 0, "trump": "Spades", "tricks_won": [3, 2, 2, 2] },
-    "trick_no": 2,
-    "leader": 1,
-    "current_trick": [
-      [0, "AS"],
-      [1, "KH"]
-    ],
-    "to_act": 2,
-    "playable": ["2C", "3C", "5C"]
-  }
-}
-```
+Scoring uses only the following mechanisms.
 
-- **Scoring**
-```json
-{
-  "phase": "Scoring",
-  "data": {
-    "round": { "hand_size": 11, "leader": 0, "bid_winner": 0, "trump": "Spades", "tricks_won": [4, 3, 2, 2] },
-    "round_scores": [14, 3, 2, 2]
-  }
-}
-```
+- Each trick won = **+1 point**
+- If a player wins exactly the number of tricks they bid, they receive **+10 bonus points**
 
-- **Complete**
-```json
-{
-  "phase": "Complete",
-  "data": {
-    "round": { "hand_size": 1, "leader": 0, "bid_winner": 0, "trump": "Spades", "tricks_won": [1, 0, 0, 0] }
-  }
-}
-```
+Additional rules:
+
+- The bonus applies even for a bid of **0**.
+- There are **no negative scores**.
+- Failing to meet a bid only forfeits the bonus.
+
+Scores accumulate across all 26 rounds.
+
+## Game End
+
+After round 26:
+
+- The game ends.
+- Player(s) with the **highest total score** win.
+- Ties result in **joint winners**.

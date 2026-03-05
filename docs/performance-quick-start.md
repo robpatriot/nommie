@@ -1,136 +1,108 @@
 # Performance Profiling Quick Start
 
-Quick guide to get started with performance profiling for Nommie.
+This is an operational guide for profiling Nommie page-load performance.  
+It focuses on the fastest ways to diagnose performance issues during development.
 
-## Option 1: Use the Performance Monitor Component (Development)
+For deeper explanations and additional tools see `performance-profiling-guide.md`.
 
-Add the `PerformanceMonitor` component to your root layout for automatic console logging in development.
+## Recommended Workflow
 
-**Note**: This component works in both dev and production builds. However, for accurate performance metrics that reflect what users experience, use a production build (`pnpm build && pnpm start`). Dev builds are slower and not representative of production performance, but can be useful for quick checks during development.
+1. Run the application using a production build.
+2. Use Lighthouse to get a quick automated performance report.
+3. Use Chrome DevTools Performance tab to identify bottlenecks.
 
-### Add to `app/layout.tsx`:
+Production builds are recommended because development builds include additional tooling and are significantly slower than real deployments.
 
-```typescript
-import { PerformanceMonitor } from '@/components/PerformanceMonitor'
+Start services with:
 
-export default async function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  // ... existing code ...
-  
-  return (
-    <html lang="en" data-theme-name={initialResolved} data-colour-scheme={initialTheme}>
-      <body className={`${inter.className} tabletop-shell`}>
-        {/* ... existing code ... */}
-        {process.env.NODE_ENV === 'development' && <PerformanceMonitor />}
-        {/* ... rest of layout ... */}
-      </body>
-    </html>
-  )
-}
-```
+pnpm build  
+pnpm start
 
-This will automatically log detailed performance metrics to the console on every page load in development mode.
+The frontend will normally run at:
 
-**To enable in production**, set `NEXT_PUBLIC_PERF_MONITOR=true` in your environment variables.
+http://localhost:3000
 
-## Option 2: Run Lighthouse Audit (Automated)
+---
 
-**⚠️ Prerequisites:** Your frontend (and backend if needed) must be running before running Lighthouse!
+## Option 1 — Lighthouse Audit (Fastest)
 
-**📦 Build Type Note:** For accurate performance metrics, use a production build (`pnpm build && pnpm start`). Dev builds (`pnpm start` or `pnpm fe:up`) work but will show slower, less accurate metrics. See the [full guide](./performance-profiling-guide.md#3-dev-build-vs-production-build) for details.
+Run the profiling script:
 
-1. Start your services (preferably production build):
-   ```bash
-   # Production build (recommended for accurate metrics)
-   pnpm build
-   pnpm start
-   
-   # Or dev build (faster iteration, less accurate metrics)
-   # pnpm start
-   # Or separately:
-   # pnpm fe:up
-   # pnpm be:up
-   ```
+pnpm perf:profile
 
-2. Wait for services to be ready (frontend typically on http://localhost:3000)
+Other variants:
 
-3. Run Lighthouse audit:
-   ```bash
-   # Basic usage (mobile preset, default URL: http://localhost:3000)
-   pnpm perf:profile
+pnpm perf:profile:desktop  
+pnpm perf:profile:mobile
 
-   # Desktop preset
-   pnpm perf:profile:desktop
+Custom run:
 
-   # Mobile preset (explicit)
-   pnpm perf:profile:mobile
+bash scripts/profile-performance.sh http://localhost:3000 ./performance-reports true
 
-   # Custom URL and output directory
-   bash scripts/profile-performance.sh http://localhost:3000 ./my-reports true
-   ```
+This produces:
 
-The script will:
-- Run Lighthouse audit
-- Generate HTML and JSON reports
-- Open the HTML report in your browser
-- Display key metrics in the terminal
+- HTML report
+- JSON report
+- terminal summary
 
-Reports are saved to `./performance-reports/` by default.
+Reports are written to `./performance-reports`.
 
-## Option 3: Chrome DevTools (Manual, Most Detailed)
+Key metrics to review:
 
-For the most detailed analysis:
+- Largest Contentful Paint (LCP)
+- First Contentful Paint (FCP)
+- Total Blocking Time (TBT)
+- Cumulative Layout Shift (CLS)
 
-1. **Open Chrome DevTools** (F12 or Cmd+Option+I)
-2. **Go to Performance tab**
-3. **Configure:**
-   - Enable "Network" throttling (Fast 3G or Slow 3G)
-   - Enable "CPU" throttling (4x slowdown)
-   - Check "Disable cache"
-   - Check "Enable advanced paint instrumentation"
-4. **Record:**
-   - Click Record button
-   - Hard reload: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux)
-   - Wait for page to fully load
-   - Stop recording
-5. **Analyze:**
-   - Check the timeline for bottlenecks
-   - Look for long tasks (red triangles)
-   - Review the Bottom-Up panel for expensive operations
+---
 
-See the [full performance profiling guide](./performance-profiling-guide.md) for detailed instructions.
+## Option 2 — Chrome DevTools Performance Tab
 
-## Option 4: Network Tab Analysis
+1. Open Chrome DevTools (F12).
+2. Select the **Performance** tab.
+3. Enable:
+   - Network throttling (Fast 3G recommended)
+   - CPU throttling (4× slowdown)
+   - Disable cache
+4. Start recording.
+5. Perform a hard reload (Cmd+Shift+R / Ctrl+Shift+R).
+6. Stop recording after the page loads.
+
+Look for:
+
+- long tasks (>50 ms)
+- slow scripting blocks
+- layout or paint bottlenecks
+
+The Bottom-Up panel helps identify which functions consume the most time.
+
+---
+
+## Option 3 — Network Tab
 
 For resource loading analysis:
 
-1. **Open Chrome DevTools** → **Network tab**
-2. **Configure:**
-   - Check "Disable cache"
-   - Set throttling (Fast 3G recommended)
-3. **Clear and reload:**
-   - Clear current requests
-   - Hard reload (Cmd+Shift+R / Ctrl+Shift+R)
-4. **Analyze:**
-   - Waterfall view shows loading sequence
-   - Check TTFB (Time to First Byte) for each resource
-   - Identify blocking resources
-   - Export as HAR for further analysis
+1. Open **Network** tab.
+2. Enable **Disable cache**.
+3. Set throttling (Fast 3G recommended).
+4. Hard reload the page.
 
-## Quick Performance Checklist
+Use the waterfall to identify:
 
-Before profiling, ensure:
+- large resources
+- sequential blocking requests
+- slow server responses (TTFB)
 
-- [ ] **Services are running** (frontend and backend if needed)
-- [ ] **Use production build** (`pnpm build && pnpm start`) for accurate metrics
-  - Dev builds work but give slower, non-representative results
-  - Only use dev builds if you need source-level debugging
-- [ ] Clear browser cache
-- [ ] Close other tabs/extensions
-- [ ] Use throttling for realistic conditions
-- [ ] Run multiple times and average results
+---
 
-See the [Performance Profiling Checklist](./performance-profiling-guide.md#performance-profiling-checklist) in the full guide for a comprehensive checklist.
+## Quick Profiling Checklist
+
+Before running measurements:
+
+- Use a production build
+- Clear browser cache
+- Close other browser tabs
+- Disable extensions
+- Use network throttling
+- Run multiple measurements and average results
+

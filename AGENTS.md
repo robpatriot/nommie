@@ -37,3 +37,4 @@ Common patterns include: install (`pnpm install`), dev (`pnpm dev`), lint (`pnpm
 - Testing: `agent/testing.md`
 - Backend deep rules: `agent/backend/*`
 - Frontend deep rules: `agent/frontend/*`
+- Documentation: `agents/docs.md`

@@ -1,82 +1,105 @@
-# 🎲 Nommie Game Rules
+i===== game-rules.md =====
 
-## Document Scope
+# Game Rules
 
-Authoritative rule reference for gameplay logic. The AI guide repeats key
-excerpts for convenience; this document is the canonical source for future rule
-changes and validation logic.
-
-This project implements *Nomination Whist* with the following fixed ruleset.
-These rules are **locked** — all game logic, extractors, tests, and UI must conform.
-
----
+This project implements Nomination Whist with a fixed ruleset.  
+All game logic, validation, and UI must conform to these rules.
 
 ## Players
-- Always exactly **4 players**.
-- Fixed **turn order** (clockwise).
 
----
+- Exactly **4 players**.
+- Turn order is **clockwise**.
 
 ## Rounds
-- The game lasts **26 rounds**.
-- Hand size schedule:
-  13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 
-  2, 2, 2, 2,
-  3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
-- Each round is dealt from a freshly shuffled standard 52-card deck.
-- **Dealer** rotates clockwise each round.
 
----
+The game contains **26 rounds**.
+
+Hand sizes per round:
+
+13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3,  
+2, 2, 2, 2,  
+3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13
+
+Rules:
+
+- Each round uses a freshly shuffled 52-card deck.
+- The **dealer rotates clockwise** each round.
 
 ## Bidding
-- Each player must make exactly **one bid** per round.
-- Valid bids are integers `0 … hand_size`.
-- The **dealer always bids last**.
-  - Dealer’s restriction: cannot choose a bid that would make
-    `sum(all 4 bids) == hand_size`.
-- A player may bid **0**, but cannot do so **more than three rounds in a row**.
-  - After three consecutive 0-bids, that player must bid at least 1 in the next round.
-- Once all 4 bids are in:
-  - **Highest bid** wins the right to select trump.
-  - If tied, the earliest bidder among the tied players wins.
 
----
+Each player submits exactly one bid per round.
+
+Valid bids:
+
+0 … hand_size
+
+Rules:
+
+- The **dealer bids last**.
+- The dealer may not choose a bid that causes:
+
+sum(all bids) == hand_size
+
+- A player may bid **0**, but not **more than three rounds in a row**.
+- After three consecutive 0 bids, that player must bid at least 1.
+
+After bidding:
+
+- The **highest bid** wins the right to select trump.
+- If tied, the earliest bidder among the tied players wins.
 
 ## Trump Selection
-- The winning bidder chooses the **trump suit** for that round.
-  - Valid choices: ♠, ♥, ♦, ♣, or **No Trumps**.
-- If **No Trumps** is chosen:
-  - There are *no trump cards* for that round.
-  - Each trick is won by the **highest card of the lead suit**.
-  - All other suits have no special power.
 
----
+The winning bidder selects the trump suit.
+
+Valid choices:
+
+- Spades
+- Hearts
+- Diamonds
+- Clubs
+- No Trumps
+
+If **No Trumps** is selected:
+
+- No cards have trump priority.
+- Tricks are won by the highest card of the lead suit.
 
 ## Trick Play
-- The **player to the left of the dealer** leads the first trick of each round.
-- Players must **follow suit** if able.
-- If no card of the lead suit, they may play any card.
-- Trick winner:
-  - If the round has a trump suit **and** any trump cards are played, the trick is won by the **highest trump**.
-  - Otherwise (either **No Trumps** round, or **no trump cards were played**), the trick is won by the **highest card of the lead suit**.
-- Trick winner leads the next trick.
-- Each round has exactly **hand_size tricks**.
 
----
+- The player to the **left of the dealer** leads the first trick.
+- Players must **follow suit if able**.
+- If unable to follow suit, any card may be played.
+
+Trick resolution:
+
+- If a trump suit exists and at least one trump is played, the highest trump wins.
+- Otherwise the highest card of the lead suit wins.
+
+Additional rules:
+
+- The trick winner leads the next trick.
+- Each round contains exactly **hand_size tricks**.
 
 ## Scoring
-// Scoring is intentionally simple and **only** uses the following two mechanisms.
-// No other bonuses, penalties, or adjustments are allowed.
-- Each trick won = **+1 point**.
-- If a player wins **exactly as many tricks as they bid**, they gain a **+10 bonus**.
-  - Applies even to a bid of 0 (if they take no tricks).
-- There are **no negative scores** at the trick or round level:
-  - Missing your bid means you simply **don’t receive** the +10 bonus; you never lose points.
-- Scores are cumulative across all 26 rounds.
 
----
+Scoring uses only the following mechanisms.
+
+- Each trick won = **+1 point**
+- If a player wins exactly the number of tricks they bid, they receive **+10 bonus points**
+
+Additional rules:
+
+- The bonus applies even for a bid of **0**.
+- There are **no negative scores**.
+- Failing to meet a bid only forfeits the bonus.
+
+Scores accumulate across all 26 rounds.
 
 ## Game End
-- After Round 26, the game ends.
+
+After round 26:
+
+- The game ends.
 - Player(s) with the **highest total score** win.
-- If multiple players tie, they are declared **joint winners**.
+- Ties result in **joint winners**.

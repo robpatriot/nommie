@@ -1,201 +1,63 @@
-# GameContext Architecture
+# GameContext
 
-## Document Scope
+## Purpose
 
-This document dives into the `GameContext` concept: how we assemble and cache
-it in HTTP handlers, how AI orchestration consumes it, and why services treat it
-as read-only input. For a system-wide overview, start with
-`architecture-overview.md`. Error propagation patterns are covered in
-`backend-error-handling.md`.
+Defines the `GameContext` concept and how it is used by HTTP handlers and AI orchestration.
 
-## Overview
+`GameContext` is a read-only view that bundles game-wide and player-specific state.
 
-This document describes the unified `GameContext` architecture that consolidates game-wide and player-specific state into a single cohesive structure used by both HTTP handlers and AI systems.
+## Design Principles
 
----
+- Stateless server: no cross-request in-memory cache in AppState.
+- Request-scoped caching: cache may exist only within a single request boundary.
+- Services are trust boundaries: services load their own authoritative validation data.
+- Progressive enhancement: context fields may be absent depending on game state.
 
-## Core Design Principles
+## Context Contents
 
-1. **Stateless Server** - No in-memory state stored in AppState
-2. **Request-Scoped Caching** - Cache within a single HTTP request, dies when request ends  
-3. **No HTTP Coupling in Services** - Services work with plain domain types
-4. **Progressive Enhancement** - Context fields are optional to support different game states
+`GameContext` combines:
 
----
+- game identifier
+- optional game history
+- optional current-round player view
+- optional round memory
 
-## The GameContext Structure
+Each of these fields may be unavailable depending on when the context is assembled.
 
-`GameContext` combines game identification, historical data, and optional player-specific round information. See `apps/backend/src/domain/game_context.rs` for the complete definition.
+## Progressive Enhancement States
 
-### Progressive Enhancement States
+- Lobby: game id only
+- Game started: adds history
+- Player action: adds current-round info
+- AI decision: adds round memory
 
-| State | game_id | history | round_info | round_memory |
-|-------|---------|---------|------------|--------------|
-| **Lobby** (pre-game) | ✅ | ❌ | ❌ | ❌ |
-| **Game Started** | ✅ | ✅ | ❌ | ❌ |
-| **Player Action** (HTTP) | ✅ | ✅ | ✅ | ❌ |
-| **AI Decision** | ✅ | ✅ | ✅ | ✅ |
+## HTTP Boundary
 
----
+HTTP handlers may use an extractor that:
 
-## HTTP Layer: CachedGameContext Extractor
+- builds a `GameContext` for the authenticated user
+- caches it in request extensions for the duration of the request
 
-### Purpose
-Automatically loads and caches GameContext for authenticated users in HTTP requests. The context is cached in request extensions, so multiple consumers within the same request get the same instance without additional database queries.
+Within a request, repeated access must not introduce additional database queries.
 
-### Usage in Handlers
+## Service Boundary
 
-```rust
-async fn submit_bid(
-    context: CachedGameContext,  // ← One parameter with everything
-    body: ValidatedJson<BidRequest>,
-) -> Result<HttpResponse, AppError> {
-    let ctx = context.context();
-    
-    // Access everything:
-    let game_id = ctx.game_id;
-    let history = ctx.game_history();      // Option<&GameHistory>
-    let round_info = ctx.round_info();     // Option<&CurrentRoundInfo>
-    
-    Ok(HttpResponse::Ok().finish())
-}
-```
+Services must not trust caller-provided `GameContext` for validation.
 
-### Caching Behavior
+Rules:
 
-- **First access**: Loads from DB, caches in `req.extensions()`
-- **Subsequent access**: Returns cached instance (no DB queries)
-- **Lifetime**: Dies when HTTP request completes (stateless)
+- service APIs accept identifiers and request parameters
+- services load validation data from the database within their transaction
+- cached context is permitted for response shaping, not for authorization or validation
 
----
+This preserves a security boundary: validation data must be loaded from the authoritative store.
 
-## Service Layer Integration
+## AI Orchestration
 
-### Services Are Trust Boundaries
+AI orchestration may cache game history locally within its own loop for performance.
 
-**Key principle**: Services do NOT accept `GameContext` for validation. They load their own data from the database.
+Rules:
 
-This is a security boundary: if services accepted pre-built context, callers could manipulate validation data. Services must control their own validation data by loading from the authoritative source (database).
-
-### Service Implementation Pattern
-
-Services accept only IDs and load their own data:
-
-```rust
-pub async fn submit_bid_internal(
-    &self,
-    txn: &DatabaseTransaction,
-    game_id: i64,           // ← Just the IDs
-    player_seat: i16,
-    bid_value: u8,
-) -> Result<(), AppError>
-```
-
-### Performance Note
-
-Yes, this means loading `GameHistory` even when it might be cached elsewhere. This is intentional:
-- **Security over micro-optimization**
-- Single transaction may cache query results
-- Adds ~1 extra query per action
-- Clear trust boundaries worth the cost
-
----
-
-## AI Orchestration Path
-
-AI orchestration maintains its own local cache within the orchestration loop:
-
-- Game history is loaded once and reused across all AI decisions in the loop
-- Per-player state (`CurrentRoundInfo`, `RoundMemory`) is loaded fresh per iteration
-- Services still load their own validation data (trust boundary)
-
-See `apps/backend/src/services/game_flow/ai_coordinator.rs` for the implementation.
-
----
-
-## Request Flow Comparison
-
-### Human Player (HTTP Request)
-
-```
-HTTP POST /api/games/123/bid
-    │
-    ├─> CachedGameContext::from_request()
-    │   ├─> GameHistory::load()        [DB Query #1]
-    │   ├─> CurrentRoundInfo::load()   [DB Query #2]
-    │   └─> Cache in req.extensions()
-    │
-    ├─> Handler: submit_bid(context)
-    │   ├─> Use context for UI rendering
-    │   └─> service.submit_bid_internal(game_id, ...)
-    │       └─> GameHistory::load()     [DB Query #3 - trust boundary]
-    │           validate_consecutive_zeros(&history, ...)
-    │
-    └─> Response (uses cached context)
-    
-Total DB queries: 3 (service loads its own validation data)
-```
-
-### AI Player (No HTTP Request)
-
-```
-Orchestration Loop
-    │
-    ├─> GameHistory::load()            [DB Query #1]
-    │   (cached in local variable for entire loop)
-    │
-    ├─> AI Decision (uses cached history for strategy)
-    │   └─> ai.choose_bid(&round_info, &game_context)
-    │
-    ├─> service.submit_bid_internal(game_id, ...)
-    │   └─> GameHistory::load()        [DB Query #2 - trust boundary]
-    │       validate_consecutive_zeros(&history, ...)
-    │
-    └─> Loop continues
-    
-Total DB queries per action: 2 (orchestration cache + service validation)
-Note: Within same transaction, DB may cache query results
-```
-
----
-
-## Benefits
-
-### 1. Single Cohesive Concept
-Instead of passing 3-4 separate parameters, everything is unified in one `GameContext` structure.
-
-### 2. Request-Scoped Caching
-- HTTP requests: Load once, use many times within request
-- Cache dies with request (stateless server)
-- No memory leaks, no cache invalidation complexity
-
-### 3. Services Are Trust Boundaries
-- Services don't accept `GameContext` for validation
-- They load their own data from authoritative source (DB)
-- No risk of caller manipulation
-- Clear security model: services control validation data
-
-### 4. Separation of Concerns
-- **GameContext**: Read-only view for UI and AI strategy
-- **Services**: Load their own data for validation (security)
-- **HTTP layer**: Uses cached context for response building
-- Each layer has clear responsibilities
-
-### 5. Clean Service Signatures
-Services have simple, focused signatures that accept only what they need (IDs, not full context).
-
----
-
-## Summary
-
-The `GameContext` architecture provides:
-
-✅ **Unified State** - One concept for game data (ID, history, round info)  
-✅ **Request-Scoped Caching** - Efficient HTTP without server-side state  
-✅ **Trust Boundaries** - Services load their own validation data (secure)  
-✅ **Separation of Concerns** - Context for UI/AI, services for validation  
-✅ **No HTTP Coupling** - Services work with plain types  
-✅ **Tested** - Comprehensive validation tests  
-✅ **Scalable** - Stateless server design  
-
-This design provides efficient caching for UI and AI strategy while maintaining proper security boundaries: services are authoritative about validation data and never trust caller-provided context.
+- orchestration may reuse history for AI strategy
+- services still load their own validation data
+- orchestration must treat `GameContext` as read-only input only

@@ -1,468 +1,186 @@
-# Performance Profiling Guide for Full Page Reloads
+# Performance Profiling Guide
 
-This guide covers the optimum ways to profile full page reload performance and understand where time is spent during page loads.
+This document describes tools and techniques for analyzing page-load performance in Nommie.
 
-## Overview: The Full Page Load Timeline
+Unlike architectural documentation, this file is an operational reference and may contain commands, examples, and step-by-step procedures.
 
-A full page reload consists of several phases:
+## Page Load Timeline
 
-1. **Navigation Start** → **Redirect** (if any)
-2. **Fetch Start** → DNS lookup, TCP connection, TLS negotiation
-3. **Response Start** → Server processing time
-4. **DOM Content Loaded** → HTML parsing, DOM construction
-5. **Load Complete** → All resources loaded, page interactive
-6. **First Paint** → First pixels rendered
-7. **First Contentful Paint (FCP)** → First content visible
-8. **Largest Contentful Paint (LCP)** → Main content rendered
-9. **Time to Interactive (TTI)** → Page fully interactive
+A typical full page reload contains several phases:
 
----
+1. Navigation start
+2. Network connection and request
+3. Server processing
+4. HTML parsing and DOM construction
+5. Resource loading
+6. First paint and content rendering
+7. Page becoming interactive
 
-## Method 1: Chrome DevTools Performance Tab (Recommended)
-
-The **Performance tab** provides the most detailed view of where time is spent.
-
-### Setup for Accurate Measurement
-
-1. **Open DevTools** (F12 or Cmd+Option+I)
-2. **Go to Performance tab**
-3. **Before recording:**
-   - Enable "Network" throttling: Set to "Slow 3G" or "Fast 3G" to simulate real conditions
-   - Enable "CPU" throttling: 4x slowdown (Chrome 58+)
-   - Check "Disable cache" for cold load testing
-   - Check "Enable advanced paint instrumentation" (for paint timing)
-
-4. **Record:**
-   - Click the **Record** button (or press Cmd+E / Ctrl+E)
-   - Do a **hard reload**: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows/Linux)
-   - Wait for page to fully load
-   - Click **Stop**
-
-### What to Look For
-
-#### Timeline View (Waterfall)
-- **Purple bars**: HTML document download
-- **Blue bars**: JavaScript files
-- **Green bars**: CSS files
-- **Orange bars**: Images
-- **Gray bars**: Other resources
-
-#### Flame Chart
-- **Yellow (Scripting)**: JavaScript execution time
-- **Purple (Rendering)**: Layout/paint operations
-- **Green (Painting)**: Paint operations
-- **Gray (System)**: Browser overhead
-- **Light blue (Loading)**: Network requests
-- **Dark blue (Idle)**: Waiting time
-
-#### Bottom-Up / Call Tree
-- Shows which functions consume the most time
-- Sort by "Self Time" to find expensive operations
-- Expand to see call stacks
-
-#### Main Thread Activity
-- Long tasks (>50ms) block interactivity
-- Look for red warning triangles
-- Identify render-blocking resources
-
-### Key Metrics to Extract
-
-1. **Total Load Time**: From navigationStart to loadEventEnd
-2. **DOMContentLoaded**: Time to parse HTML and build DOM
-3. **First Paint**: First pixel rendered
-4. **First Contentful Paint**: First text/image rendered
-5. **Largest Contentful Paint**: Main content visible
-6. **Time to Interactive**: Page fully responsive
+Understanding which phase dominates load time is the goal of performance profiling.
 
 ---
 
-## Method 2: Chrome DevTools Network Tab
+## Chrome DevTools Performance Tab
 
-The **Network tab** shows resource loading timing in detail.
+The Performance tab provides the most detailed view of browser activity.
 
-### Setup
+Typical setup:
 
-1. Open **Network tab**
-2. Ensure **"Disable cache"** is checked
-3. Set throttling to desired speed
-4. Clear current requests
-5. **Hard reload** (Cmd+Shift+R / Ctrl+Shift+R)
+- enable network throttling
+- enable CPU throttling
+- disable cache
+- perform a hard reload during recording
 
-### Resource Timing Breakdown
+Important panels:
 
-For each resource, you can see:
+Timeline  
+Shows when network requests, rendering, and scripting occur.
 
-- **Queued**: Time waiting to start
-- **DNS Lookup**: DNS resolution time
-- **Initial Connection**: TCP handshake + TLS negotiation
-- **SSL**: TLS handshake (if HTTPS)
-- **Request Sent**: Time to send request
-- **Waiting (TTFB)**: Time to First Byte (server processing)
-- **Content Download**: Time to download response body
+Flame chart  
+Shows how JavaScript execution time is distributed.
 
-### Key Insights
+Bottom-up view  
+Highlights which functions consume the most processing time.
 
-- **Waterfall visualization**: Shows parallel vs sequential loading
-- **Request initiators**: See what triggers each request
-- **Resource size vs time**: Identify large resources
-- **Blocking resources**: Render-blocking CSS/JS
-
-### Export Timing Data
-
-1. Right-click in Network tab → "Save all as HAR with content"
-2. Use HAR viewer or parse programmatically for analysis
+Main thread view  
+Identifies long tasks that block page interaction.
 
 ---
 
-## Method 3: Lighthouse (Automated Analysis)
+## Chrome DevTools Network Tab
 
-**Lighthouse** provides automated performance audits with actionable recommendations.
+The Network tab focuses on resource loading.
 
-### Using Lighthouse in DevTools
+Typical analysis workflow:
 
-1. Open DevTools → **Lighthouse** tab
-2. Select **Performance** category
-3. Choose device type: **Desktop** or **Mobile**
-4. Check **"Clear storage"** for accurate cold load
-5. Click **"Analyze page load"**
-6. Do a hard reload when prompted
+1. Disable cache.
+2. Apply network throttling.
+3. Hard reload the page.
+4. Inspect the waterfall chart.
 
-### Using Lighthouse CLI
+Important timing phases:
 
-```bash
-# Install Lighthouse CLI
-npm install -g lighthouse
+Queued  
+DNS lookup  
+Connection establishment  
+Time to First Byte (TTFB)  
+Content download
 
-# Run performance audit
-lighthouse http://localhost:3000 --only-categories=performance --output=html --output-path=./lighthouse-report.html
+Common issues identified here include:
 
-# Generate JSON for programmatic analysis
-lighthouse http://localhost:3000 --only-categories=performance --output=json --output-path=./lighthouse-report.json
-```
+- large resources
+- render-blocking CSS or JavaScript
+- slow backend responses
 
-### Key Metrics from Lighthouse
-
-- **First Contentful Paint (FCP)**: < 1.8s (good)
-- **Largest Contentful Paint (LCP)**: < 2.5s (good)
-- **Total Blocking Time (TBT)**: < 200ms (good)
-- **Cumulative Layout Shift (CLS)**: < 0.1 (good)
-- **Speed Index**: < 3.4s (good)
-
-Lighthouse also identifies:
-- Render-blocking resources
-- Unused CSS/JS
-- Large images
-- Slow server response times
+Network requests can be exported as HAR files for further analysis.
 
 ---
 
-## Method 4: Web Vitals API (Real User Monitoring)
+## Lighthouse Audits
 
-**Web Vitals** provides standardized metrics for real user monitoring.
+Lighthouse performs automated performance analysis.
 
-### Implementation
+Using DevTools:
 
-Add to your Next.js app (e.g., `app/layout.tsx` or a client component):
+1. Open the Lighthouse panel.
+2. Select the Performance category.
+3. Run the audit.
 
-```typescript
-// lib/web-vitals.ts
-export function reportWebVitals(metric: {
-  id: string
-  name: string
-  value: number
-  rating: 'good' | 'needs-improvement' | 'poor'
-  delta: number
-  entries: PerformanceEntry[]
-}) {
-  // Log to console in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[Web Vitals]', metric)
-  }
+Typical metrics produced:
 
-  // Send to analytics service in production
-  // Example: send to your backend
-  if (process.env.NODE_ENV === 'production') {
-    fetch('/api/analytics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(metric),
-    }).catch(() => {
-      // Ignore errors to avoid impacting performance
-    })
-  }
-}
-```
+- First Contentful Paint
+- Largest Contentful Paint
+- Total Blocking Time
+- Cumulative Layout Shift
+- Speed Index
 
-### Next.js Built-in Web Vitals
+Lighthouse also highlights optimization opportunities such as:
 
-Next.js has built-in support for Web Vitals. Create `app/_app.tsx` or add to your root layout:
-
-```typescript
-// For Pages Router: app/_app.tsx
-// export { reportWebVitals } from 'next/web-vitals'
-
-// For App Router: Use a client component
-// app/web-vitals.tsx
-'use client'
-import { useEffect } from 'react'
-import { onCLS, onFID, onFCP, onLCP, onTTFB } from 'web-vitals'
-
-export function WebVitals() {
-  useEffect(() => {
-    onCLS(console.log)
-    onFID(console.log)
-    onFCP(console.log)
-    onLCP(console.log)
-    onTTFB(console.log)
-  }, [])
-  return null
-}
-```
-
-### Key Web Vitals Metrics
-
-- **LCP (Largest Contentful Paint)**: Loading performance
-- **FID (First Input Delay)**: Interactivity
-- **CLS (Cumulative Layout Shift)**: Visual stability
-- **FCP (First Contentful Paint)**: Perceived load speed
-- **TTFB (Time to First Byte)**: Server response time
+- unused JavaScript
+- large images
+- render-blocking resources
 
 ---
 
-## Method 5: Performance API (Programmatic Access)
+## Web Vitals Monitoring
 
-The **Performance API** provides detailed timing data programmatically.
+Web Vitals measure real user experience.
 
-### Navigation Timing API
+Key metrics:
 
-```typescript
-// Get full page load timing
-const perfData = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming
+LCP — loading performance  
+FID — responsiveness  
+CLS — visual stability  
+FCP — first visible content  
+TTFB — server response time
 
-console.log('DNS:', perfData.domainLookupEnd - perfData.domainLookupStart, 'ms')
-console.log('TCP:', perfData.connectEnd - perfData.connectStart, 'ms')
-console.log('TLS:', perfData.secureConnectionStart 
-  ? perfData.connectEnd - perfData.secureConnectionStart 
-  : 0, 'ms')
-console.log('TTFB:', perfData.responseStart - perfData.requestStart, 'ms')
-console.log('Download:', perfData.responseEnd - perfData.responseStart, 'ms')
-console.log('DOM Processing:', perfData.domInteractive - perfData.responseEnd, 'ms')
-console.log('Load Complete:', perfData.loadEventEnd - perfData.loadEventStart, 'ms')
-console.log('Total Load Time:', perfData.loadEventEnd - perfData.fetchStart, 'ms')
-```
-
-### Resource Timing API
-
-```typescript
-// Get timing for all resources
-const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[]
-
-resources.forEach(resource => {
-  console.log(resource.name, {
-    DNS: resource.domainLookupEnd - resource.domainLookupEnd,
-    Connection: resource.connectEnd - resource.connectStart,
-    TTFB: resource.responseStart - resource.requestStart,
-    Download: resource.responseEnd - resource.responseStart,
-    Total: resource.responseEnd - resource.fetchStart,
-  })
-})
-```
-
-### Paint Timing API
-
-```typescript
-// Get paint timing
-const paintEntries = performance.getEntriesByType('paint')
-
-paintEntries.forEach(entry => {
-  console.log(entry.name, entry.startTime, 'ms')
-  // 'first-paint' or 'first-contentful-paint'
-})
-```
-
-### Long Task API
-
-```typescript
-// Detect long tasks (blocking operations > 50ms)
-if ('PerformanceObserver' in window) {
-  const observer = new PerformanceObserver((list) => {
-    for (const entry of list.getEntries()) {
-      console.warn('Long task detected:', entry.duration, 'ms', entry)
-    }
-  })
-  observer.observe({ entryTypes: ['longtask'] })
-}
-```
-
-### Create a Performance Monitoring Hook
-
-```typescript
-// hooks/usePerformanceMetrics.ts
-'use client'
-import { useEffect } from 'react'
-
-export function usePerformanceMetrics() {
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-
-    // Navigation timing
-    const navTiming = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming
-    if (navTiming) {
-      console.table({
-        'DNS Lookup': `${(navTiming.domainLookupEnd - navTiming.domainLookupStart).toFixed(2)} ms`,
-        'TCP Connection': `${(navTiming.connectEnd - navTiming.connectStart).toFixed(2)} ms`,
-        'TLS Negotiation': navTiming.secureConnectionStart
-          ? `${(navTiming.connectEnd - navTiming.secureConnectionStart).toFixed(2)} ms`
-          : 'N/A',
-        'Time to First Byte': `${(navTiming.responseStart - navTiming.requestStart).toFixed(2)} ms`,
-        'Download Time': `${(navTiming.responseEnd - navTiming.responseStart).toFixed(2)} ms`,
-        'DOM Processing': `${(navTiming.domInteractive - navTiming.responseEnd).toFixed(2)} ms`,
-        'Total Load Time': `${(navTiming.loadEventEnd - navTiming.fetchStart).toFixed(2)} ms`,
-      })
-    }
-
-    // Resource timing summary
-    const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[]
-    const totalResourceTime = resources.reduce(
-      (sum, r) => sum + (r.responseEnd - r.fetchStart),
-      0
-    )
-    console.log(`Total resource load time: ${totalResourceTime.toFixed(2)} ms (${resources.length} resources)`)
-
-    // Paint timing
-    const paintEntries = performance.getEntriesByType('paint')
-    paintEntries.forEach(entry => {
-      console.log(`${entry.name}: ${entry.startTime.toFixed(2)} ms`)
-    })
-  }, [])
-}
-```
+These metrics can be logged during development or sent to monitoring systems in production.
 
 ---
 
-## Method 6: Chrome Performance Monitor
+## Performance API
 
-The **Performance Monitor** shows real-time metrics as you interact with the page.
+The browser Performance API exposes timing information programmatically.
 
-1. Open DevTools → **More tools** → **Performance monitor**
-2. Metrics shown:
-   - CPU usage
-   - JS heap size
-   - DOM nodes
-   - Event listeners
-   - Documents (iframes)
+It can be used to inspect:
 
----
+- navigation timing
+- resource loading times
+- paint timing
+- long tasks on the main thread
 
-## Best Practices for Accurate Measurements
-
-### 1. Test Conditions
-
-- **Cold load**: Clear cache, hard reload (Cmd+Shift+R)
-- **Warm load**: Regular reload (to test cache effectiveness)
-- **Network throttling**: Use "Slow 3G" or "Fast 3G" for realistic conditions
-- **CPU throttling**: Enable 4x slowdown for mobile simulation
-
-### 2. Multiple Runs
-
-- Run tests **3-5 times** and average results
-- First load is often slower (DNS, connections)
-- Ignore outliers
-
-### 3. Dev Build vs Production Build
-
-**None of the profiling methods require a dev build**, but the choice matters:
-
-#### When to Use Production Builds (Recommended)
-
-**Use production builds (`next build && next start`) for accurate performance metrics because:**
-
-- **Accurate representation**: Production builds reflect what users actually experience
-- **Optimized code**: Minified, tree-shaken, optimized bundles
-- **Proper caching**: Production caching behavior
-- **Real bundle sizes**: Actual file sizes shipped to users
-- **Server optimizations**: Production Next.js optimizations enabled
-
-**All profiling methods benefit from production builds for accurate results:**
-- ✅ Lighthouse - More accurate scores and recommendations
-- ✅ Performance Tab - Real-world timing data
-- ✅ Network Tab - Actual resource sizes and loading patterns
-- ✅ Performance API - Accurate metrics matching production
-- ✅ Web Vitals - Real user experience metrics
-- ✅ Performance Monitor Component - Production-like measurements
-
-#### When Dev Builds Can Be Useful
-
-**Dev builds (`next dev`) can be helpful for:**
-
-- **Debugging**: Source maps make it easier to identify which source code files are slow
-- **Development workflow**: Quick iteration without rebuilding
-- **Code-level analysis**: Performance tab can show readable function names instead of minified code
-- **Performance Monitor Component**: Convenient console logging during development
-
-**However, dev build metrics are NOT representative because:**
-- ❌ Much slower due to hot module reloading overhead
-- ❌ Unoptimized bundles (larger file sizes)
-- ❌ Different caching behavior
-- ❌ Development-only code included
-- ❌ No minification or tree-shaking
-- ❌ Different webpack/Next.js behavior
-
-**Recommendation**: Use production builds for profiling. Use dev builds only when you need source-level debugging information, then switch to production for accurate measurements.
-
-### 4. Test on Real Devices
-
-- Desktop Chrome performance differs from mobile
-- Use Chrome DevTools device emulation
-- Test on actual mobile devices when possible
-
-### 5. Compare Before/After
-
-- Baseline measurements before optimizations
-- Measure impact of each change
-- Track improvements over time
+This is useful for automated logging or internal performance dashboards.
 
 ---
 
-## Performance Profiling Checklist
+## Performance Monitor
 
-Use this checklist when profiling full page reloads to ensure consistent, accurate measurements.
+Chrome includes a real-time performance monitor.
 
-### Pre-Profiling Setup
+Open DevTools → More Tools → Performance Monitor.
 
-- [ ] **Clear browser cache** (Cmd+Shift+Delete / Ctrl+Shift+Delete)
-- [ ] **Close other tabs** to minimize system resource usage
-- [ ] **Disable browser extensions** that might interfere (ad blockers, etc.)
-- [ ] **Use incognito/private mode** for clean profile
-- [ ] **Stop background processes** that might affect CPU/memory
+Metrics shown include:
 
-### Browser DevTools Configuration
+- CPU usage
+- JavaScript heap size
+- DOM node count
+- event listener count
 
-- [ ] **Performance Tab:**
-  - [ ] Enable "Network" throttling (Fast 3G or Slow 3G)
-  - [ ] Enable "CPU" throttling (4x slowdown)
-  - [ ] Check "Disable cache"
-  - [ ] Check "Enable advanced paint instrumentation"
-
-- [ ] **Network Tab:**
-  - [ ] Check "Disable cache"
-  - [ ] Set appropriate throttling
-
-### Environment
-
-- [ ] **Production Build:**
-  - [ ] `pnpm fe:build` to build frontend production bundle
-  - [ ] `pnpm start` runs backend production (`cargo run --release`) and frontend production server (`next start`)
-  - [ ] `NODE_ENV=production` (automatically set by Next.js in production mode)
+This tool is useful while interacting with the page to detect runtime performance issues.
 
 ---
 
-## Tools Summary
+## Measurement Best Practices
 
-| Tool | Use Case | Granularity | Real User Data |
-|------|----------|-------------|----------------|
-| **Performance Tab** | Deep analysis, identify bottlenecks | Millisecond | No |
-| **Network Tab** | Resource loading analysis | Millisecond | No |
-| **Lighthouse** | Automated audit, recommendations | Second | No |
-| **Performance API** | Programmatic monitoring | Millisecond | Yes (with code) |
-| **Web Vitals** | Standardized metrics | Millisecond | Yes (with code) |
+For reliable measurements:
+
+Use production builds  
+Run multiple tests and average results  
+Test under network throttling  
+Use CPU throttling to simulate slower devices  
+Test on mobile devices when possible
+
+Always compare results before and after changes to measure impact.
+
+---
+
+## Tools Overview
+
+Performance Tab  
+Deep browser activity analysis.
+
+Network Tab  
+Resource loading and request timing.
+
+Lighthouse  
+Automated performance audits.
+
+Performance API  
+Programmatic access to timing data.
+
+Web Vitals  
+User-experience performance metrics.
+
+Performance Monitor  
+Real-time browser metrics while interacting with the page.
+

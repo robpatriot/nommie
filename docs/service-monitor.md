@@ -1,64 +1,58 @@
-# 🔍 Nommie — Service Monitoring & Readiness (End-State Specification)
+# Service Monitoring and Readiness
 
-## Document Scope
+## Scope
 
-This document defines the intended end-state behavior of Nommie’s monitoring, readiness, frontend degraded handling, and WebSocket interaction model.
+This document specifies how Nommie detects dependency outages, exposes backend readiness state, and how the frontend reacts to those states.
 
-It describes the authoritative semantics of:
+It defines:
 
-- Backend dependency monitoring
-- Readiness state transitions
-- Frontend Suspect and Degraded states
-- WebSocket error handling
-- Reconciliation after failures
+- backend dependency monitoring
+- backend readiness states
+- frontend Healthy / Suspect / Degraded behavior
+- HTTP mutation failure handling
+- post-recovery reconciliation behavior
 
----
+WebSocket error handling semantics are defined in `docs/websocket-design.md`.
 
-# 🌐 Core Principles
+## Core Rules
 
-1. Backend readiness is the single source of truth.
-2. Readiness reflects strict dependency health.
-3. No artificial traffic is generated to force readiness transitions.
-4. No additional database probing loop is introduced beyond the backend monitor and readiness probing mechanisms.
-5. `/api/readyz` is a lightweight view of the readiness state machine and does not actively probe Postgres.
-6. Frontend behavior aligns to backend readiness confirmation.
-7. Eventual consistency is achieved without polling loops for game state.
+- Backend readiness is the single source of truth for system availability.
+- Readiness reflects dependency health.
+- `/api/readyz` reports the current readiness state and does not actively probe dependencies.
+- The frontend does not infer backend readiness state solely from local error counts.
+- Game state synchronization remains snapshot-based and does not rely on polling loops.
 
----
+## Monitoring Model
 
-# 🔁 Polling & Monitoring Model
+- The backend runs an internal monitor that tracks dependency health and controls readiness transitions.
+- The frontend probes `/readyz` when in Suspect or Degraded states.
+- There is no continuous database ping loop during Healthy operation.
+- Game state is not periodically polled.
 
-- The backend runs an internal monitor loop that evaluates dependency state and manages readiness transitions.
-- The frontend probes `/readyz` during Suspect and Degraded states.
-- There is no continuous Postgres ping loop during Healthy state.
-- There is no periodic game-state polling.
-
----
-
-# ⚙️ Backend Readiness Model
-
-## Dependency Recording
+## Dependency Monitoring
 
 ### Postgres
 
-- Postgres health is event-driven.
-- Failures are recorded when `DB_UNAVAILABLE` is emitted from:
-  - HTTP request boundaries
-  - WebSocket boundary handlers
-- `require_db` does not update readiness.
-- `/api/readyz` reports current readiness state only.
+Postgres outages are recorded when the backend emits the error code:
+
+- `DB_UNAVAILABLE`
+
+Failures may originate from:
+
+- HTTP request handlers
+- WebSocket request handlers
+
+`require_db` does not modify readiness state.
 
 ### Redis
 
-Redis readiness is recorded from:
+Redis outages are recorded from:
 
-- Startup dependency resolution
-- Publisher path failures
-- Subscriber loop failures
+- startup dependency resolution
+- publisher failures
+- subscriber loop failures
 
-No HTTP middleware is used for Redis.
-
----
+Redis monitoring is internal to the backend and not implemented as HTTP middleware.
 
 ## Canonical Dependency-Outage Codes
 
@@ -69,241 +63,131 @@ Only the following codes represent dependency outages:
 
 These codes:
 
-- Increment backend dependency failure counters
-- Trigger frontend Suspect state
-- Drive reconciliation behavior
-- Are shared across HTTP and WebSocket transports
+- record dependency failure in the backend monitor
+- cause the frontend to enter Suspect state
 
-No generic `BACKEND_UNAVAILABLE` is defined.
+## Backend Readiness States
 
----
+The backend readiness state machine contains four states:
 
-# 🧭 Backend State Machine
-
-## Modes
-
-- `Startup`
-- `Healthy`
-- `Recovering`
-- `Failed`
-
-## Semantics
+- Startup
+- Healthy
+- Recovering
+- Failed
 
 ### Startup
 
-- Initial state at boot.
-- Service is Not Ready.
-- Exits only when:
-  - Migrations succeed, and
-  - All dependencies meet success thresholds.
+Initial state at process boot.
 
-Failures during Startup do not create additional transitions (service is already Not Ready).
+The service is Not Ready until:
+
+- migrations succeed
+- dependencies meet success thresholds
 
 ### Healthy
 
-- All dependencies healthy.
-- `/api/readyz` returns 200.
+All dependencies are healthy.
+
+`/api/readyz` returns `200`.
 
 ### Recovering
 
-- Dependency failure threshold exceeded.
-- `/api/readyz` returns 503.
-- Recoverable when success thresholds are met.
+Dependency failure threshold has been exceeded.
+
+`/api/readyz` returns `503`.
+
+The system returns to Healthy after recovery thresholds are met.
 
 ### Failed
 
-- Irrecoverable startup failure (e.g. migration mismatch).
-- Entered immediately on migration failure.
-- `/api/readyz` returns 503 permanently until restart.
-- No in-process recovery path.
+Irrecoverable startup failure (for example migration mismatch).
 
----
+`/api/readyz` returns `503` permanently until restart.
 
-# 🖥️ Frontend Readiness Model
+## Frontend Availability States
 
-Frontend states:
+The frontend operates in three states:
 
 - Healthy
 - Suspect
-- Degraded (Confirmed Not Ready)
+- Degraded
 
-Frontend assumes Healthy UX by default and does not show a banner on initial load.
+The UI assumes Healthy by default.
 
----
+### Suspect
 
-## Suspect State
+Suspect represents an observed dependency outage that has not yet been confirmed by backend readiness.
 
-Suspect represents observed dependency failure that has not yet been confirmed by backend readiness.
+Entry conditions:
 
-### Entry Conditions
+- HTTP response containing `DB_UNAVAILABLE` or `REDIS_UNAVAILABLE`
+- WebSocket `error` frame containing those codes
 
-Entered when a dependency-outage signal is observed:
+Behavior:
 
-- HTTP response with `DB_UNAVAILABLE` or `REDIS_UNAVAILABLE`
-- WebSocket error frame with those codes
+- UI remains usable
+- a non-blocking banner or toast is shown
+- `/readyz` probing begins
+- no automatic game state refetch occurs
 
-### Behavior
+Suspect does not clear based solely on `/readyz` returning 200.
 
-- UI remains usable.
-- A non-blocking toast/banner is shown.
-- `/readyz` probing begins.
-- WebSocket remains connected.
-- No immediate state refetch occurs.
-- The current game may set `needs_reconcile_after_recovery`.
+Suspect exits when either:
 
-### Transition Rules
+- `/readyz` returns 503 (transition to Degraded), or
+- a subsequent successful backend operation confirms normal service behavior
 
-Suspect does **not** clear based solely on `/readyz` returning 200.
+Repeated dependency outages keep the frontend in Suspect.
 
-Suspect remains active until one of the following occurs:
+### Degraded
 
-1. **Backend Confirmation of Degraded**
-   - `/readyz` returns 503.
-   - Transition to Degraded (blocking).
+Degraded represents backend-confirmed unavailability.
 
-2. **Successful Normal Operation**
-   - A subsequent user-driven operation that exercises the backend succeeds (e.g. a player action or authoritative state fetch).
-   - Transition back to Healthy.
-   - Clear any transient Suspect indicators.
+Entry condition:
 
-Repeated dependency failures while in Suspect:
-- Keep the frontend in Suspect.
-- Continue showing appropriate toast messaging.
-- Maintain any `needs_reconcile_after_recovery` flags.
+- `/readyz` returns 503
 
----
+Behavior:
 
-## Degraded State
+- a blocking degraded screen is shown
+- `/readyz` probing continues
 
-Degraded represents backend-confirmed not-ready state.
+Exit condition:
 
-### Entry Condition
+- `/readyz` returns 200 consistently
 
-- `/readyz` returns 503.
+On exit to Healthy, perform post-recovery reconciliation if required.
 
-### Behavior
+## HTTP Mutation Failure Handling
 
-- Blocking degraded page/screen is shown.
-- Normal site usage is prevented.
-- WebSocket connect/reconnect attempts are paused.
-- `/readyz` probing continues.
+### Success
 
-### Exit Condition
+- optimistic state is retained or reconciled
 
-- `/readyz` returns 200 consistently according to recovery threshold.
-- Transition to Healthy.
-- Perform post-recovery reconciliation if required.
+If the frontend is in Suspect, a successful mutation transitions to Healthy.
 
----
+### Validation or Domain Error
 
-# 🔌 WebSocket Behavior
+- optimistic state rolls back
+- no automatic refetch occurs
 
-## Dependency Outage in WS Handlers
+### Version Conflict
 
-When backend encounters DB/Redis failure during WS processing:
+- optimistic state rolls back
+- one authoritative snapshot refetch is performed
 
-- Sends `error { code: DB_UNAVAILABLE | REDIS_UNAVAILABLE }`
-- Keeps socket open
-- Records readiness failure
+### Dependency Outage
 
-*Implementation note:* Today only DB is used in the WS request path (e.g. subscribe/build_game_state), so only `DB_UNAVAILABLE` is sent over the socket. Redis failures are recorded in the broker (publisher/subscriber) and drive `/readyz`; no Redis failure is sent to clients over WS until we add a path that surfaces it (e.g. broker broadcast).
+- optimistic state rolls back
+- frontend enters or remains in Suspect
+- no immediate refetch occurs
+- mark the current game as needing post-recovery reconciliation
 
-Client:
+## Post-Recovery Reconciliation
 
-- Clears pending latches
-- Enters Suspect
-- Does not immediately refetch
-- Sets `needs_reconcile_after_recovery` for the current game
+When the frontend transitions from Degraded to Healthy:
 
----
+If the current game is marked as needing reconciliation:
 
-## Protocol Errors (Malformed / Bad Protocol)
-
-- Backend closes socket.
-- Client reconnects with backoff (unless in Degraded).
-- No automatic refetch.
-
----
-
-## Authorization Errors (Forbidden)
-
-- Backend sends error frame.
-- Socket remains open.
-- Client clears latches.
-- No automatic refetch required.
-
----
-
-# 🔁 HTTP Mutation Handling
-
-## Success
-
-- Optimistic update retained or reconciled via snapshot.
-- If in Suspect, transition back to Healthy.
-- No refetch required.
-
-## Validation / Domain Failure
-
-- Roll back to previous state.
-- Show action-level error.
-- No refetch required.
-
-## Version Conflict / Optimistic Lock Mismatch
-
-- Roll back.
-- Perform one immediate refetch of authoritative game state.
-- Converge to server truth.
-
-## Dependency Outage
-
-- Roll back optimistic update.
-- Show service message.
-- Enter or remain in Suspect.
-- Do not immediately refetch.
-- Set `needs_reconcile_after_recovery` for the current game.
-
----
-
-# 🔄 Post-Recovery Reconciliation
-
-Triggered when frontend transitions from Degraded back to Healthy.
-
-If the current game has `needs_reconcile_after_recovery`:
-
-- Perform one bounded refetch of game state.
-- Clear the flag.
-- Do not refetch again unless another qualifying event occurs.
-
-Navigating to a different game naturally triggers a fresh state load.
-
----
-
-# 🌐 Network Errors
-
-Network failures are treated as client connectivity issues.
-
-They do not assert backend dependency failure.
-
----
-
-# ❌ Explicit Non-Goals
-
-- No additional DB ping loop in Healthy state.
-- No automatic refetch on dependency-outage WS errors.
-- No refetch on every mutation failure.
-- No closing WebSocket on dependency outage.
-- No frontend escalation to Degraded based solely on local failure counts.
-- No duplicate readiness updates from `require_db`.
-
----
-
-# ✅ Stability Guarantees
-
-This model guarantees:
-
-- No frontend/backend threshold mismatch bounce.
-- No infinite refresh loops during outages.
-- No reliance on multiple users to confirm failure.
-- Eventual convergence after recovery.
-- Minimal additional load during degraded periods.
-- Clear separation between dependency health, protocol correctness, domain validation, and network instability.
+- perform one bounded refetch of authoritative game state
+- clear the reconciliation flag

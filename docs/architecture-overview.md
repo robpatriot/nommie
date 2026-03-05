@@ -1,78 +1,55 @@
-# 🏗️ Nommie — Architecture & Tech Stack
+# Architecture Overview
 
-## Document Scope
+## Purpose
 
-This overview orients new contributors to the high-level shape of the system:
-frontend, backend, data, and the primary engineering principles that keep those
-layers aligned. Deep-dives for specific subsystems live in separate documents
-and are linked under **Related Documents**.
+Orients contributors to the high-level system shape: frontend, backend, data, and cross-cutting principles.
 
-## 🌐 Overview
+Subsystem deep-dives live in separate documents.
 
-Nommie is a web-based, multiplayer version of **Nomination Whist**. The system 
-is **full-stack** and **Docker-first**.
+## System
 
----
+Nommie is a web-based multiplayer implementation of Nomination Whist.
 
-## 🎨 Frontend
-- **Framework:** Next.js (App Router)
-- **Styling:** Tailwind CSS
-- **Auth:** NextAuth v5 beta (Google login + JWTs)
-- **Build Tooling:** Turbopack (dev), standard Next.js build (prod)
-- **Package Manager:** pnpm
+The system is Docker-first.
 
----
+## Frontend
 
-## ⚙️ Backend
-- **Language:** Rust
-- **Framework:** Actix Web
-- **ORM:** SeaORM (repositories in orchestration layer)
-- **Auth:** JWT validation from NextAuth tokens
-- **Architecture Layers:**
-  - **Domain modules** → pure game logic (`rules`, `bidding`, `tricks`, `scoring`, `state`)
-  - **Orchestration** → DB + domain wiring, per-feature modules (`orchestration::bidding`, etc.)
-  - **Routes** → thin adapters that call orchestration
+- Next.js (App Router)
+- Tailwind CSS
+- Authentication: NextAuth (Google login) issuing tokens consumed by the backend
+- Package manager: pnpm
 
----
+## Backend
 
-## 🗄️ Database & Infrastructure
-- **Database:** PostgreSQL (production), SQLite (testing/local dev)
-- **PostgreSQL:** Docker Compose manages Postgres (roles, DBs, grants, search_path)
-- **SQLite:** In-memory for fast testing, file-based for local development
-- **Schema Management:** SeaORM migrations with backend branching
-- **Test DB:** programmatically recreated from init SQL at startup, `_test` guard enforced
-- **Environment Variables:** - `SQLITE_DB_DIR`: Directory for SQLite file databases
+- Rust
+- Actix Web
+- SeaORM (data access adapters only)
 
----
+Backend layering:
 
-## 🛠️ Dev Workflow
-- **Testing:**
-  - `pnpm test` runs all tests (unit + integration + smoke)
-  - Property-based tests for tricky card logic (later milestones)
+- Domain: pure game logic
+- Orchestration: DB + domain wiring
+- Routes: thin HTTP adapters calling orchestration
 
-- **Lint & Format (pnpm scripts):**
-  - `pnpm lint` → frontend lint + Prettier
+## Data and Infrastructure
 
-- **Logging:**
-  - Structured JSON logs
-  - Per-request `trace_id`, surfaced in responses and logs
+- PostgreSQL for production and normal development
+- SQLite for targeted testing modes
 
----
+Schema management:
 
-## 🧭 Principles
-- **Docker-first** (host-pnpm for speed)
-- **Init-only schema** — no runtime migrations
-- **No panics in handlers** — all errors → Problem Details
-  (`type`, `title`, `status`, `detail`, `code`, `trace_id`)
-- **Extractors for authn/authz/shape** — not business rules
-- **Domain-first design** — no SeaORM in domain modules
+- migrations are applied at startup as required by the runtime environment
+- production schema readiness failures are treated as fatal startup errors
 
----
+## Development Workflow
 
-## Related Documents
+- lint and formatting are enforced via pnpm scripts
+- tests include unit and integration coverage across frontend and backend
+- logs are structured and include per-request trace identifiers
 
-- `architecture-game-context.md` — detailed design of the `GameContext`
-  extractor and cache model.
-- `backend-error-handling.md` — layered error strategy and RFC 7807 mapping.
-- `backend-testing-guide.md` — database harness, safety rails, and test layout.
-- `frontend-theme-system.md` — client experience
+## Principles
+
+- domain modules are infrastructure-free (no Actix or SeaORM)
+- handlers return structured errors mapped to Problem Details responses
+- extractors perform auth and request shaping, not business logic
+- no panics in request handlers
