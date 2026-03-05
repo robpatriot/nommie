@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useBackendReadiness } from '@/lib/providers/backend-readiness-provider'
 
 /**
@@ -9,14 +9,44 @@ import { useBackendReadiness } from '@/lib/providers/backend-readiness-provider'
  * backend call failed), rendering this with ready={false} causes the client
  * to enter recovery (banner + polling) on hydration.
  */
-export default function BackendStatusSync({ ready }: { ready: boolean }) {
+interface BackendStatusSyncSignal {
+  renderPid: number
+  statusVersion: number
+  backendMode: string
+}
+
+export default function BackendStatusSync({
+  ready,
+  signal,
+}: {
+  ready: boolean
+  signal?: BackendStatusSyncSignal
+}) {
   const { triggerRecovery } = useBackendReadiness()
+  const lastReadyRef = useRef<boolean>(ready)
+  const lastHandledDownEventRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!ready) {
+    const downEventKey =
+      signal != null
+        ? `pid:${signal.renderPid}:v:${signal.statusVersion}:mode:${signal.backendMode}`
+        : null
+    const wasReady = lastReadyRef.current
+    const becameDown = wasReady && !ready
+    const shouldHandleDown =
+      !ready &&
+      (downEventKey != null
+        ? downEventKey !== lastHandledDownEventRef.current
+        : becameDown)
+
+    if (shouldHandleDown) {
+      if (downEventKey != null) {
+        lastHandledDownEventRef.current = downEventKey
+      }
       triggerRecovery()
     }
-  }, [ready, triggerRecovery])
+    lastReadyRef.current = ready
+  }, [ready, triggerRecovery, signal])
 
   return null
 }

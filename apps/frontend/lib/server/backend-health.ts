@@ -110,7 +110,7 @@ export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
     const backendBase =
       process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
     if (!backendBase) {
-      markBackendDown('Backend URL not configured')
+      markBackendDown('Backend URL not configured', 'checkBackendReadiness')
       return { ready: false, error: 'Backend URL not configured' }
     }
     const base = backendBase.replace(/\/$/, '')
@@ -125,16 +125,16 @@ export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
     await drainResponseBody(response)
 
     if (response.ok) {
-      markBackendUp()
+      markBackendUp('checkBackendReadiness')
       return { ready: true }
     }
 
     const errorMsg = `Backend not ready (HTTP ${response.status})`
-    markBackendDown(errorMsg)
+    markBackendDown(errorMsg, 'checkBackendReadiness')
     return { ready: false, error: errorMsg }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-    markBackendDown(errorMsg)
+    markBackendDown(errorMsg, 'checkBackendReadiness')
     return { ready: false, error: errorMsg }
   }
 }

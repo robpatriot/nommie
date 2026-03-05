@@ -110,14 +110,14 @@ export async function fetchWithAuth(
 
     // Only mark backend up when we got a successful response. 503/5xx means not ready.
     if (response.ok) {
-      markBackendUp()
+      markBackendUp('fetchWithAuth')
     }
   } catch (error) {
     const isConnectionError = isBackendConnectionError(error)
 
     if (isConnectionError) {
       const msg = error instanceof Error ? error.message : String(error)
-      markBackendDown(msg)
+      markBackendDown(msg, 'fetchWithAuth_connection')
     }
 
     if (isBackendReady() && shouldLogError()) {
@@ -157,7 +157,7 @@ export async function fetchWithAuth(
 
     // Mark backend as down when it returns 503 so server-side readiness is correct
     if (response.status === 503) {
-      markBackendDown(parsedError.message)
+      markBackendDown(parsedError.message, 'fetchWithAuth_503')
     }
 
     // Only log 5xx as errors when we should; skip 503 (expected when backend is not ready)

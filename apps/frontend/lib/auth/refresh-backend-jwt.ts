@@ -229,7 +229,7 @@ async function fetchNewBackendJwt(
     })
 
     if (!response.ok) {
-      markBackendUp() // Got response, backend is up
+      markBackendUp('refresh_backend_jwt') // Got response, backend is up
 
       // Special-case allowlist failures so callers can distinguish them.
       if (response.status === 403) {
@@ -271,7 +271,7 @@ async function fetchNewBackendJwt(
       return null
     }
 
-    markBackendUp()
+    markBackendUp('refresh_backend_jwt')
 
     const data = (await response.json()) as { token?: unknown }
     if (data && typeof data.token === 'string' && data.token.length > 0) {

@@ -4,7 +4,11 @@ import { getTranslations } from 'next-intl/server'
 import LobbyClient from '@/components/LobbyClient'
 import ErrorBoundaryWithTranslations from '@/components/ErrorBoundaryWithTranslations'
 import { getAvailableGames } from '@/lib/api'
-import { isBackendKnownDown } from '@/lib/server/backend-status'
+import {
+  getBackendMode,
+  getBackendStatus,
+  isBackendKnownDown,
+} from '@/lib/server/backend-status'
 import BackendStatusSync from '@/components/BackendStatusSync'
 import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import {
@@ -39,6 +43,8 @@ export default async function LobbyPage() {
   }
 
   const backendKnownDown = isBackendKnownDown()
+  const backendMode = getBackendMode()
+  const { statusVersion } = getBackendStatus()
 
   const lobbyGames = allGames.filter((game) => game.state === 'LOBBY')
   const joinableGames = lobbyGames.filter(
@@ -59,7 +65,14 @@ export default async function LobbyPage() {
 
   return (
     <ErrorBoundaryWithTranslations>
-      <BackendStatusSync ready={!backendKnownDown} />
+      <BackendStatusSync
+        ready={!backendKnownDown}
+        signal={{
+          renderPid: process.pid,
+          statusVersion,
+          backendMode,
+        }}
+      />
       <BreadcrumbSetter crumbs={[{ label: t('breadcrumbs.lobby') }]} />
       <LobbyClient
         joinableGames={joinableGames}

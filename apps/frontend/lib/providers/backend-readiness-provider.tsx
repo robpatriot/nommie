@@ -117,6 +117,7 @@ export function BackendReadinessProvider({
   // by useEffect so router.refresh() runs after React has committed (avoids
   // "Rendered more hooks than during the previous render").
   const pendingStartupRecoveryRefreshRef = useRef(false)
+  const pendingRecoveryRefreshRef = useRef(false)
   const router = useRouter()
 
   const clearScheduled = useCallback(() => {
@@ -156,11 +157,17 @@ export function BackendReadinessProvider({
         await drainResponseBody(response)
 
         if (response.ok) {
-          // /readyz 200 is authoritative only for recovering from Degraded.
-          if (modeRef.current === 'degraded') {
+          // /readyz 200 is authoritative for recovering from Degraded.
+          // Also allow Suspect → Healthy on consecutive 200s to avoid a loop where
+          // ws-token 503 triggers Degraded immediately after we recover, causing
+          // Degraded → Healthy → ws-token 503 → Degraded → ...
+          const inDegradedOrSuspect =
+            modeRef.current === 'degraded' || modeRef.current === 'suspect'
+          if (inDegradedOrSuspect) {
             const next = consecutiveSuccessRef.current + 1
             consecutiveSuccessRef.current = next
             if (next >= RECOVERY_SUCCESS_THRESHOLD) {
+              const previousMode = modeRef.current
               hasEverSucceededRef.current = true
               modeRef.current = 'healthy'
               setMode('healthy')
@@ -169,6 +176,9 @@ export function BackendReadinessProvider({
                 needsReconcileAfterRecoveryRef.current = false
               }
               setRecoveryGeneration((g) => g + 1)
+              if (previousMode === 'degraded') {
+                pendingRecoveryRefreshRef.current = true
+              }
               if (startedInDegradedRef.current) {
                 startedInDegradedRef.current = false
                 pendingStartupRecoveryRefreshRef.current = true
@@ -251,8 +261,13 @@ export function BackendReadinessProvider({
   // Run router.refresh() after we've transitioned to healthy from startup-degraded,
   // so it runs in a separate commit and avoids hook-order issues when the tree expands.
   useEffect(() => {
-    if (mode === 'healthy' && pendingStartupRecoveryRefreshRef.current) {
+    if (
+      mode === 'healthy' &&
+      (pendingStartupRecoveryRefreshRef.current ||
+        pendingRecoveryRefreshRef.current)
+    ) {
       pendingStartupRecoveryRefreshRef.current = false
+      pendingRecoveryRefreshRef.current = false
       router.refresh()
     }
   }, [mode, router])

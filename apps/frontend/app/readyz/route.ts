@@ -10,9 +10,9 @@ export async function GET(request: Request) {
   const result = await probeBackendReadiness(sameOrigin)
 
   if (result.ready) {
-    markBackendUp()
+    markBackendUp('readyz_route')
   } else {
-    markBackendDown(result.error)
+    markBackendDown(result.error, 'readyz_route')
   }
 
   const body = result.ready

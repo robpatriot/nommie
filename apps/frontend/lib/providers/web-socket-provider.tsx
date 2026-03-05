@@ -125,7 +125,7 @@ export function WebSocketProvider({
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
 
   const queryClient = useQueryClient()
-  const { mode, triggerRecovery } = useBackendReadiness()
+  const { mode, reportDependencyOutage } = useBackendReadiness()
 
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -178,7 +178,9 @@ export function WebSocketProvider({
 
       if (!response.ok) {
         if (response.status === 503) {
-          triggerRecovery()
+          // Use reportDependencyOutage (Suspect) instead of triggerRecovery (Degraded)
+          // to avoid a loop: Degraded → Healthy → ws-token 503 → Degraded → ...
+          reportDependencyOutage()
         }
         if (response.status === 401) {
           if (!hasTriggeredStaleSignoutRef.current) {
@@ -206,7 +208,7 @@ export function WebSocketProvider({
       }
       throw error
     }
-  }, [triggerRecovery])
+  }, [reportDependencyOutage])
 
   const resolveWsUrl = useCallback(() => {
     try {
@@ -320,7 +322,9 @@ export function WebSocketProvider({
   const connect = useCallback(async () => {
     // Pause all connect/reconnect attempts while the backend is in Degraded
     // mode; allow connections in Healthy and Suspect.
-    if (mode === 'degraded') return
+    if (mode === 'degraded') {
+      return
+    }
 
     if (!isPageActive()) {
       pendingReconnectRef.current = true

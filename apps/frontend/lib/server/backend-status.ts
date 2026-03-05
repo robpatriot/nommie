@@ -11,6 +11,7 @@ let consecutiveSuccesses = 0
 let consecutiveFailures = 0
 let lastOk: number | null = null
 let lastError: string | null = null
+let statusVersion = 0
 
 const FAILURE_THRESHOLD = 2
 const RECOVERY_THRESHOLD = 2
@@ -44,6 +45,7 @@ export function getBackendStatus() {
     consecutiveFailures,
     lastOk,
     lastError,
+    statusVersion,
   }
 }
 
@@ -60,7 +62,9 @@ export function shouldLogError(): boolean {
 /**
  * Mark a successful backend check.
  */
-export function markBackendUp(): void {
+export function markBackendUp(source?: string): void {
+  statusVersion += 1
+  void source
   consecutiveSuccesses += 1
   consecutiveFailures = 0
   lastOk = Date.now()
@@ -75,7 +79,9 @@ export function markBackendUp(): void {
 /**
  * Mark a failed backend check.
  */
-export function markBackendDown(error?: string): void {
+export function markBackendDown(error?: string, source?: string): void {
+  statusVersion += 1
+  void source
   consecutiveFailures += 1
   consecutiveSuccesses = 0
   if (error) lastError = error

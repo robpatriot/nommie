@@ -43,7 +43,7 @@ export async function GET() {
 
     // Mark backend as up if we got a response (even if error) - connection succeeded
     // This helps differentiate startup failures from runtime failures
-    markBackendUp()
+    markBackendUp('ws_token_route')
 
     if (!response.ok) {
       // Only log if we should (outside startup window or runtime failure)
@@ -86,7 +86,7 @@ export async function GET() {
 
     if (isConnectionErr) {
       const msg = error instanceof Error ? error.message : String(error)
-      markBackendDown(msg)
+      markBackendDown(msg, 'ws_token_route')
       // Always return 503 for connection errors regardless of current mode.
       // This stops the WS provider from scheduling a reconnect (which would
       // just generate another connection error) and ensures triggerRecovery()
