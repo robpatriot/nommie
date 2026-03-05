@@ -1,11 +1,12 @@
 use std::error::Error as StdError;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant as StdInstant};
 
 use rand::random;
 use redis::aio::{ConnectionManager, PubSub};
 use redis::{AsyncCommands, Client};
-use tokio::sync::Mutex;
+use tokio::sync::Mutex as TokioMutex;
+use tokio::task::JoinHandle;
 use tokio::time::{sleep, Instant};
 use tokio_stream::StreamExt;
 use tracing::{error, info, warn};
@@ -36,7 +37,8 @@ pub enum EventEnvelope {
 
 pub struct RealtimeBroker {
     registry: Arc<WsRegistry>,
-    publisher: Mutex<ConnectionManager>,
+    publisher: TokioMutex<ConnectionManager>,
+    subscriber_task: StdMutex<Option<JoinHandle<()>>>,
     readiness: Arc<ReadinessManager>,
 }
 
@@ -70,13 +72,14 @@ impl RealtimeBroker {
             })?;
 
         let registry = Arc::new(WsRegistry::new());
+        let subscriber_task = spawn_subscriber(redis_url, registry.clone(), readiness.clone());
+
         let broker = Arc::new(Self {
             registry: registry.clone(),
-            publisher: Mutex::new(manager),
+            publisher: TokioMutex::new(manager),
+            subscriber_task: StdMutex::new(Some(subscriber_task)),
             readiness: readiness.clone(),
         });
-
-        spawn_subscriber(redis_url, registry, readiness);
 
         Ok(broker)
     }
@@ -201,11 +204,25 @@ const PUBLISHER_MAX_ATTEMPTS: u32 = 3;
 const PUBLISHER_INITIAL_RETRY_DELAY_MS: u64 = 50;
 const PUBLISHER_MAX_RETRY_DELAY_MS: u64 = 200;
 
-fn spawn_subscriber(redis_url: &str, registry: Arc<WsRegistry>, readiness: Arc<ReadinessManager>) {
+fn spawn_subscriber(
+    redis_url: &str,
+    registry: Arc<WsRegistry>,
+    readiness: Arc<ReadinessManager>,
+) -> JoinHandle<()> {
     let redis_url = redis_url.to_string();
     tokio::spawn(async move {
         run_subscription_loop_with_retry(&redis_url, registry, readiness).await;
-    });
+    })
+}
+
+impl Drop for RealtimeBroker {
+    fn drop(&mut self) {
+        if let Ok(mut task_slot) = self.subscriber_task.lock() {
+            if let Some(handle) = task_slot.take() {
+                handle.abort();
+            }
+        }
+    }
 }
 
 fn is_transient_error(err: &AppError) -> bool {

@@ -3,6 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 
 use sea_orm::DatabaseConnection;
+use tracing::info;
 
 use super::security_config::SecurityConfig;
 use crate::config::db::{DbKind, RuntimeEnv};
@@ -79,9 +80,25 @@ impl AppState {
 
     /// Attach realtime broker (replaces existing if any)
     pub fn set_realtime(&self, realtime: Arc<RealtimeBroker>) {
-        if let Ok(mut reg) = self.websocket_registry.write() {
-            *reg = Some(realtime.registry());
+        let new_registry = realtime.registry();
+        let old_registry = if let Ok(mut reg) = self.websocket_registry.write() {
+            reg.replace(new_registry.clone())
+        } else {
+            None
+        };
+
+        if let Some(old) = old_registry {
+            if !Arc::ptr_eq(&old, &new_registry) {
+                let closed = old.close_all_connections_now();
+                if closed > 0 {
+                    info!(
+                        closed_connections = closed,
+                        "realtime registry replaced; closed sessions from previous generation"
+                    );
+                }
+            }
         }
+
         if let Ok(mut rt) = self.realtime.write() {
             *rt = Some(realtime);
         }

@@ -248,6 +248,25 @@ impl WsRegistry {
         }
         addrs.into_iter().map(|addr| addr.send(Shutdown)).collect()
     }
+
+    /// Fire-and-forget shutdown for all active websocket sessions.
+    ///
+    /// Use this when a caller cannot `await` request futures (e.g. synchronous
+    /// state transitions). Returns the number of sessions signaled.
+    pub fn close_all_connections_now(&self) -> usize {
+        let mut addrs = Vec::new();
+        for user_entry in self.by_user.iter() {
+            for conn_entry in user_entry.value().iter() {
+                let (_, addr) = conn_entry.value();
+                addrs.push(addr.clone());
+            }
+        }
+        let total = addrs.len();
+        for addr in addrs {
+            addr.do_send(Shutdown);
+        }
+        total
+    }
 }
 
 impl Default for WsRegistry {

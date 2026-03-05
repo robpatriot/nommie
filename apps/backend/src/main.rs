@@ -88,9 +88,7 @@ async fn main() -> std::io::Result<()> {
 
     // Wrap AppState with web::Data before passing to HttpServer
     let data = actix_web::web::Data::from(app_state_arc);
-
-    // Clone registry for shutdown handler
-    let registry_for_shutdown = data.websocket_registry();
+    let data_for_shutdown = data.clone();
 
     // Extract host and port for server binding
     let host = config.host.clone();
@@ -196,7 +194,7 @@ async fn main() -> std::io::Result<()> {
     let server_handle = server.handle();
     spawn_shutdown_handler(
         server_handle,
-        registry_for_shutdown,
+        data_for_shutdown,
         config.websocket_timeout_secs,
     );
 
@@ -243,7 +241,7 @@ fn create_json_config(max_size: usize) -> actix_web::web::JsonConfig {
 /// Spawn a task to handle graceful shutdown signals
 fn spawn_shutdown_handler(
     server_handle: actix_web::dev::ServerHandle,
-    registry: Option<Arc<backend::ws::hub::WsRegistry>>,
+    app_state: actix_web::web::Data<backend::state::app_state::AppState>,
     timeout_secs: u64,
 ) {
     tokio::spawn(async move {
@@ -269,8 +267,9 @@ fn spawn_shutdown_handler(
             let _ = signal::ctrl_c().await;
         }
 
-        // Close all websocket connections and wait for shutdown messages to be processed
-        if let Some(registry) = registry {
+        // Close all websocket connections and wait for shutdown messages to be processed.
+        // Resolve the registry at shutdown time because Redis recovery can swap it.
+        if let Some(registry) = app_state.websocket_registry() {
             let shutdown_futures = registry.close_all_connections();
             if !shutdown_futures.is_empty() {
                 let total = shutdown_futures.len();
