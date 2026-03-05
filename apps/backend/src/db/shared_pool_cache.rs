@@ -74,6 +74,17 @@ pub async fn get_or_create_shared_pool(
     env: RuntimeEnv,
     db_kind: DbKind,
 ) -> Result<Arc<DatabaseConnection>, AppError> {
+    struct InitLockCleanup {
+        key: PoolKey,
+    }
+    impl Drop for InitLockCleanup {
+        fn drop(&mut self) {
+            if let Some(locks) = INIT_LOCKS.get() {
+                locks.remove(&self.key);
+            }
+        }
+    }
+
     let pool_cfg = build_connection_settings(env, db_kind, PoolPurpose::Runtime)?;
     let db_url = make_conn_spec(env, db_kind, DbOwner::App)?;
     let key = PoolKey::new(env, db_kind, &db_url);
@@ -109,6 +120,7 @@ pub async fn get_or_create_shared_pool(
     // Acquire per-key mutex
     let wait_start = Instant::now();
     let _guard = lock.lock().await;
+    let _lock_cleanup = InitLockCleanup { key: key.clone() };
     let dedup_wait_ms = wait_start.elapsed().as_millis();
     if dedup_wait_ms > 0 {
         debug!(
@@ -140,10 +152,6 @@ pub async fn get_or_create_shared_pool(
     let pool = create_pool(env, db_kind, &pool_cfg).await?;
     let arc_pool = Arc::new(pool);
     cache.insert(key.clone(), arc_pool.clone()).await;
-
-    if let Some(locks) = INIT_LOCKS.get() {
-        locks.remove(&key);
-    }
 
     Ok(arc_pool)
 }
