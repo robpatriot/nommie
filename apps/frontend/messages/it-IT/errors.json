@@ -26,6 +26,7 @@
     "BAD_REQUEST": "La richiesta non è valida.",
     "INVALID_HEADER": "Mancano informazioni necessarie nella richiesta.",
     "PRECONDITION_REQUIRED": "Aggiorna e riprova.",
+    "PAYLOAD_TOO_LARGE": "La richiesta è troppo grande. Riprova con una richiesta più piccola.",
     "GAME_NOT_FOUND": "Non è stato possibile trovare la partita.",
     "USER_NOT_FOUND": "Non è stato possibile trovare il tuo account.",
     "PLAYER_NOT_FOUND": "Non è stato possibile trovare quel giocatore.",

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use actix_extensible_rate_limit::backend::memory::InMemoryBackend;
 use actix_extensible_rate_limit::RateLimiter;
-use actix_web::{App, HttpServer};
+use actix_web::{App, HttpMessage, HttpServer};
 use tokio::signal;
 #[cfg(unix)]
 use tokio::signal::unix::{signal as unix_signal, SignalKind};
@@ -201,40 +201,40 @@ async fn main() -> std::io::Result<()> {
     server.await
 }
 
-/// Create JSON payload configuration with size limits and error handling
+/// Create JSON payload configuration with size limits and error handling.
+/// Uses the canonical AppError path so responses align with RFC 7807 and the
+/// standard API error contract (code, trace_id, application/problem+json).
 fn create_json_config(max_size: usize) -> actix_web::web::JsonConfig {
     let max_size_mb = max_size / (1024 * 1024);
     actix_web::web::JsonConfig::default()
         .limit(max_size)
-        .error_handler(move |err, _req| {
+        .error_handler(move |err, req| {
             use actix_web::error::JsonPayloadError;
-            use actix_web::HttpResponse;
+            use actix_web::http::StatusCode;
 
-            let (status, detail) = match err {
-                JsonPayloadError::Overflow { limit: _ } => {
-                    let msg = format!("Payload too large. Maximum size is {}MB.", max_size_mb);
-                    (actix_web::http::StatusCode::PAYLOAD_TOO_LARGE, msg)
-                }
-                JsonPayloadError::ContentType => (
-                    actix_web::http::StatusCode::BAD_REQUEST,
-                    "Content type error".to_string(),
+            let app_err = match err {
+                JsonPayloadError::Overflow { limit: _ } => backend::AppError::Validation {
+                    code: backend::ErrorCode::PayloadTooLarge,
+                    detail: format!("Payload too large. Maximum size is {}MB.", max_size_mb),
+                    status: StatusCode::PAYLOAD_TOO_LARGE,
+                },
+                JsonPayloadError::ContentType => backend::AppError::bad_request(
+                    backend::ErrorCode::InvalidHeader,
+                    "Content type error",
                 ),
-                _ => (
-                    actix_web::http::StatusCode::BAD_REQUEST,
-                    "Invalid JSON payload".to_string(),
+                _ => backend::AppError::bad_request(
+                    backend::ErrorCode::BadRequest,
+                    "Invalid JSON payload",
                 ),
             };
 
-            actix_web::error::InternalError::from_response(
-                err,
-                HttpResponse::build(status).json(serde_json::json!({
-                    "type": "https://tools.ietf.org/html/rfc7231#section-6.5.11",
-                    "title": "Payload Too Large",
-                    "status": status.as_u16(),
-                    "detail": detail,
-                })),
-            )
-            .into()
+            let trace_id = req
+                .extensions()
+                .get::<String>()
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            let response = app_err.to_http_response_with_trace_id(trace_id);
+            actix_web::error::InternalError::from_response(err, response).into()
         })
 }
 

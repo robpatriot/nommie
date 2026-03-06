@@ -26,6 +26,7 @@
     "BAD_REQUEST": "Diese Anfrage ist nicht gültig.",
     "INVALID_HEADER": "In deiner Anfrage fehlen erforderliche Informationen.",
     "PRECONDITION_REQUIRED": "Bitte aktualisiere und versuche es erneut.",
+    "PAYLOAD_TOO_LARGE": "Die Anfrage ist zu groß. Bitte versuche es mit einer kleineren Anfrage erneut.",
     "GAME_NOT_FOUND": "Dieses Spiel wurde nicht gefunden.",
     "USER_NOT_FOUND": "Dein Konto konnte nicht gefunden werden.",
     "PLAYER_NOT_FOUND": "Dieser Spieler wurde nicht gefunden.",

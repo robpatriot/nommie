@@ -73,15 +73,11 @@ export async function leaveGame(
   gameId: number,
   version: number
 ): Promise<void> {
-  const response = await fetchWithAuth(`/api/games/${gameId}/leave`, {
+  await fetchWithAuth(`/api/games/${gameId}/leave`, {
     method: 'DELETE',
     body: JSON.stringify({ version: version }),
   })
-  // For 204 No Content responses, we don't need to parse JSON
-  // Just verify the response was successful (fetchWithAuth throws on error)
-  if (!response.ok) {
-    throw new Error(`Leave game failed with status ${response.status}`)
-  }
+  // 204 No Content; fetchWithAuth throws BackendApiError on non-OK
 }
 
 export async function rejoinGame(
@@ -95,10 +91,6 @@ export async function rejoinGame(
     },
     body: JSON.stringify({ version: version }),
   })
-
-  if (!response.ok) {
-    throw new Error(`Rejoin game failed with status ${response.status}`)
-  }
 
   const data = (await response.json()) as { version: number }
   return data
@@ -217,14 +209,6 @@ export async function listRegisteredAis(): Promise<AiRegistryResponse> {
   const response = await fetchWithAuth('/api/games/ai/registry', {
     method: 'GET',
   })
-
-  if (!response.ok) {
-    throw new BackendApiError(
-      'Failed to load AI registry',
-      response.status,
-      'AI_REGISTRY_ERROR'
-    )
-  }
 
   const data = await response.json()
   return {

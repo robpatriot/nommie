@@ -26,6 +26,7 @@
     "BAD_REQUEST": "Cette requête n’est pas valide.",
     "INVALID_HEADER": "Votre requête ne contient pas les informations requises.",
     "PRECONDITION_REQUIRED": "Veuillez actualiser et réessayer.",
+    "PAYLOAD_TOO_LARGE": "La requête est trop volumineuse. Veuillez réessayer avec une requête plus petite.",
     "GAME_NOT_FOUND": "Cette partie est introuvable.",
     "USER_NOT_FOUND": "Votre compte est introuvable.",
     "PLAYER_NOT_FOUND": "Ce joueur est introuvable.",

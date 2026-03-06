@@ -66,6 +66,8 @@ pub enum ErrorCode {
     InvalidHeader,
     /// Precondition required for this operation
     PreconditionRequired,
+    /// Request payload exceeds size limit
+    PayloadTooLarge,
 
     // Resource Not Found
     /// Game not found
@@ -174,6 +176,7 @@ impl ErrorCode {
             Self::BadRequest => "BAD_REQUEST",
             Self::InvalidHeader => "INVALID_HEADER",
             Self::PreconditionRequired => "PRECONDITION_REQUIRED",
+            Self::PayloadTooLarge => "PAYLOAD_TOO_LARGE",
 
             // Resource Not Found
             Self::GameNotFound => "GAME_NOT_FOUND",
@@ -275,6 +278,7 @@ mod tests {
             ErrorCode::PreconditionRequired.as_str(),
             "PRECONDITION_REQUIRED"
         );
+        assert_eq!(ErrorCode::PayloadTooLarge.as_str(), "PAYLOAD_TOO_LARGE");
         assert_eq!(ErrorCode::GameNotFound.as_str(), "GAME_NOT_FOUND");
         assert_eq!(ErrorCode::PlayerNotFound.as_str(), "PLAYER_NOT_FOUND");
         assert_eq!(ErrorCode::NotFound.as_str(), "NOT_FOUND");

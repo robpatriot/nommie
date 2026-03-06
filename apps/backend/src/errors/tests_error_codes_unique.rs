@@ -19,6 +19,7 @@ fn error_codes_are_unique() {
         ErrorCode::InvalidGoogleSub,
         ErrorCode::ValidationError,
         ErrorCode::BadRequest,
+        ErrorCode::PayloadTooLarge,
         ErrorCode::GameNotFound,
         ErrorCode::UserNotFound,
         ErrorCode::NotFound,
