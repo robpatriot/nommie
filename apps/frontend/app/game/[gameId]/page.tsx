@@ -9,7 +9,11 @@ import { BreadcrumbSetter } from '@/components/header-breadcrumbs'
 import { fetchGameState } from '@/lib/api/game-room'
 import { getUserOptions } from '@/lib/api/user-options'
 import { BackendApiError } from '@/lib/api'
-import { isBackendKnownDown } from '@/lib/server/backend-status'
+import {
+  getBackendMode,
+  getBackendStatus,
+  isBackendKnownDown,
+} from '@/lib/server/backend-status'
 import { isBackendStartupError } from '@/lib/server/connection-errors'
 import BackendStatusSync from '@/components/BackendStatusSync'
 import { handleStaleSessionError } from '@/lib/auth/allowlist'
@@ -88,6 +92,8 @@ export default async function GamePage({
   }
 
   const backendKnownDown = isBackendKnownDown()
+  const backendMode = getBackendMode()
+  const { statusVersion } = getBackendStatus()
   const t = await getTranslations('common')
   const tLobby = await getTranslations('lobby')
   const isSpectator = selectViewerSeat(initialState) === null
@@ -97,7 +103,14 @@ export default async function GamePage({
 
   return (
     <ErrorBoundaryWithTranslations>
-      <BackendStatusSync ready={!backendKnownDown} />
+      <BackendStatusSync
+        ready={!backendKnownDown}
+        signal={{
+          renderPid: process.pid,
+          statusVersion,
+          backendMode,
+        }}
+      />
       <BreadcrumbSetter
         crumbs={[
           { label: tLobby('breadcrumbs.lobby'), href: '/lobby' },
