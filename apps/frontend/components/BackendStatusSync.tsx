@@ -25,6 +25,7 @@ export default function BackendStatusSync({
   const { triggerRecovery } = useBackendReadiness()
   const lastReadyRef = useRef<boolean>(ready)
   const lastHandledDownEventRef = useRef<string | null>(null)
+  const handledInitialDownRef = useRef(false)
 
   useEffect(() => {
     const downEventKey =
@@ -33,16 +34,19 @@ export default function BackendStatusSync({
         : null
     const wasReady = lastReadyRef.current
     const becameDown = wasReady && !ready
+    const initialDownWithoutTransition =
+      !ready && !wasReady && !handledInitialDownRef.current
     const shouldHandleDown =
       !ready &&
       (downEventKey != null
         ? downEventKey !== lastHandledDownEventRef.current
-        : becameDown)
+        : becameDown || initialDownWithoutTransition)
 
     if (shouldHandleDown) {
       if (downEventKey != null) {
         lastHandledDownEventRef.current = downEventKey
       }
+      handledInitialDownRef.current = true
       triggerRecovery()
     }
     lastReadyRef.current = ready
