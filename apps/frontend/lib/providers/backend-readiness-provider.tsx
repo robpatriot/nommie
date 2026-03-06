@@ -176,7 +176,7 @@ export function BackendReadinessProvider({
                 needsReconcileAfterRecoveryRef.current = false
               }
               setRecoveryGeneration((g) => g + 1)
-              if (previousMode === 'degraded') {
+              if (previousMode === 'degraded' || previousMode === 'suspect') {
                 pendingRecoveryRefreshRef.current = true
               }
               if (startedInDegradedRef.current) {
@@ -266,9 +266,17 @@ export function BackendReadinessProvider({
       (pendingStartupRecoveryRefreshRef.current ||
         pendingRecoveryRefreshRef.current)
     ) {
+      const startupRecovery = pendingStartupRecoveryRefreshRef.current
       pendingStartupRecoveryRefreshRef.current = false
       pendingRecoveryRefreshRef.current = false
-      router.refresh()
+      if (startupRecovery) {
+        // Force a full document navigation to current URL after startup recovery.
+        // This guarantees a fresh server route resolution (including redirects)
+        // and avoids app-router pending segment wedges after degraded startup.
+        window.location.replace(window.location.href)
+      } else {
+        router.refresh()
+      }
     }
   }, [mode, router])
 
