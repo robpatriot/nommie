@@ -125,7 +125,7 @@ async fn test_all_error_responses_conform_to_problem_details() -> Result<(), App
         (
             "/_test/db_unavailable",
             503,
-            "DB_UNAVAILABLE",
+            "SERVICE_UNAVAILABLE",
             "database unavailable",
         ),
     ];
@@ -296,8 +296,9 @@ async fn test_require_db_without_database() -> Result<(), AppError> {
         .to_request();
     let resp = test::call_service(&app, req).await;
 
-    // Should return DB_UNAVAILABLE problem details with trace id
-    assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "database unavailable").await;
+    // Should return SERVICE_UNAVAILABLE problem details with trace id
+    assert_problem_details_structure(resp, 503, "SERVICE_UNAVAILABLE", "database unavailable")
+        .await;
 
     Ok(())
 }
@@ -389,6 +390,45 @@ async fn test_optimistic_lock_extensions() -> Result<(), AppError> {
         .expect("extensions present");
     assert_eq!(extensions["expected"], 5);
     assert_eq!(extensions["actual"], 7);
+
+    Ok(())
+}
+
+/// Test that ReadinessGate returns RFC 7807 Problem Details with SERVICE_UNAVAILABLE
+/// when the service is not ready (e.g. Startup or Recovering mode).
+#[actix_web::test]
+async fn test_readiness_gate_returns_rfc7807_service_unavailable() -> Result<(), AppError> {
+    let state = build_state().build().await?;
+    assert!(
+        !state.readiness().is_ready(),
+        "hollow state should be in Startup mode (not ready)"
+    );
+
+    let app = create_test_app(state)
+        .with_routes(|cfg| {
+            cfg.service(
+                web::scope("/_test")
+                    .wrap(backend::middleware::readiness_gate::ReadinessGate)
+                    .route(
+                        "/gate",
+                        web::get()
+                            .to(|| async { Ok::<_, AppError>(HttpResponse::Ok().body("ok")) }),
+                    ),
+            );
+        })
+        .build()
+        .await?;
+
+    let req = test::TestRequest::get().uri("/_test/gate").to_request();
+    let resp = test::call_service(&app, req).await;
+
+    assert_problem_details_structure(
+        resp,
+        503,
+        "SERVICE_UNAVAILABLE",
+        "Service temporarily unavailable",
+    )
+    .await;
 
     Ok(())
 }

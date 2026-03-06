@@ -36,7 +36,7 @@
     "OPTIMISTIC_LOCK": "La partida cambió. Actualiza e inténtalo de nuevo.",
     "CONFLICT": "No se pudo completar porque algo cambió.",
     "DB_ERROR": "Algo salió mal. Inténtalo de nuevo.",
-    "DB_UNAVAILABLE": "El servidor no está disponible temporalmente. Inténtalo de nuevo.",
+    "SERVICE_UNAVAILABLE": "El servidor no está disponible temporalmente. Inténtalo de nuevo.",
     "DB_POOL_EXHAUSTED": "El servidor está ocupado. Inténtalo de nuevo.",
     "DB_TIMEOUT": "Tardó demasiado. Inténtalo de nuevo.",
     "LOCK_TIMEOUT_ACQUIRE": "El servidor está ocupado. Inténtalo de nuevo.",

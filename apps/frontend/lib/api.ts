@@ -162,9 +162,7 @@ export async function fetchWithAuth(
 
     // Only log 5xx as errors when we should; skip 503 (expected when backend is not ready)
     const isServiceUnavailable =
-      response.status === 503 ||
-      parsedError.code === 'DB_UNAVAILABLE' ||
-      parsedError.code === 'REDIS_UNAVAILABLE'
+      response.status === 503 || parsedError.code === 'SERVICE_UNAVAILABLE'
     if (shouldLogError() && response.status >= 500 && !isServiceUnavailable) {
       logError('Backend API error', new Error(parsedError.message), {
         status: response.status,

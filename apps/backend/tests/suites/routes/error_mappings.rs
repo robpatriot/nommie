@@ -92,7 +92,8 @@ async fn test_database_unavailable_response() {
 
     // Use the common helper for comprehensive validation
     use crate::common::assert_problem_details_structure;
-    assert_problem_details_structure(resp, 503, "DB_UNAVAILABLE", "database unavailable").await;
+    assert_problem_details_structure(resp, 503, "SERVICE_UNAVAILABLE", "database unavailable")
+        .await;
 }
 
 #[actix_web::test]

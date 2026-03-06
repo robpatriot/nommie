@@ -36,7 +36,7 @@
     "OPTIMISTIC_LOCK": "La partie a changé. Actualisez puis réessayez.",
     "CONFLICT": "Impossible de terminer : un changement a été détecté.",
     "DB_ERROR": "Une erreur est survenue. Veuillez réessayer.",
-    "DB_UNAVAILABLE": "Serveur temporairement indisponible. Veuillez réessayer.",
+    "SERVICE_UNAVAILABLE": "Serveur temporairement indisponible. Veuillez réessayer.",
     "DB_POOL_EXHAUSTED": "Le serveur est occupé. Veuillez réessayer.",
     "DB_TIMEOUT": "Délai dépassé. Veuillez réessayer.",
     "LOCK_TIMEOUT_ACQUIRE": "Le serveur est occupé. Veuillez réessayer.",

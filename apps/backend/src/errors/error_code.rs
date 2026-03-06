@@ -92,10 +92,12 @@ pub enum ErrorCode {
     // System Errors
     /// Database error
     DbError,
-    /// Database unavailable
+    /// Database unavailable (internal only; public serialization uses SERVICE_UNAVAILABLE)
     DbUnavailable,
-    /// Redis unavailable
+    /// Redis unavailable (internal only; public serialization uses SERVICE_UNAVAILABLE)
     RedisUnavailable,
+    /// Service unavailable (canonical public code for infrastructure/readiness unavailability)
+    ServiceUnavailable,
     /// Database pool exhausted
     DbPoolExhausted,
     /// Database timeout (gateway timeout)
@@ -190,6 +192,7 @@ impl ErrorCode {
             Self::DbError => "DB_ERROR",
             Self::DbUnavailable => "DB_UNAVAILABLE",
             Self::RedisUnavailable => "REDIS_UNAVAILABLE",
+            Self::ServiceUnavailable => "SERVICE_UNAVAILABLE",
             Self::DbPoolExhausted => "DB_POOL_EXHAUSTED",
             Self::DbTimeout => "DB_TIMEOUT",
 
@@ -279,6 +282,10 @@ mod tests {
         assert_eq!(ErrorCode::DbError.as_str(), "DB_ERROR");
         assert_eq!(ErrorCode::DbUnavailable.as_str(), "DB_UNAVAILABLE");
         assert_eq!(ErrorCode::RedisUnavailable.as_str(), "REDIS_UNAVAILABLE");
+        assert_eq!(
+            ErrorCode::ServiceUnavailable.as_str(),
+            "SERVICE_UNAVAILABLE"
+        );
         assert_eq!(ErrorCode::DbPoolExhausted.as_str(), "DB_POOL_EXHAUSTED");
         assert_eq!(
             ErrorCode::LockTimeoutAcquire.as_str(),

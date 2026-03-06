@@ -41,7 +41,7 @@ export function handleActionResultError(
 
 /**
  * Hook-aware wrapper around handleActionResultError for client mutations.
- * For dependency-outage errors (DB_UNAVAILABLE / REDIS_UNAVAILABLE) it:
+ * For dependency-outage errors (SERVICE_UNAVAILABLE) it:
  * - Signals a backend dependency outage to the readiness provider
  * - Marks that the current game should reconcile once recovery is confirmed
  * - Still returns a BackendApiError for per-action handling.
@@ -53,7 +53,7 @@ export function useHandleActionError() {
   return (errorResult: ActionErrorResult): BackendApiError => {
     const err = handleActionResultError(errorResult)
 
-    if (err.code === 'DB_UNAVAILABLE' || err.code === 'REDIS_UNAVAILABLE') {
+    if (err.code === 'SERVICE_UNAVAILABLE') {
       reportDependencyOutage()
       markNeedsReconcileAfterRecovery()
     }

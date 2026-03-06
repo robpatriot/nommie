@@ -308,7 +308,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                             Self::send_json(
                                                 ctx,
                                                 &ServerMsg::Error {
-                                                    code: ErrorCode::DbUnavailable,
+                                                    code: ErrorCode::ServiceUnavailable,
                                                     message: reason.clone(),
                                                 },
                                             );
@@ -451,7 +451,7 @@ impl Handler<HubEvent> for WsSession {
                                     Self::send_json(
                                         ctx,
                                         &ServerMsg::Error {
-                                            code: ErrorCode::DbUnavailable,
+                                            code: ErrorCode::ServiceUnavailable,
                                             message: reason.clone(),
                                         },
                                     );

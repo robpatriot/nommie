@@ -69,7 +69,7 @@ mod tests {
             let response = error.error_response();
             assert_problem_details_from_http_response(
                 response,
-                "DB_UNAVAILABLE",
+                "SERVICE_UNAVAILABLE",
                 StatusCode::SERVICE_UNAVAILABLE,
                 Some("database unavailable"),
             )
@@ -99,7 +99,7 @@ mod tests {
             let response = error.error_response();
             assert_problem_details_from_http_response(
                 response,
-                "DB_UNAVAILABLE",
+                "SERVICE_UNAVAILABLE",
                 StatusCode::SERVICE_UNAVAILABLE,
                 Some("database unavailable"),
             )

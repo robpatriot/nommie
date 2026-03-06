@@ -36,7 +36,7 @@
     "OPTIMISTIC_LOCK": "La partita è cambiata. Aggiorna e riprova.",
     "CONFLICT": "Impossibile completare perché qualcosa è cambiato.",
     "DB_ERROR": "Qualcosa è andato storto. Riprova.",
-    "DB_UNAVAILABLE": "Il server non è disponibile temporaneamente. Riprova.",
+    "SERVICE_UNAVAILABLE": "Il server non è disponibile temporaneamente. Riprova.",
     "DB_POOL_EXHAUSTED": "Il server è occupato. Riprova.",
     "DB_TIMEOUT": "Tempo scaduto. Riprova.",
     "LOCK_TIMEOUT_ACQUIRE": "Il server è occupato. Riprova.",

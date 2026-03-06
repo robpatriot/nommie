@@ -65,8 +65,8 @@ pub enum ErrorCode {
     BadTopic,
     BadRequest,
     Forbidden,
-    DbUnavailable,
-    RedisUnavailable,
+    /// Canonical public code for infrastructure/readiness unavailability
+    ServiceUnavailable,
 }
 
 impl ErrorCode {
@@ -76,8 +76,7 @@ impl ErrorCode {
             ErrorCode::BadTopic => "bad_topic",
             ErrorCode::BadRequest => "bad_request",
             ErrorCode::Forbidden => "forbidden",
-            ErrorCode::DbUnavailable => "db_unavailable",
-            ErrorCode::RedisUnavailable => "redis_unavailable",
+            ErrorCode::ServiceUnavailable => "service_unavailable",
         }
     }
 }

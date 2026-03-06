@@ -14,6 +14,8 @@ It defines:
 
 WebSocket error handling semantics are defined in `docs/websocket-design.md`.
 
+---
+
 ## Core Rules
 
 - Backend readiness is the single source of truth for system availability.
@@ -22,6 +24,35 @@ WebSocket error handling semantics are defined in `docs/websocket-design.md`.
 - The frontend does not infer backend readiness state solely from local error counts.
 - Game state synchronization remains snapshot-based and does not rely on polling loops.
 
+---
+
+## Public Error Contract
+
+Infrastructure or readiness unavailability is exposed using a single public error contract.
+
+Responses use:
+
+- HTTP status: `503`
+- Content-Type: `application/problem+json`
+- RFC 7807 response body
+- `code: SERVICE_UNAVAILABLE`
+
+Example:
+
+{
+  "type": "...",
+  "title": "Service unavailable",
+  "status": 503,
+  "code": "SERVICE_UNAVAILABLE",
+  "detail": "...",
+  "trace_id": "..."
+}
+
+Dependency-specific causes (DB, Redis, etc.) are not exposed to clients.
+Those details remain server-side for logging and diagnostics.
+
+---
+
 ## Monitoring Model
 
 - The backend runs an internal monitor that tracks dependency health and controls readiness transitions.
@@ -29,13 +60,30 @@ WebSocket error handling semantics are defined in `docs/websocket-design.md`.
 - There is no continuous database ping loop during Healthy operation.
 - Game state is not periodically polled.
 
+Dependency outages may surface through two paths:
+
+1. Direct request failure  
+   A request reaches a handler and fails due to dependency unavailability.  
+   The response returns `503 SERVICE_UNAVAILABLE`.
+
+2. Readiness gate blocking  
+   After the backend confirms an outage via its internal thresholds, the readiness gate blocks further requests and returns `503 SERVICE_UNAVAILABLE` before the handler executes.
+
+Readiness transitions are threshold-based.
+
+A single dependency failure does not immediately flip readiness.
+The internal monitor requires multiple confirmed failures before transitioning from Healthy to Recovering.
+
+---
+
 ## Dependency Monitoring
 
 ### Postgres
 
-Postgres outages are recorded when the backend emits the error code:
+Postgres outages are recorded when the backend emits infrastructure unavailability.
+Internally the backend tracks DB vs Redis; the public client contract uses:
 
-- `DB_UNAVAILABLE`
+- `SERVICE_UNAVAILABLE`
 
 Failures may originate from:
 
@@ -54,17 +102,7 @@ Redis outages are recorded from:
 
 Redis monitoring is internal to the backend and not implemented as HTTP middleware.
 
-## Canonical Dependency-Outage Codes
-
-Only the following codes represent dependency outages:
-
-- `DB_UNAVAILABLE`
-- `REDIS_UNAVAILABLE`
-
-These codes:
-
-- record dependency failure in the backend monitor
-- cause the frontend to enter Suspect state
+---
 
 ## Backend Readiness States
 
@@ -104,6 +142,8 @@ Irrecoverable startup failure (for example migration mismatch).
 
 `/api/readyz` returns `503` permanently until restart.
 
+---
+
 ## Frontend Availability States
 
 The frontend operates in three states:
@@ -120,8 +160,8 @@ Suspect represents an observed dependency outage that has not yet been confirmed
 
 Entry conditions:
 
-- HTTP response containing `DB_UNAVAILABLE` or `REDIS_UNAVAILABLE`
-- WebSocket `error` frame containing those codes
+- HTTP response containing `SERVICE_UNAVAILABLE` (503, RFC 7807)
+- WebSocket `error` frame containing `service_unavailable`
 
 Behavior:
 
@@ -158,6 +198,8 @@ Exit condition:
 
 On exit to Healthy, perform post-recovery reconciliation if required.
 
+---
+
 ## HTTP Mutation Failure Handling
 
 ### Success
@@ -182,6 +224,8 @@ If the frontend is in Suspect, a successful mutation transitions to Healthy.
 - frontend enters or remains in Suspect
 - no immediate refetch occurs
 - mark the current game as needing post-recovery reconciliation
+
+---
 
 ## Post-Recovery Reconciliation
 

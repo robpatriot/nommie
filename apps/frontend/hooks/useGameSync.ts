@@ -230,7 +230,7 @@ export function useGameSync({
         setLwPendingAction(queryClient, gameIdRef.current, false)
 
         const code = typeof msg.code === 'string' ? msg.code : undefined
-        if (code === 'db_unavailable' || code === 'redis_unavailable') {
+        if (code === 'service_unavailable') {
           // Dependency outage via WebSocket:
           // - Enter Suspect on the frontend
           // - Mark that we need a single reconciliation after recovery

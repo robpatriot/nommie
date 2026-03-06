@@ -2,9 +2,11 @@ use std::future::{ready, Ready};
 
 use actix_web::body::EitherBody;
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
-use actix_web::{web, HttpResponse};
+use actix_web::http::header::{HeaderValue, CACHE_CONTROL};
+use actix_web::{web, HttpMessage};
 use futures_util::future::LocalBoxFuture;
 
+use crate::error::{AppError, Sentinel};
 use crate::readiness::READINESS_RETRY_AFTER_SECS;
 use crate::state::app_state::AppState;
 
@@ -54,10 +56,20 @@ where
             .unwrap_or(false);
 
         if !is_ready {
-            let response = HttpResponse::ServiceUnavailable()
-                .insert_header(("Cache-Control", "no-store"))
-                .insert_header(("Retry-After", READINESS_RETRY_AFTER_SECS.to_string()))
-                .json(serde_json::json!({ "error": "service_not_ready" }));
+            let trace_id = req
+                .extensions()
+                .get::<String>()
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string());
+            let err = AppError::db_unavailable(
+                "Service temporarily unavailable",
+                Sentinel("readiness gate blocked"),
+                Some(READINESS_RETRY_AFTER_SECS),
+            );
+            let mut response = err.to_http_response_with_trace_id(trace_id);
+            response
+                .headers_mut()
+                .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
             return Box::pin(async { Ok(req.into_response(response).map_into_right_body()) });
         }
 

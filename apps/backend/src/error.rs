@@ -453,16 +453,28 @@ impl AppError {
         Some(serde_json::json!({ "expected": expected, "actual": actual }))
     }
 
+    /// Public-facing error code for HTTP/WS serialization.
+    /// Infrastructure/readiness unavailability is collapsed to SERVICE_UNAVAILABLE
+    /// at the public boundary; internal codes remain for logging and diagnostics.
+    fn public_code(&self) -> &'static str {
+        match self {
+            AppError::DbUnavailable { .. } | AppError::RedisUnavailable { .. } => {
+                ErrorCode::ServiceUnavailable.as_str()
+            }
+            _ => self.code().as_str(),
+        }
+    }
+
     /// Private canonical method for building ProblemDetails
     /// This is the single source of truth for ProblemDetails construction
     fn to_problem_details_with_trace_id(&self, trace_id: String) -> ProblemDetails {
         let status = self.status();
-        let code = self.code().as_str();
+        let code = self.public_code();
         let detail = self.detail();
         let extensions = self.extensions();
 
         ProblemDetails {
-            type_: format!("https://nommie.app/errors/{}", code.to_uppercase()),
+            type_: format!("https://nommie.app/errors/{}", code),
             title: Self::humanize_code(code),
             status: status.as_u16(),
             detail,
@@ -678,19 +690,16 @@ impl From<crate::errors::domain::DomainError> for AppError {
     }
 }
 
-impl ResponseError for AppError {
-    fn status_code(&self) -> StatusCode {
-        self.status()
-    }
-
-    fn error_response(&self) -> HttpResponse {
+impl AppError {
+    /// Build an HTTP response using the canonical serialization path.
+    /// Use this from middleware (e.g. ReadinessGate) when trace_id must come from
+    /// request extensions rather than trace_ctx. Handlers use `error_response()`.
+    pub fn to_http_response_with_trace_id(&self, trace_id: String) -> HttpResponse {
         let status = self.status();
-        let trace_id = trace_ctx::trace_id();
         let problem_details = self.to_problem_details_with_trace_id(trace_id.clone());
 
         // Log with appropriate level: domain=warn, infra=error
         match self {
-            // Domain-level conditions
             AppError::Validation { .. }
             | AppError::Conflict { .. }
             | AppError::NotFound { .. }
@@ -708,7 +717,6 @@ impl ResponseError for AppError {
                     "domain error"
                 );
             }
-            // Infra/system-level
             AppError::Db { .. }
             | AppError::DbUnavailable { .. }
             | AppError::RedisUnavailable { .. }
@@ -724,25 +732,15 @@ impl ResponseError for AppError {
             }
         }
 
-        // Build response with appropriate headers based on status code
-        // Header rules (enforced in production, validated in tests):
-        // - 401 Unauthorized: MUST have WWW-Authenticate: Bearer, MUST NOT have Retry-After
-        // - 503 Service Unavailable: MUST have Retry-After, MUST NOT have WWW-Authenticate
-        // - Other errors (400, 404, 409, etc.): MUST NOT have either header
         let mut builder = HttpResponse::build(status);
         builder.insert_header((CONTENT_TYPE, "application/problem+json"));
-        builder.insert_header(("x-trace-id", trace_id));
+        builder.insert_header(("x-trace-id", trace_id.clone()));
 
-        // Apply status-specific headers according to RFC 7235 and RFC 7231
         match status {
             StatusCode::UNAUTHORIZED => {
-                // RFC 7235: 401 responses must include WWW-Authenticate
                 builder.insert_header((WWW_AUTHENTICATE, "Bearer"));
-                // Note: Retry-After is explicitly NOT set for 401
             }
             StatusCode::SERVICE_UNAVAILABLE => {
-                // RFC 7231: 503 responses should include Retry-After
-                // Use retry_after_secs from DbUnavailable/RedisUnavailable, otherwise default to 1
                 let retry_secs: u32 = match self {
                     AppError::DbUnavailable {
                         retry_after_secs, ..
@@ -753,23 +751,13 @@ impl ResponseError for AppError {
                     _ => 1,
                 };
                 builder.insert_header((RETRY_AFTER, retry_secs.to_string()));
-                // Note: WWW-Authenticate is explicitly NOT set for 503
             }
-            StatusCode::GATEWAY_TIMEOUT => {
-                // 504 responses do NOT include Retry-After or WWW-Authenticate
-            }
-            _ => {
-                // Other status codes (400, 404, 409, etc.) do not require
-                // WWW-Authenticate or Retry-After headers
-            }
+            StatusCode::GATEWAY_TIMEOUT => {}
+            _ => {}
         }
 
-        // Build the response body.
         let mut resp = builder.json(problem_details);
 
-        // Mark responses that are definitively caused by database outages so that
-        // middleware can update the readiness manager without relying on status
-        // codes alone.
         if matches!(self, AppError::DbUnavailable { .. })
             || matches!(self, AppError::Timeout { code, .. } if *code == ErrorCode::DbTimeout)
         {
@@ -777,6 +765,16 @@ impl ResponseError for AppError {
         }
 
         resp
+    }
+}
+
+impl ResponseError for AppError {
+    fn status_code(&self) -> StatusCode {
+        self.status()
+    }
+
+    fn error_response(&self) -> HttpResponse {
+        self.to_http_response_with_trace_id(trace_ctx::trace_id())
     }
 }
 

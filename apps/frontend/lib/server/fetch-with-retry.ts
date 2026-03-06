@@ -36,8 +36,7 @@ export async function fetchWithAuthWithRetry(
       isNetworkError(error) ||
       (error instanceof BackendApiError &&
         isTransient5xx(error.status) &&
-        error.code !== 'DB_UNAVAILABLE' &&
-        error.code !== 'REDIS_UNAVAILABLE')
+        error.code !== 'SERVICE_UNAVAILABLE')
 
     if (shouldRetry) {
       // Wait a bit before retry (simple delay, no exponential backoff needed for 1 retry)

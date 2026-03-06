@@ -60,8 +60,7 @@ export type ErrorMsg = {
     | 'bad_topic'
     | 'bad_request'
     | 'forbidden'
-    | 'db_unavailable'
-    | 'redis_unavailable'
+    | 'service_unavailable'
   message: string
 }
 

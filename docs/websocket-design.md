@@ -107,7 +107,7 @@ Exact message schemas are defined in the backend and frontend types.
 
 When a dependency outage occurs during WebSocket processing:
 
-- the backend sends an `error` frame with code `DB_UNAVAILABLE` or `REDIS_UNAVAILABLE`
+- the backend sends an `error` frame with code `service_unavailable`
 - the connection remains open
 - the backend records the dependency failure for readiness monitoring
 

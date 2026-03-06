@@ -36,7 +36,7 @@
     "OPTIMISTIC_LOCK": "Das Spiel hat sich geändert. Bitte aktualisiere und versuche es erneut.",
     "CONFLICT": "Das konnte nicht abgeschlossen werden, weil sich etwas geändert hat.",
     "DB_ERROR": "Etwas ist schiefgelaufen. Bitte versuche es erneut.",
-    "DB_UNAVAILABLE": "Der Server ist vorübergehend nicht verfügbar. Bitte versuche es erneut.",
+    "SERVICE_UNAVAILABLE": "Der Server ist vorübergehend nicht verfügbar. Bitte versuche es erneut.",
     "DB_POOL_EXHAUSTED": "Der Server ist ausgelastet. Bitte versuche es erneut.",
     "DB_TIMEOUT": "Das hat zu lange gedauert. Bitte versuche es erneut.",
     "LOCK_TIMEOUT_ACQUIRE": "Der Server ist ausgelastet. Bitte versuche es erneut.",

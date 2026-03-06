@@ -286,7 +286,7 @@ describe('BackendReadinessProvider', () => {
     expect(driver.capturedDelays.at(-1)).toBeLessThanOrEqual(1_000)
   })
 
-  it('mutation error with DB_UNAVAILABLE triggers reportDependencyOutage and enters suspect', async () => {
+  it('mutation error with SERVICE_UNAVAILABLE triggers reportDependencyOutage and enters suspect', async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         mutations: { retry: 0 },
@@ -298,7 +298,7 @@ describe('BackendReadinessProvider', () => {
           throw new BackendApiError(
             'database unavailable',
             503,
-            'DB_UNAVAILABLE'
+            'SERVICE_UNAVAILABLE'
           )
         },
       })

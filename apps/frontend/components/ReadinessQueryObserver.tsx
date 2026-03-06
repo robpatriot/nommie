@@ -69,7 +69,7 @@ export default function ReadinessQueryObserver() {
       if (isNetworkError(error)) return
       if (
         error instanceof BackendApiError &&
-        (error.code === 'DB_UNAVAILABLE' || error.code === 'REDIS_UNAVAILABLE')
+        error.code === 'SERVICE_UNAVAILABLE'
       ) {
         reportDependencyOutage()
       }
@@ -81,7 +81,7 @@ export default function ReadinessQueryObserver() {
       if (isNetworkError(error)) return
       if (
         error instanceof BackendApiError &&
-        (error.code === 'DB_UNAVAILABLE' || error.code === 'REDIS_UNAVAILABLE')
+        error.code === 'SERVICE_UNAVAILABLE'
       ) {
         reportDependencyOutage()
       }
