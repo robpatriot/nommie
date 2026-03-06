@@ -5,6 +5,9 @@ export const handlers = [
   http.get('/api/ws-token', () => {
     return HttpResponse.json({ token: 'mock-ws-token' })
   }),
+  http.get('/readyz', () => {
+    return new HttpResponse(null, { status: 200 })
+  }),
 ]
 
 export const server = setupServer(...handlers)
