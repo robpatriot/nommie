@@ -70,9 +70,21 @@ impl RealtimeBroker {
                     source: Box::new(err),
                 }
             })?;
+        info!(
+            latency_ms = connect_start.elapsed().as_millis(),
+            "redis readiness debug: publisher connection manager initialized"
+        );
 
         let registry = Arc::new(WsRegistry::new());
-        let subscriber_task = spawn_subscriber(redis_url, registry.clone(), readiness.clone());
+        let subscription_start = StdInstant::now();
+        let pubsub = establish_pubsub(redis_url).await?;
+        let subscription_latency = subscription_start.elapsed();
+        info!("redis subscriber debug: pubsub subscriptions established");
+        info!("redis readiness debug: marking redis ok from subscriber path");
+        readiness.mark_dependency_authoritative_ok(DependencyName::Redis, subscription_latency);
+
+        let subscriber_task =
+            spawn_subscriber(redis_url, registry.clone(), readiness.clone(), Some(pubsub));
 
         let broker = Arc::new(Self {
             registry: registry.clone(),
@@ -151,11 +163,13 @@ impl RealtimeBroker {
 
             match publish_res {
                 (Ok(_), latency) => {
-                    // Successful publish confirms the Redis connection is alive.
-                    // Resets consecutive_failures so stale counts from past blips
-                    // don't cause a spurious Recovering transition later.
-                    self.readiness
-                        .update_dependency(DependencyName::Redis, DependencyCheck::Ok { latency });
+                    // Publish success is useful diagnostics, but readiness recovery is
+                    // authoritative only when the subscriber path is resubscribed.
+                    info!(
+                        channel = %channel,
+                        latency_ms = latency.as_millis(),
+                        "redis readiness debug: publisher path publish succeeded"
+                    );
                     return Ok(());
                 }
                 (Err(err), latency) => {
@@ -208,10 +222,11 @@ fn spawn_subscriber(
     redis_url: &str,
     registry: Arc<WsRegistry>,
     readiness: Arc<ReadinessManager>,
+    initial_pubsub: Option<PubSub>,
 ) -> JoinHandle<()> {
     let redis_url = redis_url.to_string();
     tokio::spawn(async move {
-        run_subscription_loop_with_retry(&redis_url, registry, readiness).await;
+        run_subscription_loop_with_retry(&redis_url, registry, readiness, initial_pubsub).await;
     })
 }
 
@@ -288,14 +303,23 @@ async fn run_subscription_loop_with_retry(
     redis_url: &str,
     registry: Arc<WsRegistry>,
     readiness: Arc<ReadinessManager>,
+    mut initial_pubsub: Option<PubSub>,
 ) {
     let mut attempt = 0u32;
 
     loop {
         attempt += 1;
+        info!(
+            attempt,
+            "redis subscriber debug: starting subscription attempt"
+        );
 
         let start = StdInstant::now();
-        let loop_res = run_subscription_loop(redis_url, registry.clone(), readiness.clone()).await;
+        let loop_res = if let Some(pubsub) = initial_pubsub.take() {
+            run_subscription_stream(pubsub, registry.clone()).await
+        } else {
+            run_subscription_loop(redis_url, registry.clone(), readiness.clone()).await
+        };
         let latency = start.elapsed();
         match loop_res {
             Ok(()) => {
@@ -343,6 +367,17 @@ async fn run_subscription_loop(
     registry: Arc<WsRegistry>,
     readiness: Arc<ReadinessManager>,
 ) -> Result<(), AppError> {
+    let subscription_start = StdInstant::now();
+    let pubsub = establish_pubsub(redis_url).await?;
+    let subscription_latency = subscription_start.elapsed();
+    info!("redis subscriber debug: pubsub subscriptions established");
+    info!("redis readiness debug: marking redis ok from subscriber path");
+    readiness.mark_dependency_authoritative_ok(DependencyName::Redis, subscription_latency);
+
+    run_subscription_stream(pubsub, registry).await
+}
+
+async fn establish_pubsub(redis_url: &str) -> Result<PubSub, AppError> {
     let client = Client::open(redis_url).map_err(|err| AppError::Internal {
         code: ErrorCode::ConfigError,
         detail: format!("Failed to create Redis client: {err}"),
@@ -386,7 +421,7 @@ async fn run_subscription_loop(
             source: Box::new(err),
         })?;
 
-    info!("Subscribing to Redis patterns 'game:*' and 'user:*'");
+    info!("redis subscriber debug: attempting pubsub subscriptions");
     pubsub
         .psubscribe("game:*")
         .await
@@ -404,18 +439,13 @@ async fn run_subscription_loop(
             source: Box::new(err),
         })?;
 
-    info!("Redis subscription established, processing messages");
+    Ok(pubsub)
+}
 
-    // Connection and subscriptions confirmed — reset any stale failure count so
-    // that a previous blip that recovered here doesn't cause a spurious
-    // Recovering transition on the next failure.
-    readiness.update_dependency(
-        DependencyName::Redis,
-        DependencyCheck::Ok {
-            latency: StdInstant::now().elapsed(),
-        },
-    );
-
+async fn run_subscription_stream(
+    pubsub: PubSub,
+    registry: Arc<WsRegistry>,
+) -> Result<(), AppError> {
     let mut stream = pubsub.into_on_message();
 
     loop {

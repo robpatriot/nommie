@@ -403,6 +403,97 @@ impl ReadinessManager {
         transitioned
     }
 
+    /// Mark a dependency healthy from an authoritative source.
+    ///
+    /// This is used when a higher-level dependency contract has been fully restored
+    /// (for example, Redis pubsub subscriptions are active again). Unlike
+    /// `update_dependency(Ok)`, this bypasses the generic consecutive-success
+    /// threshold and immediately restores the dependency to `Ok`.
+    pub fn mark_dependency_authoritative_ok(
+        &self,
+        name: DependencyName,
+        latency: std::time::Duration,
+    ) -> bool {
+        let mut inner = match self.inner.write() {
+            Ok(guard) => guard,
+            Err(poisoned) => {
+                tracing::error!(
+                    dependency = %name,
+                    "readiness: RwLock poisoned when marking authoritative dependency ok; continuing with last known state"
+                );
+                poisoned.into_inner()
+            }
+        };
+
+        if inner.mode == ServiceMode::Failed {
+            return false;
+        }
+
+        let Some(dep) = inner.dependencies.get_mut(&name) else {
+            tracing::error!(
+                dependency = %name,
+                "readiness: authoritative ok called for unregistered dependency; ignoring update"
+            );
+            return false;
+        };
+
+        let now = OffsetDateTime::now_utc();
+        let was_recovering = matches!(dep.status, CheckStatus::Down)
+            || dep.consecutive_successes < RECOVERY_THRESHOLD;
+
+        dep.checked_at = Some(now);
+        dep.last_ok = Some(now);
+        dep.last_error = None;
+        dep.latency_ms = Some(latency.as_millis() as u64);
+        dep.status = CheckStatus::Ok;
+        dep.consecutive_failures = 0;
+        dep.consecutive_successes = RECOVERY_THRESHOLD;
+
+        if was_recovering {
+            tracing::info!(
+                dependency = %name,
+                recovery_threshold = RECOVERY_THRESHOLD,
+                "readiness: dependency recovered from authoritative signal"
+            );
+        }
+
+        let previous = inner.mode;
+        let new_mode = compute_new_mode(&inner);
+        let transitioned = new_mode != previous;
+
+        if transitioned {
+            inner.mode = new_mode;
+            match new_mode {
+                ServiceMode::Healthy => {
+                    tracing::info!(
+                        previous_mode = %previous,
+                        new_mode = %new_mode,
+                        dependency = %name,
+                        "readiness: service transitioned to Healthy"
+                    );
+                }
+                ServiceMode::Recovering => {
+                    tracing::error!(
+                        previous_mode = %previous,
+                        new_mode = %new_mode,
+                        dependency = %name,
+                        "readiness: authoritative dependency ok did not restore service readiness"
+                    );
+                }
+                _ => {
+                    tracing::info!(
+                        previous_mode = %previous,
+                        new_mode = %new_mode,
+                        dependency = %name,
+                        "readiness: mode transition"
+                    );
+                }
+            }
+        }
+
+        transitioned
+    }
+
     // ── JSON serialisation ─────────────────────────────────────────
 
     /// Minimal public response body.
@@ -769,6 +860,67 @@ mod tests {
                 latency: Duration::from_millis(1),
             },
         );
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+        assert!(mgr.is_ready());
+    }
+
+    #[test]
+    fn authoritative_ok_recovers_immediately_from_recovering() {
+        let mgr = ReadinessManager::new();
+        mgr.set_migration_result(true, None);
+
+        for _ in 0..2 {
+            mgr.update_dependency(
+                DependencyName::Postgres,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+            mgr.update_dependency(
+                DependencyName::Redis,
+                DependencyCheck::Ok {
+                    latency: Duration::from_millis(1),
+                },
+            );
+        }
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+
+        for _ in 0..2 {
+            mgr.update_dependency(
+                DependencyName::Redis,
+                DependencyCheck::Down {
+                    error: "down".into(),
+                    latency: Duration::from_millis(100),
+                },
+            );
+        }
+        assert_eq!(mgr.mode(), ServiceMode::Recovering);
+
+        let transitioned =
+            mgr.mark_dependency_authoritative_ok(DependencyName::Redis, Duration::from_millis(5));
+
+        assert!(transitioned);
+        assert_eq!(mgr.mode(), ServiceMode::Healthy);
+        assert!(mgr.is_ready());
+    }
+
+    #[test]
+    fn authoritative_ok_marks_startup_dependency_fully_healthy() {
+        let mgr = ReadinessManager::new();
+        mgr.set_migration_result(true, None);
+
+        mgr.update_dependency(
+            DependencyName::Postgres,
+            DependencyCheck::Ok {
+                latency: Duration::from_millis(1),
+            },
+        );
+        mgr.mark_dependency_authoritative_ok(DependencyName::Redis, Duration::from_millis(1));
+
+        assert_eq!(mgr.mode(), ServiceMode::Startup);
+
+        mgr.mark_initial_resolution_success();
+
         assert_eq!(mgr.mode(), ServiceMode::Healthy);
         assert!(mgr.is_ready());
     }

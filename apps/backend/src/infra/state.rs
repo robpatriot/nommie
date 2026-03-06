@@ -118,10 +118,21 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
                 Some(_) => {
                     // PING current connection
                     let check = check_redis_ping(url).await;
-                    state.readiness().update_dependency(
-                        crate::readiness::types::DependencyName::Redis,
-                        check.clone(),
-                    );
+                    match &check {
+                        crate::readiness::types::DependencyCheck::Ok { latency } => {
+                            tracing::info!(
+                                latency_ms = latency.as_millis(),
+                                "redis readiness debug: ping path succeeded"
+                            );
+                        }
+                        crate::readiness::types::DependencyCheck::Down { error, latency } => {
+                            tracing::info!(
+                                latency_ms = latency.as_millis(),
+                                error = %error,
+                                "redis readiness debug: ping path observed redis down"
+                            );
+                        }
+                    }
                     !check.is_ok()
                 }
             };
@@ -132,10 +143,21 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
                     Ok(broker) => {
                         state.set_realtime(broker);
                         let check = check_redis_ping(url).await;
-                        state.readiness().update_dependency(
-                            crate::readiness::types::DependencyName::Redis,
-                            check,
-                        );
+                        match &check {
+                            crate::readiness::types::DependencyCheck::Ok { latency } => {
+                                tracing::info!(
+                                    latency_ms = latency.as_millis(),
+                                    "redis readiness debug: resolution ping succeeded"
+                                );
+                            }
+                            crate::readiness::types::DependencyCheck::Down { error, latency } => {
+                                tracing::info!(
+                                    latency_ms = latency.as_millis(),
+                                    error = %error,
+                                    "redis readiness debug: resolution ping still sees redis down"
+                                );
+                            }
+                        }
                         tracing::info!("readiness: Redis resolution successful");
                     }
                     Err(e) => {
