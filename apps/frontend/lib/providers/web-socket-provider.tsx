@@ -4,41 +4,44 @@ import type { ReactNode } from 'react'
 
 let lifecycleListenersInstalled = false
 
-type ResumeHandlerRef = { current: (() => void) | null }
-type PageFrozenRef = { current: boolean }
+/**
+ * Module-level active resume handler ref. Listeners invoke .current?.().
+ * Ownership: only the provider whose wrapper is stored may clear it (wrapper identity check).
+ */
+const activeResumeHandlerRef: { current: (() => void) | null } = {
+  current: null,
+}
 
-function installLifecycleListenersOnce(
-  resumeHandlerRef: ResumeHandlerRef,
-  pageFrozenRef: PageFrozenRef
-) {
+/** Module-level page frozen state. Updated by freeze/resume listeners; no provider refs. */
+let pageFrozen = false
+
+/**
+ * Installs global lifecycle listeners once. Does not close over any provider-local refs.
+ * Listeners call activeResumeHandlerRef.current?.() and update module-level pageFrozen.
+ */
+function installLifecycleListenersOnce() {
   if (lifecycleListenersInstalled || typeof window === 'undefined') return
   lifecycleListenersInstalled = true
   const doc = document
   const win = window
 
-  const tryResume = () => {
-    resumeHandlerRef.current?.()
-  }
+  const tryResume = () => activeResumeHandlerRef.current?.()
 
   doc.addEventListener('visibilitychange', () => {
     if (!doc.hidden) tryResume()
   })
-  win.addEventListener('pageshow', () => {
-    tryResume()
-  })
+  win.addEventListener('pageshow', () => tryResume())
   win.addEventListener('freeze', () => {
-    pageFrozenRef.current = true
+    pageFrozen = true
   })
   win.addEventListener('resume', () => {
-    pageFrozenRef.current = false
+    pageFrozen = false
     tryResume()
   })
   win.addEventListener('focus', () => {
     if (!doc.hidden) tryResume()
   })
-  win.addEventListener('online', () => {
-    tryResume()
-  })
+  win.addEventListener('online', () => tryResume())
 }
 import {
   createContext,
@@ -121,6 +124,8 @@ export function WebSocketProvider({
 }) {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>('disconnected')
+  const connectionStateRef = useRef<ConnectionState>('disconnected')
+  connectionStateRef.current = connectionState
   const [syncError, setSyncError] = useState<GameRoomError | null>(null)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
 
@@ -132,12 +137,11 @@ export function WebSocketProvider({
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY_MS)
   const reconnectAttemptsRef = useRef(0)
   const pendingReconnectRef = useRef(false)
-  const pageFrozenRef = useRef(false)
   const connectInFlightRef = useRef(false)
 
   function isPageActive(): boolean {
     if (typeof document === 'undefined') return true
-    return !document.hidden && !pageFrozenRef.current
+    return !document.hidden && !pageFrozen
   }
   const hasTriggeredStaleSignoutRef = useRef(false)
   const closeReasonRef = useRef<CloseReason | null>(null)
@@ -253,9 +257,7 @@ export function WebSocketProvider({
 
   const cleanupSocketAndTimers = useCallback(
     (reason: CloseReason) => {
-      // Invalidate any in-flight handlers / epochs
       genRef.current += 1
-
       closeReasonRef.current = reason
 
       clearHandshakeTimeout()
@@ -274,7 +276,9 @@ export function WebSocketProvider({
 
       helloAckedRef.current = false
       reconnectAttemptsRef.current = 0
-      setReconnectAttempts(0)
+      if (reason !== 'unmount') {
+        setReconnectAttempts(0)
+      }
     },
     [clearHandshakeTimeout, clearReconnectTimeout]
   )
@@ -320,11 +324,7 @@ export function WebSocketProvider({
   )
 
   const connect = useCallback(async () => {
-    // Pause all connect/reconnect attempts while the backend is in Degraded
-    // mode; allow connections in Healthy and Suspect.
-    if (mode === 'degraded') {
-      return
-    }
+    if (mode === 'degraded') return
 
     if (!isPageActive()) {
       pendingReconnectRef.current = true
@@ -341,8 +341,8 @@ export function WebSocketProvider({
     }
 
     connectInFlightRef.current = true
+
     try {
-      // State transition: avoid incorrectly flipping 'connecting' -> 'reconnecting'
       setConnectionState((prev) => {
         if (prev === 'connected') return 'connected'
         if (prev === 'reconnecting') return 'reconnecting'
@@ -512,9 +512,6 @@ export function WebSocketProvider({
     void connect()
   }, [isAuthenticated, mode, connect, clearReconnectTimeout])
 
-  const resumeHandlerRef = useRef<(() => void) | null>(null)
-  resumeHandlerRef.current = tryResumeReconnect
-
   const disconnect = useCallback(() => {
     cleanupSocketAndTimers('manual')
     setSyncError(null)
@@ -528,9 +525,21 @@ export function WebSocketProvider({
     }
   }, [])
 
+  const resumeHandlerRef = useRef<(() => void) | null>(null)
+  resumeHandlerRef.current = tryResumeReconnect
+
   useEffect(() => {
-    if (typeof window !== 'undefined')
-      installLifecycleListenersOnce(resumeHandlerRef, pageFrozenRef)
+    const ourWrapper = () => resumeHandlerRef.current?.()
+    activeResumeHandlerRef.current = ourWrapper
+    return () => {
+      if (activeResumeHandlerRef.current === ourWrapper) {
+        activeResumeHandlerRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') installLifecycleListenersOnce()
   }, [])
 
   useEffect(() => {
@@ -541,7 +550,6 @@ export function WebSocketProvider({
     }
 
     return () => {
-      // On provider unmount, clean up socket/timers.
       cleanupSocketAndTimers('unmount')
     }
   }, [isAuthenticated, mode, connect, disconnect, cleanupSocketAndTimers])
