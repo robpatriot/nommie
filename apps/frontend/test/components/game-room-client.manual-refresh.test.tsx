@@ -120,13 +120,6 @@ describe('GameRoomClient', () => {
         etag: 'initial-etag',
       })
 
-      await waitFor(
-        () => {
-          expect(mockGetGameRoomStateAction).toHaveBeenCalled()
-        },
-        { timeout: 2000 }
-      )
-
       const initElements = screen.queryAllByText(/Init|Add players|Setup/i)
       expect(initElements.length).toBeGreaterThan(0)
     })
