@@ -40,7 +40,7 @@ vi.mock('@/hooks/useToast', () => ({
 // It will create WebSocket connections (mocked) and update the query cache
 // The WebSocket API is already mocked above, so this will work
 
-// Create mutation hook mocks with pending state tracking and delay for ready-action tests
+// Create mutation hook mocks with pending state tracking and controlled promise for ready-action tests
 const {
   mockUseMarkPlayerReady,
   mockUseSubmitBid,
@@ -51,9 +51,10 @@ const {
   mockUseRemoveAiSeat,
   mockUseLeaveGame,
   markPlayerReadyState,
+  resolveMarkPlayerReadyDelay,
 } = createMockMutationHooks({
   trackMarkPlayerReadyPending: true,
-  addMarkPlayerReadyDelay: true,
+  addMarkPlayerReadyDeferred: true,
 })
 
 vi.mock('@/hooks/mutations/useGameRoomMutations', () => ({
@@ -107,11 +108,13 @@ describe('GameRoomClient', () => {
       })
       await userEvent.click(readyButton)
 
-      // Wait for async operations
+      // Resolve controlled promise so mutation proceeds to call action
+      await act(async () => {
+        resolveMarkPlayerReadyDelay?.()
+      })
+
       await waitFor(
-        () => {
-          expect(mockMarkPlayerReadyAction).toHaveBeenCalled()
-        },
+        () => expect(mockMarkPlayerReadyAction).toHaveBeenCalled(),
         { timeout: 2000 }
       )
 
@@ -149,11 +152,13 @@ describe('GameRoomClient', () => {
         fireEvent.click(readyButton)
       })
 
-      // Wait for async operations (mutation resolves + component state updates)
+      // Resolve controlled promise so first mutation completes
+      await act(async () => {
+        resolveMarkPlayerReadyDelay?.()
+      })
+
       await waitFor(
-        () => {
-          expect(mockMarkPlayerReadyAction).toHaveBeenCalledTimes(1)
-        },
+        () => expect(mockMarkPlayerReadyAction).toHaveBeenCalledTimes(1),
         { timeout: 2000 }
       )
 
@@ -191,6 +196,11 @@ describe('GameRoomClient', () => {
       })
       await userEvent.click(readyButton)
 
+      // Resolve controlled promise so mutation proceeds and action returns error
+      await act(async () => {
+        resolveMarkPlayerReadyDelay?.()
+      })
+
       // Wait for error toast to be shown (errors are now shown via toast, not UI text)
       await waitFor(
         () => {
@@ -222,13 +232,14 @@ describe('GameRoomClient', () => {
       })
       await userEvent.click(readyButton)
 
-      // Wait for ready action to complete
+      // Resolve controlled promise so mutation completes
       await act(async () => {
-        // Wait for promise to resolve
-        await new Promise((resolve) => setTimeout(resolve, 50))
+        resolveMarkPlayerReadyDelay?.()
       })
-
-      expect(mockMarkPlayerReadyAction).toHaveBeenCalled()
+      await waitFor(
+        () => expect(mockMarkPlayerReadyAction).toHaveBeenCalled(),
+        { timeout: 2000 }
+      )
 
       // Simulate phase change via WebSocket
       const ws = await waitForWebSocketConnection()

@@ -13,20 +13,29 @@ import type {
   CancelPoll,
   PollDriver,
 } from '@/lib/providers/backend-readiness-provider'
+import type {
+  CancelTimeout,
+  TimeoutScheduler,
+} from '@/lib/providers/web-socket-provider'
 
 // AllProviders wrapper - includes QueryClientProvider + WebSocketProvider
 const AllProviders = ({
   children,
   queryClient,
   isAuthenticated = false,
+  timeoutScheduler,
 }: {
   children: React.ReactNode
   queryClient: QueryClient
   isAuthenticated?: boolean
+  timeoutScheduler?: TimeoutScheduler
 }) => {
   return (
     <QueryClientProvider client={queryClient}>
-      <WebSocketProvider isAuthenticated={isAuthenticated}>
+      <WebSocketProvider
+        isAuthenticated={isAuthenticated}
+        timeoutScheduler={timeoutScheduler}
+      >
         {children}
       </WebSocketProvider>
     </QueryClientProvider>
@@ -66,20 +75,27 @@ const render = (
   options?: Omit<RenderOptions, 'wrapper'> & {
     queryClient?: QueryClient
     isAuthenticated?: boolean
+    timeoutScheduler?: TimeoutScheduler
   }
 ): RenderResultWithClient => {
   const queryClient = options?.queryClient ?? createTestQueryClient()
   const isAuthenticated = options?.isAuthenticated ?? true
+  const timeoutScheduler = options?.timeoutScheduler
 
   const {
     queryClient: _,
     isAuthenticated: __,
+    timeoutScheduler: ___,
     ...renderOptions
   } = options ?? {}
 
   const renderResult = rtlRender(ui, {
     wrapper: ({ children }) => (
-      <AllProviders queryClient={queryClient} isAuthenticated={isAuthenticated}>
+      <AllProviders
+        queryClient={queryClient}
+        isAuthenticated={isAuthenticated}
+        timeoutScheduler={timeoutScheduler}
+      >
         {children}
       </AllProviders>
     ),
@@ -110,16 +126,27 @@ export function renderHook<Result, Props>(
   options?: Omit<RenderHookOptions<Props>, 'wrapper'> & {
     queryClient?: QueryClient
     isAuthenticated?: boolean
+    timeoutScheduler?: TimeoutScheduler
   }
 ): RenderHookResultWithClient<Result, Props> {
   const queryClient = options?.queryClient ?? createTestQueryClient()
   const isAuthenticated = options?.isAuthenticated ?? true
+  const timeoutScheduler = options?.timeoutScheduler
 
-  const { queryClient: _, isAuthenticated: __, ...hookOptions } = options ?? {}
+  const {
+    queryClient: _,
+    isAuthenticated: __,
+    timeoutScheduler: ___,
+    ...hookOptions
+  } = options ?? {}
 
   const hookResult = rtlRenderHook(callback, {
     wrapper: ({ children }) => (
-      <AllProviders queryClient={queryClient} isAuthenticated={isAuthenticated}>
+      <AllProviders
+        queryClient={queryClient}
+        isAuthenticated={isAuthenticated}
+        timeoutScheduler={timeoutScheduler}
+      >
         {children}
       </AllProviders>
     ),
@@ -133,6 +160,42 @@ export function renderHook<Result, Props>(
 }
 
 type Task = { cb: () => void; canceled: boolean }
+
+// Manual timeout driver for deterministic WebSocket tests
+type TimeoutTask = { cb: () => void; canceled: boolean }
+
+export class ManualTimeoutDriver implements TimeoutScheduler {
+  private queue: TimeoutTask[] = []
+
+  schedule(cb: () => void, _delayMs: number): CancelTimeout {
+    const task: TimeoutTask = { cb, canceled: false }
+    this.queue.push(task)
+    return {
+      cancel: () => {
+        task.canceled = true
+      },
+    }
+  }
+
+  async tick(): Promise<void> {
+    const idx = this.queue.findIndex((t) => !t.canceled)
+    if (idx === -1) {
+      throw new Error('ManualTimeoutDriver.tick(): no pending tasks')
+    }
+    const [task] = this.queue.splice(idx, 1)
+    task.cb()
+    await Promise.resolve()
+  }
+
+  tickN(n: number): void {
+    for (let i = 0; i < n; i++) {
+      const idx = this.queue.findIndex((t) => !t.canceled)
+      if (idx === -1) break
+      const [task] = this.queue.splice(idx, 1)
+      task.cb()
+    }
+  }
+}
 
 export class ManualPollDriver implements PollDriver {
   private queue: Task[] = []

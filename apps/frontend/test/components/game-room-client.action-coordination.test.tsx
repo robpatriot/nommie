@@ -118,8 +118,6 @@ describe('GameRoomClient', () => {
       await act(async () => {
         resolveReady!()
         await readyPromise
-        // Wait for promise to resolve
-        await new Promise((resolve) => setTimeout(resolve, 50))
       })
     })
 
@@ -162,7 +160,6 @@ describe('GameRoomClient', () => {
       await act(async () => {
         resolveReady!()
         await readyPromise
-        await new Promise((resolve) => setTimeout(resolve, 50))
       })
     })
   })

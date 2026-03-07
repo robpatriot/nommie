@@ -167,36 +167,26 @@ describe('Optimistic Update Rollback Tests', () => {
 
       const { result } = renderHook(() => useSubmitBid(), { queryClient })
 
-      // Mock slow error response
-      mocks.submitBidAction.mockImplementation(
-        () =>
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Server error')), 100)
-          )
-      )
+      let rejectMutation!: (err: Error) => void
+      const mutationActionPromise = new Promise<never>((_, reject) => {
+        rejectMutation = reject
+      })
+      mocks.submitBidAction.mockReturnValue(mutationActionPromise)
 
-      // Start mutation
-      const mutationPromise = await act(async () => {
-        try {
-          await result.current.mutateAsync({
-            gameId,
-            bid: 5,
-            version: 1,
-          })
-        } catch {
-          // Expected
-        }
+      act(() => {
+        result.current.mutate({
+          gameId,
+          bid: 5,
+          version: 1,
+        })
       })
 
-      // Verify pending during mutation
       await waitFor(() => {
         expect(result.current.isPending).toBe(true)
       })
 
-      // Wait for completion
-      await mutationPromise
+      rejectMutation(new Error('Server error'))
 
-      // Verify no longer pending after rollback
       await waitFor(() => {
         expect(result.current.isPending).toBe(false)
       })

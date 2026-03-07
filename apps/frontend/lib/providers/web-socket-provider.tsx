@@ -79,6 +79,21 @@ const MAX_RECONNECT_ATTEMPTS = 10
 const PROTOCOL_VERSION = 1 as const
 const HANDSHAKE_TIMEOUT_MS = 10_000
 
+// ── Timeout scheduler (injectable for deterministic tests) ───────────────────
+
+export type CancelTimeout = { cancel: () => void }
+
+export interface TimeoutScheduler {
+  schedule: (cb: () => void, delayMs: number) => CancelTimeout
+}
+
+const defaultTimeoutScheduler: TimeoutScheduler = {
+  schedule: (cb, delayMs) => {
+    const id = setTimeout(cb, delayMs)
+    return { cancel: () => clearTimeout(id) }
+  },
+}
+
 function getReadyStateName(state: number): string {
   switch (state) {
     case WebSocket.CONNECTING:
@@ -118,9 +133,11 @@ type CloseReason = 'manual' | 'unmount' | 'error'
 export function WebSocketProvider({
   children,
   isAuthenticated,
+  timeoutScheduler = defaultTimeoutScheduler,
 }: {
   children: ReactNode
   isAuthenticated: boolean
+  timeoutScheduler?: TimeoutScheduler
 }) {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>('disconnected')
@@ -133,7 +150,9 @@ export function WebSocketProvider({
   const { mode, reportDependencyOutage } = useBackendReadiness()
 
   const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectCancelRef = useRef<
+    ReturnType<TimeoutScheduler['schedule']>['cancel'] | null
+  >(null)
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY_MS)
   const reconnectAttemptsRef = useRef(0)
   const pendingReconnectRef = useRef(false)
@@ -150,25 +169,27 @@ export function WebSocketProvider({
 
   // Handshake state
   const helloAckedRef = useRef(false)
-  const handshakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handshakeCancelRef = useRef<
+    ReturnType<TimeoutScheduler['schedule']>['cancel'] | null
+  >(null)
 
   const clearReconnectTimeout = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-      reconnectTimeoutRef.current = null
+    if (reconnectCancelRef.current) {
+      reconnectCancelRef.current()
+      reconnectCancelRef.current = null
     }
   }, [])
 
   const clearHandshakeTimeout = useCallback(() => {
-    if (handshakeTimeoutRef.current) {
-      clearTimeout(handshakeTimeoutRef.current)
-      handshakeTimeoutRef.current = null
+    if (handshakeCancelRef.current) {
+      handshakeCancelRef.current()
+      handshakeCancelRef.current = null
     }
   }, [])
 
   const fetchWsToken = useCallback(async () => {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => {
+    const timeoutHandle = timeoutScheduler.schedule(() => {
       controller.abort()
     }, WS_TOKEN_FETCH_TIMEOUT_MS)
 
@@ -178,7 +199,7 @@ export function WebSocketProvider({
         cache: 'no-store',
         signal: controller.signal,
       })
-      clearTimeout(timeoutId)
+      timeoutHandle.cancel()
 
       if (!response.ok) {
         if (response.status === 503) {
@@ -205,14 +226,14 @@ export function WebSocketProvider({
 
       return body.token
     } catch (error) {
-      clearTimeout(timeoutId)
+      timeoutHandle.cancel()
       const err = error instanceof Error ? error : new Error(String(error))
       if (err.name === 'AbortError') {
         throw new Error('Request to fetch realtime token timed out')
       }
       throw error
     }
-  }, [reportDependencyOutage])
+  }, [reportDependencyOutage, timeoutScheduler])
 
   const resolveWsUrl = useCallback(() => {
     try {
@@ -239,7 +260,7 @@ export function WebSocketProvider({
   const armHandshakeTimeout = useCallback(
     (ws: WebSocket, myGen: number) => {
       clearHandshakeTimeout()
-      handshakeTimeoutRef.current = setTimeout(() => {
+      const handle = timeoutScheduler.schedule(() => {
         if (genRef.current !== myGen) return
         if (!helloAckedRef.current) {
           closeReasonRef.current = 'error'
@@ -251,8 +272,9 @@ export function WebSocketProvider({
           setSyncError({ message: 'Realtime handshake timed out' })
         }
       }, HANDSHAKE_TIMEOUT_MS)
+      handshakeCancelRef.current = handle.cancel
     },
-    [clearHandshakeTimeout]
+    [clearHandshakeTimeout, timeoutScheduler]
   )
 
   const cleanupSocketAndTimers = useCallback(
@@ -312,15 +334,16 @@ export function WebSocketProvider({
       reconnectDelayRef.current = nextDelay
 
       clearReconnectTimeout()
-      reconnectTimeoutRef.current = setTimeout(() => {
+      const handle = timeoutScheduler.schedule(() => {
         if (!isPageActive()) {
           pendingReconnectRef.current = true
           return
         }
         void connectFn()
       }, delay)
+      reconnectCancelRef.current = handle.cancel
     },
-    [clearReconnectTimeout]
+    [clearReconnectTimeout, timeoutScheduler]
   )
 
   const connect = useCallback(async () => {

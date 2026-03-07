@@ -1,5 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, waitFor, act, createTestQueryClient } from '../utils'
+import {
+  renderHook,
+  waitFor,
+  act,
+  createTestQueryClient,
+  ManualTimeoutDriver,
+} from '../utils'
 import type { QueryClient } from '@tanstack/react-query'
 import { useWebSocket } from '@/lib/providers/web-socket-provider'
 import { MockWebSocket, mockWebSocketInstances } from '../setup/mock-websocket'
@@ -171,12 +177,12 @@ describe('WebSocketProvider', () => {
   })
 
   it('should attempt reconnection on connection failure', async () => {
-    // Use real timers (no fake timers)
-    vi.useRealTimers()
+    const timeoutDriver = new ManualTimeoutDriver()
 
     const { result } = renderHook(() => useWebSocket(), {
       queryClient,
       isAuthenticated: true,
+      timeoutScheduler: timeoutDriver,
     })
 
     // Wait for the first WebSocket to be initialized
@@ -193,9 +199,9 @@ describe('WebSocketProvider', () => {
       expect(result.current.connectionState).toBe('reconnecting')
     })
 
-    // Using real timers here, so the timer will work as expected
+    // Advance scheduler to trigger reconnect (deterministic, no real time)
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await timeoutDriver.tick()
     })
 
     // Wait for WebSocket count to increase (reconnect should happen)
@@ -248,10 +254,9 @@ describe('WebSocketProvider', () => {
   })
 
   it('sets syncError when ws-token fetch times out', async () => {
-    // Use real timers (no fake timers)
-    vi.useRealTimers()
+    const timeoutDriver = new ManualTimeoutDriver()
 
-    // Make fetch never resolve so AbortController timeout triggers
+    // Make fetch never resolve; provider's scheduler will trigger abort
     vi.stubGlobal(
       'fetch',
       vi.fn((input: string | URL | Request, init?: RequestInit) => {
@@ -264,37 +269,33 @@ describe('WebSocketProvider', () => {
 
         if (urlString.includes('/api/ws-token')) {
           const signal = init?.signal
-          return new Promise((_, reject) => {
+          return new Promise<never>((_, reject) => {
             const err = new Error('Aborted')
-            ;(err as any).name = 'AbortError'
-
-            // Make sure the timeout triggers
-            setTimeout(() => {
-              reject(err)
-            }, 100) // Ensure rejection occurs after timeout
+            ;(err as Error & { name: string }).name = 'AbortError'
 
             if (signal?.aborted) return reject(err)
             signal?.addEventListener('abort', () => reject(err), { once: true })
-          }) as any
+          })
         }
 
-        return originalFetch(input as any, init as any)
+        return originalFetch(input as RequestInfo | URL, init)
       })
     )
 
     const { result } = renderHook(() => useWebSocket(), {
       queryClient,
       isAuthenticated: true,
+      timeoutScheduler: timeoutDriver,
     })
 
-    // Use real timers and set the timeout to 100ms
+    // Advance scheduler to trigger ws-token timeout (abort)
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100))
+      await timeoutDriver.tick()
     })
 
     await waitFor(() => {
-      expect(result.current.syncError).toBeTruthy() // Ensure syncError is truthy
-      expect(result.current.syncError?.message).toContain('timed out') // Check the timeout message
+      expect(result.current.syncError).toBeTruthy()
+      expect(result.current.syncError?.message).toContain('timed out')
     })
   })
 

@@ -52,22 +52,37 @@ export function setupFetchMock(originalFetch: typeof global.fetch): void {
   )
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((r) => {
+    resolve = r
+  })
+  return { promise, resolve }
+}
+
 /**
  * Creates a mock implementation for useMarkPlayerReady hook.
  *
  * @param options.trackPending - If true, tracks pending state to prevent concurrent calls
- * @param options.addDelay - If true, adds a 50ms delay to simulate async behavior
- * @returns Object with mockUseMarkPlayerReady function and optional markPlayerReadyState
+ * @param options.addDeferredDelay - If true, waits on a controlled promise before calling action (test resolves via resolveMarkPlayerReadyDelay)
+ * @returns Object with mockUseMarkPlayerReady function and optional markPlayerReadyState, resolveMarkPlayerReadyDelay
  */
 export function createMockUseMarkPlayerReady(options?: {
   trackPending?: boolean
-  addDelay?: boolean
+  addDeferredDelay?: boolean
 }) {
   const trackPending = options?.trackPending ?? false
-  const addDelay = options?.addDelay ?? false
+  const addDeferredDelay = options?.addDeferredDelay ?? false
 
   // Track pending state if requested
   const markPlayerReadyState = trackPending ? { isPending: false } : undefined
+
+  // Controlled promise for addDeferredDelay: test resolves when ready
+  let currentDeferred: ReturnType<typeof deferred<void>> | null = null
+  const resolveMarkPlayerReadyDelay = () => {
+    currentDeferred?.resolve()
+    currentDeferred = null
+  }
 
   const mockUseMarkPlayerReady = vi.fn(() => {
     if (trackPending && markPlayerReadyState) {
@@ -84,8 +99,9 @@ export function createMockUseMarkPlayerReady(options?: {
           }
           markPlayerReadyState.isPending = true
           try {
-            if (addDelay) {
-              await new Promise((resolve) => setTimeout(resolve, 50))
+            if (addDeferredDelay) {
+              currentDeferred = deferred<void>()
+              await currentDeferred.promise
             }
             const result = await mockMarkPlayerReadyAction(gameId, isReady)
             if (result.kind === 'error') {
@@ -123,6 +139,9 @@ export function createMockUseMarkPlayerReady(options?: {
   return {
     mockUseMarkPlayerReady,
     markPlayerReadyState, // Expose for tests that need to reset it
+    resolveMarkPlayerReadyDelay: addDeferredDelay
+      ? resolveMarkPlayerReadyDelay
+      : undefined,
   }
 }
 
@@ -142,13 +161,16 @@ export function createMockUseMarkPlayerReady(options?: {
  */
 export function createMockMutationHooks(options?: {
   trackMarkPlayerReadyPending?: boolean
-  addMarkPlayerReadyDelay?: boolean
+  addMarkPlayerReadyDeferred?: boolean
 }) {
-  const { mockUseMarkPlayerReady, markPlayerReadyState } =
-    createMockUseMarkPlayerReady({
-      trackPending: options?.trackMarkPlayerReadyPending ?? false,
-      addDelay: options?.addMarkPlayerReadyDelay ?? false,
-    })
+  const {
+    mockUseMarkPlayerReady,
+    markPlayerReadyState,
+    resolveMarkPlayerReadyDelay,
+  } = createMockUseMarkPlayerReady({
+    trackPending: options?.trackMarkPlayerReadyPending ?? false,
+    addDeferredDelay: options?.addMarkPlayerReadyDeferred ?? false,
+  })
 
   const mockUseSubmitBid = vi.fn(() => ({
     mutateAsync: (request: unknown) => mockSubmitBidAction(request),
@@ -195,6 +217,7 @@ export function createMockMutationHooks(options?: {
     mockUseRemoveAiSeat,
     mockUseLeaveGame,
     markPlayerReadyState, // Expose for tests that need to reset it
+    resolveMarkPlayerReadyDelay, // Expose when addMarkPlayerReadyDeferred is true
   }
 }
 

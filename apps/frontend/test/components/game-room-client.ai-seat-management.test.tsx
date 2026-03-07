@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import { render, act } from '../utils'
+import { render, act, waitFor } from '../utils'
 import type { ReactNode } from 'react'
 
 import { GameRoomClient } from '@/app/game/[gameId]/_components/game-room-client'
@@ -92,14 +92,11 @@ describe('GameRoomClient', () => {
         render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
-      // Wait for async operations (AI registry fetch - enough for promise to resolve)
-      await act(async () => {
-        // Wait for promise to resolve
-        await new Promise((resolve) => setTimeout(resolve, 50))
-      })
-
-      // AI registry should be fetched when component mounts and host can view AI manager
-      expect(mockFetchAiRegistryAction).toHaveBeenCalled()
+      // Wait for AI registry fetch (non-timer async)
+      await waitFor(
+        () => expect(mockFetchAiRegistryAction).toHaveBeenCalled(),
+        { timeout: 2000 }
+      )
     })
 
     it('does not load AI registry for non-host', async () => {
@@ -118,10 +115,14 @@ describe('GameRoomClient', () => {
       // Wait for WebSocket to connect and component to fully render
       await waitForWebSocketConnection()
 
-      // Wait a bit more for any async operations to complete
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 300))
-      })
+      // Wait for async to settle (non-timer); non-host should not trigger registry fetch
+      await waitFor(
+        () => {
+          const count = mockFetchAiRegistryAction.mock.calls.length
+          expect(count).toBeLessThanOrEqual(callCountBefore + 1)
+        },
+        { timeout: 1000 }
+      )
 
       // AI registry should not be fetched for non-host (enabled=false)
       // TanStack Query should respect the enabled flag and not call the query function
@@ -147,13 +148,11 @@ describe('GameRoomClient', () => {
         render(<GameRoomClient initialState={initialState} gameId={42} />)
       })
 
-      // Wait for AI registry to load
-      await act(async () => {
-        // Wait for promise to resolve
-        await new Promise((resolve) => setTimeout(resolve, 50))
-      })
-
-      expect(mockFetchAiRegistryAction).toHaveBeenCalled()
+      // Wait for AI registry to load (non-timer async)
+      await waitFor(
+        () => expect(mockFetchAiRegistryAction).toHaveBeenCalled(),
+        { timeout: 2000 }
+      )
 
       // The AI seat management is tested through the handler guards
       // Full UI interaction tests would be in game-room-view.test.tsx

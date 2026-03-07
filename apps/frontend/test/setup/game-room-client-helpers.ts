@@ -155,8 +155,8 @@ export async function waitForWebSocketConnection(): Promise<MockWebSocket> {
   // Complete handshake - wrap in act to prevent warnings from WebSocketProvider state updates
   await act(async () => {
     serverSendJson(ws, { type: 'hello_ack', protocol: 1, user_id: 123 })
-    // Allow state updates to flush
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    // Allow state updates to flush (microtask, not timer)
+    await Promise.resolve()
   })
 
   return ws

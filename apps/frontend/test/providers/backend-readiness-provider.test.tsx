@@ -29,7 +29,6 @@ function TestConsumer({
 
 describe('BackendReadinessProvider', () => {
   beforeEach(() => {
-    vi.stubEnv('NEXT_PUBLIC_FETCH_MODE', 'test')
     vi.spyOn(global, 'fetch')
 
     if (typeof AbortSignal.timeout !== 'function') {

@@ -40,16 +40,15 @@ export function useBackendReadiness() {
 
 // ── Configuration ──────────────────────────────────────────────────
 
-const IS_TEST = process.env.NEXT_PUBLIC_FETCH_MODE === 'test'
 const PROBE_TIMEOUT_MS = 1_000
 const RECOVERY_SUCCESS_THRESHOLD = 2
 
 // Recovery polling: 1s for 30s, then 5s till 5min, then 30s
-const RECOVERY_FAST_MS = IS_TEST ? 10 : 1_000
-const RECOVERY_FAST_DURATION_MS = IS_TEST ? 50 : 30_000
-const RECOVERY_MEDIUM_MS = IS_TEST ? 20 : 5_000
-const RECOVERY_MEDIUM_DURATION_MS = IS_TEST ? 100 : 300_000
-const RECOVERY_SLOW_MS = IS_TEST ? 30 : 30_000
+const RECOVERY_FAST_MS = 1_000
+const RECOVERY_FAST_DURATION_MS = 30_000
+const RECOVERY_MEDIUM_MS = 5_000
+const RECOVERY_MEDIUM_DURATION_MS = 300_000
+const RECOVERY_SLOW_MS = 30_000
 
 function nextRecoveryDelayMs(elapsedMs: number): number {
   if (elapsedMs < RECOVERY_FAST_DURATION_MS) return RECOVERY_FAST_MS

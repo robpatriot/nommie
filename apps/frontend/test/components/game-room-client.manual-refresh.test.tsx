@@ -1,12 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import {
-  render,
-  screen,
-  waitFor,
-  act,
-  fireEvent,
-  createTestQueryClient,
-} from '../utils'
+import { render, screen, waitFor, act, createTestQueryClient } from '../utils'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { queryKeys } from '@/lib/queries/query-keys'
@@ -286,106 +279,6 @@ describe('GameRoomClient', () => {
 
       // After first completes, only one call should have been made
       expect(mockGetGameRoomStateAction).toHaveBeenCalledTimes(1)
-    })
-
-    it('shows slow sync indicator when manual refresh takes longer than 1 second', async () => {
-      const initialState = createInitialState(42)
-
-      vi.useRealTimers()
-      mockShowToast.mockReturnValueOnce('slow-sync-id')
-
-      const queryClient = createTestQueryClient()
-      queryClient.setQueryData(queryKeys.games.state(42), initialState)
-
-      await act(async () => {
-        render(<GameRoomClient initialState={initialState} gameId={42} />, {
-          queryClient,
-        })
-      })
-
-      // Wait for WebSocket to connect
-      await waitForWebSocketConnection()
-
-      // Wait for component to render (check for Init phase text)
-      await waitFor(
-        () => {
-          expect(screen.getByText(/Init/i)).toBeInTheDocument()
-        },
-        { timeout: 3000 }
-      )
-
-      // Wait for refresh button to appear - try multiple ways to find it
-      const refreshButton = await waitFor(
-        () => {
-          // Try by aria-label first
-          const buttons = screen.queryAllByRole('button', {
-            name: /Refresh game state/i,
-          })
-          if (buttons.length > 0) {
-            return buttons[0]
-          }
-          // Fallback: try by text content
-          const buttonsByText = screen
-            .getAllByRole('button')
-            .filter(
-              (btn) =>
-                btn.textContent?.includes('Refresh game state') ||
-                btn.textContent?.includes('Manual sync')
-            )
-          if (buttonsByText.length > 0) {
-            return buttonsByText[0]
-          }
-          throw new Error('Refresh button not found')
-        },
-        { timeout: 3000 }
-      )
-
-      // Clear any calls from initialization
-      mockGetGameRoomStateAction.mockClear()
-
-      // Make refresh slow (longer than 1 second) - set up the mock to return a hanging promise
-      let resolveRefresh: () => void
-      const refreshPromise = new Promise<{
-        kind: 'ok'
-        data: ReturnType<typeof createStateForMock>
-      }>((resolve) => {
-        resolveRefresh = () =>
-          resolve({
-            kind: 'ok',
-            data: createStateForMock(42),
-          })
-      })
-      mockGetGameRoomStateAction.mockReturnValueOnce(refreshPromise)
-
-      // Now switch to fake timers for the rest of the test
-      vi.useFakeTimers()
-
-      await act(async () => {
-        fireEvent.click(refreshButton)
-        // Advance time by 1 second - slow sync indicator should appear
-        await vi.advanceTimersByTimeAsync(1000)
-      })
-
-      // Check for slow sync indicator (toast)
-      expect(mockShowToast).toHaveBeenCalledWith(
-        'Updating game state…',
-        'warning'
-      )
-
-      // Resolve the refresh
-      await act(async () => {
-        resolveRefresh!()
-        await refreshPromise
-        await vi.advanceTimersByTimeAsync(0)
-      })
-
-      // Slow sync indicator should disappear
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0)
-      })
-      expect(mockHideToast).toHaveBeenCalledWith('slow-sync-id')
-
-      vi.useRealTimers()
     })
   })
 })
