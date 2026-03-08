@@ -29,6 +29,17 @@ pub struct Tactician {
     rng: Mutex<StdRng>,
 }
 
+/// Parameters for choosing a card when following in a trick.
+struct FollowParams<'a> {
+    state: &'a CurrentRoundInfo,
+    context: &'a GameContext,
+    legal_plays: &'a [Card],
+    should_win: bool,
+    urgency: f64,
+    trump_suit: Option<Suit>,
+    position: u8,
+}
+
 impl Tactician {
     pub const NAME: &'static str = "Tactician";
     pub const VERSION: &'static str = "1.4.0";
@@ -534,15 +545,15 @@ impl AiPlayer for Tactician {
         }
 
         // Following in the trick
-        self.choose_follow(
+        self.choose_follow(FollowParams {
             state,
             context,
-            &legal_plays,
+            legal_plays: &legal_plays,
             should_win,
             urgency,
             trump_suit,
             position,
-        )
+        })
     }
 }
 
@@ -922,17 +933,16 @@ impl Tactician {
     }
 
     /// Choose a card when following in a trick.
-    #[allow(clippy::too_many_arguments)]
-    fn choose_follow(
-        &self,
-        state: &CurrentRoundInfo,
-        context: &GameContext,
-        legal_plays: &[Card],
-        should_win: bool,
-        urgency: f64,
-        trump_suit: Option<Suit>,
-        position: u8,
-    ) -> Result<Card, AiError> {
+    fn choose_follow(&self, params: FollowParams<'_>) -> Result<Card, AiError> {
+        let FollowParams {
+            state,
+            context,
+            legal_plays,
+            should_win,
+            urgency,
+            trump_suit,
+            position,
+        } = params;
         let lead_card = state.current_trick_plays[0].1;
         let lead_suit = lead_card.suit;
         let is_last = position == 3; // We're playing last
