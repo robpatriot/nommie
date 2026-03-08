@@ -247,7 +247,6 @@ async fn ensure_ai_profiles_with_lock(
 /// - SqliteFile: Database-level PRAGMAs (journal_mode, synchronous) must be set before other connections exist
 /// - Postgres: Migrations use admin pool for consistency; no technical requirement but maintains pattern
 /// - Schema validation uses fast_path_schema_check to ensure migrations completed correctly
-#[allow(clippy::explicit_auto_deref)]
 pub async fn bootstrap_db(
     env: RuntimeEnv,
     db_kind: DbKind,
@@ -308,7 +307,7 @@ pub async fn bootstrap_db(
     migration_counters::log_snapshot("bootstrap_db");
 
     // Return the shared pool (same connection that was migrated for InMemory, new pool for others)
-    Ok((*shared_pool).clone())
+    Ok(shared_pool.as_ref().clone())
 }
 
 pub async fn build_pool(
