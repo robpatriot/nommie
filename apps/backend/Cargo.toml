@@ -54,6 +54,7 @@ regex = "1"
 unicode-normalization = "0.1"
 
 # Concurrency and hashing
+parking_lot = "0.12"
 rand = { version = "0.9", features = ["os_rng"] }
 rand_chacha = "0.9"
 blake3 = "1"

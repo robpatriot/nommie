@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::sync::RwLock;
 use std::time::Instant;
 
+use parking_lot::RwLock;
 use serde_json::{json, Value};
 use time::OffsetDateTime;
 use tokio::sync::Notify;
@@ -64,17 +64,7 @@ impl ReadinessManager {
 
     /// Current service mode.
     pub fn mode(&self) -> ServiceMode {
-        match self.inner.read() {
-            Ok(inner) => inner.mode,
-            Err(poisoned) => {
-                let inner = poisoned.into_inner();
-                tracing::error!(
-                    previous_mode = %inner.mode,
-                    "readiness: RwLock poisoned when reading service mode; treating as failed"
-                );
-                ServiceMode::Failed
-            }
-        }
+        self.inner.read().mode
     }
 
     /// Notify the readiness monitor that state may have changed.
@@ -91,15 +81,7 @@ impl ReadinessManager {
 
     /// Record migration outcome. A failure is a **hard** failure → immediate `Failed`.
     pub fn set_migration_result(&self, ok: bool, error: Option<String>) {
-        let mut inner = match self.inner.write() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                tracing::error!(
-                    "readiness: RwLock poisoned when setting migration result; continuing with last known state"
-                );
-                poisoned.into_inner()
-            }
-        };
+        let mut inner = self.inner.write();
         inner.migration.completed = ok;
         inner.migration.error = error.clone();
 
@@ -141,16 +123,7 @@ impl ReadinessManager {
     /// the recovery threshold, so `compute_new_mode` can transition Startup → Healthy.
     /// The monitor still runs for recovery but will immediately park on `notified()`.
     pub fn mark_initial_resolution_success(&self) {
-        let mut inner = match self.inner.write() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                tracing::error!(
-                    "readiness: RwLock poisoned in mark_initial_resolution_success; skipping"
-                );
-                drop(poisoned.into_inner());
-                return;
-            }
-        };
+        let mut inner = self.inner.write();
 
         if inner.mode != ServiceMode::Startup {
             return;
@@ -184,16 +157,7 @@ impl ReadinessManager {
     ///
     /// Returns `true` if this call caused a mode transition.
     pub fn disable_dependency(&self, name: DependencyName, reason: String) -> bool {
-        let mut inner = match self.inner.write() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                tracing::error!(
-                    dependency = %name,
-                    "readiness: RwLock poisoned when disabling dependency; continuing with last known state"
-                );
-                poisoned.into_inner()
-            }
-        };
+        let mut inner = self.inner.write();
 
         // Hard-failed services never recover.
         if inner.mode == ServiceMode::Failed {
@@ -244,16 +208,7 @@ impl ReadinessManager {
     /// Returns `true` if a mode transition occurred (caller can use this to
     /// decide whether to wake the monitor task).
     pub fn update_dependency(&self, name: DependencyName, check: DependencyCheck) -> bool {
-        let mut inner = match self.inner.write() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                tracing::error!(
-                    dependency = %name,
-                    "readiness: RwLock poisoned when updating dependency; continuing with last known state"
-                );
-                poisoned.into_inner()
-            }
-        };
+        let mut inner = self.inner.write();
 
         // Hard-failed services never recover.
         if inner.mode == ServiceMode::Failed {
@@ -415,16 +370,7 @@ impl ReadinessManager {
         name: DependencyName,
         latency: std::time::Duration,
     ) -> bool {
-        let mut inner = match self.inner.write() {
-            Ok(guard) => guard,
-            Err(poisoned) => {
-                tracing::error!(
-                    dependency = %name,
-                    "readiness: RwLock poisoned when marking authoritative dependency ok; continuing with last known state"
-                );
-                poisoned.into_inner()
-            }
-        };
+        let mut inner = self.inner.write();
 
         if inner.mode == ServiceMode::Failed {
             return false;
@@ -508,44 +454,25 @@ impl ReadinessManager {
 
     /// Rich internal response body.
     pub fn to_internal_json(&self) -> Value {
-        match self.inner.read() {
-            Ok(inner) => {
-                let uptime_secs = inner.boot_time.elapsed().as_secs();
+        let inner = self.inner.read();
+        let uptime_secs = inner.boot_time.elapsed().as_secs();
 
-                let deps: Vec<Value> = inner
-                    .dependencies
-                    .values()
-                    .map(|d| serde_json::to_value(d).unwrap_or_default())
-                    .collect();
+        let deps: Vec<Value> = inner
+            .dependencies
+            .values()
+            .map(|d| serde_json::to_value(d).unwrap_or_default())
+            .collect();
 
-                json!({
-                    "service": "backend",
-                    "uptime_seconds": uptime_secs,
-                    "state": {
-                        "mode": inner.mode,
-                        "ready": inner.mode == ServiceMode::Healthy,
-                    },
-                    "dependencies": deps,
-                    "migration": inner.migration,
-                })
-            }
-            Err(poisoned) => {
-                let inner = poisoned.into_inner();
-                let uptime_secs = inner.boot_time.elapsed().as_secs();
-                tracing::error!(
-                    "readiness: RwLock poisoned when building internal readiness JSON; reporting error state"
-                );
-                json!({
-                    "service": "backend",
-                    "uptime_seconds": uptime_secs,
-                    "state": {
-                        "mode": ServiceMode::Failed,
-                        "ready": false,
-                    },
-                    "error": "readiness_lock_poisoned",
-                })
-            }
-        }
+        json!({
+            "service": "backend",
+            "uptime_seconds": uptime_secs,
+            "state": {
+                "mode": inner.mode,
+                "ready": inner.mode == ServiceMode::Healthy,
+            },
+            "dependencies": deps,
+            "migration": inner.migration,
+        })
     }
 }
 
