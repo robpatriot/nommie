@@ -1,5 +1,6 @@
-#![allow(dead_code)]
 // tests/common/mod.rs
+// Shared across test binaries; helpers appear dead when analyzed per-binary.
+#![allow(dead_code)]
 use actix_web::body::BoxBody;
 use actix_web::dev::ServiceResponse;
 use actix_web::http::header::{HeaderName, CONTENT_TYPE};

@@ -1,3 +1,5 @@
+// Test support is shared across multiple test binaries (adapters, auth, routes, services, etc.).
+// Each binary uses a subset of helpers; the rest appear "dead" when that binary is analyzed.
 #![allow(dead_code, unused_imports)]
 
 pub mod ai_memory_helpers;
