@@ -61,7 +61,7 @@ where
                 .get::<String>()
                 .cloned()
                 .unwrap_or_else(|| "unknown".to_string());
-            let err = AppError::db_unavailable(
+            let err = AppError::service_unavailable(
                 "Service temporarily unavailable",
                 Sentinel("readiness gate blocked"),
                 Some(READINESS_RETRY_AFTER_SECS),

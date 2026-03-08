@@ -140,6 +140,15 @@ pub enum AppError {
         source: BoxError,
         retry_after_secs: Option<u32>,
     },
+    /// Service unavailable for generic reasons (e.g. readiness gate).
+    /// Does NOT set DbOutageMarker – use DbUnavailable only for actual DB outages.
+    #[error("Service unavailable: {reason}")]
+    ServiceUnavailable {
+        reason: String,
+        #[source]
+        source: BoxError,
+        retry_after_secs: Option<u32>,
+    },
     #[error("Timeout: {detail}")]
     Timeout {
         code: ErrorCode,
@@ -174,6 +183,7 @@ impl AppError {
             AppError::Conflict { code, .. } => *code,
             AppError::DbUnavailable { .. } => ErrorCode::DbUnavailable,
             AppError::RedisUnavailable { .. } => ErrorCode::RedisUnavailable,
+            AppError::ServiceUnavailable { .. } => ErrorCode::ServiceUnavailable,
             AppError::Timeout { code, .. } => *code,
         }
     }
@@ -184,6 +194,7 @@ impl AppError {
         match self {
             AppError::DbUnavailable { .. } => true,
             AppError::RedisUnavailable { .. } => true,
+            AppError::ServiceUnavailable { .. } => true,
             AppError::Timeout { .. } => true,
             _ => {
                 // Check if the detail or source suggests a connectivity issue
@@ -220,6 +231,7 @@ impl AppError {
             AppError::Conflict { detail, .. } => detail.clone(),
             AppError::DbUnavailable { reason, .. } => reason.clone(),
             AppError::RedisUnavailable { reason, .. } => reason.clone(),
+            AppError::ServiceUnavailable { reason, .. } => reason.clone(),
             AppError::Timeout { detail, .. } => detail.clone(),
         }
     }
@@ -242,6 +254,7 @@ impl AppError {
             AppError::Conflict { .. } => StatusCode::CONFLICT,
             AppError::DbUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             AppError::RedisUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            AppError::ServiceUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
             AppError::Timeout { .. } => StatusCode::GATEWAY_TIMEOUT,
         }
     }
@@ -399,6 +412,20 @@ impl AppError {
         }
     }
 
+    /// Create a service unavailable error (503) with optional retry_after_secs.
+    /// Use for generic unavailability (e.g. readiness gate) – does NOT set DbOutageMarker.
+    pub fn service_unavailable(
+        reason: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+        retry_after_secs: Option<u32>,
+    ) -> Self {
+        Self::ServiceUnavailable {
+            reason: reason.into(),
+            source: Box::new(source),
+            retry_after_secs,
+        }
+    }
+
     /// Create a timeout error with source (504)
     pub fn timeout(
         code: ErrorCode,
@@ -458,9 +485,9 @@ impl AppError {
     /// at the public boundary; internal codes remain for logging and diagnostics.
     fn public_code(&self) -> &'static str {
         match self {
-            AppError::DbUnavailable { .. } | AppError::RedisUnavailable { .. } => {
-                ErrorCode::ServiceUnavailable.as_str()
-            }
+            AppError::DbUnavailable { .. }
+            | AppError::RedisUnavailable { .. }
+            | AppError::ServiceUnavailable { .. } => ErrorCode::ServiceUnavailable.as_str(),
             _ => self.code().as_str(),
         }
     }
@@ -720,6 +747,7 @@ impl AppError {
             AppError::Db { .. }
             | AppError::DbUnavailable { .. }
             | AppError::RedisUnavailable { .. }
+            | AppError::ServiceUnavailable { .. }
             | AppError::Timeout { .. }
             | AppError::Internal { .. }
             | AppError::Config { .. } => {
@@ -746,6 +774,9 @@ impl AppError {
                         retry_after_secs, ..
                     }
                     | AppError::RedisUnavailable {
+                        retry_after_secs, ..
+                    }
+                    | AppError::ServiceUnavailable {
                         retry_after_secs, ..
                     } => retry_after_secs.unwrap_or(1),
                     _ => 1,
