@@ -4,7 +4,6 @@ pub mod core;
 
 // Diagnostics and locking are provided by db-infra and re-exported here
 // Re-export commonly used config types and core DB functions
-#[allow(unused_imports)]
 pub use core::bootstrap_db;
 
 pub use db_infra::infra::db::core::orchestrate_migration;
