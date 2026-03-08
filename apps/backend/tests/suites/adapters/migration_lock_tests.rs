@@ -34,8 +34,6 @@ fn skip_if_sqlite_memory(test_name: &str) -> Option<DbKind> {
 enum TestLock {
     Postgres {
         lock: PgAdvisoryLock,
-        #[allow(dead_code)] // Stored to keep connection alive, but not directly accessed
-        pool: sea_orm::DatabaseConnection,
     },
     SqliteFile {
         lock: SqliteFileLock,
@@ -63,13 +61,7 @@ impl TestLock {
                 );
                 let lock = PgAdvisoryLock::new(admin_pool.clone(), &lock_key);
 
-                (
-                    TestLock::Postgres {
-                        lock,
-                        pool: admin_pool.clone(),
-                    },
-                    Some(admin_pool),
-                )
+                (TestLock::Postgres { lock }, Some(admin_pool))
             }
             DbKind::SqliteFile => {
                 // Create deterministic lock path based on base_name
