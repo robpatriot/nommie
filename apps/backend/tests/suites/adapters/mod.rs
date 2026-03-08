@@ -4,6 +4,7 @@ pub mod db_bootstrap_contention;
 pub mod games_sea;
 pub mod hands_sea;
 pub mod infra_bootstrap;
+pub mod infra_state;
 pub mod memberships_sea;
 pub mod migration_lock_tests;
 pub mod optimistic_lock_repo_tests;
