@@ -113,27 +113,18 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
     if let Some(url) = &state.config.redis_url.0 {
         if let Some(guard) = ResolutionGuard::try_acquire(&state.redis_resolution_in_flight) {
             let realtime = state.realtime();
-            let needs_resolution = match realtime {
-                None => true,
-                Some(_) => {
-                    // PING current connection
+            let (needs_resolution, ping_check) = match realtime {
+                None => (true, None),
+                Some(broker) => {
                     let check = check_redis_ping(url).await;
-                    match &check {
-                        crate::readiness::types::DependencyCheck::Ok { latency } => {
-                            tracing::info!(
-                                latency_ms = latency.as_millis(),
-                                "redis readiness debug: ping path succeeded"
-                            );
-                        }
-                        crate::readiness::types::DependencyCheck::Down { error, latency } => {
-                            tracing::info!(
-                                latency_ms = latency.as_millis(),
-                                error = %error,
-                                "redis readiness debug: ping path observed redis down"
-                            );
-                        }
+                    let subscriber_alive = broker.is_subscriber_alive();
+                    if !subscriber_alive {
+                        tracing::info!(
+                            "readiness: Redis subscriber dead, triggering broker replacement"
+                        );
                     }
-                    !check.is_ok()
+                    let needs = !check.is_ok() || !subscriber_alive;
+                    (needs, Some(check))
                 }
             };
 
@@ -142,22 +133,7 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
                 match RealtimeBroker::connect(url, state.readiness().clone()).await {
                     Ok(broker) => {
                         state.set_realtime(broker);
-                        let check = check_redis_ping(url).await;
-                        match &check {
-                            crate::readiness::types::DependencyCheck::Ok { latency } => {
-                                tracing::info!(
-                                    latency_ms = latency.as_millis(),
-                                    "redis readiness debug: resolution ping succeeded"
-                                );
-                            }
-                            crate::readiness::types::DependencyCheck::Down { error, latency } => {
-                                tracing::info!(
-                                    latency_ms = latency.as_millis(),
-                                    error = %error,
-                                    "redis readiness debug: resolution ping still sees redis down"
-                                );
-                            }
-                        }
+                        let _check = check_redis_ping(url).await;
                         tracing::info!("readiness: Redis resolution successful");
                     }
                     Err(e) => {
@@ -169,8 +145,14 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
                                 latency,
                             },
                         );
-                        tracing::debug!(error = %e, "readiness: Redis resolution attempt failed");
                     }
+                }
+            } else if let Some(check) = ping_check {
+                // Broker exists, ping ok, subscriber alive – update readiness.
+                if check.is_ok() {
+                    state
+                        .readiness()
+                        .update_dependency(crate::readiness::types::DependencyName::Redis, check);
                 }
             }
             drop(guard);

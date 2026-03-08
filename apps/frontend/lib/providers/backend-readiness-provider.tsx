@@ -166,7 +166,7 @@ export function BackendReadinessProvider({
             const next = consecutiveSuccessRef.current + 1
             consecutiveSuccessRef.current = next
             if (next >= RECOVERY_SUCCESS_THRESHOLD) {
-              const previousMode = modeRef.current
+              const prevMode = modeRef.current
               hasEverSucceededRef.current = true
               modeRef.current = 'healthy'
               setMode('healthy')
@@ -175,7 +175,7 @@ export function BackendReadinessProvider({
                 needsReconcileAfterRecoveryRef.current = false
               }
               setRecoveryGeneration((g) => g + 1)
-              if (previousMode === 'degraded' || previousMode === 'suspect') {
+              if (prevMode === 'degraded' || prevMode === 'suspect') {
                 pendingRecoveryRefreshRef.current = true
               }
               if (startedInDegradedRef.current) {

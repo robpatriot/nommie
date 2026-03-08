@@ -357,6 +357,7 @@ impl ReadinessManager {
                 previous != ServiceMode::Recovering && new_mode == ServiceMode::Recovering;
 
             inner.mode = new_mode;
+
             match new_mode {
                 ServiceMode::Healthy => {
                     tracing::info!(
