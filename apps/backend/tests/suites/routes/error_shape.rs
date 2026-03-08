@@ -126,7 +126,7 @@ async fn test_all_error_responses_conform_to_problem_details() -> Result<(), App
             "/_test/db_unavailable",
             503,
             "SERVICE_UNAVAILABLE",
-            "database unavailable",
+            "Service temporarily unavailable",
         ),
     ];
 
@@ -297,8 +297,13 @@ async fn test_require_db_without_database() -> Result<(), AppError> {
     let resp = test::call_service(&app, req).await;
 
     // Should return SERVICE_UNAVAILABLE problem details with trace id
-    assert_problem_details_structure(resp, 503, "SERVICE_UNAVAILABLE", "database unavailable")
-        .await;
+    assert_problem_details_structure(
+        resp,
+        503,
+        "SERVICE_UNAVAILABLE",
+        "Service temporarily unavailable",
+    )
+    .await;
 
     Ok(())
 }

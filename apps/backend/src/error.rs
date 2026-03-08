@@ -497,7 +497,14 @@ impl AppError {
     fn to_problem_details_with_trace_id(&self, trace_id: String) -> ProblemDetails {
         let status = self.status();
         let code = self.public_code();
-        let detail = self.detail();
+        // Sanitize detail for infrastructure unavailability: do not expose DB/Redis specifics
+        // (see docs/service-monitor.md: dependency causes remain server-side)
+        let detail = match self {
+            AppError::DbUnavailable { .. }
+            | AppError::RedisUnavailable { .. }
+            | AppError::ServiceUnavailable { .. } => "Service temporarily unavailable".to_string(),
+            _ => self.detail(),
+        };
         let extensions = self.extensions();
 
         ProblemDetails {

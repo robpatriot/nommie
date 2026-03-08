@@ -71,7 +71,7 @@ mod tests {
                 response,
                 "SERVICE_UNAVAILABLE",
                 StatusCode::SERVICE_UNAVAILABLE,
-                Some("database unavailable"),
+                Some("Service temporarily unavailable"),
             )
             .await;
         } else {
@@ -101,7 +101,7 @@ mod tests {
                 response,
                 "SERVICE_UNAVAILABLE",
                 StatusCode::SERVICE_UNAVAILABLE,
-                Some("database unavailable"),
+                Some("Service temporarily unavailable"),
             )
             .await;
         } else {

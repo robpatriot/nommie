@@ -295,7 +295,7 @@ describe('BackendReadinessProvider', () => {
       const mutation = useMutation({
         mutationFn: async () => {
           throw new BackendApiError(
-            'database unavailable',
+            'Service temporarily unavailable',
             503,
             'SERVICE_UNAVAILABLE'
           )
