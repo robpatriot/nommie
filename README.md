@@ -37,6 +37,7 @@ docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
 Minimum env:
 
 - `BACKEND_JWT_SECRET`
+- `GOOGLE_CLIENT_ID` (must match frontend `AUTH_GOOGLE_ID` for ID token verification)
 - Database coordinates (`POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `APP_DB_USER`, `APP_DB_PASSWORD`)
 - Any telemetry or feature flags your deployment needs
 
@@ -89,21 +90,22 @@ docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
 - `NOMMIE_OWNER_USER`, `NOMMIE_OWNER_PASSWORD` - Owner role credentials
 
 **Backend Configuration:**
-- `APP_JWT_SECRET` - JWT signing secret (required)
+- `BACKEND_JWT_SECRET` - JWT signing secret (required)
+- `GOOGLE_CLIENT_ID` - Google OAuth client ID for ID token verification (must match frontend `AUTH_GOOGLE_ID`)
 - `CORS_ALLOWED_ORIGINS` - Comma-separated allowed origins (defaults to localhost:3000, 127.0.0.1:3000)
 - `REDIS_URL` - Redis connection string for realtime fan-out (e.g. `redis://127.0.0.1:6379/0`)
 
 **Frontend Configuration:**
 - `NEXT_PUBLIC_BACKEND_BASE_URL` - Backend API URL, required (e.g., `http://localhost:3001`)
 - `BACKEND_BASE_URL` - Optional internal URL for server-side fe->be calls; when set, overrides `NEXT_PUBLIC_BACKEND_BASE_URL` for auth/JWT/API
-- `APP_JWT_SECRET` - NextAuth secret (shared with backend JWT secret from root .env)
+- `AUTH_SECRET` - NextAuth secret for session management
 - `NEXT_PUBLIC_BACKEND_WS_URL` - Optional override for websocket base (falls back to `NEXT_PUBLIC_BACKEND_BASE_URL` with `ws://`)
 - See Authentication Setup section for Google OAuth configuration
 
 ### Environment File Setup
 1. **Root environment:** Copy `.env.example` to `.env` and update values
 2. **Frontend environment:** See Authentication Setup section below for detailed frontend configuration
-3. **Shared secrets:** The frontend automatically uses `APP_JWT_SECRET` from the root `.env` file
+3. **Shared secrets:** The frontend uses `AUTH_SECRET` for NextAuth; the backend uses `BACKEND_JWT_SECRET` for API tokens
 
 ---
 
@@ -174,13 +176,14 @@ The frontend uses **NextAuth v5** with Google OAuth for user authentication.
 2. **Update required variables:**
    - `AUTH_GOOGLE_ID` & `AUTH_GOOGLE_SECRET`: Get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
    - `NEXT_PUBLIC_BACKEND_BASE_URL`: Set to `http://localhost:3001` for local development
-   - `APP_JWT_SECRET`: Already configured in root `.env` (shared with backend)
+   - `AUTH_SECRET`: NextAuth session secret (generate with `openssl rand -hex 32`)
 
 ### 🔑 Google OAuth Setup
 1. Go to [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Create OAuth 2.0 credentials for a web application
 3. Add authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
 4. Copy Client ID and Client Secret to your `apps/frontend/.env.local` as `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET`
+5. Set `GOOGLE_CLIENT_ID` in the backend environment to the same Client ID (used for server-side ID token verification)
 
 ### 🚀 Running with Authentication
 - **Start the app:** `pnpm start` (from root)
@@ -220,18 +223,9 @@ During early testing, you can restrict signup and login to a controlled set of e
 
 ## Auth Policy (Google OAuth)
 
-- Each `user_credentials.email` is unique and links to at most one Google account.
-- On login:
-  - If `google_sub` is NULL, we set it to the incoming Google sub.
-  - If `google_sub` is already set and equals the incoming sub, login succeeds and updates `last_login`.
-  - If `google_sub` is already set and **differs** from the incoming sub, the request fails with:
-    - **HTTP 409 CONFLICT**
-    - Problem Details `code=GOOGLE_SUB_MISMATCH`
-- We never silently overwrite `google_sub`. This prevents unintended or malicious account re-linking.
-- Logging:
-  - INFO on first creation and when setting `google_sub` from NULL.
-  - DEBUG on repeat logins.
-  - WARN on mismatch.
+- **Login:** The frontend sends a Google ID token to `POST /api/auth/login`. The backend verifies the token server-side (signature, issuer, audience, expiry), extracts trusted claims (`sub`, `email`, `email_verified`), and rejects if `email_verified` is not true. Allowlist is applied using the verified email. The backend mints its own JWT with internal `users.id` as `sub`.
+- **Refresh:** `POST /api/auth/refresh` accepts a Bearer token with the current backend JWT and returns a new JWT. Used to extend sessions without re-authenticating with Google.
+- **Identity model:** `users.id` is the internal canonical identity. External provider identity lives in `user_auth_identities` with `(provider, provider_user_id)` as the canonical key. The backend never trusts client-posted `email`, `name`, or `google_sub`; all identity comes from verified ID token claims.
 
 ---
 

@@ -30,6 +30,9 @@ pub struct Config {
     // Email allowlist configuration (optional)
     pub email_allowlist: Option<EmailAllowlist>,
 
+    // Google OAuth client ID for ID token verification (required for auth)
+    pub google_client_id: String,
+
     // HTTP payload limits
     pub max_json_payload_size: usize,
     pub max_payload_size: usize,
@@ -81,6 +84,25 @@ impl Config {
         // Email allowlist configuration (optional)
         let email_allowlist = EmailAllowlist::from_env();
 
+        // Google OAuth client ID for ID token verification
+        let google_client_id = env::var("GOOGLE_CLIENT_ID").map_err(|_| AppError::Config {
+            detail: "GOOGLE_CLIENT_ID must be set for Google ID token verification".to_string(),
+            source: Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "GOOGLE_CLIENT_ID environment variable not found",
+            )),
+        })?;
+        let google_client_id = google_client_id.trim().to_string();
+        if google_client_id.is_empty() {
+            return Err(AppError::Config {
+                detail: "GOOGLE_CLIENT_ID must be non-empty".to_string(),
+                source: Box::new(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "GOOGLE_CLIENT_ID empty",
+                )),
+            });
+        }
+
         // HTTP payload limits (default to 1MB if not specified)
         const DEFAULT_MAX_PAYLOAD_SIZE: usize = 1024 * 1024;
         let max_json_payload_size = env::var("MAX_JSON_PAYLOAD_SIZE")
@@ -103,6 +125,7 @@ impl Config {
             jwt_secret,
             redis_url,
             email_allowlist,
+            google_client_id,
             max_json_payload_size,
             max_payload_size,
             websocket_timeout_secs,

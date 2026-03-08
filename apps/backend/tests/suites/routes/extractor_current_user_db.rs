@@ -20,7 +20,6 @@ use crate::support::test_state_builder;
 #[derive(serde::Serialize)]
 struct TestMeDbResponse {
     id: i64,
-    sub: String,
     email: Option<String>,
 }
 
@@ -29,7 +28,6 @@ async fn test_me_db_handler(
 ) -> Result<web::Json<TestMeDbResponse>, AppError> {
     Ok(web::Json(TestMeDbResponse {
         id: current_user.id,
-        sub: current_user.sub,
         email: current_user.email,
     }))
 }
@@ -80,15 +78,15 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(&db).await?;
 
-    // Seed user with specific sub - use unique helpers to ensure uniqueness
+    // Seed user - use unique helpers to ensure uniqueness
     let test_sub = unique_str("test-sub");
     let test_email = unique_email("test");
     let user = seed_user_with_sub(shared.transaction(), &test_sub, Some(&test_email))
         .await
         .expect("should create user successfully");
 
-    // Mint JWT with the same sub
-    let token = mint_test_token(&test_sub, &test_email, &security_config);
+    // Mint JWT with user.id as sub
+    let token = mint_test_token(&user.id.to_string(), &test_email, &security_config);
 
     // Build app with test routes
     let mut app = build_auth_app(state).await?;
@@ -114,7 +112,6 @@ async fn test_me_db_success() -> Result<(), Box<dyn std::error::Error>> {
 
     // Verify response structure
     assert_eq!(response["id"], user.id);
-    assert_eq!(response["sub"], test_sub);
     assert_eq!(response["email"], Value::String(test_email.clone()));
 
     // Rollback the transaction
@@ -133,10 +130,10 @@ async fn test_me_db_user_not_found() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Mint JWT with a sub that doesn't exist in database - use unique helpers to ensure uniqueness
-    let missing_sub = unique_str("missing-sub");
+    // Mint JWT with a user id that doesn't exist in database - use a high id that won't exist
+    let missing_sub = "999999999";
     let test_email = unique_email("missing");
-    let token = mint_test_token(&missing_sub, &test_email, &security_config);
+    let token = mint_test_token(missing_sub, &test_email, &security_config);
 
     // Build app with test routes
     let mut app = build_auth_app(state).await?;

@@ -3,7 +3,6 @@
 
 import { BACKEND_JWT_COOKIE_NAME } from './backend-jwt-cookie'
 import * as jose from 'jose'
-import { getToken } from 'next-auth/jwt'
 
 const REFRESH_THRESHOLD_SECONDS = 300 // 5 minutes
 
@@ -129,56 +128,45 @@ function isConnectionError(err: unknown): boolean {
   )
 }
 
+function parseBackendJwtFromCookieHeader(cookieHeader: string): string | null {
+  const parts = cookieHeader.split(';').map((p) => p.trim())
+  for (const part of parts) {
+    const eq = part.indexOf('=')
+    if (eq > 0) {
+      const name = part.slice(0, eq).trim()
+      const value = part.slice(eq + 1).trim()
+      if (name === BACKEND_JWT_COOKIE_NAME && value) {
+        try {
+          return decodeURIComponent(value)
+        } catch {
+          return value
+        }
+      }
+    }
+  }
+  return null
+}
+
 /**
- * Fetch new JWT - Generic version for middleware
+ * Fetch new JWT via refresh endpoint. Requires existing backend JWT in cookies.
  */
 async function fetchNewBackendJwtGeneric(
   cookieHeader: string
 ): Promise<string | null> {
-  const headers = new Headers({ cookie: cookieHeader })
-  // We need to mock the Request object for getToken
-  // getToken expects `req` to have `headers` or `cookies`
+  const existingJwt = parseBackendJwtFromCookieHeader(cookieHeader)
+  if (!existingJwt) return null
 
-  // NOTE: getToken is Edge compatible.
-  const token = await getToken({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    req: { headers } as any,
-    secret: process.env.AUTH_SECRET,
-    secureCookie: process.env.NODE_ENV === 'production',
-    salt:
-      process.env.NODE_ENV === 'production'
-        ? '__Secure-authjs.session-token'
-        : 'authjs.session-token',
-  })
-
-  if (!token) return null
-
-  // Extract needed fields
-  const googleSub =
-    (token?.googleSub && typeof token.googleSub === 'string'
-      ? token.googleSub
-      : null) ||
-    (token?.sub && typeof token.sub === 'string' ? token.sub : null)
-
-  const email = token?.email
-  const name = token?.name
-
-  if (!googleSub || !email) return null
-
-  // Get Backend URL - prefer internal when set
   const backendBase =
     process.env.BACKEND_BASE_URL || process.env.NEXT_PUBLIC_BACKEND_BASE_URL
   if (!backendBase) return null
 
   try {
-    const response = await fetch(`${backendBase}/api/auth/login`, {
+    const response = await fetch(`${backendBase}/api/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        name,
-        google_sub: googleSub,
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${existingJwt}`,
+      },
     })
 
     if (!response.ok) return null

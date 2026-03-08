@@ -14,6 +14,7 @@
     "INVALID_GAME_ID": "That game link is invalid.",
     "INVALID_EMAIL": "Please enter a valid email address.",
     "INVALID_GOOGLE_SUB": "Sign-in failed. Please try again.",
+    "INVALID_ID_TOKEN": "Sign-in failed. Please try again.",
     "INVALID_SEAT": "That seat is not valid.",
     "INVALID_BID": "That bid is not valid.",
     "MUST_FOLLOW_SUIT": "You must follow suit.",

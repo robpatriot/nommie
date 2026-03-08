@@ -14,6 +14,7 @@
     "INVALID_GAME_ID": "Ce lien de partie est invalide.",
     "INVALID_EMAIL": "Veuillez saisir une adresse e-mail valide.",
     "INVALID_GOOGLE_SUB": "Échec de la connexion. Veuillez réessayer.",
+    "INVALID_ID_TOKEN": "Échec de la connexion. Veuillez réessayer.",
     "INVALID_SEAT": "Cette place n’est pas valide.",
     "INVALID_BID": "Cette enchère n’est pas valide.",
     "MUST_FOLLOW_SUIT": "Vous devez fournir la couleur demandée.",

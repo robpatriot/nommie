@@ -11,7 +11,7 @@
 	}
 
 	# Backend auth endpoints (must go to backend)
-	@backend_auth path /api/auth/login /api/auth/check-allowlist
+	@backend_auth path /api/auth/login /api/auth/refresh /api/auth/check-allowlist
 	handle @backend_auth {
 		reverse_proxy backend:3001
 	}

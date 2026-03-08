@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use actix_web::test;
+use backend::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
 use backend::auth::jwt::verify_access_token;
 use backend::state::security_config::SecurityConfig;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
@@ -22,7 +25,7 @@ async fn test_malformed_json_returns_400_with_rfc7807() -> Result<(), Box<dyn st
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     // Test malformed JSON (trailing comma)
-    let malformed_json = r#"{"email": "test@example.com", "google_sub": "test_sub",}"#;
+    let malformed_json = r#"{"id_token": "test",}"#;
 
     let req = test::TestRequest::post()
         .uri("/api/auth/login")
@@ -51,10 +54,9 @@ async fn test_wrong_type_returns_400_with_rfc7807() -> Result<(), Box<dyn std::e
     // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    // Test wrong type (number instead of string for email)
+    // Test wrong type (number instead of string for id_token)
     let wrong_type_json = json!({
-        "email": 123,
-        "google_sub": "test_sub"
+        "id_token": 123
     });
 
     let req = test::TestRequest::post()
@@ -91,11 +93,8 @@ async fn test_missing_required_field_returns_400_with_rfc7807(
     // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    // Test missing required field (google_sub is required but missing)
-    let missing_field_json = json!({
-        "email": "test@example.com"
-        // Missing google_sub field
-    });
+    // Test missing required field (id_token is required but missing)
+    let missing_field_json = json!({});
 
     let req = test::TestRequest::post()
         .uri("/api/auth/login")
@@ -105,13 +104,12 @@ async fn test_missing_required_field_returns_400_with_rfc7807(
 
     let resp = test::call_service(&app, req).await;
 
-    // Validate error structure using centralized helper
-    // This should be INVALID_GOOGLE_SUB because the JSON is valid but the field is missing
+    // Serde reports missing field as Data error -> "wrong types for one or more fields"
     assert_problem_details_structure(
         resp,
         400,
-        "INVALID_GOOGLE_SUB",
-        "Google sub cannot be empty",
+        "BAD_REQUEST",
+        "Invalid JSON: wrong types for one or more fields",
     )
     .await;
 
@@ -120,25 +118,25 @@ async fn test_missing_required_field_returns_400_with_rfc7807(
 
 #[actix_web::test]
 async fn test_valid_json_happy_path_unchanged() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with database and security config
+    let test_email = unique_email("test");
+    let test_google_sub = unique_str("google");
+    let mock_verifier = Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+        sub: test_google_sub,
+        email: test_email.clone(),
+        name: Some("Test User".to_string()),
+    }));
+
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = test_state_builder()?
         .with_security(security_config.clone())
+        .with_google_verifier(mock_verifier)
         .build()
         .await?;
 
-    // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    // Test valid JSON - should work as before
-    let test_email = unique_email("test");
-    let test_google_sub = unique_str("google");
-    let valid_json = json!({
-        "email": test_email,
-        "name": "Test User",
-        "google_sub": test_google_sub
-    });
+    let valid_json = json!({ "id_token": "test-token" });
 
     let req = test::TestRequest::post()
         .uri("/api/auth/login")
@@ -169,25 +167,25 @@ async fn test_valid_json_happy_path_unchanged() -> Result<(), Box<dyn std::error
 #[actix_web::test]
 async fn test_non_json_content_type_still_attempts_parse() -> Result<(), Box<dyn std::error::Error>>
 {
-    // Build state with database and security config
+    let test_email = unique_email("test");
+    let test_google_sub = unique_str("google");
+    let mock_verifier = Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+        sub: test_google_sub,
+        email: test_email,
+        name: Some("Test User".to_string()),
+    }));
+
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = test_state_builder()?
         .with_security(security_config)
+        .with_google_verifier(mock_verifier)
         .build()
         .await?;
 
-    // Build app with production routes
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    // Test with non-JSON content type but valid JSON body
-    let test_email = unique_email("test");
-    let test_google_sub = unique_str("google");
-    let valid_json = json!({
-        "email": test_email,
-        "name": "Test User",
-        "google_sub": test_google_sub
-    });
+    let valid_json = json!({ "id_token": "test-token" });
 
     let req = test::TestRequest::post()
         .uri("/api/auth/login")

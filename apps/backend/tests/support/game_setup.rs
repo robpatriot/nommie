@@ -84,8 +84,7 @@ pub async fn setup_game_with_players_ex<C: ConnectionTrait>(
 
         let user = users::ActiveModel {
             id: NotSet,
-            sub: Set(user_sub),
-            username: Set(Some(format!("player{i}"))),
+            username: Set(Some(user_sub)),
             is_ai: Set(false),
             created_at: Set(now),
             updated_at: Set(now),

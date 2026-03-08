@@ -46,7 +46,10 @@ const nextAuthResult = NextAuth({
   providers: [
     Google({
       allowDangerousEmailAccountLinking: false,
-    }),
+      // Required for account.id_token in JWT callback; without it Google may not
+      // include the ID token, causing backend verification to fail.
+      idToken: true,
+    } as Parameters<typeof Google>[0]),
   ],
   callbacks: {
     async signIn({ account, profile }) {
@@ -96,8 +99,11 @@ const nextAuthResult = NextAuth({
     },
 
     async jwt({ token, account, profile, trigger }) {
-      // Store user info in token for refreshing backend JWT
       if (account?.provider === 'google' && profile) {
+        const idToken = await import('@/lib/auth/require-google-id-token').then(
+          (m) => m.requireGoogleIdToken(account)
+        )
+
         if (!profile.email) {
           throw new Error('Google profile missing email')
         }
@@ -109,27 +115,20 @@ const nextAuthResult = NextAuth({
         token.googleSub = profile.sub
         token.name = profile.name || token.name
 
-        // Email is allowed (signIn callback already checked), proceed with backend login
         const backendBase = getBackendBaseUrlOrThrow()
 
         try {
           const response = await fetch(`${backendBase}/api/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: profile.email,
-              name: profile.name,
-              google_sub: profile.sub,
-            }),
+            body: JSON.stringify({ id_token: idToken }),
           })
 
           if (response.ok) {
             const data = await response.json()
             if (data && typeof data.token === 'string') {
-              // Store in token and cookie
               token.backendJwt = data.token
 
-              // IMPORTANT: cookie helpers are server-only now
               const { setBackendJwtInCookie } =
                 await import('@/lib/auth/backend-jwt-cookie.server')
               await setBackendJwtInCookie(data.token)
@@ -140,7 +139,7 @@ const nextAuthResult = NextAuth({
           logError('Failed to get backend JWT on initial login', error, {
             action: 'initialLogin',
           })
-          // Don't fail the login if backend JWT fetch fails (allowlist already passed)
+          throw error
         }
       }
 

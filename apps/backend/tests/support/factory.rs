@@ -24,8 +24,7 @@ pub async fn seed_user_with_sub(
 
     let user = backend::entities::users::ActiveModel {
         id: NotSet, // Let database auto-generate
-        sub: Set(sub.to_string()),
-        username: Set(Some("Test User".to_string())),
+        username: Set(Some(sub.to_string())),
         is_ai: Set(false),
         created_at: Set(now),
         updated_at: Set(now),
@@ -77,8 +76,7 @@ pub async fn create_test_user_with_randomization(
 
     let user = backend::entities::users::ActiveModel {
         id: NotSet,
-        sub: Set(final_sub),
-        username: Set(username.map(|s| s.to_string())),
+        username: Set(username.map(|s| s.to_string()).or(Some(final_sub))),
         is_ai: Set(false),
         created_at: Set(now),
         updated_at: Set(now),

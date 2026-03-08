@@ -17,6 +17,7 @@ fn error_codes_are_unique() {
         ErrorCode::InvalidGameId,
         ErrorCode::InvalidEmail,
         ErrorCode::InvalidGoogleSub,
+        ErrorCode::InvalidIdToken,
         ErrorCode::ValidationError,
         ErrorCode::BadRequest,
         ErrorCode::PayloadTooLarge,

@@ -2,6 +2,7 @@
 
 pub mod ai_overrides;
 pub mod ai_profiles;
+pub mod auth_identities;
 pub mod bids;
 pub mod games;
 pub mod hands;

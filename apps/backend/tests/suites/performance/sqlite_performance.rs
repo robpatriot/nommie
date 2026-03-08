@@ -4,6 +4,7 @@
 
 use std::time::Instant;
 
+use backend::auth::google::VerifiedGoogleClaims;
 use backend::config::db::{DbKind, RuntimeEnv};
 use backend::db::txn::with_txn;
 use backend::infra::state::build_state;
@@ -28,9 +29,12 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
             for i in 0..10 {
                 let email = unique_email(&format!("memory_user_{}", i));
                 let sub = unique_str(&format!("memory-sub-{}", i));
-                let _user = service
-                    .ensure_user(txn, &email, Some(&format!("Memory User {}", i)), &sub, None)
-                    .await?;
+                let claims = VerifiedGoogleClaims {
+                    sub: sub.clone(),
+                    email: email.clone(),
+                    name: Some(format!("Memory User {}", i)),
+                };
+                let _user = service.ensure_user(txn, &claims, None).await?;
             }
             Ok(())
         })
@@ -52,9 +56,12 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
             for i in 0..10 {
                 let email = unique_email(&format!("file_user_{}", i));
                 let sub = unique_str(&format!("file-sub-{}", i));
-                let _user = service
-                    .ensure_user(txn, &email, Some(&format!("File User {}", i)), &sub, None)
-                    .await?;
+                let claims = VerifiedGoogleClaims {
+                    sub: sub.clone(),
+                    email: email.clone(),
+                    name: Some(format!("File User {}", i)),
+                };
+                let _user = service.ensure_user(txn, &claims, None).await?;
             }
             Ok(())
         })

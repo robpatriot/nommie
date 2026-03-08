@@ -47,7 +47,7 @@ async fn starting_game_by_adding_last_ai_seat_drains_ai_turns() -> Result<(), Ap
 
     let host_sub = test_user_sub(&format!("{test_name}_creator"));
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_sub, &host_email, &security);
+    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -129,7 +129,7 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
 
     let host_sub = test_user_sub(&format!("{test_name}_creator"));
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_sub, &host_email, &security);
+    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -208,7 +208,7 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
 
     let host_sub = test_user_sub(&format!("{test_name}_creator"));
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_sub, &host_email, &security);
+    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -318,7 +318,7 @@ async fn host_can_remove_ai_seat() -> Result<(), AppError> {
 
     let host_sub = test_user_sub(&format!("{test_name}_creator"));
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_sub, &host_email, &security);
+    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -407,7 +407,7 @@ async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
         .await?;
 
     let non_host_email = format!("{non_host_sub}@example.com");
-    let non_host_token = mint_test_token(&non_host_sub, &non_host_email, &security);
+    let non_host_token = mint_test_token(&non_host_id.to_string(), &non_host_email, &security);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -452,7 +452,9 @@ async fn ai_registry_endpoint_lists_factories() -> Result<(), AppError> {
 
     let host_sub = test_user_sub("ai_registry_host");
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_sub, &host_email, &security);
+    let host_user_id =
+        create_test_user(shared.transaction(), &host_sub, Some("Registry Host")).await?;
+    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {

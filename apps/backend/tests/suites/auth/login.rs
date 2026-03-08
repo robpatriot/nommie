@@ -1,9 +1,14 @@
 // Integration tests for auth login endpoint.
 //
-// Tests both successful login flows and validation errors.
+// Tests login with verified Google ID token and refresh endpoint.
 
-use actix_web::test;
+use std::sync::Arc;
+
+use actix_web::{test, HttpMessage};
+use backend::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
 use backend::auth::jwt::verify_access_token;
+use backend::db::require_db;
+use backend::db::txn::SharedTxn;
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
@@ -19,28 +24,34 @@ use crate::support::test_state_builder;
 
 #[actix_web::test]
 async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::Error>> {
+    let test_email = unique_email("test");
+    let test_google_sub = unique_str("google");
+    let mock_verifier = Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+        sub: test_google_sub.clone(),
+        email: test_email.clone(),
+        name: Some("Test User".to_string()),
+    }));
+
     let security_config =
         SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
     let state = test_state_builder()?
         .with_security(security_config.clone())
+        .with_google_verifier(mock_verifier)
         .build()
         .await?;
 
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(&db).await?;
+
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    // First login with new email -> creates user + returns JWT
-    let test_email = unique_email("test");
-    let test_google_sub = unique_str("google");
-    let login_data = json!({
-        "email": test_email,
-        "name": "Test User",
-        "google_sub": test_google_sub
-    });
+    let login_data = json!({ "id_token": "test-token" });
 
     let req = test::TestRequest::post()
         .uri("/api/auth/login")
         .set_json(login_data)
         .to_request();
+    req.extensions_mut().insert(shared.clone());
 
     let resp = test::call_service(&app, req).await;
 
@@ -56,19 +67,14 @@ async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::
     let decoded = verify_access_token(token, &security_config).expect("JWT should be valid");
     assert_eq!(decoded.email, test_email);
 
-    let first_user_sub = decoded.sub;
+    let first_user_id_str = decoded.sub;
 
-    // Second call with same email -> reuses the same user
-    let login_data_2 = json!({
-        "email": test_email,
-        "name": "Updated Name",
-        "google_sub": test_google_sub
-    });
-
+    let login_data_2 = json!({ "id_token": "test-token" });
     let req2 = test::TestRequest::post()
         .uri("/api/auth/login")
         .set_json(login_data_2)
         .to_request();
+    req2.extensions_mut().insert(shared.clone());
 
     let resp2 = test::call_service(&app, req2).await;
 
@@ -77,11 +83,15 @@ async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::
 
     let body2: serde_json::Value = test::read_body_json(resp2).await;
     let token2 = body2["token"].as_str().unwrap();
-
     let decoded2 = verify_access_token(token2, &security_config).expect("JWT should be valid");
 
-    assert_eq!(decoded2.sub, first_user_sub);
+    assert_eq!(
+        decoded2.sub, first_user_id_str,
+        "repeat login should return same user id"
+    );
     assert_eq!(decoded2.email, test_email);
+
+    shared.rollback().await?;
 
     Ok(())
 }
@@ -91,173 +101,11 @@ async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::
 // ============================================================================
 
 #[actix_web::test]
-async fn test_login_rejects_missing_required_fields() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_login_rejects_missing_id_token() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().build().await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    let test_email = unique_email("test");
-    let login_data = json!({
-        "email": test_email
-    });
-
-    let req = test::TestRequest::post()
-        .uri("/api/auth/login")
-        .set_json(login_data)
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-
-    assert_problem_details_structure(
-        resp,
-        400,
-        "INVALID_GOOGLE_SUB",
-        "Google sub cannot be empty",
-    )
-    .await;
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_login_rejects_empty_email() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().build().await?;
-    let app = create_test_app(state).with_prod_routes().build().await?;
-
-    let test_google_sub = unique_str("google");
-    let login_data = json!({
-        "email": "",
-        "google_sub": test_google_sub
-    });
-
-    let req = test::TestRequest::post()
-        .uri("/api/auth/login")
-        .set_json(login_data)
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-
-    assert_problem_details_structure(resp, 400, "INVALID_EMAIL", "Email cannot be empty").await;
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_login_rejects_empty_google_sub() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().build().await?;
-    let app = create_test_app(state).with_prod_routes().build().await?;
-
-    let test_email = unique_email("test");
-    let login_data = json!({
-        "email": test_email,
-        "google_sub": "",
-        "name": "Test User"
-    });
-
-    let req = test::TestRequest::post()
-        .uri("/api/auth/login")
-        .set_json(login_data)
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-
-    assert_problem_details_structure(
-        resp,
-        400,
-        "INVALID_GOOGLE_SUB",
-        "Google sub cannot be empty",
-    )
-    .await;
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_login_rejects_both_empty() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().build().await?;
-    let app = create_test_app(state).with_prod_routes().build().await?;
-
-    let login_data = json!({
-        "email": "",
-        "google_sub": "",
-        "name": ""
-    });
-
-    let req = test::TestRequest::post()
-        .uri("/api/auth/login")
-        .set_json(login_data)
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-
-    // Should fail on first validation (email)
-    assert_problem_details_structure(resp, 400, "INVALID_EMAIL", "Email cannot be empty").await;
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_login_missing_email_field() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().build().await?;
-    let app = create_test_app(state).with_prod_routes().build().await?;
-
-    let test_google_sub = unique_str("google");
-    let login_data = json!({
-        "google_sub": test_google_sub,
-        "name": "Test User"
-    });
-
-    let req = test::TestRequest::post()
-        .uri("/api/auth/login")
-        .set_json(login_data)
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-
-    assert_problem_details_structure(resp, 400, "INVALID_EMAIL", "Email cannot be empty").await;
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_login_missing_google_sub_field() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().build().await?;
-    let app = create_test_app(state).with_prod_routes().build().await?;
-
-    let test_email = unique_email("test");
-    let login_data = json!({
-        "email": test_email,
-        "name": "Test User"
-    });
-
-    let req = test::TestRequest::post()
-        .uri("/api/auth/login")
-        .set_json(login_data)
-        .to_request();
-
-    let resp = test::call_service(&app, req).await;
-
-    assert_problem_details_structure(
-        resp,
-        400,
-        "INVALID_GOOGLE_SUB",
-        "Google sub cannot be empty",
-    )
-    .await;
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_login_wrong_type_for_email() -> Result<(), Box<dyn std::error::Error>> {
-    let state = build_state().build().await?;
-    let app = create_test_app(state).with_prod_routes().build().await?;
-
-    let test_google_sub = unique_str("google");
-    let login_data = json!({
-        "email": 123,
-        "google_sub": test_google_sub,
-        "name": "Test User"
-    });
+    let login_data = json!({});
 
     let req = test::TestRequest::post()
         .uri("/api/auth/login")
@@ -278,16 +126,31 @@ async fn test_login_wrong_type_for_email() -> Result<(), Box<dyn std::error::Err
 }
 
 #[actix_web::test]
-async fn test_login_wrong_type_for_google_sub() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_login_rejects_empty_id_token() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().build().await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    let test_email = unique_email("test");
-    let login_data = json!({
-        "email": test_email,
-        "google_sub": 456,
-        "name": "Test User"
-    });
+    let login_data = json!({ "id_token": "" });
+
+    let req = test::TestRequest::post()
+        .uri("/api/auth/login")
+        .set_json(login_data)
+        .to_request();
+
+    let resp = test::call_service(&app, req).await;
+
+    assert_problem_details_structure(resp, 400, "INVALID_ID_TOKEN", "id_token cannot be empty")
+        .await;
+
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_login_rejects_wrong_type_for_id_token() -> Result<(), Box<dyn std::error::Error>> {
+    let state = build_state().build().await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
+
+    let login_data = json!({ "id_token": 123 });
 
     let req = test::TestRequest::post()
         .uri("/api/auth/login")
@@ -307,31 +170,80 @@ async fn test_login_wrong_type_for_google_sub() -> Result<(), Box<dyn std::error
     Ok(())
 }
 
+// ============================================================================
+// Refresh Endpoint Tests
+// ============================================================================
+
 #[actix_web::test]
-async fn test_login_wrong_type_for_name() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_refresh_returns_new_jwt() -> Result<(), Box<dyn std::error::Error>> {
+    let test_email = unique_email("refresh");
+    let test_google_sub = unique_str("refresh-google");
+    let mock_verifier = Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+        sub: test_google_sub,
+        email: test_email.clone(),
+        name: None,
+    }));
+
+    let security_config =
+        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
+    let state = test_state_builder()?
+        .with_security(security_config.clone())
+        .with_google_verifier(mock_verifier)
+        .build()
+        .await?;
+
+    let db = require_db(&state).expect("DB required");
+    let shared = SharedTxn::open(&db).await?;
+
+    let app = create_test_app(state).with_prod_routes().build().await?;
+
+    let login_data = json!({ "id_token": "test-token" });
+    let login_req = test::TestRequest::post()
+        .uri("/api/auth/login")
+        .set_json(login_data)
+        .to_request();
+    login_req.extensions_mut().insert(shared.clone());
+
+    let login_resp = test::call_service(&app, login_req).await;
+    assert!(login_resp.status().is_success());
+    let body: serde_json::Value = test::read_body_json(login_resp).await;
+    let original_token = body["token"].as_str().unwrap();
+
+    let refresh_req = test::TestRequest::post()
+        .uri("/api/auth/refresh")
+        .insert_header(("Authorization", format!("Bearer {}", original_token)))
+        .to_request();
+
+    let refresh_resp = test::call_service(&app, refresh_req).await;
+    assert!(refresh_resp.status().is_success());
+    let refresh_body: serde_json::Value = test::read_body_json(refresh_resp).await;
+    let new_token = refresh_body["token"].as_str().unwrap();
+    assert!(!new_token.is_empty());
+
+    let decoded = verify_access_token(new_token, &security_config).expect("JWT should be valid");
+    assert_eq!(decoded.email, test_email);
+
+    shared.rollback().await?;
+
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_refresh_rejects_missing_bearer() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_state().build().await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
 
-    let test_email = unique_email("test");
-    let test_google_sub = unique_str("google");
-    let login_data = json!({
-        "email": test_email,
-        "google_sub": test_google_sub,
-        "name": 789
-    });
-
     let req = test::TestRequest::post()
-        .uri("/api/auth/login")
-        .set_json(login_data)
+        .uri("/api/auth/refresh")
         .to_request();
 
     let resp = test::call_service(&app, req).await;
 
     assert_problem_details_structure(
         resp,
-        400,
-        "BAD_REQUEST",
-        "Invalid JSON: wrong types for one or more fields",
+        401,
+        "UNAUTHORIZED_MISSING_BEARER",
+        "Missing or malformed Bearer token",
     )
     .await;
 

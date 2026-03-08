@@ -11,7 +11,6 @@ pub struct Migration;
 enum Users {
     Table,
     Id,
-    Sub,
     Username,
     IsAi,
     CreatedAt,
@@ -19,14 +18,15 @@ enum Users {
 }
 
 #[derive(Iden)]
-enum UserCredentials {
+enum UserAuthIdentities {
     Table,
     Id,
     UserId,
-    PasswordHash,
+    Provider,
+    ProviderUserId,
     Email,
-    GoogleSub,
-    LastLogin,
+    PasswordHash,
+    LastLoginAt,
     CreatedAt,
     UpdatedAt,
 }
@@ -220,7 +220,6 @@ impl MigrationTrait for Migration {
                             .primary_key()
                             .auto_increment(),
                     )
-                    .col(ColumnDef::new(Users::Sub).string().not_null())
                     .col(ColumnDef::new(Users::Username).string().null())
                     .col(
                         ColumnDef::new(Users::IsAi)
@@ -242,75 +241,103 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Create unique index on users.sub
-        manager
-            .create_index(
-                Index::create()
-                    .name("idx_users_sub_unique")
-                    .table(Users::Table)
-                    .col(Users::Sub)
-                    .unique()
-                    .to_owned(),
-            )
-            .await?;
-
-        // user_credentials
+        // user_auth_identities
         manager
             .create_table(
                 Table::create()
-                    .table(UserCredentials::Table)
+                    .table(UserAuthIdentities::Table)
                     .if_not_exists()
                     .col(
-                        ColumnDef::new(UserCredentials::Id)
+                        ColumnDef::new(UserAuthIdentities::Id)
                             .big_integer()
                             .not_null()
                             .primary_key()
                             .auto_increment(),
                     )
                     .col(
-                        ColumnDef::new(UserCredentials::UserId)
+                        ColumnDef::new(UserAuthIdentities::UserId)
                             .big_integer()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(UserCredentials::PasswordHash)
+                        ColumnDef::new(UserAuthIdentities::Provider)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserAuthIdentities::ProviderUserId)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserAuthIdentities::Email)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(UserAuthIdentities::PasswordHash)
                             .string()
                             .null(),
                     )
                     .col(
-                        ColumnDef::new(UserCredentials::Email)
-                            .string()
-                            .not_null()
-                            .unique_key(),
-                    )
-                    .col(
-                        ColumnDef::new(UserCredentials::GoogleSub)
-                            .string()
-                            .null()
-                            .unique_key(),
-                    )
-                    .col(
-                        ColumnDef::new(UserCredentials::LastLogin)
+                        ColumnDef::new(UserAuthIdentities::LastLoginAt)
                             .timestamp_with_time_zone()
                             .null(),
                     )
                     .col(
-                        ColumnDef::new(UserCredentials::CreatedAt)
+                        ColumnDef::new(UserAuthIdentities::CreatedAt)
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
                     .col(
-                        ColumnDef::new(UserCredentials::UpdatedAt)
+                        ColumnDef::new(UserAuthIdentities::UpdatedAt)
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
                     .foreign_key(
                         ForeignKey::create()
-                            .name("fk_user_credentials_user_id")
-                            .from(UserCredentials::Table, UserCredentials::UserId)
+                            .name("fk_user_auth_identities_user_id")
+                            .from(UserAuthIdentities::Table, UserAuthIdentities::UserId)
                             .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
+                    .to_owned(),
+            )
+            .await?;
+
+        // Unique (provider, provider_user_id)
+        manager
+            .create_index(
+                Index::create()
+                    .name("ux_user_auth_identities_provider_provider_user_id")
+                    .table(UserAuthIdentities::Table)
+                    .col(UserAuthIdentities::Provider)
+                    .col(UserAuthIdentities::ProviderUserId)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        // Unique (provider, email)
+        manager
+            .create_index(
+                Index::create()
+                    .name("ux_user_auth_identities_provider_email")
+                    .table(UserAuthIdentities::Table)
+                    .col(UserAuthIdentities::Provider)
+                    .col(UserAuthIdentities::Email)
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+
+        // Index on user_id for lookups
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_user_auth_identities_user_id")
+                    .table(UserAuthIdentities::Table)
+                    .col(UserAuthIdentities::UserId)
                     .to_owned(),
             )
             .await?;
@@ -364,18 +391,6 @@ impl MigrationTrait for Migration {
                             .to(Users::Table, Users::Id)
                             .on_delete(ForeignKeyAction::Cascade),
                     )
-                    .to_owned(),
-            )
-            .await?;
-
-        // unique index on user_credentials.user_id
-        manager
-            .create_index(
-                Index::create()
-                    .name("ux_user_credentials_user_id")
-                    .table(UserCredentials::Table)
-                    .col(UserCredentials::UserId)
-                    .unique()
                     .to_owned(),
             )
             .await?;
@@ -1603,28 +1618,36 @@ impl MigrationTrait for Migration {
         manager
             .drop_index(
                 Index::drop()
-                    .name("ux_user_credentials_user_id")
-                    .table(UserCredentials::Table)
+                    .name("idx_user_auth_identities_user_id")
+                    .table(UserAuthIdentities::Table)
                     .to_owned(),
             )
             .await?;
 
         manager
-            .drop_table(Table::drop().table(UserCredentials::Table).to_owned())
+            .drop_index(
+                Index::drop()
+                    .name("ux_user_auth_identities_provider_email")
+                    .table(UserAuthIdentities::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ux_user_auth_identities_provider_provider_user_id")
+                    .table(UserAuthIdentities::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(UserAuthIdentities::Table).to_owned())
             .await?;
 
         manager
             .drop_table(Table::drop().table(UserOptions::Table).to_owned())
-            .await?;
-
-        // Drop users.sub unique index before dropping users table
-        manager
-            .drop_index(
-                Index::drop()
-                    .name("idx_users_sub_unique")
-                    .table(Users::Table)
-                    .to_owned(),
-            )
             .await?;
 
         manager

@@ -14,6 +14,7 @@
     "INVALID_GAME_ID": "Ese enlace de partida no es válido.",
     "INVALID_EMAIL": "Introduce un correo electrónico válido.",
     "INVALID_GOOGLE_SUB": "Error al iniciar sesión. Inténtalo de nuevo.",
+    "INVALID_ID_TOKEN": "Error al iniciar sesión. Inténtalo de nuevo.",
     "INVALID_SEAT": "Ese asiento no es válido.",
     "INVALID_BID": "Esa puja no es válida.",
     "MUST_FOLLOW_SUIT": "Debes seguir el palo.",

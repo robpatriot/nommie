@@ -10,7 +10,6 @@ use crate::support::auth::mint_test_token;
 use crate::support::build_test_state;
 use crate::support::factory::create_test_user;
 use crate::support::game_setup::setup_game_with_players;
-use crate::support::test_utils::test_user_sub;
 use crate::support::txn_helpers::rollback_eventually;
 use crate::support::websocket::{attach_test_registry, start_test_server, wait_for_connections};
 use crate::support::websocket_client::WebSocketClient;
@@ -30,7 +29,7 @@ async fn websocket_yourturn_delivered_to_target_user() -> Result<(), Box<dyn std
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -81,13 +80,13 @@ async fn websocket_yourturn_not_delivered_to_other_users() -> Result<(), Box<dyn
 
     let user_b_sub = format!("{test_name}_user_b");
     let user_b_email = format!("{test_name}_b@example.com");
-    let _user_b_id = create_test_user(shared.transaction(), &user_b_sub, Some("User B")).await?;
+    let user_b_id = create_test_user(shared.transaction(), &user_b_sub, Some("User B")).await?;
 
     let (state, registry) = attach_test_registry(state);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
-    let token_a = mint_test_token(&user_a_sub, &user_a_email, &security);
-    let token_b = mint_test_token(&user_b_sub, &user_b_email, &security);
+    let token_a = mint_test_token(&user_a_id.to_string(), &user_a_email, &security);
+    let token_b = mint_test_token(&user_b_id.to_string(), &user_b_email, &security);
     let ws_url_a = format!("ws://{}/ws?token={}", addr, token_a);
     let ws_url_b = format!("ws://{}/ws?token={}", addr, token_b);
 
@@ -157,14 +156,11 @@ async fn websocket_yourturn_not_delivered_to_sessions_already_in_that_game(
     let player_idx = 0usize;
     let user_id = setup.user_ids[player_idx];
 
-    // Reconstruct the user's sub the same way setup_game_with_players_ex does.
-    let user_sub = test_user_sub(&format!("{}_player_{}", test_name, player_idx));
-
-    // Email isn't used for membership; provide a stable value for minting.
-    let user_email = format!("{user_sub}@example.com");
+    // Use user_id from setup (player 0)
+    let user_email = format!("{}_player_{}@example.com", test_name, player_idx);
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);

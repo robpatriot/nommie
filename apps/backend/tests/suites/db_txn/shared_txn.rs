@@ -59,16 +59,18 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
         .expect("should create user successfully");
 
     // Request with state + auth header; inject shared txn
+    // JWT sub is now user.id
+    let user_sub = user.id.to_string();
     let mut req = test::TestRequest::default()
         .insert_header((
             "Authorization",
-            bearer_header(&test_sub, &test_email, &security_config),
+            bearer_header(&user_sub, &test_email, &security_config),
         ))
         .app_data(web::Data::new(state))
         .to_http_request();
     shared.inject(&mut req);
     req.extensions_mut().insert(BackendClaims {
-        sub: test_sub.clone(),
+        sub: user_sub.clone(),
         email: test_email.clone(),
         exp: usize::MAX,
     });
@@ -79,7 +81,6 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
 
     // Verify
     assert_eq!(result.id, user.id);
-    assert_eq!(result.sub, test_sub);
     assert_eq!(result.email.as_deref(), Some(test_email.as_str()));
 
     // Roll back shared txn

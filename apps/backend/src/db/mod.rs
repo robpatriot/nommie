@@ -40,14 +40,25 @@ pub fn require_db(state: &AppState) -> Result<DatabaseConnection, AppError> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use actix_web::http::StatusCode;
     use actix_web::ResponseError;
     use backend_test_support::problem_details::assert_problem_details_from_http_response;
 
     use super::*;
+    use crate::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
     use crate::config::db::{DbKind, RuntimeEnv};
     use crate::state::app_state::{AppConfig, Secret};
     use crate::state::security_config::SecurityConfig;
+
+    fn test_google_verifier() -> Arc<dyn crate::auth::google::GoogleIdTokenVerifier> {
+        Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+            sub: "test-sub".to_string(),
+            email: "test@example.com".to_string(),
+            name: None,
+        }))
+    }
 
     #[tokio::test]
     async fn test_require_db_without_db() {
@@ -58,6 +69,7 @@ mod tests {
             redis_url: Secret(None),
             security: SecurityConfig::default(),
             email_allowlist: None,
+            google_verifier: test_google_verifier(),
         };
         let app_state = AppState::new_without_db(config, None);
 
@@ -88,6 +100,7 @@ mod tests {
             redis_url: Secret(None),
             security: SecurityConfig::default(),
             email_allowlist: None,
+            google_verifier: test_google_verifier(),
         };
         let app_state = AppState::new_without_db(config, None);
 

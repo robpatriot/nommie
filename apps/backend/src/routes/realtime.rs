@@ -30,7 +30,7 @@ async fn issue_ws_token(
     })?;
 
     let token = mint_access_token_with_ttl(
-        &current_user.sub,
+        &current_user.id.to_string(),
         &email,
         SystemTime::now(),
         WS_TOKEN_TTL_SECONDS,

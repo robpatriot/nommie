@@ -47,7 +47,7 @@ async fn player_only_action(
         message: String,
     }
     Ok(web::Json(Out {
-        user_id: current_user.sub,
+        user_id: current_user.id.to_string(),
         game_id: game_id.0,
         role: format!("{:?}", membership.role),
         message: "Player action successful".to_string(),
@@ -68,7 +68,7 @@ async fn spectator_allowed_action(
         message: String,
     }
     Ok(web::Json(Out {
-        user_id: current_user.sub,
+        user_id: current_user.id.to_string(),
         game_id: game_id.0,
         role: format!("{:?}", membership.role),
         message: "Any member can view this".to_string(),
@@ -123,8 +123,8 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     };
     membership.insert(shared.transaction()).await?;
 
-    // Create a valid JWT token
-    let token = mint_test_token(&user_sub, &user_email, &security_config);
+    // Create a valid JWT token (sub is now user.id)
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security_config);
 
     // Build test app with player-only route
     let app = create_test_app(state)
@@ -205,8 +205,8 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     };
     membership.insert(shared.transaction()).await?;
 
-    // Create a valid JWT token
-    let token = mint_test_token(&user_sub, &user_email, &security_config);
+    // Create a valid JWT token (sub is now user.id)
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security_config);
 
     // Build test app with spectator-allowed route
     let app = create_test_app(state)

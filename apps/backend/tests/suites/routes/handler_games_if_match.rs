@@ -55,7 +55,7 @@ async fn setup_bidding_test(test_name: &str) -> Result<IfMatchTestContext, AppEr
 
     attach_human_to_seat(shared.transaction(), setup.game_id, actor_seat, user_id).await?;
 
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
 
     Ok(IfMatchTestContext {
         state,
@@ -83,7 +83,7 @@ async fn setup_trump_test(test_name: &str) -> Result<IfMatchTestContext, AppErro
 
     attach_human_to_seat(shared.transaction(), setup.game_id, winning_bidder, user_id).await?;
 
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
 
     Ok(IfMatchTestContext {
         state,
@@ -149,7 +149,7 @@ async fn setup_play_test(
     )?;
     let card_to_play = first_card;
 
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
 
     let ctx = IfMatchTestContext {
         state,
@@ -184,7 +184,7 @@ async fn setup_delete_test(test_name: &str) -> Result<IfMatchTestContext, AppErr
     game.created_by = sea_orm::Set(Some(user_id));
     ActiveModelTrait::update(game, shared.transaction()).await?;
 
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
 
     Ok(IfMatchTestContext {
         state,

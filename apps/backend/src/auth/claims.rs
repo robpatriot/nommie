@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 /// by the authentication middleware.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BackendClaims {
-    /// External user identifier (users.sub)
+    /// Internal user id (users.id) as string
     pub sub: String,
     pub email: String,
     /// Expiry (seconds since epoch)

@@ -2,6 +2,7 @@
 
 pub mod ai_overrides_sea;
 pub mod ai_profiles_sea;
+pub mod auth_identities_sea;
 pub mod bids_sea;
 pub mod games_sea;
 pub mod hands_sea;

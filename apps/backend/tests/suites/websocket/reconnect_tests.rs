@@ -31,7 +31,7 @@ async fn websocket_reconnect_receives_snapshot_after_resubscribe(
     attach_human_to_seat(shared.transaction(), setup.game_id, 0, user_id).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -81,7 +81,7 @@ async fn websocket_reconnect_after_multiple_disconnects() -> Result<(), Box<dyn 
     attach_human_to_seat(shared.transaction(), setup.game_id, 0, user_id).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);

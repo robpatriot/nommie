@@ -8,6 +8,6 @@ pub mod round_hands;
 pub mod round_scores;
 pub mod round_tricks;
 pub mod trick_plays;
-pub mod user_credentials;
+pub mod user_auth_identities;
 pub mod user_options;
 pub mod users;

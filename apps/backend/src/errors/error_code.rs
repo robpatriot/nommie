@@ -42,6 +42,8 @@ pub enum ErrorCode {
     InvalidEmail,
     /// Invalid Google sub provided
     InvalidGoogleSub,
+    /// Invalid or unverifiable Google ID token
+    InvalidIdToken,
     /// Invalid seat number
     InvalidSeat,
     /// Invalid bid provided
@@ -164,6 +166,7 @@ impl ErrorCode {
             Self::InvalidGameId => "INVALID_GAME_ID",
             Self::InvalidEmail => "INVALID_EMAIL",
             Self::InvalidGoogleSub => "INVALID_GOOGLE_SUB",
+            Self::InvalidIdToken => "INVALID_ID_TOKEN",
             Self::InvalidSeat => "INVALID_SEAT",
             Self::InvalidBid => "INVALID_BID",
             Self::MustFollowSuit => "MUST_FOLLOW_SUIT",
@@ -260,6 +263,7 @@ mod tests {
         assert_eq!(ErrorCode::InvalidGameId.as_str(), "INVALID_GAME_ID");
         assert_eq!(ErrorCode::InvalidEmail.as_str(), "INVALID_EMAIL");
         assert_eq!(ErrorCode::InvalidGoogleSub.as_str(), "INVALID_GOOGLE_SUB");
+        assert_eq!(ErrorCode::InvalidIdToken.as_str(), "INVALID_ID_TOKEN");
         assert_eq!(ErrorCode::InvalidSeat.as_str(), "INVALID_SEAT");
         assert_eq!(ErrorCode::InvalidBid.as_str(), "INVALID_BID");
         assert_eq!(ErrorCode::MustFollowSuit.as_str(), "MUST_FOLLOW_SUIT");

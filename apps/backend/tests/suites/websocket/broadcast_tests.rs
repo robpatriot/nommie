@@ -38,8 +38,8 @@ async fn broadcast_reaches_all_subscribed_clients() -> Result<(), Box<dyn std::e
     attach_human_to_seat(shared.transaction(), setup.game_id, 1, user2_id).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token1 = mint_test_token(&user1_sub, &user1_email, &security);
-    let token2 = mint_test_token(&user2_sub, &user2_email, &security);
+    let token1 = mint_test_token(&user1_id.to_string(), &user1_email, &security);
+    let token2 = mint_test_token(&user2_id.to_string(), &user2_email, &security);
 
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
@@ -114,8 +114,8 @@ async fn broadcast_only_sent_to_same_game_subscribers() -> Result<(), Box<dyn st
     attach_human_to_seat(shared.transaction(), setup2.game_id, 0, user2_id).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token1 = mint_test_token(&user1_sub, &user1_email, &security);
-    let token2 = mint_test_token(&user2_sub, &user2_email, &security);
+    let token1 = mint_test_token(&user1_id.to_string(), &user1_email, &security);
+    let token2 = mint_test_token(&user2_id.to_string(), &user2_email, &security);
 
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 

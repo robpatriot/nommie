@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
 use crate::config::db::{DbKind, RuntimeEnv};
 use crate::config::email_allowlist::EmailAllowlist;
 use crate::error::AppError;
@@ -18,6 +19,7 @@ pub struct StateBuilder {
     email_allowlist: Option<EmailAllowlist>,
     redis_url: Option<String>,
     readiness: Option<Arc<ReadinessManager>>,
+    google_verifier: Option<std::sync::Arc<dyn crate::auth::google::GoogleIdTokenVerifier>>,
 }
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -219,6 +221,14 @@ impl StateBuilder {
         self
     }
 
+    pub fn with_google_verifier(
+        mut self,
+        verifier: std::sync::Arc<dyn crate::auth::google::GoogleIdTokenVerifier>,
+    ) -> Self {
+        self.google_verifier = Some(verifier);
+        self
+    }
+
     pub fn with_readiness(mut self, readiness: Arc<ReadinessManager>) -> Self {
         self.readiness = Some(readiness);
         self
@@ -234,6 +244,14 @@ impl StateBuilder {
         let db_url = Secret("".to_string());
         let redis_url = Secret(self.redis_url.clone());
 
+        let google_verifier = self.google_verifier.unwrap_or_else(|| {
+            Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+                sub: "test-google-sub".to_string(),
+                email: "test@example.com".to_string(),
+                name: Some("Test User".to_string()),
+            }))
+        });
+
         let (state, needs_resolution) = match (self.env, self.db_kind) {
             (Some(env), Some(db_kind)) => {
                 let config = AppConfig {
@@ -243,6 +261,7 @@ impl StateBuilder {
                     redis_url,
                     security: self.security_config,
                     email_allowlist: self.email_allowlist,
+                    google_verifier,
                 };
                 let state = AppState::new(config, None, None, readiness);
 
@@ -271,6 +290,7 @@ impl StateBuilder {
                     redis_url,
                     security: self.security_config,
                     email_allowlist: self.email_allowlist,
+                    google_verifier,
                 };
                 let state = AppState::new_without_db(config, Some(readiness));
                 (state, false)

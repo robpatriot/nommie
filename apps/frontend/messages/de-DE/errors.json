@@ -14,6 +14,7 @@
     "INVALID_GAME_ID": "Dieser Spiellink ist ungültig.",
     "INVALID_EMAIL": "Bitte gib eine gültige E-Mail-Adresse ein.",
     "INVALID_GOOGLE_SUB": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
+    "INVALID_ID_TOKEN": "Anmeldung fehlgeschlagen. Bitte versuche es erneut.",
     "INVALID_SEAT": "Dieser Sitzplatz ist nicht gültig.",
     "INVALID_BID": "Dieses Gebot ist nicht gültig.",
     "MUST_FOLLOW_SUIT": "Du musst Farbe bedienen.",

@@ -38,9 +38,10 @@ async fn setup_snapshot_test(test_name: &str) -> Result<SnapshotTestContext, App
 
     let viewer_sub = test_user_sub(&format!("{test_name}_viewer"));
     let viewer_email = format!("{viewer_sub}@example.com");
-    create_test_user(shared.transaction(), &viewer_sub, Some("Snapshot Viewer")).await?;
+    let viewer_id =
+        create_test_user(shared.transaction(), &viewer_sub, Some("Snapshot Viewer")).await?;
 
-    let bearer = bearer_header(&viewer_sub, &viewer_email, &security);
+    let bearer = bearer_header(&viewer_id.to_string(), &viewer_email, &security);
 
     Ok(SnapshotTestContext {
         state,

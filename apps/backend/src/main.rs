@@ -42,11 +42,17 @@ async fn main() -> std::io::Result<()> {
     // By providing the ReadinessManager to the builder, we enable
     // Resilient Mode. Failures in DB or Redis will be caught, reported
     // to the manager, and the service will continue to start.
+    let google_verifier = std::sync::Arc::new(
+        backend::auth::google::GoogleVerifierImpl::new(config.google_client_id.clone())
+            .await
+            .map_err(|e| std::io::Error::other(format!("Google OIDC init failed: {e}")))?,
+    );
     let app_state = backend::infra::state::build_state()
         .with_env(config.runtime_env)
         .with_db(config.db_kind)
         .with_security(security_config)
         .with_email_allowlist(config.email_allowlist.clone())
+        .with_google_verifier(google_verifier)
         .with_redis_url(Some(config.redis_url.clone()))
         .with_readiness(readiness.clone())
         .build()

@@ -24,10 +24,10 @@ async fn websocket_hello_ack_succeeds_with_valid_jwt() -> Result<(), Box<dyn std
     let test_name = "ws_hello_ack_valid_jwt";
     let user_sub = format!("{test_name}_user");
     let user_email = format!("{test_name}@example.com");
-    let _user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
 
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
@@ -66,7 +66,7 @@ async fn websocket_subscribe_ack_then_snapshot_ordering() -> Result<(), Box<dyn 
     attach_human_to_seat(shared.transaction(), setup.game_id, 0, user_id).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
 
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -116,7 +116,7 @@ async fn websocket_ack_semantics_subscribe_and_unsubscribe(
     attach_human_to_seat(shared.transaction(), setup.game_id, 0, user_id).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
 
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
     let ws_url = format!("ws://{}/ws?token={}", addr, token);

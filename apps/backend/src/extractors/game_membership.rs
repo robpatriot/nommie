@@ -66,11 +66,13 @@ async fn resolve_membership(req: HttpRequest) -> Result<GameMembership, AppError
         )
     })?;
 
+    let user_id: i64 = claims.sub.parse().map_err(|_| AppError::unauthorized())?;
+
     let user = match SharedTxn::from_req(&req) {
-        Some(shared_txn) => users::find_user_by_sub(shared_txn.transaction(), &claims.sub).await?,
+        Some(shared_txn) => users::find_user_by_id(shared_txn.transaction(), user_id).await?,
         _ => {
             let db = require_db(app_state)?;
-            users::find_user_by_sub(&db, &claims.sub).await?
+            users::find_user_by_id(&db, user_id).await?
         }
     };
 

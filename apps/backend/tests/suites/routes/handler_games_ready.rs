@@ -31,7 +31,7 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
 
     create_test_game_player_with_ready(shared.transaction(), game_id, user_id, 0, false).await?;
 
-    let token = mint_test_token(user_sub, user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), user_email, &security);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -96,7 +96,7 @@ async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
             .await?;
     }
 
-    let token = mint_test_token(actor_sub, actor_email, &security);
+    let token = mint_test_token(&actor_id.to_string(), actor_email, &security);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {

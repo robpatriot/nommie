@@ -1,7 +1,7 @@
 // Backend JWT refresh logic
 // This file provides both pure functions (that never set cookies) and context-specific wrappers
 
-import { auth, getBackendBaseUrlOrThrow } from '@/auth'
+import { getBackendBaseUrlOrThrow } from '@/auth'
 import { cookies } from 'next/headers'
 import { BACKEND_JWT_COOKIE_NAME } from './backend-jwt-cookie'
 import { getBackendJwtFromCookie } from './backend-jwt-cookie.server'
@@ -97,8 +97,7 @@ export async function refreshBackendJwtIfNeeded(
     return { token: existing, refreshed: false }
   }
 
-  // Need to refresh - fetch new JWT
-  const newToken = await fetchNewBackendJwt(cookieHeader)
+  const newToken = await fetchNewBackendJwt(cookieHeader, getCookie)
 
   if (!newToken) {
     // Refresh failed
@@ -122,89 +121,51 @@ export async function refreshBackendJwtIfNeeded(
   return { token: newToken, refreshed: true }
 }
 
-/**
- * Fetch a new backend JWT from the backend
- * @param cookieHeader - Optional cookie header string (for proxy context)
- */
-async function fetchNewBackendJwt(
-  cookieHeader?: string
-): Promise<string | null> {
-  // In proxy context, we can't use auth() or cookies() from next/headers
-  // So we need the cookie header passed in
-  if (!cookieHeader) {
-    // Try to get from next/headers (works in server actions/route handlers)
-    try {
-      const session = await auth()
-      if (!session?.user?.email) {
-        return null
+function parseBackendJwtFromCookieHeader(cookieHeader: string): string | null {
+  const parts = cookieHeader.split(';').map((p) => p.trim())
+  for (const part of parts) {
+    const eq = part.indexOf('=')
+    if (eq > 0) {
+      const name = part.slice(0, eq).trim()
+      const value = part.slice(eq + 1).trim()
+      if (name === BACKEND_JWT_COOKIE_NAME && value) {
+        try {
+          return decodeURIComponent(value)
+        } catch {
+          return value
+        }
       }
-
-      // Get googleSub from token (needed for backend auth)
-      const cookieStore = await cookies()
-      cookieHeader = cookieStore
-        .getAll()
-        .map(({ name, value }) => `${name}=${value}`)
-        .join('; ')
-
-      if (!cookieHeader) {
-        return null
-      }
-    } catch {
-      // If auth() or cookies() fail (e.g., in proxy), return null
-      return null
     }
   }
+  return null
+}
 
-  // Parse cookie header to get session info
-  const headers = new Headers({ cookie: cookieHeader })
-  const req: { headers: Headers } = { headers }
-
-  const { getToken } = await import('next-auth/jwt')
-  const token = await getToken({
-    req,
-    secret: process.env.AUTH_SECRET,
-    secureCookie: process.env.NODE_ENV === 'production',
-    salt:
-      process.env.NODE_ENV === 'production'
-        ? '__Secure-authjs.session-token'
-        : 'authjs.session-token',
-  })
-
-  // If getToken returns null, the NextAuth session is expired or invalid
-  // In this case, we cannot refresh the backend JWT, so return null
-  // The caller should clear the backend JWT cookie and allow the request to proceed
-  if (!token) {
+/**
+ * Fetch a new backend JWT from the refresh endpoint.
+ * Requires existing backend JWT as Bearer token.
+ * @param cookieHeader - Optional cookie header string (for proxy context)
+ * @param getCookie - Optional callback to read cookies (for server action context)
+ */
+async function fetchNewBackendJwt(
+  cookieHeader?: string,
+  getCookie?: (name: string) => Promise<string | undefined>
+): Promise<string | null> {
+  let existingJwt: string | null = null
+  if (cookieHeader) {
+    existingJwt = parseBackendJwtFromCookieHeader(cookieHeader)
+  }
+  if (!existingJwt && getCookie) {
+    existingJwt = (await getCookie(BACKEND_JWT_COOKIE_NAME)) ?? null
+  }
+  if (!existingJwt) {
     return null
   }
 
-  const googleSub =
-    (token?.googleSub && typeof token.googleSub === 'string'
-      ? token.googleSub
-      : null) ||
-    (token?.sub && typeof token.sub === 'string' ? token.sub : null)
-
-  if (!googleSub) {
-    return null
-  }
-
-  // Get email and name from token
-  const email =
-    token?.email && typeof token.email === 'string' ? token.email : null
-  const name =
-    token?.name && typeof token.name === 'string' ? token.name : undefined
-
-  if (!email) {
-    return null
-  }
-
-  // Check backend health first
   const { ready: backendHealthy } = await checkBackendReadiness()
   if (!backendHealthy) {
     if (getBackendMode() === 'startup') {
-      // Backend not ready yet - return null silently
       return null
     }
-    // Backend should be up by now - log error
     if (shouldLogError()) {
       logError(
         'Backend not available for JWT refresh',
@@ -214,18 +175,15 @@ async function fetchNewBackendJwt(
     return null
   }
 
-  // Fetch new JWT from backend
   const backendBase = getBackendBaseUrlOrThrow()
 
   try {
-    const response = await fetch(`${backendBase}/api/auth/login`, {
+    const response = await fetch(`${backendBase}/api/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        name,
-        google_sub: googleSub,
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${existingJwt}`,
+      },
     })
 
     if (!response.ok) {

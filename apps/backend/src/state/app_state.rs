@@ -6,6 +6,7 @@ use sea_orm::DatabaseConnection;
 use tracing::info;
 
 use super::security_config::SecurityConfig;
+use crate::auth::google::GoogleVerifier;
 use crate::config::db::{DbKind, RuntimeEnv};
 use crate::config::email_allowlist::EmailAllowlist;
 use crate::readiness::ReadinessManager;
@@ -23,7 +24,7 @@ impl<T> fmt::Debug for Secret<T> {
 }
 
 /// Consolidated configuration DNA for the AppState
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct AppConfig {
     pub env: RuntimeEnv,
     pub db_kind: DbKind,
@@ -31,6 +32,7 @@ pub struct AppConfig {
     pub redis_url: Secret<Option<String>>,
     pub security: SecurityConfig,
     pub email_allowlist: Option<EmailAllowlist>,
+    pub google_verifier: GoogleVerifier,
 }
 
 /// Application state containing shared resources

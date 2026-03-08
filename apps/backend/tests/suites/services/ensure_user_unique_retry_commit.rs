@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
+use backend::auth::google::VerifiedGoogleClaims;
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, TxnPolicy};
-use backend::entities::{user_credentials, users};
+use backend::entities::{user_auth_identities, users};
 use backend::services::users::UserService;
 use backend::AppError;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
@@ -11,6 +12,8 @@ use tokio::sync::Barrier;
 use tokio::task::LocalSet;
 
 use crate::support::build_test_state;
+
+const PROVIDER_GOOGLE: &str = "google";
 
 #[tokio::test]
 async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Result<(), AppError> {
@@ -41,8 +44,13 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
                     let sub1 = sub1.clone();
                     Box::pin(async move {
                         let service = UserService;
+                        let claims = VerifiedGoogleClaims {
+                            sub: sub1,
+                            email: email1,
+                            name: Some("Race".to_string()),
+                        };
                         let user = service
-                            .ensure_user(txn, &email1, Some("Race"), &sub1, None)
+                            .ensure_user(txn, &claims, None)
                             .await
                             .map_err(AppError::from)?;
                         Ok::<_, AppError>(user.id)
@@ -58,8 +66,13 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
                     let sub2 = sub2.clone();
                     Box::pin(async move {
                         let service = UserService;
+                        let claims = VerifiedGoogleClaims {
+                            sub: sub2,
+                            email: email2,
+                            name: Some("Race".to_string()),
+                        };
                         let user = service
-                            .ensure_user(txn, &email2, Some("Race"), &sub2, None)
+                            .ensure_user(txn, &claims, None)
                             .await
                             .map_err(AppError::from)?;
                         Ok::<_, AppError>(user.id)
@@ -96,17 +109,21 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
     let normalized_email = email.to_lowercase();
     let conn = state.db().expect("db must exist");
 
-    let credential_count = user_credentials::Entity::find()
-        .filter(user_credentials::Column::Email.eq(&normalized_email))
+    let identity_count = user_auth_identities::Entity::find()
+        .filter(user_auth_identities::Column::Provider.eq(PROVIDER_GOOGLE))
+        .filter(user_auth_identities::Column::Email.eq(&normalized_email))
         .count(&conn)
         .await?;
-    assert_eq!(
-        credential_count, 1,
-        "should have exactly one credential row"
-    );
+    assert_eq!(identity_count, 1, "should have exactly one identity row");
 
+    let identity = user_auth_identities::Entity::find()
+        .filter(user_auth_identities::Column::Provider.eq(PROVIDER_GOOGLE))
+        .filter(user_auth_identities::Column::ProviderUserId.eq(&google_sub))
+        .one(&conn)
+        .await?
+        .expect("identity should exist");
     let user_count = users::Entity::find()
-        .filter(users::Column::Sub.eq(&google_sub))
+        .filter(users::Column::Id.eq(identity.user_id))
         .count(&conn)
         .await?;
     assert_eq!(user_count, 1, "should not commit an orphan user row");
@@ -114,12 +131,15 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
     with_txn(None, state.as_ref(), |txn| {
         let normalized_email = normalized_email.clone();
         Box::pin(async move {
-            let creds = user_credentials::Entity::find()
-                .filter(user_credentials::Column::Email.eq(&normalized_email))
+            let identity = user_auth_identities::Entity::find()
+                .filter(user_auth_identities::Column::Provider.eq(PROVIDER_GOOGLE))
+                .filter(user_auth_identities::Column::Email.eq(&normalized_email))
                 .one(txn)
                 .await?
-                .expect("credential should exist");
-            users::Entity::delete_by_id(creds.user_id).exec(txn).await?;
+                .expect("identity should exist");
+            users::Entity::delete_by_id(identity.user_id)
+                .exec(txn)
+                .await?;
             Ok::<_, AppError>(())
         })
     })

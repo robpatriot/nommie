@@ -24,10 +24,10 @@ async fn websocket_bad_protocol_sends_error_and_closes() -> Result<(), Box<dyn s
     let test_name = "ws_bad_protocol";
     let user_sub = format!("{test_name}_user");
     let user_email = format!("{test_name}@example.com");
-    let _user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -69,10 +69,10 @@ async fn websocket_malformed_json_sends_bad_request_and_closes(
     let test_name = "ws_bad_json";
     let user_sub = format!("{test_name}_user");
     let user_email = format!("{test_name}@example.com");
-    let _user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -111,10 +111,10 @@ async fn websocket_subscribe_before_hello_is_rejected() -> Result<(), Box<dyn st
 
     let user_sub = format!("{test_name}_user");
     let user_email = format!("{test_name}@example.com");
-    let _user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -158,10 +158,10 @@ async fn websocket_unauthorized_subscription_is_forbidden() -> Result<(), Box<dy
 
     let user_sub = format!("{test_name}_outsider");
     let user_email = format!("{test_name}_outsider@example.com");
-    let _user_id = create_test_user(shared.transaction(), &user_sub, Some("Outsider")).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("Outsider")).await?;
 
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_sub, &user_email, &security);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);

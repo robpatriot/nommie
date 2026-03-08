@@ -40,7 +40,7 @@ async fn echo_membership(
         role: String,
     }
     Ok(web::Json(Out {
-        user_id: current_user.sub,
+        user_id: current_user.id.to_string(),
         game_id: game_id.0,
         membership_id: membership.id,
         turn_order: membership.turn_order.unwrap_or(0),
@@ -94,7 +94,7 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     };
     let membership = membership.insert(shared.transaction()).await?;
 
-    let token = mint_test_token(&user_sub, &user_email, &security_config);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security_config);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -118,7 +118,7 @@ async fn test_membership_success() -> Result<(), Box<dyn std::error::Error>> {
     assert!(resp.status().is_success());
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["user_id"], user_sub);
+    assert_eq!(body["user_id"], user_id.to_string());
     assert_eq!(body["game_id"], game.id);
     assert_eq!(body["membership_id"], membership.id);
     assert_eq!(body["turn_order"], 1);
@@ -147,7 +147,7 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
     // Create a test user
     let user_sub = unique_str("test-user");
     let user_email = unique_email("test");
-    let _user_id = create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
 
     // Create a test game
     let now = OffsetDateTime::now_utc();
@@ -163,7 +163,7 @@ async fn test_membership_not_found() -> Result<(), Box<dyn std::error::Error>> {
     };
     let game = game.insert(shared.transaction()).await?;
 
-    let token = mint_test_token(&user_sub, &user_email, &security_config);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security_config);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -314,7 +314,7 @@ async fn test_membership_composition_with_current_user_and_game_id(
     };
     let membership = membership.insert(shared.transaction()).await?;
 
-    let token = mint_test_token(&user_sub, &user_email, &security_config);
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security_config);
 
     let app = create_test_app(state)
         .with_routes(|cfg| {
@@ -339,7 +339,7 @@ async fn test_membership_composition_with_current_user_and_game_id(
 
     let body: Value = test::read_body_json(resp).await;
     // Verify all three extractors worked together
-    assert_eq!(body["user_id"], user_sub); // From CurrentUser
+    assert_eq!(body["user_id"], user_id.to_string()); // From CurrentUser
     assert_eq!(body["game_id"], game.id); // From GameId
     assert_eq!(body["membership_id"], membership.id); // From GameMembership
     assert_eq!(body["turn_order"], serde_json::json!(2));
@@ -362,14 +362,13 @@ async fn test_membership_game_not_found() -> Result<(), Box<dyn std::error::Erro
         .build()
         .await?;
 
-    // Create a JWT token
-    let user_sub = unique_str("test-user");
-    let user_email = unique_email("test");
-    let token = mint_test_token(&user_sub, &user_email, &security_config);
-
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(&db).await?;
-    create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
+
+    let user_sub = unique_str("test-user");
+    let user_email = unique_email("test");
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("testuser")).await?;
+    let token = mint_test_token(&user_id.to_string(), &user_email, &security_config);
 
     // Build test app with echo route
     let app = create_test_app(state)

@@ -31,10 +31,10 @@ fn extract_sqlite_table_column(error_msg: &str) -> Option<&str> {
 /// Map SQLite table.column format to domain-specific conflict errors.
 fn map_sqlite_table_column_to_conflict(table_column: &str) -> Option<(ConflictKind, &'static str)> {
     match table_column {
-        "user_credentials.email" | "users.email" => {
+        "user_auth_identities.email" | "user_credentials.email" | "users.email" => {
             Some((ConflictKind::UniqueEmail, "Email already registered"))
         }
-        "user_credentials.google_sub" => Some((
+        "user_auth_identities.provider_user_id" | "user_credentials.google_sub" => Some((
             ConflictKind::Other("UniqueGoogleSub".into()),
             "Google account already linked to another user",
         )),
@@ -44,10 +44,17 @@ fn map_sqlite_table_column_to_conflict(table_column: &str) -> Option<(ConflictKi
 
 /// Map PostgreSQL constraint names to domain-specific conflict errors.
 fn map_postgres_constraint_to_conflict(error_msg: &str) -> Option<(ConflictKind, &'static str)> {
-    if error_msg.contains("user_credentials_email_key") || error_msg.contains("users_email_key") {
+    if error_msg.contains("ux_user_auth_identities_provider_email")
+        || error_msg.contains("user_auth_identities_provider_email")
+        || error_msg.contains("user_credentials_email_key")
+        || error_msg.contains("users_email_key")
+    {
         return Some((ConflictKind::UniqueEmail, "Email already registered"));
     }
-    if error_msg.contains("user_credentials_google_sub_key") {
+    if error_msg.contains("ux_user_auth_identities_provider_provider_user_id")
+        || error_msg.contains("user_auth_identities_provider_provider_user_id_key")
+        || error_msg.contains("user_credentials_google_sub_key")
+    {
         return Some((
             ConflictKind::Other("UniqueGoogleSub".into()),
             "Google account already linked to another user",

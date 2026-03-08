@@ -11,7 +11,7 @@ use crate::state::security_config::SecurityConfig;
 /// Claims included in our backend-issued access tokens.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Claims {
-    /// External user identifier (users.sub)
+    /// Internal user id (users.id) as string
     pub sub: String,
     pub email: String,
     /// Issued-at (seconds since epoch)

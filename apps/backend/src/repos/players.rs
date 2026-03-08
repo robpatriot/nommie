@@ -83,7 +83,7 @@ pub async fn resolve_display_name_for_membership<C: ConnectionTrait + Send + Syn
                         return Ok(trimmed.to_owned());
                     }
                 }
-                return Ok(user.sub.clone());
+                return Ok(format!("User {}", user.id));
             }
         }
         PlayerKind::Ai => {

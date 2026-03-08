@@ -2,19 +2,22 @@ use sea_orm::DatabaseTransaction;
 use tracing::{info, trace, warn};
 use unicode_normalization::UnicodeNormalization;
 
+use crate::auth::google::VerifiedGoogleClaims;
 use crate::config::email_allowlist::EmailAllowlist;
 use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind, ValidationKind};
 use crate::logging::pii::Redacted;
-use crate::repos::user_options as user_options_repo;
 use crate::repos::users::{self as users_repo, User};
+use crate::repos::{auth_identities as auth_identities_repo, user_options as user_options_repo};
 
-/// Redacts a google_sub value for logging purposes.
+const PROVIDER_GOOGLE: &str = "google";
+
+/// Redacts a provider user id for logging purposes.
 /// Shows only the first 4 characters followed by asterisks.
-fn redact_google_sub(google_sub: &str) -> String {
-    if google_sub.len() <= 4 {
-        "*".repeat(google_sub.len())
+fn redact_provider_user_id(user_id: &str) -> String {
+    if user_id.len() <= 4 {
+        "*".repeat(user_id.len())
     } else {
-        format!("{}***", &google_sub[..4])
+        format!("{}***", &user_id[..4])
     }
 }
 
@@ -99,30 +102,53 @@ pub struct UserService;
 
 impl UserService {
     /// Ensures a user exists for Google OAuth, creating one if necessary.
-    /// This function is idempotent - calling it multiple times with the same email
-    /// will return the same user without creating duplicates.
+    /// Accepts only verified claims from a server-verified Google ID token.
+    /// This function is idempotent - calling it multiple times with the same
+    /// provider_user_id will return the same user without creating duplicates.
     /// Returns the User that was found or created.
     pub async fn ensure_user(
         &self,
         txn: &DatabaseTransaction,
-        email: &str,
-        name: Option<&str>,
-        google_sub: &str,
+        claims: &VerifiedGoogleClaims,
         email_allowlist: Option<&EmailAllowlist>,
     ) -> Result<User, DomainError> {
+        let provider_user_id = &claims.sub;
+        let email = &claims.email;
+        let name = claims.name.as_deref();
+
         // Sanitize email: normalize (trim, lowercase, NFKC) and validate format
         let clean_email = sanitize_email(email)?;
 
-        // Look up existing user credentials by email
-        let existing_credential = users_repo::find_credentials_by_email(txn, &clean_email).await?;
+        // Lookup by (provider, provider_user_id) first - fast path for repeat login
+        let existing_identity =
+            auth_identities_repo::find_by_provider_user_id(txn, PROVIDER_GOOGLE, provider_user_id)
+                .await?;
 
-        if let Some(credential) = existing_credential {
-            return ensure_from_existing_credential(txn, email, google_sub, credential).await;
+        if let Some(identity) = existing_identity {
+            return ensure_from_existing_identity(txn, email, identity).await;
         }
 
-        // User doesn't exist, create new user and credentials
+        // Not found by provider_user_id - check by email for mismatch
+        let existing_by_email =
+            auth_identities_repo::find_by_provider_email(txn, PROVIDER_GOOGLE, &clean_email)
+                .await?;
 
-        // Check email allowlist before creating new user (defense in depth)
+        if let Some(identity) = existing_by_email {
+            // Same email, different Google account - conflict
+            warn!(
+                user_id = identity.user_id,
+                email = %Redacted(email),
+                incoming_provider_user_id = %redact_provider_user_id(provider_user_id),
+                existing_provider_user_id = %redact_provider_user_id(&identity.provider_user_id),
+                "Google sub mismatch detected"
+            );
+            return Err(DomainError::conflict(
+                ConflictKind::GoogleSubMismatch,
+                "This email is already linked to a different Google account. Please use the original Google account or contact support.",
+            ));
+        }
+
+        // New user - check allowlist before creating
         if let Some(allowlist) = email_allowlist {
             if !allowlist.is_allowed(&clean_email) {
                 return Err(DomainError::validation(
@@ -136,81 +162,52 @@ impl UserService {
         // Derive username from name or email local-part
         let username = derive_username(name, &clean_email);
 
-        // Ensure the user exists for this google_sub without aborting the transaction
-        // on concurrent inserts.
-        let (user, created_user) = users_repo::ensure_user_by_sub(
-            txn,
-            google_sub,
-            username.as_deref().unwrap_or("user"),
-            false,
-        )
-        .await?;
+        // Create user (no sub)
+        let user =
+            users_repo::create_user(txn, username.as_deref().unwrap_or("user"), false).await?;
 
-        // Ensure credentials exist for this email without aborting the transaction on
-        // concurrent inserts. If the email is already owned by a different user, delete
-        // the newly created user (if any) to avoid committing an orphan row.
-        let (credential, inserted_credential) =
-            users_repo::ensure_credentials_by_email(txn, user.id, &clean_email, Some(google_sub))
-                .await?;
+        // Create identity - may race with concurrent insert, handle via ensure
+        let (identity, inserted_identity) =
+            auth_identities_repo::ensure_identity_by_provider_user_id(
+                txn,
+                user.id,
+                PROVIDER_GOOGLE,
+                provider_user_id,
+                &clean_email,
+            )
+            .await?;
 
-        if credential.user_id != user.id {
-            if created_user {
-                users_repo::delete_user(txn, user.id).await?;
-            }
-            return ensure_from_existing_credential(txn, email, google_sub, credential).await;
+        // If another insert won the race (different user_id), we have a conflict
+        if identity.user_id != user.id {
+            users_repo::delete_user(txn, user.id).await?;
+            return ensure_from_existing_identity(txn, email, identity).await;
         }
 
-        if created_user && inserted_credential {
+        if inserted_identity {
             info!(
                 user_id = user.id,
                 email = %Redacted(email),
-                google_sub = %redact_google_sub(google_sub),
+                provider_user_id = %redact_provider_user_id(provider_user_id),
                 "First user creation"
             );
         }
 
-        ensure_from_existing_credential(txn, email, google_sub, credential).await
+        user_options_repo::ensure_default_for_user(txn, user.id).await?;
+
+        Ok(user)
     }
 }
 
-async fn ensure_from_existing_credential(
+async fn ensure_from_existing_identity(
     txn: &DatabaseTransaction,
     email_for_logging: &str,
-    google_sub: &str,
-    credential: crate::repos::users::UserCredentials,
+    identity: auth_identities_repo::AuthIdentity,
 ) -> Result<User, DomainError> {
-    if let Some(existing_google_sub) = &credential.google_sub {
-        if existing_google_sub != google_sub {
-            warn!(
-                user_id = credential.user_id,
-                email = %Redacted(email_for_logging),
-                incoming_google_sub = %redact_google_sub(google_sub),
-                existing_google_sub = %redact_google_sub(existing_google_sub),
-                "Google sub mismatch detected"
-            );
-            return Err(DomainError::conflict(
-                ConflictKind::GoogleSubMismatch,
-                "This email is already linked to a different Google account. Please use the original Google account or contact support.",
-            ));
-        }
-    }
+    let user_id = identity.user_id;
 
-    let user_id = credential.user_id;
-    let mut updated_credential = credential.clone();
-    updated_credential.last_login = Some(time::OffsetDateTime::now_utc());
-
-    if updated_credential.google_sub.is_none() {
-        info!(
-            user_id = user_id,
-            email = %Redacted(email_for_logging),
-            google_sub = %redact_google_sub(google_sub),
-            "Setting google_sub for existing user (was previously NULL)"
-        );
-        updated_credential.google_sub = Some(google_sub.to_string());
-    }
-
-    updated_credential.updated_at = time::OffsetDateTime::now_utc();
-    users_repo::update_credentials(txn, updated_credential).await?;
+    let mut updated_identity = identity.clone();
+    updated_identity.last_login_at = Some(time::OffsetDateTime::now_utc());
+    auth_identities_repo::update_identity(txn, updated_identity).await?;
 
     let user = users_repo::find_user_by_id(txn, user_id)
         .await?

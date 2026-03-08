@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::auth::jwt::mint_access_token;
+use crate::auth::jwt::{mint_access_token, verify_access_token};
 use crate::db::txn::with_txn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -13,11 +13,7 @@ use crate::state::app_state::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
-    #[serde(default)]
-    pub email: String,
-    pub name: Option<String>,
-    #[serde(default)]
-    pub google_sub: String,
+    pub id_token: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -35,68 +31,87 @@ pub struct CheckAllowlistResponse {
     pub allowed: bool,
 }
 
-/// Handle Google OAuth login callback
-/// Creates or reuses a user based on email and returns a JWT token
+/// Handle Google OAuth login with verified ID token.
+/// Verifies the token server-side, extracts trusted claims, and returns our JWT.
 async fn login(
     http_req: HttpRequest,
     req: ValidatedJson<LoginRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
-    // Validate required fields
-    if req.email.trim().is_empty() {
+    let id_token = req.id_token.trim();
+    if id_token.is_empty() {
         return Err(AppError::bad_request(
-            ErrorCode::InvalidEmail,
-            "Email cannot be empty".to_string(),
+            ErrorCode::InvalidIdToken,
+            "id_token cannot be empty".to_string(),
         ));
     }
 
-    if req.google_sub.trim().is_empty() {
-        return Err(AppError::bad_request(
-            ErrorCode::InvalidGoogleSub,
-            "Google sub cannot be empty".to_string(),
-        ));
-    }
+    let claims = app_state
+        .config
+        .google_verifier
+        .verify(id_token)
+        .await
+        .inspect_err(|_| crate::logging::security::login_failed("invalid_id_token", None))?;
 
-    // Check email allowlist before proceeding (prevents both signup and login)
-    // The allowlist's is_allowed() method handles normalization internally
+    let verified_email = claims.email.clone();
+
+    // Apply allowlist using verified email from token
     if let Some(allowlist) = &app_state.config.email_allowlist {
-        if !allowlist.is_allowed(&req.email) {
+        if !allowlist.is_allowed(&verified_email) {
             return Err(AppError::email_not_allowed());
         }
     }
 
-    // Prepare owned values to move into the txn closure
-    let email = req.email.clone();
-    let name = req.name.clone();
-    let google_sub = req.google_sub.clone();
     let email_allowlist = app_state.config.email_allowlist.clone();
 
-    // Own the transaction boundary here and pass a borrowed txn to the service
     let user = with_txn(Some(&http_req), &app_state, |txn| {
-        // Box the async block so its lifetime is tied to `txn` (no 'static)
         Box::pin(async move {
             let service = UserService;
             Ok(service
-                .ensure_user(
-                    txn,
-                    &email,
-                    name.as_deref(),
-                    &google_sub,
-                    email_allowlist.as_ref(),
-                )
+                .ensure_user(txn, &claims, email_allowlist.as_ref())
                 .await?)
         })
     })
     .await?;
 
     let token = mint_access_token(
-        &user.sub,
-        &req.email,
+        &user.id.to_string(),
+        &verified_email,
         SystemTime::now(),
         app_state.security(),
     )?;
 
     let response = LoginResponse { token };
+    Ok(HttpResponse::Ok().json(response))
+}
+
+/// Refresh backend JWT. Requires Bearer token with current valid backend JWT.
+/// Returns a new JWT with extended expiry.
+async fn refresh(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let auth_header = req
+        .headers()
+        .get(actix_web::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(AppError::unauthorized_missing_bearer)?;
+
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .or_else(|| auth_header.strip_prefix("bearer "))
+        .ok_or_else(AppError::unauthorized_missing_bearer)?;
+
+    let claims = verify_access_token(token.trim(), app_state.security())?;
+
+    let new_token = mint_access_token(
+        &claims.sub,
+        &claims.email,
+        SystemTime::now(),
+        app_state.security(),
+    )?;
+
+    let response = LoginResponse { token: new_token };
     Ok(HttpResponse::Ok().json(response))
 }
 
@@ -108,7 +123,6 @@ async fn check_allowlist(
     req: ValidatedJson<CheckAllowlistRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
-    // Validate email is not empty
     if req.email.trim().is_empty() {
         return Err(AppError::bad_request(
             ErrorCode::InvalidEmail,
@@ -116,11 +130,9 @@ async fn check_allowlist(
         ));
     }
 
-    // Check allowlist - no database work, just in-memory pattern matching
     let allowed = if let Some(allowlist) = &app_state.config.email_allowlist {
         allowlist.is_allowed(&req.email)
     } else {
-        // No allowlist configured - all emails allowed
         true
     };
 
@@ -133,7 +145,7 @@ async fn check_allowlist(
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    // Route path is relative to the scope in main.rs (/api/auth)
     cfg.service(web::resource("/login").route(web::post().to(login)));
+    cfg.service(web::resource("/refresh").route(web::post().to(refresh)));
     cfg.service(web::resource("/check-allowlist").route(web::post().to(check_allowlist)));
 }

@@ -14,6 +14,7 @@
     "INVALID_GAME_ID": "Quel link alla partita non è valido.",
     "INVALID_EMAIL": "Inserisci un indirizzo email valido.",
     "INVALID_GOOGLE_SUB": "Accesso non riuscito. Riprova.",
+    "INVALID_ID_TOKEN": "Accesso non riuscito. Riprova.",
     "INVALID_SEAT": "Quel posto non è valido.",
     "INVALID_BID": "Quella puntata non è valida.",
     "MUST_FOLLOW_SUIT": "Devi seguire il seme.",

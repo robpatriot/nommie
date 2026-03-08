@@ -1,3 +1,4 @@
+pub mod auth_identities_sea;
 pub mod bids_sea;
 pub mod bids_sea_simple;
 pub mod db_bootstrap_contention;

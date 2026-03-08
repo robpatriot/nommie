@@ -15,7 +15,6 @@ use crate::state::app_state::AppState;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CurrentUser {
     pub id: i64,
-    pub sub: String,
     pub email: Option<String>,
 }
 
@@ -34,6 +33,9 @@ impl FromRequest for CurrentUser {
                 .ok_or_else(AppError::unauthorized_missing_bearer)?
                 .clone();
 
+            // Parse sub as user id
+            let user_id: i64 = claims.sub.parse().map_err(|_| AppError::unauthorized())?;
+
             // Get database connection from AppState
             let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
                 AppError::internal(
@@ -46,26 +48,21 @@ impl FromRequest for CurrentUser {
                 )
             })?;
 
-            // Look up user by sub in database
+            // Look up user by id in database
             let user = match SharedTxn::from_req(&req) {
                 Some(shared_txn) => {
-                    // Use shared transaction if present
-                    users::find_user_by_sub(shared_txn.transaction(), &claims.sub).await?
+                    users::find_user_by_id(shared_txn.transaction(), user_id).await?
                 }
                 _ => {
-                    // Fall back to pooled connection
                     let db = require_db(app_state)?;
-                    users::find_user_by_sub(&db, &claims.sub).await?
+                    users::find_user_by_id(&db, user_id).await?
                 }
             };
 
             let user = user.ok_or(AppError::unauthorized())?;
 
-            // Use sub and email from JWT claims (already validated) rather than from database
-            // We still need user.id from the database lookup
             Ok(CurrentUser {
                 id: user.id,
-                sub: claims.sub,
                 email: Some(claims.email),
             })
         })

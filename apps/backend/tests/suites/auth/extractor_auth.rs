@@ -19,7 +19,7 @@ use crate::support::test_state_builder;
 
 #[derive(Serialize)]
 struct TestCurrentUserResponse {
-    sub: String,
+    id: i64,
     email: Option<String>,
 }
 
@@ -27,7 +27,7 @@ async fn test_current_user_handler(
     current_user: CurrentUser,
 ) -> Result<web::Json<TestCurrentUserResponse>, AppError> {
     Ok(web::Json(TestCurrentUserResponse {
-        sub: current_user.sub,
+        id: current_user.id,
         email: current_user.email,
     }))
 }
@@ -144,14 +144,14 @@ async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Create expired JWT token by using a time from the past
+    // Create user first, then mint expired token with user.id as sub
     let sub = unique_str("test-sub-expired");
     let email = unique_email("test");
-    let expired_token = mint_expired_token(&sub, &email, &security_config);
-
     let db = require_db(&state)?;
     let shared = SharedTxn::open(&db).await?;
-    create_test_user(shared.transaction(), &sub, Some("Expired User")).await?;
+    let user_id = create_test_user(shared.transaction(), &sub, Some("Expired User")).await?;
+    let user_sub = user_id.to_string();
+    let expired_token = mint_expired_token(&user_sub, &email, &security_config);
 
     let mut app = build_auth_test_app(state).await?;
 
@@ -180,14 +180,14 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    // Create a valid JWT token
+    // Create user first, then mint token with user.id as sub
     let sub = unique_str("test-sub-happy");
     let email = unique_email("test");
-    let token = mint_test_token(&sub, &email, &security_config);
-
     let db = require_db(&state)?;
     let shared = SharedTxn::open(&db).await?;
-    create_test_user(shared.transaction(), &sub, Some("Happy User")).await?;
+    let user_id = create_test_user(shared.transaction(), &sub, Some("Happy User")).await?;
+    let user_sub = user_id.to_string();
+    let token = mint_test_token(&user_sub, &email, &security_config);
 
     let app = build_auth_test_app(state).await?;
 
@@ -203,7 +203,7 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
     assert!(resp.status().is_success());
 
     let body: Value = test::read_body_json(resp).await;
-    assert_eq!(body["sub"], sub);
+    assert_eq!(body["id"], user_id);
     assert_eq!(body["email"], email);
 
     shared.rollback().await?;
