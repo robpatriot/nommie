@@ -113,18 +113,23 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
     if let Some(url) = &state.config.redis_url.0 {
         if let Some(guard) = ResolutionGuard::try_acquire(&state.redis_resolution_in_flight) {
             let realtime = state.realtime();
-            let (needs_resolution, ping_check) = match realtime {
+            let (needs_resolution, healthy_check) = match realtime {
                 None => (true, None),
                 Some(broker) => {
-                    let check = check_redis_ping(url).await;
                     let subscriber_alive = broker.is_subscriber_alive();
                     if !subscriber_alive {
                         tracing::info!(
                             "readiness: Redis subscriber dead, triggering broker replacement"
                         );
                     }
-                    let needs = !check.is_ok() || !subscriber_alive;
-                    (needs, Some(check))
+                    let publisher_check = broker.check_publisher().await;
+                    if !publisher_check.is_ok() {
+                        tracing::info!(
+                            "readiness: Redis publisher unhealthy, triggering broker replacement"
+                        );
+                    }
+                    let needs = !subscriber_alive || !publisher_check.is_ok();
+                    (needs, Some(publisher_check))
                 }
             };
 
@@ -133,7 +138,6 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
                 match RealtimeBroker::connect(url, state.readiness().clone()).await {
                     Ok(broker) => {
                         state.set_realtime(broker);
-                        let _check = check_redis_ping(url).await;
                         tracing::info!("readiness: Redis resolution successful");
                     }
                     Err(e) => {
@@ -147,8 +151,8 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
                         );
                     }
                 }
-            } else if let Some(check) = ping_check {
-                // Broker exists, ping ok, subscriber alive – update readiness.
+            } else if let Some(check) = healthy_check {
+                // Broker exists, subscriber alive, publisher ok – update readiness.
                 if check.is_ok() {
                     state
                         .readiness()
@@ -185,26 +189,6 @@ async fn check_db_ping(
             latency,
         },
     }
-}
-
-async fn check_redis_ping(url: &str) -> crate::readiness::types::DependencyCheck {
-    let start = std::time::Instant::now();
-    let res = try_redis_ping(url).await;
-    let latency = start.elapsed();
-    match res {
-        Ok(_) => crate::readiness::types::DependencyCheck::Ok { latency },
-        Err(e) => crate::readiness::types::DependencyCheck::Down {
-            error: format!("{e}"),
-            latency,
-        },
-    }
-}
-
-async fn try_redis_ping(url: &str) -> Result<(), redis::RedisError> {
-    let client = redis::Client::open(url)?;
-    let mut conn = client.get_multiplexed_async_connection().await?;
-    redis::cmd("PING").query_async::<String>(&mut conn).await?;
-    Ok(())
 }
 
 impl StateBuilder {

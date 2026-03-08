@@ -103,6 +103,37 @@ impl RealtimeBroker {
         false
     }
 
+    /// Check publisher connection health via PING. Retries once on failure to avoid
+    /// treating transient blips as Down. Uses a 1s timeout per attempt.
+    pub async fn check_publisher(&self) -> crate::readiness::types::DependencyCheck {
+        const TIMEOUT: Duration = Duration::from_secs(1);
+        const RETRY_DELAY: Duration = Duration::from_millis(50);
+
+        let attempt = |start: StdInstant| async move {
+            let mut publisher = self.publisher.lock().await;
+            match tokio::time::timeout(TIMEOUT, publisher.ping::<String>()).await {
+                Ok(Ok(_)) => Ok(start.elapsed()),
+                Ok(Err(e)) => Err((e.to_string(), start.elapsed())),
+                Err(_) => Err(("publisher ping timeout".to_string(), start.elapsed())),
+            }
+        };
+
+        let start = StdInstant::now();
+        match attempt(start).await {
+            Ok(latency) => crate::readiness::types::DependencyCheck::Ok { latency },
+            Err((error, _)) => {
+                sleep(RETRY_DELAY).await;
+                match attempt(StdInstant::now()).await {
+                    Ok(latency) => crate::readiness::types::DependencyCheck::Ok { latency },
+                    Err((retry_error, _)) => crate::readiness::types::DependencyCheck::Down {
+                        error: format!("{error}; retry: {retry_error}"),
+                        latency: start.elapsed(),
+                    },
+                }
+            }
+        }
+    }
+
     /// Publish a "game_state_available" event for a given game.
     pub async fn publish_game_state(&self, game_id: i64, version: i32) -> Result<(), AppError> {
         let envelope = EventEnvelope::GameStateAvailable { game_id, version };
