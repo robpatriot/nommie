@@ -33,12 +33,6 @@ postgres_data/
 # SQLite data
 data/sqlite/*.db
 
-# Next.js
-.next/
-out/
-build/
-dist/
-
 # TypeScript
 *.tsbuildinfo
 
@@ -94,16 +88,18 @@ jspm_packages/
 .cache
 .parcel-cache
 
-# Next.js build output
-.next
-
 # Nuxt.js build / generate output
 .nuxt
-dist
 
 # Storybook build outputs
 .out
 .storybook-out
+
+# Next.js / build output
+.next/
+out/
+build/
+dist/
 
 # Temporary folders
 tmp/
@@ -111,6 +107,9 @@ temp/
 
 # Performance reports
 performance-reports/
+
+# Simulation outputs
+simulation-results/
 
 # Performance profiling cookies (contains sensitive auth tokens)
 cookies.txt
