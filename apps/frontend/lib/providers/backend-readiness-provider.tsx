@@ -281,6 +281,7 @@ export function BackendReadinessProvider({
 
   useEffect(() => {
     if (!initialReady) {
+      recoveryStartedAtRef.current = Date.now()
       enterDegraded()
       startPolling()
     }
