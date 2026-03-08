@@ -14,7 +14,7 @@ import {
 } from '@/hooks/mutations/useGameRoomMutations'
 import { queryKeys } from '@/lib/queries/query-keys'
 import type { GameRoomState } from '@/lib/game-room/state'
-import { selectSnapshot } from '@/lib/game-room/state'
+import { selectSnapshot, selectViewerHand } from '@/lib/game-room/state'
 import { createInitialStateWithVersion } from '../setup/game-room-client-helpers'
 import {
   biddingSnapshotFixture,
@@ -322,6 +322,7 @@ describe('Optimistic Update Rollback Tests', () => {
       if (snapshotAfter.phase.phase === 'Trick') {
         expect(snapshotAfter.phase.data.current_trick).toEqual(trickBefore)
       }
+      expect(selectViewerHand(stateAfter!)).toEqual(['2H', 'KD', 'QC'])
       expect(stateAfter).toEqual(stateBefore)
     })
 
@@ -358,10 +359,11 @@ describe('Optimistic Update Rollback Tests', () => {
         }
       })
 
-      // Verify complete rollback
+      // Verify complete rollback (including hand restoration)
       const stateAfter = queryClient.getQueryData<GameRoomState>(
         queryKeys.games.state(gameId)
       )
+      expect(selectViewerHand(stateAfter!)).toEqual(['2H', 'KD', 'QC'])
       expect(stateAfter).toEqual(stateBefore)
     })
   })

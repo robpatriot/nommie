@@ -310,9 +310,19 @@ export function useSubmitPlay() {
       }
 
       const phaseData = phase.data
+      const viewerSeat = selectViewerSeat(previousState)
+      const isViewerPlay =
+        viewerSeat !== null && phaseData.to_act === viewerSeat
+
       const updatedState: GameRoomState = {
         ...previousState,
         source: 'optimistic',
+        viewer: isViewerPlay
+          ? {
+              ...previousState.viewer,
+              hand: previousState.viewer.hand.filter((c) => c !== request.card),
+            }
+          : previousState.viewer,
         game: {
           ...snapshot,
           phase: {

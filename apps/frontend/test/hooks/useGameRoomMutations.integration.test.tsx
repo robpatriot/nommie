@@ -431,9 +431,8 @@ describe('Full Mutation Cycle Integration Tests', () => {
         throw new Error('Expected Trick phase')
       }
 
-      // Verify viewer hand NOT updated by optimistic mutation
-      // (backend is authoritative for hand updates)
-      expect(selectViewerHand(optimisticState!)).toEqual(['2H', 'KD', 'QC'])
+      // Verify viewer hand updated by optimistic mutation (card removed)
+      expect(selectViewerHand(optimisticState!)).toEqual(['KD', 'QC'])
 
       // Simulate WS state - hand updated by server
       const updatedSnapshot = {
