@@ -89,11 +89,7 @@ pub struct GameResult {
     /// Final scores for each player (indexed by seat 0-3)
     pub final_scores: [i16; 4],
     /// Complete game history
-    #[allow(dead_code)] // Reserved for future detailed metrics
     pub history: GameHistory,
-    /// Number of rounds played
-    #[allow(dead_code)] // Reserved for future detailed metrics
-    pub rounds_played: u8,
 }
 
 /// In-memory game simulator.
@@ -147,7 +143,6 @@ impl Simulator {
         Ok(GameResult {
             final_scores: self.state.scores_total,
             history: self.history,
-            rounds_played: 26,
         })
     }
 
