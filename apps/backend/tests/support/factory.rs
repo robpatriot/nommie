@@ -26,6 +26,7 @@ pub async fn seed_user_with_sub(
         id: NotSet, // Let database auto-generate
         username: Set(Some(sub.to_string())),
         is_ai: Set(false),
+        role: Set(backend::entities::users::UserRole::User),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -78,6 +79,7 @@ pub async fn create_test_user_with_randomization(
         id: NotSet,
         username: Set(username.map(|s| s.to_string()).or(Some(final_sub))),
         is_ai: Set(false),
+        role: Set(backend::entities::users::UserRole::User),
         created_at: Set(now),
         updated_at: Set(now),
     };

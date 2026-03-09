@@ -3,7 +3,7 @@
 use sea_orm::{ActiveModelTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, Set};
 use time::OffsetDateTime;
 
-use crate::entities::user_options;
+use crate::entities::user_options::{self, ColourScheme, Theme, UserLocale};
 
 pub async fn find_by_user_id<C: ConnectionTrait + Send + Sync>(
     conn: &C,
@@ -22,8 +22,8 @@ pub async fn ensure_default_for_user(
 
     let active = user_options::ActiveModel {
         user_id: Set(user_id),
-        colour_scheme: Set("system".to_string()),
-        theme: Set("standard".to_string()),
+        colour_scheme: Set(ColourScheme::System),
+        theme: Set(Theme::Standard),
         require_card_confirmation: Set(true),
         locale: Set(None),
         trick_display_duration_seconds: Set(None),
@@ -45,14 +45,14 @@ pub async fn ensure_default_for_user(
 pub async fn update_options(
     txn: &DatabaseTransaction,
     user_id: i64,
-    colour_scheme: Option<&str>,
-    theme: Option<&str>,
+    colour_scheme: Option<ColourScheme>,
+    theme: Option<Theme>,
     require_card_confirmation: Option<bool>,
-    // Option<Option<&str>> allows distinguishing:
+    // Option<Option<UserLocale>> allows distinguishing:
     // - None = field not provided (don't update)
     // - Some(None) = field provided as null (explicitly unset to null)
-    // - Some(Some(str)) = field provided with value
-    locale: Option<Option<&str>>,
+    // - Some(Some(locale)) = field provided with value
+    locale: Option<Option<UserLocale>>,
     // Option<Option<f64>> allows distinguishing:
     // - None = field not provided (don't update)
     // - Some(None) = field provided as null (explicitly unset to default)
@@ -72,17 +72,16 @@ pub async fn update_options(
 
     let mut active: user_options::ActiveModel = existing.into();
     if let Some(mode) = colour_scheme {
-        active.colour_scheme = Set(mode.to_string());
+        active.colour_scheme = Set(mode);
     }
-    if let Some(theme_str) = theme {
-        active.theme = Set(theme_str.to_string());
+    if let Some(t) = theme {
+        active.theme = Set(t);
     }
     if let Some(require_confirmation) = require_card_confirmation {
         active.require_card_confirmation = Set(require_confirmation);
     }
-    // Handle locale: Some(None) = set to null, Some(Some(str)) = set to value
     if let Some(locale_opt) = locale {
-        active.locale = Set(locale_opt.map(|s| s.to_string()));
+        active.locale = Set(locale_opt);
     }
     // Handle trick_display_duration_seconds: Some(None) = set to null, Some(Some(value)) = set to value
     if let Some(duration_opt) = trick_display_duration_seconds {

@@ -2,6 +2,15 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
+#[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "user_role")]
+pub enum UserRole {
+    #[sea_orm(string_value = "user")]
+    User,
+    #[sea_orm(string_value = "admin")]
+    Admin,
+}
+
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "users")]
 pub struct Model {
@@ -10,6 +19,8 @@ pub struct Model {
     pub username: Option<String>,
     #[sea_orm(column_name = "is_ai")]
     pub is_ai: bool,
+    #[sea_orm(column_name = "role")]
+    pub role: UserRole,
     #[sea_orm(column_name = "created_at")]
     pub created_at: OffsetDateTime,
     #[sea_orm(column_name = "updated_at")]

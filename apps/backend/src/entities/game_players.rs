@@ -72,7 +72,7 @@ impl Related<super::ai_profiles::Entity> for Entity {
 impl ActiveModelBehavior for ActiveModel {}
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
-#[sea_orm(rs_type = "String", db_type = "Text")]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "player_kind")]
 pub enum PlayerKind {
     #[sea_orm(string_value = "human")]
     Human,
@@ -81,7 +81,7 @@ pub enum PlayerKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, EnumIter, DeriveActiveEnum, Serialize, Deserialize)]
-#[sea_orm(rs_type = "String", db_type = "Text")]
+#[sea_orm(rs_type = "String", db_type = "Enum", enum_name = "game_role")]
 pub enum GameRole {
     #[sea_orm(string_value = "player")]
     Player,

@@ -86,6 +86,7 @@ pub async fn setup_game_with_players_ex<C: ConnectionTrait>(
             id: NotSet,
             username: Set(Some(user_sub)),
             is_ai: Set(false),
+            role: Set(users::UserRole::User),
             created_at: Set(now),
             updated_at: Set(now),
         };

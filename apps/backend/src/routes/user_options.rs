@@ -4,13 +4,12 @@ use serde::{Deserialize, Serialize};
 use serde_with::rust::double_option;
 
 use crate::db::txn::with_txn;
+use crate::entities::user_options::{ColourScheme, Theme, UserLocale};
 use crate::error::AppError;
 use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
 use crate::extractors::ValidatedJson;
-use crate::repos::user_options::{
-    self, ColourScheme, Theme, UpdateUserOptions, UserLocale, UserOptions,
-};
+use crate::repos::user_options::{self, UpdateUserOptions, UserOptions};
 use crate::state::app_state::AppState;
 
 #[derive(Debug, Serialize)]
@@ -85,7 +84,7 @@ async fn update_user_options(
     let user_id = current_user.id;
     let payload = body.into_inner();
 
-    if let Some(Some(locale)) = payload.locale {
+    if let Some(Some(ref locale)) = payload.locale {
         tracing::info!(
             user_id = user_id,
             locale = locale.as_str(),

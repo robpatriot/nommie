@@ -13,6 +13,7 @@ enum Users {
     Id,
     Username,
     IsAi,
+    Role,
     CreatedAt,
     UpdatedAt,
 }
@@ -94,6 +95,42 @@ enum CardSuitEnum {
 #[derive(Iden)]
 enum CardTrumpEnum {
     #[iden = "card_trump"]
+    Type,
+}
+
+#[derive(Iden)]
+enum UserRoleEnum {
+    #[iden = "user_role"]
+    Type,
+}
+
+#[derive(Iden)]
+enum PlayerKindEnum {
+    #[iden = "player_kind"]
+    Type,
+}
+
+#[derive(Iden)]
+enum GameRoleEnum {
+    #[iden = "game_role"]
+    Type,
+}
+
+#[derive(Iden)]
+enum ColourSchemeEnum {
+    #[iden = "colour_scheme"]
+    Type,
+}
+
+#[derive(Iden)]
+enum ThemeEnum {
+    #[iden = "theme"]
+    Type,
+}
+
+#[derive(Iden)]
+enum UserLocaleEnum {
+    #[iden = "user_locale"]
     Type,
 }
 
@@ -215,6 +252,67 @@ enum RoundScores {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Create Postgres enums for user_options and users (before their tables)
+        if matches!(
+            manager.get_database_backend(),
+            sea_orm::DatabaseBackend::Postgres
+        ) {
+            async fn enum_exists(
+                manager: &SchemaManager<'_>,
+                enum_name: &str,
+            ) -> Result<bool, DbErr> {
+                let result = manager
+                    .get_connection()
+                    .query_one(Statement::from_string(
+                        sea_orm::DatabaseBackend::Postgres,
+                        format!("SELECT 1 FROM pg_type WHERE typname = '{}'", enum_name),
+                    ))
+                    .await?;
+                Ok(result.is_some())
+            }
+
+            if !enum_exists(manager, "user_role").await? {
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(UserRoleEnum::Type)
+                            .values(["user", "admin"])
+                            .to_owned(),
+                    )
+                    .await?;
+            }
+            if !enum_exists(manager, "colour_scheme").await? {
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(ColourSchemeEnum::Type)
+                            .values(["system", "light", "dark"])
+                            .to_owned(),
+                    )
+                    .await?;
+            }
+            if !enum_exists(manager, "theme").await? {
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(ThemeEnum::Type)
+                            .values(["standard", "high_roller", "oldtime"])
+                            .to_owned(),
+                    )
+                    .await?;
+            }
+            if !enum_exists(manager, "user_locale").await? {
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(UserLocaleEnum::Type)
+                            .values(["en-GB", "fr-FR", "de-DE", "es-ES", "it-IT"])
+                            .to_owned(),
+                    )
+                    .await?;
+            }
+        }
+
         // users
         manager
             .create_table(
@@ -234,6 +332,12 @@ impl MigrationTrait for Migration {
                             .boolean()
                             .not_null()
                             .default(false),
+                    )
+                    .col(
+                        ColumnDef::new(Users::Role)
+                            .custom(UserRoleEnum::Type)
+                            .not_null()
+                            .default("user"),
                     )
                     .col(
                         ColumnDef::new(Users::CreatedAt)
@@ -402,13 +506,13 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(UserOptions::ColourScheme)
-                            .string()
+                            .custom(ColourSchemeEnum::Type)
                             .not_null()
                             .default("system"),
                     )
                     .col(
                         ColumnDef::new(UserOptions::Theme)
-                            .string()
+                            .custom(ThemeEnum::Type)
                             .not_null()
                             .default("standard"),
                     )
@@ -418,7 +522,11 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(true),
                     )
-                    .col(ColumnDef::new(UserOptions::Locale).string().null())
+                    .col(
+                        ColumnDef::new(UserOptions::Locale)
+                            .custom(UserLocaleEnum::Type)
+                            .null(),
+                    )
                     .col(
                         ColumnDef::new(UserOptions::TrickDisplayDurationSeconds)
                             .double()
@@ -510,6 +618,28 @@ impl MigrationTrait for Migration {
                             PgType::create()
                                 .as_enum(CardTrumpEnum::Type)
                                 .values(["CLUBS", "DIAMONDS", "HEARTS", "SPADES", "NO_TRUMPS"])
+                                .to_owned(),
+                        )
+                        .await?;
+                }
+
+                if !enum_exists(manager, "player_kind").await? {
+                    manager
+                        .create_type(
+                            PgType::create()
+                                .as_enum(PlayerKindEnum::Type)
+                                .values(["human", "ai"])
+                                .to_owned(),
+                        )
+                        .await?;
+                }
+
+                if !enum_exists(manager, "game_role").await? {
+                    manager
+                        .create_type(
+                            PgType::create()
+                                .as_enum(GameRoleEnum::Type)
+                                .values(["player", "spectator"])
                                 .to_owned(),
                         )
                         .await?;
@@ -732,7 +862,7 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(GamePlayers::GameId).big_integer().not_null())
                     .col(
                         ColumnDef::new(GamePlayers::PlayerKind)
-                            .string()
+                            .custom(PlayerKindEnum::Type)
                             .not_null()
                             .default("human"),
                     )
@@ -764,7 +894,7 @@ impl MigrationTrait for Migration {
                     )
                     .col(
                         ColumnDef::new(GamePlayers::Role)
-                            .string()
+                            .custom(GameRoleEnum::Type)
                             .not_null()
                             .default("player"),
                     )
@@ -1638,6 +1768,24 @@ impl MigrationTrait for Migration {
                 manager
                     .drop_type(
                         PgType::drop()
+                            .name(GameRoleEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
+                    .await?;
+
+                manager
+                    .drop_type(
+                        PgType::drop()
+                            .name(PlayerKindEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
+                    .await?;
+
+                manager
+                    .drop_type(
+                        PgType::drop()
                             .name(GameVisibilityEnum::Type)
                             .if_exists()
                             .to_owned(),
@@ -1648,6 +1796,42 @@ impl MigrationTrait for Migration {
                     .drop_type(
                         PgType::drop()
                             .name(GameStateEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
+                    .await?;
+
+                manager
+                    .drop_type(
+                        PgType::drop()
+                            .name(UserLocaleEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
+                    .await?;
+
+                manager
+                    .drop_type(
+                        PgType::drop()
+                            .name(ThemeEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
+                    .await?;
+
+                manager
+                    .drop_type(
+                        PgType::drop()
+                            .name(ColourSchemeEnum::Type)
+                            .if_exists()
+                            .to_owned(),
+                    )
+                    .await?;
+
+                manager
+                    .drop_type(
+                        PgType::drop()
+                            .name(UserRoleEnum::Type)
                             .if_exists()
                             .to_owned(),
                     )

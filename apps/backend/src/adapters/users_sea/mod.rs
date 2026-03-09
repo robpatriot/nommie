@@ -19,6 +19,7 @@ pub async fn create_user(
         id: NotSet,
         username: Set(Some(dto.username)),
         is_ai: Set(dto.is_ai),
+        role: Set(users::UserRole::User),
         created_at: Set(now),
         updated_at: Set(now),
     };
