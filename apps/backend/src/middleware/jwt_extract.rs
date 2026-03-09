@@ -14,7 +14,6 @@ use futures_util::future::{ready, LocalBoxFuture, Ready};
 
 use crate::auth::claims::BackendClaims;
 use crate::auth::jwt::JwtClaims;
-use crate::error::AppError;
 use crate::state::app_state::AppState;
 
 pub struct JwtExtract;
@@ -96,16 +95,6 @@ where
 
         match jwt_result {
             Ok(jwt_claims) => {
-                // Check email allowlist if enabled (invalidates existing sessions for non-allowlisted users)
-                if let Some(allowlist) = app_state.config.email_allowlist.as_ref() {
-                    let email = &jwt_claims.claims.email;
-                    if !allowlist.is_allowed(email) {
-                        // Use structured AppError so the frontend receives a proper
-                        // Problem Details response with code=EMAIL_NOT_ALLOWED.
-                        return Box::pin(async { Err(AppError::email_not_allowed().into()) });
-                    }
-                }
-
                 // Store claims in request extensions BEFORE calling the service
                 req.extensions_mut().insert(jwt_claims.claims);
 

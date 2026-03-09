@@ -2,8 +2,10 @@ use std::time::SystemTime;
 
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
+use unicode_normalization::UnicodeNormalization;
 
 use crate::auth::jwt::{mint_access_token, verify_access_token};
+use crate::db::require_db;
 use crate::db::txn::with_txn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -55,21 +57,10 @@ async fn login(
 
     let verified_email = claims.email.clone();
 
-    // Apply allowlist using verified email from token
-    if let Some(allowlist) = &app_state.config.email_allowlist {
-        if !allowlist.is_allowed(&verified_email) {
-            return Err(AppError::email_not_allowed());
-        }
-    }
-
-    let email_allowlist = app_state.config.email_allowlist.clone();
-
     let user = with_txn(Some(&http_req), &app_state, |txn| {
         Box::pin(async move {
             let service = UserService;
-            Ok(service
-                .ensure_user(txn, &claims, email_allowlist.as_ref())
-                .await?)
+            Ok(service.ensure_user(txn, &claims).await?)
         })
     })
     .await?;
@@ -115,10 +106,16 @@ async fn refresh(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Lightweight endpoint to check if an email is allowed by the allowlist.
+/// Lightweight endpoint to check if an email is admitted for first-time login.
 ///
-/// Prevents unnecessary backend API calls and session creation for non-allowed emails.
+/// Prevents unnecessary backend API calls and session creation for non-admitted emails.
 /// No authentication required - this is a public endpoint.
+///
+/// Returns allowed=true if:
+/// - The email has an existing linked identity (repeat login), or
+/// - The email matches the admission table (first-time login).
+///
+/// Existing users are always allowed regardless of the admission table.
 async fn check_allowlist(
     req: ValidatedJson<CheckAllowlistRequest>,
     app_state: web::Data<AppState>,
@@ -130,11 +127,23 @@ async fn check_allowlist(
         ));
     }
 
-    let allowed = if let Some(allowlist) = &app_state.config.email_allowlist {
-        allowlist.is_allowed(&req.email)
-    } else {
-        true
-    };
+    let db = require_db(app_state.as_ref())?;
+    let email = req.email.trim().nfkc().collect::<String>().to_lowercase();
+
+    // Existing linked users bypass admission check
+    let existing = crate::repos::auth_identities::find_by_provider_email(&db, "google", &email)
+        .await
+        .map_err(AppError::from)?;
+
+    if existing.is_some() {
+        let response = CheckAllowlistResponse { allowed: true };
+        return Ok(HttpResponse::Ok().json(response));
+    }
+
+    // First-time login: must be in admission table
+    let allowed = crate::repos::allowed_emails::is_email_admitted(&db, &email)
+        .await
+        .map_err(AppError::from)?;
 
     if !allowed {
         return Err(AppError::email_not_allowed());

@@ -3,11 +3,12 @@ use tracing::{info, trace, warn};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::auth::google::VerifiedGoogleClaims;
-use crate::config::email_allowlist::EmailAllowlist;
 use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind, ValidationKind};
 use crate::logging::pii::Redacted;
 use crate::repos::users::{self as users_repo, User};
-use crate::repos::{auth_identities as auth_identities_repo, user_options as user_options_repo};
+use crate::repos::{
+    allowed_emails, auth_identities as auth_identities_repo, user_options as user_options_repo,
+};
 
 const PROVIDER_GOOGLE: &str = "google";
 
@@ -110,7 +111,6 @@ impl UserService {
         &self,
         txn: &DatabaseTransaction,
         claims: &VerifiedGoogleClaims,
-        email_allowlist: Option<&EmailAllowlist>,
     ) -> Result<User, DomainError> {
         let provider_user_id = &claims.sub;
         let email = &claims.email;
@@ -148,15 +148,13 @@ impl UserService {
             ));
         }
 
-        // New user - check allowlist before creating
-        if let Some(allowlist) = email_allowlist {
-            if !allowlist.is_allowed(&clean_email) {
-                return Err(DomainError::validation(
-                    ValidationKind::InvalidEmail,
-                    "Access restricted. Please contact support if you believe this is an error."
-                        .to_string(),
-                ));
-            }
+        // New user - check admission table before creating
+        if !allowed_emails::is_email_admitted(txn, &clean_email).await? {
+            return Err(DomainError::validation(
+                ValidationKind::EmailNotAllowed,
+                "Access restricted. Please contact support if you believe this is an error."
+                    .to_string(),
+            ));
         }
 
         // Derive username from name or email local-part

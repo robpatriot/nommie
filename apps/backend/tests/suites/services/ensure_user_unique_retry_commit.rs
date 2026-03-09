@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use backend::auth::google::VerifiedGoogleClaims;
+use backend::db::require_db;
 use backend::db::txn::with_txn;
 use backend::db::txn_policy::{current, TxnPolicy};
-use backend::entities::{user_auth_identities, users};
+use backend::entities::{allowed_emails, user_auth_identities, users};
 use backend::services::users::UserService;
 use backend::AppError;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
-use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+use sea_orm::{ActiveValue, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use tokio::sync::Barrier;
 use tokio::task::LocalSet;
 
@@ -22,6 +23,23 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
     let state = Arc::new(build_test_state().await?);
     let email = unique_email("ensure-user-race");
     let google_sub = unique_str("google-sub");
+
+    let db = require_db(state.as_ref())?;
+    let now = time::OffsetDateTime::now_utc();
+    let model = allowed_emails::ActiveModel {
+        id: ActiveValue::NotSet,
+        email: ActiveValue::Set(email.to_lowercase()),
+        created_at: ActiveValue::Set(now),
+    };
+    allowed_emails::Entity::insert(model)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns([allowed_emails::Column::Email])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(&db)
+        .await
+        .map_err(|e| AppError::from(backend::infra::db_errors::map_db_err(e)))?;
 
     let barrier = Arc::new(Barrier::new(2));
     let local = LocalSet::new();
@@ -50,7 +68,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
                             name: Some("Race".to_string()),
                         };
                         let user = service
-                            .ensure_user(txn, &claims, None)
+                            .ensure_user(txn, &claims)
                             .await
                             .map_err(AppError::from)?;
                         Ok::<_, AppError>(user.id)
@@ -72,7 +90,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
                             name: Some("Race".to_string()),
                         };
                         let user = service
-                            .ensure_user(txn, &claims, None)
+                            .ensure_user(txn, &claims)
                             .await
                             .map_err(AppError::from)?;
                         Ok::<_, AppError>(user.id)

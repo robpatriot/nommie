@@ -3,12 +3,14 @@ use std::sync::Arc;
 use actix_web::test;
 use backend::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
 use backend::auth::jwt::verify_access_token;
+use backend::db::require_db;
 use backend::state::security_config::SecurityConfig;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use serde_json::json;
 
 use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
+use crate::support::auth::seed_admission_email;
 use crate::support::test_state_builder;
 
 #[actix_web::test]
@@ -134,6 +136,9 @@ async fn test_valid_json_happy_path_unchanged() -> Result<(), Box<dyn std::error
         .build()
         .await?;
 
+    let db = require_db(&state).expect("DB required for this test");
+    seed_admission_email(&db, &test_email.to_lowercase()).await;
+
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let valid_json = json!({ "id_token": "test-token" });
@@ -171,7 +176,7 @@ async fn test_non_json_content_type_still_attempts_parse() -> Result<(), Box<dyn
     let test_google_sub = unique_str("google");
     let mock_verifier = Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
         sub: test_google_sub,
-        email: test_email,
+        email: test_email.clone(),
         name: Some("Test User".to_string()),
     }));
 
@@ -182,6 +187,9 @@ async fn test_non_json_content_type_still_attempts_parse() -> Result<(), Box<dyn
         .with_google_verifier(mock_verifier)
         .build()
         .await?;
+
+    let db = require_db(&state).expect("DB required for this test");
+    seed_admission_email(&db, &test_email.to_lowercase()).await;
 
     let app = create_test_app(state).with_prod_routes().build().await?;
 

@@ -593,6 +593,9 @@ impl From<crate::errors::domain::DomainError> for AppError {
         match err {
             crate::errors::domain::DomainError::Validation(kind, detail) => {
                 match kind {
+                    crate::errors::domain::ValidationKind::EmailNotAllowed => {
+                        AppError::email_not_allowed()
+                    }
                     crate::errors::domain::ValidationKind::InvalidGameId => AppError::BadRequest {
                         code: ErrorCode::InvalidGameId,
                         detail,

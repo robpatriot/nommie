@@ -1,6 +1,7 @@
 use actix_web::http::StatusCode;
 use actix_web::ResponseError;
 use backend::auth::google::VerifiedGoogleClaims;
+use backend::db::require_db;
 use backend::db::txn::with_txn;
 use backend::entities::user_auth_identities;
 use backend::services::users::UserService;
@@ -8,6 +9,7 @@ use backend::{AppError, ErrorCode};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 
+use crate::support::auth::seed_admission_email;
 use crate::support::build_test_state;
 
 const PROVIDER_GOOGLE: &str = "google";
@@ -23,6 +25,8 @@ fn claims(email: &str, name: Option<&str>, sub: &str) -> VerifiedGoogleClaims {
 #[tokio::test]
 async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
     let state = build_test_state().await?;
+    let db = require_db(&state).expect("DB required");
+    seed_admission_email(&db, "*@example.test").await;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -31,11 +35,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
             let test_google_sub = unique_str("google-sub");
             let service = UserService;
             let user1 = service
-                .ensure_user(
-                    txn,
-                    &claims(&test_email, Some("Alice"), &test_google_sub),
-                    None,
-                )
+                .ensure_user(txn, &claims(&test_email, Some("Alice"), &test_google_sub))
                 .await?;
 
             // Verify user was created with expected values
@@ -48,7 +48,6 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
                 .ensure_user(
                     txn,
                     &claims(&test_email, Some("Alice Smith"), &test_google_sub),
-                    None,
                 )
                 .await?;
 
@@ -99,6 +98,8 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
     let state = build_test_state().await?;
+    let db = require_db(&state).expect("DB required");
+    seed_admission_email(&db, "*@example.test").await;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -109,11 +110,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 
             // Scenario 1: First login (no user/identity) → creates user + identity
             let user1 = service
-                .ensure_user(
-                    txn,
-                    &claims(&test_email, Some("Bob"), &original_google_sub),
-                    None,
-                )
+                .ensure_user(txn, &claims(&test_email, Some("Bob"), &original_google_sub))
                 .await?;
 
             assert_eq!(user1.username, Some("Bob".to_string()));
@@ -139,7 +136,6 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
                 .ensure_user(
                     txn,
                     &claims(&test_email, Some("Bob Smith"), &original_google_sub),
-                    None,
                 )
                 .await?;
 
@@ -159,7 +155,6 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
                 .ensure_user(
                     txn,
                     &claims(&test_email, Some("Bob"), &different_google_sub),
-                    None,
                 )
                 .await;
 
@@ -195,6 +190,8 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 #[tokio::test]
 async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> {
     let state = build_test_state().await?;
+    let db = require_db(&state).expect("DB required");
+    seed_admission_email(&db, "alice@example.com").await;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -205,7 +202,6 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
                 .ensure_user(
                     txn,
                     &claims("  ALICE@EXAMPLE.COM  ", Some("Alice"), &google_sub),
-                    None,
                 )
                 .await?;
 
@@ -215,7 +211,6 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
                 .ensure_user(
                     txn,
                     &claims("alice@example.com", Some("Alice"), &google_sub),
-                    None,
                 )
                 .await?;
 
@@ -225,7 +220,6 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
                 .ensure_user(
                     txn,
                     &claims("Alice@Example.Com", Some("Alice"), &google_sub),
-                    None,
                 )
                 .await?;
 
@@ -250,6 +244,8 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
 #[tokio::test]
 async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
     let state = build_test_state().await?;
+    let db = require_db(&state).expect("DB required");
+    seed_admission_email(&db, "café@example.com").await;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -258,20 +254,12 @@ async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
 
             let email_composed = "café@example.com";
             let user1 = service
-                .ensure_user(
-                    txn,
-                    &claims(email_composed, Some("User"), &google_sub),
-                    None,
-                )
+                .ensure_user(txn, &claims(email_composed, Some("User"), &google_sub))
                 .await?;
 
             let email_decomposed = "cafe\u{0301}@example.com";
             let user2 = service
-                .ensure_user(
-                    txn,
-                    &claims(email_decomposed, Some("User"), &google_sub),
-                    None,
-                )
+                .ensure_user(txn, &claims(email_decomposed, Some("User"), &google_sub))
                 .await?;
 
             assert_eq!(
@@ -297,11 +285,7 @@ async fn test_email_validation_missing_at_symbol() -> Result<(), AppError> {
             let google_sub = unique_str("google-sub");
 
             let result = service
-                .ensure_user(
-                    txn,
-                    &claims("invalidemail.com", Some("User"), &google_sub),
-                    None,
-                )
+                .ensure_user(txn, &claims("invalidemail.com", Some("User"), &google_sub))
                 .await;
 
             match result {
@@ -331,11 +315,7 @@ async fn test_email_validation_multiple_at_symbols() -> Result<(), AppError> {
             let google_sub = unique_str("google-sub");
 
             let result = service
-                .ensure_user(
-                    txn,
-                    &claims("user@@example.com", Some("User"), &google_sub),
-                    None,
-                )
+                .ensure_user(txn, &claims("user@@example.com", Some("User"), &google_sub))
                 .await;
 
             match result {
@@ -365,11 +345,7 @@ async fn test_email_validation_empty_local_part() -> Result<(), AppError> {
             let google_sub = unique_str("google-sub");
 
             let result = service
-                .ensure_user(
-                    txn,
-                    &claims("@example.com", Some("User"), &google_sub),
-                    None,
-                )
+                .ensure_user(txn, &claims("@example.com", Some("User"), &google_sub))
                 .await;
 
             match result {
@@ -399,7 +375,7 @@ async fn test_email_validation_empty_domain() -> Result<(), AppError> {
             let google_sub = unique_str("google-sub");
 
             let result = service
-                .ensure_user(txn, &claims("user@", Some("User"), &google_sub), None)
+                .ensure_user(txn, &claims("user@", Some("User"), &google_sub))
                 .await;
 
             match result {
@@ -429,7 +405,7 @@ async fn test_email_validation_whitespace_only() -> Result<(), AppError> {
             let google_sub = unique_str("google-sub");
 
             let result = service
-                .ensure_user(txn, &claims("   ", Some("User"), &google_sub), None)
+                .ensure_user(txn, &claims("   ", Some("User"), &google_sub))
                 .await;
 
             match result {

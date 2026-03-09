@@ -3,7 +3,10 @@
 use std::time::SystemTime;
 
 use backend::auth::jwt::mint_access_token;
+use backend::entities::allowed_emails;
 use backend::state::security_config::SecurityConfig;
+use sea_orm::sea_query::OnConflict;
+use sea_orm::{ActiveValue, EntityTrait};
 
 /// Mint a bearer token for the given sub and email
 ///
@@ -45,4 +48,22 @@ pub fn mint_expired_token(sub: &str, email: &str, sec: &SecurityConfig) -> Strin
         .checked_sub(std::time::Duration::from_secs(7200))
         .unwrap();
     mint_access_token(sub, email, past_time, sec).expect("should mint expired token successfully")
+}
+
+/// Insert an email into the admission table for testing. Idempotent (ON CONFLICT DO NOTHING).
+pub async fn seed_admission_email(conn: &sea_orm::DatabaseConnection, email: &str) {
+    let now = time::OffsetDateTime::now_utc();
+    let model = allowed_emails::ActiveModel {
+        id: ActiveValue::NotSet,
+        email: ActiveValue::Set(email.to_string()),
+        created_at: ActiveValue::Set(now),
+    };
+    let _ = allowed_emails::Entity::insert(model)
+        .on_conflict(
+            OnConflict::columns([allowed_emails::Column::Email])
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec(conn)
+        .await;
 }

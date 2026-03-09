@@ -8,7 +8,6 @@ use tracing::info;
 use super::security_config::SecurityConfig;
 use crate::auth::google::GoogleVerifier;
 use crate::config::db::{DbKind, RuntimeEnv};
-use crate::config::email_allowlist::EmailAllowlist;
 use crate::readiness::ReadinessManager;
 use crate::routes::snapshot_cache::SnapshotCache;
 use crate::ws::hub::{RealtimeBroker, WsRegistry};
@@ -31,7 +30,6 @@ pub struct AppConfig {
     pub db_url: Secret<String>,
     pub redis_url: Secret<Option<String>>,
     pub security: SecurityConfig,
-    pub email_allowlist: Option<EmailAllowlist>,
     pub google_verifier: GoogleVerifier,
 }
 

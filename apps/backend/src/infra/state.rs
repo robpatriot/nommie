@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use crate::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
 use crate::config::db::{DbKind, RuntimeEnv};
-use crate::config::email_allowlist::EmailAllowlist;
 use crate::error::AppError;
 use crate::infra::db::bootstrap_db;
 use crate::readiness::ReadinessManager;
@@ -16,7 +15,6 @@ pub struct StateBuilder {
     security_config: SecurityConfig,
     env: Option<RuntimeEnv>,
     db_kind: Option<DbKind>,
-    email_allowlist: Option<EmailAllowlist>,
     redis_url: Option<String>,
     readiness: Option<Arc<ReadinessManager>>,
     google_verifier: Option<std::sync::Arc<dyn crate::auth::google::GoogleIdTokenVerifier>>,
@@ -209,13 +207,6 @@ impl StateBuilder {
         self
     }
 
-    /// Set the email allowlist (None = disabled, Some = enabled)
-    /// If not called, allowlist defaults to None (disabled)
-    pub fn with_email_allowlist(mut self, allowlist: Option<EmailAllowlist>) -> Self {
-        self.email_allowlist = allowlist;
-        self
-    }
-
     pub fn with_redis_url(mut self, redis_url: Option<String>) -> Self {
         self.redis_url = redis_url;
         self
@@ -260,7 +251,6 @@ impl StateBuilder {
                     db_url,
                     redis_url,
                     security: self.security_config,
-                    email_allowlist: self.email_allowlist,
                     google_verifier,
                 };
                 let state = AppState::new(config, None, None, readiness);
@@ -289,7 +279,6 @@ impl StateBuilder {
                     db_url,
                     redis_url,
                     security: self.security_config,
-                    email_allowlist: self.email_allowlist,
                     google_verifier,
                 };
                 let state = AppState::new_without_db(config, Some(readiness));

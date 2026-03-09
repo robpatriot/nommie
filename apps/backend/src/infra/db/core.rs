@@ -234,6 +234,35 @@ async fn ensure_ai_profiles_with_lock(
     Ok(())
 }
 
+/// Seed admission table from ALLOWED_EMAILS env var. Additive and idempotent.
+async fn seed_admission_from_env(pool: &DatabaseConnection) -> Result<(), AppError> {
+    use sea_orm::TransactionTrait;
+
+    let patterns = crate::repos::allowed_emails::parse_allowed_emails_from_env();
+    if patterns.is_empty() {
+        return Ok(());
+    }
+
+    let txn = pool
+        .begin()
+        .await
+        .map_err(|e| AppError::config("failed to begin transaction for admission seed", e))?;
+
+    let inserted = crate::repos::allowed_emails::seed_from_env(&txn)
+        .await
+        .map_err(AppError::from)?;
+
+    txn.commit()
+        .await
+        .map_err(|e| AppError::config("failed to commit admission seed", e))?;
+
+    if inserted > 0 {
+        info!(inserted, "admission_seed=complete");
+    }
+
+    Ok(())
+}
+
 /// Determine database engine type for logging
 /// Build the app DB *and* guarantee schema is current.
 /// Uses unified migration orchestration with appropriate pool creation strategy.
@@ -291,6 +320,8 @@ pub async fn bootstrap_db(
     .await?;
 
     ensure_ai_profiles_with_lock(&migration_pool, env, db_kind).await?;
+
+    seed_admission_from_env(&migration_pool).await?;
 
     // Build final shared pool (reuse for SqliteMemory, create new for others)
     let shared_pool = match db_kind {

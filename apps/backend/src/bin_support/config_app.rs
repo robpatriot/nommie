@@ -7,7 +7,6 @@
 use std::env;
 
 use crate::config::db::{DbKind, RuntimeEnv};
-use crate::config::email_allowlist::EmailAllowlist;
 use crate::error::AppError;
 
 /// Centralized application configuration loaded from environment variables
@@ -26,9 +25,6 @@ pub struct Config {
 
     // Redis configuration
     pub redis_url: String,
-
-    // Email allowlist configuration (optional)
-    pub email_allowlist: Option<EmailAllowlist>,
 
     // Google OAuth client ID for ID token verification (required for auth)
     pub google_client_id: String,
@@ -81,9 +77,6 @@ impl Config {
             )),
         })?;
 
-        // Email allowlist configuration (optional)
-        let email_allowlist = EmailAllowlist::from_env();
-
         // Google OAuth client ID for ID token verification
         let google_client_id = env::var("GOOGLE_CLIENT_ID").map_err(|_| AppError::Config {
             detail: "GOOGLE_CLIENT_ID must be set for Google ID token verification".to_string(),
@@ -124,7 +117,6 @@ impl Config {
             db_kind,
             jwt_secret,
             redis_url,
-            email_allowlist,
             google_client_id,
             max_json_payload_size,
             max_payload_size,

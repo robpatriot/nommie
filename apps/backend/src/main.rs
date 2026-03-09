@@ -51,7 +51,6 @@ async fn main() -> std::io::Result<()> {
         .with_env(config.runtime_env)
         .with_db(config.db_kind)
         .with_security(security_config)
-        .with_email_allowlist(config.email_allowlist.clone())
         .with_google_verifier(google_verifier)
         .with_redis_url(Some(config.redis_url.clone()))
         .with_readiness(readiness.clone())
@@ -61,19 +60,6 @@ async fn main() -> std::io::Result<()> {
 
     // Check TLS certificate expiry (logs warning if expiring soon)
     backend::bin_support::tls_checks::check_postgres_cert_expiry();
-
-    // Log email allowlist status
-    match &app_state.config.email_allowlist {
-        Some(allowlist) => {
-            println!(
-                "🔒 Email allowlist enabled with {} pattern(s)",
-                allowlist.pattern_count()
-            );
-        }
-        None => {
-            println!("🔓 Email allowlist disabled (open signup/login)");
-        }
-    }
 
     // Console diagnostic summary
     if app_state.db().is_some() {

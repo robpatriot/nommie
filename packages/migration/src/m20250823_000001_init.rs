@@ -18,6 +18,14 @@ enum Users {
 }
 
 #[derive(Iden)]
+enum AllowedEmails {
+    Table,
+    Id,
+    Email,
+    CreatedAt,
+}
+
+#[derive(Iden)]
 enum UserAuthIdentities {
     Table,
     Id,
@@ -237,6 +245,44 @@ impl MigrationTrait for Migration {
                             .timestamp_with_time_zone()
                             .not_null(),
                     )
+                    .to_owned(),
+            )
+            .await?;
+
+        // allowed_emails - admission table for first-time login
+        manager
+            .create_table(
+                Table::create()
+                    .table(AllowedEmails::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(AllowedEmails::Id)
+                            .big_integer()
+                            .not_null()
+                            .primary_key()
+                            .auto_increment(),
+                    )
+                    .col(
+                        ColumnDef::new(AllowedEmails::Email)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AllowedEmails::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("ux_allowed_emails_email")
+                    .table(AllowedEmails::Table)
+                    .col(AllowedEmails::Email)
+                    .unique()
                     .to_owned(),
             )
             .await?;
@@ -1644,6 +1690,19 @@ impl MigrationTrait for Migration {
 
         manager
             .drop_table(Table::drop().table(UserAuthIdentities::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ux_allowed_emails_email")
+                    .table(AllowedEmails::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(AllowedEmails::Table).to_owned())
             .await?;
 
         manager

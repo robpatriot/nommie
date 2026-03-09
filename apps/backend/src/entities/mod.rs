@@ -1,5 +1,6 @@
 pub mod ai_overrides;
 pub mod ai_profiles;
+pub mod allowed_emails;
 pub mod game_players;
 pub mod game_rounds;
 pub mod games;

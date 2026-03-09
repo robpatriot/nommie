@@ -68,7 +68,6 @@ mod tests {
             db_url: Secret("".to_string()),
             redis_url: Secret(None),
             security: SecurityConfig::default(),
-            email_allowlist: None,
             google_verifier: test_google_verifier(),
         };
         let app_state = AppState::new_without_db(config, None);
@@ -99,7 +98,6 @@ mod tests {
             db_url: Secret("".to_string()),
             redis_url: Secret(None),
             security: SecurityConfig::default(),
-            email_allowlist: None,
             google_verifier: test_google_verifier(),
         };
         let app_state = AppState::new_without_db(config, None);

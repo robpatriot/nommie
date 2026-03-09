@@ -42,6 +42,7 @@ pub enum ValidationKind {
     InvalidSeat,
     InvalidGameId,
     InvalidEmail,
+    EmailNotAllowed,
     InvalidPlayerCount,
     InvalidHandSize,
     Other(String),

@@ -34,7 +34,7 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
                     email: email.clone(),
                     name: Some(format!("Memory User {}", i)),
                 };
-                let _user = service.ensure_user(txn, &claims, None).await?;
+                let _user = service.ensure_user(txn, &claims).await?;
             }
             Ok(())
         })
@@ -61,7 +61,7 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
                     email: email.clone(),
                     name: Some(format!("File User {}", i)),
                 };
-                let _user = service.ensure_user(txn, &claims, None).await?;
+                let _user = service.ensure_user(txn, &claims).await?;
             }
             Ok(())
         })
