@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
-use crate::config::db::{DbKind, RuntimeEnv};
+use crate::config::db::RuntimeEnv;
 use crate::error::AppError;
 use crate::infra::db::bootstrap_db;
 use crate::readiness::ReadinessManager;
@@ -14,7 +14,6 @@ use crate::ws::hub::RealtimeBroker;
 pub struct StateBuilder {
     security_config: SecurityConfig,
     env: Option<RuntimeEnv>,
-    db_kind: Option<DbKind>,
     redis_url: Option<String>,
     readiness: Option<Arc<ReadinessManager>>,
     google_verifier: Option<std::sync::Arc<dyn crate::auth::google::GoogleIdTokenVerifier>>,
@@ -72,7 +71,7 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
 
         if needs_resolution {
             let start = std::time::Instant::now();
-            match bootstrap_db(state.config.env, state.config.db_kind).await {
+            match bootstrap_db(state.config.env).await {
                 Ok(conn) => {
                     state.set_db(conn.clone());
                     state.readiness().set_migration_result(true, None);
@@ -199,11 +198,6 @@ impl StateBuilder {
         self
     }
 
-    pub fn with_db(mut self, db_kind: DbKind) -> Self {
-        self.db_kind = Some(db_kind);
-        self
-    }
-
     pub fn with_security(mut self, security_config: SecurityConfig) -> Self {
         self.security_config = security_config;
         self
@@ -253,11 +247,10 @@ impl StateBuilder {
 
         let admission_mode = self.admission_mode.unwrap_or_else(AdmissionMode::from_env);
 
-        let (state, needs_resolution) = match (self.env, self.db_kind) {
-            (Some(env), Some(db_kind)) => {
+        let (state, needs_resolution) = match self.env {
+            Some(env) => {
                 let config = AppConfig {
                     env,
-                    db_kind,
                     db_url,
                     redis_url,
                     security: self.security_config,
@@ -281,12 +274,11 @@ impl StateBuilder {
 
                 (state, true)
             }
-            _ => {
+            None => {
                 // Hollow state for tests that don't need DB/Redis.
                 // Skips resolve_dependencies; no self-healing (nothing to heal).
                 let config = AppConfig {
                     env: RuntimeEnv::Test,
-                    db_kind: DbKind::SqliteMemory,
                     db_url,
                     redis_url,
                     security: self.security_config,

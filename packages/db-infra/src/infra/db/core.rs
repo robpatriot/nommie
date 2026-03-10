@@ -4,44 +4,24 @@ use migration::{migrate, MigrationCommand, Migrator, MigratorTrait};
 use rand::Rng;
 use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DbErr};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, trace, warn};
+use tracing::{info, trace, warn};
 
 use crate::config::db::{
-    build_connection_settings, build_session_statements, make_conn_spec, validate_db_config,
-    DbKind, DbOwner, DbSettings, PoolPurpose, RuntimeEnv,
+    build_connection_settings, build_session_statements, make_conn_spec, DbOwner, DbSettings,
+    PoolPurpose, RuntimeEnv,
 };
 use crate::error::DbInfraError;
 use crate::infra::db::diagnostics::migration_counters;
-use crate::infra::db::locking::{
-    BootstrapLock, Guard, InMemoryLock, PgAdvisoryLock, SqliteFileLock,
-};
+use crate::infra::db::locking::{BootstrapLock, Guard, PgAdvisoryLock};
 
-fn get_db_engine(db_kind: DbKind) -> &'static str {
-    match db_kind {
-        DbKind::Postgres => "postgresql",
-        DbKind::SqliteFile | DbKind::SqliteMemory => "sqlite",
-    }
+fn get_db_path(env: RuntimeEnv) -> String {
+    let spec = make_conn_spec(env, DbOwner::Owner)
+        .unwrap_or_else(|_| "postgres-unknown".to_string());
+    sanitize_db_url(&spec)
 }
 
-fn get_db_path(db_kind: DbKind, env: RuntimeEnv) -> String {
-    match db_kind {
-        DbKind::Postgres => {
-            let spec = make_conn_spec(env, db_kind, DbOwner::Owner).unwrap_or_else(|_| "postgres-unknown".to_string());
-            sanitize_db_url(&spec)
-        }
-        DbKind::SqliteFile => {
-            crate::config::db::sqlite_file_spec(db_kind, env).unwrap_or_else(|_| "sqlite-file-unknown".to_string())
-        }
-        DbKind::SqliteMemory => "sqlite::memory:".to_string(),
-    }
-}
-
-
-pub async fn build_admin_pool(
-    env: RuntimeEnv,
-    db_kind: DbKind,
-) -> Result<DatabaseConnection, DbInfraError> {
-    let url = make_conn_spec(env, db_kind, DbOwner::Owner)?;
+pub async fn build_admin_pool(env: RuntimeEnv) -> Result<DatabaseConnection, DbInfraError> {
+    let url = make_conn_spec(env, DbOwner::Owner)?;
 
     let mut opt = ConnectOptions::new(&url);
     opt.min_connections(1)
@@ -49,9 +29,6 @@ pub async fn build_admin_pool(
         .acquire_timeout(Duration::from_secs(2))
         .sqlx_logging(true);
 
-    // Single attempt — the ReadinessManager monitor owns retry scheduling.
-    // The old retry_connection(5, 500) loop predates the monitor and added
-    // ~12 s of noise per probe; retries now happen at the monitor level.
     let pool = Database::connect(opt)
         .await
         .map_err(|e| DbInfraError::Config {
@@ -62,7 +39,6 @@ pub async fn build_admin_pool(
 }
 
 /// Sanitize database URL by masking password in connection strings.
-/// Used for generating lock keys and logging.
 pub fn sanitize_db_url(url: &str) -> String {
     if url.contains("@") && url.contains(":") {
         let parts: Vec<&str> = url.split("@").collect();
@@ -123,23 +99,8 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, DbInf
 
     if is_up_to_date {
         migration_counters::fast_path_hit();
-        trace!(
-            fastpath = "hit",
-            current_count = current_count,
-            expected_count = expected_count,
-            current_last = %current_last.as_deref().unwrap_or(""),
-            expected_last = %expected_last
-        );
     } else {
         migration_counters::fast_path_miss();
-        trace!(
-            fastpath = "miss",
-            current_count = current_count,
-            expected_count = expected_count,
-            current_last = %current_last.as_deref().unwrap_or(""),
-            expected_last = %expected_last,
-            reason = "count_or_version_mismatch"
-        );
     }
 
     Ok(is_up_to_date)
@@ -147,30 +108,25 @@ async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, DbInf
 
 pub async fn orchestrate_migration(
     env: RuntimeEnv,
-    db_kind: DbKind,
     command: MigrationCommand,
 ) -> Result<(), DbInfraError> {
-    validate_db_config(env, db_kind)?;
+    let admin_pool = build_admin_pool(env).await?;
 
-    let admin_pool = build_admin_pool(env, db_kind).await?;
-
-    let res = orchestrate_migration_internal(&admin_pool, env, db_kind, command).await;
+    let res = orchestrate_migration_internal(&admin_pool, env, command).await;
     res
 }
 
 pub async fn orchestrate_migration_internal(
     pool: &DatabaseConnection,
     env: RuntimeEnv,
-    db_kind: DbKind,
     command: MigrationCommand,
 ) -> Result<(), DbInfraError> {
     let cancellation_token = CancellationToken::new();
-    let engine = get_db_engine(db_kind);
-    let path = get_db_path(db_kind, env);
+    let path = get_db_path(env);
 
     info!(
-        "migrate=start env={:?} db_kind={:?} engine={} path={}",
-        env, db_kind, engine, path
+        "migrate=start env={:?} engine=postgresql path={}",
+        env, path
     );
 
     if matches!(command, MigrationCommand::Status) {
@@ -183,63 +139,20 @@ pub async fn orchestrate_migration_internal(
         return Ok(());
     }
 
-    let url = make_conn_spec(env, db_kind, DbOwner::Owner)?;
-    let result = match db_kind {
-        DbKind::Postgres => {
-            let sanitized_url = sanitize_db_url(&url);
-            let key = format!("nommie:migrate:{:?}:{}", db_kind, sanitized_url);
+    let url = make_conn_spec(env, DbOwner::Owner)?;
+    let sanitized_url = sanitize_db_url(&url);
+    let key = format!("nommie:migrate:{:?}:{}", env, sanitized_url);
 
-            let lock = PgAdvisoryLock::new(pool.clone(), &key);
+    let lock = PgAdvisoryLock::new(pool.clone(), &key);
 
-            migrate_with_lock(
-                pool,
-                lock,
-                env,
-                db_kind,
-                command,
-                cancellation_token.clone(),
-            )
-            .await
-        }
-        DbKind::SqliteMemory => {
-            let lock = InMemoryLock;
-
-            migrate_with_lock(
-                pool,
-                lock,
-                env,
-                db_kind,
-                command,
-                cancellation_token.clone(),
-            )
-            .await
-        }
-        DbKind::SqliteFile => {
-            let lock_path = crate::config::db::sqlite_lock_path(db_kind, env)?;
-            let lock = SqliteFileLock::new(&lock_path)?;
-
-            migrate_with_lock(
-                pool,
-                lock,
-                env,
-                db_kind,
-                command,
-                cancellation_token.clone(),
-            )
-            .await
-        }
-    };
-
-    if let Err(ref e) = result {
-        let error_msg = match e {
-            DbInfraError::Config { message } => message,
-        }
-        .to_string();
-        if error_msg.contains("database is locked") || error_msg.contains("SQLITE_BUSY") {
-            migration_counters::busy_event();
-            error!("sqlite_busy op=migrate err={:?}", e);
-        }
-    }
+    let result = migrate_with_lock(
+        pool,
+        lock,
+        env,
+        command,
+        cancellation_token.clone(),
+    )
+    .await;
 
     info!("migrate=done");
     migration_counters::log_snapshot("migrate_orchestration");
@@ -247,18 +160,14 @@ pub async fn orchestrate_migration_internal(
     result
 }
 
-async fn migrate_with_lock<L>(
+async fn migrate_with_lock(
     pool: &DatabaseConnection,
-    mut lock: L,
+    mut lock: PgAdvisoryLock,
     env: RuntimeEnv,
-    db_kind: DbKind,
     command: MigrationCommand,
     cancellation_token: CancellationToken,
-) -> Result<(), DbInfraError>
-where
-    L: BootstrapLock,
-{
-    let connection_settings = build_connection_settings(env, db_kind, PoolPurpose::Migration)?;
+) -> Result<(), DbInfraError> {
+    let connection_settings = build_connection_settings(env, PoolPurpose::Migration)?;
     let lock_acquire_ms = std::env::var("NOMMIE_MIGRATE_TIMEOUT_MS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
@@ -270,7 +179,6 @@ where
     info!(
         acquire_ms = lock_acquire_ms,
         env = ?env,
-        db_kind = ?db_kind,
         "migration timeouts configured"
     );
 
@@ -291,7 +199,6 @@ where
             trace!(
                 lock = "won",
                 env = ?env,
-                db_kind = ?db_kind,
                 attempts = attempts,
                 elapsed_ms = start.elapsed().as_millis()
             );
@@ -342,7 +249,6 @@ where
         pool,
         guard,
         env,
-        db_kind,
         command,
         cancellation_token,
         connection_settings.db_settings.clone(),
@@ -373,7 +279,6 @@ async fn migrate_with_guard_controlled(
     pool: &DatabaseConnection,
     guard: Guard,
     env: RuntimeEnv,
-    db_kind: DbKind,
     command: MigrationCommand,
     cancellation_token: CancellationToken,
     db_settings: DbSettings,
@@ -381,13 +286,7 @@ async fn migrate_with_guard_controlled(
     let start = Instant::now();
     let body_timeout_ms: u64 = 120000;
 
-    if matches!(db_kind, DbKind::SqliteFile) {
-        if let Err(e) = setup_sqlite_file_prerequisites(pool).await {
-            return Err((guard, e));
-        }
-    }
-
-    if let Err(e) = apply_db_settings(pool, &db_settings, db_kind).await {
+    if let Err(e) = apply_db_settings(pool, &db_settings).await {
         return Err((guard, e));
     }
 
@@ -461,7 +360,6 @@ async fn migrate_with_guard_controlled(
     info!(
         migrator = "ran",
         env = ?env,
-        db_kind = ?db_kind,
         elapsed_ms = start.elapsed().as_millis()
     );
 
@@ -481,8 +379,8 @@ async fn migrate_with_guard_controlled(
             if applied_count != 0 {
                 migration_counters::postcheck_mismatch();
                 let detail = format!(
-                    "Migration verification failed: reset should leave 0 migrations applied, but {} were found (env={:?}, db_kind={:?})",
-                    applied_count, env, db_kind
+                    "Migration verification failed: reset should leave 0 migrations applied, but {} were found (env={:?})",
+                    applied_count, env
                 );
                 return Err((guard, DbInfraError::Config { message: detail }));
             }
@@ -498,8 +396,8 @@ async fn migrate_with_guard_controlled(
             if applied_count != expected_count {
                 migration_counters::postcheck_mismatch();
                 let detail = format!(
-                    "Migration verification failed: expected {} migrations, but {} were applied (env={:?}, db_kind={:?})",
-                    expected_count, applied_count, env, db_kind
+                    "Migration verification failed: expected {} migrations, but {} were applied (env={:?})",
+                    expected_count, applied_count, env
                 );
                 return Err((guard, DbInfraError::Config { message: detail }));
             }
@@ -513,10 +411,9 @@ async fn migrate_with_guard_controlled(
 async fn apply_db_settings(
     pool: &DatabaseConnection,
     settings: &DbSettings,
-    db_kind: DbKind,
 ) -> Result<(), DbInfraError> {
-    let statements = build_session_statements(db_kind, settings);
-    let backend = sea_orm::DatabaseBackend::from(db_kind);
+    let statements = build_session_statements(settings);
+    let backend = sea_orm::DatabaseBackend::Postgres;
     for stmt in statements {
         pool.execute(sea_orm::Statement::from_string(backend, stmt))
             .await
@@ -524,29 +421,5 @@ async fn apply_db_settings(
                 message: format!("failed to apply db settings: {}", e),
             })?;
     }
-    Ok(())
-}
-
-async fn setup_sqlite_file_prerequisites(pool: &DatabaseConnection) -> Result<(), DbInfraError> {
-    use sea_orm::{DatabaseBackend, Statement};
-
-    pool.execute(Statement::from_string(
-        DatabaseBackend::Sqlite,
-        "PRAGMA journal_mode = WAL;",
-    ))
-    .await
-    .map_err(|e| DbInfraError::Config {
-        message: format!("failed to set journal_mode: {}", e),
-    })?;
-
-    pool.execute(Statement::from_string(
-        DatabaseBackend::Sqlite,
-        "PRAGMA synchronous = NORMAL;",
-    ))
-    .await
-    .map_err(|e| DbInfraError::Config {
-        message: format!("failed to set synchronous: {}", e),
-    })?;
-
     Ok(())
 }

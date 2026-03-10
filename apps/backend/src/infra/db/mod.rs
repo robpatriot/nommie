@@ -9,4 +9,4 @@ pub use core::bootstrap_db;
 pub use db_infra::infra::db::core::orchestrate_migration;
 pub use db_infra::infra::db::{diagnostics, locking};
 
-pub use crate::config::db::{DbKind, DbOwner, RuntimeEnv};
+pub use crate::config::db::{DbOwner, RuntimeEnv};

@@ -1,1 +1,1 @@
-pub mod sqlite_performance;
+// Performance tests (Postgres only)

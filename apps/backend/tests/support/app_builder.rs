@@ -101,7 +101,7 @@ impl TestAppBuilder {
 /// ```rust
 /// use backend::infra::state::build_state;
 /// use support::app_builder::create_test_app;
-/// use backend::config::db::{RuntimeEnv, DbKind};
+/// use backend::config::db::RuntimeEnv;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// use crate::support::test_state::build_test_state;

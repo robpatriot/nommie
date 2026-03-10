@@ -6,7 +6,7 @@
 
 use std::env;
 
-use crate::config::db::{DbKind, RuntimeEnv};
+use crate::config::db::RuntimeEnv;
 use crate::error::AppError;
 
 /// Centralized application configuration loaded from environment variables
@@ -18,7 +18,6 @@ pub struct Config {
 
     // Database configuration (hardcoded to Prod/Postgres for binary)
     pub runtime_env: RuntimeEnv,
-    pub db_kind: DbKind,
 
     // Security configuration
     pub jwt_secret: String,
@@ -57,7 +56,6 @@ impl Config {
 
         // Database configuration (hardcoded for binary)
         let runtime_env = RuntimeEnv::Prod;
-        let db_kind = DbKind::Postgres;
 
         // Security configuration
         let jwt_secret = env::var("BACKEND_JWT_SECRET").map_err(|_| AppError::Config {
@@ -114,7 +112,6 @@ impl Config {
             host,
             port,
             runtime_env,
-            db_kind,
             jwt_secret,
             redis_url,
             google_client_id,

@@ -1,78 +1,34 @@
-// Standard library imports
 use std::process;
-use std::str::FromStr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use db_infra::config::db::build_session_statements;
 use db_infra::error::DbInfraError;
-use db_infra::infra::db::diagnostics::{migration_counters, sqlite_diagnostics};
-use db_infra::infra::db::locking::{BootstrapLock, InMemoryLock, PgAdvisoryLock, SqliteFileLock};
+use db_infra::infra::db::diagnostics::{db_diagnostics, migration_counters};
+use db_infra::infra::db::locking::{BootstrapLock, PgAdvisoryLock};
 use db_infra::sanitize_db_url;
-// External crate imports
 use migration::MigrationCommand;
 use rand::Rng;
-use sea_orm::{DatabaseConnection, SqlxPostgresConnector, SqlxSqliteConnector};
+use sea_orm::{DatabaseConnection, SqlxPostgresConnector};
 use sqlx::postgres::PgPoolOptions;
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePool, SqlitePoolOptions};
 use tracing::{info, trace, warn};
 
-// Use re-exported types from parent module
-use super::{DbKind, DbOwner, RuntimeEnv};
-// Internal crate imports
-use crate::config::db::{make_conn_spec, validate_db_config, ConnectionSettings, DbSettings};
+use super::{DbOwner, RuntimeEnv};
+use crate::config::db::{make_conn_spec, ConnectionSettings, DbSettings};
 use crate::db::shared_pool_cache::get_or_create_shared_pool;
 use crate::error::AppError;
 
-/// Apply SQLite-specific per-connection settings
-/// Extracts Sqlite variant from DbSettings and applies foreign_keys + busy_timeout
-async fn apply_sqlite_config(
-    conn: &mut sqlx::SqliteConnection,
-    settings: &DbSettings,
-) -> Result<(), sqlx::Error> {
-    // Build and execute session statements for SQLite
-    let statements = build_session_statements(DbKind::SqliteMemory, settings);
-    for stmt in statements {
-        sqlx::query(&stmt).execute(&mut *conn).await?;
-    }
-    Ok(())
-}
-
-/// Apply PostgreSQL-specific per-connection settings
-/// Extracts Postgres variant from DbSettings and applies app_name, statement_timeout,
-/// idle_in_transaction_timeout, and optionally lock_timeout
 async fn apply_postgres_config(
     conn: &mut sqlx::PgConnection,
     settings: &DbSettings,
 ) -> Result<(), sqlx::Error> {
-    // Build and execute session statements for Postgres
-    let statements = build_session_statements(DbKind::Postgres, settings);
+    let statements = build_session_statements(settings);
     for stmt in statements {
         sqlx::query(&stmt).execute(&mut *conn).await?;
     }
     Ok(())
 }
 
-/// Get SQLite lock file path for AI profile initialization (`<db>.ai_profiles.lock`)
-fn sqlite_ai_profiles_lock_path(
-    db_kind: DbKind,
-    env: RuntimeEnv,
-) -> Result<std::path::PathBuf, AppError> {
-    use db_infra::sqlite_file_spec;
-
-    match db_kind {
-        DbKind::SqliteFile => {
-            let file_spec = sqlite_file_spec(db_kind, env).map_err(AppError::from)?;
-            Ok(std::path::Path::new(&file_spec).with_extension("ai_profiles.lock"))
-        }
-        _ => Err(AppError::config(
-            "sqlite_ai_profiles_lock_path",
-            crate::error::Sentinel("only works with SqliteFile database kind"),
-        )),
-    }
-}
-
-/// Fast-path check: verify if all required AI profiles already exist and match expected values
 async fn fast_path_ai_profiles_check(conn: &DatabaseConnection) -> Result<bool, AppError> {
     use std::collections::HashMap;
 
@@ -83,7 +39,6 @@ async fn fast_path_ai_profiles_check(conn: &DatabaseConnection) -> Result<bool, 
         .await
         .map_err(|e| AppError::config("failed to list AI profiles for fast-path check", e))?;
 
-    // Build lookup map: (registry_name, registry_version, variant) -> AiProfile
     let mut profile_map: HashMap<(String, String, String), crate::repos::ai_profiles::AiProfile> =
         HashMap::new();
     for profile in existing_profiles {
@@ -95,7 +50,6 @@ async fn fast_path_ai_profiles_check(conn: &DatabaseConnection) -> Result<bool, 
         profile_map.insert(key, profile);
     }
 
-    // Check each expected profile - must exist AND match values
     for factory in registry::registered_ais() {
         let profile_defaults = &factory.profile;
         let key = (
@@ -106,33 +60,26 @@ async fn fast_path_ai_profiles_check(conn: &DatabaseConnection) -> Result<bool, 
 
         match profile_map.get(&key) {
             Some(existing) => {
-                // Profile exists - check if values match
                 if !profile_matches_defaults(existing, profile_defaults) {
-                    return Ok(false); // Values don't match - need update
+                    return Ok(false);
                 }
             }
-            None => {
-                return Ok(false); // Profile missing - need creation
-            }
+            None => return Ok(false),
         }
     }
 
-    Ok(true) // All profiles exist and all values match
+    Ok(true)
 }
 
-/// Ensure default AI profiles with database-level locking for coordination across processes
 async fn ensure_ai_profiles_with_lock(
-    pool: &DatabaseConnection, // admin_pool for Postgres/SqliteFile, shared_pool for SqliteMemory
+    pool: &DatabaseConnection,
     env: RuntimeEnv,
-    db_kind: DbKind,
 ) -> Result<(), AppError> {
-    // Fast-path: skip lock acquisition if profiles already exist
     if fast_path_ai_profiles_check(pool).await? {
         info!("ai_profiles_init=skipped up_to_date=true");
         return Ok(());
     }
 
-    // Acquire lock with timeout and retry logic (same pattern as migrations)
     let lock_acquire_ms = std::env::var("NOMMIE_AI_PROFILES_INIT_TIMEOUT_MS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
@@ -141,38 +88,22 @@ async fn ensure_ai_profiles_with_lock(
             _ => 900,
         });
 
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let mut attempts: u32 = 0;
     let guard = loop {
         attempts += 1;
 
-        // Try to acquire lock based on database type
-        let maybe_guard = match db_kind {
-            DbKind::Postgres => {
-                let url = make_conn_spec(env, db_kind, DbOwner::App).map_err(AppError::from)?;
-                let sanitized_url = sanitize_db_url(&url);
-                let key = format!("nommie:ai_profiles_init:{:?}:{}", db_kind, sanitized_url);
-                let mut lock = PgAdvisoryLock::new(pool.clone(), &key);
-                let res = lock.try_acquire().await.map_err(AppError::from)?;
-                res
-            }
-            DbKind::SqliteMemory => {
-                let mut lock = InMemoryLock;
-                lock.try_acquire().await.map_err(AppError::from)?
-            }
-            DbKind::SqliteFile => {
-                let lock_path = sqlite_ai_profiles_lock_path(db_kind, env)?;
-                let mut lock = SqliteFileLock::new(&lock_path).map_err(AppError::from)?;
-                lock.try_acquire().await.map_err(AppError::from)?
-            }
-        };
+        let url = make_conn_spec(env, DbOwner::App).map_err(AppError::from)?;
+        let sanitized_url = sanitize_db_url(&url);
+        let key = format!("nommie:ai_profiles_init:{:?}:{}", env, sanitized_url);
+        let mut lock = PgAdvisoryLock::new(pool.clone(), &key);
+        let maybe_guard = lock.try_acquire().await.map_err(AppError::from)?;
 
         if let Some(acquired_guard) = maybe_guard {
             trace!(
                 lock = "won",
                 operation = "ai_profiles_init",
                 env = ?env,
-                db_kind = ?db_kind,
                 attempts = attempts,
                 elapsed_ms = start.elapsed().as_millis()
             );
@@ -206,7 +137,6 @@ async fn ensure_ai_profiles_with_lock(
         }
     };
 
-    // Double-check after acquiring lock (another process might have initialized)
     if fast_path_ai_profiles_check(pool).await? {
         info!("ai_profiles_init=skipped up_to_date=true (after lock acquisition)");
         if let Err(release_err) = guard.release().await {
@@ -217,14 +147,12 @@ async fn ensure_ai_profiles_with_lock(
         return Ok(());
     }
 
-    // Actually initialize the profiles (while holding the lock)
     crate::repos::ai_profiles::ensure_default_ai_profiles(pool)
         .await
         .map_err(AppError::from)?;
 
     info!("ai_profiles_init=complete");
 
-    // Release lock
     if let Err(release_err) = guard.release().await {
         warn!(error = %format!("{}", match release_err {
             DbInfraError::Config { message } => message,
@@ -234,12 +162,6 @@ async fn ensure_ai_profiles_with_lock(
     Ok(())
 }
 
-/// Seed admission table from ALLOWED_EMAILS and ADMIN_EMAILS. Additive and idempotent.
-///
-/// - seed_from_env: only when ALLOWED_EMAILS is set (adds admission patterns).
-/// - seed_admin_from_env: when ADMIN_EMAILS is set (adds/updates admin role flags).
-///
-/// Admin rows do not affect admission mode; admission mode is deployment config from ALLOWED_EMAILS.
 async fn seed_admission_from_env(pool: &DatabaseConnection) -> Result<(), AppError> {
     use sea_orm::TransactionTrait;
 
@@ -282,180 +204,71 @@ async fn seed_admission_from_env(pool: &DatabaseConnection) -> Result<(), AppErr
     Ok(())
 }
 
-/// Determine database engine type for logging
-/// Build the app DB *and* guarantee schema is current.
-/// Uses unified migration orchestration with appropriate pool creation strategy.
-///
-/// FLOW:
-/// - InMemory: Create shared pool → migrate on shared pool → init AI profiles on shared pool → return shared pool
-/// - Others: Create admin pool → migrate on admin pool → init AI profiles on admin pool → create shared pool → return shared pool
-///
-/// INVARIANTS:
-/// - InMemory: Must migrate on shared pool since each connection is its own database instance
-/// - SqliteFile: Database-level PRAGMAs (journal_mode, synchronous) must be set before other connections exist
-/// - Postgres: Migrations use admin pool for consistency; no technical requirement but maintains pattern
-/// - Schema validation uses fast_path_schema_check to ensure migrations completed correctly
-pub async fn bootstrap_db(
-    env: RuntimeEnv,
-    db_kind: DbKind,
-) -> Result<DatabaseConnection, AppError> {
-    // Validate configuration first
-    validate_db_config(env, db_kind)?;
-
+pub async fn bootstrap_db(env: RuntimeEnv) -> Result<DatabaseConnection, AppError> {
     let pid = process::id();
 
-    // Emitted on every resolve_dependencies call (startup and recovery probes).
-    // debug-level to avoid spamming logs during recovery polling.
-    tracing::debug!(
-        "bootstrap=start env={:?} db_kind={:?} pid={}",
-        env,
-        db_kind,
-        pid
-    );
+    tracing::debug!("bootstrap=start env={:?} pid={}", env, pid);
 
-    // Build migration pool (shared for SqliteMemory, admin for others)
-    let migration_pool = match db_kind {
-        DbKind::SqliteMemory => {
-            // CRITICAL: For SQLite in-memory, we must migrate on the same connection
-            // that will be returned, since each connection gets its own database instance
-            get_or_create_shared_pool(env, db_kind).await?
-        }
-        _ => {
-            // For non-in-memory databases, use admin pool for migrations
-            // This ensures database-level settings (e.g., SQLite PRAGMAs) are set before other connections exist
-            let admin_pool = db_infra::infra::db::core::build_admin_pool(env, db_kind).await?;
-            Arc::new(admin_pool)
-        }
-    };
+    let admin_pool = db_infra::infra::db::core::build_admin_pool(env).await?;
+    let migration_pool = Arc::new(admin_pool);
 
-    // Common: run migrations and initialize AI profiles on the migration pool
-    // For SqliteFile: Sets database-level PRAGMAs (journal_mode, synchronous) which require exclusive access
     db_infra::infra::db::core::orchestrate_migration_internal(
         &migration_pool,
         env,
-        db_kind,
         MigrationCommand::Up,
     )
     .await?;
 
-    ensure_ai_profiles_with_lock(&migration_pool, env, db_kind).await?;
+    ensure_ai_profiles_with_lock(&migration_pool, env).await?;
 
     seed_admission_from_env(&migration_pool).await?;
 
-    // Build final shared pool (reuse for SqliteMemory, create new for others)
-    let shared_pool = match db_kind {
-        DbKind::SqliteMemory => migration_pool, // reuse - same pool
-        _ => {
-            // Create shared pool AFTER migrations and admin operations complete
-            // For SqliteFile: PRAGMAs are now set, so safe to create multiple connections
-            get_or_create_shared_pool(env, db_kind).await?
-        }
-    };
+    let shared_pool = get_or_create_shared_pool(env).await?;
 
-    //  Bootstrap ready marker - JUST BEFORE returning the pool
     info!("bootstrap=ready");
     migration_counters::log_snapshot("bootstrap_db");
 
-    // Return the shared pool (same connection that was migrated for InMemory, new pool for others)
     Ok(shared_pool.as_ref().clone())
 }
 
 pub async fn build_pool(
     env: RuntimeEnv,
-    db_kind: DbKind,
     pool_cfg: &ConnectionSettings,
 ) -> Result<DatabaseConnection, AppError> {
-    let url = make_conn_spec(env, db_kind, DbOwner::App)?;
+    let url = make_conn_spec(env, DbOwner::App)?;
 
-    match db_kind {
-        // ---------- SQLite (file and in-memory) ----------
-        DbKind::SqliteFile | DbKind::SqliteMemory => {
-            let connect_opts = SqliteConnectOptions::from_str(&url)
-                .map_err(|e| AppError::config("invalid SQLite connection options", e))?
-                .create_if_missing(true);
+    info!(
+        "pool=connecting engine=postgres url_configured={} min={} max={} acquire_timeout_ms={}",
+        !url.is_empty(),
+        pool_cfg.pool_min,
+        pool_cfg.pool_max,
+        pool_cfg.acquire_timeout_ms
+    );
 
-            // Build SQLx pool with per-connection PRAGMAs
-            let db_settings = pool_cfg.db_settings.clone();
-            let pool: SqlitePool = SqlitePoolOptions::new()
-                .min_connections(pool_cfg.pool_min)
-                .max_connections(pool_cfg.pool_max)
-                .acquire_timeout(Duration::from_millis(pool_cfg.acquire_timeout_ms))
-                .after_connect(move |conn, _meta| {
-                    let settings = db_settings.clone();
-                    Box::pin(async move {
-                        apply_sqlite_config(conn, &settings).await?;
-                        trace!("db=sqlite hook=after_connect ok");
-                        Ok::<_, sqlx::Error>(())
-                    })
-                })
-                .connect_with(connect_opts)
-                .await
-                .map_err(|e| AppError::config("failed to create SQLite connection pool", e))?;
+    let db_settings = pool_cfg.db_settings.clone();
+    let sqlx_pool = PgPoolOptions::new()
+        .min_connections(pool_cfg.pool_min)
+        .max_connections(pool_cfg.pool_max)
+        .acquire_timeout(Duration::from_millis(pool_cfg.acquire_timeout_ms))
+        .idle_timeout(Duration::from_secs(30))
+        .after_connect(move |conn, _meta| {
+            let settings = db_settings.clone();
+            Box::pin(async move {
+                apply_postgres_config(conn, &settings).await?;
+                Ok::<_, sqlx::Error>(())
+            })
+        })
+        .connect(&url)
+        .await
+        .map_err(|e| AppError::config("failed to connect to Postgres", e))?;
 
-            // warm-up to ensure hook ran on initial connection(s)
-            if pool_cfg.pool_min > 0 {
-                let mut conn = pool.acquire().await.map_err(|e| {
-                    AppError::config("connection acquisition failed during warmup", e)
-                })?;
-                sqlx::query("SELECT 1;")
-                    .execute(&mut *conn)
-                    .await
-                    .map_err(|e| AppError::config("warmup query failed", e))?;
-            }
+    let db = SqlxPostgresConnector::from_sqlx_postgres_pool(sqlx_pool);
 
-            // Hand back to SeaORM
-            let db = SqlxSqliteConnector::from_sqlx_sqlite_pool(pool);
+    let pool_id = db_diagnostics::connection_id(&db);
 
-            // Generate connection-based pool_id for consistent correlation
-            let pool_id = sqlite_diagnostics::connection_id(&db);
-
-            // Diagnostics snapshot
-            sqlite_diagnostics::log_pragma_snapshot(&db, "shared").await?;
-
-            info!(
-                "pool=create engine=sqlite path={} pool_id={} min={} max={} acquire_timeout_ms={}",
-                url, pool_id, pool_cfg.pool_min, pool_cfg.pool_max, pool_cfg.acquire_timeout_ms
-            );
-            Ok(db)
-        }
-
-        // ---------- Postgres (Prod/Test) ----------
-        DbKind::Postgres => {
-            info!(
-                "pool=connecting engine=postgres url_configured={} min={} max={} acquire_timeout_ms={}",
-                !url.is_empty(), pool_cfg.pool_min, pool_cfg.pool_max, pool_cfg.acquire_timeout_ms
-            );
-
-            // Build raw SQLx pool so we can apply a true per-connection hook
-            // Note: No retry logic needed here - if we reach this point, the admin pool
-            // connection already succeeded (with retries if needed), so the database is ready
-            let db_settings = pool_cfg.db_settings.clone();
-            let sqlx_pool = PgPoolOptions::new()
-                .min_connections(pool_cfg.pool_min)
-                .max_connections(pool_cfg.pool_max)
-                .acquire_timeout(Duration::from_millis(pool_cfg.acquire_timeout_ms))
-                .idle_timeout(Duration::from_secs(30))
-                .after_connect(move |conn, _meta| {
-                    let settings = db_settings.clone();
-                    Box::pin(async move {
-                        apply_postgres_config(conn, &settings).await?;
-                        Ok::<_, sqlx::Error>(())
-                    })
-                })
-                .connect(&url)
-                .await
-                .map_err(|e| AppError::config("failed to connect to Postgres", e))?;
-
-            let db = SqlxPostgresConnector::from_sqlx_postgres_pool(sqlx_pool);
-
-            // Generate connection-based pool_id for consistent correlation
-            let pool_id = sqlite_diagnostics::connection_id(&db);
-
-            info!(
-                "pool=create engine=postgres path=postgres pool_id={} min={} max={} acquire_timeout_ms={}",
-                pool_id, pool_cfg.pool_min, pool_cfg.pool_max, pool_cfg.acquire_timeout_ms
-            );
-            Ok(db)
-        }
-    }
+    info!(
+        "pool=create engine=postgres path=postgres pool_id={} min={} max={} acquire_timeout_ms={}",
+        pool_id, pool_cfg.pool_min, pool_cfg.pool_max, pool_cfg.acquire_timeout_ms
+    );
+    Ok(db)
 }

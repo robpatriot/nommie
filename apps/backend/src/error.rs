@@ -43,16 +43,11 @@ impl std::fmt::Display for DomainErrorWrapper {
 
 /// Classify transient database errors into a suggested Retry-After (in seconds).
 ///
-/// Rules:
-/// - SQLite contention: message contains "database is locked" → Some(1)
-/// - Postgres transients by SQLSTATE code:
-///   - codes starting with "08" (connection exceptions) → Some(1)
-///   - codes equal to one of: "55P03", "40001", "40P01", "53300" → Some(1)
+/// Rules (Postgres):
+/// - codes starting with "08" (connection exceptions) → Some(1)
+/// - codes equal to one of: "55P03", "40001", "40P01", "53300" → Some(1)
 /// - Otherwise → None
-pub fn classify_transient(code: Option<&str>, message: &str) -> Option<u32> {
-    if message.contains("database is locked") {
-        return Some(1);
-    }
+pub fn classify_transient(code: Option<&str>, _message: &str) -> Option<u32> {
     if let Some(c) = code {
         if c.starts_with("08") {
             return Some(1);
@@ -567,11 +562,7 @@ impl From<sqlx::Error> for AppError {
         let code = code_owned.as_deref();
 
         if let Some(secs) = classify_transient(code, &message) {
-            let reason = if message.contains("database is locked") {
-                "database is locked".to_string()
-            } else {
-                format!("postgres transient error: {}", code.unwrap_or("unknown"))
-            };
+            let reason = format!("postgres transient error: {}", code.unwrap_or("unknown"));
             return AppError::db_unavailable(reason, e, Some(secs));
         }
 
@@ -823,14 +814,6 @@ impl ResponseError for AppError {
 mod tests {
     use super::*;
     use crate::errors::ErrorCode;
-
-    #[test]
-    fn test_classify_transient_sqlite_locked() {
-        assert_eq!(
-            classify_transient(None, "xyz database is locked abc"),
-            Some(1)
-        );
-    }
 
     #[test]
     fn test_classify_transient_pg_codes() {

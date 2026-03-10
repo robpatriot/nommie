@@ -3,101 +3,45 @@
 //! Tests prove:
 //! - No premature unlock occurs
 //! - Proper cleanup after cancellation, errors, and timeouts
-//! - Works for both PostgreSQL advisory locks and SQLite file locks
+//! - PostgreSQL advisory locks
 
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use backend::config::db::{DbKind, RuntimeEnv};
-use backend::infra::db::locking::{BootstrapLock, PgAdvisoryLock, SqliteFileLock};
+use backend::config::db::RuntimeEnv;
+use backend::infra::db::locking::{BootstrapLock, PgAdvisoryLock};
 use db_infra::infra::db::build_admin_pool;
 use migration::{migrate, MigrationCommand};
 use tokio::sync::Barrier;
 
-use crate::support::resolve_test_db_kind;
-
-/// Helper to skip tests that don't apply to SQLite memory databases.
-/// Migration locks require persistent storage (Postgres advisory locks or SQLite file locks).
-fn skip_if_sqlite_memory(test_name: &str) -> Option<DbKind> {
-    let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
-
-    if matches!(db_kind, DbKind::SqliteMemory) {
-        println!("Skipping {} for DbKind::{:?}", test_name, db_kind);
-        return None;
-    }
-
-    Some(db_kind)
-}
-
-enum TestLock {
-    Postgres {
-        lock: PgAdvisoryLock,
-    },
-    SqliteFile {
-        lock: SqliteFileLock,
-        lock_path: PathBuf, // Store path for cleanup
-    },
+struct TestLock {
+    lock: PgAdvisoryLock,
 }
 
 impl TestLock {
     async fn create_shared(
         base_name: &str,
         _task_suffix: &str,
-    ) -> (Self, Option<sea_orm::DatabaseConnection>) {
-        let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
+    ) -> (Self, sea_orm::DatabaseConnection) {
+        let admin_pool = build_admin_pool(RuntimeEnv::Test)
+            .await
+            .expect("Failed to build admin pool");
 
-        match db_kind {
-            DbKind::Postgres => {
-                let admin_pool = build_admin_pool(RuntimeEnv::Test, db_kind)
-                    .await
-                    .expect("Failed to build admin pool");
+        let lock_key = format!(
+            "test:migration_lock:shared:{}:{}",
+            base_name,
+            std::process::id()
+        );
+        let lock = PgAdvisoryLock::new(admin_pool.clone(), &lock_key);
 
-                let lock_key = format!(
-                    "test:migration_lock:shared:{}:{}",
-                    base_name,
-                    std::process::id()
-                );
-                let lock = PgAdvisoryLock::new(admin_pool.clone(), &lock_key);
-
-                (TestLock::Postgres { lock }, Some(admin_pool))
-            }
-            DbKind::SqliteFile => {
-                // Create deterministic lock path based on base_name
-                // All tasks in the same test will use the same lock file
-                let lock_path = std::env::temp_dir().join(format!(
-                    "{}-{}.migrate.lock",
-                    base_name,
-                    std::process::id()
-                ));
-                let lock = SqliteFileLock::new(&lock_path).expect("Should create lock");
-
-                (TestLock::SqliteFile { lock, lock_path }, None)
-            }
-            DbKind::SqliteMemory => {
-                panic!("SQLite memory does not support migration locks")
-            }
-        }
+        (TestLock { lock }, admin_pool)
     }
 
     async fn try_acquire(
         &mut self,
     ) -> Result<Option<backend::infra::db::locking::Guard>, backend::AppError> {
-        match self {
-            TestLock::Postgres { lock, .. } => Ok(BootstrapLock::try_acquire(lock).await?),
-            TestLock::SqliteFile { lock, .. } => Ok(BootstrapLock::try_acquire(lock).await?),
-        }
-    }
-}
-
-// Clean up lock file when TestLock is dropped
-impl Drop for TestLock {
-    fn drop(&mut self) {
-        if let TestLock::SqliteFile { lock_path, .. } = self {
-            // Attempt to remove the lock file, ignore errors (file may already be removed)
-            let _ = std::fs::remove_file(lock_path);
-        }
+        Ok(BootstrapLock::try_acquire(&mut self.lock).await?)
     }
 }
 
@@ -128,10 +72,6 @@ async fn cancel_mid_migration_releases_lock() {
     // A acquires lock and starts a long "body".
     // Cancel A; assert A task aborted, then B acquires successfully (no timeout).
 
-    if skip_if_sqlite_memory("cancel_mid_migration_releases_lock").is_none() {
-        return;
-    }
-
     let barrier = Arc::new(Barrier::new(2));
     let a_started = Arc::new(AtomicBool::new(false));
     let a_cancelled = Arc::new(AtomicBool::new(false));
@@ -144,8 +84,7 @@ async fn cancel_mid_migration_releases_lock() {
     let cancel_flag_a = cancel_flag.clone();
 
     let task_a = tokio::spawn(async move {
-        let (mut lock_a, admin_pool_opt) =
-            TestLock::create_shared("cancel_mid_migration", "A").await;
+        let (mut lock_a, admin_pool_a) = TestLock::create_shared("cancel_mid_migration", "A").await;
 
         // Try to acquire lock
         let guard = lock_a
@@ -158,22 +97,11 @@ async fn cancel_mid_migration_releases_lock() {
         a_started_flag.store(true, Ordering::Relaxed);
         barrier_a.wait().await;
 
-        // Start slow migration that can be cancelled (only for Postgres)
-        let was_cancelled = if let Some(admin_pool_a) = admin_pool_opt {
-            let result = slow_migration_task(admin_pool_a, cancel_flag_a, 5000).await;
-            let was = result.is_err() && result.unwrap_err().to_string().contains("cancelled");
-            a_cancelled_flag.store(was, Ordering::Relaxed);
-            was
-        } else {
-            // For SQLite file locks, just simulate waiting and cancellation
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            if cancel_flag_a.load(Ordering::Relaxed) {
-                a_cancelled_flag.store(true, Ordering::Relaxed);
-                true
-            } else {
-                false
-            }
-        };
+        // Start slow migration that can be cancelled
+        let result = slow_migration_task(admin_pool_a, cancel_flag_a, 5000).await;
+        let was_cancelled =
+            result.is_err() && result.unwrap_err().to_string().contains("cancelled");
+        a_cancelled_flag.store(was_cancelled, Ordering::Relaxed);
 
         // Always release the guard
         guard.release().await.expect("A should release guard");
@@ -197,8 +125,7 @@ async fn cancel_mid_migration_releases_lock() {
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         // Now try to acquire the lock - should succeed quickly since A released it
-        let (mut lock_b, _admin_pool_b) =
-            TestLock::create_shared("cancel_mid_migration", "B").await;
+        let (mut lock_b, _) = TestLock::create_shared("cancel_mid_migration", "B").await;
 
         let acquire_start = std::time::Instant::now();
         let guard_b = lock_b
@@ -241,10 +168,6 @@ async fn cancel_mid_migration_releases_lock() {
 async fn body_error_unlocks() {
     // A acquires; migration returns Err; assert unlock happened and B acquires.
 
-    if skip_if_sqlite_memory("body_error_unlocks").is_none() {
-        return;
-    }
-
     let barrier = Arc::new(Barrier::new(2));
     let a_completed = Arc::new(AtomicBool::new(false));
 
@@ -253,7 +176,7 @@ async fn body_error_unlocks() {
     let a_completed_flag = a_completed.clone();
 
     let task_a = tokio::spawn(async move {
-        let (mut lock_a, _admin_pool_a) = TestLock::create_shared("body_error", "A").await;
+        let (mut lock_a, _) = TestLock::create_shared("body_error", "A").await;
 
         // Acquire lock
         let guard = lock_a
@@ -293,7 +216,7 @@ async fn body_error_unlocks() {
         }
 
         // Now try to acquire - should succeed immediately
-        let (mut lock_b, _admin_pool_b) = TestLock::create_shared("body_error", "B").await;
+        let (mut lock_b, _) = TestLock::create_shared("body_error", "B").await;
 
         let acquire_start = std::time::Instant::now();
         let guard_b = lock_b
@@ -331,10 +254,6 @@ async fn body_error_unlocks() {
 async fn acquire_timeout_distinct() {
     // A holds lock beyond acquire timeout; B attempts and returns None (locked).
 
-    if skip_if_sqlite_memory("acquire_timeout_distinct").is_none() {
-        return;
-    }
-
     // Set very short acquire timeout for this test
     // TODO: Audit that the environment access only happens in single-threaded code.
     unsafe { std::env::set_var("NOMMIE_MIGRATE_TIMEOUT_MS", "200") };
@@ -347,7 +266,7 @@ async fn acquire_timeout_distinct() {
     let a_holding_flag = a_holding.clone();
 
     let task_a = tokio::spawn(async move {
-        let (mut lock_a, _admin_pool_a) = TestLock::create_shared("acquire_timeout", "A").await;
+        let (mut lock_a, _) = TestLock::create_shared("acquire_timeout", "A").await;
 
         // Acquire lock
         let guard = lock_a
@@ -380,7 +299,7 @@ async fn acquire_timeout_distinct() {
         );
 
         // Try to acquire lock - should return None since lock is held
-        let (mut lock_b, _admin_pool_b) = TestLock::create_shared("acquire_timeout", "B").await;
+        let (mut lock_b, _) = TestLock::create_shared("acquire_timeout", "B").await;
 
         let result = lock_b
             .try_acquire()
@@ -416,10 +335,6 @@ async fn lock_contention() {
     // Two tasks target the same lock. First acquires and holds; second try_acquire() returns None.
     // After first releases, second acquires successfully.
 
-    if skip_if_sqlite_memory("lock_contention").is_none() {
-        return;
-    }
-
     let barrier = Arc::new(Barrier::new(2));
     let a_holding = Arc::new(AtomicBool::new(false));
 
@@ -428,7 +343,7 @@ async fn lock_contention() {
     let a_holding_flag = a_holding.clone();
 
     let task_a = tokio::spawn(async move {
-        let (mut lock_a, _admin_pool_a) = TestLock::create_shared("lock_contention", "A").await;
+        let (mut lock_a, _) = TestLock::create_shared("lock_contention", "A").await;
 
         // Try to acquire lock
         let guard = lock_a
@@ -463,7 +378,7 @@ async fn lock_contention() {
         );
 
         // Try to acquire lock - should return None (contention)
-        let (mut lock_b, _admin_pool_b) = TestLock::create_shared("lock_contention", "B").await;
+        let (mut lock_b, _) = TestLock::create_shared("lock_contention", "B").await;
         let result = lock_b
             .try_acquire()
             .await
@@ -504,11 +419,7 @@ async fn lock_contention() {
 async fn release_idempotence() {
     // Double release should be a no-op (guard already tracks released)
 
-    if skip_if_sqlite_memory("release_idempotence").is_none() {
-        return;
-    }
-
-    let (mut lock, _admin_pool) = TestLock::create_shared("release_idempotence", "single").await;
+    let (mut lock, _) = TestLock::create_shared("release_idempotence", "single").await;
     let guard = lock
         .try_acquire()
         .await
@@ -519,7 +430,7 @@ async fn release_idempotence() {
     guard.release().await.expect("First release should succeed");
 
     // Guard is consumed, so create a new one and verify it can be acquired/released
-    let (mut lock2, _admin_pool2) = TestLock::create_shared("release_idempotence", "double").await;
+    let (mut lock2, _) = TestLock::create_shared("release_idempotence", "double").await;
     let guard2 = lock2
         .try_acquire()
         .await
@@ -533,43 +444,6 @@ async fn release_idempotence() {
 }
 
 #[tokio::test]
-async fn path_normalization_sqlite_file() {
-    // Test that sqlite_file_spec + lock_path composition produce a canonical lock path
-
-    let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
-
-    // Only test SQLite file path normalization
-    if db_kind != DbKind::SqliteFile {
-        println!(
-            "Skipping path_normalization_sqlite_file for DbKind::{:?}",
-            db_kind
-        );
-        return;
-    }
-
-    // Use the same helper as production code to derive the SQLite lock path
-    let lock_path =
-        backend::config::db::sqlite_lock_path(db_kind, backend::config::db::RuntimeEnv::Test)
-            .expect("sqlite_lock_path should succeed for SqliteFile/Test");
-
-    // Should end with .migrate.lock
-    assert!(
-        lock_path.to_string_lossy().ends_with(".migrate.lock"),
-        "Lock path should end with .migrate.lock"
-    );
-
-    // Should be absolute
-    assert!(lock_path.is_absolute(), "Lock path should be absolute");
-
-    // Should be canonical (no .. or . components)
-    let lock_path_str = lock_path.to_string_lossy();
-    assert!(
-        !lock_path_str.contains("..") && !lock_path_str.contains("/./"),
-        "Lock path should be canonical"
-    );
-}
-
-#[tokio::test]
 async fn body_timeout_aborts_and_unlocks() {
     // Configure small body timeout; A exceeds it; assert abort + unlock; B acquires.
     // Note: Only truly applies to Postgres with actual migration; SQLite simulates the behavior
@@ -577,13 +451,6 @@ async fn body_timeout_aborts_and_unlocks() {
     // Set short body timeout for this test
     // TODO: Audit that the environment access only happens in single-threaded code.
     unsafe { std::env::set_var("NOMMIE_MIGRATE_BODY_TIMEOUT_MS", "200") };
-
-    let db_kind = match skip_if_sqlite_memory("body_timeout_aborts_and_unlocks") {
-        None => return,
-        Some(kind) => kind,
-    };
-
-    let is_postgres = matches!(db_kind, DbKind::Postgres);
 
     let barrier = Arc::new(Barrier::new(2));
     let a_completed = Arc::new(AtomicBool::new(false));
@@ -593,7 +460,7 @@ async fn body_timeout_aborts_and_unlocks() {
     let a_completed_flag = a_completed.clone();
 
     let task_a = tokio::spawn(async move {
-        let (mut lock_a, admin_pool_opt) = TestLock::create_shared("body_timeout", "A").await;
+        let (mut lock_a, admin_pool_a) = TestLock::create_shared("body_timeout", "A").await;
 
         // Acquire lock
         let guard = lock_a
@@ -606,30 +473,24 @@ async fn body_timeout_aborts_and_unlocks() {
         barrier_a.wait().await;
 
         // Simulate a migration that takes longer than body timeout
-        let was_timeout = if let Some(admin_pool_a) = admin_pool_opt {
-            let cancel_flag = Arc::new(AtomicBool::new(false));
-            let slow_task = slow_migration_task(admin_pool_a, cancel_flag.clone(), 1000);
+        let cancel_flag = Arc::new(AtomicBool::new(false));
+        let slow_task = slow_migration_task(admin_pool_a, cancel_flag.clone(), 1000);
 
-            let result = tokio::select! {
-                migration_result = slow_task => migration_result,
-                _ = tokio::time::sleep(Duration::from_millis(200)) => {
-                    cancel_flag.store(true, Ordering::Relaxed);
-                    Err(sea_orm::DbErr::Custom("Body timeout".to_string()))
-                }
-            };
-
-            result.is_err()
-                && (result.as_ref().unwrap_err().to_string().contains("timeout")
-                    || result
-                        .as_ref()
-                        .unwrap_err()
-                        .to_string()
-                        .contains("cancelled"))
-        } else {
-            // SQLite: just simulate timeout behavior
-            tokio::time::sleep(Duration::from_millis(200)).await;
-            true
+        let result = tokio::select! {
+            migration_result = slow_task => migration_result,
+            _ = tokio::time::sleep(Duration::from_millis(200)) => {
+                cancel_flag.store(true, Ordering::Relaxed);
+                Err(sea_orm::DbErr::Custom("Body timeout".to_string()))
+            }
         };
+
+        let was_timeout = result.is_err()
+            && (result.as_ref().unwrap_err().to_string().contains("timeout")
+                || result
+                    .as_ref()
+                    .unwrap_err()
+                    .to_string()
+                    .contains("cancelled"));
 
         // Always release guard
         guard.release().await.expect("A should release guard");
@@ -654,7 +515,7 @@ async fn body_timeout_aborts_and_unlocks() {
         tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Now try to acquire - should succeed quickly since A timed out and released
-        let (mut lock_b, _admin_pool_b) = TestLock::create_shared("body_timeout", "B").await;
+        let (mut lock_b, _) = TestLock::create_shared("body_timeout", "B").await;
 
         let acquire_start = std::time::Instant::now();
         let guard_b = lock_b
@@ -678,12 +539,10 @@ async fn body_timeout_aborts_and_unlocks() {
     // Wait for both tasks
     let (a_result, b_result) = tokio::join!(task_a, task_b);
 
-    if is_postgres {
-        assert!(
-            a_result.expect("Task A should complete"),
-            "A should have timed out"
-        );
-    }
+    assert!(
+        a_result.expect("Task A should complete"),
+        "A should have timed out"
+    );
     assert!(
         b_result.expect("Task B should complete"),
         "B should acquire lock successfully"

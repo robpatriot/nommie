@@ -30,9 +30,6 @@ docker/postgres-tls/ca.crt
 # Postgres data
 postgres_data/
 
-# SQLite data
-data/sqlite/*.db
-
 # TypeScript
 *.tsbuildinfo
 

@@ -1,10 +1,7 @@
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
-use std::{env, process};
+use std::env;
 
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use tracing::trace;
-use sea_orm::DatabaseBackend;
 
 use crate::error::DbInfraError;
 
@@ -21,44 +18,6 @@ pub enum RuntimeEnv {
     Test,
 }
 
-/// Database kind enum
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum DbKind {
-    /// PostgreSQL database
-    Postgres,
-    /// SQLite file-based database
-    SqliteFile,
-    /// SQLite in-memory database
-    SqliteMemory,
-}
-
-impl FromStr for DbKind {
-    type Err = DbInfraError;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        let normalized = value.trim().to_ascii_lowercase();
-        match normalized.as_str() {
-            "postgres" | "pg" => Ok(DbKind::Postgres),
-            "sqlitefile" | "sqlite_file" | "sqlite-file" => Ok(DbKind::SqliteFile),
-            "sqlitememory" | "sqlite_memory" | "sqlite-memory" | "sqlite-mem" | "sqlite:memory" => {
-                Ok(DbKind::SqliteMemory)
-            }
-            other => Err(DbInfraError::Config {
-                message: format!("unknown database kind: {other}"),
-            }),
-        }
-    }
-}
-
-impl From<DbKind> for DatabaseBackend {
-    fn from(db_kind: DbKind) -> Self {
-        match db_kind {
-            DbKind::Postgres => DatabaseBackend::Postgres,
-            DbKind::SqliteFile | DbKind::SqliteMemory => DatabaseBackend::Sqlite,
-        }
-    }
-}
-
 /// Pool purpose enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PoolPurpose {
@@ -68,10 +27,10 @@ pub enum PoolPurpose {
     Migration,
 }
 
-/// Connection settings - pool-level and database-specific per-connection settings
+/// Connection settings - pool-level and per-connection settings for Postgres
 #[derive(Debug, Clone)]
 pub struct ConnectionSettings {
-    // Pool-level settings (common to all databases)
+    // Pool-level settings
     pub pool_min: u32,
     pub pool_max: u32,
     pub acquire_timeout_ms: u64,
@@ -79,18 +38,13 @@ pub struct ConnectionSettings {
     pub db_settings: DbSettings,
 }
 
-/// Database-specific per-connection settings
+/// Database-specific per-connection settings (Postgres only)
 #[derive(Debug, Clone)]
-pub enum DbSettings {
-    Sqlite {
-        busy_timeout_ms: u32,
-    },
-    Postgres {
-        app_name: String,
-        statement_timeout: String,
-        idle_in_transaction_timeout: String,
-        lock_timeout: Option<String>,
-    },
+pub struct DbSettings {
+    pub app_name: String,
+    pub statement_timeout: String,
+    pub idle_in_transaction_timeout: String,
+    pub lock_timeout: Option<String>,
 }
 
 /// Calculate baseline parallelism for the given environment
@@ -110,19 +64,17 @@ fn calculate_baseline_parallelism(env: RuntimeEnv) -> Result<u32, DbInfraError> 
     }
 }
 
-/// Build connection settings from environment, database kind, and pool purpose
+/// Build connection settings from environment and pool purpose
 pub fn build_connection_settings(
     env: RuntimeEnv,
-    db_kind: DbKind,
     purpose: PoolPurpose,
 ) -> Result<ConnectionSettings, DbInfraError> {
     let baseline = calculate_baseline_parallelism(env)?;
 
-    // Calculate pool_max and acquire_timeout_ms based on env + db_kind, then adjust for purpose
-    let (pool_min, pool_max, acquire_timeout_ms, db_settings) = match (env, db_kind) {
-        (RuntimeEnv::Prod, DbKind::Postgres) => {
+    let (pool_min, pool_max, acquire_timeout_ms, db_settings) = match env {
+        RuntimeEnv::Prod => {
             let pool_max = (baseline + 2).clamp(8, 16);
-            let db_settings = DbSettings::Postgres {
+            let db_settings = DbSettings {
                 app_name: format!(
                     "nommie-prod-{}-{}",
                     if matches!(purpose, PoolPurpose::Migration) {
@@ -138,9 +90,9 @@ pub fn build_connection_settings(
             };
             (2, pool_max, 5000, db_settings)
         }
-        (RuntimeEnv::Test, DbKind::Postgres) => {
+        RuntimeEnv::Test => {
             let pool_max = (baseline + 2).clamp(8, 16);
-            let db_settings = DbSettings::Postgres {
+            let db_settings = DbSettings {
                 app_name: format!(
                     "nommie-test-{}-{}",
                     if matches!(purpose, PoolPurpose::Migration) {
@@ -155,34 +107,6 @@ pub fn build_connection_settings(
                 lock_timeout: Some("5000ms".to_string()),
             };
             (4, pool_max, 5000, db_settings)
-        }
-        (RuntimeEnv::Prod, DbKind::SqliteFile) => {
-            let pool_max = (baseline + 2).clamp(8, 16);
-            let db_settings = DbSettings::Sqlite {
-                busy_timeout_ms: 15000,
-            };
-            (2, pool_max, 2000, db_settings)
-        }
-        (RuntimeEnv::Test, DbKind::SqliteFile) => {
-            let db_settings = DbSettings::Sqlite {
-                busy_timeout_ms: 15000,
-            };
-            (2, 4, 2000, db_settings)
-        }
-        (RuntimeEnv::Test, DbKind::SqliteMemory) => {
-            // busy_timeout differs by purpose
-            let busy_timeout_ms = match purpose {
-                PoolPurpose::Runtime => 15000,
-                PoolPurpose::Migration => 500,
-            };
-            let db_settings = DbSettings::Sqlite { busy_timeout_ms };
-            (1, 1, 2000, db_settings)
-        }
-        (RuntimeEnv::Prod, DbKind::SqliteMemory) => {
-            return Err(DbInfraError::Config {
-                message: "SQLite in-memory database is not allowed in production environment"
-                    .to_string(),
-            });
         }
     };
 
@@ -208,123 +132,21 @@ fn encode_userinfo(value: &str) -> String {
     utf8_percent_encode(value, USERINFO_ENCODE_SET).to_string()
 }
 
-/// Build ordered session-level SQL statements for the given database kind and settings.
-/// Note: SQLite file prerequisites (journal_mode, synchronous) are handled separately and not included here.
-pub fn build_session_statements(db_kind: DbKind, settings: &DbSettings) -> Vec<String> {
-    match (db_kind, settings) {
-        (DbKind::SqliteFile | DbKind::SqliteMemory, DbSettings::Sqlite { busy_timeout_ms }) => {
-            vec![
-                "PRAGMA foreign_keys = ON;".to_string(),
-                format!("PRAGMA busy_timeout = {};", busy_timeout_ms),
-            ]
-        }
-        (
-            DbKind::Postgres,
-            DbSettings::Postgres {
-                app_name,
-                statement_timeout,
-                idle_in_transaction_timeout,
-                lock_timeout,
-            },
-        ) => {
-            let mut stmts = vec![
-                format!("SET application_name = '{}';", app_name.replace('\'', "''")),
-                "SET timezone = 'UTC';".to_string(),
-                format!("SET statement_timeout = '{}';", statement_timeout),
-                format!(
-                    "SET idle_in_transaction_session_timeout = '{}';",
-                    idle_in_transaction_timeout
-                ),
-            ];
-            if let Some(lock_timeout) = lock_timeout {
-                stmts.push(format!("SET lock_timeout = '{}';", lock_timeout));
-            }
-            stmts
-        }
-        _ => Vec::new(),
+/// Build ordered session-level SQL statements for Postgres
+pub fn build_session_statements(settings: &DbSettings) -> Vec<String> {
+    let mut stmts = vec![
+        format!("SET application_name = '{}';", settings.app_name.replace('\'', "''")),
+        "SET timezone = 'UTC';".to_string(),
+        format!("SET statement_timeout = '{}';", settings.statement_timeout),
+        format!(
+            "SET idle_in_transaction_session_timeout = '{}';",
+            settings.idle_in_transaction_timeout
+        ),
+    ];
+    if let Some(lock_timeout) = &settings.lock_timeout {
+        stmts.push(format!("SET lock_timeout = '{}';", lock_timeout));
     }
-}
-
-/// Validate database configuration
-pub fn validate_db_config(env: RuntimeEnv, db_kind: DbKind) -> Result<(), DbInfraError> {
-    match (env, db_kind) {
-        (RuntimeEnv::Prod, DbKind::SqliteMemory) => Err(DbInfraError::Config {
-            message: "SQLite in-memory database is not allowed in production environment"
-                .to_string(),
-        }),
-        _ => Ok(()),
-    }
-}
-
-/// Get SQLite file specification for the given database kind
-pub fn sqlite_file_spec(db_kind: DbKind, env: RuntimeEnv) -> Result<String, DbInfraError> {
-    match db_kind {
-        DbKind::SqliteFile => {
-            // Inline sqlite_file_path logic
-            let db_name = match env {
-                RuntimeEnv::Prod => "nommie.db",
-                RuntimeEnv::Test => "nommie-test.db",
-            };
-            let raw = env::temp_dir().join("nommie-db").join(db_name);
-
-            // Create parent directories
-            if let Some(parent) = raw.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| DbInfraError::Config {
-                    message: format!("failed to create database directory: {e}"),
-                })?;
-            }
-
-            // Canonicalize the path
-            let canonical = canonicalize_lenient(&raw)?;
-
-            // Apply test isolation if enabled
-            let path = if env::var("NOMMIE_SQLITE_TEST_ISOLATE")
-                .map(|val| val == "1" || val.to_lowercase() == "true")
-                .unwrap_or(false)
-            {
-                let pid = process::id();
-
-                if let Some(extension) = canonical.extension() {
-                    let stem = canonical
-                        .file_stem()
-                        .unwrap_or(std::ffi::OsStr::new("nommie"));
-                    let new_filename = format!(
-                        "{}-{}.{}",
-                        stem.to_string_lossy(),
-                        pid,
-                        extension.to_string_lossy()
-                    );
-                    let mut path = canonical.clone();
-                    path.pop();
-                    path.push(new_filename);
-                    path
-                } else {
-                    // No extension, just append the suffix
-                    let new_filename = format!("{}-{}", canonical.display(), pid);
-                    PathBuf::from(new_filename)
-                }
-            } else {
-                canonical
-            };
-
-            Ok(path.to_string_lossy().to_string())
-        }
-        _ => Err(DbInfraError::Config {
-            message: "sqlite_file_spec only works with SqliteFile database kind".to_string(),
-        }),
-    }
-}
-
-/// Get the SQLite lock file path (`<db>.migrate.lock`) for the given database kind and env.
-///
-/// This composes `sqlite_file_spec` with the lock file naming convention used by the
-/// migration system, ensuring all callers share a single normalization pipeline.
-pub fn sqlite_lock_path(
-    db_kind: DbKind,
-    env: RuntimeEnv,
-) -> Result<std::path::PathBuf, DbInfraError> {
-    let file_spec = sqlite_file_spec(db_kind, env)?;
-    Ok(std::path::Path::new(&file_spec).with_extension("migrate.lock"))
+    stmts
 }
 
 /// Redact password from connection string for safe logging.
@@ -342,86 +164,48 @@ fn redact_conn_spec_for_log(url: &str) -> String {
     url.to_string()
 }
 
-/// Create connection string from environment, database kind, and database owner
-pub fn make_conn_spec(
-    env: RuntimeEnv,
-    db_kind: DbKind,
-    owner: DbOwner,
-) -> Result<String, DbInfraError> {
-    match db_kind {
-        DbKind::Postgres => {
-            // Inline db_url logic
-            let host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
-            let port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
+/// Create connection string from environment and database owner
+pub fn make_conn_spec(env: RuntimeEnv, owner: DbOwner) -> Result<String, DbInfraError> {
+    let host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
+    let port = env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
 
-            // Inline db_name logic
-            let db_name = match env {
-                RuntimeEnv::Prod => must_var("PROD_DB")?,
-                RuntimeEnv::Test => {
-                    let db_name = must_var("TEST_DB")?;
-                    if !db_name.ends_with("_test") {
-                        return Err(DbInfraError::Config {
-                            message: "test database name must end with _test".to_string(),
-                        });
-                    }
-                    db_name
-                }
-            };
-
-            // Inline credentials logic
-            let (username_raw, password_raw) = match owner {
-                DbOwner::App => (must_var("APP_DB_USER")?, must_var("APP_DB_PASSWORD")?),
-                DbOwner::Owner => (
-                    must_var("NOMMIE_OWNER_USER")?,
-                    must_var("NOMMIE_OWNER_PASSWORD")?,
-                ),
-            };
-
-            let username = encode_userinfo(&username_raw);
-            let password = encode_userinfo(&password_raw);
-
-            let mut url = format!("postgresql://{username}:{password}@{host}:{port}/{db_name}");
-
-            // TLS configuration for Postgres connections.
-            //
-            // POSTGRES_SSL_MODE:
-            //   - Defaults to "verify-full" when unset, enabling TLS with full verification.
-            //   - Set to "disable" explicitly to turn TLS off (no sslmode/sslrootcert appended).
-            //   - Any other value ("require", "verify-ca", etc.) is passed through directly.
-            //
-            // POSTGRES_SSL_ROOT_CERT:
-            //   - Absolute path to CA certificate inside the container.
-            //   - Required whenever TLS is enabled (i.e., sslmode != "disable").
-            let ssl_mode =
-                env::var("POSTGRES_SSL_MODE").unwrap_or_else(|_| "verify-full".to_string());
-
-            if !ssl_mode.eq_ignore_ascii_case("disable") {
-                let root_cert = must_var("POSTGRES_SSL_ROOT_CERT")?;
-
-                // Append query parameters, handling the (currently unlikely) case where
-                // a query string already exists on the URL.
-                let separator = if url.contains('?') { '&' } else { '?' };
-                url.push(separator);
-                url.push_str(&format!("sslmode={}", ssl_mode));
-                url.push_str("&sslrootcert=");
-                url.push_str(&root_cert);
-            }
-
-            trace!(conn_spec = %redact_conn_spec_for_log(&url), "make_conn_spec returning postgres connection string");
-            Ok(url)
+    let db_name = match env {
+        RuntimeEnv::Prod => must_var("PROD_DB")?,
+        RuntimeEnv::Test => {
+            let db_name = must_var("TEST_DB")?;
+            validate_test_db_name(&db_name)?;
+            db_name
         }
-        DbKind::SqliteFile => {
-            let file_spec = sqlite_file_spec(db_kind, env)?;
-            let url = format!("sqlite:{}?mode=rwc", file_spec);
-            trace!(conn_spec = %url, "make_conn_spec returning sqlite file connection string");
-            Ok(url)
-        }
-        DbKind::SqliteMemory => {
-            let url = "sqlite::memory:".to_string();
-            trace!(conn_spec = %url, "make_conn_spec returning sqlite memory connection string");
-            Ok(url)
-        }
+    };
+
+    let (username_raw, password_raw) = match owner {
+        DbOwner::App => (must_var("APP_DB_USER")?, must_var("APP_DB_PASSWORD")?),
+        DbOwner::Owner => (
+            must_var("NOMMIE_OWNER_USER")?,
+            must_var("NOMMIE_OWNER_PASSWORD")?,
+        ),
+    };
+
+    let username = encode_userinfo(&username_raw);
+    let password = encode_userinfo(&password_raw);
+
+    let mut url = format!("postgresql://{username}:{password}@{host}:{port}/{db_name}");
+
+    let ssl_mode =
+        env::var("POSTGRES_SSL_MODE").unwrap_or_else(|_| "verify-full".to_string());
+
+    if !ssl_mode.eq_ignore_ascii_case("disable") {
+        let root_cert = must_var("POSTGRES_SSL_ROOT_CERT")?;
+
+        let separator = if url.contains('?') { '&' } else { '?' };
+        url.push(separator);
+        url.push_str(&format!("sslmode={}", ssl_mode));
+        url.push_str("&sslrootcert=");
+        url.push_str(&root_cert);
     }
+
+    trace!(conn_spec = %redact_conn_spec_for_log(&url), "make_conn_spec returning postgres connection string");
+    Ok(url)
 }
 
 /// Database owner enum for different access levels
@@ -433,6 +217,17 @@ pub enum DbOwner {
     Owner,
 }
 
+/// Validate that a test database name ends with `_test` to prevent accidental production use.
+pub fn validate_test_db_name(db_name: &str) -> Result<(), DbInfraError> {
+    if db_name.ends_with("_test") {
+        Ok(())
+    } else {
+        Err(DbInfraError::Config {
+            message: "test database name must end with _test".to_string(),
+        })
+    }
+}
+
 /// Get required environment variable or return error
 fn must_var(name: &str) -> Result<String, DbInfraError> {
     env::var(name).map_err(|e| DbInfraError::Config {
@@ -440,21 +235,20 @@ fn must_var(name: &str) -> Result<String, DbInfraError> {
     })
 }
 
-fn canonicalize_lenient(p: &Path) -> Result<PathBuf, DbInfraError> {
-    match p.canonicalize() {
-        Ok(abs) => Ok(abs),
-        Err(_) => {
-            let parent = p
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .canonicalize()
-                .map_err(|e| DbInfraError::Config {
-                    message: format!("failed to canonicalize path: {e}"),
-                })?;
-            let file_name = p.file_name().ok_or_else(|| DbInfraError::Config {
-                message: "path has no file name".to_string(),
-            })?;
-            Ok(parent.join(file_name))
-        }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_test_db_name_accepts_suffix() {
+        assert!(validate_test_db_name("nommie_test").is_ok());
+        assert!(validate_test_db_name("my_app_test").is_ok());
+    }
+
+    #[test]
+    fn test_validate_test_db_name_rejects_missing_suffix() {
+        let err = validate_test_db_name("nommie_prod").unwrap_err();
+        assert!(matches!(err, DbInfraError::Config { .. }));
+        assert!(err.to_string().contains("_test"));
     }
 }

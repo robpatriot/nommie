@@ -79,37 +79,15 @@ struct DbDiagnostics {
 async fn get_db_diagnostics(db: &DatabaseConnection) -> Result<DbDiagnostics, sea_orm::DbErr> {
     let profile = format!("{:?}", db.get_database_backend());
 
-    let name = match db.get_database_backend() {
-        sea_orm::DatabaseBackend::Postgres => {
-            let stmt = Statement::from_string(
-                db.get_database_backend(),
-                String::from("select current_database() as name"),
-            );
-            match db.query_one(stmt).await? {
-                Some(row) => row.try_get("", "name")?,
-                _ => "<unknown>".to_string(),
-            }
+    let name = {
+        let stmt = Statement::from_string(
+            db.get_database_backend(),
+            String::from("select current_database() as name"),
+        );
+        match db.query_one(stmt).await? {
+            Some(row) => row.try_get("", "name")?,
+            _ => "<unknown>".to_string(),
         }
-        sea_orm::DatabaseBackend::Sqlite => {
-            let stmt = Statement::from_string(
-                db.get_database_backend(),
-                String::from("SELECT file FROM pragma_database_list WHERE name = 'main'"),
-            );
-            match db.query_one(stmt).await? {
-                Some(row) => match row.try_get::<String>("", "file") {
-                    Ok(file) => {
-                        if file.is_empty() {
-                            ":memory:".to_string()
-                        } else {
-                            file
-                        }
-                    }
-                    _ => "<unknown>".to_string(),
-                },
-                _ => "<unknown>".to_string(),
-            }
-        }
-        _ => "<unsupported>".to_string(),
     };
 
     // Use SeaORM directly since we're in migration context with admin pool

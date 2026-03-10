@@ -46,7 +46,6 @@
     "MIGRATION_CANCELLED": "Le serveur redémarre. Veuillez réessayer.",
     "MIGRATION_FAILED": "Le serveur redémarre. Veuillez réessayer.",
     "POSTCHECK_MISMATCH": "Le serveur redémarre. Veuillez réessayer.",
-    "SQLITE_LOCK_ERROR": "Le serveur est occupé. Veuillez réessayer.",
     "UNIQUE_VIOLATION": "Cet élément existe déjà.",
     "FK_VIOLATION": "Impossible de terminer cette action.",
     "CHECK_VIOLATION": "Cette valeur n’est pas valide.",

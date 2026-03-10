@@ -7,24 +7,12 @@ use sea_orm::{ConnectionTrait, DatabaseBackend};
 use tokio::time::{timeout, Duration};
 use {tracing, tracing_subscriber};
 
-use crate::support::resolve_test_db_kind;
-
 #[tokio::test]
 async fn contention_burst_all_ok_and_single_migrator() {
     let _ = tracing_subscriber::fmt::try_init();
 
     let env = RuntimeEnv::Test;
-    let db_kind = resolve_test_db_kind().expect("Failed to resolve DB kind");
 
-    // SQLite memory creates separate database instances per connection type
-    // (shared pool vs admin pool), so migration counts won't match across connections
-    if matches!(db_kind, backend::config::db::DbKind::SqliteMemory) {
-        println!(
-            "Skipping contention_burst_all_ok_and_single_migrator for DbKind::{:?}",
-            db_kind
-        );
-        return;
-    }
     let burst_n = 6;
     let timeout_secs = 6;
 
@@ -32,32 +20,23 @@ async fn contention_burst_all_ok_and_single_migrator() {
     let total_migrations = Migrator::migrations().len();
 
     // First bootstrap to ensure database is ready
-    let _baseline_bootstrap = bootstrap_db(env, db_kind)
-        .await
-        .expect("baseline bootstrap");
+    let _baseline_bootstrap = bootstrap_db(env).await.expect("baseline bootstrap");
 
     // Use admin pool for accurate migration count (admin credentials ensure full database access)
-    let baseline_admin_pool = build_admin_pool(env, db_kind)
-        .await
-        .expect("baseline admin pool");
+    let baseline_admin_pool = build_admin_pool(env).await.expect("baseline admin pool");
     let baseline = Migrator::get_applied_migrations(&baseline_admin_pool)
         .await
         .unwrap_or_else(|_| vec![])
         .len();
 
     // Determine the correct backend for database operations
-    let backend = DatabaseBackend::from(db_kind);
+    let backend = DatabaseBackend::Postgres;
 
-    // Launch burst_n concurrent tasks, each calling bootstrap_db(env, db_kind),
+    // Launch burst_n concurrent tasks, each calling bootstrap_db(env),
     // wrapped in a timeout of timeout_secs. After each completes, assert the pool
     // can execute "SELECT 1" for the given backend.
-    let futs = (0..burst_n).map(|_| async {
-        timeout(
-            Duration::from_secs(timeout_secs),
-            bootstrap_db(env, db_kind),
-        )
-        .await
-    });
+    let futs = (0..burst_n)
+        .map(|_| async { timeout(Duration::from_secs(timeout_secs), bootstrap_db(env)).await });
     let results = join_all(futs).await;
 
     for r in results {
@@ -68,9 +47,7 @@ async fn contention_burst_all_ok_and_single_migrator() {
     }
 
     // Read after = migration_count using admin pool for accurate count
-    let after_admin_pool = build_admin_pool(env, db_kind)
-        .await
-        .expect("after admin pool");
+    let after_admin_pool = build_admin_pool(env).await.expect("after admin pool");
     let after = Migrator::get_applied_migrations(&after_admin_pool)
         .await
         .unwrap_or_else(|_| vec![])
@@ -104,13 +81,8 @@ async fn contention_burst_all_ok_and_single_migrator() {
     }
 
     // Launch a second identical burst
-    let futs2 = (0..burst_n).map(|_| async {
-        timeout(
-            Duration::from_secs(timeout_secs),
-            bootstrap_db(env, db_kind),
-        )
-        .await
-    });
+    let futs2 = (0..burst_n)
+        .map(|_| async { timeout(Duration::from_secs(timeout_secs), bootstrap_db(env)).await });
     let results2 = join_all(futs2).await;
 
     for r in results2 {
@@ -121,9 +93,7 @@ async fn contention_burst_all_ok_and_single_migrator() {
     }
 
     // Read again_after = migration_count using admin pool for accurate count
-    let again_after_admin_pool = build_admin_pool(env, db_kind)
-        .await
-        .expect("again_after admin pool");
+    let again_after_admin_pool = build_admin_pool(env).await.expect("again_after admin pool");
     let again_after = Migrator::get_applied_migrations(&again_after_admin_pool)
         .await
         .unwrap_or_else(|_| vec![])

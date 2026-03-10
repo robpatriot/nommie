@@ -118,8 +118,6 @@ pub enum ErrorCode {
     MigrationFailed,
     /// Post-migration verification mismatch
     PostcheckMismatch,
-    /// SQLite file lock error (I/O or permission failure)
-    SqliteLockError,
 
     // Database Constraint Violations
     /// Unique constraint violation (SQLSTATE 23505; generic 409)
@@ -208,7 +206,6 @@ impl ErrorCode {
             Self::MigrationCancelled => "MIGRATION_CANCELLED",
             Self::MigrationFailed => "MIGRATION_FAILED",
             Self::PostcheckMismatch => "POSTCHECK_MISMATCH",
-            Self::SqliteLockError => "SQLITE_LOCK_ERROR",
 
             // Database Constraint Violations
             Self::UniqueViolation => "UNIQUE_VIOLATION",
@@ -306,7 +303,6 @@ mod tests {
         );
         assert_eq!(ErrorCode::MigrationFailed.as_str(), "MIGRATION_FAILED");
         assert_eq!(ErrorCode::PostcheckMismatch.as_str(), "POSTCHECK_MISMATCH");
-        assert_eq!(ErrorCode::SqliteLockError.as_str(), "SQLITE_LOCK_ERROR");
         assert_eq!(ErrorCode::UniqueViolation.as_str(), "UNIQUE_VIOLATION");
         assert_eq!(ErrorCode::FkViolation.as_str(), "FK_VIOLATION");
         assert_eq!(ErrorCode::CheckViolation.as_str(), "CHECK_VIOLATION");

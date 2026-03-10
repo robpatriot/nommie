@@ -46,7 +46,6 @@
     "MIGRATION_CANCELLED": "Il server si sta riavviando. Riprova.",
     "MIGRATION_FAILED": "Il server si sta riavviando. Riprova.",
     "POSTCHECK_MISMATCH": "Il server si sta riavviando. Riprova.",
-    "SQLITE_LOCK_ERROR": "Il server è occupato. Riprova.",
     "UNIQUE_VIOLATION": "Esiste già.",
     "FK_VIOLATION": "Non è stato possibile completare.",
     "CHECK_VIOLATION": "Quel valore non è valido.",

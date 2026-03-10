@@ -6,7 +6,7 @@
 //   cargo test --test performance_tests
 //
 // Run specific performance tests:
-//   cargo test --test performance_tests performance::sqlite_performance::
+//   cargo test --test performance_tests
 
 mod common;
 mod support;

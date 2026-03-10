@@ -12,39 +12,6 @@ fn mentions_sqlstate(msg: &str, code: &str) -> bool {
     msg.contains(code) || msg.contains(&format!("SQLSTATE({code})"))
 }
 
-/// Extract the constraint spec from SQLite "UNIQUE constraint failed: ..." error messages.
-/// SQLite uses "table.col1, table.col2" for composite unique constraints.
-fn extract_sqlite_constraint_spec(error_msg: &str) -> Option<&str> {
-    const PREFIX: &str = "UNIQUE constraint failed: ";
-    error_msg
-        .find(PREFIX)
-        .map(|i| &error_msg[i + PREFIX.len()..])
-}
-
-/// Map SQLite constraint spec to domain-specific conflict errors.
-/// Handles both single-column ("table.column") and composite ("table.col1, table.col2") formats.
-fn map_sqlite_constraint_to_conflict(
-    constraint_spec: &str,
-) -> Option<(ConflictKind, &'static str)> {
-    // Composite constraints: "user_auth_identities.provider, user_auth_identities.email"
-    // Check for the distinguishing column in each constraint.
-    if constraint_spec.contains("user_auth_identities.email")
-        || constraint_spec.contains("user_credentials.email")
-        || constraint_spec.contains("users.email")
-    {
-        return Some((ConflictKind::UniqueEmail, "Email already registered"));
-    }
-    if constraint_spec.contains("user_auth_identities.provider_user_id")
-        || constraint_spec.contains("user_credentials.google_sub")
-    {
-        return Some((
-            ConflictKind::Other("UniqueGoogleSub".into()),
-            "Google account already linked to another user",
-        ));
-    }
-    None
-}
-
 /// Map PostgreSQL constraint names to domain-specific conflict errors.
 fn map_postgres_constraint_to_conflict(error_msg: &str) -> Option<(ConflictKind, &'static str)> {
     if error_msg.contains("ux_user_auth_identities_provider_email")
@@ -144,16 +111,8 @@ pub fn map_db_err(e: sea_orm::DbErr) -> DomainError {
 
     if mentions_sqlstate(&error_msg, "23505")
         || error_msg.contains("duplicate key value violates unique constraint")
-        || error_msg.contains("UNIQUE constraint failed")
     {
         warn!(raw_error = %Redacted(&error_msg), "Unique constraint violation");
-
-        // Try to extract constraint spec from SQLite format errors first
-        if let Some(constraint_spec) = extract_sqlite_constraint_spec(&error_msg) {
-            if let Some((kind, detail)) = map_sqlite_constraint_to_conflict(constraint_spec) {
-                return DomainError::conflict(kind, detail);
-            }
-        }
 
         // Check for PostgreSQL constraint name patterns
         if let Some((kind, detail)) = map_postgres_constraint_to_conflict(&error_msg) {

@@ -49,7 +49,6 @@ async fn main() -> std::io::Result<()> {
     );
     let app_state = backend::infra::state::build_state()
         .with_env(config.runtime_env)
-        .with_db(config.db_kind)
         .with_security(security_config)
         .with_google_verifier(google_verifier)
         .with_redis_url(Some(config.redis_url.clone()))

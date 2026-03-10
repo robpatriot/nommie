@@ -8,7 +8,7 @@ use tracing::info;
 use super::admission_mode::AdmissionMode;
 use super::security_config::SecurityConfig;
 use crate::auth::google::GoogleVerifier;
-use crate::config::db::{DbKind, RuntimeEnv};
+use crate::config::db::RuntimeEnv;
 use crate::readiness::ReadinessManager;
 use crate::routes::snapshot_cache::SnapshotCache;
 use crate::ws::hub::{RealtimeBroker, WsRegistry};
@@ -27,7 +27,6 @@ impl<T> fmt::Debug for Secret<T> {
 #[derive(Clone)]
 pub struct AppConfig {
     pub env: RuntimeEnv,
-    pub db_kind: DbKind,
     pub db_url: Secret<String>,
     pub redis_url: Secret<Option<String>>,
     pub security: SecurityConfig,

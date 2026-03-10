@@ -14,27 +14,25 @@ use crate::config::db::{
 };
 use crate::error::AppError;
 use crate::infra::db::core::build_pool;
-use crate::infra::db::{DbKind, RuntimeEnv};
+use crate::infra::db::RuntimeEnv;
 use crate::logging::pii::Redacted;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct PoolKey {
     env: RuntimeEnv,
-    db_kind: DbKind,
     db_url_hash: u64,
 }
 
 impl PoolKey {
-    fn new(env: RuntimeEnv, db_kind: DbKind, db_url: &str) -> Self {
+    fn new(env: RuntimeEnv, db_url: &str) -> Self {
         Self {
             env,
-            db_kind,
             db_url_hash: xxh3_64(db_url.as_bytes()),
         }
     }
 
     fn sanitized_log_key(&self, _db_url: &str) -> String {
-        format!("{:?}:{:?}:{:x}", self.env, self.db_kind, self.db_url_hash)
+        format!("{:?}:{:x}", self.env, self.db_url_hash)
     }
 }
 
@@ -64,15 +62,13 @@ fn build_cache() -> Cache<PoolKey, Arc<DatabaseConnection>> {
 
 async fn create_pool(
     env: RuntimeEnv,
-    db_kind: DbKind,
     pool_cfg: &ConnectionSettings,
 ) -> Result<DatabaseConnection, AppError> {
-    build_pool(env, db_kind, pool_cfg).await
+    build_pool(env, pool_cfg).await
 }
 
 pub async fn get_or_create_shared_pool(
     env: RuntimeEnv,
-    db_kind: DbKind,
 ) -> Result<Arc<DatabaseConnection>, AppError> {
     struct InitLockCleanup {
         key: PoolKey,
@@ -85,9 +81,9 @@ pub async fn get_or_create_shared_pool(
         }
     }
 
-    let pool_cfg = build_connection_settings(env, db_kind, PoolPurpose::Runtime)?;
-    let db_url = make_conn_spec(env, db_kind, DbOwner::App)?;
-    let key = PoolKey::new(env, db_kind, &db_url);
+    let pool_cfg = build_connection_settings(env, PoolPurpose::Runtime)?;
+    let db_url = make_conn_spec(env, DbOwner::App)?;
+    let key = PoolKey::new(env, &db_url);
     let sanitized_key = key.sanitized_log_key(&db_url);
 
     let cache = SHARED_POOL_CACHE.get_or_init(build_cache);
@@ -98,7 +94,6 @@ pub async fn get_or_create_shared_pool(
             shared_pool = "reuse",
             key = %Redacted(&sanitized_key),
             env = ?key.env,
-            db_kind = ?key.db_kind,
             "Reusing existing shared database pool"
         );
         return Ok(value);
@@ -127,7 +122,6 @@ pub async fn get_or_create_shared_pool(
             shared_pool = "dedup_wait_ms",
             key = %Redacted(&sanitized_key),
             env = ?key.env,
-            db_kind = ?key.db_kind,
             wait_ms = dedup_wait_ms,
             "Waited for concurrent pool creation"
         );
@@ -139,17 +133,13 @@ pub async fn get_or_create_shared_pool(
             shared_pool = "reuse",
             key = %Redacted(&sanitized_key),
             env = ?key.env,
-            db_kind = ?key.db_kind,
             "Reusing pool created by concurrent task"
         );
         return Ok(value);
     }
 
-    info!(
-        "pool=about_to_build env={:?} db_kind={:?} owner=App",
-        env, db_kind
-    );
-    let pool = create_pool(env, db_kind, &pool_cfg).await?;
+    info!("pool=about_to_build env={:?} owner=App", env);
+    let pool = create_pool(env, &pool_cfg).await?;
     let arc_pool = Arc::new(pool);
     cache.insert(key.clone(), arc_pool.clone()).await;
 
@@ -168,24 +158,24 @@ mod tests {
         let url_a_copy = "postgresql://user:pass@localhost/db1";
         let url_b = "postgresql://user:pass@localhost/db2";
 
-        let k1 = PoolKey::new(RuntimeEnv::Test, DbKind::Postgres, url_a);
-        let k2 = PoolKey::new(RuntimeEnv::Test, DbKind::Postgres, url_a_copy);
+        let k1 = PoolKey::new(RuntimeEnv::Test, url_a);
+        let k2 = PoolKey::new(RuntimeEnv::Test, url_a_copy);
         assert_eq!(k1, k2);
 
-        let k3 = PoolKey::new(RuntimeEnv::Prod, DbKind::Postgres, url_a);
+        let k3 = PoolKey::new(RuntimeEnv::Prod, url_a);
         assert_ne!(k1, k3);
 
-        let k4 = PoolKey::new(RuntimeEnv::Test, DbKind::SqliteFile, url_a);
+        let k4 = PoolKey::new(RuntimeEnv::Test, url_b);
         assert_ne!(k1, k4);
 
-        let k5 = PoolKey::new(RuntimeEnv::Test, DbKind::Postgres, url_b);
+        let k5 = PoolKey::new(RuntimeEnv::Prod, url_a);
         assert_ne!(k1, k5);
     }
 
     #[tokio::test]
     async fn test_init_locks_single_flight_behavior() {
         // Build a synthetic key (no DB access needed)
-        let key = PoolKey::new(RuntimeEnv::Test, DbKind::SqliteMemory, "sqlite::memory:");
+        let key = PoolKey::new(RuntimeEnv::Test, "postgresql://user:pass@localhost/test_db");
 
         // Fresh map for this test run
         let locks = INIT_LOCKS.get_or_init(DashMap::new);

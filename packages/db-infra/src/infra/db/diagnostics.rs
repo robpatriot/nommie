@@ -1,13 +1,10 @@
 // No top-level imports needed - all imports are within the modules
 
-/// SQLite diagnostics and connection tracking
-pub mod sqlite_diagnostics {
+/// Database diagnostics and connection tracking (Postgres only)
+pub mod db_diagnostics {
     use std::process;
 
-    use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
-    use tracing::info;
-
-    use crate::error::DbInfraError;
+    use sea_orm::ConnectionTrait;
 
     /// Get current process ID
     pub fn current_pid() -> u32 {
@@ -15,72 +12,10 @@ pub mod sqlite_diagnostics {
     }
 
     /// Generate a consistent connection-based identifier for logging correlation
-    /// Uses readily available connection properties: PID + backend + connection pointer
     pub fn connection_id<C: ConnectionTrait>(conn: &C) -> String {
         let pid = current_pid();
-        let backend = match conn.get_database_backend() {
-            DatabaseBackend::Sqlite => "sq",
-            DatabaseBackend::Postgres => "pg",
-            DatabaseBackend::MySql => "my",
-        };
         let conn_ptr = conn as *const _ as usize;
-        format!("{}-{}-{:x}", pid, backend, conn_ptr % 0xFFFF) // Keep last 4 hex digits
-    }
-
-    /// Log PRAGMA values for SQLite diagnostics
-    pub async fn log_pragma_snapshot<C: ConnectionTrait>(
-        conn: &C,
-        pool_type: &str,
-    ) -> Result<(), DbInfraError> {
-        let pid = current_pid();
-
-        // Infer database type from connection
-        let db_type = match conn.get_database_backend() {
-            DatabaseBackend::Sqlite => "sqlite",
-            DatabaseBackend::Postgres => "postgres",
-            DatabaseBackend::MySql => {
-                return Err(DbInfraError::Config {
-                    message: "MySQL database backend is not supported, only SQLite and PostgreSQL are supported"
-                        .to_string(),
-                });
-            }
-        };
-
-        let pragmas = [
-            "journal_mode",
-            "synchronous",
-            "busy_timeout",
-            "locking_mode",
-            "mmap_size",
-        ];
-
-        for pragma in &pragmas {
-            let query = format!("PRAGMA {};", pragma);
-            if let Ok(Some(row)) = conn
-                .query_one(Statement::from_string(DatabaseBackend::Sqlite, query))
-                .await
-            {
-                // Try different types that this PRAGMA might return
-                let formatted_value = row
-                    .try_get::<String>("", pragma)
-                    .ok()
-                    .or_else(|| row.try_get::<i32>("", pragma).ok().map(|v| v.to_string()))
-                    .or_else(|| row.try_get::<i64>("", pragma).ok().map(|v| v.to_string()));
-
-                if let Some(value) = formatted_value {
-                    info!(
-                        pid = pid,
-                        db_type = db_type,
-                        pool_type = pool_type,
-                        pragma = pragma,
-                        value = value,
-                        "PRAGMA snapshot"
-                    );
-                }
-            }
-        }
-
-        Ok(())
+        format!("{}-pg-{:x}", pid, conn_ptr % 0xFFFF)
     }
 }
 

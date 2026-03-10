@@ -157,16 +157,7 @@ pub async fn update_game(
     optimistic_update_then_fetch(txn, dto.id, dto.expected_version, |mut update| {
         // Update state if provided
         if let Some(state) = dto.state {
-            let state_expr = match txn.get_database_backend() {
-                sea_orm::DatabaseBackend::Postgres => {
-                    // PostgreSQL needs explicit cast to enum type
-                    Expr::val(state).cast_as(Alias::new("game_state"))
-                }
-                _ => {
-                    // SQLite and others - just use string value
-                    Expr::val(state).into()
-                }
-            };
+            let state_expr = Expr::val(state).cast_as(Alias::new("game_state"));
             update = update.col_expr(games::Column::State, state_expr);
         }
 

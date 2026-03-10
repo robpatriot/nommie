@@ -254,10 +254,7 @@ enum RoundScores {
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         // Create Postgres enums for user_options and users (before their tables)
-        if matches!(
-            manager.get_database_backend(),
-            sea_orm::DatabaseBackend::Postgres
-        ) {
+        {
             async fn enum_exists(
                 manager: &SchemaManager<'_>,
                 enum_name: &str,
@@ -556,26 +553,24 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Create Postgres enums (PostgreSQL only)
-        match manager.get_database_backend() {
-            sea_orm::DatabaseBackend::Postgres => {
-                // Helper function to check if enum exists
-                async fn enum_exists(
-                    manager: &SchemaManager<'_>,
-                    enum_name: &str,
-                ) -> Result<bool, DbErr> {
-                    let result = manager
-                        .get_connection()
-                        .query_one(Statement::from_string(
-                            sea_orm::DatabaseBackend::Postgres,
-                            format!("SELECT 1 FROM pg_type WHERE typname = '{}'", enum_name),
-                        ))
-                        .await?;
-                    Ok(result.is_some())
-                }
+        // Create Postgres enums
+        {
+            async fn enum_exists(
+                manager: &SchemaManager<'_>,
+                enum_name: &str,
+            ) -> Result<bool, DbErr> {
+                let result = manager
+                    .get_connection()
+                    .query_one(Statement::from_string(
+                        sea_orm::DatabaseBackend::Postgres,
+                        format!("SELECT 1 FROM pg_type WHERE typname = '{}'", enum_name),
+                    ))
+                    .await?;
+                Ok(result.is_some())
+            }
 
-                // Create GameStateEnum if it doesn't exist
-                if !enum_exists(manager, "game_state").await? {
+            // Create GameStateEnum if it doesn't exist
+            if !enum_exists(manager, "game_state").await? {
                     manager
                         .create_type(
                             PgType::create()
@@ -641,22 +636,15 @@ impl MigrationTrait for Migration {
                         .await?;
                 }
 
-                if !enum_exists(manager, "game_role").await? {
-                    manager
-                        .create_type(
-                            PgType::create()
-                                .as_enum(GameRoleEnum::Type)
-                                .values(["player", "spectator"])
-                                .to_owned(),
-                        )
-                        .await?;
-                }
-            }
-            sea_orm::DatabaseBackend::Sqlite => {
-                // SQLite doesn't need enum types - they're stored as TEXT
-            }
-            _ => {
-                return Err(DbErr::Custom("Unsupported database backend".into()));
+            if !enum_exists(manager, "game_role").await? {
+                manager
+                    .create_type(
+                        PgType::create()
+                            .as_enum(GameRoleEnum::Type)
+                            .values(["player", "spectator"])
+                            .to_owned(),
+                    )
+                    .await?;
             }
         }
 
@@ -776,19 +764,14 @@ impl MigrationTrait for Migration {
             )
             .await?;
 
-        // Add CHECK constraint for rng_seed length (Postgres only)
-        if matches!(
-            manager.get_database_backend(),
-            sea_orm::DatabaseBackend::Postgres
-        ) {
-            manager
-                .get_connection()
-                .execute(Statement::from_string(
-                    sea_orm::DatabaseBackend::Postgres,
-                    "ALTER TABLE games ADD CONSTRAINT ck_games_rng_seed_length CHECK (octet_length(rng_seed) = 32)".to_string(),
-                ))
-                .await?;
-        }
+        // Add CHECK constraint for rng_seed length
+        manager
+            .get_connection()
+            .execute(Statement::from_string(
+                sea_orm::DatabaseBackend::Postgres,
+                "ALTER TABLE games ADD CONSTRAINT ck_games_rng_seed_length CHECK (octet_length(rng_seed) = 32)".to_string(),
+            ))
+            .await?;
 
         // ai_profiles catalog
         manager
@@ -1751,10 +1734,9 @@ impl MigrationTrait for Migration {
             .drop_table(Table::drop().table(Games::Table).to_owned())
             .await?;
 
-        // Drop enum types (PostgreSQL only)
-        match manager.get_database_backend() {
-            sea_orm::DatabaseBackend::Postgres => {
-                manager
+        // Drop enum types
+        {
+            manager
                     .drop_type(
                         PgType::drop()
                             .name(CardTrumpEnum::Type)
@@ -1843,13 +1825,6 @@ impl MigrationTrait for Migration {
                             .to_owned(),
                     )
                     .await?;
-            }
-            sea_orm::DatabaseBackend::Sqlite => {
-                // SQLite doesn't have enum types to drop
-            }
-            _ => {
-                return Err(DbErr::Custom("Unsupported database backend".into()));
-            }
         }
 
         manager

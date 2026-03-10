@@ -46,7 +46,6 @@
     "MIGRATION_CANCELLED": "El servidor se está reiniciando. Inténtalo de nuevo.",
     "MIGRATION_FAILED": "El servidor se está reiniciando. Inténtalo de nuevo.",
     "POSTCHECK_MISMATCH": "El servidor se está reiniciando. Inténtalo de nuevo.",
-    "SQLITE_LOCK_ERROR": "El servidor está ocupado. Inténtalo de nuevo.",
     "UNIQUE_VIOLATION": "Eso ya existe.",
     "FK_VIOLATION": "No se pudo completar.",
     "CHECK_VIOLATION": "Ese valor no es válido.",

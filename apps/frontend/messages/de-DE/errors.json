@@ -46,7 +46,6 @@
     "MIGRATION_CANCELLED": "Der Server startet neu. Bitte versuche es erneut.",
     "MIGRATION_FAILED": "Der Server startet neu. Bitte versuche es erneut.",
     "POSTCHECK_MISMATCH": "Der Server startet neu. Bitte versuche es erneut.",
-    "SQLITE_LOCK_ERROR": "Der Server ist ausgelastet. Bitte versuche es erneut.",
     "UNIQUE_VIOLATION": "Das existiert bereits.",
     "FK_VIOLATION": "Das konnte nicht abgeschlossen werden.",
     "CHECK_VIOLATION": "Dieser Wert ist nicht gültig.",

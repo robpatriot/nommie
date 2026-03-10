@@ -48,7 +48,7 @@ mod tests {
 
     use super::*;
     use crate::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
-    use crate::config::db::{DbKind, RuntimeEnv};
+    use crate::config::db::RuntimeEnv;
     use crate::state::admission_mode::AdmissionMode;
     use crate::state::app_state::{AppConfig, Secret};
     use crate::state::security_config::SecurityConfig;
@@ -65,7 +65,6 @@ mod tests {
     async fn test_require_db_without_db() {
         let config = AppConfig {
             env: RuntimeEnv::Test,
-            db_kind: DbKind::SqliteMemory,
             db_url: Secret("".to_string()),
             redis_url: Secret(None),
             security: SecurityConfig::default(),
@@ -96,7 +95,6 @@ mod tests {
     async fn test_require_db_error_code() {
         let config = AppConfig {
             env: RuntimeEnv::Test,
-            db_kind: DbKind::SqliteMemory,
             db_url: Secret("".to_string()),
             redis_url: Secret(None),
             security: SecurityConfig::default(),
