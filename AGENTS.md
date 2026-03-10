@@ -15,6 +15,12 @@ If any instruction conflicts with this file: stop and ask.
 - Don’t leave prompt artifacts or implementation plans in code comments.
 - When a rule cannot be followed, explain the conflict and propose the compliant alternative.
 
+## Testing
+
+- All changes must be validated by running the appropriate test scripts from `package.json`.
+- Before adding or modifying tests, agents must read and follow `docs/testing.md`.
+- Tasks are not complete until tests pass.
+
 ## How to run
 Use `package.json` scripts as canonical. Prefer inspecting scripts over guessing commands.
 

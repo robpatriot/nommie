@@ -1,139 +1,99 @@
 # Testing Rules
 
-- Tests must be deterministic.
-- Add tests for complex logic and edge/error paths.
-- Prefer structured assertions over string matching.
-- Use repository scripts in package.json as canonical for running tests, lint, and build.
-- If behavior changes, ensure relevant test coverage exists or is updated.
+This document defines how tests must be written and executed in this repository.
 
-## Deterministic Time and Async Control
-
-### Requirement
-
-Tests must not depend on wall-clock time.
-
-Tests must complete without waiting for real time to pass. Any behavior that
-would otherwise depend on timers, delays, or deferred async completion must be
-controlled deterministically by the test.
-
-There are two required patterns:
-
-- **Deterministic scheduler control** for timer-driven application control flow
-- **Controlled promises / deferred async** for non-timer asynchronous lifecycle
-
-Agents must choose the pattern that matches the behavior under test.
+Agents must follow these rules whenever adding, modifying, or validating code.
 
 ---
 
-### Prohibited Test Patterns
+# Core Principles
 
-Agents must not introduce or rely on the following patterns:
+- Tests must be **deterministic**.
+- Add tests for **complex logic, edge cases, and error paths**.
+- Prefer **structured assertions** over string matching.
+- If behaviour changes, ensure **relevant tests are added or updated**.
+- Follow **existing testing patterns in the repository**.
 
-- Global fake timers (`vi.useFakeTimers`, `jest.useFakeTimers`)
-- Timer advancement hacks (`advanceTimersByTime`, `runAllTimers`,
-  `runOnlyPendingTimers`)
-- Sleep-based waiting (`new Promise(resolve => setTimeout(...))`,
-  `sleep()`, `delay()`)
-- Long `waitFor` timeouts used to simulate timer progression
-- Test-only reductions of polling intervals or retry delays
-- Any approach that depends on real time passing
-
-These approaches introduce nondeterminism, slow test suites, and CI flakiness.
+Agents must not introduce new testing styles when established patterns already exist.
 
 ---
 
-### Required Pattern: Timer-Driven Control Flow
+# Running Tests
 
-When application control-flow logic requires scheduling, it must use an
-injectable scheduler or driver abstraction rather than directly calling
-`setTimeout` or `setInterval`.
+Tests must be executed using the **repository scripts defined in `package.json`**.
 
-This applies to behavior where scheduled progression is part of the logic being
-tested, including:
+These scripts are the **canonical interface** for running tests, linting, and builds.
 
-- polling loops
-- retry logic
-- exponential backoff
-- WebSocket reconnect timers
-- readiness checks
-- other scheduled coordination logic
+Agents must **not invoke language-native test runners directly**.
 
-The abstraction must:
+Prohibited examples:
 
-- Provide a method for scheduling delayed work
-- Return a handle that allows scheduled work to be cancelled
-- Allow tests to control execution deterministically
+- `cargo test`
+- `vitest`
+- `jest`
+- any direct test runner invocation
 
-Production code must use a scheduler implementation backed by real timers.
+Always run the appropriate script from `package.json`.
 
-Tests must use a manual driver implementation that:
-
-- Stores scheduled callbacks in memory
-- Executes them only when explicitly triggered by the test
-- Provides a deterministic mechanism for advancing scheduled work
-
-Tests must advance scheduler-driven behavior explicitly. They must not wait for
-time to pass.
+If uncertain which script to use, inspect `package.json` and follow the existing conventions.
 
 ---
 
-### Required Pattern: Non-Timer Async Lifecycle
+# Test Execution Requirement
 
-If the behavior under test is asynchronous but not truly timer-driven, tests
-must use controlled async primitives rather than delays.
+Testing is a **required completion step for every task**.
 
-This applies to cases such as:
+After making any change that could affect behaviour, agents must:
 
-- pending network requests
-- mutation in-flight state
-- success or failure resolution
-- rollback behavior
-- async loading transitions
-- coordination around promise completion
+1. Run the relevant repository test script(s)
+2. Confirm tests pass
+3. Fix failures if they occur
 
-Tests should use controlled promises, deferred resolution, or equivalent
-explicit mechanisms so the test decides when async work resolves or rejects.
-
-Agents must not simulate these states by inserting sleeps or mock timers.
-
-Agents must not introduce scheduler abstractions for these cases unless the
-production behavior is genuinely driven by scheduled control flow.
+A task is **not complete until tests pass**.
 
 ---
 
-### React Testing Requirements
+# Deterministic Async and Time Behaviour
 
-If advancing a scheduler triggers React state updates, scheduler advancement
-must occur inside `act(...)`.
+Tests must **not depend on real time passing**.
 
-Typical pattern:
+Agents must not introduce:
 
-`await act(async () => { await driver.tick() })`
+- sleeps or delays (`setTimeout`, `sleep`, `delay`)
+- fake timer frameworks (`vi.useFakeTimers`, `jest.useFakeTimers`)
+- timer advancement helpers (`advanceTimersByTime`, `runAllTimers`)
 
-If resolving or rejecting a controlled promise triggers React state updates,
-that transition must also be observed safely through `act(...)` or normal
-Testing Library async utilities.
+Instead, follow the **deterministic patterns already used in the repository**:
+
+- **Scheduler/driver pattern** for timer-driven logic (polling, retries, reconnect loops)
+- **Controlled promises or deferred resolution** for non-timer async behaviour
+
+Tests must control when asynchronous behaviour progresses rather than waiting for time.
+
+---
+
+# React Testing
+
+If advancing a scheduler or resolving async work triggers React state updates,
+the operation must occur inside `act(...)`.
+
+Example pattern:
+
+await act(async () => {
+  await driver.tick()
+})
 
 `waitFor` must not be used to simulate timer progression.
 
-`waitFor` may be used only for non-timer asynchronous settling and should rely
-on short default timeouts.
-
 ---
 
-### When This Rule Does Not Apply
+# Scope of These Rules
 
-Agents must **not** introduce scheduler abstractions for timers used only for
-cosmetic UI behavior or presentation concerns, including:
+Do not introduce scheduler abstractions for cosmetic UI timers such as:
 
 - animations
 - temporary visual delays
 - toast auto-dismiss timers
 - minor UI debouncing
-- performance logging or diagnostics delays
 
-Such timers may continue to use normal browser scheduling unless there is a
-separate explicit reason to refactor them.
-
-Agents must also **not** refactor third-party integrations or external library
-code solely to satisfy this rule.
+Also do not refactor third-party code solely to satisfy these testing rules.
