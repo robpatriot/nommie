@@ -121,12 +121,11 @@ export function logError(
       }
     }
 
-    console.error(parts.join('\n'))
-
-    // Also log traceId if available for easier debugging
     if (context?.traceId) {
-      console.error(`[Error Logger] Trace ID: ${context.traceId}`)
+      parts.push(`Trace ID: ${context.traceId}`)
     }
+
+    console.error(parts.join('\n'))
   } else {
     // In production, log minimal details (can be extended to send to error tracking service)
     console.error(`[Error] ${message}`, error || '')
@@ -163,13 +162,30 @@ export function logInfo(message: string, context?: ErrorContext): void {
 }
 
 /**
+ * True when the error is an expected backend-down/infra case (502/503/504 or SERVICE_UNAVAILABLE).
+ * We suppress logging for these to avoid console noise when backend is degraded.
+ */
+function shouldSuppressBackendError(error: {
+  status?: number
+  code?: string
+}): boolean {
+  if (error.status === 502 || error.status === 503 || error.status === 504)
+    return true
+  if (error.code === 'SERVICE_UNAVAILABLE') return true
+  return false
+}
+
+/**
  * Log a BackendApiError with traceId for easier debugging.
+ * Skips logging for expected infra errors (502/503/504, SERVICE_UNAVAILABLE)
+ * to avoid console noise when backend is degraded.
  */
 export function logBackendError(
   message: string,
   error: { message: string; traceId?: string; status?: number; code?: string },
   additionalContext?: Omit<ErrorContext, 'traceId'>
 ): void {
+  if (shouldSuppressBackendError(error)) return
   // Extract error properties into a plain object for consistent serialization
   // The error parameter may be a BackendApiError instance or a plain object
   const errorDetails: Record<string, unknown> = {

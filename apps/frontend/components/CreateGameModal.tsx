@@ -42,19 +42,15 @@ export default function CreateGameModal({
 
   if (!isOpen) return null
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
-
-    try {
-      await onCreateGame(name.trim())
-      // Don't close modal or reset name - navigation will unmount this component
-      // Modal will stay visible with loading state until navigation completes
-    } catch {
+    // Use .catch() instead of async/await so the promise is explicitly handled.
+    // Avoids unhandled rejection when React doesn't await the form's async handler.
+    void onCreateGame(name.trim()).catch(() => {
       // Error is already logged by handleCreateGame in LobbyClient
-      // Just reset submitting state so user can try again
       setIsSubmitting(false)
-    }
+    })
   }
 
   return (
