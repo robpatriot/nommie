@@ -1,18 +1,19 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use migration::{migrate, MigrationCommand, Migrator, MigratorTrait};
-use rand::Rng;
 use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DbErr};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, trace, warn};
 
 use crate::config::db::{
-    build_connection_settings, build_session_statements, make_conn_spec, DbOwner, DbSettings,
-    PoolPurpose, RuntimeEnv,
+    build_connection_settings, build_session_statements, make_conn_spec, sanitize_db_url,
+    DbOwner, DbSettings, PoolPurpose, RuntimeEnv,
 };
 use crate::error::DbInfraError;
+use crate::infra::db::advisory_lock::{acquire_bootstrap_lock, AcquireResult, LockCallbacks};
 use crate::infra::db::diagnostics::migration_counters;
-use crate::infra::db::locking::{Guard, PgAdvisoryLock};
+use crate::infra::db::locking::Guard;
 
 fn get_db_path(env: RuntimeEnv) -> String {
     let spec = make_conn_spec(env, DbOwner::Owner)
@@ -36,28 +37,6 @@ pub async fn build_admin_pool(env: RuntimeEnv) -> Result<DatabaseConnection, DbI
         })?;
 
     Ok(pool)
-}
-
-/// Sanitize database URL by masking password in connection strings.
-pub fn sanitize_db_url(url: &str) -> String {
-    if url.contains("@") && url.contains(":") {
-        let parts: Vec<&str> = url.split("@").collect();
-        if parts.len() == 2 {
-            let auth_part = parts[0];
-            let host_part = parts[1];
-
-            if let Some(colon_pos) = auth_part.rfind(':') {
-                let scheme_user = &auth_part[..colon_pos];
-                format!("{}:***@{}", scheme_user, host_part)
-            } else {
-                url.to_string()
-            }
-        } else {
-            url.to_string()
-        }
-    } else {
-        url.to_string()
-    }
 }
 
 async fn fast_path_schema_check(conn: &DatabaseConnection) -> Result<bool, DbInfraError> {
@@ -139,20 +118,7 @@ pub async fn orchestrate_migration_internal(
         return Ok(());
     }
 
-    let url = make_conn_spec(env, DbOwner::Owner)?;
-    let sanitized_url = sanitize_db_url(&url);
-    let key = format!("nommie:migrate:{:?}:{}", env, sanitized_url);
-
-    let lock = PgAdvisoryLock::new(pool.clone(), &key);
-
-    let result = migrate_with_lock(
-        pool,
-        lock,
-        env,
-        command,
-        cancellation_token.clone(),
-    )
-    .await;
+    let result = migrate_with_lock(pool, env, command, cancellation_token.clone()).await;
 
     info!("migrate=done");
     migration_counters::log_snapshot("migrate_orchestration");
@@ -162,87 +128,42 @@ pub async fn orchestrate_migration_internal(
 
 async fn migrate_with_lock(
     pool: &DatabaseConnection,
-    mut lock: PgAdvisoryLock,
     env: RuntimeEnv,
     command: MigrationCommand,
     cancellation_token: CancellationToken,
 ) -> Result<(), DbInfraError> {
     let connection_settings = build_connection_settings(env, PoolPurpose::Migration)?;
-    let lock_acquire_ms = std::env::var("NOMMIE_MIGRATE_TIMEOUT_MS")
-        .ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(match env {
-            RuntimeEnv::Test => 3000,
-            _ => 900,
-        });
 
-    info!(
-        acquire_ms = lock_acquire_ms,
-        env = ?env,
-        "migration timeouts configured"
-    );
+    let callbacks = LockCallbacks {
+        on_acquired: Some(Arc::new(|_| migration_counters::lock_acquired())),
+        on_backoff: Some(Arc::new(migration_counters::lock_backoff_event)),
+        on_timeout: Some(Arc::new(migration_counters::lock_acquire_timeout)),
+        on_add_attempts: Some(Arc::new(migration_counters::add_lock_acquire_attempts)),
+    };
 
-    let start = Instant::now();
+    let fast_path = matches!(command, MigrationCommand::Up).then(|| {
+        let pool = pool.clone();
+        move || {
+            let pool = pool.clone();
+            async move { fast_path_schema_check(&pool).await }
+        }
+    });
 
-    let mut attempts: u32 = 0;
-    let guard = loop {
-        attempts += 1;
+    let acquire_result = acquire_bootstrap_lock(
+        pool,
+        env,
+        fast_path,
+        Some(cancellation_token.clone()),
+        callbacks,
+    )
+    .await?;
 
-        if matches!(command, MigrationCommand::Up) && fast_path_schema_check(pool).await? {
+    let guard = match acquire_result {
+        AcquireResult::Skipped => {
             info!("migrate=skipped up_to_date=true");
             return Ok(());
         }
-
-        if let Some(acquired_guard) = lock.try_acquire().await? {
-            migration_counters::add_lock_acquire_attempts(attempts as usize);
-            migration_counters::lock_acquired();
-            trace!(
-                lock = "won",
-                env = ?env,
-                attempts = attempts,
-                elapsed_ms = start.elapsed().as_millis()
-            );
-            break acquired_guard;
-        }
-
-        let base_delay_ms = (5u64 << attempts.saturating_sub(1)).min(80);
-        let jitter_ms = rand::rng().random::<u64>() % 4;
-        let delay_ms = base_delay_ms + jitter_ms;
-
-        trace!(
-            lock = "backoff",
-            attempts = attempts,
-            delay_ms = delay_ms,
-            elapsed_ms = start.elapsed().as_millis()
-        );
-        migration_counters::lock_backoff_event();
-
-        tokio::select! {
-            _ = tokio::time::sleep(Duration::from_millis(delay_ms)) => {
-                if start.elapsed() >= Duration::from_millis(lock_acquire_ms) {
-                    migration_counters::lock_acquire_timeout();
-                    return Err(DbInfraError::Config {
-                        message: format!(
-                            "migration lock acquisition timeout after {:?} ({} attempts)",
-                            start.elapsed(), attempts
-                        ),
-                    });
-                }
-            }
-            _ = cancellation_token.cancelled() => {
-                info!(
-                    elapsed_ms = start.elapsed().as_millis(),
-                    attempts = attempts,
-                    "Migration cancelled during acquire backoff"
-                );
-                return Err(DbInfraError::Config {
-                    message: format!(
-                        "migration cancelled during acquire backoff after {}ms",
-                        start.elapsed().as_millis()
-                    ),
-                });
-            }
-        }
+        AcquireResult::Acquired(g) => g,
     };
 
     let result = migrate_with_guard_controlled(

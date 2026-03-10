@@ -149,6 +149,23 @@ pub fn build_session_statements(settings: &DbSettings) -> Vec<String> {
     stmts
 }
 
+/// Sanitize database URL by masking password in connection strings.
+pub fn sanitize_db_url(url: &str) -> String {
+    if url.contains('@') && url.contains(':') {
+        let parts: Vec<&str> = url.split('@').collect();
+        if parts.len() == 2 {
+            let auth_part = parts[0];
+            let host_part = parts[1];
+
+            if let Some(colon_pos) = auth_part.rfind(':') {
+                let scheme_user = &auth_part[..colon_pos];
+                return format!("{}:***@{}", scheme_user, host_part);
+            }
+        }
+    }
+    url.to_string()
+}
+
 /// Redact password from connection string for safe logging.
 fn redact_conn_spec_for_log(url: &str) -> String {
     if url.starts_with("postgresql://") {

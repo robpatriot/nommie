@@ -9,6 +9,7 @@ pub fn pg_lock_id(key: &str) -> i64 {
 }
 
 /// Guard struct that represents a held Postgres advisory lock.
+#[derive(Debug)]
 pub struct Guard {
     admin_pool: Option<DatabaseConnection>,
     lock_key: i64,

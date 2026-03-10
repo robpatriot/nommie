@@ -4,14 +4,12 @@ use std::time::Duration;
 
 use db_infra::config::db::build_session_statements;
 use db_infra::error::DbInfraError;
+use db_infra::infra::db::advisory_lock::{acquire_bootstrap_lock, AcquireResult};
 use db_infra::infra::db::diagnostics::{db_diagnostics, migration_counters};
-use db_infra::infra::db::locking::PgAdvisoryLock;
-use db_infra::sanitize_db_url;
 use migration::MigrationCommand;
-use rand::Rng;
 use sea_orm::{DatabaseConnection, SqlxPostgresConnector};
 use sqlx::postgres::PgPoolOptions;
-use tracing::{info, trace, warn};
+use tracing::{info, warn};
 
 use super::{DbOwner, RuntimeEnv};
 use crate::config::db::{make_conn_spec, ConnectionSettings, DbSettings};
@@ -75,66 +73,27 @@ async fn ensure_ai_profiles_with_lock(
     pool: &DatabaseConnection,
     env: RuntimeEnv,
 ) -> Result<(), AppError> {
-    if fast_path_ai_profiles_check(pool).await? {
-        info!("ai_profiles_init=skipped up_to_date=true");
-        return Ok(());
-    }
+    let pool_clone = pool.clone();
+    let fast_path = move || {
+        let pool = pool_clone.clone();
+        async move { fast_path_ai_profiles_check(&pool).await }
+    };
 
-    let lock_acquire_ms = std::env::var("NOMMIE_AI_PROFILES_INIT_TIMEOUT_MS")
-        .ok()
-        .and_then(|s| s.parse::<u64>().ok())
-        .unwrap_or(match env {
-            RuntimeEnv::Test => 3000,
-            _ => 900,
-        });
+    let acquire_result = acquire_bootstrap_lock(
+        pool,
+        env,
+        Some(fast_path),
+        None,
+        db_infra::infra::db::advisory_lock::LockCallbacks::default(),
+    )
+    .await?;
 
-    let start = std::time::Instant::now();
-    let mut attempts: u32 = 0;
-    let guard = loop {
-        attempts += 1;
-
-        let url = make_conn_spec(env, DbOwner::App).map_err(AppError::from)?;
-        let sanitized_url = sanitize_db_url(&url);
-        let key = format!("nommie:ai_profiles_init:{:?}:{}", env, sanitized_url);
-        let mut lock = PgAdvisoryLock::new(pool.clone(), &key);
-        let maybe_guard = lock.try_acquire().await.map_err(AppError::from)?;
-
-        if let Some(acquired_guard) = maybe_guard {
-            trace!(
-                lock = "won",
-                operation = "ai_profiles_init",
-                env = ?env,
-                attempts = attempts,
-                elapsed_ms = start.elapsed().as_millis()
-            );
-            break acquired_guard;
+    let guard = match acquire_result {
+        AcquireResult::Skipped => {
+            info!("ai_profiles_init=skipped up_to_date=true");
+            return Ok(());
         }
-
-        let base_delay_ms = (5u64 << attempts.saturating_sub(1)).min(80);
-        let jitter_ms = rand::rng().random::<u64>() % 4;
-        let delay_ms = base_delay_ms + jitter_ms;
-
-        trace!(
-            lock = "backoff",
-            operation = "ai_profiles_init",
-            attempts = attempts,
-            delay_ms = delay_ms,
-            elapsed_ms = start.elapsed().as_millis()
-        );
-
-        tokio::time::sleep(Duration::from_millis(delay_ms)).await;
-
-        if start.elapsed() >= Duration::from_millis(lock_acquire_ms) {
-            let detail = format!(
-                "AI profiles initialization lock acquisition timeout after {:?} ({} attempts)",
-                start.elapsed(),
-                attempts
-            );
-            return Err(AppError::config(
-                detail,
-                crate::error::Sentinel("ai_profiles_init_lock_timeout"),
-            ));
-        }
+        AcquireResult::Acquired(g) => g,
     };
 
     if fast_path_ai_profiles_check(pool).await? {
