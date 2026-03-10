@@ -64,52 +64,47 @@ fn matches_pattern(email: &str, pattern: &str) -> bool {
     true
 }
 
-/// Check if an email is admitted for first-time login.
+/// Check admission and admin status for an email.
 ///
-/// Admission mode is deployment config (from ALLOWED_EMAILS at startup), not inferred from DB.
+/// Returns `(admitted, is_admin)`. Admission mode is deployment config (from ALLOWED_EMAILS at
+/// startup), not inferred from DB.
 ///
-/// - **Open**: Always admits; no admission table check.
-/// - **Restricted**: Email must match at least one pattern in the admission table.
-///   Empty table in restricted mode means no one is admitted.
-pub async fn is_email_admitted<C: ConnectionTrait + Send + Sync>(
+/// - **Open**: Always admits; admin from exact row if present.
+/// - **Restricted**: Admitted if exact match or wildcard match; admin only from exact row.
+///
+/// Uses indexed exact lookup first; loads wildcard rows only when exact match fails.
+pub async fn check_admission_and_admin<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     email: &str,
     mode: AdmissionMode,
-) -> Result<bool, DomainError> {
-    if mode == AdmissionMode::Open {
-        return Ok(true);
-    }
-
-    let rules = allowed_emails_sea::list_all(conn)
-        .await
-        .map_err(crate::infra::db_errors::map_db_err)?;
-    if rules.is_empty() {
-        return Ok(false);
-    }
-
+) -> Result<(bool, bool), DomainError> {
     let normalized = normalize(email);
-    for rule in &rules {
-        if matches_pattern(&normalized, &rule.pattern) {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
 
-/// Check if there is an exact (non-wildcard) row for `normalized_email` with `is_admin=true`.
-pub async fn is_exact_admin_match<C: ConnectionTrait + Send + Sync>(
-    conn: &C,
-    normalized_email: &str,
-) -> Result<bool, DomainError> {
-    let rules = allowed_emails_sea::list_all(conn)
+    if mode == AdmissionMode::Open {
+        let is_admin = allowed_emails_sea::find_by_email(conn, &normalized)
+            .await
+            .map_err(crate::infra::db_errors::map_db_err)?
+            .is_some_and(|r| r.is_admin);
+        return Ok((true, is_admin));
+    }
+
+    let exact = allowed_emails_sea::find_by_email(conn, &normalized)
         .await
         .map_err(crate::infra::db_errors::map_db_err)?;
-    for rule in &rules {
-        if !rule.pattern.contains('*') && rule.pattern == normalized_email && rule.is_admin {
-            return Ok(true);
-        }
+
+    if let Some(rule) = exact {
+        return Ok((true, rule.is_admin));
     }
-    Ok(false)
+
+    let wildcards = allowed_emails_sea::list_wildcard_rules(conn)
+        .await
+        .map_err(crate::infra::db_errors::map_db_err)?;
+
+    let admitted = wildcards
+        .iter()
+        .any(|rule| matches_pattern(&normalized, &rule.pattern));
+
+    Ok((admitted, false))
 }
 
 /// Parse ALLOWED_EMAILS from environment. Returns normalized patterns.

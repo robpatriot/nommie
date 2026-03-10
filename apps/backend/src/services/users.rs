@@ -151,8 +151,11 @@ impl UserService {
             ));
         }
 
-        // New user - check admission table before creating
-        if !allowed_emails::is_email_admitted(txn, &clean_email, admission_mode).await? {
+        // New user - check admission and admin in one pass
+        let (admitted, is_admin) =
+            allowed_emails::check_admission_and_admin(txn, &clean_email, admission_mode).await?;
+
+        if !admitted {
             return Err(DomainError::validation(
                 ValidationKind::EmailNotAllowed,
                 "Access restricted. Please contact support if you believe this is an error."
@@ -163,7 +166,7 @@ impl UserService {
         // Derive username from name or email local-part
         let username = derive_username(name, &clean_email);
 
-        let role = if allowed_emails::is_exact_admin_match(txn, &clean_email).await? {
+        let role = if is_admin {
             UserRole::Admin
         } else {
             UserRole::User

@@ -184,10 +184,13 @@ async fn check_allowlist(
             }
 
             // First-time login: check admission (open mode admits all; restricted requires match)
-            let allowed =
-                crate::repos::allowed_emails::is_email_admitted(txn, &email, admission_mode)
-                    .await
-                    .map_err(AppError::from)?;
+            let (allowed, _) = crate::repos::allowed_emails::check_admission_and_admin(
+                txn,
+                &email,
+                admission_mode,
+            )
+            .await
+            .map_err(AppError::from)?;
 
             if !allowed {
                 return Err(AppError::email_not_allowed());

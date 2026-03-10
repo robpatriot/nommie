@@ -6,6 +6,7 @@
 //! - Missing sub falls back to email-based check
 
 use actix_web::{test, HttpMessage};
+use backend::adapters::allowed_emails_sea;
 use backend::db::require_db;
 use backend::entities::allowed_emails;
 use backend::prelude::SharedTxn;
@@ -143,9 +144,14 @@ async fn test_first_time_user_with_sub_admitted_allowed() -> Result<(), Box<dyn 
         .await?;
 
     let db = require_db(&state).expect("DB required");
-    seed_admission_email(&db, &test_email.to_lowercase(), false).await;
-
     let shared = SharedTxn::open(&db).await?;
+    allowed_emails_sea::insert_if_not_exists(
+        shared.transaction(),
+        &test_email.to_lowercase(),
+        false,
+    )
+    .await?;
+
     let app = create_test_app(state).with_prod_routes().build().await?;
 
     let body = json!({

@@ -1,7 +1,9 @@
 //! SeaORM adapter for allowed_emails (admission table).
 
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ConnectionTrait, DatabaseTransaction, EntityTrait, NotSet, Set};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, NotSet, QueryFilter, Set,
+};
 
 use crate::entities::allowed_emails;
 
@@ -12,10 +14,27 @@ pub struct AllowRule {
     pub is_admin: bool,
 }
 
-pub async fn list_all<C: ConnectionTrait + Send + Sync>(
+pub async fn find_by_email<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    email: &str,
+) -> Result<Option<AllowRule>, sea_orm::DbErr> {
+    let model = allowed_emails::Entity::find()
+        .filter(allowed_emails::Column::Email.eq(email))
+        .one(conn)
+        .await?;
+    Ok(model.map(|m| AllowRule {
+        pattern: m.email,
+        is_admin: m.is_admin,
+    }))
+}
+
+pub async fn list_wildcard_rules<C: ConnectionTrait + Send + Sync>(
     conn: &C,
 ) -> Result<Vec<AllowRule>, sea_orm::DbErr> {
-    let models = allowed_emails::Entity::find().all(conn).await?;
+    let models = allowed_emails::Entity::find()
+        .filter(allowed_emails::Column::Email.like("%*%"))
+        .all(conn)
+        .await?;
     Ok(models
         .into_iter()
         .map(|m| AllowRule {
