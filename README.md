@@ -12,7 +12,7 @@ It’s a **full-stack, Docker-first app** with a clean split between frontend, b
    - `cp .env.example .env`
    - `set -a; . ./.env; set +a`
 3. Start Postgres & Redis (run manually with docker-compose):
-   - `docker compose -f docker/dev-db/docker-compose.yml up -d postgres redis`
+   - `docker compose -f docker/dev-db/compose.yaml up -d postgres redis`
 4. Create/refresh databases (run manually - see Database & Migrations section):
 5. Run backend + frontend:
    - Both: `pnpm start` (starts backend and frontend, logs → `.dev/dev.log`)
@@ -38,7 +38,7 @@ Minimum env:
 
 - `BACKEND_JWT_SECRET`
 - `GOOGLE_CLIENT_ID` (must match frontend `AUTH_GOOGLE_ID` for ID token verification)
-- Database coordinates (`POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `APP_DB_USER`, `APP_DB_PASSWORD`)
+- Database coordinates (`POSTGRES_HOST`, `POSTGRES_PORT`, `PROD_DB`, `APP_DB_USER`, `APP_DB_PASSWORD`)
 - Any telemetry or feature flags your deployment needs
 
 The container listens on port `3001` and logs to stdout/stderr. Run migrations beforehand (e.g. via `apps/migration-cli`) and point the env vars at the migrated database.
@@ -73,7 +73,7 @@ set -a; . ./.env; set +a
 ```
 
 **For Docker Deployments:**
-Environment variables are set via `docker-compose.yml` `env_file` directives or `docker run --env-file`. See the Docker setup sections below.
+Environment variables are set via compose file `env_file` directives or `docker run --env-file`. See the Docker setup sections below.
 
 **For Standalone Docker Containers:**
 Pass environment files when running containers:
@@ -114,16 +114,16 @@ docker run --env-file .env.backend.prod -p 3001:3001 nommie-backend:prod
 **Auto-Migration**: Empty databases are automatically migrated on first connection via `build_state()`.
 
 **Docker Compose Commands** (run manually):
-- Start Postgres: `docker compose -f docker/dev-db/docker-compose.yml up -d postgres`
-- Stop Postgres: `docker compose -f docker/dev-db/docker-compose.yml stop postgres`
+- Start Postgres: `docker compose -f docker/dev-db/compose.yaml up -d postgres`
+- Stop Postgres: `docker compose -f docker/dev-db/compose.yaml stop postgres`
 - Check readiness: `pnpm db:svc:ready`
-- View logs: `docker compose -f docker/dev-db/docker-compose.yml logs -f postgres`
-- Connect via psql: `docker compose -f docker/dev-db/docker-compose.yml exec postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"`
+- View logs: `docker compose -f docker/dev-db/compose.yaml logs -f postgres`
+- Connect via psql: `docker compose -f docker/dev-db/compose.yaml exec postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"`
 
 **Manual Migration Commands** (run with **Owner** role using migration-cli):
-- Migrate prod DB: `cargo run --bin migration-cli -- --env prod --db postgres up`
-- Fresh prod DB: `cargo run --bin migration-cli -- --env prod --db postgres fresh`
-- Fresh test DB: `cargo run --bin migration-cli -- --env test --db postgres fresh`
+- Migrate prod DB: `cargo run -p migration-cli -- up --env prod`
+- Fresh prod DB: `cargo run -p migration-cli -- fresh --env prod`
+- Fresh test DB: `cargo run -p migration-cli -- fresh --env test`
 
 ---
 

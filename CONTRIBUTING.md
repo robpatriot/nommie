@@ -20,7 +20,7 @@ This document outlines the development workflow and conventions for contributing
    ```
 4. Start PostgreSQL (run manually):
    ```bash
-   docker compose -f docker/dev-db/docker-compose.yml up -d postgres
+   docker compose -f docker/dev-db/compose.yaml up -d postgres
    ```
 5. Create/refresh databases (run manually using migration-cli):
    ```bash
@@ -49,17 +49,17 @@ This document outlines the development workflow and conventions for contributing
 
 ### Database
 Run docker-compose commands manually:
-- **Start:** `docker compose -f docker/dev-db/docker-compose.yml up -d postgres`
-- **Stop:** `docker compose -f docker/dev-db/docker-compose.yml stop postgres`
-- **Destroy:** `docker compose -f docker/dev-db/docker-compose.yml down -v`
+- **Start:** `docker compose -f docker/dev-db/compose.yaml up -d postgres`
+- **Stop:** `docker compose -f docker/dev-db/compose.yaml stop postgres`
+- **Destroy:** `docker compose -f docker/dev-db/compose.yaml down -v`
 - **Check readiness:** `pnpm db:svc:ready`
-- **View logs:** `docker compose -f docker/dev-db/docker-compose.yml logs -f postgres`
-- **Connect via psql:** `docker compose -f docker/dev-db/docker-compose.yml exec postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"`
+- **View logs:** `docker compose -f docker/dev-db/compose.yaml logs -f postgres`
+- **Connect via psql:** `docker compose -f docker/dev-db/compose.yaml exec postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}"`
 
 For migrations, use the migration-cli binary:
-- **Migrate prod DB:** `cargo run --bin migration-cli -- --env prod --db postgres up`
-- **Fresh prod DB:** `cargo run --bin migration-cli -- --env prod --db postgres fresh`
-- **Fresh test DB:** `cargo run --bin migration-cli -- --env test --db postgres fresh`
+- **Migrate prod DB:** `cargo run -p migration-cli -- up --env prod`
+- **Fresh prod DB:** `cargo run -p migration-cli -- fresh --env prod`
+- **Fresh test DB:** `cargo run -p migration-cli -- fresh --env test`
 
 ### Combined
 - **Start all:** `pnpm start` (starts backend and frontend)

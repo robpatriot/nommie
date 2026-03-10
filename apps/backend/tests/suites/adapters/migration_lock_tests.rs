@@ -446,7 +446,7 @@ async fn release_idempotence() {
 #[tokio::test]
 async fn body_timeout_aborts_and_unlocks() {
     // Configure small body timeout; A exceeds it; assert abort + unlock; B acquires.
-    // Note: Only truly applies to Postgres with actual migration; SQLite simulates the behavior
+    // Postgres advisory locks and migration orchestration with body timeout.
 
     // Set short body timeout for this test
     // TODO: Audit that the environment access only happens in single-threaded code.

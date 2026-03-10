@@ -45,25 +45,25 @@ ls -la docker/shared/ca.crt
 
 Verify runtime certificate files exist:
 
-docker compose -f docker/dev-db/docker-compose.yml exec postgres ls -la /var/lib/postgresql/ssl/
+docker compose -f docker/dev-db/compose.yaml exec postgres ls -la /var/lib/postgresql/ssl/
 
 Verify mounted CA exists (for local backend):
 
-docker compose -f docker/dev-db/docker-compose.yml exec postgres ls -la /etc/ssl/certs/nommie-ca.crt
+docker compose -f docker/dev-db/compose.yaml exec postgres ls -la /etc/ssl/certs/nommie-ca.crt
 
 Verify Postgres configuration points at the expected files:
 
-docker compose -f docker/dev-db/docker-compose.yml exec postgres grep -E "^ssl|ssl_cert|ssl_key|ssl_ca" /var/lib/postgresql/data/postgresql.conf
+docker compose -f docker/dev-db/compose.yaml exec postgres grep -E "^ssl|ssl_cert|ssl_key|ssl_ca" /var/lib/postgresql/data/postgresql.conf
 
 ### Backend container
 
 Verify mounted CA exists:
 
-docker compose -f docker/prod/docker-compose.yml exec backend ls -la /etc/ssl/certs/nommie-ca.crt
+docker compose -f docker/prod/compose.yaml exec backend ls -la /etc/ssl/certs/nommie-ca.crt
 
 Verify backend TLS env is set:
 
-docker compose -f docker/prod/docker-compose.yml exec backend env | grep POSTGRES_SSL
+docker compose -f docker/prod/compose.yaml exec backend env | grep POSTGRES_SSL
 
 ## Common Failures
 

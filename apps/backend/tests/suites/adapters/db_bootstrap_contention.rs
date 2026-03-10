@@ -29,7 +29,6 @@ async fn contention_burst_all_ok_and_single_migrator() {
         .unwrap_or_else(|_| vec![])
         .len();
 
-    // Determine the correct backend for database operations
     let backend = DatabaseBackend::Postgres;
 
     // Launch burst_n concurrent tasks, each calling bootstrap_db(env),

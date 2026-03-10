@@ -35,7 +35,7 @@
     "fe:test": "pnpm --filter @nommie/frontend test",
     "fe:test:watch": "pnpm --filter @nommie/frontend test:watch",
     "fe:test:cov": "pnpm --filter @nommie/frontend test:cov",
-    "db:svc:ready": "docker compose -f docker/dev-db/docker-compose.yml exec postgres pg_isready -U \"${POSTGRES_USER}\" -d \"${POSTGRES_DB}\""
+    "db:svc:ready": "docker compose -f docker/dev-db/compose.yaml exec postgres pg_isready -U \"${POSTGRES_USER}\" -d \"${POSTGRES_DB}\""
   },
   "devDependencies": {
     "baseline-browser-mapping": "^2.9.19",

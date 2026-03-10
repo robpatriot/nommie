@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TEST_DIR="${SCRIPT_DIR}/.test-ssl"
 CA_DIR="${TEST_DIR}/ca"
-COMPOSE_FILE="${ROOT_DIR}/docker/dev-db/docker-compose.yml"
+COMPOSE_FILE="${ROOT_DIR}/docker/dev-db/compose.yaml"
 POSTGRES_TLS_CA_CERT="${ROOT_DIR}/docker/postgres-tls/ca.crt"
 
 # Colors for output
@@ -261,7 +261,7 @@ start_container() {
     export NOMMIE_CA_CERT_PATH="${CA_DIR}/ca.crt"
     
     # Build and start with environment variables set
-    # SSL_RENEWAL_THRESHOLD_SECONDS is now in docker-compose.yml environment section
+    # SSL_RENEWAL_THRESHOLD_SECONDS is now in compose.yaml environment section
     # and will be passed to container if set in shell environment
     docker compose -f "${COMPOSE_FILE}" build postgres 2>&1 || return 1
     docker compose -f "${COMPOSE_FILE}" up -d postgres 2>&1 || return 1

@@ -50,10 +50,10 @@ The `dev-db` and `prod` docker-compose files are configured to automatically bui
 
 ```bash
 # For dev-db
-docker compose -f docker/dev-db/docker-compose.yml up --build
+docker compose -f docker/dev-db/compose.yaml up --build
 
 # For prod
-docker compose -f docker/prod/docker-compose.yml up --build
+docker compose -f docker/prod/compose.yaml up --build
 ```
 
 The compose files will automatically:
@@ -65,7 +65,7 @@ The compose files will automatically:
 ```bash
 export NOMMIE_CA_KEY_PATH=/custom/path/to/ca.key
 export NOMMIE_CA_CERT_PATH=/custom/path/to/ca.crt
-docker compose -f docker/dev-db/docker-compose.yml up --build
+docker compose -f docker/dev-db/compose.yaml up --build
 ```
 
 ### Option 2: Manual Build
@@ -93,7 +93,7 @@ docker build \
 
 ### dev-db
 
-The `dev-db/docker-compose.yml` uses the image directly:
+The `dev-db/compose.yaml` uses the image directly:
 
 ```yaml
 postgres:
@@ -107,7 +107,7 @@ On first container start:
 
 ### prod
 
-The `prod/docker-compose.yml` also uses the same image:
+The `prod/compose.yaml` also uses the same image:
 
 ```yaml
 postgres:
@@ -142,7 +142,7 @@ Backend containers have the CA cert baked into the image at `/etc/ssl/certs/nomm
 1. Rebuild the image with the same CA secrets (new server certs will be generated)
 2. Optionally delete old certs from the volume to force re-copy:
    ```bash
-   docker compose -f docker/dev-db/docker-compose.yml exec postgres rm -f /var/lib/postgresql/data/ssl/server.key /var/lib/postgresql/data/ssl/server.crt
+   docker compose -f docker/dev-db/compose.yaml exec postgres rm -f /var/lib/postgresql/data/ssl/server.key /var/lib/postgresql/data/ssl/server.crt
    ```
 3. Restart the container
 
@@ -152,7 +152,7 @@ Backend containers have the CA cert baked into the image at `/etc/ssl/certs/nomm
 openssl x509 -enddate -noout -in docker/postgres-tls/ca.crt
 
 # Check server cert (from inside container)
-docker compose -f docker/dev-db/docker-compose.yml exec postgres openssl x509 -enddate -noout -in /var/lib/postgresql/data/ssl/server.crt
+docker compose -f docker/dev-db/compose.yaml exec postgres openssl x509 -enddate -noout -in /var/lib/postgresql/data/ssl/server.crt
 ```
 
 ## Security Notes
@@ -169,7 +169,7 @@ docker compose -f docker/dev-db/docker-compose.yml exec postgres openssl x509 -e
 
 **Backend can't connect with TLS:**
 - Verify `POSTGRES_SSL_ROOT_CERT` points to the mounted CA cert path
-- Check that the CA cert is mounted in `docker-compose.yml`
+- Check that the CA cert is mounted in the compose file
 - Ensure `POSTGRES_SSL_MODE` is not set to `disable` (unless you want to disable TLS)
 
 **Postgres starts without SSL:**

@@ -34,7 +34,6 @@ Backend layering:
 ## Data and Infrastructure
 
 - PostgreSQL for production and normal development
-- SQLite for targeted testing modes
 
 Schema management:
 
