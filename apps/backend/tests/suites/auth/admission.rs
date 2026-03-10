@@ -18,30 +18,10 @@ use serde_json::json;
 
 use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
+use crate::support::auth::seed_admission_email;
 use crate::support::test_state_builder;
 
 const PROVIDER_GOOGLE: &str = "google";
-
-/// Insert an email into the admission table for testing. Idempotent - uses ON CONFLICT DO NOTHING.
-async fn seed_admission_email(conn: &sea_orm::DatabaseConnection, email: &str, is_admin: bool) {
-    use sea_orm::sea_query::OnConflict;
-
-    let now = time::OffsetDateTime::now_utc();
-    let model = allowed_emails::ActiveModel {
-        id: sea_orm::ActiveValue::NotSet,
-        email: sea_orm::ActiveValue::Set(email.to_string()),
-        is_admin: sea_orm::ActiveValue::Set(is_admin),
-        created_at: sea_orm::ActiveValue::Set(now),
-    };
-    let _ = allowed_emails::Entity::insert(model)
-        .on_conflict(
-            OnConflict::columns([allowed_emails::Column::Email])
-                .do_nothing()
-                .to_owned(),
-        )
-        .exec(conn)
-        .await;
-}
 
 #[actix_web::test]
 async fn test_admitted_first_time_login_creates_user_and_identity(
