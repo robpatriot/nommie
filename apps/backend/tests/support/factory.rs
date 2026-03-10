@@ -35,6 +35,37 @@ pub async fn seed_user_with_sub(
     Ok(user)
 }
 
+/// Seed a user with a specific sub and role for testing purposes.
+///
+/// # Arguments
+/// * `db` - Database connection
+/// * `sub` - External identifier for the user (e.g., "test-sub-123")
+/// * `_email` - Optional email for the user (currently unused)
+/// * `role` - User role (User or Admin)
+///
+/// # Returns
+/// The created user model
+pub async fn seed_user_with_sub_and_role(
+    db: &(impl ConnectionTrait + Send),
+    sub: &str,
+    _email: Option<&str>,
+    role: backend::entities::users::UserRole,
+) -> Result<User, sea_orm::DbErr> {
+    let now = OffsetDateTime::now_utc();
+
+    let user = backend::entities::users::ActiveModel {
+        id: NotSet, // Let database auto-generate
+        username: Set(Some(sub.to_string())),
+        is_ai: Set(false),
+        role: Set(role),
+        created_at: Set(now),
+        updated_at: Set(now),
+    };
+
+    let user = user.insert(db).await?;
+    Ok(user)
+}
+
 /// Create a test user with custom sub and username
 ///
 /// # Arguments
