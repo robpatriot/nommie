@@ -59,12 +59,17 @@ const nextAuthResult = NextAuth({
         const backendBase = getBackendBaseUrlOrThrow()
 
         try {
+          const body: { email: string; sub?: string } = { email: profile.email }
+          if (profile.sub && typeof profile.sub === 'string') {
+            body.sub = profile.sub
+          }
+
           const checkResponse = await fetch(
             `${backendBase}/api/auth/check-allowlist`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: profile.email }),
+              body: JSON.stringify(body),
             }
           )
 

@@ -4,7 +4,6 @@ use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::jwt::{mint_access_token, verify_access_token};
-use crate::db::require_db;
 use crate::db::txn::with_txn;
 use crate::error::AppError;
 use crate::errors::ErrorCode;
@@ -22,9 +21,13 @@ pub struct LoginResponse {
     pub token: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CheckAllowlistRequest {
     pub email: String,
+    /// Google OAuth `sub` (provider_user_id). When present, returning users are
+    /// recognized by identity even if email has changed.
+    #[serde(default)]
+    pub sub: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -128,11 +131,14 @@ async fn refresh(
 /// No authentication required - this is a public endpoint.
 ///
 /// Returns allowed=true if:
+/// - An existing identity is found by (provider, provider_user_id) when `sub` is provided, or
 /// - The email has an existing linked identity (repeat login), or
 /// - The email matches the admission table (first-time login).
 ///
-/// Existing users are always allowed regardless of the admission table.
+/// When `sub` is present, we check by provider_user_id first (aligned with ensure_user),
+/// so returning users with changed email are recognized.
 async fn check_allowlist(
+    http_req: HttpRequest,
     req: ValidatedJson<CheckAllowlistRequest>,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse, AppError> {
@@ -143,34 +149,56 @@ async fn check_allowlist(
         ));
     }
 
-    let db = require_db(app_state.as_ref())?;
     let email = crate::repos::allowed_emails::normalize(&req.email);
+    let admission_mode = app_state.config.admission_mode;
 
-    // Existing linked users bypass admission check
-    let existing = crate::repos::auth_identities::find_by_provider_email(&db, "google", &email)
-        .await
-        .map_err(AppError::from)?;
+    let result = with_txn(Some(&http_req), &app_state, |txn| {
+        let req = req.clone();
+        Box::pin(async move {
+            // When sub is provided, check by (provider, provider_user_id) first - same as ensure_user
+            if let Some(ref sub) = req.sub {
+                let sub_trimmed = sub.trim();
+                if !sub_trimmed.is_empty() {
+                    let existing = crate::repos::auth_identities::find_by_provider_user_id(
+                        txn,
+                        "google",
+                        sub_trimmed,
+                    )
+                    .await
+                    .map_err(AppError::from)?;
 
-    if existing.is_some() {
-        let response = CheckAllowlistResponse { allowed: true };
-        return Ok(HttpResponse::Ok().json(response));
-    }
+                    if existing.is_some() {
+                        return Ok(CheckAllowlistResponse { allowed: true });
+                    }
+                }
+            }
 
-    // First-time login: check admission (open mode admits all; restricted requires match)
-    let allowed = crate::repos::allowed_emails::is_email_admitted(
-        &db,
-        &email,
-        app_state.config.admission_mode,
-    )
-    .await
-    .map_err(AppError::from)?;
+            // Fall back to email-based check for returning users without sub or not found by sub
+            let existing =
+                crate::repos::auth_identities::find_by_provider_email(txn, "google", &email)
+                    .await
+                    .map_err(AppError::from)?;
 
-    if !allowed {
-        return Err(AppError::email_not_allowed());
-    }
+            if existing.is_some() {
+                return Ok(CheckAllowlistResponse { allowed: true });
+            }
 
-    let response = CheckAllowlistResponse { allowed: true };
-    Ok(HttpResponse::Ok().json(response))
+            // First-time login: check admission (open mode admits all; restricted requires match)
+            let allowed =
+                crate::repos::allowed_emails::is_email_admitted(txn, &email, admission_mode)
+                    .await
+                    .map_err(AppError::from)?;
+
+            if !allowed {
+                return Err(AppError::email_not_allowed());
+            }
+
+            Ok(CheckAllowlistResponse { allowed: true })
+        })
+    })
+    .await?;
+
+    Ok(HttpResponse::Ok().json(result))
 }
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
