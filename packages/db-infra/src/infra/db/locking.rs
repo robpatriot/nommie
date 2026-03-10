@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use sea_orm::{ConnectionTrait, DatabaseConnection};
 use tracing::warn;
 use xxhash_rust::xxh3::xxh3_64;
@@ -81,11 +80,6 @@ impl Guard {
     }
 }
 
-#[async_trait]
-pub trait BootstrapLock {
-    async fn try_acquire(&mut self) -> Result<Option<Guard>, DbInfraError>;
-}
-
 /// PostgreSQL advisory lock using admin pool
 pub struct PgAdvisoryLock {
     admin_pool: DatabaseConnection,
@@ -101,11 +95,8 @@ impl PgAdvisoryLock {
             lock_key,
         }
     }
-}
 
-#[async_trait]
-impl BootstrapLock for PgAdvisoryLock {
-    async fn try_acquire(&mut self) -> Result<Option<Guard>, DbInfraError> {
+    pub async fn try_acquire(&mut self) -> Result<Option<Guard>, DbInfraError> {
         use sea_orm::{DatabaseBackend, Statement};
 
         let lock_stmt = Statement::from_sql_and_values(

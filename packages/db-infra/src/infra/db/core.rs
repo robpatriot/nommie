@@ -12,7 +12,7 @@ use crate::config::db::{
 };
 use crate::error::DbInfraError;
 use crate::infra::db::diagnostics::migration_counters;
-use crate::infra::db::locking::{BootstrapLock, Guard, PgAdvisoryLock};
+use crate::infra::db::locking::{Guard, PgAdvisoryLock};
 
 fn get_db_path(env: RuntimeEnv) -> String {
     let spec = make_conn_spec(env, DbOwner::Owner)

@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use backend::config::db::RuntimeEnv;
-use backend::infra::db::locking::{BootstrapLock, PgAdvisoryLock};
+use backend::infra::db::locking::{Guard, PgAdvisoryLock};
 use db_infra::infra::db::build_admin_pool;
 use migration::{migrate, MigrationCommand};
 use tokio::sync::Barrier;
@@ -38,10 +38,8 @@ impl TestLock {
         (TestLock { lock }, admin_pool)
     }
 
-    async fn try_acquire(
-        &mut self,
-    ) -> Result<Option<backend::infra::db::locking::Guard>, backend::AppError> {
-        Ok(BootstrapLock::try_acquire(&mut self.lock).await?)
+    async fn try_acquire(&mut self) -> Result<Option<Guard>, backend::AppError> {
+        Ok(self.lock.try_acquire().await?)
     }
 }
 

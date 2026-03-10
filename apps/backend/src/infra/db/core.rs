@@ -5,7 +5,7 @@ use std::time::Duration;
 use db_infra::config::db::build_session_statements;
 use db_infra::error::DbInfraError;
 use db_infra::infra::db::diagnostics::{db_diagnostics, migration_counters};
-use db_infra::infra::db::locking::{BootstrapLock, PgAdvisoryLock};
+use db_infra::infra::db::locking::PgAdvisoryLock;
 use db_infra::sanitize_db_url;
 use migration::MigrationCommand;
 use rand::Rng;
