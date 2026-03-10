@@ -5,6 +5,7 @@ use unicode_normalization::UnicodeNormalization;
 
 use crate::adapters::allowed_emails_sea;
 use crate::errors::domain::DomainError;
+use crate::state::admission_mode::AdmissionMode;
 
 /// Normalize an email/pattern for consistent storage and lookup.
 /// Canonical path used by ALLOWED_EMAILS, ADMIN_EMAILS, allow matching, exact admin matching.
@@ -65,17 +66,25 @@ fn matches_pattern(email: &str, pattern: &str) -> bool {
 
 /// Check if an email is admitted for first-time login.
 ///
-/// - If the admission table is empty, all emails are admitted (open signup).
-/// - If the table has rows, the email must match at least one pattern.
+/// Admission mode is deployment config (from ALLOWED_EMAILS at startup), not inferred from DB.
+///
+/// - **Open**: Always admits; no admission table check.
+/// - **Restricted**: Email must match at least one pattern in the admission table.
+///   Empty table in restricted mode means no one is admitted.
 pub async fn is_email_admitted<C: ConnectionTrait + Send + Sync>(
     conn: &C,
     email: &str,
+    mode: AdmissionMode,
 ) -> Result<bool, DomainError> {
+    if mode == AdmissionMode::Open {
+        return Ok(true);
+    }
+
     let rules = allowed_emails_sea::list_all(conn)
         .await
         .map_err(crate::infra::db_errors::map_db_err)?;
     if rules.is_empty() {
-        return Ok(true);
+        return Ok(false);
     }
 
     let normalized = normalize(email);

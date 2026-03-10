@@ -49,6 +49,7 @@ mod tests {
     use super::*;
     use crate::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
     use crate::config::db::{DbKind, RuntimeEnv};
+    use crate::state::admission_mode::AdmissionMode;
     use crate::state::app_state::{AppConfig, Secret};
     use crate::state::security_config::SecurityConfig;
 
@@ -69,6 +70,7 @@ mod tests {
             redis_url: Secret(None),
             security: SecurityConfig::default(),
             google_verifier: test_google_verifier(),
+            admission_mode: AdmissionMode::Open,
         };
         let app_state = AppState::new_without_db(config, None);
 
@@ -99,6 +101,7 @@ mod tests {
             redis_url: Secret(None),
             security: SecurityConfig::default(),
             google_verifier: test_google_verifier(),
+            admission_mode: AdmissionMode::Open,
         };
         let app_state = AppState::new_without_db(config, None);
 

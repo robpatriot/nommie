@@ -58,6 +58,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
 
             let t1 = tokio::task::spawn_local(async move {
                 b1.wait().await;
+                let admission_mode = s1.config.admission_mode;
                 with_txn(None, s1.as_ref(), |txn| {
                     let email1 = email1.clone();
                     let sub1 = sub1.clone();
@@ -69,7 +70,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
                             name: Some("Race".to_string()),
                         };
                         let user = service
-                            .ensure_user(txn, &claims)
+                            .ensure_user(txn, &claims, admission_mode)
                             .await
                             .map_err(AppError::from)?;
                         Ok::<_, AppError>(user.id)
@@ -80,6 +81,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
 
             let t2 = tokio::task::spawn_local(async move {
                 b2.wait().await;
+                let admission_mode = s2.config.admission_mode;
                 let first = with_txn(None, s2.as_ref(), |txn| {
                     let email2 = email2.clone();
                     let sub2 = sub2.clone();
@@ -91,7 +93,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
                             name: Some("Race".to_string()),
                         };
                         let user = service
-                            .ensure_user(txn, &claims)
+                            .ensure_user(txn, &claims, admission_mode)
                             .await
                             .map_err(AppError::from)?;
                         Ok::<_, AppError>(user.id)
@@ -111,7 +113,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
                                     name: Some("Race".to_string()),
                                 };
                                 let user = service
-                                    .ensure_user(txn, &claims)
+                                    .ensure_user(txn, &claims, admission_mode)
                                     .await
                                     .map_err(AppError::from)?;
                                 Ok::<_, AppError>(user.id)

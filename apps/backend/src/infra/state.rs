@@ -18,10 +18,12 @@ pub struct StateBuilder {
     redis_url: Option<String>,
     readiness: Option<Arc<ReadinessManager>>,
     google_verifier: Option<std::sync::Arc<dyn crate::auth::google::GoogleIdTokenVerifier>>,
+    admission_mode: Option<AdmissionMode>,
 }
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use crate::state::admission_mode::AdmissionMode;
 use crate::state::app_state::{AppConfig, Secret};
 
 /// RAII guard to manage SingleFlight resolution flags
@@ -225,6 +227,12 @@ impl StateBuilder {
         self
     }
 
+    /// Override admission mode (for tests). If not set, derived from ALLOWED_EMAILS at build time.
+    pub fn with_admission_mode(mut self, mode: AdmissionMode) -> Self {
+        self.admission_mode = Some(mode);
+        self
+    }
+
     const REDIS_DISABLED_REASON_TEST: &'static str = "redis_url not configured in test env";
 
     pub async fn build(self) -> Result<AppState, AppError> {
@@ -243,6 +251,8 @@ impl StateBuilder {
             }))
         });
 
+        let admission_mode = self.admission_mode.unwrap_or_else(AdmissionMode::from_env);
+
         let (state, needs_resolution) = match (self.env, self.db_kind) {
             (Some(env), Some(db_kind)) => {
                 let config = AppConfig {
@@ -252,6 +262,7 @@ impl StateBuilder {
                     redis_url,
                     security: self.security_config,
                     google_verifier,
+                    admission_mode,
                 };
                 let state = AppState::new(config, None, None, readiness);
 
@@ -280,6 +291,7 @@ impl StateBuilder {
                     redis_url,
                     security: self.security_config,
                     google_verifier,
+                    admission_mode,
                 };
                 let state = AppState::new_without_db(config, Some(readiness));
                 (state, false)

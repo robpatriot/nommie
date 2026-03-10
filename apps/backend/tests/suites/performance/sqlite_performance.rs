@@ -23,6 +23,7 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
         .await?;
 
     let start = Instant::now();
+    let admission_mode = memory_state.config.admission_mode;
     with_txn(None, &memory_state, |txn| {
         Box::pin(async move {
             let service = UserService;
@@ -34,7 +35,7 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
                     email: email.clone(),
                     name: Some(format!("Memory User {}", i)),
                 };
-                let _user = service.ensure_user(txn, &claims).await?;
+                let _user = service.ensure_user(txn, &claims, admission_mode).await?;
             }
             Ok(())
         })
@@ -50,6 +51,7 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
         .await?;
 
     let start = Instant::now();
+    let admission_mode = file_state.config.admission_mode;
     with_txn(None, &file_state, |txn| {
         Box::pin(async move {
             let service = UserService;
@@ -61,7 +63,7 @@ async fn memory_vs_file_performance_sqlite() -> Result<(), Box<dyn std::error::E
                     email: email.clone(),
                     name: Some(format!("File User {}", i)),
                 };
-                let _user = service.ensure_user(txn, &claims).await?;
+                let _user = service.ensure_user(txn, &claims, admission_mode).await?;
             }
             Ok(())
         })

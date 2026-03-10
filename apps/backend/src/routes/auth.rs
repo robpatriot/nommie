@@ -55,12 +55,13 @@ async fn login(
         .inspect_err(|_| crate::logging::security::login_failed("invalid_id_token", None))?;
 
     let verified_email = claims.email.clone();
+    let admission_mode = app_state.config.admission_mode;
 
     let user = match with_txn(Some(&http_req), &app_state, |txn| {
         let c = claims.clone();
         Box::pin(async move {
             let service = UserService;
-            Ok(service.ensure_user(txn, &c).await?)
+            Ok(service.ensure_user(txn, &c, admission_mode).await?)
         })
     })
     .await
@@ -72,7 +73,7 @@ async fn login(
                 let c = claims.clone();
                 Box::pin(async move {
                     let service = UserService;
-                    Ok(service.ensure_user(txn, &c).await?)
+                    Ok(service.ensure_user(txn, &c, admission_mode).await?)
                 })
             })
             .await?
@@ -155,10 +156,14 @@ async fn check_allowlist(
         return Ok(HttpResponse::Ok().json(response));
     }
 
-    // First-time login: must be in admission table
-    let allowed = crate::repos::allowed_emails::is_email_admitted(&db, &email)
-        .await
-        .map_err(AppError::from)?;
+    // First-time login: check admission (open mode admits all; restricted requires match)
+    let allowed = crate::repos::allowed_emails::is_email_admitted(
+        &db,
+        &email,
+        app_state.config.admission_mode,
+    )
+    .await
+    .map_err(AppError::from)?;
 
     if !allowed {
         return Err(AppError::email_not_allowed());

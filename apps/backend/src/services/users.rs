@@ -10,6 +10,7 @@ use crate::repos::users::{self as users_repo, User};
 use crate::repos::{
     allowed_emails, auth_identities as auth_identities_repo, user_options as user_options_repo,
 };
+use crate::state::admission_mode::AdmissionMode;
 
 const PROVIDER_GOOGLE: &str = "google";
 
@@ -112,6 +113,7 @@ impl UserService {
         &self,
         txn: &DatabaseTransaction,
         claims: &VerifiedGoogleClaims,
+        admission_mode: AdmissionMode,
     ) -> Result<User, DomainError> {
         let provider_user_id = &claims.sub;
         let email = &claims.email;
@@ -150,7 +152,7 @@ impl UserService {
         }
 
         // New user - check admission table before creating
-        if !allowed_emails::is_email_admitted(txn, &clean_email).await? {
+        if !allowed_emails::is_email_admitted(txn, &clean_email, admission_mode).await? {
             return Err(DomainError::validation(
                 ValidationKind::EmailNotAllowed,
                 "Access restricted. Please contact support if you believe this is an error."

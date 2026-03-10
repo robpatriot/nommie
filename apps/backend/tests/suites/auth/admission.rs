@@ -11,6 +11,7 @@ use backend::db::require_db;
 use backend::db::txn::with_txn;
 use backend::entities::allowed_emails;
 use backend::prelude::SharedTxn;
+use backend::state::admission_mode::AdmissionMode;
 use backend::state::security_config::SecurityConfig;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
@@ -39,6 +40,7 @@ async fn test_admitted_first_time_login_creates_user_and_identity(
     let state = test_state_builder()?
         .with_security(security_config.clone())
         .with_google_verifier(mock_verifier)
+        .with_admission_mode(AdmissionMode::Open)
         .build()
         .await?;
 
@@ -92,6 +94,7 @@ async fn test_non_admitted_first_time_login_denied() -> Result<(), Box<dyn std::
             "test_secret_key_for_testing_purposes_only".as_bytes(),
         ))
         .with_google_verifier(mock_verifier)
+        .with_admission_mode(AdmissionMode::Restricted)
         .build()
         .await?;
 
@@ -247,6 +250,7 @@ async fn test_repeated_first_login_no_duplicate_users() -> Result<(), Box<dyn st
             "test_secret_key_for_testing_purposes_only".as_bytes(),
         ))
         .with_google_verifier(mock_verifier)
+        .with_admission_mode(AdmissionMode::Open)
         .build()
         .await?;
 
@@ -291,11 +295,11 @@ async fn test_repeated_first_login_no_duplicate_users() -> Result<(), Box<dyn st
 #[actix_web::test]
 async fn test_admission_seed_admin_from_env_wildcard_ignored(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let state = test_state_builder()?.build().await?;
-    let db = require_db(&state).expect("DB required");
-
     env::set_var("ALLOWED_EMAILS", "*@example.test");
     env::set_var("ADMIN_EMAILS", "*@example.test");
+
+    let state = test_state_builder()?.build().await?;
+    let db = require_db(&state).expect("DB required");
 
     let shared = SharedTxn::open(&db).await?;
     let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction()).await?;
@@ -321,37 +325,36 @@ async fn test_admission_seed_admin_from_env_wildcard_ignored(
 async fn test_admission_seed_admin_from_env_exact_marks_or_creates(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let exact = unique_email("admin-exact");
-    let state = test_state_builder()?.build().await?;
-    let db = require_db(&state).expect("DB required");
-
     env::set_var("ALLOWED_EMAILS", &exact);
     env::set_var("ADMIN_EMAILS", &exact);
 
-    let shared = SharedTxn::open(&db).await?;
-    let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction()).await?;
-    let _ = backend::repos::allowed_emails::seed_admin_from_env(shared.transaction()).await?;
+    let state = test_state_builder()?.build().await?;
+    let db = require_db(&state).expect("DB required");
 
     let rows = allowed_emails::Entity::find()
         .filter(allowed_emails::Column::Email.eq(exact.to_lowercase()))
-        .all(shared.transaction())
+        .all(&db)
         .await?;
-    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows.len(),
+        1,
+        "bootstrap should seed exact email from ALLOWED_EMAILS"
+    );
     assert!(rows[0].is_admin, "exact admin email must be marked admin");
 
     env::remove_var("ALLOWED_EMAILS");
     env::remove_var("ADMIN_EMAILS");
-    shared.rollback().await?;
     Ok(())
 }
 
 #[actix_web::test]
 async fn test_admission_seed_admin_idempotent() -> Result<(), Box<dyn std::error::Error>> {
     let exact = unique_email("admin-idem");
-    let state = test_state_builder()?.build().await?;
-    let db = require_db(&state).expect("DB required");
-
     env::set_var("ALLOWED_EMAILS", &exact);
     env::set_var("ADMIN_EMAILS", &exact);
+
+    let state = test_state_builder()?.build().await?;
+    let db = require_db(&state).expect("DB required");
 
     let shared = SharedTxn::open(&db).await?;
     let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction()).await?;
@@ -371,13 +374,151 @@ async fn test_admission_seed_admin_idempotent() -> Result<(), Box<dyn std::error
 }
 
 #[actix_web::test]
+async fn test_open_mode_allows_first_time_login_even_with_admin_rows(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let test_email = unique_email("open-mode-user");
+    let test_google_sub = unique_str("google");
+    let mock_verifier = Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+        sub: test_google_sub.clone(),
+        email: test_email.clone(),
+        name: Some("Open Mode User".to_string()),
+    }));
+
+    let state = test_state_builder()?
+        .with_security(SecurityConfig::new(
+            "test_secret_key_for_testing_purposes_only".as_bytes(),
+        ))
+        .with_google_verifier(mock_verifier)
+        .with_admission_mode(AdmissionMode::Open)
+        .build()
+        .await?;
+
+    let db = require_db(&state).expect("DB required");
+    allowed_emails::Entity::delete_many().exec(&db).await?;
+    seed_admission_email(&db, "admin@example.com", true).await;
+
+    let app = create_test_app(state).with_prod_routes().build().await?;
+
+    let login_data = json!({ "id_token": "test-token" });
+    let req = test::TestRequest::post()
+        .uri("/api/auth/login")
+        .set_json(login_data)
+        .to_request();
+
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "open mode should allow first-time login even when only admin rows exist"
+    );
+
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_restricted_mode_requires_admission_match() -> Result<(), Box<dyn std::error::Error>> {
+    let test_email = unique_email("restricted-denied");
+    let test_google_sub = unique_str("google");
+    let mock_verifier = Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+        sub: test_google_sub,
+        email: test_email.clone(),
+        name: None,
+    }));
+
+    let state = test_state_builder()?
+        .with_security(SecurityConfig::new(
+            "test_secret_key_for_testing_purposes_only".as_bytes(),
+        ))
+        .with_google_verifier(mock_verifier)
+        .with_admission_mode(AdmissionMode::Restricted)
+        .build()
+        .await?;
+
+    let db = require_db(&state).expect("DB required");
+    allowed_emails::Entity::delete_many().exec(&db).await?;
+    seed_admission_email(&db, "other@example.com", false).await;
+
+    let shared = SharedTxn::open(&db).await?;
+    let app = create_test_app(state).with_prod_routes().build().await?;
+
+    let login_data = json!({ "id_token": "test-token" });
+    let req = test::TestRequest::post()
+        .uri("/api/auth/login")
+        .set_json(login_data)
+        .to_request();
+    req.extensions_mut().insert(shared.clone());
+
+    let resp = test::call_service(&app, req).await;
+    assert_problem_details_structure(
+        resp,
+        403,
+        "EMAIL_NOT_ALLOWED",
+        "Access restricted. Please contact support if you believe this is an error.",
+    )
+    .await;
+
+    shared.rollback().await?;
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_admin_only_seeded_rows_do_not_flip_open_to_restricted(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let test_email = unique_email("admin-only-open");
+    let test_google_sub = unique_str("google");
+    let mock_verifier = Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
+        sub: test_google_sub,
+        email: test_email.clone(),
+        name: None,
+    }));
+
+    env::remove_var("ALLOWED_EMAILS");
+    env::set_var("ADMIN_EMAILS", "admin@example.com");
+
+    let state = test_state_builder()?
+        .with_security(SecurityConfig::new(
+            "test_secret_key_for_testing_purposes_only".as_bytes(),
+        ))
+        .with_google_verifier(mock_verifier)
+        .with_admission_mode(AdmissionMode::Open)
+        .build()
+        .await?;
+
+    backend::db::txn::with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let _ = backend::repos::allowed_emails::seed_admin_from_env(txn)
+                .await
+                .map_err(backend::AppError::from)?;
+            Ok::<_, backend::AppError>(())
+        })
+    })
+    .await?;
+
+    let app = create_test_app(state).with_prod_routes().build().await?;
+
+    let login_data = json!({ "id_token": "test-token" });
+    let req = test::TestRequest::post()
+        .uri("/api/auth/login")
+        .set_json(login_data)
+        .to_request();
+
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "open mode with admin-only rows should still allow any email (admission from config, not table)"
+    );
+
+    env::remove_var("ADMIN_EMAILS");
+    Ok(())
+}
+
+#[actix_web::test]
 async fn test_admission_seed_normalization_case_admin() -> Result<(), Box<dyn std::error::Error>> {
     let base = unique_email("norm-admin");
-    let state = test_state_builder()?.build().await?;
-    let db = require_db(&state).expect("DB required");
-
     env::set_var("ALLOWED_EMAILS", &base);
     env::set_var("ADMIN_EMAILS", base.to_uppercase());
+
+    let state = test_state_builder()?.build().await?;
+    let db = require_db(&state).expect("DB required");
 
     let shared = SharedTxn::open(&db).await?;
     let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction()).await?;

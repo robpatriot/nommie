@@ -234,7 +234,12 @@ async fn ensure_ai_profiles_with_lock(
     Ok(())
 }
 
-/// Seed admission table from ALLOWED_EMAILS, then augment from ADMIN_EMAILS. Additive and idempotent.
+/// Seed admission table from ALLOWED_EMAILS and ADMIN_EMAILS. Additive and idempotent.
+///
+/// - seed_from_env: only when ALLOWED_EMAILS is set (adds admission patterns).
+/// - seed_admin_from_env: when ADMIN_EMAILS is set (adds/updates admin role flags).
+///
+/// Admin rows do not affect admission mode; admission mode is deployment config from ALLOWED_EMAILS.
 async fn seed_admission_from_env(pool: &DatabaseConnection) -> Result<(), AppError> {
     use sea_orm::TransactionTrait;
 
@@ -249,13 +254,19 @@ async fn seed_admission_from_env(pool: &DatabaseConnection) -> Result<(), AppErr
         .await
         .map_err(|e| AppError::config("failed to begin transaction for admission seed", e))?;
 
-    let inserted = crate::repos::allowed_emails::seed_from_env(&txn)
-        .await
-        .map_err(AppError::from)?;
+    let mut inserted = 0;
+    if !patterns.is_empty() {
+        inserted = crate::repos::allowed_emails::seed_from_env(&txn)
+            .await
+            .map_err(AppError::from)?;
+    }
 
-    let admin_count = crate::repos::allowed_emails::seed_admin_from_env(&txn)
-        .await
-        .map_err(AppError::from)?;
+    let mut admin_count = 0;
+    if !admin_emails.is_empty() {
+        admin_count = crate::repos::allowed_emails::seed_admin_from_env(&txn)
+            .await
+            .map_err(AppError::from)?;
+    }
 
     txn.commit()
         .await

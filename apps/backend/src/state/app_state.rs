@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock};
 use sea_orm::DatabaseConnection;
 use tracing::info;
 
+use super::admission_mode::AdmissionMode;
 use super::security_config::SecurityConfig;
 use crate::auth::google::GoogleVerifier;
 use crate::config::db::{DbKind, RuntimeEnv};
@@ -31,6 +32,8 @@ pub struct AppConfig {
     pub redis_url: Secret<Option<String>>,
     pub security: SecurityConfig,
     pub google_verifier: GoogleVerifier,
+    /// Admission mode for first-time signup. Sourced from ALLOWED_EMAILS at startup.
+    pub admission_mode: AdmissionMode,
 }
 
 /// Application state containing shared resources
