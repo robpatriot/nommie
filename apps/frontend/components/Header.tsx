@@ -27,6 +27,7 @@ function getInitials(email?: string | null) {
   return parts[0].slice(0, 2).toUpperCase()
 }
 
+import type { MeResponse } from '@/lib/api/user-me'
 import ResumeGameButton from './ResumeGameButton'
 import {
   signInWithGoogleAction,
@@ -38,9 +39,10 @@ import { renderNavigationPool } from '@/lib/queries/lw-cache'
 
 type HeaderProps = {
   session: { user?: { email?: string | null } } | null
+  me?: MeResponse | null
 }
 
-export default function Header({ session }: HeaderProps) {
+export default function Header({ session, me = null }: HeaderProps) {
   const t = useTranslations('nav')
   const pathname = usePathname()
   const { crumbs } = useHeaderBreadcrumbs()
@@ -235,7 +237,11 @@ export default function Header({ session }: HeaderProps) {
                 <button
                   type="button"
                   onClick={() => setIsUserMenuOpen((open) => !open)}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-card text-sm font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm font-semibold uppercase tracking-wide text-muted-foreground transition hover:border-primary/50 hover:text-foreground ${
+                    me?.role === 'admin'
+                      ? 'border-amber-400/80 bg-card shadow-[0_0_0_1px_rgba(251,191,36,0.5)]'
+                      : 'border-border/60 bg-card'
+                  }`}
                   aria-haspopup="true"
                   aria-expanded={isUserMenuOpen}
                   aria-label={t('account.menuAria')}

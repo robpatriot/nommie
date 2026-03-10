@@ -143,6 +143,7 @@ async fn main() -> std::io::Result<()> {
                     .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(api_limiter.clone())
                     .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .configure(backend::routes::user::configure_routes)
                     .configure(backend::routes::user_options::configure_routes),
             )
             // More specific /api/* scopes must be registered before the generic /api scope

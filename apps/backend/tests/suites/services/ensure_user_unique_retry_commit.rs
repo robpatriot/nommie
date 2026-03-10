@@ -29,6 +29,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
     let model = allowed_emails::ActiveModel {
         id: ActiveValue::NotSet,
         email: ActiveValue::Set(email.to_lowercase()),
+        is_admin: ActiveValue::Set(false),
         created_at: ActiveValue::Set(now),
     };
     allowed_emails::Entity::insert(model)
@@ -79,7 +80,7 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
 
             let t2 = tokio::task::spawn_local(async move {
                 b2.wait().await;
-                with_txn(None, s2.as_ref(), |txn| {
+                let first = with_txn(None, s2.as_ref(), |txn| {
                     let email2 = email2.clone();
                     let sub2 = sub2.clone();
                     Box::pin(async move {
@@ -96,7 +97,30 @@ async fn ensure_user_concurrent_calls_same_email_succeed_and_no_orphans() -> Res
                         Ok::<_, AppError>(user.id)
                     })
                 })
-                .await
+                .await;
+                match first {
+                    Ok(id) => Ok(id),
+                    Err(e) if e.code() == backend::ErrorCode::UniqueEmail => {
+                        // Retry with fresh transaction (winner will have committed)
+                        with_txn(None, s2.as_ref(), |txn| {
+                            Box::pin(async move {
+                                let service = UserService;
+                                let claims = VerifiedGoogleClaims {
+                                    sub: sub2,
+                                    email: email2,
+                                    name: Some("Race".to_string()),
+                                };
+                                let user = service
+                                    .ensure_user(txn, &claims)
+                                    .await
+                                    .map_err(AppError::from)?;
+                                Ok::<_, AppError>(user.id)
+                            })
+                        })
+                        .await
+                    }
+                    Err(e) => Err(e),
+                }
             });
 
             let a = t1.await.map_err(|e| {

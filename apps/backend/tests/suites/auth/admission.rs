@@ -23,13 +23,14 @@ use crate::support::test_state_builder;
 const PROVIDER_GOOGLE: &str = "google";
 
 /// Insert an email into the admission table for testing. Idempotent - uses ON CONFLICT DO NOTHING.
-async fn seed_admission_email(conn: &sea_orm::DatabaseConnection, email: &str) {
+async fn seed_admission_email(conn: &sea_orm::DatabaseConnection, email: &str, is_admin: bool) {
     use sea_orm::sea_query::OnConflict;
 
     let now = time::OffsetDateTime::now_utc();
     let model = allowed_emails::ActiveModel {
         id: sea_orm::ActiveValue::NotSet,
         email: sea_orm::ActiveValue::Set(email.to_string()),
+        is_admin: sea_orm::ActiveValue::Set(is_admin),
         created_at: sea_orm::ActiveValue::Set(now),
     };
     let _ = allowed_emails::Entity::insert(model)
@@ -62,7 +63,7 @@ async fn test_admitted_first_time_login_creates_user_and_identity(
         .await?;
 
     let db = require_db(&state).expect("DB required");
-    seed_admission_email(&db, &test_email.to_lowercase()).await;
+    seed_admission_email(&db, &test_email.to_lowercase(), false).await;
 
     let shared = SharedTxn::open(&db).await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
@@ -118,7 +119,7 @@ async fn test_non_admitted_first_time_login_denied() -> Result<(), Box<dyn std::
     let other_email = backend_test_support::unique_helpers::unique_email("other");
     // Clear table so bootstrap ALLOWED_EMAILS cannot admit test_email; insert only other_email
     allowed_emails::Entity::delete_many().exec(&db).await?;
-    seed_admission_email(&db, &other_email).await;
+    seed_admission_email(&db, &other_email, false).await;
 
     let shared = SharedTxn::open(&db).await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
@@ -166,9 +167,14 @@ async fn test_existing_linked_user_logs_in_without_admission_check(
     let shared = SharedTxn::open(&db).await?;
     let txn = shared.transaction();
 
-    let user = backend::repos::users::create_user(txn, "user", false)
-        .await
-        .map_err(backend::AppError::from)?;
+    let user = backend::repos::users::create_user(
+        txn,
+        "user",
+        false,
+        backend::entities::users::UserRole::User,
+    )
+    .await
+    .map_err(backend::AppError::from)?;
     backend::repos::auth_identities::create_identity(
         txn,
         user.id,
@@ -199,21 +205,28 @@ async fn test_existing_linked_user_logs_in_without_admission_check(
 
 #[actix_web::test]
 async fn test_bootstrap_seeding_inserts_missing_rows() -> Result<(), Box<dyn std::error::Error>> {
-    env::set_var(
-        "ALLOWED_EMAILS",
-        "bootstrap1@example.com,bootstrap2@example.com",
-    );
+    let e1 = unique_email("bootstrap1");
+    let e2 = unique_email("bootstrap2");
+    env::set_var("ALLOWED_EMAILS", format!("{e1},{e2}"));
 
     let state = test_state_builder()?.build().await?;
     let db = require_db(&state).expect("DB required");
 
-    let count = allowed_emails::Entity::find().count(&db).await?;
+    let shared = SharedTxn::open(&db).await?;
+    let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction())
+        .await
+        .map_err(backend::AppError::from)?;
+
+    let count = allowed_emails::Entity::find()
+        .count(shared.transaction())
+        .await?;
     assert!(
         count >= 2,
-        "bootstrap should have seeded at least 2 rows from ALLOWED_EMAILS"
+        "seed_from_env with 2 emails in ALLOWED_EMAILS should produce at least 2 rows (bootstrap or our seed)"
     );
 
     env::remove_var("ALLOWED_EMAILS");
+    shared.rollback().await?;
     Ok(())
 }
 
@@ -258,7 +271,7 @@ async fn test_repeated_first_login_no_duplicate_users() -> Result<(), Box<dyn st
         .await?;
 
     let db = require_db(&state).expect("DB required");
-    seed_admission_email(&db, &test_email.to_lowercase()).await;
+    seed_admission_email(&db, &test_email.to_lowercase(), false).await;
 
     let shared = SharedTxn::open(&db).await?;
     let app = create_test_app(state).with_prod_routes().build().await?;
@@ -292,5 +305,126 @@ async fn test_repeated_first_login_no_duplicate_users() -> Result<(), Box<dyn st
         "should have exactly one identity despite repeated logins"
     );
 
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_admission_seed_admin_from_env_wildcard_ignored(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let state = test_state_builder()?.build().await?;
+    let db = require_db(&state).expect("DB required");
+
+    env::set_var("ALLOWED_EMAILS", "*@example.test");
+    env::set_var("ADMIN_EMAILS", "*@example.test");
+
+    let shared = SharedTxn::open(&db).await?;
+    let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction()).await?;
+    let _ = backend::repos::allowed_emails::seed_admin_from_env(shared.transaction()).await?;
+
+    let rows = allowed_emails::Entity::find()
+        .filter(allowed_emails::Column::Email.eq("*@example.test"))
+        .all(shared.transaction())
+        .await?;
+    assert_eq!(rows.len(), 1);
+    assert!(
+        !rows[0].is_admin,
+        "wildcard in ADMIN_EMAILS must not be marked admin"
+    );
+
+    env::remove_var("ALLOWED_EMAILS");
+    env::remove_var("ADMIN_EMAILS");
+    shared.rollback().await?;
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_admission_seed_admin_from_env_exact_marks_or_creates(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let exact = unique_email("admin-exact");
+    let state = test_state_builder()?.build().await?;
+    let db = require_db(&state).expect("DB required");
+
+    env::set_var("ALLOWED_EMAILS", &exact);
+    env::set_var("ADMIN_EMAILS", &exact);
+
+    let shared = SharedTxn::open(&db).await?;
+    let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction()).await?;
+    let _ = backend::repos::allowed_emails::seed_admin_from_env(shared.transaction()).await?;
+
+    let rows = allowed_emails::Entity::find()
+        .filter(allowed_emails::Column::Email.eq(exact.to_lowercase()))
+        .all(shared.transaction())
+        .await?;
+    assert_eq!(rows.len(), 1);
+    assert!(rows[0].is_admin, "exact admin email must be marked admin");
+
+    env::remove_var("ALLOWED_EMAILS");
+    env::remove_var("ADMIN_EMAILS");
+    shared.rollback().await?;
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_admission_seed_admin_idempotent() -> Result<(), Box<dyn std::error::Error>> {
+    let exact = unique_email("admin-idem");
+    let state = test_state_builder()?.build().await?;
+    let db = require_db(&state).expect("DB required");
+
+    env::set_var("ALLOWED_EMAILS", &exact);
+    env::set_var("ADMIN_EMAILS", &exact);
+
+    let shared = SharedTxn::open(&db).await?;
+    let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction()).await?;
+    let _ = backend::repos::allowed_emails::seed_admin_from_env(shared.transaction()).await?;
+    let _ = backend::repos::allowed_emails::seed_admin_from_env(shared.transaction()).await?;
+
+    let count = allowed_emails::Entity::find()
+        .filter(allowed_emails::Column::Email.eq(exact.to_lowercase()))
+        .count(shared.transaction())
+        .await?;
+    assert_eq!(count, 1, "repeated seed must not create duplicate rows");
+
+    env::remove_var("ALLOWED_EMAILS");
+    env::remove_var("ADMIN_EMAILS");
+    shared.rollback().await?;
+    Ok(())
+}
+
+#[actix_web::test]
+async fn test_admission_seed_normalization_case_admin() -> Result<(), Box<dyn std::error::Error>> {
+    let base = unique_email("norm-admin");
+    let state = test_state_builder()?.build().await?;
+    let db = require_db(&state).expect("DB required");
+
+    env::set_var("ALLOWED_EMAILS", &base);
+    env::set_var("ADMIN_EMAILS", base.to_uppercase());
+
+    let shared = SharedTxn::open(&db).await?;
+    let _ = backend::repos::allowed_emails::seed_from_env(shared.transaction()).await?;
+    let _ = backend::repos::allowed_emails::seed_admin_from_env(shared.transaction()).await?;
+
+    let normalized = base.to_lowercase();
+    let count = allowed_emails::Entity::find()
+        .filter(allowed_emails::Column::Email.eq(&normalized))
+        .count(shared.transaction())
+        .await?;
+    assert_eq!(
+        count, 1,
+        "different casing must produce single normalized row"
+    );
+
+    let row = allowed_emails::Entity::find()
+        .filter(allowed_emails::Column::Email.eq(&normalized))
+        .one(shared.transaction())
+        .await?
+        .expect("row must exist");
+    assert!(
+        row.is_admin,
+        "admin from ADMIN_EMAILS with different casing must be marked admin"
+    );
+
+    env::remove_var("ALLOWED_EMAILS");
+    env::remove_var("ADMIN_EMAILS");
+    shared.rollback().await?;
     Ok(())
 }

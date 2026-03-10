@@ -39,7 +39,13 @@ async fn test_create_and_find_identity_roundtrip() -> Result<(), AppError> {
             let email = unique_email("roundtrip");
             let provider_user_id = unique_str("google-sub");
 
-            let user = users::create_user(txn, "TestUser", false).await?;
+            let user = users::create_user(
+                txn,
+                "TestUser",
+                false,
+                backend::entities::users::UserRole::User,
+            )
+            .await?;
             let created = auth_identities::create_identity(
                 txn,
                 user.id,
@@ -79,7 +85,13 @@ async fn test_create_identity_duplicate_provider_user_id() -> Result<(), AppErro
             let email2 = unique_email("user2");
             let provider_user_id = unique_str("duplicate-google-sub");
 
-            let user1 = users::create_user(txn, "User1", false).await?;
+            let user1 = users::create_user(
+                txn,
+                "User1",
+                false,
+                backend::entities::users::UserRole::User,
+            )
+            .await?;
             auth_identities::create_identity(
                 txn,
                 user1.id,
@@ -89,7 +101,13 @@ async fn test_create_identity_duplicate_provider_user_id() -> Result<(), AppErro
             )
             .await?;
 
-            let user2 = users::create_user(txn, "User2", false).await?;
+            let user2 = users::create_user(
+                txn,
+                "User2",
+                false,
+                backend::entities::users::UserRole::User,
+            )
+            .await?;
             let result = auth_identities::create_identity(
                 txn,
                 user2.id,
@@ -125,10 +143,22 @@ async fn test_create_identity_duplicate_provider_email() -> Result<(), AppError>
             let sub1 = unique_str("sub1");
             let sub2 = unique_str("sub2");
 
-            let user1 = users::create_user(txn, "User1", false).await?;
+            let user1 = users::create_user(
+                txn,
+                "User1",
+                false,
+                backend::entities::users::UserRole::User,
+            )
+            .await?;
             auth_identities::create_identity(txn, user1.id, PROVIDER_GOOGLE, &sub1, &email).await?;
 
-            let user2 = users::create_user(txn, "User2", false).await?;
+            let user2 = users::create_user(
+                txn,
+                "User2",
+                false,
+                backend::entities::users::UserRole::User,
+            )
+            .await?;
             let result =
                 auth_identities::create_identity(txn, user2.id, PROVIDER_GOOGLE, &sub2, &email)
                     .await;
@@ -157,7 +187,13 @@ async fn test_update_identity_idempotent() -> Result<(), AppError> {
             let email = unique_email("update");
             let provider_user_id = unique_str("google-sub");
 
-            let user = users::create_user(txn, "UpdateUser", false).await?;
+            let user = users::create_user(
+                txn,
+                "UpdateUser",
+                false,
+                backend::entities::users::UserRole::User,
+            )
+            .await?;
             let identity = auth_identities::create_identity(
                 txn,
                 user.id,

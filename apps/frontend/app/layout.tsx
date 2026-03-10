@@ -27,6 +27,7 @@ import { AppQueryClientProvider } from '@/lib/providers/query-client-provider'
 import { LOCALE_COOKIE_NAME, resolveLocale } from '@/i18n/locale'
 import { loadMessages } from '@/i18n/messages'
 import { getUserOptions } from '@/lib/api/user-options'
+import { getMe } from '@/lib/api/user-me'
 import { isBackendKnownDown } from '@/lib/server/backend-status'
 import { BACKEND_JWT_COOKIE_NAME } from '@/lib/auth/backend-jwt-cookie'
 import { WebSocketProvider } from '@/lib/providers/web-socket-provider'
@@ -129,6 +130,8 @@ export default async function RootLayout({
   let initialColourScheme: ColourScheme = 'system'
   let initialThemeName: ThemeName = 'standard'
 
+  let me: Awaited<ReturnType<typeof getMe>> = null
+
   // Backend is authoritative for logged-in users
   if (session && backendJwt) {
     try {
@@ -137,6 +140,13 @@ export default async function RootLayout({
       initialColourScheme = options.colour_scheme
     } catch {
       // Fall back to defaults on error
+    }
+    try {
+      me = await getMe()
+    } catch {
+      // 401 is normal unauthenticated; other errors are handled by getMe (re-thrown)
+      // If we get here, we're swallowing unexpected errors - treat as unauthenticated
+      me = null
     }
   }
 
@@ -196,7 +206,7 @@ export default async function RootLayout({
                     <HeaderBreadcrumbProvider>
                       <div className="tabletop-content">
                         <Suspense fallback={null}>
-                          <Header session={session} />
+                          <Header session={session} me={me} />
                         </Suspense>
 
                         {children}

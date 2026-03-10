@@ -3,6 +3,7 @@
 use sea_orm::{ConnectionTrait, DatabaseTransaction};
 
 use crate::adapters::users_sea as users_adapter;
+use crate::entities::users::UserRole;
 use crate::errors::domain::DomainError;
 
 /// User domain model
@@ -11,6 +12,7 @@ pub struct User {
     pub id: i64,
     pub username: Option<String>,
     pub is_ai: bool,
+    pub role: UserRole,
     pub created_at: time::OffsetDateTime,
     pub updated_at: time::OffsetDateTime,
 }
@@ -19,8 +21,9 @@ pub async fn create_user(
     txn: &DatabaseTransaction,
     username: &str,
     is_ai: bool,
+    role: UserRole,
 ) -> Result<User, DomainError> {
-    let dto = users_adapter::UserCreate::new(username, is_ai);
+    let dto = users_adapter::UserCreate::new(username, is_ai, role);
     let user = users_adapter::create_user(txn, dto).await?;
     Ok(User::from(user))
 }
@@ -44,6 +47,7 @@ impl From<crate::entities::users::Model> for User {
             id: model.id,
             username: model.username,
             is_ai: model.is_ai,
+            role: model.role,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }

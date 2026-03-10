@@ -9,29 +9,15 @@ use backend::auth::google::{MockGoogleVerifier, VerifiedGoogleClaims};
 use backend::auth::jwt::verify_access_token;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::entities::allowed_emails;
 use backend::infra::state::build_state;
 use backend::state::security_config::SecurityConfig;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
-use sea_orm::{ActiveValue, EntityTrait};
 use serde_json::json;
 
 use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
+use crate::support::auth::seed_admission_email;
 use crate::support::test_state_builder;
-
-async fn seed_admission_email(conn: &sea_orm::DatabaseConnection, email: &str) {
-    let now = time::OffsetDateTime::now_utc();
-    let model = allowed_emails::ActiveModel {
-        id: ActiveValue::NotSet,
-        email: ActiveValue::Set(email.to_string()),
-        created_at: ActiveValue::Set(now),
-    };
-    allowed_emails::Entity::insert(model)
-        .exec(conn)
-        .await
-        .expect("seed admission email");
-}
 
 // ============================================================================
 // Happy Path Tests
@@ -56,7 +42,7 @@ async fn test_login_creates_and_reuses_user() -> Result<(), Box<dyn std::error::
         .await?;
 
     let db = require_db(&state).expect("DB required for this test");
-    seed_admission_email(&db, &test_email.to_lowercase()).await;
+    seed_admission_email(&db, &test_email.to_lowercase(), false).await;
     let shared = SharedTxn::open(&db).await?;
 
     let app = create_test_app(state).with_prod_routes().build().await?;
@@ -209,7 +195,7 @@ async fn test_refresh_returns_new_jwt() -> Result<(), Box<dyn std::error::Error>
         .await?;
 
     let db = require_db(&state).expect("DB required");
-    seed_admission_email(&db, &test_email.to_lowercase()).await;
+    seed_admission_email(&db, &test_email.to_lowercase(), false).await;
     let shared = SharedTxn::open(&db).await?;
 
     let app = create_test_app(state).with_prod_routes().build().await?;

@@ -51,11 +51,12 @@ pub fn mint_expired_token(sub: &str, email: &str, sec: &SecurityConfig) -> Strin
 }
 
 /// Insert an email into the admission table for testing. Idempotent (ON CONFLICT DO NOTHING).
-pub async fn seed_admission_email(conn: &sea_orm::DatabaseConnection, email: &str) {
+pub async fn seed_admission_email(conn: &sea_orm::DatabaseConnection, email: &str, is_admin: bool) {
     let now = time::OffsetDateTime::now_utc();
     let model = allowed_emails::ActiveModel {
         id: ActiveValue::NotSet,
         email: ActiveValue::Set(email.to_string()),
+        is_admin: ActiveValue::Set(is_admin),
         created_at: ActiveValue::Set(now),
     };
     let _ = allowed_emails::Entity::insert(model)

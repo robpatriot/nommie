@@ -137,7 +137,7 @@ async fn test_valid_json_happy_path_unchanged() -> Result<(), Box<dyn std::error
         .await?;
 
     let db = require_db(&state).expect("DB required for this test");
-    seed_admission_email(&db, &test_email.to_lowercase()).await;
+    seed_admission_email(&db, &test_email.to_lowercase(), false).await;
 
     let app = create_test_app(state).with_prod_routes().build().await?;
 
@@ -189,7 +189,7 @@ async fn test_non_json_content_type_still_attempts_parse() -> Result<(), Box<dyn
         .await?;
 
     let db = require_db(&state).expect("DB required for this test");
-    seed_admission_email(&db, &test_email.to_lowercase()).await;
+    seed_admission_email(&db, &test_email.to_lowercase(), false).await;
 
     let app = create_test_app(state).with_prod_routes().build().await?;
 

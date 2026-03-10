@@ -4,6 +4,7 @@ use backend::auth::google::VerifiedGoogleClaims;
 use backend::db::require_db;
 use backend::db::txn::with_txn;
 use backend::entities::user_auth_identities;
+use backend::entities::users::UserRole;
 use backend::services::users::UserService;
 use backend::{AppError, ErrorCode};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
@@ -26,7 +27,7 @@ fn claims(email: &str, name: Option<&str>, sub: &str) -> VerifiedGoogleClaims {
 async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required");
-    seed_admission_email(&db, "*@example.test").await;
+    seed_admission_email(&db, "*@example.test", false).await;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -99,7 +100,7 @@ async fn test_ensure_user_inserts_then_reuses() -> Result<(), AppError> {
 async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required");
-    seed_admission_email(&db, "*@example.test").await;
+    seed_admission_email(&db, "*@example.test", false).await;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -191,7 +192,7 @@ async fn test_ensure_user_google_sub_mismatch_policy() -> Result<(), AppError> {
 async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required");
-    seed_admission_email(&db, "alice@example.com").await;
+    seed_admission_email(&db, "alice@example.com", false).await;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -245,7 +246,7 @@ async fn test_email_normalization_case_and_whitespace() -> Result<(), AppError> 
 async fn test_email_normalization_unicode_nfkc() -> Result<(), AppError> {
     let state = build_test_state().await?;
     let db = require_db(&state).expect("DB required");
-    seed_admission_email(&db, "café@example.com").await;
+    seed_admission_email(&db, "café@example.com", false).await;
 
     with_txn(None, &state, |txn| {
         Box::pin(async move {
@@ -422,5 +423,148 @@ async fn test_email_validation_whitespace_only() -> Result<(), AppError> {
     })
     .await?;
 
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_first_login_role_normal_allowed_creates_user() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+    let db = require_db(&state).expect("DB required");
+    seed_admission_email(&db, "alice@example.com", false).await;
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService;
+            let user = service
+                .ensure_user(
+                    txn,
+                    &claims(
+                        "alice@example.com",
+                        Some("Alice"),
+                        &unique_str("google-sub"),
+                    ),
+                )
+                .await?;
+            assert_eq!(user.role, UserRole::User);
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_first_login_role_exact_admin_creates_admin() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+    let db = require_db(&state).expect("DB required");
+    seed_admission_email(&db, "admin@example.com", true).await;
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService;
+            let user = service
+                .ensure_user(
+                    txn,
+                    &claims(
+                        "admin@example.com",
+                        Some("Admin"),
+                        &unique_str("google-sub"),
+                    ),
+                )
+                .await?;
+            assert_eq!(user.role, UserRole::Admin);
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_first_login_role_wildcard_only_creates_user() -> Result<(), AppError> {
+    let state = build_test_state().await?;
+    let db = require_db(&state).expect("DB required");
+    seed_admission_email(&db, "*@example.test", false).await;
+
+    with_txn(None, &state, |txn| {
+        Box::pin(async move {
+            let service = UserService;
+            let user = service
+                .ensure_user(
+                    txn,
+                    &claims(
+                        &unique_email("wildcard-user"),
+                        Some("User"),
+                        &unique_str("google-sub"),
+                    ),
+                )
+                .await?;
+            assert_eq!(
+                user.role,
+                UserRole::User,
+                "wildcard-only must yield role=user"
+            );
+            Ok::<_, AppError>(())
+        })
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_downgraded_user_repeat_login_does_not_reevaluate_role() -> Result<(), AppError> {
+    use backend::db::txn::SharedTxn;
+    use sea_orm::{ActiveModelTrait, ActiveValue, EntityTrait};
+
+    let state = build_test_state().await?;
+    let db = require_db(&state).expect("DB required");
+    let email = "downgraded@example.com";
+    seed_admission_email(&db, email, true).await;
+
+    let google_sub = unique_str("google-sub");
+
+    let shared = SharedTxn::open(&db).await?;
+    let txn = shared.transaction();
+
+    let service = UserService;
+    let user = service
+        .ensure_user(txn, &claims(email, Some("Admin"), &google_sub))
+        .await?;
+    assert_eq!(user.role, UserRole::Admin);
+
+    let identity = user_auth_identities::Entity::find()
+        .filter(user_auth_identities::Column::Provider.eq(PROVIDER_GOOGLE))
+        .filter(user_auth_identities::Column::Email.eq(email))
+        .one(txn)
+        .await
+        .map_err(|e| AppError::from(backend::infra::db_errors::map_db_err(e)))?
+        .expect("identity should exist after ensure_user");
+
+    let user_model = backend::entities::users::Entity::find_by_id(identity.user_id)
+        .one(txn)
+        .await
+        .map_err(|e| AppError::from(backend::infra::db_errors::map_db_err(e)))?
+        .expect("user should exist");
+
+    let mut active: backend::entities::users::ActiveModel = user_model.into();
+    active.role = ActiveValue::Set(UserRole::User);
+    active
+        .update(txn)
+        .await
+        .map_err(|e| AppError::from(backend::infra::db_errors::map_db_err(e)))?;
+
+    let user_after = service
+        .ensure_user(txn, &claims(email, Some("Admin"), &google_sub))
+        .await?;
+    assert_eq!(
+        user_after.role,
+        UserRole::User,
+        "repeat login must not re-evaluate role; role stays user after manual downgrade"
+    );
+
+    shared.rollback().await?;
     Ok(())
 }

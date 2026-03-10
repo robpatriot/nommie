@@ -8,6 +8,8 @@ pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     pub email: String,
+    #[sea_orm(column_name = "is_admin")]
+    pub is_admin: bool,
     #[sea_orm(column_name = "created_at")]
     pub created_at: OffsetDateTime,
 }

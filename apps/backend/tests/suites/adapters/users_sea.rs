@@ -14,7 +14,13 @@ async fn test_create_user_and_find_by_id_roundtrip() -> Result<(), AppError> {
             let username = "TestUser";
 
             // Create user
-            let created = users::create_user(txn, username, false).await?;
+            let created = users::create_user(
+                txn,
+                username,
+                false,
+                backend::entities::users::UserRole::User,
+            )
+            .await?;
 
             assert!(created.id > 0, "User ID should be positive");
             assert_eq!(created.username, Some(username.to_string()));

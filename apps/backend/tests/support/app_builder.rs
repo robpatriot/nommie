@@ -2,6 +2,7 @@ use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{test, web, App, Error};
+use backend::middleware::jwt_extract::JwtExtract;
 use backend::middleware::request_trace::RequestTrace;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
@@ -21,7 +22,12 @@ fn configure_test_routes(cfg: &mut web::ServiceConfig) {
     // More specific /api/* scopes before generic /api (health) so e.g. /api/auth/login matches.
     cfg.service(web::scope("/api/auth").configure(routes::auth::configure_routes));
     cfg.service(web::scope("/api/games").configure(routes::games::configure_routes));
-    cfg.service(web::scope("/api/user").configure(routes::user_options::configure_routes));
+    cfg.service(
+        web::scope("/api/user")
+            .wrap(JwtExtract)
+            .configure(routes::user::configure_routes)
+            .configure(routes::user_options::configure_routes),
+    );
     cfg.service(web::scope("/api/ws").configure(routes::realtime::configure_routes));
 
     cfg.service(

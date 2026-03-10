@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::auth::claims::BackendClaims;
 use crate::db::require_db;
 use crate::db::txn::SharedTxn;
+use crate::entities::users::UserRole;
 use crate::error::AppError;
 use crate::repos::users;
 use crate::state::app_state::AppState;
@@ -16,6 +17,8 @@ use crate::state::app_state::AppState;
 pub struct CurrentUser {
     pub id: i64,
     pub email: Option<String>,
+    pub username: Option<String>,
+    pub role: UserRole,
 }
 
 impl FromRequest for CurrentUser {
@@ -64,6 +67,8 @@ impl FromRequest for CurrentUser {
             Ok(CurrentUser {
                 id: user.id,
                 email: Some(claims.email),
+                username: user.username,
+                role: user.role,
             })
         })
     }

@@ -9,6 +9,7 @@ pub mod handler_games_bid;
 pub mod handler_games_if_match;
 pub mod handler_games_ready;
 pub mod handler_players;
+pub mod handler_user_me;
 pub mod healthcheck;
 pub mod rate_limiting;
 pub mod security_headers;

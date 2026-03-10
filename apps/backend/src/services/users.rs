@@ -3,6 +3,7 @@ use tracing::{info, trace, warn};
 use unicode_normalization::UnicodeNormalization;
 
 use crate::auth::google::VerifiedGoogleClaims;
+use crate::entities::users::UserRole;
 use crate::errors::domain::{ConflictKind, DomainError, NotFoundKind, ValidationKind};
 use crate::logging::pii::Redacted;
 use crate::repos::users::{self as users_repo, User};
@@ -160,39 +161,56 @@ impl UserService {
         // Derive username from name or email local-part
         let username = derive_username(name, &clean_email);
 
-        // Create user (no sub)
-        let user =
-            users_repo::create_user(txn, username.as_deref().unwrap_or("user"), false).await?;
+        let role = if allowed_emails::is_exact_admin_match(txn, &clean_email).await? {
+            UserRole::Admin
+        } else {
+            UserRole::User
+        };
 
-        // Create identity - may race with concurrent insert, handle via ensure
-        let (identity, inserted_identity) =
-            auth_identities_repo::ensure_identity_by_provider_user_id(
-                txn,
-                user.id,
-                PROVIDER_GOOGLE,
-                provider_user_id,
-                &clean_email,
-            )
+        // Create user (no sub)
+        let user = users_repo::create_user(txn, username.as_deref().unwrap_or("user"), false, role)
             .await?;
 
-        // If another insert won the race (different user_id), we have a conflict
-        if identity.user_id != user.id {
-            users_repo::delete_user(txn, user.id).await?;
-            return ensure_from_existing_identity(txn, email, identity).await;
+        // Create identity - may race with concurrent insert on (provider, provider_user_id) or (provider, email)
+        let identity_result = auth_identities_repo::ensure_identity_by_provider_user_id(
+            txn,
+            user.id,
+            PROVIDER_GOOGLE,
+            provider_user_id,
+            &clean_email,
+        )
+        .await;
+
+        match identity_result {
+            Ok((identity, inserted_identity)) => {
+                // If another insert won the race (different user_id), we have an orphan
+                if identity.user_id != user.id {
+                    users_repo::delete_user(txn, user.id).await?;
+                    return ensure_from_existing_identity(txn, email, identity).await;
+                }
+
+                if inserted_identity {
+                    info!(
+                        user_id = user.id,
+                        email = %Redacted(email),
+                        provider_user_id = %redact_provider_user_id(provider_user_id),
+                        "First user creation"
+                    );
+                }
+
+                user_options_repo::ensure_default_for_user(txn, user.id).await?;
+                Ok(user)
+            }
+            Err(DomainError::Conflict(ConflictKind::UniqueEmail, _)) => {
+                // Concurrent insert won on (provider, email). This transaction is aborted;
+                // we cannot recover here. Propagate so caller can retry with a fresh transaction.
+                Err(DomainError::conflict(
+                    ConflictKind::UniqueEmail,
+                    "Email already registered", // preserved from db_errors mapping
+                ))
+            }
+            Err(e) => Err(e),
         }
-
-        if inserted_identity {
-            info!(
-                user_id = user.id,
-                email = %Redacted(email),
-                provider_user_id = %redact_provider_user_id(provider_user_id),
-                "First user creation"
-            );
-        }
-
-        user_options_repo::ensure_default_for_user(txn, user.id).await?;
-
-        Ok(user)
     }
 }
 

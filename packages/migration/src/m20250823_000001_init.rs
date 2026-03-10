@@ -23,6 +23,7 @@ enum AllowedEmails {
     Table,
     Id,
     Email,
+    IsAdmin,
     CreatedAt,
 }
 
@@ -370,6 +371,12 @@ impl MigrationTrait for Migration {
                         ColumnDef::new(AllowedEmails::Email)
                             .string()
                             .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AllowedEmails::IsAdmin)
+                            .boolean()
+                            .not_null()
+                            .default(false),
                     )
                     .col(
                         ColumnDef::new(AllowedEmails::CreatedAt)

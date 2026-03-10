@@ -2,7 +2,6 @@ use std::time::SystemTime;
 
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use serde::{Deserialize, Serialize};
-use unicode_normalization::UnicodeNormalization;
 
 use crate::auth::jwt::{mint_access_token, verify_access_token};
 use crate::db::require_db;
@@ -57,13 +56,29 @@ async fn login(
 
     let verified_email = claims.email.clone();
 
-    let user = with_txn(Some(&http_req), &app_state, |txn| {
+    let user = match with_txn(Some(&http_req), &app_state, |txn| {
+        let c = claims.clone();
         Box::pin(async move {
             let service = UserService;
-            Ok(service.ensure_user(txn, &claims).await?)
+            Ok(service.ensure_user(txn, &c).await?)
         })
     })
-    .await?;
+    .await
+    {
+        Ok(u) => u,
+        Err(e) if e.code() == ErrorCode::UniqueEmail => {
+            // Concurrent insert won; retry with fresh transaction (winner will have committed)
+            with_txn(Some(&http_req), &app_state, |txn| {
+                let c = claims.clone();
+                Box::pin(async move {
+                    let service = UserService;
+                    Ok(service.ensure_user(txn, &c).await?)
+                })
+            })
+            .await?
+        }
+        Err(e) => return Err(e),
+    };
 
     let token = mint_access_token(
         &user.id.to_string(),
@@ -128,7 +143,7 @@ async fn check_allowlist(
     }
 
     let db = require_db(app_state.as_ref())?;
-    let email = req.email.trim().nfkc().collect::<String>().to_lowercase();
+    let email = crate::repos::allowed_emails::normalize(&req.email);
 
     // Existing linked users bypass admission check
     let existing = crate::repos::auth_identities::find_by_provider_email(&db, "google", &email)

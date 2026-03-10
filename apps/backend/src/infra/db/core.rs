@@ -234,12 +234,13 @@ async fn ensure_ai_profiles_with_lock(
     Ok(())
 }
 
-/// Seed admission table from ALLOWED_EMAILS env var. Additive and idempotent.
+/// Seed admission table from ALLOWED_EMAILS, then augment from ADMIN_EMAILS. Additive and idempotent.
 async fn seed_admission_from_env(pool: &DatabaseConnection) -> Result<(), AppError> {
     use sea_orm::TransactionTrait;
 
     let patterns = crate::repos::allowed_emails::parse_allowed_emails_from_env();
-    if patterns.is_empty() {
+    let admin_emails = crate::repos::allowed_emails::parse_admin_emails_from_env();
+    if patterns.is_empty() && admin_emails.is_empty() {
         return Ok(());
     }
 
@@ -252,12 +253,19 @@ async fn seed_admission_from_env(pool: &DatabaseConnection) -> Result<(), AppErr
         .await
         .map_err(AppError::from)?;
 
+    let admin_count = crate::repos::allowed_emails::seed_admin_from_env(&txn)
+        .await
+        .map_err(AppError::from)?;
+
     txn.commit()
         .await
         .map_err(|e| AppError::config("failed to commit admission seed", e))?;
 
     if inserted > 0 {
         info!(inserted, "admission_seed=complete");
+    }
+    if admin_count > 0 {
+        info!(admin_count, "admin_seed=complete");
     }
 
     Ok(())
