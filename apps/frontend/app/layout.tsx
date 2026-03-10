@@ -141,13 +141,9 @@ export default async function RootLayout({
     } catch {
       // Fall back to defaults on error
     }
-    try {
-      me = await getMe()
-    } catch {
-      // 401 is normal unauthenticated; other errors are handled by getMe (re-thrown)
-      // If we get here, we're swallowing unexpected errors - treat as unauthenticated
-      me = null
-    }
+    // getMe returns null on 401 (unauthenticated); throws on network/5xx/other errors.
+    // Only 401 is treated as expected unauthenticated state. Other errors propagate.
+    me = await getMe()
   }
 
   const backendKnownDown = isBackendKnownDown()
