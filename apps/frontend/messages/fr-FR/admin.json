@@ -4,6 +4,27 @@
   },
   "users": {
     "title": "Rôles utilisateur",
-    "comingSoon": "Gestion des rôles utilisateur à venir."
+    "searchPlaceholder": "Rechercher par e-mail ou nom d'utilisateur...",
+    "loading": "Chargement...",
+    "noUsers": "Aucun utilisateur trouvé",
+    "loadMore": "Charger plus",
+    "id": "ID",
+    "displayName": "Nom d'affichage",
+    "email": "E-mail",
+    "role": "Rôle",
+    "actions": "Actions",
+    "grantAdmin": "Accorder admin",
+    "revokeAdmin": "Révoquer admin",
+    "revokeConfirmTitle": "Révoquer admin ?",
+    "revokeConfirmMessage": "Cela supprimera les privilèges admin de cet utilisateur.",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "error": "Une erreur s'est produite",
+    "lastAdminProtection": "Impossible de révoquer le dernier admin.",
+    "cannotRevokeOwn": "Vous ne pouvez pas révoquer votre propre rôle admin.",
+    "adminGranted": "Admin accordé",
+    "alreadyAdmin": "Déjà admin",
+    "adminRevoked": "Admin révoqué",
+    "alreadyUser": "Déjà utilisateur"
   }
 }

@@ -4,6 +4,27 @@
   },
   "users": {
     "title": "Benutzerrollen",
-    "comingSoon": "Benutzerrollen-Verwaltung kommt bald."
+    "searchPlaceholder": "Nach E-Mail oder Benutzername suchen...",
+    "loading": "Laden...",
+    "noUsers": "Keine Benutzer gefunden",
+    "loadMore": "Mehr laden",
+    "id": "ID",
+    "displayName": "Anzeigename",
+    "email": "E-Mail",
+    "role": "Rolle",
+    "actions": "Aktionen",
+    "grantAdmin": "Admin vergeben",
+    "revokeAdmin": "Admin entziehen",
+    "revokeConfirmTitle": "Admin entziehen?",
+    "revokeConfirmMessage": "Dies entfernt die Admin-Rechte dieses Benutzers.",
+    "cancel": "Abbrechen",
+    "confirm": "Bestätigen",
+    "error": "Etwas ist schiefgelaufen",
+    "lastAdminProtection": "Der letzte Admin kann nicht entzogen werden.",
+    "cannotRevokeOwn": "Sie können sich nicht selbst die Admin-Rolle entziehen.",
+    "adminGranted": "Admin vergeben",
+    "alreadyAdmin": "Bereits Admin",
+    "adminRevoked": "Admin entzogen",
+    "alreadyUser": "Bereits Benutzer"
   }
 }

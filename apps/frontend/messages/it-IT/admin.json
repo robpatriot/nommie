@@ -4,6 +4,27 @@
   },
   "users": {
     "title": "Ruoli utente",
-    "comingSoon": "Gestione ruoli utente in arrivo."
+    "searchPlaceholder": "Cerca per email o nome utente...",
+    "loading": "Caricamento...",
+    "noUsers": "Nessun utente trovato",
+    "loadMore": "Carica altro",
+    "id": "ID",
+    "displayName": "Nome visualizzato",
+    "email": "Email",
+    "role": "Ruolo",
+    "actions": "Azioni",
+    "grantAdmin": "Concedi admin",
+    "revokeAdmin": "Revoca admin",
+    "revokeConfirmTitle": "Revocare admin?",
+    "revokeConfirmMessage": "Questo rimuoverà i privilegi admin da questo utente.",
+    "cancel": "Annulla",
+    "confirm": "Conferma",
+    "error": "Qualcosa è andato storto",
+    "lastAdminProtection": "Impossibile revocare l'ultimo admin.",
+    "cannotRevokeOwn": "Non puoi revocare il tuo ruolo admin.",
+    "adminGranted": "Admin concesso",
+    "alreadyAdmin": "Già admin",
+    "adminRevoked": "Admin revocato",
+    "alreadyUser": "Già utente"
   }
 }

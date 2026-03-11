@@ -4,6 +4,27 @@
   },
   "users": {
     "title": "User Roles",
-    "comingSoon": "User role management coming soon."
+    "searchPlaceholder": "Search by email or username...",
+    "loading": "Loading...",
+    "noUsers": "No users found",
+    "loadMore": "Load more",
+    "id": "ID",
+    "displayName": "Display name",
+    "email": "Email",
+    "role": "Role",
+    "actions": "Actions",
+    "grantAdmin": "Grant admin",
+    "revokeAdmin": "Revoke admin",
+    "revokeConfirmTitle": "Revoke admin?",
+    "revokeConfirmMessage": "This will remove admin privileges from this user.",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "error": "Something went wrong",
+    "lastAdminProtection": "Cannot revoke the last admin.",
+    "cannotRevokeOwn": "You cannot revoke your own admin role.",
+    "adminGranted": "Admin granted",
+    "alreadyAdmin": "Already admin",
+    "adminRevoked": "Admin revoked",
+    "alreadyUser": "Already user"
   }
 }
