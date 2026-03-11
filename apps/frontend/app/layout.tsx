@@ -156,6 +156,7 @@ export default async function RootLayout({
     'lobby',
     'game',
     'guide',
+    'admin',
   ])
 
   // Only set server-side "dark" class (and color-scheme) when user explicitly chose

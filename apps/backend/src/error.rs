@@ -620,15 +620,30 @@ impl From<crate::errors::domain::DomainError> for AppError {
                             crate::errors::domain::ValidationKind::InvalidEmail => {
                                 ErrorCode::InvalidEmail
                             }
+                            crate::errors::domain::ValidationKind::InvalidSearchQuery => {
+                                ErrorCode::InvalidSearchQuery
+                            }
+                            crate::errors::domain::ValidationKind::InvalidCursor => {
+                                ErrorCode::InvalidCursor
+                            }
                             crate::errors::domain::ValidationKind::Other(_) => {
                                 ErrorCode::ValidationError
                             }
                             _ => ErrorCode::ValidationError, // catch-all for any new variants
                         };
+                        let status = if matches!(
+                            kind,
+                            crate::errors::domain::ValidationKind::InvalidSearchQuery
+                                | crate::errors::domain::ValidationKind::InvalidCursor
+                        ) {
+                            StatusCode::BAD_REQUEST
+                        } else {
+                            StatusCode::UNPROCESSABLE_ENTITY
+                        };
                         AppError::Validation {
                             code: error_code,
                             detail,
-                            status: StatusCode::UNPROCESSABLE_ENTITY,
+                            status,
                         }
                     }
                 }
@@ -639,6 +654,8 @@ impl From<crate::errors::domain::DomainError> for AppError {
                     ConflictKind::UniqueEmail => ErrorCode::UniqueEmail,
                     ConflictKind::OptimisticLock => ErrorCode::OptimisticLock,
                     ConflictKind::GoogleSubMismatch => ErrorCode::GoogleSubMismatch,
+                    ConflictKind::CannotRevokeOwnAdmin => ErrorCode::CannotRevokeOwnAdmin,
+                    ConflictKind::LastAdminProtection => ErrorCode::LastAdminProtection,
                     ConflictKind::Other(_) => ErrorCode::Conflict, // generic conflict fallback
                 };
 
@@ -660,6 +677,7 @@ impl From<crate::errors::domain::DomainError> for AppError {
             crate::errors::domain::DomainError::NotFound(kind, detail) => {
                 let code = match kind {
                     NotFoundKind::User => ErrorCode::UserNotFound,
+                    NotFoundKind::TargetUser => ErrorCode::TargetUserNotFound,
                     NotFoundKind::Game => ErrorCode::GameNotFound,
                     NotFoundKind::Player => ErrorCode::PlayerNotFound,
                     NotFoundKind::Membership => ErrorCode::NotAMember,
@@ -667,6 +685,9 @@ impl From<crate::errors::domain::DomainError> for AppError {
                 };
                 // Preserve original detail for NotFound (they're already client-safe)
                 AppError::NotFound { code, detail }
+            }
+            crate::errors::domain::DomainError::PermissionDenied(detail) => {
+                AppError::forbidden_with_code(ErrorCode::PermissionDenied, detail)
             }
             crate::errors::domain::DomainError::Infra(kind, detail) => {
                 match kind {

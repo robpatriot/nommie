@@ -7,6 +7,7 @@ const MESSAGES_DIR = path.join(ROOT, 'messages')
 const DEFAULT_LOCALE = 'en-GB'
 const LOCALES = ['en-GB', 'fr-FR', 'de-DE', 'es-ES', 'it-IT']
 const NAMESPACES = [
+  'admin',
   'common',
   'nav',
   'errors',

@@ -1,6 +1,7 @@
 import type { SupportedLocale } from './locale'
 
 export type Namespace =
+  | 'admin'
   | 'common'
   | 'nav'
   | 'settings'

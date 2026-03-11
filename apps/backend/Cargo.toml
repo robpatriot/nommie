@@ -48,6 +48,7 @@ time = { version = "0.3", features = ["serde", "macros"] }
 once_cell = "1.19"
 
 # String and data processing
+base64 = "0.22"
 bytes = "1.0"
 lazy-regex = "3"
 regex = "1"

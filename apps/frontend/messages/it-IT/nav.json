@@ -3,7 +3,8 @@
     "homeAria": "Home di Nommie",
     "menuAria": "Menu di navigazione Nommie",
     "lobby": "Sala",
-    "guide": "Guida"
+    "guide": "Guida",
+    "admin": "Amministrazione"
   },
   "breadcrumbs": {
     "ariaLabel": "Percorso di navigazione"

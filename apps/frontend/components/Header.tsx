@@ -109,6 +109,7 @@ export default function Header({ session, me = null }: HeaderProps) {
 
   const isOnLobby = pathname === '/lobby'
   const isOnGuide = pathname === '/guide'
+  const isOnAdmin = pathname.startsWith('/admin')
 
   return (
     <header className="sticky top-0 z-30 border-b border-border/60 bg-muted/70 px-3 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.15)] backdrop-blur-lg">
@@ -157,7 +158,7 @@ export default function Header({ session, me = null }: HeaderProps) {
                   </Link>
                   <Link
                     href="/guide"
-                    className={`flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-2 font-semibold transition hover:border-primary/50 ${
+                    className={`mb-2 flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-2 font-semibold transition hover:border-primary/50 ${
                       isOnGuide
                         ? 'border-primary/50 text-primary'
                         : 'text-foreground hover:text-primary'
@@ -171,6 +172,24 @@ export default function Header({ session, me = null }: HeaderProps) {
                       </span>
                     ) : null}
                   </Link>
+                  {me?.role === 'admin' ? (
+                    <Link
+                      href="/admin/users"
+                      className={`flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card px-4 py-2 font-semibold transition hover:border-primary/50 ${
+                        isOnAdmin
+                          ? 'border-primary/50 text-primary'
+                          : 'text-foreground hover:text-primary'
+                      }`}
+                      onClick={() => setIsBrandMenuOpen(false)}
+                    >
+                      {t('brand.admin')}
+                      {isOnAdmin ? (
+                        <span className="text-xs" aria-hidden>
+                          ●
+                        </span>
+                      ) : null}
+                    </Link>
+                  ) : null}
                 </div>
               ) : null}
             </div>

@@ -3,7 +3,8 @@
     "homeAria": "Nommie Startseite",
     "menuAria": "Nommie Navigationsmenü",
     "lobby": "Spielhalle",
-    "guide": "Handbuch"
+    "guide": "Handbuch",
+    "admin": "Administration"
   },
   "breadcrumbs": {
     "ariaLabel": "Pfadnavigation"

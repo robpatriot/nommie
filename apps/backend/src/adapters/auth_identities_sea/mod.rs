@@ -38,6 +38,19 @@ pub async fn find_by_provider_email<C: ConnectionTrait + Send + Sync>(
         .await
 }
 
+pub async fn find_email_by_user_and_provider<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    user_id: i64,
+    provider: &str,
+) -> Result<Option<String>, sea_orm::DbErr> {
+    user_auth_identities::Entity::find()
+        .filter(user_auth_identities::Column::UserId.eq(user_id))
+        .filter(user_auth_identities::Column::Provider.eq(provider))
+        .one(conn)
+        .await
+        .map(|opt| opt.map(|m| m.email))
+}
+
 pub async fn create_identity(
     txn: &DatabaseTransaction,
     dto: IdentityCreate,

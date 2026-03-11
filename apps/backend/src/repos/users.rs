@@ -41,6 +41,30 @@ pub async fn delete_user(txn: &DatabaseTransaction, user_id: i64) -> Result<(), 
     Ok(())
 }
 
+pub async fn update_user_role(
+    txn: &DatabaseTransaction,
+    user_id: i64,
+    role: UserRole,
+) -> Result<User, DomainError> {
+    let model = users_adapter::update_user_role(txn, user_id, role).await?;
+    Ok(User::from(model))
+}
+
+pub async fn count_admins<C: ConnectionTrait + Send + Sync>(conn: &C) -> Result<u64, DomainError> {
+    users_adapter::count_admins(conn)
+        .await
+        .map_err(DomainError::from)
+}
+
+pub async fn count_admins_excluding_user<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    exclude_user_id: i64,
+) -> Result<u64, DomainError> {
+    users_adapter::count_admins_excluding_user(conn, exclude_user_id)
+        .await
+        .map_err(DomainError::from)
+}
+
 impl From<crate::entities::users::Model> for User {
     fn from(model: crate::entities::users::Model) -> Self {
         Self {

@@ -148,6 +148,16 @@ async fn main() -> std::io::Result<()> {
             // More specific /api/* scopes must be registered before the generic /api scope
             // so that e.g. /api/auth/login matches /api/auth, not /api (which only has livez/readyz).
             .service(
+                // Admin routes - requires JwtExtract + AdminPrincipal (AccessAdmin)
+                actix_web::web::scope("/api/admin")
+                    .wrap(backend::middleware::security_headers::SecurityHeaders)
+                    .wrap(backend::middleware::readiness_gate::ReadinessGate)
+                    .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
+                    .wrap(api_limiter.clone())
+                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .configure(backend::routes::admin::configure_routes),
+            )
+            .service(
                 // WebSocket token endpoint - issues short-lived tokens for WS connections
                 actix_web::web::scope("/api/ws")
                     .wrap(backend::middleware::security_headers::SecurityHeaders)

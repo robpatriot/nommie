@@ -1,5 +1,7 @@
 //! Repository traits for domain layer.
 
+pub mod admin_audit_log;
+pub mod admin_users;
 pub mod ai_overrides;
 pub mod ai_profiles;
 pub mod allowed_emails;

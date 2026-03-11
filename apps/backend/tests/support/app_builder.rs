@@ -28,6 +28,11 @@ fn configure_test_routes(cfg: &mut web::ServiceConfig) {
             .configure(routes::user::configure_routes)
             .configure(routes::user_options::configure_routes),
     );
+    cfg.service(
+        web::scope("/api/admin")
+            .wrap(JwtExtract)
+            .configure(routes::admin::configure_routes),
+    );
     cfg.service(web::scope("/api/ws").configure(routes::realtime::configure_routes));
 
     cfg.service(

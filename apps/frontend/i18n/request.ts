@@ -23,6 +23,7 @@ export default getRequestConfig(async () => {
   })
 
   const messages = await loadMessages(locale as SupportedLocale, [
+    'admin',
     'common',
     'nav',
     'settings',

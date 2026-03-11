@@ -18,6 +18,7 @@
 pub mod adapters;
 pub mod ai;
 pub mod auth;
+pub mod authz;
 pub mod bin_support;
 pub mod config;
 pub mod db;

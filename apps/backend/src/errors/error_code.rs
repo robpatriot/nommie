@@ -34,6 +34,8 @@ pub enum ErrorCode {
     NotAMember,
     /// User has insufficient role for this operation
     InsufficientRole,
+    /// Admin capability required but caller lacks it
+    PermissionDenied,
 
     // Request Validation
     /// Invalid game ID provided
@@ -70,12 +72,18 @@ pub enum ErrorCode {
     PreconditionRequired,
     /// Request payload exceeds size limit
     PayloadTooLarge,
+    /// Invalid admin search query (missing/empty q, invalid limit)
+    InvalidSearchQuery,
+    /// Invalid or malformed cursor
+    InvalidCursor,
 
     // Resource Not Found
     /// Game not found
     GameNotFound,
     /// User not found
     UserNotFound,
+    /// Target user does not exist (admin context)
+    TargetUserNotFound,
     /// Player not found
     PlayerNotFound,
     /// General not found error
@@ -92,6 +100,10 @@ pub enum ErrorCode {
     OptimisticLock,
     /// Generic conflict (fallback for unmatched conflicts)
     Conflict,
+    /// Actor tries to revoke own admin
+    CannotRevokeOwnAdmin,
+    /// Would leave zero admins
+    LastAdminProtection,
 
     // System Errors
     /// Database error
@@ -159,6 +171,7 @@ impl ErrorCode {
             Self::EmailNotAllowed => "EMAIL_NOT_ALLOWED",
             Self::NotAMember => "NOT_A_MEMBER",
             Self::InsufficientRole => "INSUFFICIENT_ROLE",
+            Self::PermissionDenied => "PERMISSION_DENIED",
 
             // Request Validation
             Self::InvalidGameId => "INVALID_GAME_ID",
@@ -178,10 +191,13 @@ impl ErrorCode {
             Self::InvalidHeader => "INVALID_HEADER",
             Self::PreconditionRequired => "PRECONDITION_REQUIRED",
             Self::PayloadTooLarge => "PAYLOAD_TOO_LARGE",
+            Self::InvalidSearchQuery => "INVALID_SEARCH_QUERY",
+            Self::InvalidCursor => "INVALID_CURSOR",
 
             // Resource Not Found
             Self::GameNotFound => "GAME_NOT_FOUND",
             Self::UserNotFound => "USER_NOT_FOUND",
+            Self::TargetUserNotFound => "TARGET_USER_NOT_FOUND",
             Self::PlayerNotFound => "PLAYER_NOT_FOUND",
             Self::NotFound => "NOT_FOUND",
 
@@ -191,6 +207,8 @@ impl ErrorCode {
             Self::UniqueEmail => "UNIQUE_EMAIL",
             Self::OptimisticLock => "OPTIMISTIC_LOCK",
             Self::Conflict => "CONFLICT",
+            Self::CannotRevokeOwnAdmin => "CANNOT_REVOKE_OWN_ADMIN",
+            Self::LastAdminProtection => "LAST_ADMIN_PROTECTION",
 
             // System Errors
             Self::DbError => "DB_ERROR",

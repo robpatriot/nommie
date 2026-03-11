@@ -1,0 +1,9 @@
+{
+  "nav": {
+    "users": "Rôles utilisateur"
+  },
+  "users": {
+    "title": "Rôles utilisateur",
+    "comingSoon": "Gestion des rôles utilisateur à venir."
+  }
+}

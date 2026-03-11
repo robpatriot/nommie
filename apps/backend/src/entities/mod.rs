@@ -1,3 +1,4 @@
+pub mod admin_audit_log;
 pub mod ai_overrides;
 pub mod ai_profiles;
 pub mod allowed_emails;

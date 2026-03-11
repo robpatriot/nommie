@@ -1,3 +1,6 @@
+pub mod admin_audit;
+pub mod admin_search;
+pub mod admin_service;
 pub mod ai_memory;
 pub mod ai_memory_degradation;
 pub mod domain_error_mapping;

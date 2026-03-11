@@ -54,6 +54,20 @@ enum UserOptions {
 }
 
 #[derive(Iden)]
+enum AdminAuditLog {
+    Table,
+    Id,
+    ActorUserId,
+    Action,
+    TargetType,
+    TargetId,
+    Result,
+    Reason,
+    MetadataJson,
+    CreatedAt,
+}
+
+#[derive(Iden)]
 enum Games {
     Table,
     Id,
@@ -492,6 +506,86 @@ impl MigrationTrait for Migration {
                     .name("idx_user_auth_identities_user_id")
                     .table(UserAuthIdentities::Table)
                     .col(UserAuthIdentities::UserId)
+                    .to_owned(),
+            )
+            .await?;
+
+        // admin_audit_log
+        manager
+            .create_table(
+                Table::create()
+                    .table(AdminAuditLog::Table)
+                    .if_not_exists()
+                    .col(
+                        ColumnDef::new(AdminAuditLog::Id)
+                            .big_integer()
+                            .not_null()
+                            .primary_key()
+                            .auto_increment(),
+                    )
+                    .col(
+                        ColumnDef::new(AdminAuditLog::ActorUserId)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AdminAuditLog::Action)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AdminAuditLog::TargetType)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AdminAuditLog::TargetId)
+                            .big_integer()
+                            .not_null(),
+                    )
+                    .col(
+                        ColumnDef::new(AdminAuditLog::Result)
+                            .string()
+                            .not_null(),
+                    )
+                    .col(ColumnDef::new(AdminAuditLog::Reason).text().null())
+                    .col(
+                        ColumnDef::new(AdminAuditLog::MetadataJson)
+                            .json_binary()
+                            .null(),
+                    )
+                    .col(
+                        ColumnDef::new(AdminAuditLog::CreatedAt)
+                            .timestamp_with_time_zone()
+                            .not_null(),
+                    )
+                    .foreign_key(
+                        ForeignKey::create()
+                            .name("fk_admin_audit_log_actor_user_id")
+                            .from(AdminAuditLog::Table, AdminAuditLog::ActorUserId)
+                            .to(Users::Table, Users::Id)
+                            .on_delete(ForeignKeyAction::NoAction),
+                    )
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("ix_admin_audit_log_actor_user_id")
+                    .table(AdminAuditLog::Table)
+                    .col(AdminAuditLog::ActorUserId)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_index(
+                Index::create()
+                    .name("ix_admin_audit_log_created_at")
+                    .table(AdminAuditLog::Table)
+                    .col(AdminAuditLog::CreatedAt)
                     .to_owned(),
             )
             .await?;
@@ -1873,6 +1967,28 @@ impl MigrationTrait for Migration {
 
         manager
             .drop_table(Table::drop().table(UserOptions::Table).to_owned())
+            .await?;
+
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ix_admin_audit_log_created_at")
+                    .table(AdminAuditLog::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ix_admin_audit_log_actor_user_id")
+                    .table(AdminAuditLog::Table)
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .drop_table(Table::drop().table(AdminAuditLog::Table).to_owned())
             .await?;
 
         manager

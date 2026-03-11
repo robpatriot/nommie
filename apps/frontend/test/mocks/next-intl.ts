@@ -54,6 +54,7 @@ const namespaces = [
   'toasts',
   'lobby',
   'game',
+  'admin',
 ]
 const allMessages: Record<string, string> = {}
 

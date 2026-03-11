@@ -38,6 +38,16 @@ pub async fn find_by_provider_email<C: ConnectionTrait + Send + Sync>(
     Ok(identity.map(AuthIdentity::from))
 }
 
+pub async fn find_email_by_user_and_provider<C: ConnectionTrait + Send + Sync>(
+    conn: &C,
+    user_id: i64,
+    provider: &str,
+) -> Result<Option<String>, DomainError> {
+    auth_identities_adapter::find_email_by_user_and_provider(conn, user_id, provider)
+        .await
+        .map_err(DomainError::from)
+}
+
 pub async fn create_identity(
     txn: &DatabaseTransaction,
     user_id: i64,

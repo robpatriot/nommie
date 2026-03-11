@@ -1,5 +1,7 @@
 //! Adapters for external dependencies.
 
+pub mod admin_audit_log_sea;
+pub mod admin_users_sea;
 pub mod ai_overrides_sea;
 pub mod ai_profiles_sea;
 pub mod allowed_emails_sea;

@@ -1,3 +1,4 @@
+pub mod admin_principal;
 pub mod current_user;
 pub mod game_id;
 pub mod game_membership;

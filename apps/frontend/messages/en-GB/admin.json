@@ -1,0 +1,9 @@
+{
+  "nav": {
+    "users": "User Roles"
+  },
+  "users": {
+    "title": "User Roles",
+    "comingSoon": "User role management coming soon."
+  }
+}

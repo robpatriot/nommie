@@ -3,7 +3,8 @@
     "homeAria": "Accueil Nommie",
     "menuAria": "Menu de navigation Nommie",
     "lobby": "Hall",
-    "guide": "Manuel"
+    "guide": "Manuel",
+    "admin": "Administration"
   },
   "breadcrumbs": {
     "ariaLabel": "Fil d’Ariane"

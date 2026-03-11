@@ -1,9 +1,11 @@
 pub mod error_mappings;
 pub mod error_shape;
+pub mod extractor_admin_principal;
 pub mod extractor_current_user_db;
 pub mod extractor_game_id;
 pub mod extractor_game_membership;
 pub mod extractor_game_membership_roles;
+pub mod handler_admin_users;
 pub mod handler_games_ai;
 pub mod handler_games_bid;
 pub mod handler_games_if_match;

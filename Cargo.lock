@@ -506,6 +506,7 @@ dependencies = [
  "actix-web-actors",
  "async-trait",
  "backend-test-support",
+ "base64 0.22.1",
  "blake3",
  "bytes",
  "ctor",

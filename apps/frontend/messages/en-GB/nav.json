@@ -3,7 +3,8 @@
     "homeAria": "Nommie home",
     "menuAria": "Nommie navigation menu",
     "lobby": "Lobby",
-    "guide": "Guide"
+    "guide": "Guide",
+    "admin": "Admin"
   },
   "breadcrumbs": {
     "ariaLabel": "Breadcrumb"

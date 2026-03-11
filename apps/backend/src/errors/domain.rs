@@ -22,6 +22,8 @@ pub enum InfraErrorKind {
 #[non_exhaustive]
 pub enum NotFoundKind {
     User,
+    /// Target user in admin role management context
+    TargetUser,
     Game,
     Player,
     Membership,
@@ -45,6 +47,8 @@ pub enum ValidationKind {
     EmailNotAllowed,
     InvalidPlayerCount,
     InvalidHandSize,
+    InvalidSearchQuery,
+    InvalidCursor,
     Other(String),
 }
 
@@ -56,6 +60,8 @@ pub enum ConflictKind {
     UniqueEmail,
     OptimisticLock,
     GoogleSubMismatch,
+    CannotRevokeOwnAdmin,
+    LastAdminProtection,
     Other(String),
 }
 
@@ -70,6 +76,8 @@ pub enum DomainError {
     NotFound(NotFoundKind, String),
     /// Infrastructure/operational failures
     Infra(InfraErrorKind, String),
+    /// Permission denied (maps to HTTP 403)
+    PermissionDenied(String),
 }
 
 impl Display for DomainError {
@@ -79,6 +87,7 @@ impl Display for DomainError {
             DomainError::Conflict(kind, d) => write!(f, "conflict {kind:?}: {d}"),
             DomainError::NotFound(kind, d) => write!(f, "not found {kind:?}: {d}"),
             DomainError::Infra(kind, d) => write!(f, "infra {kind:?}: {d}"),
+            DomainError::PermissionDenied(d) => write!(f, "permission denied: {d}"),
         }
     }
 }
@@ -104,6 +113,9 @@ impl DomainError {
     }
     pub fn infra(kind: InfraErrorKind, detail: impl Into<String>) -> Self {
         Self::Infra(kind, detail.into())
+    }
+    pub fn permission_denied(detail: impl Into<String>) -> Self {
+        Self::PermissionDenied(detail.into())
     }
 }
 
