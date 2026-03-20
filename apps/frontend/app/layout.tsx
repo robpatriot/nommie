@@ -29,7 +29,7 @@ import { loadMessages } from '@/i18n/messages'
 import { getUserOptions } from '@/lib/api/user-options'
 import { getMe } from '@/lib/api/user-me'
 import { isBackendKnownDown } from '@/lib/server/backend-status'
-import { BACKEND_JWT_COOKIE_NAME } from '@/lib/auth/backend-jwt-cookie'
+import { BACKEND_SESSION_COOKIE_NAME } from '@/lib/auth/backend-jwt-cookie'
 import { WebSocketProvider } from '@/lib/providers/web-socket-provider'
 import { BackendReadinessProvider } from '@/lib/providers/backend-readiness-provider'
 import DegradedModeBanner from '@/components/DegradedModeBanner'
@@ -120,7 +120,7 @@ export default async function RootLayout({
 
   const cookieStore = await cookies()
   const headerStore = await headers()
-  const backendJwt = cookieStore.get(BACKEND_JWT_COOKIE_NAME)?.value ?? null
+  const backendSession = cookieStore.get(BACKEND_SESSION_COOKIE_NAME)?.value ?? null
 
   const { locale } = resolveLocale({
     cookieLocale: cookieStore.get(LOCALE_COOKIE_NAME)?.value ?? null,
@@ -133,7 +133,7 @@ export default async function RootLayout({
   let me: Awaited<ReturnType<typeof getMe>> = null
 
   // Backend is authoritative for logged-in users
-  if (session && backendJwt) {
+  if (session && backendSession) {
     try {
       const options = await getUserOptions()
       initialThemeName = options.theme

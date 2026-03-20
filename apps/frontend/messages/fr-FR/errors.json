@@ -7,7 +7,6 @@
     "FORBIDDEN": "Vous n’avez pas l’autorisation d’effectuer cette action.",
     "FORBIDDEN_USER_NOT_FOUND": "Votre compte est introuvable.",
     "EMAIL_NOT_ALLOWED": "Accès restreint. Veuillez contacter l’assistance.",
-    "MISSING_BACKEND_JWT": "Veuillez vous connecter pour continuer.",
     "BACKEND_STARTING": "Le serveur démarre. Veuillez réessayer dans un instant.",
     "NOT_A_MEMBER": "Vous ne faites pas partie de cette partie.",
     "INSUFFICIENT_ROLE": "Vous n’avez pas les droits nécessaires.",

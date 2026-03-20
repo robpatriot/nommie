@@ -9,30 +9,28 @@ use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games;
 use backend::state::app_state::AppState;
 use backend::AppError;
 
 use crate::support::app_builder::create_test_app;
-use crate::support::auth::bearer_header;
 use crate::support::build_test_state;
 use crate::support::factory::create_test_user;
 use crate::support::game_state::{
     assert_error_type_url, parse_error_json, parse_game_state_envelope,
 };
 use crate::support::snapshot_helpers::{create_snapshot_game, SnapshotGameOptions};
+use crate::support::test_middleware::TestSessionInjector;
 use crate::support::test_utils::test_user_sub;
 
 struct SnapshotTestContext {
     state: AppState,
     shared: SharedTxn,
-    bearer: String,
+    session_injector: TestSessionInjector,
 }
 
 async fn setup_snapshot_test(test_name: &str) -> Result<SnapshotTestContext, AppError> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
     let db = require_db(&state)?;
     let shared = SharedTxn::open(&db).await?;
 
@@ -41,12 +39,12 @@ async fn setup_snapshot_test(test_name: &str) -> Result<SnapshotTestContext, App
     let viewer_id =
         create_test_user(shared.transaction(), &viewer_sub, Some("Snapshot Viewer")).await?;
 
-    let bearer = bearer_header(&viewer_id.to_string(), &viewer_email, &security);
+    let session_injector = TestSessionInjector::new(viewer_id, &viewer_sub, &viewer_email);
 
     Ok(SnapshotTestContext {
         state,
         shared,
-        bearer,
+        session_injector,
     })
 }
 
@@ -55,25 +53,21 @@ async fn test_snapshot_returns_200_with_valid_json() -> Result<(), AppError> {
     let SnapshotTestContext {
         state,
         shared,
-        bearer,
+        session_injector,
     } = setup_snapshot_test("snapshot_returns_200_with_valid_json").await?;
 
     let game = create_snapshot_game(&shared, SnapshotGameOptions::default()).await?;
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games::configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
         })
         .build()
         .await?;
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/state", game.game_id))
-        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -128,16 +122,13 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
     let SnapshotTestContext {
         state,
         shared,
-        bearer,
+        session_injector,
     } = setup_snapshot_test("snapshot_invalid_game_id_returns_400").await?;
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games::configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
         })
         .build()
         .await?;
@@ -145,7 +136,6 @@ async fn test_snapshot_invalid_game_id_returns_400() -> Result<(), AppError> {
     // Call with invalid game_id (not a number)
     let req = test::TestRequest::get()
         .uri("/api/games/not-a-number/state")
-        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -168,16 +158,13 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
     let SnapshotTestContext {
         state,
         shared,
-        bearer,
+        session_injector,
     } = setup_snapshot_test("snapshot_nonexistent_game_returns_404").await?;
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games::configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
         })
         .build()
         .await?;
@@ -185,7 +172,6 @@ async fn test_snapshot_nonexistent_game_returns_404() -> Result<(), AppError> {
     // Call with a valid ID format but nonexistent game (very large ID)
     let req = test::TestRequest::get()
         .uri("/api/games/999999999/state")
-        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -207,25 +193,21 @@ async fn test_snapshot_phase_structure() -> Result<(), AppError> {
     let SnapshotTestContext {
         state,
         shared,
-        bearer,
+        session_injector,
     } = setup_snapshot_test("snapshot_phase_structure").await?;
 
     let game = create_snapshot_game(&shared, SnapshotGameOptions::default()).await?;
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games::configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(games::configure_routes));
         })
         .build()
         .await?;
 
     let req = test::TestRequest::get()
         .uri(&format!("/api/games/{}/state", game.game_id))
-        .insert_header(("Authorization", bearer.clone()))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 

@@ -81,11 +81,10 @@ On each request, `SessionExtract`:
 2. Looks up `session:<token>` in Redis.
 3. Returns 401 if the token is missing or not found.
 4. Returns 503 if Redis is unavailable.
-5. Re-checks the email allowlist if configured (allows revocation without token deletion).
-6. Slides the session TTL by resetting it to 24 hours.
-7. Inserts `SessionData` into request extensions for downstream extractors.
+5. Slides the session TTL by resetting it to 24 hours.
+6. Inserts `SessionData` into request extensions for downstream extractors.
 
-The `CurrentUser` extractor reads `SessionData` from request extensions. It does not perform a database lookup.
+The `CurrentUser` extractor reads `SessionData` from request extensions, then performs a single database lookup by `user_id` to fetch the user's `username` and `role`. These fields are not stored in `SessionData` and must come from the database.
 
 ## Frontend API Authentication
 
@@ -169,4 +168,4 @@ On session expiry, the next API call returns 401. The frontend redirects to sign
 
 ## Testing
 
-Tests that exercise `SessionExtract` end-to-end require a real Redis connection (`NOMMIE_TEST_REDIS_URL`). Tests that only test route handlers or downstream logic use `TestSessionInjector`, which injects `SessionData` directly into request extensions without Redis.
+Tests that exercise `SessionExtract` end-to-end require a real Redis connection (`REDIS_URL`). Tests that only test route handlers or downstream logic use `TestSessionInjector`, which injects `SessionData` directly into request extensions without Redis.

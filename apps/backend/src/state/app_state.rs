@@ -2,11 +2,11 @@ use std::fmt;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 
+use redis::aio::ConnectionManager;
 use sea_orm::DatabaseConnection;
 use tracing::info;
 
 use super::admission_mode::AdmissionMode;
-use super::security_config::SecurityConfig;
 use crate::auth::google::GoogleVerifier;
 use crate::config::db::RuntimeEnv;
 use crate::readiness::ReadinessManager;
@@ -29,7 +29,6 @@ pub struct AppConfig {
     pub env: RuntimeEnv,
     pub db_url: Secret<String>,
     pub redis_url: Secret<Option<String>>,
-    pub security: SecurityConfig,
     pub google_verifier: GoogleVerifier,
     /// Admission mode for first-time signup. Sourced from ALLOWED_EMAILS at startup.
     pub admission_mode: AdmissionMode,
@@ -45,9 +44,12 @@ pub struct AppState {
     realtime: Arc<RwLock<Option<Arc<RealtimeBroker>>>>,
     /// WebSocket session registry.
     websocket_registry: Arc<RwLock<Option<Arc<WsRegistry>>>>,
+    /// Session Redis connection for session store
+    session_redis: Arc<RwLock<Option<ConnectionManager>>>,
     /// Singleflight flags for resolution
     pub db_resolution_in_flight: AtomicBool,
     pub redis_resolution_in_flight: AtomicBool,
+    pub session_redis_resolution_in_flight: AtomicBool,
     /// Snapshot cache for optimizing WebSocket broadcasts.
     pub snapshot_cache: Arc<SnapshotCache>,
     /// Readiness state manager.
@@ -67,8 +69,10 @@ impl AppState {
             db: Arc::new(RwLock::new(db)),
             realtime: Arc::new(RwLock::new(realtime)),
             websocket_registry: Arc::new(RwLock::new(registry)),
+            session_redis: Arc::new(RwLock::new(None)),
             db_resolution_in_flight: AtomicBool::new(false),
             redis_resolution_in_flight: AtomicBool::new(false),
+            session_redis_resolution_in_flight: AtomicBool::new(false),
             snapshot_cache: Arc::new(SnapshotCache::new()),
             readiness,
         }
@@ -113,11 +117,6 @@ impl AppState {
         }
     }
 
-    /// Get the security configuration.
-    pub fn security(&self) -> &SecurityConfig {
-        &self.config.security
-    }
-
     /// Get a clone of the database connection if available
     ///
     /// Note: Returns an Option<DatabaseConnection> because SeaORM connections
@@ -156,5 +155,17 @@ impl AppState {
     /// Get an Arc clone of the snapshot cache.
     pub fn snapshot_cache_arc(&self) -> Arc<SnapshotCache> {
         self.snapshot_cache.clone()
+    }
+
+    /// Get a clone of the session Redis connection manager, if available.
+    pub fn session_redis(&self) -> Option<ConnectionManager> {
+        self.session_redis.read().ok()?.clone()
+    }
+
+    /// Set the session Redis connection manager.
+    pub fn set_session_redis(&self, cm: ConnectionManager) {
+        if let Ok(mut r) = self.session_redis.write() {
+            *r = Some(cm);
+        }
     }
 }

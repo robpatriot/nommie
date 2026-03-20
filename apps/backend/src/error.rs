@@ -90,12 +90,8 @@ pub enum AppError {
     NotFound { code: ErrorCode, detail: String },
     #[error("Unauthorized")]
     Unauthorized,
-    #[error("UnauthorizedMissingBearer")]
-    UnauthorizedMissingBearer,
-    #[error("UnauthorizedInvalidJwt")]
-    UnauthorizedInvalidJwt,
-    #[error("UnauthorizedExpiredJwt")]
-    UnauthorizedExpiredJwt,
+    #[error("UnauthorizedInvalidToken")]
+    UnauthorizedInvalidToken,
     #[error("Forbidden: {detail}")]
     Forbidden { code: ErrorCode, detail: String },
     #[error("Forbidden: User not found")]
@@ -166,9 +162,7 @@ impl AppError {
             AppError::Db { .. } => ErrorCode::DbError,
             AppError::NotFound { code, .. } => *code,
             AppError::Unauthorized => ErrorCode::Unauthorized,
-            AppError::UnauthorizedMissingBearer => ErrorCode::UnauthorizedMissingBearer,
-            AppError::UnauthorizedInvalidJwt => ErrorCode::UnauthorizedInvalidJwt,
-            AppError::UnauthorizedExpiredJwt => ErrorCode::UnauthorizedExpiredJwt,
+            AppError::UnauthorizedInvalidToken => ErrorCode::UnauthorizedInvalidToken,
             AppError::Forbidden { code, .. } => *code,
             AppError::ForbiddenUserNotFound => ErrorCode::ForbiddenUserNotFound,
             // EmailNotAllowed is handled via Forbidden variant with EmailNotAllowed code
@@ -211,9 +205,7 @@ impl AppError {
             AppError::Db { detail, .. } => detail.clone(),
             AppError::NotFound { detail, .. } => detail.clone(),
             AppError::Unauthorized => "Authentication required".to_string(),
-            AppError::UnauthorizedMissingBearer => "Missing or malformed Bearer token".to_string(),
-            AppError::UnauthorizedInvalidJwt => "Invalid JWT".to_string(),
-            AppError::UnauthorizedExpiredJwt => "Token expired".to_string(),
+            AppError::UnauthorizedInvalidToken => "Session token not found".to_string(),
             AppError::Forbidden { detail, .. } => detail.clone(),
             AppError::ForbiddenUserNotFound => {
                 // Avoid leaking whether a user record exists; present a generic message
@@ -238,9 +230,7 @@ impl AppError {
             AppError::Db { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             AppError::NotFound { .. } => StatusCode::NOT_FOUND,
             AppError::Unauthorized => StatusCode::UNAUTHORIZED,
-            AppError::UnauthorizedMissingBearer => StatusCode::UNAUTHORIZED,
-            AppError::UnauthorizedInvalidJwt => StatusCode::UNAUTHORIZED,
-            AppError::UnauthorizedExpiredJwt => StatusCode::UNAUTHORIZED,
+            AppError::UnauthorizedInvalidToken => StatusCode::UNAUTHORIZED,
             AppError::Forbidden { .. } => StatusCode::FORBIDDEN,
             AppError::ForbiddenUserNotFound => StatusCode::UNAUTHORIZED,
             AppError::BadRequest { .. } => StatusCode::BAD_REQUEST,
@@ -312,16 +302,8 @@ impl AppError {
         Self::Unauthorized
     }
 
-    pub fn unauthorized_missing_bearer() -> Self {
-        Self::UnauthorizedMissingBearer
-    }
-
-    pub fn unauthorized_invalid_jwt() -> Self {
-        Self::UnauthorizedInvalidJwt
-    }
-
-    pub fn unauthorized_expired_jwt() -> Self {
-        Self::UnauthorizedExpiredJwt
+    pub fn unauthorized_invalid_token() -> Self {
+        Self::UnauthorizedInvalidToken
     }
 
     pub fn forbidden() -> Self {
@@ -756,9 +738,7 @@ impl AppError {
             | AppError::ForbiddenUserNotFound
             | AppError::BadRequest { .. }
             | AppError::Unauthorized
-            | AppError::UnauthorizedMissingBearer
-            | AppError::UnauthorizedInvalidJwt
-            | AppError::UnauthorizedExpiredJwt => {
+            | AppError::UnauthorizedInvalidToken => {
                 warn!(
                     code = %self.code(),
                     status = %status.as_u16(),

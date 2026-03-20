@@ -6,7 +6,7 @@ use std::time::Duration;
 use backend::db::require_db;
 use serde_json::json;
 
-use crate::support::auth::mint_test_token;
+use crate::support::auth::create_test_ws_token;
 use crate::support::build_test_state;
 use crate::support::factory::create_test_user;
 use crate::support::game_setup::setup_game_with_players;
@@ -17,7 +17,9 @@ use crate::support::websocket_client::WebSocketClient;
 #[tokio::test]
 async fn websocket_bad_protocol_sends_error_and_closes() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -26,8 +28,8 @@ async fn websocket_bad_protocol_sends_error_and_closes() -> Result<(), Box<dyn s
     let user_email = format!("{test_name}@example.com");
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
+    let token = create_test_ws_token(&state, user_id, &user_sub, &user_email).await?;
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -62,7 +64,9 @@ async fn websocket_bad_protocol_sends_error_and_closes() -> Result<(), Box<dyn s
 async fn websocket_malformed_json_sends_bad_request_and_closes(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -71,8 +75,8 @@ async fn websocket_malformed_json_sends_bad_request_and_closes(
     let user_email = format!("{test_name}@example.com");
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
+    let token = create_test_ws_token(&state, user_id, &user_sub, &user_email).await?;
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -102,7 +106,9 @@ async fn websocket_malformed_json_sends_bad_request_and_closes(
 #[tokio::test]
 async fn websocket_subscribe_before_hello_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -113,8 +119,8 @@ async fn websocket_subscribe_before_hello_is_rejected() -> Result<(), Box<dyn st
     let user_email = format!("{test_name}@example.com");
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
+    let token = create_test_ws_token(&state, user_id, &user_sub, &user_email).await?;
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -149,7 +155,9 @@ async fn websocket_subscribe_before_hello_is_rejected() -> Result<(), Box<dyn st
 async fn websocket_unauthorized_subscription_is_forbidden() -> Result<(), Box<dyn std::error::Error>>
 {
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -160,8 +168,8 @@ async fn websocket_unauthorized_subscription_is_forbidden() -> Result<(), Box<dy
     let user_email = format!("{test_name}_outsider@example.com");
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Outsider")).await?;
 
+    let token = create_test_ws_token(&state, user_id, &user_sub, &user_email).await?;
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -183,7 +191,6 @@ async fn websocket_unauthorized_subscription_is_forbidden() -> Result<(), Box<dy
     assert_eq!(err["message"], "Not a member of this game");
 
     // Ensure the socket is still open (no close immediately after forbidden).
-    // We expect no immediate follow-up message.
     let after = client
         .recv_json_allow_error(Duration::from_millis(250))
         .await?;

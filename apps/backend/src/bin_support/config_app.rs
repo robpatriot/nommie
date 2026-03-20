@@ -19,9 +19,6 @@ pub struct Config {
     // Database configuration (hardcoded to Prod/Postgres for binary)
     pub runtime_env: RuntimeEnv,
 
-    // Security configuration
-    pub jwt_secret: String,
-
     // Redis configuration
     pub redis_url: String,
 
@@ -56,15 +53,6 @@ impl Config {
 
         // Database configuration (hardcoded for binary)
         let runtime_env = RuntimeEnv::Prod;
-
-        // Security configuration
-        let jwt_secret = env::var("BACKEND_JWT_SECRET").map_err(|_| AppError::Config {
-            detail: "BACKEND_JWT_SECRET must be set".to_string(),
-            source: Box::new(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "BACKEND_JWT_SECRET environment variable not found",
-            )),
-        })?;
 
         // Redis configuration
         let redis_url = env::var("REDIS_URL").map_err(|_| AppError::Config {
@@ -112,7 +100,6 @@ impl Config {
             host,
             port,
             runtime_env,
-            jwt_secret,
             redis_url,
             google_client_id,
             max_json_payload_size,
@@ -123,29 +110,6 @@ impl Config {
 
     /// Validate critical environment variables at startup
     fn validate_required_env() -> Result<(), AppError> {
-        // BACKEND_JWT_SECRET: required, non-empty, minimum length
-        match env::var("BACKEND_JWT_SECRET") {
-            Ok(secret) if secret.len() >= 32 => {}
-            Ok(_) => {
-                return Err(AppError::Config {
-                    detail: "BACKEND_JWT_SECRET is too short. It should be at least 32 characters for security.".to_string(),
-                    source: Box::new(std::io::Error::new(
-                        std::io::ErrorKind::InvalidInput,
-                        "BACKEND_JWT_SECRET length validation failed",
-                    )),
-                });
-            }
-            Err(_) => {
-                return Err(AppError::Config {
-                    detail: "BACKEND_JWT_SECRET must be set.".to_string(),
-                    source: Box::new(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        "BACKEND_JWT_SECRET environment variable not found",
-                    )),
-                });
-            }
-        }
-
         // Database environment for production: basic presence checks
         // (detailed validation still happens in db config errors).
         if cfg!(not(test)) {

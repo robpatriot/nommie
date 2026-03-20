@@ -2,7 +2,7 @@ use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpMessage, HttpRequest};
 use serde::{Deserialize, Serialize};
 
-use crate::auth::claims::BackendClaims;
+use crate::auth::session::SessionData;
 use crate::db::require_db;
 use crate::db::txn::SharedTxn;
 use crate::entities::users::UserRole;
@@ -11,14 +11,15 @@ use crate::repos::users;
 use crate::state::app_state::AppState;
 
 /// Current user record from the database
-/// This contains the actual user data from the database, extracted from JWT claims
-/// stored in request extensions by the JwtExtract middleware
+/// This contains the actual user data from the database, extracted from SessionData
+/// stored in request extensions by the SessionExtract middleware
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CurrentUser {
     pub id: i64,
     pub email: Option<String>,
     pub username: Option<String>,
     pub role: UserRole,
+    pub sub: String,
 }
 
 impl FromRequest for CurrentUser {
@@ -29,15 +30,14 @@ impl FromRequest for CurrentUser {
         let req = req.clone();
 
         Box::pin(async move {
-            // Read BackendClaims from request extensions (stored by JwtExtract middleware)
-            let claims = req
+            // Read SessionData from request extensions (stored by SessionExtract middleware)
+            let session_data = req
                 .extensions()
-                .get::<BackendClaims>()
-                .ok_or_else(AppError::unauthorized_missing_bearer)?
+                .get::<SessionData>()
+                .ok_or_else(AppError::unauthorized)?
                 .clone();
 
-            // Parse sub as user id
-            let user_id: i64 = claims.sub.parse().map_err(|_| AppError::unauthorized())?;
+            let user_id = session_data.user_id;
 
             // Get database connection from AppState
             let app_state = req.app_data::<web::Data<AppState>>().ok_or_else(|| {
@@ -66,9 +66,10 @@ impl FromRequest for CurrentUser {
 
             Ok(CurrentUser {
                 id: user.id,
-                email: Some(claims.email),
+                email: Some(session_data.email),
                 username: user.username,
                 role: user.role,
+                sub: session_data.sub,
             })
         })
     }

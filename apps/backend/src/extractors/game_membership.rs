@@ -1,7 +1,7 @@
 use actix_web::dev::Payload;
 use actix_web::{web, FromRequest, HttpMessage, HttpRequest};
 
-use crate::auth::claims::BackendClaims;
+use crate::auth::session::SessionData;
 use crate::db::require_db;
 use crate::db::txn::SharedTxn;
 use crate::error::AppError;
@@ -35,8 +35,8 @@ pub type GameMembership = ServiceGameMembership;
 async fn resolve_membership(req: HttpRequest) -> Result<GameMembership, AppError> {
     let claims = req
         .extensions()
-        .get::<BackendClaims>()
-        .ok_or_else(AppError::unauthorized_missing_bearer)?
+        .get::<SessionData>()
+        .ok_or_else(AppError::unauthorized)?
         .clone();
 
     let game_id_value = req
@@ -66,7 +66,7 @@ async fn resolve_membership(req: HttpRequest) -> Result<GameMembership, AppError
         )
     })?;
 
-    let user_id: i64 = claims.sub.parse().map_err(|_| AppError::unauthorized())?;
+    let user_id: i64 = claims.user_id;
 
     let user = match SharedTxn::from_req(&req) {
         Some(shared_txn) => users::find_user_by_id(shared_txn.transaction(), user_id).await?,

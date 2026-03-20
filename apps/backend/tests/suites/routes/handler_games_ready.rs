@@ -4,22 +4,19 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState};
-use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
-use backend::state::security_config::SecurityConfig;
 use backend::AppError;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
 use crate::support::app_builder::create_test_app;
-use crate::support::auth::mint_test_token;
 use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player_with_ready;
 use crate::support::factory::{create_fresh_lobby_game, create_test_user};
+use crate::support::test_middleware::TestSessionInjector;
 
 #[tokio::test]
 async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
 
@@ -31,15 +28,12 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
 
     create_test_game_player_with_ready(shared.transaction(), game_id, user_id, 0, false).await?;
 
-    let token = mint_test_token(&user_id.to_string(), user_email, &security);
+    let session_injector = TestSessionInjector::new(user_id, user_sub, user_email);
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(configure_routes));
         })
         .build()
         .await?;
@@ -51,7 +45,6 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ready"))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(serde_json::json!({ "is_ready": true, "version": game.version }))
         .to_request();
     req.extensions_mut().insert(shared.clone());
@@ -76,7 +69,6 @@ async fn mark_ready_sets_membership_flag() -> Result<(), AppError> {
 #[tokio::test]
 async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
 
@@ -96,15 +88,12 @@ async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
             .await?;
     }
 
-    let token = mint_test_token(&actor_id.to_string(), actor_email, &security);
+    let session_injector = TestSessionInjector::new(actor_id, actor_sub, actor_email);
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(configure_routes));
         })
         .build()
         .await?;
@@ -116,7 +105,6 @@ async fn mark_ready_auto_starts_when_all_ready() -> Result<(), AppError> {
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ready"))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(serde_json::json!({ "is_ready": true, "version": game.version }))
         .to_request();
     req.extensions_mut().insert(shared.clone());

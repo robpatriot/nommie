@@ -31,9 +31,6 @@ async fn main() -> std::io::Result<()> {
         config.host, config.port
     );
 
-    let security_config =
-        backend::state::security_config::SecurityConfig::new(config.jwt_secret.as_bytes());
-
     // ── Readiness manager ──────────────────────────────────────────
     let readiness = Arc::new(backend::readiness::ReadinessManager::new());
 
@@ -49,7 +46,6 @@ async fn main() -> std::io::Result<()> {
     );
     let app_state = backend::infra::state::build_state()
         .with_env(config.runtime_env)
-        .with_security(security_config)
         .with_google_verifier(google_verifier)
         .with_redis_url(Some(config.redis_url.clone()))
         .with_readiness(readiness.clone())
@@ -131,7 +127,7 @@ async fn main() -> std::io::Result<()> {
                     .wrap(backend::middleware::readiness_gate::ReadinessGate)
                     .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(api_limiter.clone())
-                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .wrap(backend::middleware::session_extract::SessionExtract)
                     .configure(backend::routes::games::configure_routes),
             )
             .service(
@@ -141,7 +137,7 @@ async fn main() -> std::io::Result<()> {
                     .wrap(backend::middleware::readiness_gate::ReadinessGate)
                     .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(api_limiter.clone())
-                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .wrap(backend::middleware::session_extract::SessionExtract)
                     .configure(backend::routes::user::configure_routes)
                     .configure(backend::routes::user_options::configure_routes),
             )
@@ -154,7 +150,7 @@ async fn main() -> std::io::Result<()> {
                     .wrap(backend::middleware::readiness_gate::ReadinessGate)
                     .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(api_limiter.clone())
-                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .wrap(backend::middleware::session_extract::SessionExtract)
                     .configure(backend::routes::admin::configure_routes),
             )
             .service(
@@ -164,13 +160,13 @@ async fn main() -> std::io::Result<()> {
                     .wrap(backend::middleware::readiness_gate::ReadinessGate)
                     .wrap(backend::middleware::db_readiness_reporter::DbReadinessReporter)
                     .wrap(api_limiter.clone())
-                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .wrap(backend::middleware::session_extract::SessionExtract)
                     .configure(backend::routes::realtime::configure_routes),
             )
             // WebSocket upgrade endpoint (generic, authenticated transport)
             .service(
                 actix_web::web::scope("/ws")
-                    .wrap(backend::middleware::jwt_extract::JwtExtract)
+                    .wrap(backend::middleware::session_extract::SessionExtract)
                     .service(
                         // GET /ws
                         actix_web::web::resource("")

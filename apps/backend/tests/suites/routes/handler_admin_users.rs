@@ -7,14 +7,13 @@ use actix_web::{test, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::users::UserRole;
-use backend::state::security_config::SecurityConfig;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use serde_json::Value;
 
 use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
-use crate::support::auth::mint_test_token;
 use crate::support::factory::{seed_user_with_sub, seed_user_with_sub_and_role};
+use crate::support::test_middleware::TestSessionInjector;
 use crate::support::test_state_builder;
 
 async fn call_service_or_error<S>(app: &mut S, req: Request) -> ServiceResponse<BoxBody>
@@ -31,23 +30,9 @@ where
     }
 }
 
-fn admin_token_and_shared(
-    user_id: i64,
-    email: &str,
-    security_config: &SecurityConfig,
-    _shared: &SharedTxn,
-) -> String {
-    mint_test_token(&user_id.to_string(), email, security_config)
-}
-
 #[actix_web::test]
 async fn get_search_200_with_valid_params_admin_user() -> Result<(), Box<dyn std::error::Error>> {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
@@ -63,13 +48,15 @@ async fn get_search_200_with_valid_params_admin_user() -> Result<(), Box<dyn std
     .await
     .expect("should create admin");
 
-    let token = admin_token_and_shared(admin.id, &test_email, &security_config, &shared);
-
-    let mut app = create_test_app(state).with_prod_routes().build().await?;
+    let session_injector = TestSessionInjector::new(admin.id, &test_sub, &test_email);
+    let mut app = create_test_app(state)
+        .with_prod_routes()
+        .with_session(session_injector)
+        .build()
+        .await?;
 
     let req = test::TestRequest::get()
         .uri("/api/admin/users/search?q=user")
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -88,12 +75,7 @@ async fn get_search_200_with_valid_params_admin_user() -> Result<(), Box<dyn std
 
 #[actix_web::test]
 async fn get_search_403_for_non_admin() -> Result<(), Box<dyn std::error::Error>> {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
@@ -104,13 +86,15 @@ async fn get_search_403_for_non_admin() -> Result<(), Box<dyn std::error::Error>
         .await
         .expect("should create user");
 
-    let token = admin_token_and_shared(user.id, &test_email, &security_config, &shared);
-
-    let mut app = create_test_app(state).with_prod_routes().build().await?;
+    let session_injector = TestSessionInjector::new(user.id, &test_sub, &test_email);
+    let mut app = create_test_app(state)
+        .with_prod_routes()
+        .with_session(session_injector)
+        .build()
+        .await?;
 
     let req = test::TestRequest::get()
         .uri("/api/admin/users/search?q=user")
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -126,12 +110,7 @@ async fn get_search_403_for_non_admin() -> Result<(), Box<dyn std::error::Error>
 #[actix_web::test]
 async fn post_grant_admin_200_body_has_user_and_changed() -> Result<(), Box<dyn std::error::Error>>
 {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
@@ -153,13 +132,15 @@ async fn post_grant_admin_200_body_has_user_and_changed() -> Result<(), Box<dyn 
         .await
         .expect("should create target user");
 
-    let token = admin_token_and_shared(admin.id, &admin_email, &security_config, &shared);
-
-    let mut app = create_test_app(state).with_prod_routes().build().await?;
+    let session_injector = TestSessionInjector::new(admin.id, &admin_sub, &admin_email);
+    let mut app = create_test_app(state)
+        .with_prod_routes()
+        .with_session(session_injector)
+        .build()
+        .await?;
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/admin/users/{}/grant-admin", target.id))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .insert_header(("content-type", "application/json"))
         .set_payload(r#"{}"#)
         .to_request();
@@ -181,12 +162,7 @@ async fn post_grant_admin_200_body_has_user_and_changed() -> Result<(), Box<dyn 
 
 #[actix_web::test]
 async fn post_grant_admin_404_for_non_existent_user() -> Result<(), Box<dyn std::error::Error>> {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
@@ -202,9 +178,12 @@ async fn post_grant_admin_404_for_non_existent_user() -> Result<(), Box<dyn std:
     .await
     .expect("should create admin");
 
-    let token = admin_token_and_shared(admin.id, &admin_email, &security_config, &shared);
-
-    let mut app = create_test_app(state).with_prod_routes().build().await?;
+    let session_injector = TestSessionInjector::new(admin.id, &admin_sub, &admin_email);
+    let mut app = create_test_app(state)
+        .with_prod_routes()
+        .with_session(session_injector)
+        .build()
+        .await?;
 
     let non_existent_user_id = 999999999i64;
 
@@ -213,7 +192,6 @@ async fn post_grant_admin_404_for_non_existent_user() -> Result<(), Box<dyn std:
             "/api/admin/users/{}/grant-admin",
             non_existent_user_id
         ))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .insert_header(("content-type", "application/json"))
         .set_payload(r#"{}"#)
         .to_request();
@@ -231,12 +209,7 @@ async fn post_grant_admin_404_for_non_existent_user() -> Result<(), Box<dyn std:
 
 #[actix_web::test]
 async fn post_revoke_admin_409_for_self_revoke() -> Result<(), Box<dyn std::error::Error>> {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
@@ -252,13 +225,15 @@ async fn post_revoke_admin_409_for_self_revoke() -> Result<(), Box<dyn std::erro
     .await
     .expect("should create admin");
 
-    let token = admin_token_and_shared(admin.id, &admin_email, &security_config, &shared);
-
-    let mut app = create_test_app(state).with_prod_routes().build().await?;
+    let session_injector = TestSessionInjector::new(admin.id, &admin_sub, &admin_email);
+    let mut app = create_test_app(state)
+        .with_prod_routes()
+        .with_session(session_injector)
+        .build()
+        .await?;
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/admin/users/{}/revoke-admin", admin.id))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .insert_header(("content-type", "application/json"))
         .set_payload(r#"{}"#)
         .to_request();

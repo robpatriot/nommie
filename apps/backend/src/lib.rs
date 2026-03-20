@@ -66,7 +66,6 @@ pub mod prelude {
     pub use super::extractors::ValidatedJson;
     // State building
     pub use super::infra::state::build_state;
-    pub use super::state::security_config::SecurityConfig;
 }
 
 // Auto-initialize logging for unit tests

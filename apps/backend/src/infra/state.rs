@@ -6,13 +6,11 @@ use crate::error::AppError;
 use crate::infra::db::bootstrap_db;
 use crate::readiness::ReadinessManager;
 use crate::state::app_state::AppState;
-use crate::state::security_config::SecurityConfig;
 use crate::ws::hub::RealtimeBroker;
 
 /// Builder for creating AppState instances
 #[derive(Default)]
 pub struct StateBuilder {
-    security_config: SecurityConfig,
     env: Option<RuntimeEnv>,
     redis_url: Option<String>,
     readiness: Option<Arc<ReadinessManager>>,
@@ -110,7 +108,7 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
         return Err(e);
     }
 
-    // 2. Resolve Redis
+    // 2. Resolve Redis (broker for realtime)
     if let Some(url) = &state.config.redis_url.0 {
         if let Some(guard) = ResolutionGuard::try_acquire(&state.redis_resolution_in_flight) {
             let realtime = state.realtime();
@@ -162,6 +160,25 @@ pub async fn resolve_dependencies(state: &AppState) -> Result<(), AppError> {
             }
             drop(guard);
         }
+
+        // Initialize session Redis connection (separate from broker)
+        if state.session_redis().is_none() {
+            match redis::Client::open(url.as_str()) {
+                Ok(client) => {
+                    match redis::aio::ConnectionManager::new(client).await {
+                        Ok(cm) => {
+                            state.set_session_redis(cm);
+                        }
+                        Err(e) => {
+                            tracing::warn!("session Redis connection failed: {e}");
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("session Redis client init failed: {e}");
+                }
+            }
+        }
     }
 
     if let Some(e) = terminal_error {
@@ -195,11 +212,6 @@ async fn check_db_ping(
 impl StateBuilder {
     pub fn with_env(mut self, env: RuntimeEnv) -> Self {
         self.env = Some(env);
-        self
-    }
-
-    pub fn with_security(mut self, security_config: SecurityConfig) -> Self {
-        self.security_config = security_config;
         self
     }
 
@@ -253,7 +265,6 @@ impl StateBuilder {
                     env,
                     db_url,
                     redis_url,
-                    security: self.security_config,
                     google_verifier,
                     admission_mode,
                 };
@@ -281,7 +292,6 @@ impl StateBuilder {
                     env: RuntimeEnv::Test,
                     db_url,
                     redis_url,
-                    security: self.security_config,
                     google_verifier,
                     admission_mode,
                 };

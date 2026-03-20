@@ -7,7 +7,6 @@
     "FORBIDDEN": "No tienes acceso para hacer eso.",
     "FORBIDDEN_USER_NOT_FOUND": "No se pudo encontrar tu cuenta.",
     "EMAIL_NOT_ALLOWED": "Acceso restringido. Contacta con soporte.",
-    "MISSING_BACKEND_JWT": "Inicia sesión para continuar.",
     "BACKEND_STARTING": "El servidor se está iniciando. Inténtalo de nuevo en un momento.",
     "NOT_A_MEMBER": "No eres miembro de esta partida.",
     "INSUFFICIENT_ROLE": "No tienes permisos para hacer eso.",

@@ -17,13 +17,11 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games;
 use backend::http::etag::game_etag;
-use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games as games_routes;
 use backend::AppError;
 use sea_orm::{ActiveModelTrait, EntityTrait};
 
 use crate::support::app_builder::create_test_app;
-use crate::support::auth::mint_test_token;
 use crate::support::build_test_state;
 use crate::support::db_memberships::{attach_human_to_seat, create_test_game_player_with_ready};
 use crate::support::factory::{create_fresh_lobby_game, create_test_user};
@@ -31,17 +29,17 @@ use crate::support::game_phases::{
     setup_game_in_bidding_phase, setup_game_in_trick_play_phase,
     setup_game_in_trump_selection_phase,
 };
+use crate::support::test_middleware::TestSessionInjector;
 
 struct IfMatchTestContext {
     state: backend::state::app_state::AppState,
     shared: SharedTxn,
-    bearer: String,
+    session_injector: TestSessionInjector,
     game_id: i64,
 }
 
 async fn setup_bidding_test(test_name: &str) -> Result<IfMatchTestContext, AppError> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
     let db = require_db(&state)?;
     let shared = SharedTxn::open(&db).await?;
 
@@ -55,19 +53,18 @@ async fn setup_bidding_test(test_name: &str) -> Result<IfMatchTestContext, AppEr
 
     attach_human_to_seat(shared.transaction(), setup.game_id, actor_seat, user_id).await?;
 
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
+    let session_injector = TestSessionInjector::new(user_id, &user_sub, &user_email);
 
     Ok(IfMatchTestContext {
         state,
         shared,
-        bearer: format!("Bearer {token}"),
+        session_injector,
         game_id: setup.game_id,
     })
 }
 
 async fn setup_trump_test(test_name: &str) -> Result<IfMatchTestContext, AppError> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
     let db = require_db(&state)?;
     let shared = SharedTxn::open(&db).await?;
 
@@ -83,12 +80,12 @@ async fn setup_trump_test(test_name: &str) -> Result<IfMatchTestContext, AppErro
 
     attach_human_to_seat(shared.transaction(), setup.game_id, winning_bidder, user_id).await?;
 
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
+    let session_injector = TestSessionInjector::new(user_id, &user_sub, &user_email);
 
     Ok(IfMatchTestContext {
         state,
         shared,
-        bearer: format!("Bearer {token}"),
+        session_injector,
         game_id: setup.game_id,
     })
 }
@@ -97,7 +94,6 @@ async fn setup_play_test(
     test_name: &str,
 ) -> Result<(IfMatchTestContext, backend::domain::Card), AppError> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
     let db = require_db(&state)?;
     let shared = SharedTxn::open(&db).await?;
 
@@ -149,12 +145,12 @@ async fn setup_play_test(
     )?;
     let card_to_play = first_card;
 
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
+    let session_injector = TestSessionInjector::new(user_id, &user_sub, &user_email);
 
     let ctx = IfMatchTestContext {
         state,
         shared,
-        bearer: format!("Bearer {token}"),
+        session_injector,
         game_id: setup.game_id,
     };
 
@@ -163,7 +159,6 @@ async fn setup_play_test(
 
 async fn setup_delete_test(test_name: &str) -> Result<IfMatchTestContext, AppError> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
     let db = require_db(&state)?;
     let shared = SharedTxn::open(&db).await?;
 
@@ -184,12 +179,12 @@ async fn setup_delete_test(test_name: &str) -> Result<IfMatchTestContext, AppErr
     game.created_by = sea_orm::Set(Some(user_id));
     ActiveModelTrait::update(game, shared.transaction()).await?;
 
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
+    let session_injector = TestSessionInjector::new(user_id, &user_sub, &user_email);
 
     Ok(IfMatchTestContext {
         state,
         shared,
-        bearer: format!("Bearer {token}"),
+        session_injector,
         game_id,
     })
 }
@@ -210,11 +205,10 @@ async fn test_bid_with_matching_version_succeeds_and_bumps_etag() -> Result<(), 
     let initial_version = game.version;
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -222,7 +216,6 @@ async fn test_bid_with_matching_version_succeeds_and_bumps_etag() -> Result<(), 
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/bid", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .set_json(serde_json::json!({ "bid": 3, "version": initial_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
@@ -272,11 +265,10 @@ async fn test_bid_with_stale_version_returns_409() -> Result<(), AppError> {
     let stale_version = game.version - 1; // Stale version
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -284,7 +276,6 @@ async fn test_bid_with_stale_version_returns_409() -> Result<(), AppError> {
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/bid", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .set_json(serde_json::json!({ "bid": 3, "version": stale_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
@@ -306,11 +297,10 @@ async fn test_bid_missing_version_returns_400() -> Result<(), AppError> {
     let ctx = setup_bidding_test("bid_missing_version").await?;
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -318,7 +308,6 @@ async fn test_bid_missing_version_returns_400() -> Result<(), AppError> {
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/bid", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         // No version in body
         .set_json(serde_json::json!({ "bid": 3 }))
         .to_request();
@@ -347,11 +336,10 @@ async fn test_trump_with_matching_version_succeeds_and_bumps_etag() -> Result<()
     let initial_version = game.version;
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -359,7 +347,6 @@ async fn test_trump_with_matching_version_succeeds_and_bumps_etag() -> Result<()
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/trump", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .set_json(serde_json::json!({ "trump": "HEARTS", "version": initial_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
@@ -409,11 +396,10 @@ async fn test_trump_with_stale_version_returns_409() -> Result<(), AppError> {
     let stale_version = game.version - 1; // Stale version
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -421,7 +407,6 @@ async fn test_trump_with_stale_version_returns_409() -> Result<(), AppError> {
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/trump", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .set_json(serde_json::json!({ "trump": "HEARTS", "version": stale_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
@@ -475,11 +460,10 @@ async fn test_play_with_matching_version_succeeds_and_bumps_etag() -> Result<(),
     let initial_version = game.version;
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -487,7 +471,6 @@ async fn test_play_with_matching_version_succeeds_and_bumps_etag() -> Result<(),
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/play", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .set_json(serde_json::json!({ "card": card_str, "version": initial_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
@@ -562,11 +545,10 @@ async fn test_play_with_stale_version_returns_409() -> Result<(), AppError> {
     let stale_version = game.version - 1; // Stale version
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -574,7 +556,6 @@ async fn test_play_with_stale_version_returns_409() -> Result<(), AppError> {
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{}/play", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .set_json(serde_json::json!({ "card": card_str, "version": stale_version }))
         .to_request();
     req.extensions_mut().insert(ctx.shared.clone());
@@ -603,11 +584,10 @@ async fn test_delete_with_matching_version_succeeds() -> Result<(), AppError> {
     let initial_version = game.version;
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -615,7 +595,6 @@ async fn test_delete_with_matching_version_succeeds() -> Result<(), AppError> {
 
     let req = test::TestRequest::delete()
         .uri(&format!("/api/games/{}", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .insert_header(("Content-Type", "application/json"))
         .set_json(serde_json::json!({ "version": initial_version }))
         .to_request();
@@ -648,11 +627,10 @@ async fn test_delete_with_stale_version_returns_409() -> Result<(), AppError> {
     let stale_version = game.version - 1; // Stale version
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -660,7 +638,6 @@ async fn test_delete_with_stale_version_returns_409() -> Result<(), AppError> {
 
     let req = test::TestRequest::delete()
         .uri(&format!("/api/games/{}", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .insert_header(("Content-Type", "application/json"))
         .set_json(serde_json::json!({ "version": stale_version }))
         .to_request();
@@ -688,11 +665,10 @@ async fn test_delete_missing_version_returns_400() -> Result<(), AppError> {
     let ctx = setup_delete_test("delete_missing_version").await?;
 
     let app = create_test_app(ctx.state)
+        .with_session(ctx.session_injector)
         .with_routes(|cfg| {
             cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(games_routes::configure_routes),
+                web::scope("/api/games").configure(games_routes::configure_routes),
             );
         })
         .build()
@@ -700,7 +676,6 @@ async fn test_delete_missing_version_returns_400() -> Result<(), AppError> {
 
     let req = test::TestRequest::delete()
         .uri(&format!("/api/games/{}", ctx.game_id))
-        .insert_header(("Authorization", ctx.bearer.clone()))
         .insert_header(("Content-Type", "application/json"))
         // No version in body
         .set_json(serde_json::json!({}))

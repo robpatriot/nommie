@@ -16,8 +16,8 @@ export class BackendApiError extends Error {
  * Check if an error represents a stale user session.
  * Stale sessions occur when:
  * - 401: User is not authorized (generic)
- * - 401 MISSING_BACKEND_JWT: No JWT cookie available
- * - 401 FORBIDDEN_USER_NOT_FOUND: JWT valid but user no longer in DB (e.g. DB wipe)
+ * - 401 UNAUTHORIZED: No session cookie available
+ * - 401 FORBIDDEN_USER_NOT_FOUND: Session valid but user no longer in DB (e.g. DB wipe)
  */
 export function isStaleSessionError(error: unknown): boolean {
   if (!(error instanceof BackendApiError)) {
@@ -30,7 +30,7 @@ export function isStaleSessionError(error: unknown): boolean {
   }
 
   // Match specific codes if they're not 401 (though usually they are)
-  const staleCodes = ['FORBIDDEN_USER_NOT_FOUND', 'MISSING_BACKEND_JWT']
+  const staleCodes = ['FORBIDDEN_USER_NOT_FOUND', 'UNAUTHORIZED']
   if (error.code && staleCodes.includes(error.code)) {
     return true
   }

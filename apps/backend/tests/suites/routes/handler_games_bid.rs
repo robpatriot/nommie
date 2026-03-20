@@ -2,7 +2,6 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::{games, round_bids};
 use backend::services::game_flow::GameFlowService;
-use backend::state::security_config::SecurityConfig;
 use backend::{AppError, ErrorCode};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
@@ -11,9 +10,7 @@ use crate::support::test_state_builder;
 
 #[tokio::test]
 async fn submit_bid_success() -> Result<(), AppError> {
-    let security = SecurityConfig::new("routes-bid-secret");
     let state = test_state_builder()?
-        .with_security(security)
         .build()
         .await?;
 
@@ -59,9 +56,7 @@ async fn submit_bid_success() -> Result<(), AppError> {
 
 #[tokio::test]
 async fn submit_bid_out_of_turn_rejected() -> Result<(), AppError> {
-    let security = SecurityConfig::new("routes-bid-secret");
     let state = test_state_builder()?
-        .with_security(security)
         .build()
         .await?;
 

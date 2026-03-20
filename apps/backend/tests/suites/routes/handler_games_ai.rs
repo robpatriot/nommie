@@ -4,24 +4,21 @@ use backend::ai::{Heuristic, RandomPlayer};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::{ai_profiles, game_players, games};
-use backend::middleware::jwt_extract::JwtExtract;
 use backend::routes::games::configure_routes;
-use backend::state::security_config::SecurityConfig;
 use backend::AppError;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serde_json::json;
 
 use crate::support::app_builder::create_test_app;
-use crate::support::auth::mint_test_token;
 use crate::support::build_test_state;
 use crate::support::db_memberships::create_test_game_player_with_ready;
 use crate::support::factory::{create_fresh_lobby_game, create_test_user};
+use crate::support::test_middleware::TestSessionInjector;
 use crate::support::test_utils::test_user_sub;
 
 #[tokio::test]
 async fn starting_game_by_adding_last_ai_seat_drains_ai_turns() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
 
@@ -47,15 +44,12 @@ async fn starting_game_by_adding_last_ai_seat_drains_ai_turns() -> Result<(), Ap
 
     let host_sub = test_user_sub(&format!("{test_name}_creator"));
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
+    let session_injector = TestSessionInjector::new(host_user_id, &host_sub, &host_email);
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(configure_routes));
         })
         .build()
         .await?;
@@ -68,7 +62,6 @@ async fn starting_game_by_adding_last_ai_seat_drains_ai_turns() -> Result<(), Ap
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "registry_name": RandomPlayer::NAME,
             "version": version
@@ -113,7 +106,6 @@ async fn starting_game_by_adding_last_ai_seat_drains_ai_turns() -> Result<(), Ap
 #[tokio::test]
 async fn host_can_add_ai_seat() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
 
@@ -129,15 +121,12 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
 
     let host_sub = test_user_sub(&format!("{test_name}_creator"));
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
+    let session_injector = TestSessionInjector::new(host_user_id, &host_sub, &host_email);
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(configure_routes));
         })
         .build()
         .await?;
@@ -150,7 +139,6 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "registry_name": Heuristic::NAME,
             "version": version
@@ -192,7 +180,6 @@ async fn host_can_add_ai_seat() -> Result<(), AppError> {
 #[tokio::test]
 async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
 
@@ -208,15 +195,12 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
 
     let host_sub = test_user_sub(&format!("{test_name}_creator"));
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
+    let session_injector = TestSessionInjector::new(host_user_id, &host_sub, &host_email);
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(configure_routes));
         })
         .build()
         .await?;
@@ -230,7 +214,6 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
     // Add initial AI seat (defaults to heuristic).
     let add_req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "registry_name": Heuristic::NAME,
             "version": version
@@ -251,7 +234,6 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
     // Update the AI seat to RandomPlayer.
     let update_req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/update"))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "seat": 1,
             "registry_name": RandomPlayer::NAME,
@@ -302,7 +284,6 @@ async fn host_can_update_ai_seat_profile() -> Result<(), AppError> {
 #[tokio::test]
 async fn host_can_remove_ai_seat() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
 
@@ -318,15 +299,12 @@ async fn host_can_remove_ai_seat() -> Result<(), AppError> {
 
     let host_sub = test_user_sub(&format!("{test_name}_creator"));
     let host_email = format!("{host_sub}@example.com");
-    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
+    let session_injector = TestSessionInjector::new(host_user_id, &host_sub, &host_email);
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(configure_routes));
         })
         .build()
         .await?;
@@ -340,7 +318,6 @@ async fn host_can_remove_ai_seat() -> Result<(), AppError> {
     // Add an AI seat first.
     let add_req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "version": version
         }))
@@ -360,7 +337,6 @@ async fn host_can_remove_ai_seat() -> Result<(), AppError> {
     // Remove the AI seat.
     let remove_req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/remove"))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .set_json(json!({
             "version": version
         }))
@@ -384,7 +360,6 @@ async fn host_can_remove_ai_seat() -> Result<(), AppError> {
 #[tokio::test]
 async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
 
@@ -407,15 +382,12 @@ async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
         .await?;
 
     let non_host_email = format!("{non_host_sub}@example.com");
-    let non_host_token = mint_test_token(&non_host_id.to_string(), &non_host_email, &security);
+    let session_injector = TestSessionInjector::new(non_host_id, &non_host_sub, &non_host_email);
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(configure_routes));
         })
         .build()
         .await?;
@@ -428,7 +400,6 @@ async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
 
     let req = test::TestRequest::post()
         .uri(&format!("/api/games/{game_id}/ai/add"))
-        .insert_header(("Authorization", format!("Bearer {non_host_token}")))
         .set_json(json!({
             "version": version
         }))
@@ -446,7 +417,6 @@ async fn non_host_cannot_manage_ai() -> Result<(), AppError> {
 #[tokio::test]
 async fn ai_registry_endpoint_lists_factories() -> Result<(), AppError> {
     let state = build_test_state().await?;
-    let security: SecurityConfig = state.security().clone();
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
 
@@ -454,22 +424,19 @@ async fn ai_registry_endpoint_lists_factories() -> Result<(), AppError> {
     let host_email = format!("{host_sub}@example.com");
     let host_user_id =
         create_test_user(shared.transaction(), &host_sub, Some("Registry Host")).await?;
-    let token = mint_test_token(&host_user_id.to_string(), &host_email, &security);
+
+    let session_injector = TestSessionInjector::new(host_user_id, &host_sub, &host_email);
 
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(
-                web::scope("/api/games")
-                    .wrap(JwtExtract)
-                    .configure(configure_routes),
-            );
+            cfg.service(web::scope("/api/games").configure(configure_routes));
         })
         .build()
         .await?;
 
     let req = test::TestRequest::get()
         .uri("/api/games/ai/registry")
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 

@@ -6,7 +6,7 @@ use std::time::Duration;
 use backend::db::require_db;
 use backend::ws::session::HubEvent;
 
-use crate::support::auth::mint_test_token;
+use crate::support::auth::create_test_ws_token;
 use crate::support::build_test_state;
 use crate::support::factory::create_test_user;
 use crate::support::game_setup::setup_game_with_players;
@@ -17,7 +17,9 @@ use crate::support::websocket_client::WebSocketClient;
 #[tokio::test]
 async fn websocket_yourturn_delivered_to_target_user() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -28,8 +30,8 @@ async fn websocket_yourturn_delivered_to_target_user() -> Result<(), Box<dyn std
     let user_email = format!("{test_name}@example.com");
     let user_id = create_test_user(shared.transaction(), &user_sub, Some("Test User")).await?;
 
+    let token = create_test_ws_token(&state, user_id, &user_sub, &user_email).await?;
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
@@ -67,7 +69,9 @@ async fn websocket_yourturn_delivered_to_target_user() -> Result<(), Box<dyn std
 async fn websocket_yourturn_not_delivered_to_other_users() -> Result<(), Box<dyn std::error::Error>>
 {
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -82,11 +86,11 @@ async fn websocket_yourturn_not_delivered_to_other_users() -> Result<(), Box<dyn
     let user_b_email = format!("{test_name}_b@example.com");
     let user_b_id = create_test_user(shared.transaction(), &user_b_sub, Some("User B")).await?;
 
+    let token_a = create_test_ws_token(&state, user_a_id, &user_a_sub, &user_a_email).await?;
+    let token_b = create_test_ws_token(&state, user_b_id, &user_b_sub, &user_b_email).await?;
     let (state, registry) = attach_test_registry(state);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
-    let token_a = mint_test_token(&user_a_id.to_string(), &user_a_email, &security);
-    let token_b = mint_test_token(&user_b_id.to_string(), &user_b_email, &security);
     let ws_url_a = format!("ws://{}/ws?token={}", addr, token_a);
     let ws_url_b = format!("ws://{}/ws?token={}", addr, token_b);
 
@@ -145,7 +149,9 @@ async fn websocket_yourturn_not_delivered_to_sessions_already_in_that_game(
     use serde_json::json;
 
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -157,10 +163,11 @@ async fn websocket_yourturn_not_delivered_to_sessions_already_in_that_game(
     let user_id = setup.user_ids[player_idx];
 
     // Use user_id from setup (player 0)
+    let user_sub = format!("{}_player_{}", test_name, player_idx);
     let user_email = format!("{}_player_{}@example.com", test_name, player_idx);
 
+    let token = create_test_ws_token(&state, user_id, &user_sub, &user_email).await?;
     let (state, registry) = attach_test_registry(state);
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security);
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
     let ws_url = format!("ws://{}/ws?token={}", addr, token);
