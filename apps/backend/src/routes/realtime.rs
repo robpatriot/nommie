@@ -1,11 +1,8 @@
-use std::time::SystemTime;
-
 use actix_web::{web, HttpResponse};
 use serde::Serialize;
 
-use crate::auth::jwt::mint_access_token_with_ttl;
+use crate::auth::session::{generate_session_token, store_ws_token, SessionData};
 use crate::error::AppError;
-use crate::errors::ErrorCode;
 use crate::extractors::current_user::CurrentUser;
 use crate::state::app_state::AppState;
 
@@ -23,19 +20,27 @@ async fn issue_ws_token(
 ) -> Result<HttpResponse, AppError> {
     let email = current_user.email.clone().ok_or_else(|| {
         AppError::internal(
-            ErrorCode::InternalError,
+            crate::errors::ErrorCode::InternalError,
             "Current user missing email".to_string(),
             std::io::Error::other("missing email"),
         )
     })?;
 
-    let token = mint_access_token_with_ttl(
-        &current_user.id.to_string(),
-        &email,
-        SystemTime::now(),
-        WS_TOKEN_TTL_SECONDS,
-        app_state.security(),
-    )?;
+    let mut conn = app_state.session_redis().ok_or_else(|| {
+        AppError::redis_unavailable(
+            "session Redis not available".to_string(),
+            crate::error::Sentinel("session Redis not available"),
+            None,
+        )
+    })?;
+
+    let token = generate_session_token();
+    let data = SessionData {
+        user_id: current_user.id,
+        sub: current_user.sub.clone(),
+        email,
+    };
+    store_ws_token(&mut conn, &token, &data).await?;
 
     Ok(HttpResponse::Ok().json(WsTokenResponse {
         token,

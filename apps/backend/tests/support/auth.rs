@@ -1,53 +1,61 @@
-// JWT token generation helpers for tests
+// Session helpers for tests
 
-use std::time::SystemTime;
-
-use backend::auth::jwt::mint_access_token;
+use backend::auth::session::{generate_session_token, store_session, store_ws_token, SessionData};
 use backend::entities::allowed_emails;
-use backend::state::security_config::SecurityConfig;
+use backend::state::app_state::AppState;
+use backend::AppError;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, EntityTrait};
 
-/// Mint a bearer token for the given sub and email
+/// Create a test session in Redis and return the session token.
 ///
-/// # Arguments
-/// * `sub` - Subject identifier (user's sub)
-/// * `email` - User's email
-/// * `sec` - Security configuration containing JWT secret
-///
-/// # Returns
-/// Bearer token string (without "Bearer " prefix)
-pub fn mint_test_token(sub: &str, email: &str, sec: &SecurityConfig) -> String {
-    mint_access_token(sub, email, SystemTime::now(), sec).expect("should mint token successfully")
+/// Requires REDIS_URL to be set in the environment, which will be picked up
+/// by `test_state_builder` automatically.
+pub async fn create_test_session(
+    state: &AppState,
+    user_id: i64,
+    sub: &str,
+    email: &str,
+) -> Result<String, AppError> {
+    let mut conn = state.session_redis().ok_or_else(|| {
+        AppError::redis_unavailable(
+            "session Redis not configured for test".to_string(),
+            backend::error::Sentinel("session Redis not available"),
+            None,
+        )
+    })?;
+    let token = generate_session_token();
+    let data = SessionData {
+        user_id,
+        sub: sub.to_string(),
+        email: email.to_string(),
+    };
+    store_session(&mut conn, &token, &data).await?;
+    Ok(token)
 }
 
-/// Mint a bearer Authorization header value for the given sub and email
-///
-/// # Arguments
-/// * `sub` - Subject identifier (user's sub)
-/// * `email` - User's email
-/// * `sec` - Security configuration containing JWT secret
-///
-/// # Returns
-/// Full Authorization header value including "Bearer " prefix
-pub fn bearer_header(sub: &str, email: &str, sec: &SecurityConfig) -> String {
-    format!("Bearer {}", mint_test_token(sub, email, sec))
-}
-
-/// Mint an expired token for testing expired token scenarios
-///
-/// # Arguments
-/// * `sub` - Subject identifier (user's sub)
-/// * `email` - User's email
-/// * `sec` - Security configuration containing JWT secret
-///
-/// # Returns
-/// Expired bearer token string
-pub fn mint_expired_token(sub: &str, email: &str, sec: &SecurityConfig) -> String {
-    let past_time = SystemTime::now()
-        .checked_sub(std::time::Duration::from_secs(7200))
-        .unwrap();
-    mint_access_token(sub, email, past_time, sec).expect("should mint expired token successfully")
+/// Create a test WebSocket token in Redis and return the token.
+pub async fn create_test_ws_token(
+    state: &AppState,
+    user_id: i64,
+    sub: &str,
+    email: &str,
+) -> Result<String, AppError> {
+    let mut conn = state.session_redis().ok_or_else(|| {
+        AppError::redis_unavailable(
+            "session Redis not configured for test".to_string(),
+            backend::error::Sentinel("session Redis not available"),
+            None,
+        )
+    })?;
+    let token = generate_session_token();
+    let data = SessionData {
+        user_id,
+        sub: sub.to_string(),
+        email: email.to_string(),
+    };
+    store_ws_token(&mut conn, &token, &data).await?;
+    Ok(token)
 }
 
 /// Insert an email into the admission table for testing. Idempotent (ON CONFLICT DO NOTHING).

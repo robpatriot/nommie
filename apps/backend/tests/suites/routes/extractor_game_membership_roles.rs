@@ -9,9 +9,7 @@ use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::game_players;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::middleware::jwt_extract::JwtExtract;
 use backend::repos::memberships::GameRole;
-use backend::state::security_config::SecurityConfig;
 use backend::{CurrentUser, GameId, GameMembership};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, Set};
@@ -19,9 +17,9 @@ use serde_json::Value;
 use time::OffsetDateTime;
 
 use crate::support::app_builder::create_test_app;
-use crate::support::auth::mint_test_token;
 use crate::support::factory::create_test_user;
 use crate::support::{test_seed, test_state_builder};
+use crate::support::test_middleware::TestSessionInjector;
 
 /// Test-only handler that requires Player role
 async fn player_only_action(
@@ -77,13 +75,7 @@ async fn spectator_allowed_action(
 
 #[actix_web::test]
 async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::Error>> {
-    // Test that handlers can enforce role-based access control
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(&db).await?;
@@ -123,13 +115,13 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     };
     membership.insert(shared.transaction()).await?;
 
-    // Create a valid JWT token (sub is now user.id)
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security_config);
+    let session_injector = TestSessionInjector::new(user_id, &user_sub, &user_email);
 
     // Build test app with player-only route
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
-            cfg.service(web::scope("/test-games").wrap(JwtExtract).route(
+            cfg.service(web::scope("/test-games").route(
                 "/{game_id}/player-action",
                 web::post().to(player_only_action),
             ));
@@ -140,7 +132,6 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
     // Make request - should succeed because user is a Player
     let req = test::TestRequest::post()
         .uri(&format!("/test-games/{}/player-action", game.id))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -159,13 +150,7 @@ async fn test_role_based_access_player_only() -> Result<(), Box<dyn std::error::
 
 #[actix_web::test]
 async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::Error>> {
-    // Test that handlers accepting any role work correctly
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(&db).await?;
@@ -205,15 +190,14 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     };
     membership.insert(shared.transaction()).await?;
 
-    // Create a valid JWT token (sub is now user.id)
-    let token = mint_test_token(&user_id.to_string(), &user_email, &security_config);
+    let session_injector = TestSessionInjector::new(user_id, &user_sub, &user_email);
 
     // Build test app with spectator-allowed route
     let app = create_test_app(state)
+        .with_session(session_injector)
         .with_routes(|cfg| {
             cfg.service(
                 web::scope("/test-games")
-                    .wrap(JwtExtract)
                     .route("/{game_id}/view", web::get().to(spectator_allowed_action)),
             );
         })
@@ -223,7 +207,6 @@ async fn test_role_based_access_any_member() -> Result<(), Box<dyn std::error::E
     // Make request - should succeed for any member
     let req = test::TestRequest::get()
         .uri(&format!("/test-games/{}/view", game.id))
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 

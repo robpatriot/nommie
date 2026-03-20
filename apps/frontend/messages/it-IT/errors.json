@@ -7,7 +7,6 @@
     "FORBIDDEN": "Non hai accesso per farlo.",
     "FORBIDDEN_USER_NOT_FOUND": "Non è stato possibile trovare il tuo account.",
     "EMAIL_NOT_ALLOWED": "Accesso limitato. Contatta l’assistenza.",
-    "MISSING_BACKEND_JWT": "Accedi per continuare.",
     "BACKEND_STARTING": "Il server si sta avviando. Riprova tra poco.",
     "NOT_A_MEMBER": "Non sei membro di questa partita.",
     "INSUFFICIENT_ROLE": "Non hai i permessi necessari.",

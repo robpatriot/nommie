@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 
 import { getBackendBaseUrlOrThrow } from '@/auth'
-import {
-  ensureBackendJwtForServerAction,
-  BackendJwtError,
-} from '@/lib/auth/refresh-backend-jwt'
+import { getBackendSessionCookie } from '@/lib/auth/backend-jwt-cookie.server'
 import {
   shouldLogError,
   markBackendUp,
@@ -28,14 +25,18 @@ export async function GET() {
     return NextResponse.json({ error: 'Backend not ready' }, { status: 503 })
   }
 
+  const token = await getBackendSessionCookie()
+  if (!token) {
+    return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+  }
+
   try {
-    const jwt = await ensureBackendJwtForServerAction()
     const backendBase = getBackendBaseUrlOrThrow()
 
     const response = await fetch(`${backendBase}/api/ws/token`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${jwt}`,
+        Cookie: `backend_session=${token}`,
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
@@ -66,22 +67,6 @@ export async function GET() {
     const payload = await response.json()
     return NextResponse.json(payload, { status: 200 })
   } catch (error) {
-    if (error instanceof BackendJwtError) {
-      // When the backend is known unavailable the JWT refresh failed due to
-      // infrastructure, not because the session is stale. Return 503 so the
-      // client enters degraded mode instead of redirecting to signout.
-      if (isBackendKnownDown()) {
-        return NextResponse.json(
-          { error: 'Backend not ready' },
-          { status: 503 }
-        )
-      }
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
-
     const isConnectionErr = isBackendConnectionError(error)
 
     if (isConnectionErr) {
@@ -92,6 +77,14 @@ export async function GET() {
       // just generate another connection error) and ensures triggerRecovery()
       // is called on the client side exactly once.
       return NextResponse.json({ error: 'Backend not ready' }, { status: 503 })
+    }
+
+    // Check if backend is known down (for auth-related failures)
+    if (isBackendKnownDown()) {
+      return NextResponse.json(
+        { error: 'Backend not ready' },
+        { status: 503 }
+      )
     }
 
     // Non-connection errors are genuine application failures — log and return 500.

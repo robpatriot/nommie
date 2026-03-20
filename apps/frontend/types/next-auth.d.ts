@@ -3,7 +3,6 @@ export {};
 
 declare module "next-auth/jwt" {
   interface JWT {
-    backendJwt?: string;
     email?: string;
     googleSub?: string;
     name?: string;

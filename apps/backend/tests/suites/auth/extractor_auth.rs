@@ -1,3 +1,8 @@
+//! SessionExtract middleware tests.
+//!
+//! Tests that require Redis (REDIS_URL env var) exercise the full SessionExtract path.
+//! Tests that only test route behavior use TestSessionInjector instead.
+
 use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::ServiceResponse;
@@ -5,15 +10,14 @@ use actix_web::http::StatusCode;
 use actix_web::{test, web, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
-use backend::middleware::jwt_extract::JwtExtract;
-use backend::state::security_config::SecurityConfig;
+use backend::middleware::session_extract::SessionExtract;
 use backend::{AppError, CurrentUser};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::support::app_builder::create_test_app;
-use crate::support::auth::{mint_expired_token, mint_test_token};
+use crate::support::auth::create_test_session;
 use crate::support::factory::create_test_user;
 use crate::support::test_state_builder;
 
@@ -42,7 +46,7 @@ async fn build_auth_test_app(
         .with_routes(|cfg| {
             cfg.service(
                 web::scope("/test-auth")
-                    .wrap(JwtExtract)
+                    .wrap(SessionExtract)
                     .route("/me", web::get().to(test_current_user_handler)),
             );
         })
@@ -67,8 +71,9 @@ where
     Ok((status, detail))
 }
 
+/// Test: no cookie and no ?token= → 401 Unauthorized
 #[actix_web::test]
-async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_missing_cookie() -> Result<(), Box<dyn std::error::Error>> {
     let state = test_state_builder()?.build().await?;
     let mut app = build_auth_test_app(state).await?;
 
@@ -76,125 +81,63 @@ async fn test_missing_header() -> Result<(), Box<dyn std::error::Error>> {
 
     let (status, detail) = call_and_capture_error(&mut app, req).await?;
     assert_eq!(status.as_u16(), 401);
-    assert_eq!(detail, "Missing Authorization header");
+    assert_eq!(detail, "Unauthorized");
 
     Ok(())
 }
 
+/// Test: valid format token not in Redis → 401 UNAUTHORIZED_INVALID_TOKEN
+/// Requires REDIS_URL.
 #[actix_web::test]
-async fn test_malformed_scheme() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_invalid_session_token() -> Result<(), Box<dyn std::error::Error>> {
     let state = test_state_builder()?.build().await?;
+
+    // Only run if Redis is configured
+    if state.session_redis().is_none() {
+        return Ok(());
+    }
+
     let mut app = build_auth_test_app(state).await?;
 
-    // Test malformed Authorization header
+    // Generate a token that looks valid but is not in Redis
+    let fake_token = backend::auth::session::generate_session_token();
     let req = test::TestRequest::get()
         .uri("/test-auth/me")
-        .insert_header(("Authorization", "Token abc"))
+        .insert_header(("Cookie", format!("backend_session={fake_token}")))
         .to_request();
 
     let (status, detail) = call_and_capture_error(&mut app, req).await?;
     assert_eq!(status.as_u16(), 401);
-    assert_eq!(detail, "Missing or invalid Bearer token");
+    assert_eq!(detail, "UnauthorizedInvalidToken");
 
     Ok(())
 }
 
+/// Test: valid session cookie → 200 with correct user data
+/// Requires REDIS_URL.
 #[actix_web::test]
-async fn test_empty_token() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_valid_session() -> Result<(), Box<dyn std::error::Error>> {
     let state = test_state_builder()?.build().await?;
-    let mut app = build_auth_test_app(state).await?;
 
-    // Test empty token
-    let req = test::TestRequest::get()
-        .uri("/test-auth/me")
-        .insert_header(("Authorization", "Bearer "))
-        .to_request();
+    // Only run if Redis is configured
+    if state.session_redis().is_none() {
+        return Ok(());
+    }
 
-    let (status, detail) = call_and_capture_error(&mut app, req).await?;
-    assert_eq!(status.as_u16(), 401);
-    assert_eq!(detail, "Missing or invalid Bearer token");
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_invalid_token() -> Result<(), Box<dyn std::error::Error>> {
-    let state = test_state_builder()?.build().await?;
-    let mut app = build_auth_test_app(state).await?;
-
-    // Test with invalid token
-    let req = test::TestRequest::get()
-        .uri("/test-auth/me")
-        .insert_header(("Authorization", "Bearer not-a-real-token"))
-        .to_request();
-
-    let (status, detail) = call_and_capture_error(&mut app, req).await?;
-    assert_eq!(status.as_u16(), 401);
-    assert_eq!(detail, "UnauthorizedInvalidJwt");
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_expired_token() -> Result<(), Box<dyn std::error::Error>> {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
-
-    // Create user first, then mint expired token with user.id as sub
-    let sub = unique_str("test-sub-expired");
-    let email = unique_email("test");
-    let db = require_db(&state)?;
+    let db = require_db(&state).expect("DB required for this test");
     let shared = SharedTxn::open(&db).await?;
-    let user_id = create_test_user(shared.transaction(), &sub, Some("Expired User")).await?;
-    let user_sub = user_id.to_string();
-    let expired_token = mint_expired_token(&user_sub, &email, &security_config);
 
-    let mut app = build_auth_test_app(state).await?;
+    let user_sub = unique_str("session-test-sub");
+    let user_email = unique_email("session-test");
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("Session User")).await?;
 
-    // Test with expired token
-    let req = test::TestRequest::get()
-        .uri("/test-auth/me")
-        .insert_header(("Authorization", format!("Bearer {expired_token}")))
-        .to_request();
-    req.extensions_mut().insert(shared.clone());
-
-    let (status, detail) = call_and_capture_error(&mut app, req).await?;
-    assert_eq!(status.as_u16(), 401);
-    assert_eq!(detail, "UnauthorizedExpiredJwt");
-
-    shared.rollback().await?;
-
-    Ok(())
-}
-
-#[actix_web::test]
-async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
-
-    // Create user first, then mint token with user.id as sub
-    let sub = unique_str("test-sub-happy");
-    let email = unique_email("test");
-    let db = require_db(&state)?;
-    let shared = SharedTxn::open(&db).await?;
-    let user_id = create_test_user(shared.transaction(), &sub, Some("Happy User")).await?;
-    let user_sub = user_id.to_string();
-    let token = mint_test_token(&user_sub, &email, &security_config);
+    let token = create_test_session(&state, user_id, &user_sub, &user_email).await?;
 
     let app = build_auth_test_app(state).await?;
 
-    // Make request with valid token
     let req = test::TestRequest::get()
         .uri("/test-auth/me")
-        .insert_header(("Authorization", format!("Bearer {token}")))
+        .insert_header(("Cookie", format!("backend_session={token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -204,7 +147,49 @@ async fn test_happy_path() -> Result<(), Box<dyn std::error::Error>> {
 
     let body: Value = test::read_body_json(resp).await;
     assert_eq!(body["id"], user_id);
-    assert_eq!(body["email"], email);
+    assert_eq!(body["email"], user_email);
+
+    shared.rollback().await?;
+
+    Ok(())
+}
+
+/// Test: valid ws_token via ?token= query parameter → 200
+/// Requires REDIS_URL.
+#[actix_web::test]
+async fn test_valid_ws_token() -> Result<(), Box<dyn std::error::Error>> {
+    let state = test_state_builder()?.build().await?;
+
+    // Only run if Redis is configured
+    if state.session_redis().is_none() {
+        return Ok(());
+    }
+
+    let db = require_db(&state).expect("DB required for this test");
+    let shared = SharedTxn::open(&db).await?;
+
+    let user_sub = unique_str("ws-token-test-sub");
+    let user_email = unique_email("ws-token-test");
+    let user_id = create_test_user(shared.transaction(), &user_sub, Some("WS Token User")).await?;
+
+    let ws_token =
+        crate::support::auth::create_test_ws_token(&state, user_id, &user_sub, &user_email)
+            .await?;
+
+    let app = build_auth_test_app(state).await?;
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/test-auth/me?token={ws_token}"))
+        .to_request();
+    req.extensions_mut().insert(shared.clone());
+
+    let resp = test::call_service(&app, req).await;
+
+    assert!(resp.status().is_success());
+
+    let body: Value = test::read_body_json(resp).await;
+    assert_eq!(body["id"], user_id);
+    assert_eq!(body["email"], user_email);
 
     shared.rollback().await?;
 

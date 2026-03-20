@@ -89,7 +89,7 @@ export async function probeBackendReadiness(
 /**
  * SSR/RSC path: checks backend readiness with backoff when backend is known down
  * (avoids hammering the backend). Updates server-side readiness state.
- * Use this for layout, refresh-backend-jwt, etc. Do NOT use for FE /readyz polling.
+ * Use this for layout, server actions, etc. Do NOT use for FE /readyz polling.
  */
 export async function checkBackendReadiness(): Promise<BackendReadinessResult> {
   const mode = getBackendMode()

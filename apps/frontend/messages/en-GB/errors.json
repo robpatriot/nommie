@@ -7,7 +7,6 @@
     "FORBIDDEN": "You don't have access to do that.",
     "FORBIDDEN_USER_NOT_FOUND": "Your account could not be found.",
     "EMAIL_NOT_ALLOWED": "Access restricted. Please contact support.",
-    "MISSING_BACKEND_JWT": "Please sign in to continue.",
     "BACKEND_STARTING": "The server is starting up. Please try again shortly.",
     "NOT_A_MEMBER": "You are not a member of this game.",
     "INSUFFICIENT_ROLE": "You don't have permission to do that.",

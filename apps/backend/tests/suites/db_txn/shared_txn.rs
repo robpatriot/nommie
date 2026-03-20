@@ -4,17 +4,15 @@
 // injected SharedTxn when present, and fall back to pooled connections otherwise.
 
 use actix_web::{test, web, FromRequest, HttpMessage};
-use backend::auth::claims::BackendClaims;
+use backend::auth::session::SessionData;
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::games::{self, GameState, GameVisibility};
-use backend::state::security_config::SecurityConfig;
 use backend::{CurrentUser, GameId};
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
 use time::OffsetDateTime;
 
-use crate::support::auth::bearer_header;
 use crate::support::factory::seed_user_with_sub;
 use crate::support::{build_test_state, test_seed, test_state_builder};
 
@@ -39,13 +37,7 @@ async fn insert_test_game(
 
 #[actix_web::test]
 async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error::Error>> {
-    // Build state with Test DB + Security (JWT)
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     // Open a shared txn first
     let db = require_db(&state).expect("DB required for this test");
@@ -58,21 +50,15 @@ async fn test_current_user_db_with_shared_txn() -> Result<(), Box<dyn std::error
         .await
         .expect("should create user successfully");
 
-    // Request with state + auth header; inject shared txn
-    // JWT sub is now user.id
-    let user_sub = user.id.to_string();
+    // Request with state + session data injected directly
     let mut req = test::TestRequest::default()
-        .insert_header((
-            "Authorization",
-            bearer_header(&user_sub, &test_email, &security_config),
-        ))
         .app_data(web::Data::new(state))
         .to_http_request();
     shared.inject(&mut req);
-    req.extensions_mut().insert(BackendClaims {
-        sub: user_sub.clone(),
+    req.extensions_mut().insert(SessionData {
+        user_id: user.id,
+        sub: test_sub.clone(),
         email: test_email.clone(),
-        exp: usize::MAX,
     });
 
     // Extract

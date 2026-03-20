@@ -51,7 +51,6 @@ mod tests {
     use crate::config::db::RuntimeEnv;
     use crate::state::admission_mode::AdmissionMode;
     use crate::state::app_state::{AppConfig, Secret};
-    use crate::state::security_config::SecurityConfig;
 
     fn test_google_verifier() -> Arc<dyn crate::auth::google::GoogleIdTokenVerifier> {
         Arc::new(MockGoogleVerifier::new(VerifiedGoogleClaims {
@@ -67,7 +66,6 @@ mod tests {
             env: RuntimeEnv::Test,
             db_url: Secret("".to_string()),
             redis_url: Secret(None),
-            security: SecurityConfig::default(),
             google_verifier: test_google_verifier(),
             admission_mode: AdmissionMode::Open,
         };
@@ -97,7 +95,6 @@ mod tests {
             env: RuntimeEnv::Test,
             db_url: Secret("".to_string()),
             redis_url: Secret(None),
-            security: SecurityConfig::default(),
             google_verifier: test_google_verifier(),
             admission_mode: AdmissionMode::Open,
         };

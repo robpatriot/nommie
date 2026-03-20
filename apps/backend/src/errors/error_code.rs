@@ -18,12 +18,8 @@ pub enum ErrorCode {
     // Authentication & Authorization
     /// Authentication required
     Unauthorized,
-    /// Missing or malformed Bearer token
-    UnauthorizedMissingBearer,
-    /// Invalid JWT token
-    UnauthorizedInvalidJwt,
-    /// JWT token has expired
-    UnauthorizedExpiredJwt,
+    /// Session token not found in Redis
+    UnauthorizedInvalidToken,
     /// Access denied
     Forbidden,
     /// User not found in database
@@ -163,9 +159,7 @@ impl ErrorCode {
         match self {
             // Authentication & Authorization
             Self::Unauthorized => "UNAUTHORIZED",
-            Self::UnauthorizedMissingBearer => "UNAUTHORIZED_MISSING_BEARER",
-            Self::UnauthorizedInvalidJwt => "UNAUTHORIZED_INVALID_JWT",
-            Self::UnauthorizedExpiredJwt => "UNAUTHORIZED_EXPIRED_JWT",
+            Self::UnauthorizedInvalidToken => "UNAUTHORIZED_INVALID_TOKEN",
             Self::Forbidden => "FORBIDDEN",
             Self::ForbiddenUserNotFound => "FORBIDDEN_USER_NOT_FOUND",
             Self::EmailNotAllowed => "EMAIL_NOT_ALLOWED",
@@ -257,16 +251,8 @@ mod tests {
         // Verify that all error codes produce the expected SCREAMING_SNAKE_CASE strings
         assert_eq!(ErrorCode::Unauthorized.as_str(), "UNAUTHORIZED");
         assert_eq!(
-            ErrorCode::UnauthorizedMissingBearer.as_str(),
-            "UNAUTHORIZED_MISSING_BEARER"
-        );
-        assert_eq!(
-            ErrorCode::UnauthorizedInvalidJwt.as_str(),
-            "UNAUTHORIZED_INVALID_JWT"
-        );
-        assert_eq!(
-            ErrorCode::UnauthorizedExpiredJwt.as_str(),
-            "UNAUTHORIZED_EXPIRED_JWT"
+            ErrorCode::UnauthorizedInvalidToken.as_str(),
+            "UNAUTHORIZED_INVALID_TOKEN"
         );
         assert_eq!(ErrorCode::Forbidden.as_str(), "FORBIDDEN");
         assert_eq!(

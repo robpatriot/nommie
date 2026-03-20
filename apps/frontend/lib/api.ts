@@ -1,13 +1,10 @@
 // Server-only API functions - must not be imported from client components
-// This file uses server-only APIs (cookies, backend JWT resolvers)
+// This file uses server-only APIs (cookies, backend session resolver)
 'use server'
 
 import { getTranslations } from 'next-intl/server'
 
-import {
-  getBackendJwtReadOnly,
-  BackendJwtError,
-} from '@/lib/auth/refresh-backend-jwt'
+import { getBackendSessionCookie } from '@/lib/auth/backend-jwt-cookie.server'
 import { getBackendBaseUrlOrThrow } from '@/auth'
 import { errorCodeToMessageKey } from '@/i18n/errors'
 import type { Game, GameListResponse, LastActiveGameResponse } from './types'
@@ -17,7 +14,6 @@ import {
   markBackendUp,
   markBackendDown,
   shouldLogError,
-  getBackendMode,
   isBackendReady,
 } from '@/lib/server/backend-status'
 import { isBackendConnectionError } from '@/lib/server/connection-errors'
@@ -43,54 +39,23 @@ async function getLocalizedErrorMessageForCode(
 /**
  * Make an authenticated API request to the backend.
  * Works from both Server Components and Server Actions.
- * Reads JWT from cookie (does not refresh - middleware handles refresh).
+ * Reads session token from cookie and forwards it as a Cookie header.
  */
 export async function fetchWithAuth(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  // Get backend JWT from cookie (read-only - middleware handles refresh)
-  let authHeaders: Record<string, string> = {}
-  try {
-    const backendJwt = await getBackendJwtReadOnly()
-    if (!backendJwt) {
-      // No JWT available - middleware should have refreshed it, but if not,
-      // this is an auth error
-      throw new BackendJwtError('Authentication required')
-    }
-    authHeaders = {
-      Authorization: `Bearer ${backendJwt}`,
-    }
-  } catch (error) {
-    if (error instanceof BackendJwtError) {
-      // If the backend explicitly reports that this email is not allowed,
-      // surface a stable 403 EMAIL_NOT_ALLOWED signal to callers.
-      if (error.message === 'EMAIL_NOT_ALLOWED') {
-        const message = await getLocalizedErrorMessageForCode(
-          'EMAIL_NOT_ALLOWED',
-          'Access restricted. Please contact support if you believe this is an error.'
-        )
-        throw new BackendApiError(message, 403, 'EMAIL_NOT_ALLOWED')
-      }
-      // During startup, if backend isn't ready, use 503 (Service Unavailable)
-      // Otherwise, use 401 (Unauthorized) for actual auth issues
-      if (
-        getBackendMode() === 'startup' &&
-        error.message.includes('starting up')
-      ) {
-        const message = await getLocalizedErrorMessageForCode(
-          'BACKEND_STARTING',
-          'Backend is starting up, please try again shortly'
-        )
-        throw new BackendApiError(message, 503, 'BACKEND_STARTING')
-      }
-      const message = await getLocalizedErrorMessageForCode(
-        'MISSING_BACKEND_JWT',
-        'Authentication required'
-      )
-      throw new BackendApiError(message, 401, 'MISSING_BACKEND_JWT')
-    }
-    throw error
+  const token = await getBackendSessionCookie()
+  if (!token) {
+    const message = await getLocalizedErrorMessageForCode(
+      'UNAUTHORIZED',
+      'Authentication required'
+    )
+    throw new BackendApiError(message, 401, 'UNAUTHORIZED')
+  }
+
+  const authHeaders: Record<string, string> = {
+    Cookie: `backend_session=${token}`,
   }
 
   const baseUrl = getBackendBaseUrlOrThrow()

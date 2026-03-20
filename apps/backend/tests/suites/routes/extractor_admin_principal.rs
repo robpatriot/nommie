@@ -7,14 +7,13 @@ use actix_web::{test, HttpMessage};
 use backend::db::require_db;
 use backend::db::txn::SharedTxn;
 use backend::entities::users::UserRole;
-use backend::state::security_config::SecurityConfig;
 use backend_test_support::unique_helpers::{unique_email, unique_str};
 use serde_json::Value;
 
 use crate::common::assert_problem_details_structure;
 use crate::support::app_builder::create_test_app;
-use crate::support::auth::mint_test_token;
 use crate::support::factory::{seed_user_with_sub, seed_user_with_sub_and_role};
+use crate::support::test_middleware::TestSessionInjector;
 use crate::support::test_state_builder;
 
 async fn call_service_or_error<S>(app: &mut S, req: Request) -> ServiceResponse<BoxBody>
@@ -33,12 +32,7 @@ where
 
 #[actix_web::test]
 async fn admin_user_extractor_returns_principal() -> Result<(), Box<dyn std::error::Error>> {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
@@ -54,13 +48,15 @@ async fn admin_user_extractor_returns_principal() -> Result<(), Box<dyn std::err
     .await
     .expect("should create admin user");
 
-    let token = mint_test_token(&user.id.to_string(), &test_email, &security_config);
-
-    let mut app = create_test_app(state).with_prod_routes().build().await?;
+    let session_injector = TestSessionInjector::new(user.id, &test_sub, &test_email);
+    let mut app = create_test_app(state)
+        .with_prod_routes()
+        .with_session(session_injector)
+        .build()
+        .await?;
 
     let req = test::TestRequest::get()
         .uri("/api/admin/users/search?q=test")
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -79,12 +75,7 @@ async fn admin_user_extractor_returns_principal() -> Result<(), Box<dyn std::err
 
 #[actix_web::test]
 async fn non_admin_user_returns_403() -> Result<(), Box<dyn std::error::Error>> {
-    let security_config =
-        SecurityConfig::new("test_secret_key_for_testing_purposes_only".as_bytes());
-    let state = test_state_builder()?
-        .with_security(security_config.clone())
-        .build()
-        .await?;
+    let state = test_state_builder()?.build().await?;
 
     let db = require_db(&state).expect("DB required");
     let shared = SharedTxn::open(&db).await?;
@@ -95,13 +86,15 @@ async fn non_admin_user_returns_403() -> Result<(), Box<dyn std::error::Error>> 
         .await
         .expect("should create user");
 
-    let token = mint_test_token(&user.id.to_string(), &test_email, &security_config);
-
-    let mut app = create_test_app(state).with_prod_routes().build().await?;
+    let session_injector = TestSessionInjector::new(user.id, &test_sub, &test_email);
+    let mut app = create_test_app(state)
+        .with_prod_routes()
+        .with_session(session_injector)
+        .build()
+        .await?;
 
     let req = test::TestRequest::get()
         .uri("/api/admin/users/search?q=test")
-        .insert_header(("Authorization", format!("Bearer {token}")))
         .to_request();
     req.extensions_mut().insert(shared.clone());
 
@@ -115,7 +108,7 @@ async fn non_admin_user_returns_403() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 #[actix_web::test]
-async fn no_jwt_returns_401() -> Result<(), Box<dyn std::error::Error>> {
+async fn no_session_returns_401() -> Result<(), Box<dyn std::error::Error>> {
     let state = test_state_builder()?.build().await?;
     let mut app = create_test_app(state).with_prod_routes().build().await?;
 
@@ -126,10 +119,6 @@ async fn no_jwt_returns_401() -> Result<(), Box<dyn std::error::Error>> {
     let resp = call_service_or_error(&mut app, req).await;
 
     assert_eq!(resp.status().as_u16(), 401);
-
-    let body = test::read_body(resp).await;
-    let detail = String::from_utf8(body.to_vec())?;
-    assert_eq!(detail, "Missing Authorization header");
 
     Ok(())
 }

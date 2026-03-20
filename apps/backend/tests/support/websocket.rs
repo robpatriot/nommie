@@ -1,5 +1,5 @@
 // apps/backend/tests/support/websocket.rs
-// WebSocket test utilities (updated for GET /ws + protocol handshake)
+// WebSocket test utilities
 
 use std::net::TcpListener;
 use std::sync::Arc;
@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use actix_web::{web, App, HttpServer};
 use backend::db::txn::SharedTxn;
-use backend::middleware::jwt_extract::JwtExtract;
 use backend::middleware::request_trace::RequestTrace;
+use backend::middleware::session_extract::SessionExtract;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
 use backend::state::app_state::AppState;
@@ -56,7 +56,8 @@ pub async fn wait_for_connections(
 
 /// Start a test HTTP server with WebSocket routes.
 ///
-/// Exposes GET /ws with JwtExtract (supports ?token=...).
+/// Exposes GET /ws with SessionExtract (supports ?token=... for ws_token lookup).
+/// Requires Redis to be configured in AppState for session validation.
 pub async fn start_test_server(
     state: AppState,
     shared_txn: SharedTxn,
@@ -82,7 +83,7 @@ pub async fn start_test_server(
             .wrap(txn_injector.clone())
             .service(
                 web::scope("/ws")
-                    .wrap(JwtExtract)
+                    .wrap(SessionExtract)
                     .service(web::resource("").route(web::get().to(backend::ws::session::upgrade))),
             )
     })

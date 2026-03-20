@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use backend::db::require_db;
 
-use crate::support::auth::mint_test_token;
+use crate::support::auth::create_test_ws_token;
 use crate::support::build_test_state;
 use crate::support::db_memberships::attach_human_to_seat;
 use crate::support::factory::create_test_user;
@@ -19,7 +19,9 @@ use crate::support::websocket_client::WebSocketClient;
 #[tokio::test]
 async fn broadcast_reaches_all_subscribed_clients() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -37,9 +39,10 @@ async fn broadcast_reaches_all_subscribed_clients() -> Result<(), Box<dyn std::e
     attach_human_to_seat(shared.transaction(), setup.game_id, 0, user1_id).await?;
     attach_human_to_seat(shared.transaction(), setup.game_id, 1, user2_id).await?;
 
+    let token1 = create_test_ws_token(&state, user1_id, &user1_sub, &user1_email).await?;
+    let token2 = create_test_ws_token(&state, user2_id, &user2_sub, &user2_email).await?;
+
     let (state, registry) = attach_test_registry(state);
-    let token1 = mint_test_token(&user1_id.to_string(), &user1_email, &security);
-    let token2 = mint_test_token(&user2_id.to_string(), &user2_email, &security);
 
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 
@@ -93,7 +96,9 @@ async fn broadcast_reaches_all_subscribed_clients() -> Result<(), Box<dyn std::e
 #[tokio::test]
 async fn broadcast_only_sent_to_same_game_subscribers() -> Result<(), Box<dyn std::error::Error>> {
     let state = build_test_state().await?;
-    let security = state.security().clone();
+    if state.session_redis().is_none() {
+        return Ok(()); // Skip if Redis not configured
+    }
     let db = require_db(&state)?;
     let shared = backend::db::txn::SharedTxn::open(&db).await?;
 
@@ -113,9 +118,10 @@ async fn broadcast_only_sent_to_same_game_subscribers() -> Result<(), Box<dyn st
     attach_human_to_seat(shared.transaction(), setup1.game_id, 0, user1_id).await?;
     attach_human_to_seat(shared.transaction(), setup2.game_id, 0, user2_id).await?;
 
+    let token1 = create_test_ws_token(&state, user1_id, &user1_sub, &user1_email).await?;
+    let token2 = create_test_ws_token(&state, user2_id, &user2_sub, &user2_email).await?;
+
     let (state, registry) = attach_test_registry(state);
-    let token1 = mint_test_token(&user1_id.to_string(), &user1_email, &security);
-    let token2 = mint_test_token(&user2_id.to_string(), &user2_email, &security);
 
     let (server_handle, addr, server_join) = start_test_server(state, shared.clone()).await?;
 

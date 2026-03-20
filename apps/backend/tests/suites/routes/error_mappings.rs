@@ -20,55 +20,32 @@ async fn test_unauthorized_responses() {
                 web::get().to(|| test_handler(AppError::unauthorized())),
             )
             .route(
-                "/unauthorized_missing_bearer",
-                web::get().to(|| test_handler(AppError::unauthorized_missing_bearer())),
-            )
-            .route(
-                "/unauthorized_invalid_jwt",
-                web::get().to(|| test_handler(AppError::unauthorized_invalid_jwt())),
-            )
-            .route(
-                "/unauthorized_expired_jwt",
-                web::get().to(|| test_handler(AppError::unauthorized_expired_jwt())),
+                "/unauthorized_invalid_token",
+                web::get().to(|| test_handler(AppError::unauthorized_invalid_token())),
             ),
     )
     .await;
 
     // Test each Unauthorized variant
-    let unauthorized_variants = vec![
-        ("/unauthorized", AppError::unauthorized()),
-        (
-            "/unauthorized_missing_bearer",
-            AppError::unauthorized_missing_bearer(),
-        ),
-        (
-            "/unauthorized_invalid_jwt",
-            AppError::unauthorized_invalid_jwt(),
-        ),
-        (
-            "/unauthorized_expired_jwt",
-            AppError::unauthorized_expired_jwt(),
-        ),
-    ];
+    use crate::common::assert_problem_details_structure;
 
-    for (path, error) in unauthorized_variants {
-        let req = test::TestRequest::get().uri(path).to_request();
-        let resp = test::call_service(&app, req).await;
+    let req = test::TestRequest::get().uri("/unauthorized").to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 401);
+    assert_problem_details_structure(resp, 401, "UNAUTHORIZED", "Authentication required").await;
 
-        assert_eq!(resp.status(), 401);
-
-        // Use the common helper for comprehensive validation
-        use crate::common::assert_problem_details_structure;
-        // For Unauthorized variants, we need to use the specific detail messages
-        let expected_detail = match error {
-            AppError::Unauthorized => "Authentication required",
-            AppError::UnauthorizedMissingBearer => "Missing or malformed Bearer token",
-            AppError::UnauthorizedInvalidJwt => "Invalid JWT",
-            AppError::UnauthorizedExpiredJwt => "Token expired",
-            _ => "Authentication required", // fallback
-        };
-        assert_problem_details_structure(resp, 401, error.code().as_str(), expected_detail).await;
-    }
+    let req = test::TestRequest::get()
+        .uri("/unauthorized_invalid_token")
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 401);
+    assert_problem_details_structure(
+        resp,
+        401,
+        "UNAUTHORIZED_INVALID_TOKEN",
+        "Session token not found",
+    )
+    .await;
 }
 
 #[actix_web::test]

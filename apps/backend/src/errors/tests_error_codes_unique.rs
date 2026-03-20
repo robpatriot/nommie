@@ -7,9 +7,7 @@ fn error_codes_are_unique() {
     let all = [
         // Keep in sync with ErrorCode enum variants
         ErrorCode::Unauthorized,
-        ErrorCode::UnauthorizedMissingBearer,
-        ErrorCode::UnauthorizedInvalidJwt,
-        ErrorCode::UnauthorizedExpiredJwt,
+        ErrorCode::UnauthorizedInvalidToken,
         ErrorCode::Forbidden,
         ErrorCode::ForbiddenUserNotFound,
         ErrorCode::NotAMember,

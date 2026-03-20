@@ -2,12 +2,13 @@ use actix_http::Request;
 use actix_web::body::BoxBody;
 use actix_web::dev::{Service, ServiceResponse};
 use actix_web::{test, web, App, Error};
-use backend::middleware::jwt_extract::JwtExtract;
 use backend::middleware::request_trace::RequestTrace;
 use backend::middleware::structured_logger::StructuredLogger;
 use backend::middleware::trace_span::TraceSpan;
 use backend::state::app_state::AppState;
 use backend::{routes, AppError};
+
+use crate::support::test_middleware::TestSessionInjector;
 
 /// Type alias for route configuration functions
 type RouteConfigFn = Box<dyn Fn(&mut web::ServiceConfig) + Send + Sync>;
@@ -18,19 +19,20 @@ type RouteConfigFn = Box<dyn Fn(&mut web::ServiceConfig) + Send + Sync>;
 /// middleware (rate limiting, security headers, auth extractors). For
 /// tests we register the same paths without those wrappers so that
 /// endpoint behavior can be exercised directly.
+///
+/// Auth middleware is provided by TestSessionInjector injected per-scope
+/// so that tests can supply a specific user identity.
 fn configure_test_routes(cfg: &mut web::ServiceConfig) {
     // More specific /api/* scopes before generic /api (health) so e.g. /api/auth/login matches.
     cfg.service(web::scope("/api/auth").configure(routes::auth::configure_routes));
     cfg.service(web::scope("/api/games").configure(routes::games::configure_routes));
     cfg.service(
         web::scope("/api/user")
-            .wrap(JwtExtract)
             .configure(routes::user::configure_routes)
             .configure(routes::user_options::configure_routes),
     );
     cfg.service(
         web::scope("/api/admin")
-            .wrap(JwtExtract)
             .configure(routes::admin::configure_routes),
     );
     cfg.service(web::scope("/api/ws").configure(routes::realtime::configure_routes));
@@ -45,6 +47,7 @@ fn configure_test_routes(cfg: &mut web::ServiceConfig) {
 pub struct TestAppBuilder {
     state: AppState,
     route_config: Option<RouteConfigFn>,
+    session_injector: Option<TestSessionInjector>,
 }
 
 impl TestAppBuilder {
@@ -53,6 +56,7 @@ impl TestAppBuilder {
         Self {
             state,
             route_config: None,
+            session_injector: None,
         }
     }
 
@@ -71,6 +75,12 @@ impl TestAppBuilder {
         self
     }
 
+    /// Inject a session for all requests (replaces JWT-based auth in tests)
+    pub fn with_session(mut self, injector: TestSessionInjector) -> Self {
+        self.session_injector = Some(injector);
+        self
+    }
+
     /// Build the test service
     pub async fn build(
         self,
@@ -78,6 +88,7 @@ impl TestAppBuilder {
     {
         let state = self.state;
         let route_config = self.route_config;
+        let session_injector = self.session_injector;
 
         // Wrap AppState with web::Data at the boundary
         let data = web::Data::new(state);
@@ -89,7 +100,18 @@ impl TestAppBuilder {
                 .wrap(RequestTrace)
                 .app_data(data)
                 .configure(move |cfg| {
-                    if let Some(config_fn) = &route_config {
+                    if let Some(injector) = session_injector.clone() {
+                        // Wrap all routes with session injector when provided
+                        cfg.service(
+                            web::scope("")
+                                .wrap(injector)
+                                .configure(|inner_cfg| {
+                                    if let Some(ref config_fn) = route_config {
+                                        config_fn(inner_cfg);
+                                    }
+                                }),
+                        );
+                    } else if let Some(ref config_fn) = route_config {
                         config_fn(cfg);
                     }
                 }),
@@ -101,21 +123,6 @@ impl TestAppBuilder {
 }
 
 /// Create a new test app builder with the given AppState
-///
-/// # Example
-/// ```rust
-/// use backend::infra::state::build_state;
-/// use support::app_builder::create_test_app;
-/// use backend::config::db::RuntimeEnv;
-///
-/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-/// use crate::support::test_state::build_test_state;
-///
-/// let state = build_test_state().await?;
-/// let app = create_test_app(state).with_prod_routes().build().await?;
-/// # Ok(())
-/// # }
-/// ```
 pub fn create_test_app(state: AppState) -> TestAppBuilder {
     TestAppBuilder::new(state)
 }
