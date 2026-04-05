@@ -205,6 +205,7 @@ export function useGameSync({
         topic: { kind: 'game', id: gameId },
       }
       sendMessage(subscribeMsg)
+      void refreshStateFromHttp()
 
       return () => {
         const unsubscribeMsg: UnsubscribeMsg = {
@@ -214,7 +215,7 @@ export function useGameSync({
         sendMessage(unsubscribeMsg)
       }
     }
-  }, [gameId, connectionState, sendMessage])
+  }, [gameId, connectionState, sendMessage, refreshStateFromHttp])
 
   // Register for messages
   useEffect(() => {
