@@ -12,7 +12,6 @@ vi.mock('@/auth', () => ({
     GET: vi.fn(),
     POST: vi.fn(),
   },
-  unstable_update: vi.fn(),
   BACKEND_BASE_URL_ERROR_MSG:
     'NEXT_PUBLIC_BACKEND_BASE_URL must be set to an absolute URL when minting backend JWT',
   getBackendBaseUrlOrThrow: vi.fn(() => TEST_BACKEND_BASE_URL),
