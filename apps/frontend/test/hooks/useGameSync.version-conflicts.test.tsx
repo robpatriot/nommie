@@ -361,6 +361,9 @@ describe('Version Conflict Edge Cases', () => {
     })
 
     it('monotonic check works with negative versions (edge case)', async () => {
+      // Prevent the on-connect HTTP refresh from overwriting the -1 seed
+      mockGetGameRoomStateAction.mockResolvedValue({ kind: 'not_modified' })
+
       const gameId = 1
       const initialState = createInitialStateWithVersion(gameId, 5)
 
