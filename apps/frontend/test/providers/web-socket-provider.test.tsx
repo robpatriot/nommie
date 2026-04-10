@@ -331,6 +331,57 @@ describe('WebSocketProvider', () => {
     })
   })
 
+  it('transitions to reconnecting when socket closes while page is hidden', async () => {
+    const timeoutDriver = new ManualTimeoutDriver()
+
+    const { result } = renderHook(() => useWebSocket(), {
+      queryClient,
+      isAuthenticated: true,
+      timeoutScheduler: timeoutDriver,
+    })
+
+    await waitForWsCount(1)
+    const ws0 = mockWebSocketInstances[0]
+
+    await waitForSentType(ws0, 'hello')
+    await act(async () => {
+      serverSendJson(ws0, { type: 'hello_ack', protocol: 1, user_id: 123 })
+    })
+    await waitFor(() => {
+      expect(result.current.connectionState).toBe('connected')
+    })
+
+    // Simulate page going to background, then socket dying (mobile OS kills TCP)
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true })
+    act(() => {
+      ws0.close(1006, 'abnormal closure')
+    })
+
+    // State must become 'reconnecting' even though page is hidden
+    await waitFor(() => {
+      expect(result.current.connectionState).toBe('reconnecting')
+    })
+
+    // Simulate page coming back to foreground
+    Object.defineProperty(document, 'hidden', { value: false, configurable: true })
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    // A new socket should be created for the reconnect
+    await waitForWsCount(2)
+    const ws1 = mockWebSocketInstances[1]
+
+    await waitForSentType(ws1, 'hello')
+    await act(async () => {
+      serverSendJson(ws1, { type: 'hello_ack', protocol: 1, user_id: 123 })
+    })
+
+    await waitFor(() => {
+      expect(result.current.connectionState).toBe('connected')
+    })
+  })
+
   it('sets syncError on websocket error event', async () => {
     const { result } = renderHook(() => useWebSocket(), {
       queryClient,

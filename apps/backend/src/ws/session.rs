@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use actix::prelude::*;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::db::txn::SharedTxn;
@@ -360,6 +360,16 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
             }
             Ok(ws::Message::Nop) => {
                 self.last_heartbeat = Instant::now();
+            }
+            Err(ws::ProtocolError::Io(ref io_err)) => {
+                debug!(
+                    conn_id = %self.conn_id,
+                    user_id = self.user_id,
+                    error = %io_err,
+                    "[WS SESSION] client disconnected abruptly"
+                );
+                ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Error)));
+                ctx.stop();
             }
             Err(err) => {
                 warn!(

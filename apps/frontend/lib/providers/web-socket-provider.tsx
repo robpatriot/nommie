@@ -309,6 +309,7 @@ export function WebSocketProvider({
     (connectFn: () => Promise<void>) => {
       if (!isPageActive()) {
         pendingReconnectRef.current = true
+        setConnectionState('reconnecting')
         return
       }
 
