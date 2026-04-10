@@ -237,7 +237,7 @@ async fn ensure_from_existing_identity(
     user_options_repo::ensure_default_for_user(txn, user.id).await?;
 
     trace!(
-        user_id = user_id,
+        user_id,
         email = %Redacted(email_for_logging),
         "Repeat login for existing user"
     );

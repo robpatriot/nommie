@@ -172,7 +172,7 @@ async fn build_user_specific_parts(
             match player_view::load_current_round_info(txn, game_id, seat).await {
                 Ok(info) => Some(info.hand.into_iter().map(format_card).collect::<Vec<_>>()),
                 Err(err) => {
-                    warn!(game_id = game_id, seat, error = %err, "Failed to load viewer hand");
+                    warn!(game_id, seat, error = %err, "Failed to load viewer hand");
                     None
                 }
             }
@@ -527,10 +527,10 @@ async fn get_player_display_name(
 
     // Check If-None-Match header for HTTP caching
     if let Some(if_none_match) = http_req.headers().get(IF_NONE_MATCH) {
-        debug!(game_id = game_id, "Found If-None-Match header present");
+        debug!(game_id, "Found If-None-Match header present");
         if let Ok(client_etag) = if_none_match.to_str() {
             debug!(
-                game_id = game_id,
+                game_id,
                 client_etag = %client_etag,
                 current_etag = %etag_value,
                 "Received If-None-Match ETag header"
@@ -543,22 +543,16 @@ async fn get_player_display_name(
                     .any(|etag| etag == etag_value);
 
             if matches {
-                info!(
-                    game_id = game_id,
-                    "ETag cache hit, returning 304 Not Modified"
-                );
+                info!(game_id, "ETag cache hit, returning 304 Not Modified");
                 // Resource hasn't changed, return 304 Not Modified
                 let mut not_modified = HttpResponse::build(StatusCode::NOT_MODIFIED);
                 not_modified.insert_header((ETAG, etag_value));
                 return Ok(not_modified.finish());
             } else {
-                debug!(game_id = game_id, "ETag mismatch, returning full response");
+                debug!(game_id, "ETag mismatch, returning full response");
             }
         } else {
-            debug!(
-                game_id = game_id,
-                "Failed to convert If-None-Match header to string"
-            );
+            debug!(game_id, "Failed to convert If-None-Match header to string");
         }
     }
 

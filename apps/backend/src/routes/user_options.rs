@@ -87,12 +87,12 @@ async fn update_user_options(
 
     if let Some(Some(ref locale)) = payload.locale {
         info!(
-            user_id = user_id,
+            user_id,
             locale = locale.as_str(),
             "user_options.locale_updated"
         );
     } else if payload.locale.is_some() {
-        info!(user_id = user_id, "user_options.locale_unset");
+        info!(user_id, "user_options.locale_unset");
     }
 
     // Allow request if any field is provided (including locale/trick_duration explicitly set to null)
