@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -81,6 +82,7 @@ pub struct WsSession {
     heartbeat_handle: Option<actix::SpawnHandle>,
 
     hello_done: bool,
+    close_reason: Cell<&'static str>,
     span: Span,
 }
 
@@ -102,6 +104,7 @@ impl WsSession {
             last_heartbeat: Instant::now(),
             heartbeat_handle: None,
             hello_done: false,
+            close_reason: Cell::new("unknown"),
             span: Span::none(),
         }
     }
@@ -119,6 +122,7 @@ impl WsSession {
         code: ErrorCode,
         message: impl Into<String>,
     ) {
+        self.close_reason.set("protocol_error");
         let msg = ServerMsg::Error {
             code,
             message: message.into(),
@@ -133,6 +137,7 @@ impl WsSession {
             let _span = actor.span.clone();
             let _guard = _span.enter();
             if Instant::now().duration_since(actor.last_heartbeat) > CLIENT_TIMEOUT {
+                actor.close_reason.set("heartbeat_timeout");
                 warn!("heartbeat timed out");
                 ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Normal)));
                 ctx.stop();
@@ -169,7 +174,7 @@ impl Actor for WsSession {
         if let Some(registry) = &self.registry {
             registry.unregister_connection(self.conn_id);
         }
-        info!("stopped");
+        info!(reason = self.close_reason.get(), "stopped");
     }
 }
 
@@ -255,75 +260,74 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                 let _span = actor.span.clone();
                                 let _guard = _span.enter();
                                 match res {
-                                Ok((version, game_snapshot, viewer)) => {
-                                    if let Some(registry) = &registry {
-                                        registry.subscribe(conn_id, Topic::Game { id: game_id });
-                                    }
-
-                                    // Ordering guarantee: ack then game_state
-                                    Self::send_json(
-                                        ctx,
-                                        &ServerMsg::Ack(Ack {
-                                            command: AckCommand::Subscribe,
-                                            topic: Topic::Game { id: game_id },
-                                        }),
-                                    );
-                                    Self::send_json(
-                                        ctx,
-                                        &ServerMsg::GameState(Box::new(GameStateMsg {
-                                            topic: Topic::Game { id: game_id },
-                                            version,
-                                            game: game_snapshot,
-                                            viewer,
-                                        })),
-                                    );
-                                }
-                                Err(err) => {
-                                    tracing::error!(
-                                        ?err,
-                                        game_id,
-                                        "subscribe failed"
-                                    );
-
-                                    match &err {
-                                        AppError::Forbidden { detail, .. } => {
-                                            Self::send_json(
-                                                ctx,
-                                                &ServerMsg::Error {
-                                                    code: ErrorCode::Forbidden,
-                                                    message: detail.clone(),
-                                                },
-                                            );
+                                    Ok((version, game_snapshot, viewer)) => {
+                                        if let Some(registry) = &registry {
+                                            registry
+                                                .subscribe(conn_id, Topic::Game { id: game_id });
                                         }
-                                        AppError::DbUnavailable { reason, .. } => {
-                                            let readiness = actor.app_state.readiness();
-                                            let transitioned = readiness.update_dependency(
-                                                DependencyName::Postgres,
-                                                DependencyCheck::Down {
-                                                    error: reason.clone(),
-                                                    latency: Duration::from_millis(0),
-                                                },
-                                            );
-                                            if transitioned {
-                                                readiness.wake_monitor();
+
+                                        // Ordering guarantee: ack then game_state
+                                        Self::send_json(
+                                            ctx,
+                                            &ServerMsg::Ack(Ack {
+                                                command: AckCommand::Subscribe,
+                                                topic: Topic::Game { id: game_id },
+                                            }),
+                                        );
+                                        Self::send_json(
+                                            ctx,
+                                            &ServerMsg::GameState(Box::new(GameStateMsg {
+                                                topic: Topic::Game { id: game_id },
+                                                version,
+                                                game: game_snapshot,
+                                                viewer,
+                                            })),
+                                        );
+                                    }
+                                    Err(err) => {
+                                        tracing::error!(?err, game_id, "subscribe failed");
+
+                                        match &err {
+                                            AppError::Forbidden { detail, .. } => {
+                                                Self::send_json(
+                                                    ctx,
+                                                    &ServerMsg::Error {
+                                                        code: ErrorCode::Forbidden,
+                                                        message: detail.clone(),
+                                                    },
+                                                );
                                             }
-                                            Self::send_json(
-                                                ctx,
-                                                &ServerMsg::Error {
-                                                    code: ErrorCode::ServiceUnavailable,
-                                                    message: reason.clone(),
-                                                },
-                                            );
-                                        }
-                                        _ => {
-                                            ctx.close(Some(ws::CloseReason::from(
-                                                ws::CloseCode::Error,
-                                            )));
-                                            ctx.stop();
+                                            AppError::DbUnavailable { reason, .. } => {
+                                                let readiness = actor.app_state.readiness();
+                                                let transitioned = readiness.update_dependency(
+                                                    DependencyName::Postgres,
+                                                    DependencyCheck::Down {
+                                                        error: reason.clone(),
+                                                        latency: Duration::from_millis(0),
+                                                    },
+                                                );
+                                                if transitioned {
+                                                    readiness.wake_monitor();
+                                                }
+                                                Self::send_json(
+                                                    ctx,
+                                                    &ServerMsg::Error {
+                                                        code: ErrorCode::ServiceUnavailable,
+                                                        message: reason.clone(),
+                                                    },
+                                                );
+                                            }
+                                            _ => {
+                                                actor.close_reason.set("internal_error");
+                                                ctx.close(Some(ws::CloseReason::from(
+                                                    ws::CloseCode::Error,
+                                                )));
+                                                ctx.stop();
+                                            }
                                         }
                                     }
                                 }
-                            }}),
+                            }),
                         );
                     }
 
@@ -354,6 +358,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 self.send_error_and_close(ctx, ErrorCode::BadRequest, "Binary not supported");
             }
             Ok(ws::Message::Close(reason)) => {
+                self.close_reason.set("clean");
                 ctx.close(reason);
                 ctx.stop();
             }
@@ -364,11 +369,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 self.last_heartbeat = Instant::now();
             }
             Err(ws::ProtocolError::Io(ref io_err)) => {
+                self.close_reason.set("abrupt_disconnect");
                 debug!(error = %io_err, "client disconnected abruptly");
                 ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Error)));
                 ctx.stop();
             }
             Err(err) => {
+                self.close_reason.set("protocol_error");
                 warn!(error = %err, "protocol error");
                 ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Error)));
                 ctx.stop();
@@ -412,59 +419,63 @@ impl Handler<HubEvent> for WsSession {
                         let _span = actor.span.clone();
                         let _guard = _span.enter();
                         match res {
-                        Ok((ver, game_snapshot, viewer)) => {
-                            Self::send_json(
-                                ctx,
-                                &ServerMsg::GameState(Box::new(GameStateMsg {
-                                    topic: Topic::Game { id: game_id },
-                                    version: ver,
-                                    game: game_snapshot,
-                                    viewer,
-                                })),
-                            );
-                        }
-                        Err(err) => {
-                            tracing::error!(?err, game_id, "build_game_state failed");
+                            Ok((ver, game_snapshot, viewer)) => {
+                                Self::send_json(
+                                    ctx,
+                                    &ServerMsg::GameState(Box::new(GameStateMsg {
+                                        topic: Topic::Game { id: game_id },
+                                        version: ver,
+                                        game: game_snapshot,
+                                        viewer,
+                                    })),
+                                );
+                            }
+                            Err(err) => {
+                                tracing::error!(?err, game_id, "build_game_state failed");
 
-                            match &err {
-                                AppError::Forbidden { .. } => {
-                                    // Protocol/auth error: keep socket open.
-                                    Self::send_json(
-                                        ctx,
-                                        &ServerMsg::Error {
-                                            code: ErrorCode::Forbidden,
-                                            message: "Not a member of this game".to_string(),
-                                        },
-                                    );
-                                }
-                                AppError::DbUnavailable { reason, .. } => {
-                                    let readiness = actor.app_state.readiness();
-                                    let transitioned = readiness.update_dependency(
-                                        DependencyName::Postgres,
-                                        DependencyCheck::Down {
-                                            error: reason.clone(),
-                                            latency: Duration::from_millis(0),
-                                        },
-                                    );
-                                    if transitioned {
-                                        readiness.wake_monitor();
+                                match &err {
+                                    AppError::Forbidden { .. } => {
+                                        // Protocol/auth error: keep socket open.
+                                        Self::send_json(
+                                            ctx,
+                                            &ServerMsg::Error {
+                                                code: ErrorCode::Forbidden,
+                                                message: "Not a member of this game".to_string(),
+                                            },
+                                        );
                                     }
-                                    Self::send_json(
-                                        ctx,
-                                        &ServerMsg::Error {
-                                            code: ErrorCode::ServiceUnavailable,
-                                            message: reason.clone(),
-                                        },
-                                    );
-                                }
-                                _ => {
-                                    // Internal failure: close to avoid a "live but broken" session.
-                                    ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Error)));
-                                    ctx.stop();
+                                    AppError::DbUnavailable { reason, .. } => {
+                                        let readiness = actor.app_state.readiness();
+                                        let transitioned = readiness.update_dependency(
+                                            DependencyName::Postgres,
+                                            DependencyCheck::Down {
+                                                error: reason.clone(),
+                                                latency: Duration::from_millis(0),
+                                            },
+                                        );
+                                        if transitioned {
+                                            readiness.wake_monitor();
+                                        }
+                                        Self::send_json(
+                                            ctx,
+                                            &ServerMsg::Error {
+                                                code: ErrorCode::ServiceUnavailable,
+                                                message: reason.clone(),
+                                            },
+                                        );
+                                    }
+                                    _ => {
+                                        // Internal failure: close to avoid a "live but broken" session.
+                                        actor.close_reason.set("internal_error");
+                                        ctx.close(Some(ws::CloseReason::from(
+                                            ws::CloseCode::Error,
+                                        )));
+                                        ctx.stop();
+                                    }
                                 }
                             }
                         }
-                    }}),
+                    }),
                 );
             }
         }
@@ -475,6 +486,7 @@ impl Handler<Shutdown> for WsSession {
     type Result = ();
 
     fn handle(&mut self, _msg: Shutdown, ctx: &mut Self::Context) -> Self::Result {
+        self.close_reason.set("shutdown");
         if let Some(registry) = &self.registry {
             registry.unregister_connection(self.conn_id);
         }
