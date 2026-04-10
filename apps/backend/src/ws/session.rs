@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use actix::prelude::*;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, info_span, warn, Span};
 use uuid::Uuid;
 
 use crate::db::txn::SharedTxn;
@@ -81,6 +81,7 @@ pub struct WsSession {
     heartbeat_handle: Option<actix::SpawnHandle>,
 
     hello_done: bool,
+    span: Span,
 }
 
 impl WsSession {
@@ -101,6 +102,7 @@ impl WsSession {
             last_heartbeat: Instant::now(),
             heartbeat_handle: None,
             hello_done: false,
+            span: Span::none(),
         }
     }
 
@@ -128,12 +130,10 @@ impl WsSession {
 
     fn start_heartbeat(&mut self, ctx: &mut ws::WebsocketContext<Self>) {
         let handle = ctx.run_interval(HEARTBEAT_INTERVAL, |actor, ctx| {
+            let _span = actor.span.clone();
+            let _guard = _span.enter();
             if Instant::now().duration_since(actor.last_heartbeat) > CLIENT_TIMEOUT {
-                warn!(
-                    conn_id = %actor.conn_id,
-                    user_id = actor.user_id,
-                    "[WS SESSION] heartbeat timed out"
-                );
+                warn!("heartbeat timed out");
                 ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Normal)));
                 ctx.stop();
                 return;
@@ -148,11 +148,11 @@ impl Actor for WsSession {
     type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        info!(
-            conn_id = %self.conn_id,
-            user_id = self.user_id,
-            "[WS SESSION] started"
-        );
+        self.span = info_span!("ws_session", conn_id = %self.conn_id, user_id = self.user_id);
+        let _span = self.span.clone();
+        let _guard = _span.enter();
+
+        info!("started");
 
         if let Some(registry) = &self.registry {
             let recipient = ctx.address().recipient::<HubEvent>();
@@ -164,19 +164,19 @@ impl Actor for WsSession {
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
+        let _span = self.span.clone();
+        let _guard = _span.enter();
         if let Some(registry) = &self.registry {
             registry.unregister_connection(self.conn_id);
         }
-        info!(
-            conn_id = %self.conn_id,
-            user_id = self.user_id,
-            "[WS SESSION] stopped"
-        );
+        info!("stopped");
     }
 }
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+        let _span = self.span.clone();
+        let _guard = _span.enter();
         match msg {
             Ok(ws::Message::Ping(payload)) => {
                 self.last_heartbeat = Instant::now();
@@ -251,7 +251,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                 >((version, game_snapshot, viewer))
                             }
                             .into_actor(self)
-                            .map(move |res, actor, ctx| match res {
+                            .map(move |res, actor, ctx| {
+                                let _span = actor.span.clone();
+                                let _guard = _span.enter();
+                                match res {
                                 Ok((version, game_snapshot, viewer)) => {
                                     if let Some(registry) = &registry {
                                         registry.subscribe(conn_id, Topic::Game { id: game_id });
@@ -279,8 +282,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                     tracing::error!(
                                         ?err,
                                         game_id,
-                                        conn_id = %conn_id,
-                                        "[WS SESSION] subscribe failed"
+                                        "subscribe failed"
                                     );
 
                                     match &err {
@@ -321,7 +323,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                         }
                                     }
                                 }
-                            }),
+                            }}),
                         );
                     }
 
@@ -362,22 +364,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 self.last_heartbeat = Instant::now();
             }
             Err(ws::ProtocolError::Io(ref io_err)) => {
-                debug!(
-                    conn_id = %self.conn_id,
-                    user_id = self.user_id,
-                    error = %io_err,
-                    "[WS SESSION] client disconnected abruptly"
-                );
+                debug!(error = %io_err, "client disconnected abruptly");
                 ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Error)));
                 ctx.stop();
             }
             Err(err) => {
-                warn!(
-                    conn_id = %self.conn_id,
-                    user_id = self.user_id,
-                    error = %err,
-                    "[WS SESSION] protocol error"
-                );
+                warn!(error = %err, "protocol error");
                 ctx.close(Some(ws::CloseReason::from(ws::CloseCode::Error)));
                 ctx.stop();
             }
@@ -389,6 +381,8 @@ impl Handler<HubEvent> for WsSession {
     type Result = ();
 
     fn handle(&mut self, msg: HubEvent, ctx: &mut Self::Context) -> Self::Result {
+        let _span = self.span.clone();
+        let _guard = _span.enter();
         match msg {
             HubEvent::YourTurn { game_id, version } => {
                 Self::send_json(ctx, &ServerMsg::YourTurn { game_id, version });
@@ -414,7 +408,10 @@ impl Handler<HubEvent> for WsSession {
                         >((ver, game_snapshot, viewer))
                     }
                     .into_actor(self)
-                    .map(move |res, actor, ctx| match res {
+                    .map(move |res, actor, ctx| {
+                        let _span = actor.span.clone();
+                        let _guard = _span.enter();
+                        match res {
                         Ok((ver, game_snapshot, viewer)) => {
                             Self::send_json(
                                 ctx,
@@ -427,13 +424,7 @@ impl Handler<HubEvent> for WsSession {
                             );
                         }
                         Err(err) => {
-                            tracing::error!(
-                                ?err,
-                                conn_id = %actor.conn_id,
-                                user_id = actor.user_id,
-                                game_id,
-                                "[WS SESSION] build_game_state failed"
-                            );
+                            tracing::error!(?err, game_id, "build_game_state failed");
 
                             match &err {
                                 AppError::Forbidden { .. } => {
@@ -473,7 +464,7 @@ impl Handler<HubEvent> for WsSession {
                                 }
                             }
                         }
-                    }),
+                    }}),
                 );
             }
         }
