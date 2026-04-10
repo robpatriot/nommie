@@ -1,5 +1,5 @@
 use sea_orm::{DatabaseTransaction, EntityTrait};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use super::GameFlowService;
 use crate::ai::{create_ai, AiConfig};
@@ -310,7 +310,7 @@ impl GameFlowService {
                     return Ok(true);
                 }
                 Err(e) => {
-                    tracing::warn!(
+                    warn!(
                         game.id,
                         player_seat,
                         retry,

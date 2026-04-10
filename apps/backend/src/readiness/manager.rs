@@ -5,6 +5,7 @@ use parking_lot::RwLock;
 use serde_json::{json, Value};
 use time::OffsetDateTime;
 use tokio::sync::Notify;
+use tracing::{error, info, warn};
 
 use super::types::{
     CheckStatus, DependencyCheck, DependencyName, DependencyStatus, MigrationState, ServiceMode,
@@ -88,14 +89,14 @@ impl ReadinessManager {
         let mut should_wake = false;
 
         if ok {
-            tracing::info!("readiness: migrations completed successfully");
+            info!("readiness: migrations completed successfully");
         }
 
         if !ok {
             let previous = inner.mode;
             inner.mode = ServiceMode::Failed;
             if previous != ServiceMode::Failed {
-                tracing::error!(
+                error!(
                     previous_mode = %previous,
                     new_mode = %ServiceMode::Failed,
                     migration_error = error.as_deref().unwrap_or("unknown"),
@@ -141,7 +142,7 @@ impl ReadinessManager {
         let new_mode = compute_new_mode(&inner);
         if new_mode == ServiceMode::Healthy {
             inner.mode = new_mode;
-            tracing::info!(
+            info!(
                 previous_mode = %ServiceMode::Startup,
                 new_mode = %new_mode,
                 "readiness: service transitioned to Healthy (initial resolution)"
@@ -166,7 +167,7 @@ impl ReadinessManager {
 
         // Only Redis is intended to be optional/disable-able.
         if name != DependencyName::Redis {
-            tracing::warn!(
+            warn!(
                 dependency = %name,
                 "readiness: disable_dependency is only supported for Redis; ignoring request"
             );
@@ -191,7 +192,7 @@ impl ReadinessManager {
 
         if transitioned {
             inner.mode = new_mode;
-            tracing::info!(
+            info!(
                 previous_mode = %previous,
                 new_mode = %new_mode,
                 dependency = %name,
@@ -218,7 +219,7 @@ impl ReadinessManager {
         let current_mode = inner.mode;
 
         let Some(dep) = inner.dependencies.get_mut(&name) else {
-            tracing::error!(
+            error!(
                 dependency = %name,
                 "readiness: update_dependency called for unregistered dependency; ignoring update"
             );
@@ -248,7 +249,7 @@ impl ReadinessManager {
                     if dep.consecutive_successes >= RECOVERY_THRESHOLD {
                         dep.status = CheckStatus::Ok;
                         dep.consecutive_failures = 0;
-                        tracing::info!(
+                        info!(
                             dependency = %name,
                             recovery_threshold = RECOVERY_THRESHOLD,
                             "readiness: dependency recovered (threshold met)"
@@ -262,7 +263,7 @@ impl ReadinessManager {
                     dep.consecutive_failures = 0;
 
                     if dep.consecutive_successes == 1 && current_mode != ServiceMode::Startup {
-                        tracing::info!(
+                        info!(
                             dependency = %name,
                             "readiness: dependency check succeeded"
                         );
@@ -272,7 +273,7 @@ impl ReadinessManager {
                         && prev_successes < RECOVERY_THRESHOLD
                         && current_mode != ServiceMode::Startup
                     {
-                        tracing::info!(
+                        info!(
                             dependency = %name,
                             recovery_threshold = RECOVERY_THRESHOLD,
                             "readiness: dependency recovered (threshold met)"
@@ -288,7 +289,7 @@ impl ReadinessManager {
 
                 if dep.consecutive_failures == 1 {
                     dep.last_error = Some(error.clone());
-                    tracing::warn!(
+                    warn!(
                         dependency = %name,
                         error = %error,
                         "readiness: first dependency failure detected"
@@ -315,7 +316,7 @@ impl ReadinessManager {
 
             match new_mode {
                 ServiceMode::Healthy => {
-                    tracing::info!(
+                    info!(
                         previous_mode = %previous,
                         new_mode = %new_mode,
                         "readiness: service transitioned to Healthy"
@@ -328,7 +329,7 @@ impl ReadinessManager {
                         .filter(|d| d.consecutive_failures >= FAILURE_THRESHOLD)
                         .map(|d| format!("{}", d.name))
                         .collect();
-                    tracing::error!(
+                    error!(
                         previous_mode = %previous,
                         new_mode = %new_mode,
                         failing_dependencies = ?failing,
@@ -341,7 +342,7 @@ impl ReadinessManager {
                     }
                 }
                 _ => {
-                    tracing::info!(
+                    info!(
                         previous_mode = %previous,
                         new_mode = %new_mode,
                         "readiness: mode transition"
@@ -377,7 +378,7 @@ impl ReadinessManager {
         }
 
         let Some(dep) = inner.dependencies.get_mut(&name) else {
-            tracing::error!(
+            error!(
                 dependency = %name,
                 "readiness: authoritative ok called for unregistered dependency; ignoring update"
             );
@@ -397,7 +398,7 @@ impl ReadinessManager {
         dep.consecutive_successes = RECOVERY_THRESHOLD;
 
         if was_recovering {
-            tracing::info!(
+            info!(
                 dependency = %name,
                 recovery_threshold = RECOVERY_THRESHOLD,
                 "readiness: dependency recovered from authoritative signal"
@@ -412,7 +413,7 @@ impl ReadinessManager {
             inner.mode = new_mode;
             match new_mode {
                 ServiceMode::Healthy => {
-                    tracing::info!(
+                    info!(
                         previous_mode = %previous,
                         new_mode = %new_mode,
                         dependency = %name,
@@ -420,7 +421,7 @@ impl ReadinessManager {
                     );
                 }
                 ServiceMode::Recovering => {
-                    tracing::error!(
+                    error!(
                         previous_mode = %previous,
                         new_mode = %new_mode,
                         dependency = %name,
@@ -428,7 +429,7 @@ impl ReadinessManager {
                     );
                 }
                 _ => {
-                    tracing::info!(
+                    info!(
                         previous_mode = %previous,
                         new_mode = %new_mode,
                         dependency = %name,

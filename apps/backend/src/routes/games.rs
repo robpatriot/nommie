@@ -5,7 +5,7 @@ use sea_orm::TransactionTrait;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use time::format_description::well_known::Rfc3339;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::ai::registry;
 use crate::db::txn::with_txn;
@@ -854,7 +854,7 @@ fn spawn_bg_game_flow_drain_and_publish(app_state: web::Data<AppState>, game_id:
         let db = match crate::db::require_db(&app_state) {
             Ok(db) => db,
             Err(err) => {
-                tracing::error!(
+                error!(
                     game_id,
                     error = %err,
                     "Failed to get database connection for background game flow"
@@ -867,7 +867,7 @@ fn spawn_bg_game_flow_drain_and_publish(app_state: web::Data<AppState>, game_id:
         let txn = match db.begin().await {
             Ok(txn) => txn,
             Err(err) => {
-                tracing::error!(
+                error!(
                     game_id,
                     error = %err,
                     "Failed to begin transaction for background game flow"
@@ -882,7 +882,7 @@ fn spawn_bg_game_flow_drain_and_publish(app_state: web::Data<AppState>, game_id:
         match flow_res {
             Ok(flow_opt) => {
                 if let Err(err) = txn.commit().await {
-                    tracing::error!(
+                    error!(
                         game_id,
                         error = %err,
                         "Failed to commit transaction after background game flow"
@@ -901,7 +901,7 @@ fn spawn_bg_game_flow_drain_and_publish(app_state: web::Data<AppState>, game_id:
                     )
                     .await
                     {
-                        tracing::error!(
+                        error!(
                             game_id,
                             error = %err,
                             "Failed to publish mutation effects after background game flow"
@@ -910,7 +910,7 @@ fn spawn_bg_game_flow_drain_and_publish(app_state: web::Data<AppState>, game_id:
                 }
             }
             Err(err) => {
-                tracing::error!(
+                error!(
                     game_id,
                     error = %err,
                     "Background game flow failed"
@@ -1732,7 +1732,7 @@ async fn publish_snapshot_with_lock(
 
     if let Some(realtime) = app_state.realtime() {
         if let Err(err) = realtime.publish_game_state(game_id, version).await {
-            tracing::error!(
+            error!(
                 game_id,
                 version,
                 error = %err,
@@ -1791,7 +1791,7 @@ async fn publish_game_mutation_effects(
                 (seat_map, ids)
             }
             Err(err) => {
-                tracing::warn!(
+                warn!(
                     game_id,
                     error = %err,
                     "Failed to load memberships for mutation effects. YourTurn and long_wait notifications may be skipped."
@@ -1810,7 +1810,7 @@ async fn publish_game_mutation_effects(
                         .publish_your_turn(*user_id, game_id, final_version)
                         .await
                     {
-                        tracing::error!(
+                        error!(
                             game_id,
                             final_version,
                             user_id,
@@ -1841,7 +1841,7 @@ async fn publish_game_mutation_effects(
                 .publish_long_wait_invalidated(user_id, game_id)
                 .await
             {
-                tracing::error!(
+                error!(
                     game_id,
                     user_id,
                     error = %err,

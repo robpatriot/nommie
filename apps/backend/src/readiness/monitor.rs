@@ -1,6 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use tracing::{error, info};
+
 use crate::infra::state::resolve_dependencies;
 use crate::readiness::types::ServiceMode;
 use crate::state::app_state::AppState;
@@ -17,9 +19,9 @@ const RECOVERY_MAX_INTERVAL: Duration = Duration::from_secs(30);
 /// Single long-lived task responsible for both startup and recovery monitoring.
 pub fn spawn_monitor(state: Arc<AppState>) {
     tokio::spawn(async move {
-        tracing::info!("readiness: starting dependency monitor");
+        info!("readiness: starting dependency monitor");
         run_monitor(&state).await;
-        tracing::info!("readiness: dependency monitoring complete – polling stopped");
+        info!("readiness: dependency monitoring complete – polling stopped");
     });
 }
 
@@ -43,7 +45,7 @@ async fn run_monitor(state: &AppState) {
             // `Failed` comes from a hard dependency/migration failure
             // (via `set_migration_result(false, ...)` inside `resolve_dependencies`).
             ServiceMode::Failed => {
-                tracing::info!(
+                info!(
                     "readiness: monitor stopping – service in failed mode (dependency or readiness manager failure)"
                 );
                 break;
@@ -57,7 +59,7 @@ async fn run_monitor(state: &AppState) {
                 // Authoritative resolution attempt - handles both pinging and reconnecting.
                 if resolve_dependencies(state).await.is_err() {
                     // Terminal error; readiness state already updated to Failed.
-                    tracing::error!(
+                    error!(
                         "readiness: monitor stopping due to terminal dependency resolution error"
                     );
                     break;
@@ -72,9 +74,7 @@ async fn run_monitor(state: &AppState) {
                 }
 
                 if after_mode == ServiceMode::Failed {
-                    tracing::info!(
-                        "readiness: monitor stopping – service entered permanent failed state"
-                    );
+                    info!("readiness: monitor stopping – service entered permanent failed state");
                     break;
                 }
 

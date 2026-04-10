@@ -2,6 +2,7 @@ use actix_web::http::StatusCode;
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use serde_with::rust::double_option;
+use tracing::info;
 
 use crate::db::txn::with_txn;
 use crate::entities::user_options::{ColourScheme, Theme, UserLocale};
@@ -85,13 +86,13 @@ async fn update_user_options(
     let payload = body.into_inner();
 
     if let Some(Some(ref locale)) = payload.locale {
-        tracing::info!(
+        info!(
             user_id = user_id,
             locale = locale.as_str(),
             "user_options.locale_updated"
         );
     } else if payload.locale.is_some() {
-        tracing::info!(user_id = user_id, "user_options.locale_unset");
+        info!(user_id = user_id, "user_options.locale_unset");
     }
 
     // Allow request if any field is provided (including locale/trick_duration explicitly set to null)
